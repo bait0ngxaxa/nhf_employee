@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { sendEmail } from "@/lib/email";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
-import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth/rate-limit";
+import { reserveAuthAttempt } from "@/lib/auth/rate-limit";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth/ssot";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
@@ -41,17 +41,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             ipAddress: metadata.ipAddress,
         };
 
-        if (
-            isAuthRateLimited(rateLimitInput, FORGOT_PASSWORD_RATE_LIMIT_POLICY)
-        ) {
+        const authReservation = reserveAuthAttempt(
+            rateLimitInput,
+            FORGOT_PASSWORD_RATE_LIMIT_POLICY,
+        );
+        if (!authReservation) {
             return acceptedResponse();
         }
 
-        const resetRequest = await requestPasswordReset(normalizedEmail);
+        let resetRequest: Awaited<ReturnType<typeof requestPasswordReset>>;
+        try {
+            resetRequest = await requestPasswordReset(normalizedEmail);
+        } catch (error) {
+            authReservation.release();
+            throw error;
+        }
+
         if (resetRequest.rateLimited) {
+            authReservation.release();
             return acceptedResponse();
         }
-        recordAuthAttempt(rateLimitInput, FORGOT_PASSWORD_RATE_LIMIT_POLICY);
+
+        authReservation.commit();
         if (!resetRequest.rawToken || !resetRequest.user) {
             return acceptedResponse();
         }

@@ -1612,3 +1612,423 @@ record above.
 
 On Windows PowerShell, `npm.ps1` is blocked by the local execution policy, so
 all npm script verification above used the equivalent `npm.cmd` command.
+
+## 19. L2 implementation / closure
+
+L2 was implemented from reviewed baseline `266a869707857401204498736a6d44a1a602ab6b`.
+Phase L0 and Phase L1 were already closed. This section is the authoritative
+record for L2 and does not rewrite the historical L0/L1 findings above.
+
+### 19.1 Gate A — complete abuse-control inventory
+
+The repository-wide caller inventory was performed for
+`isAuthRateLimited`, `recordAuthAttempt`, `clearAuthIdentityRateLimit`,
+`enforcePreAuthIpRateLimit`, `enforceAuthenticatedMutationRateLimit`, and
+`getTrustedClientIp`. The application-level controls found are:
+
+| Control | Current owner and behavior | Failure/abuse boundary |
+| --- | --- | --- |
+| Auth identity/IP limiter | `lib/auth/rate-limit.ts`; process-local `Map`, fixed windows, normalized identity, and a valid trusted-IP value or `unknown` bucket | Login, signup, and forgot-password budgets; reset clears the map |
+| Mutation limiter | `lib/security/mutation-rate-limit.ts`; process-local `Map`, fixed windows, synchronous consumption, periodic/at-cap expiry cleanup, and a 50,000-entry ceiling | Pre-auth trusted-IP and authenticated user budgets; new keys fail closed at capacity |
+| Trusted mutation check | `withTrustedMutation` checks the existing trusted Origin / `X-Requested-With` contract on browser mutations | Rejects untrusted mutation requests before the route handler; it is not a quota |
+| Request body limits | `lib/server/request-body.ts` and module HTTP helpers bound the body stream; Leave and Stock JSON are 32 KiB, Routine is 64 KiB, and LINE auth is 16 KiB | Oversized or malformed bodies return the existing 413/400 responses |
+| Leave attachments | Maximum three files, 8 MiB per file, 20 MiB total, 25,000,000-byte request bound, and allowlisted image formats/dimensions | Bound before/while multipart processing; private storage and orphan cleanup remain in the Leave module |
+| Database password-reset budget | `PasswordResetToken` rows are counted in the existing one-hour, three-request database check before a new token is created | The database result is a separate durable control; rate-limited, unknown, inactive, and email-send-failure paths retain accepted anti-enumeration behavior |
+| Mutation idempotency and state constraints | Leave, Stock, and Routine create flows use caller idempotency keys with database uniqueness/request-hash or state/version rules; Email Request has its existing idempotency service | Prevents retried requests from creating duplicate business effects; it is not a request-rate budget |
+| Reverse-proxy limits | The supported Nginx example sets `client_max_body_size 25m` and `client_body_timeout 30s` | Applies only when traffic reaches Nginx; direct Next.js exposure is unsupported |
+
+The following are application mutation endpoints with no application-level
+rate-limit call after the repository-wide search: Employee create/update/delete
+and other Employee reads, Email Request mutations, webhook handlers, cleanup
+endpoints, and scheduled maintenance endpoints. They retain their existing
+authentication/authorization, validation, secret, audit, idempotency, or
+provider controls. L2 does not add a speculative quota to them.
+
+#### Auth endpoint inventory
+
+The response shorthand in this table is exact:
+
+- `M429` means status `429`, body
+  `{ "error": "มีคำขอมากเกินไป กรุณาลองใหม่ภายหลัง" }`,
+  `Cache-Control: no-store`, `Retry-After` equal to the remaining fixed-window
+  seconds (at least one), `X-RateLimit-Limit` equal to the scope maximum, and
+  `X-RateLimit-Remaining: 0`.
+- `L429` means status `429`, body `{ "error": "Unauthorized" }`, with no
+  `Retry-After` or `X-RateLimit-*` headers.
+- `S429` means status `429`, body `{ "error": "ลองใหม่อีกครั้งภายหลัง" }`,
+  with no rate-limit headers.
+- `FOK` means status `200` and the unchanged accepted body
+  `{ "success": true, "message": "หากอีเมลนี้มีอยู่ในระบบ คุณจะได้รับลิงก์รีเซ็ตรหัสผ่านทางอีเมล" }`.
+
+| Endpoint and owner | Authentication state and scope/key | Window and maximum | Count timing, success clearing, and independent controls | Limited response / IP and restart contract |
+| --- | --- | --- | --- | --- |
+| `POST /api/auth/hybrid-login`, Auth; identity bucket | Pre-auth request with normalized `trim().toLowerCase()` email; `login:identity:<email>` | Fixed 15 minutes; 8 failed credentials | L2 reserves synchronously before asynchronous authentication, commits only `invalidCredentials`, and releases on success or authentication exception. Success does not clear prior failures. `LOGIN_FAILED` Audit behavior is unchanged. | `L429`; IP is not part of this key. Missing trusted IP is handled by the separate IP bucket. Process restart clears state; independent processes do not share it. |
+| `POST /api/auth/hybrid-login`, Auth; IP bucket | Pre-auth request; `login:ip:<trusted CF IP or unknown>` | Fixed 15 minutes; 40 failed credentials | The same reservation commits/releases with the identity reservation. The route also consumes the generic `auth-login` pre-auth mutation budget for every request before JSON parsing. | `L429` for the identity/IP Auth bucket; the generic pre-auth bucket is `M429`. No Auth-map success clearing. |
+| `POST /api/auth/signup`, Auth; identity and IP buckets | Valid schema input; normalized email identity and `signup:ip:<trusted CF IP or unknown>` | Fixed 1 hour; identity 5, IP 25 | `recordAuthAttempt` occurs before `signupAccount`. Validation failures occur before the Auth limiter. Successful account creation clears only the identity bucket; it never clears the IP bucket. Eligibility, duplicate-account, and other account-creation failures remain counted. Database uniqueness remains the final duplicate constraint. | `S429`; no `Retry-After` or `X-RateLimit-*`. Missing trusted IP uses the shared `unknown` bucket. Restart/process isolation is process-local. |
+| `POST /api/auth/forgot-password`, Auth recovery; identity and IP buckets | Valid schema input; normalized email identity and `forgot-password:ip:<trusted CF IP or unknown>` | Fixed 1 hour; identity 3, IP 30 | L2 reserves before the asynchronous database request. A database `rateLimited` result releases the reservation to avoid double-counting the same request; unknown/inactive and known-account results commit. No success clears the bucket. The durable `PasswordResetToken` three-per-hour check remains independent. | Schema-invalid parsed input, unknown/inactive, application-limited, database-limited, and email-send-failure outcomes preserve `FOK`; malformed JSON retains the existing generic 500 handler. No account existence is disclosed. Restart/process isolation is process-local. |
+| `POST /api/auth/refresh`, Auth; generic pre-auth IP bucket | Trusted mutation; `pre-auth:auth-refresh:ip:<trusted CF IP or unknown>` | Fixed 15 minutes; 300 requests | Consumed before refresh work. No identity Auth-map bucket and no success clearing. Refresh rotation, `concurrentCompletion`, five-second completion window, reuse containment, cookie behavior, and reuse Audit behavior remain the L1 contract. | `M429`; exact L1 refresh responses remain otherwise unchanged. Restart/process isolation is process-local. |
+
+At the reviewed baseline, hybrid login and forgot-password used a separate
+`isAuthRateLimited` check followed by asynchronous work and
+`recordAuthAttempt`; the final implementation uses the reservation primitive
+for those two failed-authentication flows. Signup intentionally retains its
+record-before-business semantics. `clearAuthIdentityRateLimit` has one
+production caller, successful signup, and clears only the identity key.
+
+`POST /api/auth/reset-password`, logout, logout-all, session revoke, session
+cleanup, and the Auth/LINE identity endpoints have no application-level
+rate-limit caller. Reset-password instead relies on the existing hashed,
+expiring, one-time token claim and transactional password/session invalidation;
+the other endpoints retain their existing authentication, authorization,
+trusted-mutation, body-limit, token, or secret controls. This inventory result
+is intentional; L2 does not add a quota to unrelated Auth or LINE endpoints.
+
+#### Business mutation inventory
+
+All mutation limiter responses are `M429`. Successful requests do not emit
+rate-limit headers and do not clear a bucket. Pre-auth keys use the only
+application client-IP source, `getTrustedClientIp(request.headers)`; the
+authenticated keys use the server-authenticated `auth.user.id`, never a
+client-supplied user ID. Both maps remain fixed-window and process-local.
+
+| Capability owner and production callers | Pre-auth trusted-IP scope (15-minute maximum) | Authenticated user scope (1-minute maximum) | Timing and independent business control |
+| --- | --- | --- | --- |
+| Leave dashboard and Leave LIFF: `app/api/leave/request`, `cancel`, `decision`, `not-taken`, and corresponding `app/api/line/leave/*` routes | `leave-request-create` 60; `leave-cancel` 120; `leave-decision` 120; `leave-not-taken` 120 | Same scopes: 10, 20, 20, 20 respectively | Pre-auth consumption is before authentication/business execution; authenticated consumption is after server authentication and before the mutation handler. Leave request creation retains idempotency, quota/status checks, and transaction rules. |
+| Stock dashboard and Stock LIFF: request create, request cancel, request issue/review, and item adjust routes under `app/api/stock/*` and `app/api/line/stock/*` | `stock-adjust` 300; `stock-request-create` 300; `stock-request-cancel` 300; `stock-request-issue` 300 | Same scopes: 30, 10, 20, 30 respectively | Pre-auth consumption happens before authentication; authenticated consumption remains at the existing route-specific point after auth and required input/header validation, before business mutation. Stock request creation retains `Idempotency-Key`, request-hash, uniqueness, serializable/locking, and state rules. Review selects the existing cancel/issue scope. |
+| Routine dashboard: task create/update/delete, occurrence admin edits, and import preview/apply/cancel/row routes under `app/api/routines/*`; Routine LIFF task create/update/delete under `app/api/line/routine/*` | Policies exist for `routine-task-create` 60, `routine-task-update` 120, `routine-task-delete` 60, `routine-occurrence-admin` 180, and `routine-import` 30, but no current production Routine route calls the pre-auth function | `routine-task-create` 20; `routine-task-update` 40; `routine-task-delete` 20; `routine-occurrence-admin` 60; `routine-import` 12 | Current Routine production callers consume only the authenticated user scope after server authentication and before the business handler. Existing task idempotency, import staging/state/version, and authorization remain owned by Routine. The unused pre-auth policies are inventory/configuration, not evidence of active protection. |
+
+The mutation map cleanup runs before capacity denial when the cleanup
+interval has elapsed or the map reaches capacity. It removes entries whose
+fixed window has expired. If 50,000 live entries remain, a new key is denied
+closed with the policy window as `Retry-After`; an existing key is still
+evaluated against its own quota. `unknown` is one shared pre-auth key per
+scope, not a per-request fallback identity.
+
+#### Trusted-IP helper caller inventory
+
+`getTrustedClientIp` has these production responsibilities: mutation
+pre-auth keys; Auth session/audit metadata in
+`lib/auth/hybrid/session.ts` and `lib/server/audit.ts`; Routine command actor
+metadata; Stock command actor metadata; and Employee create/update/delete
+audit actor metadata. It accepts only a syntactically valid single
+`CF-Connecting-IP` value. It rejects missing, malformed, and comma-separated
+values and ignores `X-Forwarded-For`, `X-Real-IP`, `True-Client-IP`, and other
+forwarding headers. These audit metadata callers do not create a rate-limit
+fallback from those headers.
+
+### 19.2 Gate B — supported production topology
+
+Repository evidence was reconciled across `README.md`,
+`docs/leave-attachments-deployment.md`, both Cloudflare Tunnel guides,
+`docker-compose.yml`, `docker-compose.integration.yml`, the Nginx examples,
+`package.json`, `next.config.ts`, and the repository-wide deployment/config
+search.
+
+The current supported production topology is:
+
+```text
+Internet → Cloudflare → Nginx :443 → one Next.js process at 127.0.0.1:3000
+                                      ↓
+                                  MySQL :3308
+                                      ↓
+                              persistent local .uploads/
+```
+
+`docker-compose.yml` supplies MySQL only. There is one Nginx upstream address,
+no PM2/systemd/supervisor configuration that declares a cluster, and no
+environment variable that selects an application process count. The
+production `start` script now explicitly runs `next start --hostname
+127.0.0.1`; a supervisor may restart that one process but must not run PM2
+cluster mode or multiple application workers.
+
+The explicit answers to the topology gate are:
+
+1. **One Next.js process is the current supported production invariant:** yes.
+2. **PM2 cluster mode is supported:** no; PM2 is acceptable only as a
+   single-process supervisor.
+3. **Multiple app processes behind Nginx are supported:** no.
+4. **Multiple hosts are supported:** no.
+5. **Does local upload storage constrain instances:** yes. The current local
+   `.uploads/` deployment needs one instance, or a separately designed shared
+   filesystem/object-storage contract before any scale-out.
+6. **Does a documented deployment require rate-limit counters to survive
+   restart:** no. Supervisor restart/reboot is documented for process
+   availability, not counter durability.
+7. **Is horizontal scale a current production requirement:** no. It is a
+   future architectural possibility with explicit prerequisites.
+
+It is technically possible to start additional Node processes or point a
+Tunnel directly at port 3000, but those are not supported deployment modes.
+The direct `localhost:3000` Tunnel examples are now labeled as operator
+configuration that bypasses the supported Nginx trust boundary. Before any
+future multi-instance deployment, the limiter state, upload storage, health
+behavior, cleanup, failure policy, and integration tests must be redesigned
+and accepted together.
+
+There is no current operational requirement for Auth or mutation counters to
+survive a process restart. Restart clearing is therefore an explicit accepted
+tradeoff for the current burst/brute-force controls, not an accidental claim
+of durable enforcement.
+
+### 19.3 Gate C — concurrency, restart, and capacity characterization
+
+The baseline focused limiter command passed 3 files / 14 tests before the
+implementation. The controlled hybrid-login barrier then established the
+pre-fix behavior: ten parallel invalid requests for the same normalized
+identity and IP all passed the eligibility check and completed as `401`, even
+though the identity budget was eight. The next request was `429`. The
+observable identity overshoot was therefore **two requests** in that run
+(10 admitted versus 8), caused by the check → asynchronous authentication →
+record gap. With more concurrently admitted work, the overshoot was bounded
+only by the number of requests that could pass the check and by the separate
+IP budget, not by the eight-failure identity budget.
+
+The final reservation test uses the same deterministic barrier and admits
+exactly eight invalid authentication calls; the remaining two return `429`
+before authentication. The reservation check and both bucket increments are
+synchronous within one JavaScript execution turn. A successful authentication
+or an authentication exception releases both reservations, while an invalid
+credential commits both. This preserves failed-attempt semantics and avoids
+counting successful logins as failures.
+
+The focused Auth characterization covers:
+
+- normalized identity isolation, same-identity/different-IP behavior, and
+  same-IP/different-identity behavior;
+- sequential and parallel exact boundaries;
+- success release, signup identity-only clearing with IP retention, and
+  fixed-window expiry;
+- unknown-IP sharing and explicit reset behavior; and
+- forgot-password invalid, unknown, known, application-limited, and
+  database-limited accepted responses.
+
+The focused mutation characterization proves the exact boundary for each
+key, synchronous simultaneous consumption, scope isolation, authenticated
+user isolation behind one IP, trusted-IP isolation, fixed-window reset,
+unknown-client sharing, cleanup before capacity denial, and process reset.
+The capacity test fills all 50,000 live entries with unique pre-auth IPs in a
+single bounded loop, then proves that an unrelated authenticated user's new
+key is denied. After the 15-minute expiry, cleanup runs and a new key is
+accepted. This demonstrates that one source can exhaust the shared map
+capacity across capabilities; it does not increase the ceiling. Each first
+seen unique key is inserted on its first synchronous consume, so 50,000
+unique-key requests within the window are sufficient to fill the map; there
+is no separate novelty fill-rate quota. The map is bounded at 50,000 entries,
+but the repository does not claim a portable byte measurement because V8
+string/map overhead is runtime-specific.
+
+`consume()` has no `await`, so concurrent calls to one module instance cannot
+interleave between its check and increment. Separate isolated module-instance
+tests show the converse topology property: each instance starts with an
+independent Auth and mutation map. A process restart creates the same fresh
+state, and the exported test reset functions make that contract explicit.
+No production server was spawned for this characterization.
+
+### 19.4 Gate D — Cloudflare/Nginx/application client-IP boundary
+
+Before L2, `deployment/nginx/employee_nhf.cloudflare-origin.conf` included
+the Cloudflare source ranges and configured:
+
+```nginx
+real_ip_header CF-Connecting-IP;
+real_ip_recursive on;
+```
+
+but did not overwrite the application-facing `CF-Connecting-IP` header. Nginx
+therefore used its real-IP module to derive `$remote_addr` for Nginx-side
+behavior while the upstream could still receive the original incoming header.
+If that origin were directly reachable and a caller sent
+`CF-Connecting-IP: 203.0.113.x`, the application helper would accept that
+syntactically valid spoofed value even though the peer was not an authorized
+Cloudflare source.
+
+The Nginx configuration now explicitly sets:
+
+```nginx
+proxy_set_header CF-Connecting-IP $remote_addr;
+```
+
+after the real-IP directives. With `set_real_ip_from` restricted to the
+Cloudflare ranges, a request from an authorized Cloudflare edge gets the
+canonical client address; a direct untrusted peer does not get to rewrite
+`$remote_addr` using its header and the application receives the peer address
+instead of the spoofed value. The application still ignores arbitrary
+forwarding headers. A static Nginx regression test checks the include,
+real-IP directives, loopback upstream, and overwrite invariant.
+
+This correction depends on the origin reachability invariant: port 3000 must
+remain loopback-only and the origin firewall must not expose a bypass. A
+Cloudflare Tunnel pointed directly at `localhost:3000` bypasses this Nginx
+canonicalization and is therefore not supported for production under this
+record. If Tunnel is required, it must not point directly at port 3000; routing
+through Nginx still requires an operator-verified trusted tunnel-to-Nginx
+client-IP contract. The repository configuration trusts the listed Cloudflare
+source ranges, not local `cloudflared`, by default. Cloudflare dashboard,
+tunnel ingress, and firewall state cannot be verified from this repository and
+remain operator acceptance requirements.
+
+The Nginx behavior was checked against the official real-IP and proxy-header
+contracts: [NGINX realip module](https://nginx.org/en/docs/http/ngx_http_realip_module.html),
+[NGINX proxy module](https://nginx.org/en/docs/http/ngx_http_proxy_module.html),
+and [Cloudflare `CF-Connecting-IP`](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip).
+
+#### Unknown-client policy
+
+The selected policy deliberately retains the current shared `unknown` bucket
+for missing or malformed trusted client identity. It is predictable and
+fail-closed at the existing per-scope budget, but unrelated clients can share
+that quota. Supported production traffic should never reach this state after
+Nginx canonicalization. Local development and tests may use it intentionally;
+internal/direct Next.js access, malformed headers, and accidental direct-origin
+traffic use it rather than falling back to an untrusted forwarding header.
+Operators recover from an unexpected `unknown` flood by restoring the
+supported proxy/firewall path, not by enabling header fallback. Public
+responses do not reveal this infrastructure detail.
+
+### 19.5 Selected architecture and rejected alternatives
+
+L2 selects **Option 1: retain process-local counters under an explicit
+single-process production invariant**, with two minimal corrections:
+
+1. Auth failed-attempt reservations close the confirmed asynchronous
+   check/record race without changing what counts as a failed attempt.
+2. The production start command, Nginx header contract, deployment checklist,
+   and Tunnel guidance make the single-process and trusted-IP invariants
+   operationally visible.
+
+This is the smallest production-safe correction supported by the evidence:
+the repository currently documents one app process, has no current
+requirement for restart-persistent counters or horizontal scale, and already
+has useful low-cost fixed-window controls. Mutation quotas, capacity, route
+URLs, response statuses, Thai wording, authentication, authorization,
+CSRF/trusted mutation behavior, L1 refresh/session behavior, LIFF, Email
+Request, Notification, and Outbox behavior remain unchanged.
+
+Rejected alternatives:
+
+- **Redis or another shared service:** no current supported multi-process or
+  multi-host requirement justifies its availability, deployment, monitoring,
+  failure, cleanup, and local/test dependency cost in this phase.
+- **A MySQL/Prisma rate-limit table:** the current invariant does not require
+  durable counters; adding one would introduce write amplification, cleanup
+  and index design, transaction contention, fixed-window atomicity and outage
+  decisions, migration/rollback work, and latency on every protected request.
+- **Cloudflare Rate Limiting as the application fix:** the repository cannot
+  verify or own the required Cloudflare account policy, and edge controls
+  would not replace authenticated per-user mutation quotas or Auth identity
+  semantics.
+- **Counting every login request:** rejected because it would silently change
+  failed-attempt semantics and charge successful/invalid-payload requests to
+  the identity failure budget. The reservation model preserves the existing
+  `invalidCredentials` counting contract.
+- **An in-memory Promise lock:** rejected as a general scale solution because
+  it would still be process-local, would add request coordination complexity,
+  and would not solve restart or multi-instance bypass. The synchronous
+  reservation is sufficient for the supported one-process event loop.
+
+No new npm dependency, Prisma schema, migration, external service, or shared
+backend was introduced. The only runtime deployment changes are the explicit
+loopback `start` binding and the Nginx application-header overwrite.
+
+### 19.6 Exact final contracts and failure modes
+
+- Auth identity and IP buckets remain fixed windows. Identity normalization is
+  trim/lowercase; trusted IP normalization is trim plus Node IP syntax
+  validation in `getTrustedClientIp`. Auth-map limited responses retain their
+  endpoint-specific status/body and emit no new rate headers.
+- Hybrid login counts only invalid/inactive credential outcomes returned as
+  `invalidCredentials`; successful login releases the reservation, does not
+  clear previous committed failures, and retains the existing `LOGIN_FAILED`
+  Audit event. Parallel admission is bounded by the configured identity and
+  IP budgets within one process.
+- Signup still records before account creation, clears only the identity
+  bucket on success, and leaves IP pressure intact. Validation, eligibility,
+  duplicate-account, and status behavior remain unchanged.
+- Forgot-password remains anti-enumerating. Schema-invalid parsed input does
+  not consume the application bucket; valid unknown/inactive and known
+  requests have the same accepted response; database-limited requests release
+  the application reservation and retain the accepted response; email errors
+  remain accepted after a committed valid request. A malformed JSON stream
+  still follows the pre-existing outer error handler and returns its generic
+  500 failure response without performing an account lookup.
+- Refresh keeps every L1 rotation and reuse rule. Only its existing generic
+  pre-auth IP budget is in L2 inventory.
+- Leave, Stock, and Routine retain their existing scope names, windows,
+  maximums, authenticated-user isolation, business authorization, and
+  idempotency/state constraints. The mutation response remains `M429` with
+  its existing Thai body and headers.
+- Missing/malformed application client IP remains the shared `unknown` key;
+  no arbitrary forwarding-header fallback exists.
+- Auth and mutation maps have no backend failure path and clear on process
+  restart. Mutation capacity fails closed for new keys after expiry cleanup;
+  the 50,000 ceiling is unchanged. A full map can deny unrelated new keys,
+  which is an accepted bounded risk under the single-process contract and is
+  now explicitly documented.
+- The process-local state is not horizontally scalable. Enabling cluster,
+  multiple app instances, or multiple hosts requires a future shared atomic
+  limiter and shared upload-storage design; this record does not claim that
+  capability exists.
+
+### 19.7 Deployment, schema, and compatibility record
+
+Changed deployment/runtime files:
+
+- `package.json`: `npm run start` now binds Next.js to `127.0.0.1`.
+- `deployment/nginx/employee_nhf.cloudflare-origin.conf`: Nginx overwrites
+  upstream `CF-Connecting-IP` from canonical `$remote_addr`.
+- `README.md`, `docs/leave-attachments-deployment.md`,
+  `CLOUDFLARE_TUNNEL_SETUP.md`, and `CLOUDFLARE_ZERO_TRUST_SETUP.md`: the
+  supported one-process topology, restart behavior, origin reachability,
+  client-IP responsibility, unsupported cluster/multi-host modes, and future
+  scale prerequisites are explicit.
+
+There are no dependency changes, no Prisma schema changes, no migration, no
+new environment variable, and no database-backed limiter. Existing MySQL
+integration conventions and the durable password-reset request count are
+unchanged. The package-lock file was not modified.
+
+### 19.8 L0-RATE-01 disposition
+
+**L0-RATE-01 is closed under Option 1, with an explicit supported-topology
+constraint.** The process-local bypass is not claimed to be solved by a
+distributed backend. It is closed because the current supported production
+contract is now explicit and operationally guarded: one loopback-bound Next.js
+process behind Nginx, no PM2 cluster/multiple app instances/multiple hosts,
+restart counter loss accepted, trusted client IP canonicalized at Nginx, and
+the confirmed Auth check/record overshoot removed.
+
+The remaining accepted risks are process restart clearing counters, a shared
+`unknown` bucket for unsupported/malformed traffic, the bounded 50,000-entry
+capacity-exhaustion denial of new keys, and the inability of repository tests
+to verify live Cloudflare firewall/Tunnel configuration. Before horizontal
+scale, the limiter backend and upload storage must change and receive real
+cross-instance atomic integration coverage. No operator may interpret this
+closure as horizontal scalability.
+
+### 19.9 L2 verification record
+
+Focused characterization and endpoint regression checks completed during
+implementation:
+
+- baseline limiter tests before implementation: PASS, 3 files / 14 tests;
+- final Auth/mutation/trusted-IP/process-isolation/Nginx-config and hybrid
+  login run: PASS, 7 files / 39 tests;
+- Auth route regression run (forgot-password, signup, hybrid login, hybrid
+  Auth routes, reset password): PASS, 5 files / 45 tests.
+
+The final repository verification command/results are recorded here after the
+broader pass:
+
+- `npm.cmd run architecture:check`: PASS; 1,003 repository source files
+  checked;
+- `npm.cmd run lint:strict`: PASS;
+- `npm.cmd run typecheck`: PASS;
+- `npm.cmd run test:run`: PASS; 260 files / 2,154 tests;
+- `npm.cmd run test:integration:mysql`: PASS; no pending migrations, 11 files
+  / 78 tests;
+- `git diff --check`: PASS;
+- development server: NOT RUN;
+- production build: NOT RUN.
+
+The supported architecture decision and L0-RATE-01 disposition do not depend
+on a claim that an unavailable external Cloudflare configuration was verified.

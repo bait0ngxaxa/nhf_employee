@@ -74,7 +74,7 @@ export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
 const rateLimitEntries = new Map<string, RateLimitEntry>();
 const UNKNOWN_CLIENT = "unknown";
 const CLEANUP_INTERVAL_MS = 60 * 1000;
-const MAX_RATE_LIMIT_ENTRIES = 50_000;
+export const MAX_MUTATION_RATE_LIMIT_ENTRIES = 50_000;
 let lastCleanupAt = 0;
 
 function buildPreAuthIpKey(
@@ -99,7 +99,7 @@ function consume(
 ): { limited: boolean; retryAfterSeconds: number } {
     if (
         now - lastCleanupAt >= CLEANUP_INTERVAL_MS ||
-        rateLimitEntries.size >= MAX_RATE_LIMIT_ENTRIES
+        rateLimitEntries.size >= MAX_MUTATION_RATE_LIMIT_ENTRIES
     ) {
         for (const [entryKey, entry] of rateLimitEntries.entries()) {
             if (entry.expiresAt <= now) {
@@ -111,7 +111,7 @@ function consume(
 
     const current = rateLimitEntries.get(key);
     if (!current || current.expiresAt <= now) {
-        if (rateLimitEntries.size >= MAX_RATE_LIMIT_ENTRIES) {
+        if (rateLimitEntries.size >= MAX_MUTATION_RATE_LIMIT_ENTRIES) {
             return {
                 limited: true,
                 retryAfterSeconds: Math.ceil(policy.windowMs / 1000),

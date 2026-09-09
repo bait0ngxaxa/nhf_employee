@@ -16,6 +16,17 @@ Next.js App → ถอด JWT → อัปเดตข้อมูล LeaveRequ
 
 > **สำคัญ:** Cloudflare Tunnel จะเปิดรับ request เฉพาะเส้นทาง (paths) ที่กำหนดเท่านั้น ไม่ได้เปิดให้ใช้งานหน้าเว็บ Intranet ทั้งหมดจากภายนอก
 
+> **L2 production constraint:** ตัวอย่าง `service: http://localhost:3000` ในคู่มือนี้
+> ชี้ Tunnel ตรงเข้า Next.js และข้าม Nginx จึงไม่ใช่ production topology ที่ repository
+> รองรับสำหรับ rate limiting. Production ต้องให้ traffic ผ่าน Nginx ตามเส้นทาง
+> `Cloudflare → Nginx → Next.js` เพื่อให้ Nginx ตรวจ source ranges และ overwrite
+> application-facing `CF-Connecting-IP` จากค่า client IP ที่ canonical แล้ว. การ route
+> ผ่าน Nginx เพียงอย่างเดียวไม่ทำให้ local `cloudflared` เป็น trusted proxy; operator
+> ต้องตรวจสอบ trusted tunnel-to-Nginx client-IP contract เพิ่ม. ห้ามเปิด
+> port `3000` ออก Internet หรือใช้ incoming `CF-Connecting-IP` จาก Tunnel/client เป็น
+> trusted identity โดยตรง. การชี้ Tunnel ไปยัง Nginx และการตรวจ Cloudflare/Tunnel
+> configuration เป็น operator action ที่ repository นี้ไม่ได้ยืนยันแทน.
+
 ---
 
 ## Step 1: เตรียม Domain บน Cloudflare

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
-import { isAuthRateLimited, recordAuthAttempt } from "@/lib/auth/rate-limit";
+import { reserveAuthAttempt } from "@/lib/auth/rate-limit";
 import { setHybridAuthCookies, getClientMetadata } from "@/lib/auth/hybrid/session";
 import { enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";
 import { appendAuditBestEffort } from "@/modules/audit";
@@ -43,18 +43,28 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             ipAddress: metadata.ipAddress,
         };
 
-        if (isAuthRateLimited(rateLimitInput, LOGIN_RATE_LIMIT_POLICY)) {
+        const authReservation = reserveAuthAttempt(
+            rateLimitInput,
+            LOGIN_RATE_LIMIT_POLICY,
+        );
+        if (!authReservation) {
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 429 });
         }
 
-        const result = await authenticateHybridLogin({
-            email: normalizedEmail,
-            password: parsed.data.password,
-            metadata,
-        });
+        let result: Awaited<ReturnType<typeof authenticateHybridLogin>>;
+        try {
+            result = await authenticateHybridLogin({
+                email: normalizedEmail,
+                password: parsed.data.password,
+                metadata,
+            });
+        } catch (error) {
+            authReservation.release();
+            throw error;
+        }
 
         if (result.status === "invalidCredentials") {
-            recordAuthAttempt(rateLimitInput, LOGIN_RATE_LIMIT_POLICY);
+            authReservation.commit();
             await appendAuditBestEffort({
                 action: "LOGIN_FAILED",
                 entityType: "User",
@@ -72,6 +82,8 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             });
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.invalidEmailOrPassword }, { status: 401 });
         }
+
+        authReservation.release();
 
         await appendAuditBestEffort({
             action: "LOGIN_SUCCESS",

@@ -193,6 +193,80 @@ describe("Hybrid login route employee eligibility", () => {
         );
     });
 
+    it("releases only the in-flight slot when login succeeds after failures", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(buildUser({
+            status: "ACTIVE",
+            deletedAt: null,
+        }));
+        compareMock.mockResolvedValue(false);
+
+        for (let attempt = 0; attempt < 7; attempt += 1) {
+            const response = await hybridLoginRoute(buildRequest());
+            expect(response.status).toBe(401);
+        }
+
+        compareMock.mockResolvedValue(true);
+        const successResponse = await hybridLoginRoute(buildRequest());
+        expect(successResponse.status).toBe(200);
+
+        compareMock.mockResolvedValue(false);
+        const eighthFailure = await hybridLoginRoute(buildRequest());
+        const ninthFailure = await hybridLoginRoute(buildRequest());
+
+        expect(eighthFailure.status).toBe(401);
+        expect(ninthFailure.status).toBe(429);
+    });
+
+    it("bounds parallel invalid credentials at the identity failure budget", async () => {
+        const parallelAttempts = 10;
+        const allowedAttempts = 8;
+        prismaMock.user.findUnique.mockResolvedValue(buildUser({
+            status: "ACTIVE",
+            deletedAt: null,
+        }));
+
+        let authenticationStarted = 0;
+        let releaseAuthentication: () => void = () => undefined;
+        let releaseAllStarted: () => void = () => undefined;
+        const authenticationBarrier = new Promise<void>((resolve) => {
+            releaseAuthentication = resolve;
+        });
+        const allStarted = new Promise<void>((resolve) => {
+            releaseAllStarted = resolve;
+        });
+        compareMock.mockImplementation(async () => {
+            authenticationStarted += 1;
+            if (authenticationStarted === allowedAttempts) {
+                releaseAllStarted();
+            }
+            await authenticationBarrier;
+            return false;
+        });
+
+        const responsesPromise = Promise.all(
+            Array.from({ length: parallelAttempts }, () =>
+                hybridLoginRoute(buildRequest("parallel@thainhf.org")),
+            ),
+        );
+        await allStarted;
+        releaseAuthentication();
+        const responses = await responsesPromise;
+
+        expect(authenticationStarted).toBe(allowedAttempts);
+        expect(responses.filter((response) => response.status === 401)).toHaveLength(
+            allowedAttempts,
+        );
+        expect(responses.filter((response) => response.status === 429)).toHaveLength(
+            parallelAttempts - allowedAttempts,
+        );
+
+        compareMock.mockResolvedValue(false);
+        const afterOvershoot = await hybridLoginRoute(
+            buildRequest("parallel@thainhf.org"),
+        );
+        expect(afterOvershoot.status).toBe(429);
+    });
+
     it.each([
         { status: "INACTIVE" as const, deletedAt: null, label: "inactive" },
         { status: "SUSPENDED" as const, deletedAt: null, label: "suspended" },

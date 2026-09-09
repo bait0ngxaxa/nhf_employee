@@ -5,6 +5,7 @@ import {
     AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES,
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
+    MAX_MUTATION_RATE_LIMIT_ENTRIES,
     PRE_AUTH_IP_RATE_LIMIT_POLICIES,
     resetMutationRateLimit,
 } from "@/lib/security/mutation-rate-limit";
@@ -124,6 +125,84 @@ describe("mutation rate limit", () => {
             enforceAuthenticatedMutationRateLimit(
                 "stock-request-create",
                 101,
+            ),
+        ).toBeNull();
+    });
+
+    it("consumes a single authenticated key synchronously at the exact boundary", async () => {
+        const policy = AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES[
+            "stock-request-create"
+        ];
+
+        const responses = await Promise.all(
+            Array.from({ length: policy.maxRequests + 3 }, () =>
+                Promise.resolve(
+                    enforceAuthenticatedMutationRateLimit(
+                        "stock-request-create",
+                        "parallel-user-0",
+                    ),
+                ),
+            ),
+        );
+
+        expect(responses.slice(0, policy.maxRequests).every((value) => value === null))
+            .toBe(true);
+        expect(responses.slice(policy.maxRequests).every((value) => value !== null))
+            .toBe(true);
+    });
+
+    it("places missing client IPs in one shared unknown bucket", () => {
+        const request = new NextRequest("http://localhost/api/stock/requests", {
+            method: "POST",
+        });
+        const policy = PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-request-create"];
+
+        for (let index = 0; index < policy.maxRequests; index += 1) {
+            expect(
+                enforcePreAuthIpRateLimit(request, "stock-request-create"),
+            ).toBeNull();
+        }
+
+        expect(
+            enforcePreAuthIpRateLimit(request, "stock-request-create"),
+        ).not.toBeNull();
+    });
+
+    it("fails closed at the bounded entry capacity and cleans expired entries first", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-09-09T00:00:00.000Z"));
+
+        let currentIp = "2001:db8::1";
+        const request = {
+            headers: {
+                get(name: string): string | null {
+                    return name.toLowerCase() === "cf-connecting-ip"
+                        ? currentIp
+                        : null;
+                },
+            },
+        } as unknown as NextRequest;
+
+        for (let index = 0; index < MAX_MUTATION_RATE_LIMIT_ENTRIES; index += 1) {
+            currentIp = `2001:db8::${(index + 1).toString(16)}`;
+            expect(
+                enforcePreAuthIpRateLimit(request, "stock-request-create"),
+            ).toBeNull();
+        }
+
+        expect(
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-create",
+                "unrelated-user",
+            ),
+        ).not.toBeNull();
+
+        vi.advanceTimersByTime(15 * 60 * 1000);
+
+        expect(
+            enforceAuthenticatedMutationRateLimit(
+                "stock-request-create",
+                "capacity-user-after-expiry",
             ),
         ).toBeNull();
     });

@@ -260,7 +260,7 @@ npm run build
 npm run start
 ```
 
-`npm run start` ใช้ build จาก `.next/` และฟังพอร์ต `3000` ให้ใช้ process supervisor ของเครื่อง (เช่น systemd, Supervisor หรือ PM2) เพื่อ:
+`npm run start` ใช้ build จาก `.next/` และฟังพอร์ต `3000` ที่ `127.0.0.1` เท่านั้น ให้ใช้ process supervisor ของเครื่อง (เช่น systemd, Supervisor หรือ PM2 แบบ single process) เพื่อ:
 
 - ตั้ง working directory เป็น project root
 - โหลด `.env`/environment ของ production
@@ -273,6 +273,41 @@ npm run start
 curl --fail http://127.0.0.1:3000/
 ```
 
+### 5.1 Process topology และ rate-limit contract
+
+Production topology ที่ repository รองรับในปัจจุบันคือ **หนึ่ง host และหนึ่ง
+Next.js production process** ที่รัน `npm run start` หลัง Nginx upstream เดียว
+เท่านั้น. systemd, Supervisor และ PM2 ใช้ได้ในโหมด single process; PM2 cluster,
+การรัน Next.js หลาย process หลัง Nginx และการกระจายไปหลาย host ยังไม่ใช่ topology
+ที่รองรับ. Node.js อาจทำได้ในทางเทคนิค แต่ห้ามเปิดใช้โดยถือว่า rate limit
+ปลอดภัยแล้ว.
+
+Auth และ mutation rate limit ใน `lib/auth/rate-limit.ts` และ
+`lib/security/mutation-rate-limit.ts` เป็น state ใน process เท่านั้น. Counter
+ไม่แชร์ข้าม process/host และหายเมื่อ process restart; นี่เป็น tradeoff ที่ยอมรับ
+สำหรับ topology ปัจจุบันและเป็น burst/brute-force control ไม่ใช่บัญชีโควตาถาวร.
+ก่อนเปิด cluster หรือ horizontal scale ต้องมี backend ที่แชร์และ consume แบบ
+atomic พร้อม deployment, failure policy, cleanup, integration test และ runbook
+ที่รองรับ รวมถึง shared/object storage สำหรับ `.uploads/`.
+
+เส้นทาง client IP ที่รองรับคือ `Cloudflare → Nginx → Next.js`. Nginx ตรวจ
+Cloudflare source ranges, ใช้ `real_ip_header CF-Connecting-IP` แล้วเขียนทับ
+`CF-Connecting-IP` ที่ส่งให้แอปจากค่า `$remote_addr` ที่ canonical แล้ว. แอปจึง
+ไม่ใช้ `X-Forwarded-For`, `X-Real-IP` หรือ forwarding header อื่นเป็น fallback.
+ห้ามเปิด `127.0.0.1:3000` ออก Internet และต้องให้ origin firewall รับ traffic
+เฉพาะทางเข้าที่อนุมัติ. หากใช้ Cloudflare Tunnel ห้ามชี้ตรงไป `localhost:3000`;
+การ route ผ่าน Nginx ต้องมี trusted tunnel-to-Nginx client-IP contract ที่ operator
+ตรวจสอบเพิ่ม เพราะ config ใน repository นี้ trust เฉพาะ Cloudflare source ranges
+และไม่ถือว่า local `cloudflared` เป็น trusted proxy โดยอัตโนมัติ. ตัวอย่างที่ชี้ตรงไป
+`localhost:3000` ในคู่มือ Tunnel จึงเป็นเพียง operator configuration ที่ไม่ใช่
+production topology ที่รองรับของ repository.
+
+ถ้าไม่มีหรือมีค่า client identity ที่ไม่ถูกต้อง request จะอยู่ใน shared
+`unknown` bucket สำหรับ pre-auth controls. local development/test ใช้ bucket นี้
+ได้ แต่ไม่ควรใช้เป็นหลักฐานว่า production ระบุ client IP ได้. การแก้ traffic ที่
+ถูกจัดเป็น `unknown` ต้องแก้ reverse-proxy/origin configuration ไม่ใช่เพิ่ม
+fallback ที่เชื่อ header จาก client.
+
 ### 6. ตั้ง Nginx และ Cloudflare
 
 ไฟล์ตัวอย่างอยู่ที่:
@@ -284,7 +319,7 @@ curl --fail http://127.0.0.1:3000/
 
 - `server_name` ให้เป็น hostname จริง
 - path ของ Cloudflare Origin Certificate และ private key
-- upstream หาก Next.js ไม่ได้ฟังที่ `127.0.0.1:3000`
+- upstream ต้องคงที่ `127.0.0.1:3000` ตาม single-process production contract
 
 ตัวอย่างติดตั้งบน Linux:
 
@@ -403,9 +438,12 @@ counters เมื่อบางรายการทำงานไม่ส�
 - [ ] `npx prisma migrate deploy` ผ่าน
 - [ ] `npm run check` ผ่าน
 - [ ] ตั้ง feature flags ก่อน `npm run build`
-- [ ] process supervisor รัน Next.js ด้วย non-root user
+- [ ] process supervisor รัน Next.js ด้วย non-root user และมี Next.js เพียงหนึ่ง process (ห้าม PM2 cluster)
+- [ ] `npm run start` bind ที่ `127.0.0.1:3000` และ port นี้ไม่ reachable จาก Internet โดยตรง
 - [ ] `.uploads/` เป็น persistent storage และมี backup
-- [ ] Nginx `nginx -t` ผ่านและส่ง forwarded headers ครบ
+- [ ] Nginx `nginx -t` ผ่าน, ใช้ Cloudflare real-IP ranges ที่ตรวจสอบแล้ว และ overwrite application `CF-Connecting-IP` จาก `$remote_addr`
+- [ ] ถ้าใช้ Cloudflare Tunnel ให้ route ผ่าน Nginx; ไม่ชี้ production traffic ตรงไป `localhost:3000`
+- [ ] รับทราบว่า rate-limit counters เป็น process-local และหายเมื่อ restart; ยังไม่เปิด PM2 cluster/multiple app hosts
 - [ ] scheduled maintenance ทั้ง 5 endpoints ทำงาน, cron โหลด environment ได้ และเก็บ secrets อย่างปลอดภัย
 - [ ] ทดสอบ dry-run ของ leave attachment cleanup และตรวจ disk usage/permission
 - [ ] backup ฐานข้อมูลและ `.uploads/private/leave/` สำเร็จก่อน migration และเก็บไว้นอกเครื่องเดียวกับ app

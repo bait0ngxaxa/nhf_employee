@@ -15,6 +15,11 @@ interface AuthRateLimitInput {
     ipAddress?: string;
 }
 
+export interface AuthRateLimitReservation {
+    commit(): void;
+    release(): void;
+}
+
 const authAttempts = new Map<string, AuthRateLimitEntry>();
 
 function cleanupExpiredEntries(now: number): void {
@@ -45,18 +50,35 @@ function getCount(key: string): number {
     return authAttempts.get(key)?.count ?? 0;
 }
 
-function recordKey(key: string, now: number, windowMs: number): void {
+function incrementKey(key: string, now: number, windowMs: number): number {
     const current = authAttempts.get(key);
     if (!current || current.expiresAt <= now) {
+        const expiresAt = now + windowMs;
         authAttempts.set(key, {
             count: 1,
-            expiresAt: now + windowMs,
+            expiresAt,
         });
-        return;
+        return expiresAt;
     }
 
     authAttempts.set(key, {
         count: current.count + 1,
+        expiresAt: current.expiresAt,
+    });
+    return current.expiresAt;
+}
+
+function decrementKey(key: string, expiresAt: number): void {
+    const current = authAttempts.get(key);
+    if (!current || current.expiresAt !== expiresAt) return;
+
+    if (current.count <= 1) {
+        authAttempts.delete(key);
+        return;
+    }
+
+    authAttempts.set(key, {
+        count: current.count - 1,
         expiresAt: current.expiresAt,
     });
 }
@@ -74,14 +96,52 @@ export function isAuthRateLimited(
     );
 }
 
+/**
+ * Reserve one failed-authentication budget slot synchronously before work
+ * that may await. The caller commits a failed attempt or releases the slot
+ * when authentication succeeds or cannot produce a failed attempt.
+ */
+export function reserveAuthAttempt(
+    input: AuthRateLimitInput,
+    policy: AuthRateLimitPolicy,
+): AuthRateLimitReservation | null {
+    const now = Date.now();
+    cleanupExpiredEntries(now);
+
+    const identityKey = buildIdentityKey(input);
+    const ipKey = buildIpKey(input);
+    if (
+        getCount(identityKey) >= policy.maxAttemptsPerIdentity
+        || getCount(ipKey) >= policy.maxAttemptsPerIp
+    ) {
+        return null;
+    }
+
+    const identityExpiresAt = incrementKey(identityKey, now, policy.windowMs);
+    const ipExpiresAt = incrementKey(ipKey, now, policy.windowMs);
+    let settled = false;
+
+    return {
+        commit(): void {
+            settled = true;
+        },
+        release(): void {
+            if (settled) return;
+            settled = true;
+            decrementKey(identityKey, identityExpiresAt);
+            decrementKey(ipKey, ipExpiresAt);
+        },
+    };
+}
+
 export function recordAuthAttempt(
     input: AuthRateLimitInput,
     policy: Pick<AuthRateLimitPolicy, "windowMs">,
 ): void {
     const now = Date.now();
     cleanupExpiredEntries(now);
-    recordKey(buildIdentityKey(input), now, policy.windowMs);
-    recordKey(buildIpKey(input), now, policy.windowMs);
+    incrementKey(buildIdentityKey(input), now, policy.windowMs);
+    incrementKey(buildIpKey(input), now, policy.windowMs);
 }
 
 export function clearAuthIdentityRateLimit(input: AuthRateLimitInput): void {

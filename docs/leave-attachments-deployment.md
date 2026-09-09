@@ -45,7 +45,9 @@ memory/abuse budget และต้องไม่มี static location สำ�
 Cloudflare → Nginx → Next.js `127.0.0.1:3000` → MySQL และ local persistent disk
 
 ให้ firewall/Cloudflare เปิดถึง Nginx เท่านั้นและ bind Next.js ไว้ที่ loopback; การเปิด port 3000 ตรงสู่ Internet
-จะข้าม body-size/body-timeout controls ของ Nginx และไม่ใช่ deployment ที่รองรับใน phase นี้
+จะข้าม body-size/body-timeout controls ของ Nginx และไม่ใช่ deployment ที่รองรับใน phase นี้. L2 รองรับ
+หนึ่ง Next.js production process เท่านั้น; PM2 cluster, หลาย process หลัง Nginx และหลาย host ยังไม่รองรับ
+เพราะ application rate-limit state เป็น process-local และไม่ survive process restart
 
 PM2/systemd ต้อง:
 
@@ -93,9 +95,12 @@ cleanup ปัจจุบันอ่านรายการ metadata แล�
 
 ## Multi-instance และ rollback
 
-การเก็บไฟล์แบบ local disk รองรับ single instance หรือหลาย instance ที่ mount shared filesystem เดียวกันและมี
-permission/locking ที่สอดคล้องกันเท่านั้น หากใช้หลายเครื่องโดยไม่มี shared disk ให้ย้าย service ไป object storage
-ที่มี private bucket และ authorization policy ก่อน scale out; phase นี้ยังไม่รองรับ object storage หรือ PDF
+ในเชิง storage การเก็บไฟล์แบบ local disk รองรับ single instance หรือหลาย instance ที่ mount shared filesystem เดียวกันและมี
+permission/locking ที่สอดคล้องกันเท่านั้น แต่ full production deployment ของ L2 ยังรองรับหนึ่ง app process เท่านั้น
+หากใช้หลายเครื่องโดยไม่มี shared disk ให้ย้าย service ไป object storage
+ที่มี private bucket และ authorization policy ก่อน scale out; แต่ shared disk อย่างเดียวไม่เพียงพอสำหรับ L2
+rate-limit state. ต้องออกแบบ shared atomic limiter, failure policy และ integration tests ก่อนเปิด cluster/multi-host;
+phase นี้ยังไม่รองรับ object storage หรือ PDF
 
 Migration เพิ่ม `leave_attachments` เป็น additive และยังคง `LeaveRequest.attachmentUrl` เป็น legacy field อยู่ การ
 rollback application หลัง `migrate deploy` ให้รัน build รุ่นก่อนบน schema ที่มีตารางเพิ่มได้ (รุ่นก่อนจะไม่อ่านตารางนี้)

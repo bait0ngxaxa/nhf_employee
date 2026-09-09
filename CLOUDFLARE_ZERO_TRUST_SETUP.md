@@ -9,6 +9,16 @@
 ## 🏗️ ภาพรวมการทำงาน (Architecture)
 ผู้ใช้ ➡️ [ด่านตรวจ Zero Trust: เช็กอีเมล/OTP] ➡️ [ตรวจสอบผ่าน] ➡️ 🌐 Cloudflare กำแพงกันยิง ➡️ 🚇 Cloudflare Tunnel ➡️ 💻 ระบบ (Next.js Localhost)
 
+> **L2 production constraint:** ตัวอย่าง Tunnel ที่ชี้ `service: http://localhost:3000`
+> ข้าม Nginx และไม่ใช่ production topology ที่ repository รองรับสำหรับ rate limiting.
+> Production ต้องให้เส้นทางเป็น `Cloudflare → Nginx → Next.js` โดย Nginx ตรวจ
+> Cloudflare source ranges และ overwrite `CF-Connecting-IP` ที่ส่งให้แอปจากค่า
+> client IP ที่ canonical แล้ว. การ route ผ่าน Nginx เพียงอย่างเดียวไม่ทำให้ local
+> `cloudflared` เป็น trusted proxy; operator ต้องตรวจสอบ trusted tunnel-to-Nginx
+> client-IP contract เพิ่ม. ห้ามเปิด port `3000` ออก Internet หรือเชื่อ header
+> forwarding ที่ผู้เรียกส่งเอง. การตั้งค่า Tunnel/Zero Trust จริงเป็น operator action
+> และต้องตรวจให้สอดคล้องกับสัญญานี้.
+
 ---
 
 ## 📝 ขั้นตอนที่ 1: ติดตั้งและตั้งค่า Cloudflare Tunnel
