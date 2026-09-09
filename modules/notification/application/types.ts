@@ -27,6 +27,17 @@ export type NotificationHistoryQuery = {
     cursor?: string | null;
 };
 
+export type NotificationHistoryCursor =
+    | {
+          kind: "legacy-timestamp";
+          createdAt: Date;
+      }
+    | {
+          kind: "composite";
+          createdAt: Date;
+          id: string;
+      };
+
 export type NotificationLatestResult = {
     notifications: Notification[];
     unreadCount: number;

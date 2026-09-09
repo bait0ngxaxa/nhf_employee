@@ -50,8 +50,12 @@ describe("Notification persistence repository", () => {
         });
     });
 
-    it("queries unread history with the timestamp cursor and page-size-plus-one", async () => {
-        const cursor = "2026-08-01T00:00:00.000Z";
+    it("queries unread history with the composite cursor and page-size-plus-one", async () => {
+        const cursor = {
+            kind: "composite" as const,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            id: "notification-17",
+        };
 
         await findHistoryNotifications(17, {
             filter: "unread",
@@ -63,14 +67,42 @@ describe("Notification persistence repository", () => {
             where: {
                 userId: 17,
                 isRead: false,
-                createdAt: { lt: new Date(cursor) },
+                OR: [
+                    { createdAt: { lt: cursor.createdAt } },
+                    {
+                        createdAt: cursor.createdAt,
+                        id: { lt: cursor.id },
+                    },
+                ],
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 21,
         });
         await countHistoryNotifications(17, "unread", persistenceContext);
         expect(persistenceContext.notification.count).toHaveBeenCalledWith({
             where: { userId: 17, isRead: false },
+        });
+    });
+
+    it("keeps legacy timestamp cursors on their historical boundary", async () => {
+        const cursor = {
+            kind: "legacy-timestamp" as const,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+        };
+
+        await findHistoryNotifications(17, {
+            filter: "all",
+            cursor,
+            take: 21,
+        }, persistenceContext);
+
+        expect(persistenceContext.notification.findMany).toHaveBeenCalledWith({
+            where: {
+                userId: 17,
+                createdAt: { lt: cursor.createdAt },
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: 21,
         });
     });
 
@@ -84,7 +116,7 @@ describe("Notification persistence repository", () => {
 
         expect(persistenceContext.notification.findMany).toHaveBeenCalledWith({
             where: { userId: 17 },
-            orderBy: { createdAt: "desc" },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 21,
         });
         expect(persistenceContext.notification.count).toHaveBeenCalledWith({

@@ -2365,3 +2365,178 @@ The exact verification record for this implementation is:
 
 No Prisma schema or migration was changed. No Notification, Outbox, Email
 Request, or L4 work was started.
+
+## 21. L4 implementation / closure
+
+This section is additive to the historical L0-L3 records above. It records
+the focused L4 correction for `L0-NOTIF-01`; it does not reopen L1-L3 work or
+start L5/L6 work.
+
+### 21.1 Root cause and selected ordering
+
+The confirmed defect was in the Notification history query boundary, not in
+Notification producers, stored rows, or the browser list. History rows were
+ordered by `createdAt DESC` only, while the continuation boundary was
+`createdAt < cursorTimestamp`. With 21 eligible rows sharing one timestamp,
+the first page returned 20 rows and the timestamp cursor excluded every row
+with that timestamp from the next page. Because the database order had no
+unique tie-breaker, the omitted row was also not deterministic.
+
+L4 selects the existing unique Notification CUID primary key as the stable
+tie-breaker. History queries now use the unique deterministic order:
+
+```text
+createdAt DESC, id DESC
+```
+
+The latest-notification/dropdown query, polling behavior, Notification
+producers, and stored Notification data were not changed.
+
+### 21.2 Cursor contract and continuation semantics
+
+New `nextCursor` values are version-one UTF-8 JSON encoded as unpadded
+Base64URL. The decoded payload is exactly:
+
+```json
+{
+  "v": 1,
+  "createdAt": "<Date.toISOString()>",
+  "id": "<Notification.id>"
+}
+```
+
+The browser continues to treat this value as an opaque `string | null`. The
+Notification application boundary owns encoding and parsing. Parsing checks
+the canonical Base64URL representation, supported version, valid timestamp,
+and a non-empty Notification identifier containing only the identifier
+characters supported by the persisted representation. Unsupported versions
+and malformed composite payloads are rejected before reaching Prisma.
+
+For a version-one composite cursor, the repository applies the logically
+equivalent descending-key boundary:
+
+```text
+createdAt < cursor.createdAt
+OR (createdAt = cursor.createdAt AND id < cursor.id)
+```
+
+The same `userId` condition and existing `filter=unread` (`isRead = false`)
+condition remain in the query. The query still fetches 21 rows, returns at
+most 20, and derives the next cursor from both fields of the last returned
+row. A final page returns `nextCursor: null`.
+
+### 21.3 Legacy timestamp compatibility
+
+An existing ISO timestamp cursor is accepted as a legacy input. It retains
+the historical boundary `createdAt < legacyTimestamp`; it does not invent an
+ID tie-breaker that was absent from the old cursor. Every newly generated
+cursor uses the version-one composite format, including when the request was
+continued from a legacy cursor.
+
+This means an already-issued legacy cursor cannot recover an equal-timestamp
+row that the old timestamp-only contract had already skipped. That limitation
+is explicit and is not treated as a reason to rewrite historical rows. Invalid
+and unsupported cursor inputs continue through the existing generic API error
+path; L4 does not introduce a new malformed-cursor HTTP contract.
+
+### 21.4 Regression and compatibility evidence
+
+The pre-change real-MySQL characterization was:
+
+```text
+npm.cmd exec -- vitest run --config vitest.integration.config.ts __tests__/integration/notification-history-pagination.integration.test.ts
+```
+
+It failed at the old implementation with page two containing 0 rows instead
+of the required 1 row for 21 equal-timestamp rows. After L4, the same focused
+integration file passed 1 file / 3 tests. It covers:
+
+- 21 equal-timestamp all-history rows across `[20, 1]` pages;
+- the same equal-timestamp boundary with additional read rows, proving
+  `filter=unread` remains scoped; and
+- mixed timestamps with complete, duplicate-free, deterministic ordering.
+
+The focused application/repository/cursor/API/browser command passed 6 files /
+47 tests:
+
+```text
+npm.cmd exec -- vitest run modules/notification/application/history-cursor.test.ts modules/notification/application/queries.test.ts modules/notification/infrastructure/persistence/repository.test.ts modules/notification/presentation/dashboard/NotificationShared.test.tsx modules/notification/presentation/dashboard/NotificationsPageContent.test.tsx __tests__/api/notifications.test.ts
+```
+
+API tests cover no cursor, a new composite cursor, legacy ISO cursor,
+`filter=all`, and `filter=unread`, while preserving the existing URL and
+response fields `{ notifications, nextCursor, hasMore, totalCount }`. The
+presentation test verifies that Load More passes the composite string without
+inspecting it and appends the returned page. Filter reset, mark-one,
+mark-all-read, action navigation, polling, loading/error/empty behavior, and
+Thai wording remain in the existing presentation implementation and were not
+redesigned.
+
+### 21.5 Schema, index, and performance decision
+
+No Prisma schema or migration was added. Existing Notification persistence is
+unchanged and the unique `id` is sufficient for correctness. The inspected
+Notification indexes remain:
+
+- primary key on `id`;
+- `notifications_userId_isRead_idx` on `(userId, isRead)`; and
+- `notifications_createdAt_idx` on `(createdAt)`.
+
+The generated Prisma query shape contains the user/filter predicates, the
+two-branch composite continuation `OR`, `orderBy` `[createdAt DESC, id DESC]`,
+and `take: 21`. A read-only MySQL `EXPLAIN` of that shape selected
+`notifications_createdAt_idx` with a range and backward index scan, with
+index condition and residual where evaluation. There is no production
+latency, cardinality, or query-plan evidence in this phase that justifies the
+write/storage cost and migration of a new composite index. The possible
+future tradeoff is an index involving user/filter/order fields to reduce
+candidate scanning, weighed against additional write cost and the `OR`
+continuation plan; it is deferred rather than smuggled into L4.
+
+Historical Notification rows, legacy `TICKET_*` values, and all existing
+producer contracts remain compatible.
+
+### 21.6 Files and verification record
+
+L4 changed only the Notification cursor/application/repository tests, the
+real-MySQL regression fixture, the focused presentation/API tests, the
+current module overview forward reference, and this closure record:
+
+- `modules/notification/application/history-cursor.ts`;
+- `modules/notification/application/types.ts`;
+- `modules/notification/application/queries.ts`;
+- `modules/notification/application/history-cursor.test.ts`;
+- `modules/notification/application/queries.test.ts`;
+- `modules/notification/infrastructure/persistence/repository.ts`;
+- `modules/notification/infrastructure/persistence/repository.test.ts`;
+- `__tests__/integration/notification-history-pagination.integration.test.ts`;
+- `__tests__/api/notifications.test.ts`;
+- `modules/notification/presentation/dashboard/NotificationsPageContent.test.tsx`;
+- `modules/README.md`; and
+- `docs/architecture/runtime-hardening.md`.
+
+Final verification:
+
+- `npm.cmd run architecture:check` — PASS; 1,011 repository source files
+  checked;
+- `npm.cmd run lint:strict` — PASS with zero warnings;
+- `npm.cmd run typecheck` — PASS;
+- `npm.cmd run test:run` — PASS; 265 files / 2,184 tests;
+- `npm.cmd run test:integration:mysql` — PASS; Prisma reported 65 migrations
+  with no pending migrations, then 12 files / 81 tests passed;
+- focused Notification unit/API/presentation command above — PASS; 6 files /
+  47 tests;
+- focused real-MySQL regression command above — PASS; 1 file / 3 tests;
+- `git diff --check` — PASS after this record was authored;
+- development server — NOT RUN; and
+- production build — NOT RUN.
+
+Residual risks are limited to the documented legacy cursor limitation, the
+normal live-feed behavior when rows are inserted or unread state changes
+between independent requests, and possible future performance work if
+production cardinality or latency warrants a composite index. None weakens
+user/filter scoping or the stable continuation invariant for rows addressed by
+the new cursor.
+
+**L0-NOTIF-01 — CLOSED.** L4 acceptance is complete. L3 remains closed, and
+L5/L6 were not started.

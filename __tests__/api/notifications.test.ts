@@ -114,18 +114,72 @@ describe("Notification API Routes", () => {
     });
 
     describe("GET /api/notifications/all", () => {
-        it("delegates the current filter and timestamp cursor to the public query", async () => {
+        it("keeps the response shape when loading the first all-history page", async () => {
             mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
             const result = {
                 notifications: [{ id: "notification-1" }],
-                nextCursor: "2026-08-01T00:00:00.000Z",
+                nextCursor: null,
+                hasMore: false,
+                totalCount: 1,
+            };
+            mockListHistoryForUser.mockResolvedValue(result as never);
+
+            const req = new NextRequest(
+                "http://localhost/api/notifications/all?filter=all",
+            );
+            const res = await getAllNotifications(req);
+
+            expect(res.status).toBe(200);
+            expect(await res.json()).toEqual(result);
+            expect(mockListHistoryForUser).toHaveBeenCalledWith({
+                userId: 1,
+                filter: "all",
+                cursor: null,
+            });
+        });
+
+        it("passes a new opaque composite cursor unchanged for all history", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            const compositeCursor = Buffer.from(JSON.stringify({
+                v: 1,
+                createdAt: "2026-08-01T00:00:00.000Z",
+                id: "notification-1",
+            }), "utf8").toString("base64url");
+            const result = {
+                notifications: [{ id: "notification-1" }],
+                nextCursor: compositeCursor,
                 hasMore: true,
                 totalCount: 21,
             };
             mockListHistoryForUser.mockResolvedValue(result as never);
 
             const req = new NextRequest(
-                "http://localhost/api/notifications/all?filter=unread&cursor=2026-09-01T00:00:00.000Z",
+                `http://localhost/api/notifications/all?filter=all&cursor=${encodeURIComponent(compositeCursor)}`,
+            );
+            const res = await getAllNotifications(req);
+
+            expect(res.status).toBe(200);
+            expect(await res.json()).toEqual(result);
+            expect(mockListHistoryForUser).toHaveBeenCalledWith({
+                userId: 1,
+                filter: "all",
+                cursor: compositeCursor,
+            });
+        });
+
+        it("keeps legacy ISO timestamp cursors for unread history", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            const legacyCursor = "2026-09-01T00:00:00.000Z";
+            const result = {
+                notifications: [{ id: "notification-1" }],
+                nextCursor: legacyCursor,
+                hasMore: true,
+                totalCount: 21,
+            };
+            mockListHistoryForUser.mockResolvedValue(result as never);
+
+            const req = new NextRequest(
+                `http://localhost/api/notifications/all?filter=unread&cursor=${legacyCursor}`,
             );
             const res = await getAllNotifications(req);
 
@@ -134,7 +188,7 @@ describe("Notification API Routes", () => {
             expect(mockListHistoryForUser).toHaveBeenCalledWith({
                 userId: 1,
                 filter: "unread",
-                cursor: "2026-09-01T00:00:00.000Z",
+                cursor: legacyCursor,
             });
         });
     });

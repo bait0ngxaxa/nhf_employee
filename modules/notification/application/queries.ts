@@ -4,6 +4,10 @@ import {
     findHistoryNotifications,
     findLatestNotifications,
 } from "../infrastructure/persistence/repository";
+import {
+    decodeNotificationHistoryCursor,
+    encodeNotificationHistoryCursor,
+} from "./history-cursor";
 import type {
     NotificationHistoryQuery,
     NotificationHistoryResult,
@@ -28,7 +32,7 @@ export async function listHistoryForUser(
     input: NotificationHistoryQuery,
 ): Promise<NotificationHistoryResult> {
     const filter = input.filter ?? null;
-    const cursor = input.cursor ?? null;
+    const cursor = decodeNotificationHistoryCursor(input.cursor ?? null);
     const [notifications, totalCount] = await Promise.all([
         findHistoryNotifications(input.userId, {
             filter,
@@ -44,7 +48,7 @@ export async function listHistoryForUser(
         : notifications;
     const lastItem = items[items.length - 1];
     const nextCursor = hasMore && lastItem !== undefined
-        ? lastItem.createdAt.toISOString()
+        ? encodeNotificationHistoryCursor(lastItem)
         : null;
 
     return {

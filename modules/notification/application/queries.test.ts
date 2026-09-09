@@ -4,6 +4,7 @@ import {
     listHistoryForUser,
     listLatestForUser,
 } from "./queries";
+import { encodeNotificationHistoryCursor } from "./history-cursor";
 
 const repositoryMocks = vi.hoisted(() => ({
     countHistoryNotifications: vi.fn(),
@@ -36,12 +37,20 @@ describe("Notification application queries", () => {
         expect(repositoryMocks.countUnreadNotifications).toHaveBeenCalledWith(17);
     });
 
-    it("keeps unread history pagination at 20 items and derives the timestamp cursor", async () => {
+    it("keeps unread history pagination at 20 items and derives the composite cursor", async () => {
         const notifications = Array.from({ length: 21 }, (_, index) => ({
             id: `notification-${index}`,
             createdAt: new Date(`2026-08-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`),
         }));
         const cursor = "2026-09-01T00:00:00.000Z";
+        const expectedCursor = {
+            kind: "legacy-timestamp" as const,
+            createdAt: new Date(cursor),
+        };
+        const boundaryNotification = notifications[19];
+        if (!boundaryNotification) {
+            throw new Error("Missing history page boundary fixture");
+        }
         repositoryMocks.findHistoryNotifications.mockResolvedValue(notifications);
         repositoryMocks.countHistoryNotifications.mockResolvedValue(25);
 
@@ -51,13 +60,13 @@ describe("Notification application queries", () => {
             cursor,
         })).resolves.toEqual({
             notifications: notifications.slice(0, 20),
-            nextCursor: notifications[19]?.createdAt.toISOString(),
+            nextCursor: encodeNotificationHistoryCursor(boundaryNotification),
             hasMore: true,
             totalCount: 25,
         });
         expect(repositoryMocks.findHistoryNotifications).toHaveBeenCalledWith(17, {
             filter: "unread",
-            cursor,
+            cursor: expectedCursor,
             take: 21,
         });
         expect(repositoryMocks.countHistoryNotifications).toHaveBeenCalledWith(17, "unread");

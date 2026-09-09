@@ -3,13 +3,14 @@ import type { Notification, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import type {
     NotificationCreateInput,
+    NotificationHistoryCursor,
     NotificationPersistenceContext,
     NotificationReadTransitionInput,
 } from "../../application/types";
 
 type HistoryQueryOptions = {
     filter: string | null;
-    cursor: string | null;
+    cursor: NotificationHistoryCursor | null;
     take: number;
 };
 
@@ -20,6 +21,28 @@ function buildHistoryWhere(
     return {
         userId,
         ...(filter === "unread" ? { isRead: false } : {}),
+    };
+}
+
+function buildHistoryContinuation(
+    cursor: NotificationHistoryCursor | null,
+): Prisma.NotificationWhereInput {
+    if (!cursor) {
+        return {};
+    }
+
+    if (cursor.kind === "legacy-timestamp") {
+        return { createdAt: { lt: cursor.createdAt } };
+    }
+
+    return {
+        OR: [
+            { createdAt: { lt: cursor.createdAt } },
+            {
+                createdAt: cursor.createdAt,
+                id: { lt: cursor.id },
+            },
+        ],
     };
 }
 
@@ -52,11 +75,9 @@ export function findHistoryNotifications(
     return persistenceContext.notification.findMany({
         where: {
             ...buildHistoryWhere(userId, options.filter),
-            ...(options.cursor
-                ? { createdAt: { lt: new Date(options.cursor) } }
-                : {}),
+            ...buildHistoryContinuation(options.cursor),
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: options.take,
     });
 }

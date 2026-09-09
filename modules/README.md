@@ -157,7 +157,8 @@ commands, strict explicit-user batch create, business-driven unread reference
 transitions, and Notification dedupe behavior. Its `index.ts` is the only
 supported server entry. The four `app/api/notifications/**` routes remain HTTP/auth adapters and
 delegate through that entry; their full Prisma-serialized row responses and
-current timestamp-cursor behavior remain compatible. Its browser-facing
+history cursor contract (including legacy timestamp-cursor compatibility)
+remain compatible. Its browser-facing
 `client.ts` exposes only `NotificationDropdown`, `NotificationsSection`, and
 `NotificationSectionSkeleton`; the active Dashboard presentation is owned under
 `modules/notification/presentation/dashboard/**`. The Notification page and
@@ -204,8 +205,9 @@ boundary is ready. See
 [notification-migration.md](../docs/architecture/notification-migration.md)
 for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices. H3
 producer integration and compatibility cleanup are complete. NotificationOutbox
-and the global processor remain outside Notification; timestamp-only history
-cursor ambiguity and legacy `TICKET_*` storage compatibility are unchanged.
+and the global processor remain outside Notification; L4 closes the
+timestamp-only history cursor ambiguity while legacy `TICKET_*` storage
+compatibility remains unchanged.
 
 Phase H0 CLOSED — Notification discovery and boundary definition complete.
 Phase H1 CLOSED — Notification server/application ownership complete.
