@@ -44,7 +44,9 @@ export default defineConfig({
     plugins: [react()],
     test: {
         globals: true,
-        setupFiles: "./vitest.setup.ts",
+        env: {
+            NEXT_PUBLIC_FEATURE_LEAVE: "true",
+        },
         alias: {
             "@": resolve(__dirname, "./"),
         },
@@ -64,6 +66,7 @@ export default defineConfig({
                 test: {
                     name: "dom",
                     environment: "jsdom",
+                    setupFiles: "./vitest.setup.ts",
                     include: [...DOM_TESTS],
                 },
             },

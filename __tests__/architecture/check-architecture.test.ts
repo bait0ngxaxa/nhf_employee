@@ -75,6 +75,25 @@ afterEach(async () => {
 });
 
 describe("architecture checker module boundaries", () => {
+    it("reads changed runtime imports again on a later scan of the same root", async () => {
+        const rootPath = await createFixture(fixtureFiles);
+        expect(checkArchitecture({ repositoryRoot: rootPath }).violations).toEqual([]);
+
+        const clientPath = path.join(rootPath, "modules/employee/client.ts");
+        await writeFile(
+            clientPath,
+            '"use client"; export { x } from "@/modules/employee";\n',
+            "utf8",
+        );
+        const changed = checkArchitecture({ repositoryRoot: rootPath });
+        expect(changed.violations).toContainEqual(expect.stringContaining(
+            "Client-reachable runtime code must not import the Employee server entry",
+        ));
+
+        await writeFile(clientPath, fixtureFiles["modules/employee/client.ts"], "utf8");
+        expect(checkArchitecture({ repositoryRoot: rootPath }).violations).toEqual([]);
+    });
+
     it.each([
         "@/components/liff/stock/LiffStockApp",
         "@/lib/client/liff-stock",

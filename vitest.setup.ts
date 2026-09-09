@@ -1,3 +1,1 @@
-import "@testing-library/jest-dom";
-
-process.env.NEXT_PUBLIC_FEATURE_LEAVE = "true";
+import "@testing-library/jest-dom/vitest";

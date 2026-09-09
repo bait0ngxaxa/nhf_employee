@@ -1885,6 +1885,7 @@ function getClientReachableServerEntryViolations(
     rootPath,
     sourceFiles,
     moduleName,
+    getRuntimeImports,
     clientEntry = `@/modules/${moduleName}/client`,
 ) {
     const serverEntry = resolve(rootPath, `modules/${moduleName}`);
@@ -1900,7 +1901,7 @@ function getClientReachableServerEntryViolations(
         if (visited.has(filePath)) continue;
         visited.add(filePath);
 
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 record.moduleSpecifier,
                 filePath,
@@ -1931,7 +1932,7 @@ function getClientReachableServerEntryViolations(
     return violations;
 }
 
-function getEmployeeClientGraphViolations(rootPath) {
+function getEmployeeClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/employee/client.ts");
     if (!existsSync(entryPath)) return [];
     const pending = [entryPath];
@@ -1949,7 +1950,7 @@ function getEmployeeClientGraphViolations(rootPath) {
         const filePath = pending.pop();
         if (visited.has(filePath)) continue;
         visited.add(filePath);
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 record.moduleSpecifier,
                 filePath,
@@ -1973,7 +1974,7 @@ function getEmployeeClientGraphViolations(rootPath) {
     return violations;
 }
 
-function getLeaveClientGraphViolations(rootPath) {
+function getLeaveClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/leave/client.ts");
     if (!existsSync(entryPath)) return [];
     const pending = [entryPath];
@@ -1997,7 +1998,7 @@ function getLeaveClientGraphViolations(rootPath) {
         const filePath = pending.pop();
         if (visited.has(filePath)) continue;
         visited.add(filePath);
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const specifier = record.moduleSpecifier;
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 specifier,
@@ -2017,7 +2018,7 @@ function getLeaveClientGraphViolations(rootPath) {
     return violations;
 }
 
-function getNotificationClientGraphViolations(rootPath) {
+function getNotificationClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/notification/client.ts");
     if (!existsSync(entryPath)) return [];
     const pending = [entryPath];
@@ -2047,7 +2048,7 @@ function getNotificationClientGraphViolations(rootPath) {
         if (filePath === undefined || visited.has(filePath)) continue;
         visited.add(filePath);
 
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const specifier = record.moduleSpecifier;
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 specifier,
@@ -2074,7 +2075,7 @@ function getNotificationClientGraphViolations(rootPath) {
     return violations;
 }
 
-function getAuditClientGraphViolations(rootPath) {
+function getAuditClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/audit/client.ts");
     if (!existsSync(entryPath)) return [];
 
@@ -2114,7 +2115,7 @@ function getAuditClientGraphViolations(rootPath) {
         if (filePath === undefined || visited.has(filePath)) continue;
         visited.add(filePath);
 
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const specifier = record.moduleSpecifier;
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 specifier,
@@ -2161,7 +2162,7 @@ function getAuditClientGraphViolations(rootPath) {
     return violations;
 }
 
-function getAuthClientGraphViolations(rootPath) {
+function getAuthClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/auth/client.ts");
     if (!existsSync(entryPath)) return [];
 
@@ -2201,7 +2202,7 @@ function getAuthClientGraphViolations(rootPath) {
         if (filePath === undefined || visited.has(filePath)) continue;
         visited.add(filePath);
 
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const specifier = record.moduleSpecifier;
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 specifier,
@@ -2245,7 +2246,7 @@ function getAuthClientGraphViolations(rootPath) {
     return violations;
 }
 
-function getLineClientGraphViolations(rootPath) {
+function getLineClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/line/client.ts");
     if (!existsSync(entryPath)) return [];
 
@@ -2284,7 +2285,7 @@ function getLineClientGraphViolations(rootPath) {
         if (filePath === undefined || visited.has(filePath)) continue;
         visited.add(filePath);
 
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const specifier = record.moduleSpecifier;
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 specifier,
@@ -2316,7 +2317,7 @@ function getLineClientGraphViolations(rootPath) {
     return violations;
 }
 
-function getStockClientGraphViolations(rootPath) {
+function getStockClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/stock/client.ts");
     if (!existsSync(entryPath)) return [];
 
@@ -2350,7 +2351,7 @@ function getStockClientGraphViolations(rootPath) {
         if (filePath === undefined || visited.has(filePath)) continue;
         visited.add(filePath);
 
-        for (const record of getImports(filePath, true)) {
+        for (const record of getRuntimeImports(filePath)) {
             const specifier = record.moduleSpecifier;
             const { importTarget, sourcePath } = getRuntimeImportTarget(
                 specifier,
@@ -2434,6 +2435,20 @@ function getBoundaryViolation(owner, target) {
 }
 
 function checkArchitecture(options = {}) {
+    // Graph rules share transpilation results only within this synchronous scan.
+    // Later scans must read edited files again, even for the same repository root.
+    /** @type {Map<string, ReturnType<typeof getImports>>} */
+    const runtimeImports = new Map();
+    /** @param {string} filePath @returns {ReturnType<typeof getImports>} */
+    const getRuntimeImports = (filePath) => {
+        const cached = runtimeImports.get(filePath);
+        if (cached !== undefined) {
+            return cached;
+        }
+        const imports = getImports(filePath, true);
+        runtimeImports.set(filePath, imports);
+        return imports;
+    };
     const rootPath = resolve(options.repositoryRoot ?? repositoryRoot);
     const modulesRoot = resolve(rootPath, "modules");
     const sharedRoot = resolve(rootPath, "shared");
@@ -2957,27 +2972,29 @@ function checkArchitecture(options = {}) {
     if (sharedStatusPresentationViolation !== null) {
         violations.push(sharedStatusPresentationViolation);
     }
-    violations.push(...getLeaveClientGraphViolations(rootPath));
-    violations.push(...getEmployeeClientGraphViolations(rootPath));
-    violations.push(...getNotificationClientGraphViolations(rootPath));
-    violations.push(...getAuditClientGraphViolations(rootPath));
-    violations.push(...getAuthClientGraphViolations(rootPath));
-    violations.push(...getLineClientGraphViolations(rootPath));
-    violations.push(...getStockClientGraphViolations(rootPath));
-    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave"));
-    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee"));
-    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", null));
-    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "notification"));
+    violations.push(...getLeaveClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getEmployeeClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getNotificationClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getAuditClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getAuthClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getLineClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getStockClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave", getRuntimeImports));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee", getRuntimeImports));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", getRuntimeImports, null));
+    violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "notification", getRuntimeImports));
     violations.push(...getClientReachableServerEntryViolations(
         rootPath,
         sourceFiles,
         "auth",
+        getRuntimeImports,
         "@/modules/auth/client",
     ));
     violations.push(...getClientReachableServerEntryViolations(
         rootPath,
         sourceFiles,
         "line",
+        getRuntimeImports,
         "@/modules/line/client",
     ));
     return { sourceFiles, violations };
