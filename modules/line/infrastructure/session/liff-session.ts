@@ -13,11 +13,13 @@ const LIFF_SESSION_AUDIENCE = LIFF_SESSION_PURPOSE;
 export interface LiffSessionClaims {
     userId: number;
     employeeId: number;
+    lineUserId: string;
 }
 
 interface VerifiedLiffSessionPayload extends JWTPayload {
     sub: string;
     employeeId: number;
+    lineUserId: string;
     purpose: typeof LIFF_SESSION_PURPOSE;
 }
 
@@ -40,8 +42,19 @@ function parsePositiveIntegerClaim(value: unknown): number | null {
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function isValidLineUserId(value: unknown): value is string {
+    return typeof value === "string"
+        && value.length > 0
+        && value.length <= 64
+        && value.trim() === value;
+}
+
 function assertIssueInput(input: LiffSessionClaims): void {
-    if (!isPositiveInteger(input.userId) || !isPositiveInteger(input.employeeId)) {
+    if (
+        !isPositiveInteger(input.userId)
+        || !isPositiveInteger(input.employeeId)
+        || !isValidLineUserId(input.lineUserId)
+    ) {
         throw new Error("Invalid LIFF session identity");
     }
 }
@@ -53,6 +66,7 @@ function isVerifiedLiffSessionPayload(
     return (
         userId !== null
         && isPositiveInteger(payload.employeeId)
+        && isValidLineUserId(payload.lineUserId)
         && payload.purpose === LIFF_SESSION_PURPOSE
         && typeof payload.iat === "number"
         && Number.isInteger(payload.iat)
@@ -71,6 +85,7 @@ export async function issueLiffSession(
 
     return new SignJWT({
         employeeId: input.employeeId,
+        lineUserId: input.lineUserId,
         purpose: LIFF_SESSION_PURPOSE,
     })
         .setProtectedHeader({ alg: "HS256", typ: "JWT" })
@@ -106,6 +121,7 @@ export async function verifyLiffSession(
         return {
             userId,
             employeeId: payload.employeeId,
+            lineUserId: payload.lineUserId,
         };
     } catch (error) {
         if (

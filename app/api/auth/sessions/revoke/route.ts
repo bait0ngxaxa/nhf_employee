@@ -13,6 +13,7 @@ import {
     resolveAuthenticatedUserId,
     resolveCurrentSessionFamilyId,
     revokeAuthSessionFamily,
+    getAuditFamilyCorrelation,
 } from "@/modules/auth";
 import { appendAuditBestEffort } from "@/modules/audit";
 
@@ -54,7 +55,7 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             details: {
                 metadata: {
                     method: "hybrid_logout_single_session",
-                    familyId: tokenRecord.familyId,
+                    familyCorrelation: getAuditFamilyCorrelation(tokenRecord.familyId),
                 },
             },
         });

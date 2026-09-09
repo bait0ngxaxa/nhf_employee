@@ -70,7 +70,14 @@ describe("requireLiffWorkforceSession", () => {
         vi.stubEnv("LINE_LIFF_SESSION_TTL_SECONDS", "3600");
         findAccountIdentityByIdMock.mockResolvedValue(ACTIVE_ACCOUNT);
         findLiffEmployeeByUserIdMock.mockResolvedValue(ACTIVE_EMPLOYEE);
-        setCookieValue(await issueLiffSession({ userId: 10, employeeId: 20 }));
+        lineAccountLinkFindUniqueMock.mockResolvedValue({
+            lineUserId: "LINE-identity-A",
+        });
+        setCookieValue(await issueLiffSession({
+            userId: 10,
+            employeeId: 20,
+            lineUserId: "LINE-identity-A",
+        }));
     });
 
     it("returns the current trusted user and employee identity", async () => {
@@ -116,7 +123,11 @@ describe("requireLiffWorkforceSession", () => {
         try {
             vi.setSystemTime(new Date("2026-09-08T00:00:00.000Z"));
             vi.stubEnv("LINE_LIFF_SESSION_TTL_SECONDS", "1");
-            const token = await issueLiffSession({ userId: 10, employeeId: 20 });
+            const token = await issueLiffSession({
+                userId: 10,
+                employeeId: 20,
+                lineUserId: "LINE-identity-A",
+            });
             vi.setSystemTime(new Date("2026-09-08T00:00:02.000Z"));
             setCookieValue(token);
 
@@ -157,7 +168,11 @@ describe("requireLiffWorkforceSession", () => {
     });
 
     it("does not trust an employee ID that differs from the current employee", async () => {
-        setCookieValue(await issueLiffSession({ userId: 10, employeeId: 99 }));
+        setCookieValue(await issueLiffSession({
+            userId: 10,
+            employeeId: 99,
+            lineUserId: "LINE-identity-A",
+        }));
         findLiffEmployeeByUserIdMock.mockResolvedValueOnce(null);
 
         const result = await requireLiffWorkforceSession();
@@ -167,13 +182,46 @@ describe("requireLiffWorkforceSession", () => {
         expect(findLiffEmployeeByUserIdMock).toHaveBeenCalledWith(10, 99);
     });
 
-    it("does not reread LineAccountLink during normal post-issuance authorization", async () => {
+    it("requires the current account link to match the issued LINE identity", async () => {
         await expect(requireLiffWorkforceSession()).resolves.toMatchObject({
             ok: true,
             employeeId: 20,
         });
 
-        expect(lineAccountLinkFindUniqueMock).not.toHaveBeenCalled();
+        expect(lineAccountLinkFindUniqueMock).toHaveBeenCalledWith({
+            where: { userId: 10 },
+            select: { lineUserId: true },
+        });
         expect(lineAccountLinkFindManyMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a deleted link after LIFF session issuance", async () => {
+        lineAccountLinkFindUniqueMock.mockResolvedValue(null);
+
+        const result = await requireLiffWorkforceSession();
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.response.status).toBe(401);
+    });
+
+    it("rejects a session after the user is relinked to another LINE identity", async () => {
+        lineAccountLinkFindUniqueMock.mockResolvedValue({
+            userId: 10,
+            lineUserId: "LINE-identity-B",
+        });
+
+        const result = await requireLiffWorkforceSession();
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.response.status).toBe(401);
+    });
+
+    it("fails closed when the current account link cannot be read", async () => {
+        lineAccountLinkFindUniqueMock.mockRejectedValueOnce(new Error("database unavailable"));
+
+        const result = await requireLiffWorkforceSession();
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.response.status).toBe(500);
     });
 });

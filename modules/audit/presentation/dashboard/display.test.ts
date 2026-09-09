@@ -55,6 +55,21 @@ describe("formatAuditLogDisplay", () => {
         expect(result.summary).not.toContain("new-token");
     });
 
+    it.each([
+        { familyId: "historical-family-id" },
+        { familyCorrelation: "0123456789abcdef" },
+    ])("accepts session correlation metadata without displaying it", (metadata) => {
+        const result = formatAuditLogDisplay({
+            action: "LOGIN_FAILED",
+            entityType: "User",
+            entityId: 7,
+            details: { metadata },
+        });
+
+        expect(result.summary).not.toContain("historical-family-id");
+        expect(result.summary).not.toContain("0123456789abcdef");
+    });
+
     it("formats stock export entity types without technical English", () => {
         const balanceExport = formatAuditLogDisplay({
             action: "DATA_EXPORT",

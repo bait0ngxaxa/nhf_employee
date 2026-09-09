@@ -30,6 +30,31 @@ describe("Audit Log Queries", () => {
             expect(result.auditLogs[0].details).toEqual({ foo: "bar" });
         });
 
+        it("preserves both historical familyId and new familyCorrelation metadata", async () => {
+            prismaMock.auditLog.count.mockResolvedValue(2);
+            prismaMock.auditLog.findMany.mockResolvedValue([
+                {
+                    id: 1,
+                    details: JSON.stringify({
+                        metadata: { familyId: "historical-family-id" },
+                    }),
+                },
+                {
+                    id: 2,
+                    details: JSON.stringify({
+                        metadata: { familyCorrelation: "0123456789abcdef" },
+                    }),
+                },
+            ] as never);
+
+            const result = await getAuditLogs({ page: 1, limit: 10 });
+
+            expect(result.auditLogs.map((log) => log.details)).toEqual([
+                { metadata: { familyId: "historical-family-id" } },
+                { metadata: { familyCorrelation: "0123456789abcdef" } },
+            ]);
+        });
+
         it("should handle filters", async () => {
             prismaMock.auditLog.count.mockResolvedValue(0);
             prismaMock.auditLog.findMany.mockResolvedValue([]);

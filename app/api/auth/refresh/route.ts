@@ -10,7 +10,10 @@ import {
 } from "@/lib/auth/hybrid/session";
 import { enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";
 import { appendAuditBestEffort } from "@/modules/audit";
-import { refreshHybridSession } from "@/modules/auth";
+import {
+    getAuditFamilyCorrelation,
+    refreshHybridSession,
+} from "@/modules/auth";
 
 function unauthorizedResponse(input: { preserveCookies?: boolean } = {}): NextResponse {
     const response = NextResponse.json(
@@ -41,7 +44,7 @@ async function logRefreshSecurityEvent(input: {
             metadata: {
                 authFlow: "hybrid_refresh",
                 reason: input.reason,
-                familyId: input.familyId,
+                familyCorrelation: getAuditFamilyCorrelation(input.familyId),
                 ipAddress: input.ipAddress,
                 userAgent: input.userAgent,
             },

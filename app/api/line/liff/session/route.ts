@@ -62,6 +62,7 @@ async function handleLiffSession(request: NextRequest): Promise<NextResponse> {
         const liffSession = await issueLiffSession({
             userId: identity.user.id,
             employeeId: identity.employeeId,
+            lineUserId: lineIdentity.lineUserId,
         });
         const response = NextResponse.json({
             linked: true,

@@ -59,6 +59,7 @@ describe("Audit append commands", () => {
         expect(errorSpy).toHaveBeenCalledWith(
             "[AuditLog] Failed to create audit log:",
             {
+                event: "audit_persistence_failed",
                 action: command.action,
                 entityType: command.entityType,
                 entityId: command.entityId,

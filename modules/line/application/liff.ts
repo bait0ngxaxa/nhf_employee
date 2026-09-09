@@ -9,6 +9,7 @@ import { forbidden, serverError, unauthorized } from "@/lib/ssot/http";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { getUserDisplayName } from "@/shared/identity/display";
 import { LIFF_SESSION_COOKIE_NAME, verifyLiffSession } from "../infrastructure/session/liff-session";
+import { findLineUserIdByUserId } from "../infrastructure/persistence/account-link";
 import { LineIdentityVerificationError } from "@/lib/line/errors";
 import type {
     LiffCapabilities,
@@ -86,6 +87,20 @@ export async function requireLiffWorkforceSession(): Promise<
         claims.employeeId,
     );
     if (!identity) return { ok: false, response: forbidden() };
+
+    let currentLineUserId: string | null;
+    try {
+        currentLineUserId = await findLineUserIdByUserId(claims.userId);
+    } catch (error) {
+        console.error("LIFF current account-link authorization failed", {
+            errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return { ok: false, response: serverError() };
+    }
+
+    if (currentLineUserId !== claims.lineUserId) {
+        return { ok: false, response: unauthorized() };
+    }
 
     return { ok: true, ...identity };
 }

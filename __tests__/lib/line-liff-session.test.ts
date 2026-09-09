@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
+import { SignJWT } from "jose";
 
 import {
     clearLiffSessionCookie,
@@ -13,6 +14,31 @@ import { getLineLiffSessionConfig } from "@/lib/line/config";
 
 const SESSION_SECRET = "line-liff-test-secret-0123456789abcdef";
 
+async function signSessionToken(overrides: {
+    audience?: string;
+    includeLineUserId?: boolean;
+    issuer?: string;
+    purpose?: string;
+} = {}): Promise<string> {
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    const payload: Record<string, unknown> = {
+        employeeId: 20,
+        purpose: overrides.purpose ?? LIFF_SESSION_PURPOSE,
+    };
+    if (overrides.includeLineUserId !== false) {
+        payload.lineUserId = "Uline-a";
+    }
+
+    return new SignJWT(payload)
+        .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+        .setSubject("10")
+        .setIssuer(overrides.issuer ?? "nhf_employee")
+        .setAudience(overrides.audience ?? LIFF_SESSION_PURPOSE)
+        .setIssuedAt(nowInSeconds)
+        .setExpirationTime(nowInSeconds + 3600)
+        .sign(new TextEncoder().encode(SESSION_SECRET));
+}
+
 describe("LINE LIFF session", () => {
     beforeEach(() => {
         vi.stubEnv("LINE_LIFF_SESSION_SECRET", SESSION_SECRET);
@@ -25,16 +51,25 @@ describe("LINE LIFF session", () => {
     });
 
     it("issues and verifies a session with the minimum identity claims", async () => {
-        const token = await issueLiffSession({ userId: 10, employeeId: 20 });
+        const token = await issueLiffSession({
+            userId: 10,
+            employeeId: 20,
+            lineUserId: "Uline-a",
+        });
 
         await expect(verifyLiffSession(token)).resolves.toEqual({
             userId: 10,
             employeeId: 20,
+            lineUserId: "Uline-a",
         });
     });
 
     it("rejects a tampered token", async () => {
-        const token = await issueLiffSession({ userId: 10, employeeId: 20 });
+        const token = await issueLiffSession({
+            userId: 10,
+            employeeId: 20,
+            lineUserId: "Uline-a",
+        });
         const tamperedToken = `${token.split(".").slice(0, 2).join(".")}.invalid-signature`;
 
         await expect(verifyLiffSession(tamperedToken)).rejects.toThrow(
@@ -44,7 +79,11 @@ describe("LINE LIFF session", () => {
 
     it("rejects an expired session", async () => {
         vi.stubEnv("LINE_LIFF_SESSION_TTL_SECONDS", "1");
-        const token = await issueLiffSession({ userId: 10, employeeId: 20 });
+        const token = await issueLiffSession({
+            userId: 10,
+            employeeId: 20,
+            lineUserId: "Uline-a",
+        });
         vi.useFakeTimers();
         vi.setSystemTime(Date.now() + 2_000);
 
@@ -53,23 +92,23 @@ describe("LINE LIFF session", () => {
         );
     });
 
-    it("rejects a token with the wrong session purpose", async () => {
-        const token = await issueLiffSession({ userId: 10, employeeId: 20 });
-        const [header, _payload, signature] = token.split(".");
-        const wrongPayload = Buffer.from(
-            JSON.stringify({
-                sub: "10",
-                employeeId: 20,
-                purpose: "other-purpose",
-                iss: "nhf_employee",
-                aud: LIFF_SESSION_PURPOSE,
-                iat: Math.floor(Date.now() / 1000),
-                exp: Math.floor(Date.now() / 1000) + 3600,
-            }),
-        ).toString("base64url");
+    it.each([
+        ["purpose", { purpose: "other-purpose" }],
+        ["issuer", { issuer: "other-issuer" }],
+        ["audience", { audience: "other-audience" }],
+    ])("rejects a correctly signed token with the wrong %s", async (_label, overrides) => {
+        const token = await signSessionToken(overrides);
+
+        await expect(verifyLiffSession(token)).rejects.toThrow(
+            "Invalid LIFF session",
+        );
+    });
+
+    it("rejects a signed legacy session without a LINE identity claim", async () => {
+        const legacyToken = await signSessionToken({ includeLineUserId: false });
 
         await expect(
-            verifyLiffSession(`${header}.${wrongPayload}.${signature}`),
+            verifyLiffSession(legacyToken),
         ).rejects.toThrow("Invalid LIFF session");
     });
 

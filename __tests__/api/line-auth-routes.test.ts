@@ -140,6 +140,7 @@ describe("LINE authentication routes", () => {
         expect(issueLiffSessionMock).toHaveBeenCalledWith({
             userId: 10,
             employeeId: 20,
+            lineUserId: "line-a",
         });
         expect(setLiffSessionCookieMock).toHaveBeenCalledWith(
             expect.any(NextResponse),
@@ -273,6 +274,7 @@ describe("LINE authentication routes", () => {
         expect(issueLiffSessionMock).toHaveBeenCalledWith({
             userId: 10,
             employeeId: 20,
+            lineUserId: "line-a",
         });
         expect(setLiffSessionCookieMock).toHaveBeenCalledWith(
             expect.any(NextResponse),

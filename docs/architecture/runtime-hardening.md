@@ -2032,3 +2032,336 @@ broader pass:
 
 The supported architecture decision and L0-RATE-01 disposition do not depend
 on a claim that an unavailable external Cloudflare configuration was verified.
+
+## 20. L3 implementation / closure
+
+This section is additive to the historical L0/L1/L2 records above. It records
+the L3 implementation against the reviewed `main` baseline
+`30adf7dbde12e1f725c8ce7eef6a81eb9998ad54`. L3 covers the stale LINE/LIFF
+link relationship, refresh Audit family correlation metadata, and the
+best-effort security Audit failure contract. L4 is not started by this record.
+
+### 20.1 Gate A — LINE/LIFF lifecycle inventory
+
+The current `LineAccountLink` schema remains:
+
+- `id` CUID primary key;
+- `userId` unique;
+- `lineUserId` unique and `VARCHAR(64)`;
+- `linkedAt` and `updatedAt` timestamps;
+- cascading relation to `User`;
+- no link version, revocation handle, or supported unlink/relink API.
+
+The LINE/LIFF production ownership inventory is:
+
+- `app/api/line/account-link/route.ts` verifies the LINE ID token, writes the
+  link through `@/modules/line`, and issues the LIFF session;
+- `app/api/line/liff/session/route.ts` verifies the LINE ID token, reads the
+  link by verified `lineUserId`, and bootstraps the LIFF session;
+- `modules/line/application/liff.ts` composes current Auth User state and
+  current Employee state and owns `requireLiffWorkforceSession()`;
+- the 21 protected route callers are `line/home`, the eight Leave routes
+  (`approvals`, `attachments/[id]`, `cancel`, `decision`, `me`, `not-taken`,
+  `request`, and `requests/[id]`), the four Routine routes (`reference`,
+  `summary`, `tasks`, and `tasks/[id]`), and the eight Stock routes
+  (`availability`, `categories`, `items`, `processing`, `requests`,
+  `requests/[id]`, `requests/[id]/cancel`, and `requests/[id]/issue`); the two
+  processor routes use `requireLiffStockProcessorSession()`, which composes
+  the same shared LINE guard before Stock's role check;
+- `modules/stock/presentation/liff-stock-auth.ts` composes the same shared
+  guard with Stock's server-side role check; Leave, Stock, and Routine do not
+  query `LineAccountLink` directly;
+- `findActiveLiffWorkforceIdentity()` is called by LIFF bootstrap and the
+  shared protected-session guard;
+- `findLineAccountLinkByLineUserId()` is used by LIFF bootstrap;
+  `linkLineAccount()` is used by account linking; and
+  `findLineUserIdByUserId()` is also used by the LINE notification adapter and
+  Routine reminder recipient resolution. Those notification reads remain
+  current-link reads and do not change delivery or Outbox behavior.
+
+The final lifecycle matrix is:
+
+| State or operation | Current protected LIFF request / operation result | Reason |
+| --- | --- | --- |
+| First link `User U` ↔ `LINE L` | Account-link returns 200 and issues a session bound to `U`, employee, and `L`; a protected request is accepted while all current checks pass. | The server uses only the verified LINE ID-token subject and the authenticated web workforce identity. |
+| Exact idempotent same link | Account-link returns its existing 200 contract and issues a fresh session bound to the same `L`; existing sessions remain accepted. | `linkLineAccount()` preserves exact idempotency. |
+| Conflicting LINE identity | Link attempt returns 409; an existing unchanged link/session remains governed by that unchanged link. | `lineUserId` uniqueness and the current ownership conflict rule remain authoritative. |
+| Conflicting NHF user | Link attempt returns 409; no reassignment occurs. | `userId` uniqueness and the current ownership conflict rule remain authoritative. |
+| LIFF bootstrap from a linked LINE identity | Returns `{ linked: true, workforce: ... }` and sets the existing LIFF cookie. | Verified `lineUserId` resolves the link, then current User/Employee eligibility is checked before issuance. |
+| LIFF bootstrap from an unlinked LINE identity | Returns `{ linked: false }` and clears the LIFF cookie. | No link is created by bootstrap; account linking remains an explicit supported operation. |
+| Protected request after issuance, original link still current | Accepted. | The LIFF JWT is valid, current User/Employee eligibility is valid, and current `LineAccountLink.userId.lineUserId` equals the JWT's verified `lineUserId` claim. |
+| User deactivated | Rejected with the existing 403 workforce response. | User state is reread before the link check. |
+| User soft-deleted | Rejected with the existing 403 workforce response. | `deletedAt` remains authoritative. |
+| Employee suspended/inactive | Rejected with the existing 403 workforce response. | Current Employee eligibility remains authoritative. |
+| Employee deleted/offboarded | Rejected with the existing 403 workforce response. | Current Employee existence/deleted state remains authoritative. |
+| User/Employee relationship changed | Rejected with the existing 403 workforce response. | The expected Employee ID claim is checked against the current User-to-Employee relationship. |
+| Link deleted after issuance | Rejected with 401. | The current link lookup returns no `lineUserId`; the credential no longer has an accepted current relationship. |
+| Link changed/relinked from `L1` to `L2` after issuance | The old `L1` session is rejected with 401; a newly bootstrapped `L2` session may be accepted after current eligibility checks. | The JWT is identity-bound; checking only that `U` has some link would incorrectly accept the old `L1` credential. |
+| Link is manually deleted and the exact same `L1` identity is later recreated | Rejected while the row is absent; accepted again after the same `L1` relationship is restored, if the JWT is otherwise valid. | L3 binds the provider identity relationship, not a link-row instance. A future contract requiring delete/recreate revocation would need a link ID/version claim. |
+| Password reset during a valid LIFF session | LIFF remains accepted if its own JWT, current link, User, and Employee checks remain valid. | Web Auth `tokenVersion` and refresh-token revocation are independent from the LIFF credential by contract. |
+| Web logout or logout-all during a valid LIFF session | LIFF remains accepted if its own checks remain valid. | Web Auth cookies/session families and LIFF cookies/sessions are separate systems. |
+| LIFF JWT expiry | Rejected with 401; the existing client recovery/bootstrap path may obtain a fresh session. | `exp` remains enforced by `jose` verification and the LIFF payload validator. |
+
+There is no supported product unlink/relink operation in this repository.
+The delete/relink rows above describe the security invariant for an operator or
+manual database state change and for any future supported operation; they do
+not imply a new UI or API. A future relink must preserve both unique keys and
+must issue a new identity-bound session. If that future operation must revoke
+an old session even when the exact same LINE identity is recreated, it must
+add a link-instance/version invariant; L3 does not add that state. A missing
+link also means the
+existing LINE notification consumers find no current recipient; no delivery,
+Outbox, or notification contract was changed here.
+
+### 20.2 Gate B — stale-link baseline characterization
+
+Before changing the guard, the focused baseline suite was run and the
+post-issuance characterization was recorded in `__tests__/auth/liff.test.ts`.
+The baseline command
+`npm.cmd exec vitest run __tests__/auth/liff.test.ts` passed 1 file / 16 tests.
+The characterization showed:
+
+1. a valid issued session with active User/Employee state was accepted;
+2. when the mocked current link was deleted, the session was still accepted;
+3. when the mocked current link was changed to another LINE identity, the
+   session was still accepted; and
+4. the test asserted that the baseline guard did not call the
+   `LineAccountLink` repository at all.
+
+The same baseline run retained the existing rejection coverage for inactive,
+deleted, or relationship-inconsistent User/Employee state and expired LIFF
+JWTs. The account-link suite retained real persistence behavior for exact
+idempotency, both uniqueness conflicts, and P2002 race outcomes; no fake
+database race claim was introduced for L3.
+
+### 20.3 Gate C — selected LIFF link invariant
+
+L3 selects the invariant:
+
+> Every protected LIFF request must present a valid LIFF JWT whose bound
+> `lineUserId` is the same as the current `LineAccountLink.lineUserId` for the
+> JWT's server-verified `userId`, in addition to the existing current User and
+> Employee checks.
+
+The smallest unambiguous mechanism is a combination of Option 1 and the
+identity-binding part of Option 2:
+
+- LIFF issuance adds the verified LINE subject as a `lineUserId` claim;
+- verification requires that claim together with the existing subject,
+  Employee ID, purpose, issuer, audience, `iat`, `exp`, HS256 algorithm, and
+  secret checks;
+- the shared LINE guard rereads `LineAccountLink` by the existing unique
+  `userId` index and compares the selected `lineUserId` to the verified JWT
+  claim; and
+- the comparison is authoritative for every protected LIFF capability.
+
+A user-only current-link existence check was rejected: after `L1` is replaced
+by `L2`, it would accept a credential issued under `L1`. A link ID or explicit
+version column was rejected as unnecessary because the existing unique
+user-to-current-`lineUserId` state is sufficient once the issued credential is
+bound to the LINE identity. A bounded-stale-TTL policy was rejected because it
+would intentionally leave unlink/relink usable for up to the one-hour default
+or the 24-hour configured maximum, while L0 classified the residual stale-link
+risk as Medium and L3 has a direct current-state mechanism.
+
+The LINE subject is provider identity metadata, not a credential. It is
+carried only in the signed HttpOnly LIFF JWT so the server can distinguish
+`L1` from `L2`; it is never accepted from a request body, and the JWT remains
+separate from web Auth. Legacy signed LIFF JWTs without this new claim are
+rejected as invalid with 401 and must use the existing fresh-ID-token recovery
+path.
+
+### 20.4 Enforcement and HTTP contract
+
+`requireLiffWorkforceSession()` remains the sole protected LIFF identity guard.
+It performs, in order, JWT verification, current User/Employee eligibility,
+then the current-link reread. It returns:
+
+- 401 for a missing, malformed, invalid, expired, legacy-unbound, or
+  stale-link LIFF cookie;
+- 403 for an otherwise valid LIFF session whose current User/Employee
+  workforce identity is ineligible, preserving the existing behavior;
+- 500 for a LIFF configuration failure or a current-link database read failure,
+  failing closed rather than treating unavailable state as authorized.
+
+The stale-link protected-route response is 401 and does not claim to clear the
+cookie on every protected route: the shared guard returns a response but does
+not attach `clearLiffSessionCookie()`. The existing LIFF client handles 401
+recovery through a fresh LINE ID token; if bootstrap reports `{ linked: false }`,
+that bootstrap response clears the cookie. Mutation replay remains disabled,
+and safe GET/HEAD recovery behavior is unchanged.
+
+The existing account-link conflict 409, invalid LINE ID-token 401, LINE
+verification upstream 502, unlinked bootstrap `{ linked: false }`, LIFF cookie
+name `nhf_liff_session`, purpose `nhf-liff`, issuer `nhf_employee`, audience
+`nhf-liff`, and response shapes remain unchanged. The default LIFF TTL remains
+3,600 seconds (one hour); the configured maximum remains 86,400 seconds (24
+hours). No silent TTL change was made.
+
+### 20.5 Gate D — Auth `familyId` producer/consumer inventory
+
+The inventory distinguishes runtime session authorization from Audit-only
+correlation:
+
+| Location / consumer | Use of `familyId` | L3 disposition |
+| --- | --- | --- |
+| `lib/auth/hybrid/tokens.ts` | Generates a random 16-byte hex family ID; places the family ID in the runtime refresh draft and access-token `sid`. | Unchanged; this remains runtime Auth state. |
+| `modules/auth/infrastructure/persistence/refresh-token-repository.ts` and Prisma `AuthRefreshToken` | Stores, looks up, rotates, and revokes the runtime family ID. | Unchanged; authorization and containment still use the raw runtime value. |
+| `modules/auth/application/sessions.ts` and `modules/auth/application/types.ts` | Carries family IDs through refresh, family revocation, current-session resolution, session listing, and the refresh security result. | Unchanged; the application result is not an Audit representation. |
+| `app/api/auth/refresh/route.ts` | Produces refresh reuse/expiry and inactive-user security Audit events. | Persists `metadata.familyCorrelation`, not `metadata.familyId`. |
+| `app/api/auth/sessions/revoke/route.ts` | Produces selected session-family logout Audit events. | Persists `metadata.familyCorrelation`, not `metadata.familyId`; revocation still uses raw runtime `familyId`. |
+| `components/dashboard/session-management/types.ts` and `SessionManagementView.tsx` | Displays and submits the runtime session-management identity. | Unchanged; the UI does not consume the Audit correlation field. |
+| `modules/audit/application/commands.ts` and `modules/audit/infrastructure/persistence/audit-log-repository.ts` | Generic JSON Audit append and serialization. | Remains schema-agnostic; new and historical details are stored/read as JSON. |
+| `GET /api/audit-logs`, Audit application queries, dashboard provider/types/display | Returns/parses generic `details`; dashboard summaries ignore unknown session metadata. | Both historical `familyId` and new `familyCorrelation` shapes remain readable; no raw session identifier is newly displayed. |
+| Audit export, operational logs, tests, and historical docs | Export does not query family correlation; failure logs carry action/entity/error context, not refresh secrets; historical references document prior behavior. | No runtime export/UI contract changed; historical Audit rows are not rewritten. |
+| Audit retention | `AUDIT_LOG_RETENTION_DAYS = 90`. | Unchanged. |
+
+There is no raw `familyId` in new refresh-security or selected-session-revoke
+Audit details. Login success/failure, current logout, logout-all, password
+reset, and signup event producers do not receive a family ID and were not
+changed by this policy. The current Auth family ID is random, is not a raw
+refresh token, and is not usable by itself as an authentication credential;
+L3 treats the change as defense-in-depth/privacy hardening rather than a
+credential-leak correction.
+
+### 20.6 Selected Audit correlation representation
+
+L3 selects **Option B — deterministic truncation/redaction**. The new
+`metadata.familyCorrelation` is the first 16 lowercase hexadecimal characters
+of the normal 32-character runtime family ID. This preserves equality
+correlation for operators while retaining 64 bits rather than all 128 bits of
+the random identifier. At one million distinct values in the 90-day window,
+the birthday-bound collision probability for a 64-bit prefix is approximately
+2.7 × 10^-8; this is an operational correlation aid, not an authorization
+key, and that residual risk is accepted for the current scale. The normal
+family ID generator is the source of the 32-character format. An unexpected
+non-conforming value produces the fixed `unavailable` marker rather than
+persisting a short raw identifier.
+
+The representation is deterministic for equality correlation, does not add a
+secret or rotation dependency, is never accepted by Auth runtime functions,
+and is not used as a cookie, access-token claim, refresh token, or session
+authorization input. Tests cover deterministic output, distinct normal family
+IDs, malformed/short fallback, and absence of a raw `familyId` field from new
+producer details. Existing Audit rows containing `metadata.familyId` remain
+untouched and readable. The generic API parser and dashboard display tolerate
+both shapes without trying to reinterpret either one.
+
+### 20.7 Gate E — best-effort security Audit failure contract
+
+The best-effort contract is retained intentionally. The security/session
+operation is completed first, Audit persistence is attempted independently,
+and `appendAuditBestEffort()` catches persistence errors. The failure log now
+has an explicit `event: "audit_persistence_failed"` marker plus the Audit
+action, entity type, entity ID, and safe error message. It does not log Audit
+details, raw refresh tokens, or runtime family IDs. The caller's Auth/LIFF
+authorization result and session containment are not changed by an Audit sink
+failure.
+
+The tested invariant is:
+
+- successful login remains successful when its Audit write fails;
+- failed login remains 401 when its Audit write fails;
+- confirmed refresh reuse remains 401 after family containment when its Audit
+  write fails;
+- current logout, logout-all, and selected-session revoke retain their
+  revocation result and cookie invalidation when Audit persistence fails; and
+- the failure log contains actionable event/action/entity context without a
+  raw refresh secret.
+
+No Audit outbox, retry queue, new persistence table, or retry architecture was
+introduced. Repository evidence can prove the application emits the
+structured stderr/process log, but cannot prove the retention/alerting policy
+of the deployed process supervisor or log platform. Production monitoring
+must therefore retain and alert on `audit_persistence_failed` events; that is
+an operator requirement, not an authorization dependency. A future durable
+Audit requirement would be a separate design and availability decision.
+
+### 20.8 Schema, performance, and compatibility decision
+
+No Prisma schema or migration change was required. The existing unique
+`LineAccountLink.userId` index supports the current-link check with a
+minimal `select: { lineUserId: true }`; there is no N+1 link lookup inside a
+single protected request and no process-memory cache that could recreate the
+stale-link window. The tradeoff is one indexed database read per protected
+LIFF request and making current-link database availability part of
+authorization. A read failure returns 500 and never authorizes. Redis,
+explicit link-version state, and a generic session-revocation framework were
+not justified by the current invariant.
+
+The implementation preserves LINE ID-token verification, bootstrap/recovery
+contracts, account-link uniqueness/idempotency/P2002 handling, the LIFF cookie
+and TTL contract, User/Employee eligibility, Leave/Stock/Routine business
+authorization, Auth refresh/session behavior, L2 rate/proxy behavior, Audit
+action/entity enums, historical Audit data, 90-day retention, Notification,
+Outbox, and Email Request behavior. Password reset and web logout/logout-all
+remain intentionally independent from LIFF. No product unlink/relink UI was
+added.
+
+### 20.9 L3 dispositions and remaining risks
+
+- **L0-LINE-01 — CLOSED under immediate current-link enforcement.** A
+  protected LIFF credential is identity-bound and cannot survive deletion while
+  the link is absent or relinking to a different LINE identity. Recreating the
+  exact same provider relationship is intentionally not a link-row revocation
+  event under this L3 contract. User/Employee lifecycle invalidation remains
+  promptly enforced and independent.
+- **L0-AUDIT-01 — CLOSED under `familyCorrelation`.** New security Audit rows
+  do not persist raw Auth `familyId`; historical rows remain readable and
+  runtime session management is unchanged.
+- **L0-AUDIT-02 — CLOSED as an explicit intentional best-effort contract.**
+  Audit sink loss remains an operational observability risk, with structured
+  failure signaling and an operator log-retention/alerting requirement; it
+  cannot weaken authorization, revocation, or session containment.
+
+Remaining L3 risks are the additional LIFF database read/availability
+dependency, the accepted 64-bit Audit correlation collision residual, and the
+operator requirement to retain/alert on the structured Audit failure log.
+There is no repository-supported unlink/relink endpoint, so product UX for
+that future operation remains outside L3. LIFF remains independent of web
+password reset and web logout by explicit contract. These are documented
+policies, not claims of immediate invalidation beyond the selected link and
+current User/Employee checks.
+
+### 20.10 L3 verification record
+
+The exact verification record for this implementation is:
+
+- pre-change focused baseline: `npm.cmd exec vitest run
+  __tests__/auth/liff.test.ts __tests__/lib/line-account-link.test.ts
+  __tests__/api/line-auth-routes.test.ts __tests__/api/line-home-route.test.ts
+  __tests__/api/line-leave-routes.test.ts __tests__/api/line-stock-routes.test.ts
+  __tests__/api/line-routine-routes.test.ts
+  __tests__/api/auth-audit-best-effort.test.ts` — PASS; 8 files / 88 tests;
+- pre-change stale-link characterization: `npm.cmd exec vitest run
+  __tests__/auth/liff.test.ts` — PASS; 1 file / 16 tests, including the
+  deleted/relinked-link baseline assertions described in section 20.2;
+- final focused LINE/Auth/Audit command — PASS; 17 files / 157 tests, covering
+  LIFF claims and guard behavior, all representative Home/Leave/Stock/Routine
+  adapters, link persistence, Auth refresh/session routes, Audit
+  best-effort/failure handling, correlation, historical parsing, dashboard
+  display, API compatibility, and retention:
+
+  ```text
+  npm.cmd exec vitest run __tests__/api/audit-log-route.test.ts __tests__/auth/liff.test.ts __tests__/lib/line-liff-session.test.ts __tests__/lib/line-account-link.test.ts __tests__/api/line-auth-routes.test.ts __tests__/api/line-home-route.test.ts __tests__/api/line-leave-routes.test.ts __tests__/api/line-stock-routes.test.ts __tests__/api/line-routine-routes.test.ts __tests__/api/hybrid-auth-routes.test.ts __tests__/api/auth-audit-best-effort.test.ts __tests__/api/auth-audit-failure-containment.test.ts modules/auth/application/audit-correlation.test.ts modules/audit/application/commands.test.ts modules/audit/application/queries.test.ts modules/audit/presentation/dashboard/display.test.ts modules/audit/application/retention.test.ts
+  ```
+- `npm.cmd run architecture:check` — PASS; 1,007 repository source files
+  checked;
+- `npm.cmd run lint:strict` — PASS with zero warnings;
+- `npm.cmd run typecheck` — PASS;
+- `npm.cmd run test:run` — one post-implementation run PASSed with 262 files /
+  2,167 tests. Two later exact reruns encountered only resource-sensitive
+  5-second timeouts in unrelated architecture fixture tests: one had 1 failed
+  test and one had 11 failed tests, with no assertion failures. The
+  architecture test file rerun alone passed 220 / 220 tests;
+- `npm.cmd run test:run -- --testTimeout=15000` — PASS; 263 files / 2,171
+  tests, confirming the timeout diagnosis without changing repository test
+  code or configuration;
+- `npm.cmd run test:integration:mysql` — PASS; 65 migrations found, no
+  pending migrations, 11 files / 78 tests;
+- `git diff --check` — PASS after the final documentation update;
+- development server — NOT RUN;
+- production build — NOT RUN.
+
+No Prisma schema or migration was changed. No Notification, Outbox, Email
+Request, or L4 work was started.

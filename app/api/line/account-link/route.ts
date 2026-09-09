@@ -50,6 +50,7 @@ async function handleAccountLink(
         const liffSession = await issueLiffSession({
             userId: auth.user.id,
             employeeId: auth.employeeId,
+            lineUserId: lineIdentity.lineUserId,
         });
         const response = NextResponse.json({
             linked: true,

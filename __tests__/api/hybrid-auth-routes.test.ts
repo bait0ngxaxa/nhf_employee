@@ -104,7 +104,7 @@ describe("Hybrid auth routes", () => {
                 metadata: {
                     authFlow: "hybrid_refresh",
                     reason,
-                    familyId: "family-1",
+                    familyCorrelation: "unavailable",
                     ipAddress: "203.0.113.20",
                     userAgent: "hybrid-auth-test-agent",
                 },
@@ -502,7 +502,7 @@ describe("Hybrid auth routes", () => {
             details: {
                 metadata: {
                     method: "hybrid_logout_single_session",
-                    familyId: "family-1",
+                    familyCorrelation: "unavailable",
                 },
             },
         });

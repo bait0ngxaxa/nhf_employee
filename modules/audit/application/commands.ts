@@ -28,6 +28,7 @@ export async function appendAuditBestEffort(
         await appendAuditLog(command);
     } catch (error) {
         console.error("[AuditLog] Failed to create audit log:", {
+            event: "audit_persistence_failed",
             action: command.action,
             entityType: command.entityType,
             entityId: command.entityId,

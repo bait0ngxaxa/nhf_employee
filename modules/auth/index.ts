@@ -33,6 +33,10 @@ export {
     EmployeeAccountLifecycleError,
 } from "./application/employee-account-lifecycle";
 export {
+    AUDIT_FAMILY_CORRELATION_LENGTH,
+    getAuditFamilyCorrelation,
+} from "./application/audit-correlation";
+export {
     AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS,
 } from "./infrastructure/persistence/refresh-token-repository";
 export type {
