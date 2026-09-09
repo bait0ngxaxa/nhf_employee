@@ -383,47 +383,104 @@ an unconditional two-successor path.
   confirmed protected-resource bypass.
 - Area: Refresh eligibility versus server account resolution.
 - Evidence / relevant paths:
-  modules/auth/infrastructure/persistence/refresh-token-repository.ts:5-16;
-  modules/auth/application/sessions.ts:63-76 and 136-165;
-  modules/auth/application/account-identity.ts;
-  modules/employee account lifecycle integration.
-- Current behavior: The refresh lookup selects User.isActive and tokenVersion,
-  but not User.deletedAt or Employee status/deletedAt. The refresh application
-  pre-check rejects only !existingToken.user.isActive. It can therefore issue
-  a new access/refresh pair for a deleted User or ineligible Employee if the
-  refresh row is otherwise active. Later protected server resolution rereads
-  current User/Employee state and rejects the access token.
+  `modules/auth/infrastructure/persistence/refresh-token-repository.ts:5-22`
+  and `160-197`; `modules/auth/application/sessions.ts:32-112` and
+  `136-165`; `modules/auth/infrastructure/persistence/account-repository.ts:22-32`
+  and `176-198`; `modules/employee/application/mutations.ts:140-158` and
+  `280-346`; `modules/auth/application/employee-account-lifecycle.ts:57-75`;
+  `docs/architecture/employee-migration.md:540-549` and `924-935`;
+  `modules/employee/application/mutations.test.ts:575-610` and
+  `__tests__/lib/server-auth-token-version.test.ts:125-152`.
+- Current behavior: The refresh lookup selects `User.isActive` and
+  `tokenVersion`, but not `User.deletedAt` or Employee `status`/`deletedAt`;
+  the refresh pre-check therefore rejects only an inactive User before the
+  atomic refresh-row rotation. Protected account resolution separately
+  rereads `User.deletedAt`, Employee eligibility, `tokenVersion`, and the
+  active session family.
+- Reachability distinction:
+  - Supported persistent state: OFFBOARD and SUSPEND run through the
+    serializable Employee lifecycle transaction. It locks the Employee and
+    linked User, writes the Employee state, sets the linked User inactive,
+    increments `tokenVersion`, and revokes all non-revoked refresh rows before
+    commit. The repository contains no evidence that an ordinary supported
+    offboarding path leaves `Employee` ineligible while
+    `User.isActive = true` and an active refresh family remains. Reactivation
+    likewise increments the token version and revokes sessions.
+  - Inconsistent/legacy/manual state: If Employee state or `User.deletedAt`
+    is changed without the paired Auth/session update, an otherwise active
+    refresh row can pass the narrow pre-check and rotate. The resulting access
+    token is rejected by the standard protected resolver; this is an issuance
+    mismatch, not a confirmed authorization bypass. No supported application
+    User-deletion path was found that sets `User.deletedAt` without the
+    corresponding account controls.
+  - Temporary concurrency/stale read: A refresh lookup occurs before the
+    rotation transaction and can read the pre-lifecycle state. If lifecycle
+    invalidation commits first, the conditional rotation sees the revoked row
+    and returns unauthorized. If rotation commits first, the lifecycle
+    transaction later revokes the successor and increments `tokenVersion`;
+    the refresh code can still finish from its stale pre-read and return
+    cookies, but the family/token-version/account checks make the credentials
+    unusable. The exact interleaving still needs a real-MySQL characterization
+    test.
 - Security/reliability invariant: Credential issuance and protected-resource
   authorization should agree on current account eligibility. A deactivated,
-  deleted, or ineligible account should not receive a renewed credential.
-- Concrete failure scenario: An employee is offboarded or marked deleted after
-  the refresh row was created while User.isActive remains true. A refresh
-  request rotates the token and sets cookies successfully; subsequent
-  protected calls fail only when account resolution performs its later checks.
-- Current mitigation: Employee lifecycle changes revoke refresh sessions;
-  password reset increments tokenVersion and revokes sessions; protected
-  resolution checks User.deletedAt, Employee status/deletedAt, tokenVersion,
-  and active family.
-- Residual risk: Unusable credentials are still issued, the family may be
-  extended until the later failure, and any endpoint that fails to use the
-  server resolver would not inherit the mitigation. No current evidence shows
-  a direct authorization bypass through the standard protected routes.
-- Severity: Medium.
-- Confidence: High.
-- Whether production behavior must change: Yes, to make refresh issuance
-  match the existing authorization invariant.
-- Whether schema/migration may be required: No for rereading existing User and
-  Employee state; a token-version or LIFF-style revocation design would be a
-  separate choice.
-- Compatibility constraints: Preserve 401 semantics, refresh cookies, account
-  lifecycle behavior, and no client-visible schema/API change.
-- Recommended future phase: L1.
-- Acceptance criteria: Refresh rejects and appropriately contains a session
-  for deleted Users and ineligible Employees; no renewed cookies are returned
-  for those states; normal active accounts keep the current contract.
-- Required tests: Refresh against inactive, deleted, inactive-Employee, and
-  deleted-Employee fixtures; race lifecycle-change/refresh; protected API
-  regression tests; Audit behavior for rejected refreshes.
+  deleted, or ineligible linked account should not receive a renewed usable
+  credential, while the existing intentionally unlinked-account behavior must
+  remain explicit.
+- Concrete failure scenario: At T0 an Employee is active with an active
+  refresh row. At T1 refresh reads the row and only `User.isActive=true`. At
+  T2 either (a) the lifecycle transaction commits first, causing the
+  conditional rotation to fail, or (b) rotation commits first and lifecycle
+  then revokes the successor and increments `tokenVersion`. In case (b), the
+  response may contain a newly issued pair even though later protected
+  resolution rejects it. A separate legacy/manual inconsistent row can make
+  the rotation succeed repeatedly until state is repaired, but standard
+  protected routes still reject the resulting access tokens.
+- Current mitigation: Supported Employee lifecycle changes coordinate User
+  deactivation, token-version invalidation, and refresh-family revocation in
+  one transaction; password reset does the same for password invalidation;
+  protected resolution checks `User.isActive`, `User.deletedAt`, Employee
+  status/deletedAt, `tokenVersion`, and active family. Existing lifecycle,
+  login-eligibility, and resolver tests cover the supported state transitions
+  and later authorization rejection, but not this refresh/lifecycle race on a
+  real database.
+- Residual risk: The refresh boundary can issue a short-lived, unusable
+  credential from inconsistent persisted state or a stale concurrent read,
+  and the family can be rotated before the caller learns that authorization
+  will fail. A future protected entry point that bypassed the standard
+  resolver would increase the impact, but no such current path was found.
+- Severity: Low.
+- Confidence: Medium — high confidence in the field-selection mismatch and
+  supported lifecycle mitigation; medium confidence in the frequency and
+  operational impact of inconsistent or concurrent states because the required
+  real-MySQL characterization is not present.
+- Whether production behavior must change: No immediate production change is
+  justified by L0 evidence. L1 should characterize the race first, then may
+  align refresh eligibility with the resolver as defense-in-depth without
+  treating this finding as a current authorization defect.
+- Whether schema/migration may be required: No. Existing User and Employee
+  fields and refresh-family/token-version mechanisms are sufficient to test or
+  implement an alignment; no Prisma schema or migration is implied.
+- Compatibility constraints: Preserve 401 semantics, refresh cookies, the
+  intentionally supported unlinked-account behavior, account lifecycle
+  ordering, Thai messages, and the existing API/session contracts.
+- Recommended future phase: L1, beginning with real-MySQL state/race
+  characterization rather than an immediate schema or token redesign.
+- Acceptance criteria: Prove with database-backed tests that successful
+  OFFBOARD/SUSPEND commits leave the Employee ineligible, the linked User
+  inactive with an incremented token version, and no active refresh row in the
+  affected families. Exercise both commit orders of refresh versus lifecycle
+  and show that no active usable session survives. If L1 aligns the pre-check,
+  it must reject deleted Users and ineligible linked Employees before issuing
+  cookies while preserving active and intentionally unlinked accounts; the
+  document must continue to distinguish this defense-in-depth outcome from an
+  authorization-bypass finding.
+- Required tests: Real-MySQL integration tests for refresh versus OFFBOARD,
+  SUSPEND, REACTIVATE, password reset, logout-current, and logout-all;
+  fixtures for legacy/manual User/Employee inconsistency and `User.deletedAt`;
+  protected API tests proving resolver rejection; assertions that no usable
+  access token or active successor family remains after lifecycle success; and
+  Audit assertions for any rejected refresh security event.
 
 ### 5.6 Finding L0-AUTH-TEST-01 — refresh concurrency evidence gap
 
@@ -1183,7 +1240,7 @@ security vulnerability.
 | --- | --- | --- | --- | --- | --- |
 | Medium | L0-AUTH-01 | B | Concurrent refresh can false-positive as reuse and revoke a legitimate family | Yes | L1 |
 | Medium | L0-AUTH-02 | A | Session termination is not coordinated with rotation | Yes | L1 |
-| Medium | L0-AUTH-03 | C | Refresh pre-check omits deleted/Employee eligibility | Yes | L1 |
+| Low | L0-AUTH-03 | C | Refresh pre-check omits deleted/Employee eligibility; supported lifecycle already revokes and invalidates sessions | No immediate; L1 decision | L1 |
 | Medium | L0-REPLAY-01 | B/C | Generic web 401 recovery can replay mutations | Yes | L1 |
 | Medium | L0-RATE-01 | B/C | Process-local abuse controls do not scale with topology | Conditional | L2 |
 | Medium | L0-LINE-01 | D | No post-issuance LineAccountLink reread | Conditional | L3 |
@@ -1290,9 +1347,12 @@ migration, or deployment file was changed.
 Required checks:
 
 - git status inspection: PASS before authoring; PASS after authoring with only
-  this document changed;
-- git diff inspection: PASS; final diff is limited to this document;
-- npm run architecture:check: PASS;
+  this document and `final-repository-audit.md` changed;
+- git diff inspection: PASS; final diff is limited to the two architecture
+  documents;
+- `npm run architecture:check`: blocked by the local PowerShell execution
+  policy for `npm.ps1`; equivalent `npm.cmd run architecture:check`: PASS
+  (`997` repository source files checked);
 - git diff --check: PASS;
 - development server: NOT RUN;
 - production build: NOT RUN;

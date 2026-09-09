@@ -375,6 +375,11 @@ path exist.
 | At-least-once provider delivery and external idempotency behavior | Intentional reliability tradeoff / technical debt candidate | Provider dispatch can require retry and deduplication semantics | Redesigning outbox/provider behavior is explicitly out of K0 scope | Revisit only as a reliability design, without moving the shared processor into Notification |
 | No organization/tenant model | Intentional product constraint | NHF remains single-organization | Reviving Organization would contradict the established decision | No action unless product scope explicitly changes |
 
+Runtime/security/reliability hardening is a separate L-series track from the
+historical K0/K1 modular-boundary work. Its authoritative current-state record
+is [`docs/architecture/runtime-hardening.md`](./runtime-hardening.md). Email
+Request / future IT remains deferred and is not part of that hardening track.
+
 ## 11. Obsolete-Code Candidates
 
 These are not deleted in K0. “Obsolete candidate” means no legitimate
