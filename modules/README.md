@@ -73,10 +73,11 @@ meaning and uses the public LINE read contract. The browser entry contains only
 browser-safe LIFF transport, DTOs, SDK bootstrap, and recovery, and cannot
 reach server secrets or the LINE server entry.
 
-The LIFF JWT/cookie contract and the rule that normal post-issuance workforce
-authorization does not reread `LineAccountLink` remain unchanged. Provider
-Messaging/outbox infrastructure remains under its existing platform/provider
-owners, and feature modules retain notification meaning.
+The LIFF session cookie name and lifetime contract remain compatible. Phase L3
+binds issued LIFF sessions to the verified LINE user identity and protected
+LIFF requests revalidate the current `LineAccountLink` before authorization.
+Provider Messaging/outbox infrastructure remains under its existing
+platform/provider owners, and feature modules retain notification meaning.
 Employee F0-F3 owns its server/business behavior and active presentation in
 `modules/employee/`. Employee Dashboard routes consume the minimal
 browser-safe `@/modules/employee/client` entry, which also exposes the proven
