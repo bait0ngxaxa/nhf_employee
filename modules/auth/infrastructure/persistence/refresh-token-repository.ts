@@ -25,6 +25,8 @@ const REFRESH_TOKEN_WITH_USER_INCLUDE = {
 
 type RefreshTokenStore = Pick<Prisma.TransactionClient, "authRefreshToken">;
 
+export const AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS = 5_000;
+
 export type RefreshTokenWithUser = Prisma.AuthRefreshTokenGetPayload<{
     include: typeof REFRESH_TOKEN_WITH_USER_INCLUDE;
 }>;
@@ -187,9 +189,21 @@ async function findActiveSuccessor(
     });
 }
 
+function isWithinConcurrentCompletionWindow(input: {
+    sourceRevokedAt: Date;
+    sourceLastUsedAt: Date | null;
+    now: Date;
+}): boolean {
+    if (input.sourceLastUsedAt === null) return false;
+
+    return Math.abs(input.now.getTime() - input.sourceRevokedAt.getTime())
+        <= AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS;
+}
+
 async function classifyRevokedSource(input: {
     tokenId: string;
     familyId: string;
+    sourceRevokedAt: Date;
     sourceLastUsedAt: Date | null;
     now: Date;
     client: RefreshTokenStore;
@@ -199,7 +213,10 @@ async function classifyRevokedSource(input: {
         input.now,
         input.client,
     );
-    if (successor?.lastUsedAt === null) {
+    if (
+        successor?.lastUsedAt === null
+        && isWithinConcurrentCompletionWindow(input)
+    ) {
         const marked = await input.client.authRefreshToken.updateMany({
             where: {
                 id: successor.id,
@@ -277,6 +294,7 @@ export async function rotateRefreshTokenAtomically(input: {
             return classifyRevokedSource({
                 tokenId: input.tokenId,
                 familyId: source.familyId,
+                sourceRevokedAt: source.revokedAt,
                 sourceLastUsedAt: source.lastUsedAt,
                 now: input.now,
                 client: tx,
@@ -310,6 +328,7 @@ export async function rotateRefreshTokenAtomically(input: {
                 return classifyRevokedSource({
                     tokenId: input.tokenId,
                     familyId: latestSource.familyId,
+                    sourceRevokedAt: latestSource.revokedAt,
                     sourceLastUsedAt: latestSource.lastUsedAt,
                     now: input.now,
                     client: tx,
@@ -335,6 +354,7 @@ export async function rotateRefreshTokenAtomically(input: {
                 return classifyRevokedSource({
                     tokenId: input.tokenId,
                     familyId: source.familyId,
+                    sourceRevokedAt: input.now,
                     sourceLastUsedAt: input.now,
                     now: input.now,
                     client: tx,

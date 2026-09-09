@@ -32,6 +32,9 @@ export {
     employeeAccountLifecycle,
     EmployeeAccountLifecycleError,
 } from "./application/employee-account-lifecycle";
+export {
+    AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS,
+} from "./infrastructure/persistence/refresh-token-repository";
 export type {
     AuthClientMetadata,
     AuthenticatedAccount,

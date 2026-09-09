@@ -10,6 +10,9 @@ import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
 } from "@/lib/auth/hybrid/constants";
+import {
+    AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS,
+} from "@/modules/auth";
 
 const { appendAuditBestEffortMock, prismaMock } = vi.hoisted(() => ({
     appendAuditBestEffortMock: vi.fn(),
@@ -145,7 +148,9 @@ describe("Hybrid auth routes", () => {
     });
 
     it("accepts one concurrent completion without revoking the family", async () => {
-        const rotatedAt = new Date(Date.now() - 60_000);
+        const rotatedAt = new Date(
+            Date.now() - AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS + 1_000,
+        );
         prismaMock.authRefreshToken.findUnique
             .mockResolvedValueOnce({
                 id: "rt1",
@@ -242,6 +247,72 @@ describe("Hybrid auth routes", () => {
         });
         expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
         expect(response.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("revokes the family when an unused successor is reused outside the completion window", async () => {
+        const rotatedAt = new Date(
+            Date.now() - AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS - 1,
+        );
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
+            id: "rt1",
+            userId: 1,
+            familyId: "family-1",
+            revokedAt: rotatedAt,
+            expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+            lastUsedAt: rotatedAt,
+            user: { id: 1, email: "u@test.com", role: "ADMIN", isActive: true, tokenVersion: 1 },
+        });
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue({
+            id: "rt2",
+            lastUsedAt: null,
+        });
+
+        const request = new NextRequest("http://localhost/api/auth/refresh", {
+            method: "POST",
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
+        });
+        const response = await refreshRoute(request);
+
+        expect(response.status).toBe(401);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { familyId: "family-1", revokedAt: null },
+            data: { revokedAt: expect.any(Date) },
+        });
+        expectRefreshSecurityAudit("refresh_token_reuse_or_expired");
+        expect(prismaMock.authRefreshToken.create).not.toHaveBeenCalled();
+        expect(response.headers.get("set-cookie")).toContain(
+            `${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`,
+        );
+    });
+
+    it("does not accept concurrent completion without an active successor", async () => {
+        const rotatedAt = new Date(Date.now() - 1_000);
+        prismaMock.authRefreshToken.findUnique.mockResolvedValue({
+            id: "rt1",
+            userId: 1,
+            familyId: "family-1",
+            revokedAt: rotatedAt,
+            expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+            lastUsedAt: rotatedAt,
+            user: { id: 1, email: "u@test.com", role: "ADMIN", isActive: true, tokenVersion: 1 },
+        });
+        prismaMock.authRefreshToken.findFirst.mockResolvedValue(null);
+
+        const request = new NextRequest("http://localhost/api/auth/refresh", {
+            method: "POST",
+            headers: { ...csrfHeaders, cookie: `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token` },
+        });
+        const response = await refreshRoute(request);
+
+        expect(response.status).toBe(401);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { familyId: "family-1", revokedAt: null },
+            data: { revokedAt: expect.any(Date) },
+        });
+        expectRefreshSecurityAudit("refresh_token_reuse_or_expired");
+        expect(response.headers.get("set-cookie")).toContain(
+            `${HYBRID_ACCESS_COOKIE_NAME}=; Path=/; Max-Age=0`,
+        );
     });
 
     it("refresh revokes the family when a rotated source is reused after completion", async () => {

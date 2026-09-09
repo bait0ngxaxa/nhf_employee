@@ -8,6 +8,7 @@ import {
     issueAccessToken,
 } from "@/lib/auth/hybrid/tokens";
 import {
+    AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS,
     employeeAccountLifecycle,
     refreshHybridSession,
     resetPassword,
@@ -281,6 +282,16 @@ async function runRefresh(scenario: Scenario) {
     });
 }
 
+async function setSourceRotationTimestamp(
+    scenario: Scenario,
+    timestamp: Date,
+): Promise<void> {
+    await prisma.authRefreshToken.update({
+        where: { id: scenario.sourceId },
+        data: { revokedAt: timestamp, lastUsedAt: timestamp },
+    });
+}
+
 async function runEmployeeLifecycle(
     scenario: Scenario,
     status: LifecycleOperation,
@@ -362,6 +373,85 @@ describe.sequential("Auth/session concurrency characterization with real MySQL",
             familyRevokedAfterConfirmedReuse,
         });
         expect(familyRevokedAfterConfirmedReuse).toBe(8);
+    });
+
+    it("accepts an immediate same-source completion without revoking the winner", async () => {
+        const scenario = await createScenario({ slug: "immediate-completion" });
+        const firstResult = await runRefresh(scenario);
+        expect(firstResult.status).toBe("success");
+        if (firstResult.status !== "success") {
+            throw new Error("คาดว่า refresh ครั้งแรกจะสำเร็จ");
+        }
+
+        const beforeCompletion = await readRefreshState(scenario);
+        expect(beforeCompletion.successors).toHaveLength(1);
+        expect(beforeCompletion.successors[0]?.lastUsedAt).toBeNull();
+
+        const completionResult = await runRefresh(scenario);
+        expect(completionResult).toEqual({
+            status: "unauthorized",
+            preserveCookies: true,
+        });
+
+        const afterCompletion = await readRefreshState(scenario);
+        expect(afterCompletion.activeRows).toHaveLength(1);
+        expect(afterCompletion.successors[0]?.lastUsedAt).not.toBeNull();
+        await expect(resolveAuthenticatedAccount(firstResult.accessToken))
+            .resolves.not.toBeNull();
+    });
+
+    it("confirms reuse outside the completion window even when the successor marker is unused", async () => {
+        const scenario = await createScenario({ slug: "outside-completion-window" });
+        const firstResult = await runRefresh(scenario);
+        expect(firstResult.status).toBe("success");
+
+        const oldRotationTimestamp = new Date(
+            Date.now() - AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS - 1,
+        );
+        await setSourceRotationTimestamp(scenario, oldRotationTimestamp);
+        const beforeReuse = await readRefreshState(scenario);
+        expect(beforeReuse.source?.lastUsedAt).toEqual(oldRotationTimestamp);
+        expect(beforeReuse.successors).toHaveLength(1);
+        expect(beforeReuse.successors[0]?.lastUsedAt).toBeNull();
+
+        const reuseResult = await runRefresh(scenario);
+        expect(reuseResult.status).toBe("unauthorized");
+        if (reuseResult.status === "unauthorized") {
+            expect(reuseResult.securityEvent?.reason).toBe(
+                "refresh_token_reuse_or_expired",
+            );
+        }
+
+        const finalState = await readRefreshState(scenario);
+        expect(finalState.activeRows).toHaveLength(0);
+        expect(finalState.successors[0]?.revokedAt).not.toBeNull();
+        await expect(resolveAuthenticatedAccount(
+            firstResult.status === "success" ? firstResult.accessToken : undefined,
+        )).resolves.toBeNull();
+    });
+
+    it("confirms reuse after an accepted concurrent completion consumes the marker", async () => {
+        const scenario = await createScenario({ slug: "completion-marker-reuse" });
+        const firstResult = await runRefresh(scenario);
+        expect(firstResult.status).toBe("success");
+
+        const completionResult = await runRefresh(scenario);
+        expect(completionResult).toEqual({
+            status: "unauthorized",
+            preserveCookies: true,
+        });
+
+        const reuseResult = await runRefresh(scenario);
+        expect(reuseResult.status).toBe("unauthorized");
+        if (reuseResult.status === "unauthorized") {
+            expect(reuseResult.securityEvent?.reason).toBe(
+                "refresh_token_reuse_or_expired",
+            );
+        }
+
+        const finalState = await readRefreshState(scenario);
+        expect(finalState.activeRows).toHaveLength(0);
+        expect(finalState.successors[0]?.revokedAt).not.toBeNull();
     });
 
     it("characterizes refresh versus logout-current in both commit orders", async () => {

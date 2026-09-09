@@ -1353,6 +1353,9 @@ regression suite.
 
 ### 15.3 L1 implementation / closure
 
+This corrective pass closes the remaining time-unbounded refresh-reuse issue;
+L1 status is **CLOSED**.
+
 L1 implementation was completed from the Gate A evidence above. The final
 contract below is the current source of truth for Auth/session refresh and
 generic browser 401 recovery.
@@ -1361,7 +1364,7 @@ generic browser 401 recovery.
 
 The characterization suite was retained and strengthened as
 `__tests__/integration/auth-session-concurrency.integration.test.ts`. The
-final run used the same MySQL harness and exercised 75 tests across 11
+final run used the same MySQL harness and exercised 78 tests across 11
 integration files. It repeated refresh/refresh, logout-all, and per-session
 revoke schedules; used controlled commit-order checks for logout-current; and
 asserted final database state, User.tokenVersion, Employee lifecycle state,
@@ -1380,6 +1383,14 @@ Final repeated observations were:
 | Refresh vs REACTIVATE | Reactivation also increments tokenVersion and revokes the old family; the old refresh credential did not become usable. |
 | Account eligibility | Deleted and suspended linked accounts were rejected and their families revoked; an active unlinked account remained supported and could refresh. |
 
+The corrective timestamp cases use persisted timestamp setup rather than
+sleeping for the security window. An immediate same-source completion keeps the
+single successor and its family active; moving the source timestamps to 5,001
+milliseconds before the reuse request leaves the successor marker null but
+revokes the family; and reusing the source after an accepted completion also
+revokes the family. The repeated refresh/refresh test remains in place as the
+database-backed concurrency check.
+
 #### Chosen refresh state machine
 
 `rotateRefreshTokenAtomically` now locks the User row before reading the
@@ -1391,15 +1402,20 @@ The application result names are precise rather than using the old
 1. `rotated`: an eligible, unexpired, unrevoked source is claimed once and
    creates exactly one successor. The access token uses the account role and
    tokenVersion read under the same User-row coordination.
-2. `concurrentCompletion`: the source is already revoked, exactly one active
-   direct successor exists, and its existing `lastUsedAt` completion marker is
-   atomically claimed. This result does not mint a second successor, does not
-   revoke the family, and does not emit a malicious-reuse Audit event. The
-   HTTP result remains the existing 401 shape, but preserves cookies so a
-   winning concurrent response is not erased.
-3. `confirmedReuse`: the source has already completed its accepted concurrent
-   completion or has no unconsumed completion marker. The entire family is
-   revoked in the same User-coordinated transaction and the existing
+2. `concurrentCompletion`: the source is already revoked by a prior rotation,
+   its `lastUsedAt` is non-null as the source-rotation proof, exactly one active
+   unexpired direct successor exists, its existing `lastUsedAt` completion
+   marker is null, and the absolute difference between the server request time
+   and source `revokedAt` is at most
+   `AUTH_REFRESH_CONCURRENT_COMPLETION_WINDOW_MS` (5,000 milliseconds). The
+   marker is then atomically claimed. This result does not mint a second
+   successor, does not revoke the family, and does not emit a malicious-reuse
+   Audit event. The HTTP result remains the existing 401 shape, but preserves
+   cookies so a winning concurrent response is not erased.
+3. `confirmedReuse`: a rotated source is reused outside the five-second
+   completion window, its completion marker was already claimed, or it has no
+   active direct successor. The entire family is revoked in the same
+   User-coordinated transaction and the existing
    `refresh_token_reuse_or_expired` security event is emitted.
 4. `expired`: the family is revoked and the existing reuse/expired security
    event is emitted.
@@ -1410,22 +1426,32 @@ The application result names are precise rather than using the old
    family is revoked and the existing inactive-user security event is emitted.
 7. `invalid`: missing or inconsistent source state produces no successor.
 
-The one-time marker uses the existing successor `lastUsedAt` column. It is
-not a grace window and does not make the old token a bearer token: the
-concurrent caller receives 401 and no new credential. After that marker is
-consumed, another use of the old source is confirmed reuse and revokes the
-family. This is the smallest bounded policy supported by the existing
-schema and preserves containment while avoiding the observed false-positive
-family destruction.
+The completion marker uses the existing successor `lastUsedAt` column. It is a
+one-use marker, not proof of concurrency by itself. The request-count bound is
+one successful marker claim per source; the time bound is five seconds from the
+source rotation boundary. The source `revokedAt` is the persisted boundary
+written when the source is claimed, while non-null source `lastUsedAt` excludes
+a source that was only explicitly terminated. Successor `createdAt` is not
+used as the boundary because it is a database-default timestamp and does not
+provide a more reliable request-overlap signal than the source claim timestamp.
+The request timestamp is generated server-side and is never client supplied;
+the absolute comparison also supports a legitimate loser whose timestamp was
+captured just before the User-row lock was acquired. At the inclusive boundary
+the marker may be claimed. Outside it, an unused marker is not accepted:
+the request is confirmed reuse, the family is revoked, and the caller receives
+the existing unauthorized/reuse-Audit behavior. A concurrent caller inside the
+window still receives 401 and no new credential. This is the smallest bounded
+policy supported by the existing schema while avoiding the observed
+false-positive family destruction.
 
 #### Why this design and rejected alternatives
 
 The User row lock is already used by Employee lifecycle code and can be
 shared by refresh, logout, reset, and family revocation. It gives all
 relevant operations one ordering point without weakening the source claim or
-the `rotatedFromId` uniqueness invariant. The existing `lastUsedAt` field
-provides one durable, conditional completion marker; no new persistent state
-was needed.
+the `rotatedFromId` uniqueness invariant. The existing source timestamps and
+`lastUsedAt` field provide a durable rotation boundary and conditional
+completion marker; no new persistent state was needed.
 
 The following alternatives were rejected: unconditional family revocation
 for every already-rotated source (the reproduced L0-AUTH-01 failure), making
@@ -1434,12 +1460,15 @@ unbounded grace window, a generation model, a new token table, a distributed
 lock, and a schema migration. Gate A did not demonstrate that the existing
 schema was insufficient for a bounded one-time completion contract.
 
-The exact security tradeoff is that one ambiguous old-source request may
-consume the completion marker without revoking the family. It still cannot
-mint a credential or independent successor. A second/out-of-contract reuse
-revokes the family. This bounded ambiguity is accepted to prevent a single
-legitimate near-simultaneous browser request from destroying the successful
-session.
+The exact security tradeoff is that at most one ambiguous old-source request
+inside the five-second server-time window may consume the completion marker
+without revoking the family. It still cannot mint a credential or independent
+successor. A request outside the window, or a second reuse after the marker is
+claimed, revokes the family and emits the reuse security event. The absolute
+timestamp comparison tolerates the small pre-lock ordering/clock-skew case
+within that same five-second bound; it does not accept a client-controlled
+timestamp. This bounded ambiguity is accepted to prevent a single legitimate
+near-simultaneous browser request from destroying the successful session.
 
 #### Termination ordering contract
 
@@ -1453,6 +1482,10 @@ which request returns first, has no usable targeted refresh successor.
 - logout-current resolves the supplied token's family and revokes every
   unrevoked row in that family, including a successor already created from
   the supplied source. Repeated logout remains idempotent.
+- A terminated family has no active successor eligible for
+  `concurrentCompletion`. Post-termination reuse therefore remains unusable;
+  a previously rotated source follows the confirmed-reuse path, while a source
+  that was only terminated follows the explicit-revocation path.
 - logout-all locks the account User row before revoking all of that user's
   refresh rows.
 - per-session revoke retains the user/family ownership check, then locks the
@@ -1485,7 +1518,7 @@ mutation methods and GET/HEAD recovery.
 
 | Finding | L1 disposition |
 | --- | --- |
-| L0-AUTH-01 | Closed. Real MySQL reproduced the false-positive; User coordination plus bounded one-time completion now preserves the legitimate successor and retains confirmed-reuse containment. |
+| L0-AUTH-01 | Closed. Real MySQL reproduced the false-positive; User coordination plus one-use completion bounded by both one request and five seconds now preserves the legitimate successor and retains confirmed-reuse containment. |
 | L0-AUTH-02 | Closed. Refresh, current-family logout, logout-all, per-session revoke, password reset, and Employee lifecycle invalidation share an explicit final-state ordering contract. |
 | L0-AUTH-03 | Closed as defense-in-depth. Refresh now rereads the protected account eligibility contract before issuance; unlinked valid accounts remain supported. This was not an authorization-bypass finding. |
 | L0-AUTH-TEST-01 | Closed. The real-MySQL characterization and final repeated concurrency suite are part of the repository integration tests. |
@@ -1495,12 +1528,14 @@ mutation methods and GET/HEAD recovery.
 
 No Prisma schema, migration, cookie name, route URL, or external Auth
 response shape changed. The existing User row, refresh-family rows,
-`rotatedFromId` uniqueness, and `lastUsedAt` column satisfy the final
-invariants. The only accepted residual Auth/session risk is the documented
-one-time ambiguity for an old source during legitimate near-simultaneous
-completion; it is bounded, cannot mint a credential, and escalates to family
-revocation on the next reuse. Distributed rate limiting and other abuse
-controls remain L2 scope.
+`rotatedFromId` uniqueness, source timestamps, and `lastUsedAt` column satisfy
+the final invariants. The only accepted residual Auth/session risk is the
+documented one-time ambiguity for an old source inside the five-second
+server-time window; it is also limited to one marker claim, cannot mint a
+credential, and escalates to family revocation on the next/out-of-window reuse.
+Deployment clocks must remain sufficiently synchronized for the server-side
+timestamp comparison; no client timing field is trusted. Distributed rate
+limiting and other abuse controls remain L2 scope.
 
 The exact command/results record is maintained below after the final
 repository verification pass.
@@ -1554,19 +1589,21 @@ the mocked route tests prove database atomicity.
 The L1 implementation verification record is separate from the historical L0
 record above.
 
-- baseline `git status --short --branch`: PASS; the repository was clean on
-  `main` before L1 changes;
-- Gate A and final `npm.cmd run test:integration:mysql`: PASS against
+- corrective-pass baseline `git status --short --branch`: PASS; the worktree
+  was clean at reviewed commit `ad1d23f80694e8428a9505d907f4c2a35e48e564`;
+- pre-fix Gate A `npm.cmd run test:integration:mysql`: PASS against
   `127.0.0.1:3309/employee_nhf_integration`; Prisma reported no pending
   migrations and Vitest passed 11 files / 75 tests;
 - focused Auth/session, Auth API, browser transport, LIFF, critical-flow,
   reset, and Employee lifecycle command: PASS, 8 files / 98 tests;
-- `npm.cmd run architecture:check`: PASS;
+- `npm.cmd run architecture:check`: PASS (1,000 repository source files
+  checked);
 - `npm.cmd run lint:strict`: PASS;
 - `npm.cmd run typecheck`: PASS;
-- `npm.cmd run test:run`: PASS after updating existing transaction mocks for
-  the shared User-row lock; the initial run exposed five stale test-double
-  failures and was not counted as the final pass;
+- `npm.cmd run test:run`: PASS, 257 files / 2,133 tests;
+- final `npm.cmd run test:integration:mysql`: PASS against
+  `127.0.0.1:3309/employee_nhf_integration`; Prisma reported no pending
+  migrations and Vitest passed 11 files / 78 tests;
 - `git diff --check`: PASS;
 - development server: NOT RUN;
 - production build: NOT RUN;
