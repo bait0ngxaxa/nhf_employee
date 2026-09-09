@@ -20,6 +20,7 @@ const { appendAuditBestEffortMock, hashPasswordMock, prismaMock } = vi.hoisted((
         authRefreshToken: {
             updateMany: vi.fn(),
         },
+        $queryRaw: vi.fn(),
         $transaction: vi.fn(),
     },
 }));
@@ -77,6 +78,7 @@ describe("Reset password route", () => {
         });
         prismaMock.user.update.mockResolvedValue({ id: 7 });
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 2 });
+        prismaMock.$queryRaw.mockResolvedValue([]);
         prismaMock.$transaction.mockImplementation(async (operation) => {
             if (typeof operation === "function") {
                 return operation(prismaMock);

@@ -21,6 +21,7 @@ export {
 } from "./presentation";
 export {
     fetchWithRefresh,
+    isHybridReplayableMethod,
     logoutHybridSession,
     refreshHybridSession,
     shouldAttemptHybridRefresh,

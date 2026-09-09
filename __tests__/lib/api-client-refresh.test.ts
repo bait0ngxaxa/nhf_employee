@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet, apiPost } from "@/lib/client/api-client";
+import { apiGet, apiPost, apiRequest } from "@/lib/client/api-client";
 
 describe("api-client refresh retry", () => {
     afterEach(() => {
@@ -51,6 +51,33 @@ describe("api-client refresh retry", () => {
             "/api/protected",
             expect.objectContaining({ credentials: "include", method: "GET" }),
         );
+    });
+
+    it.each([
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+    ] as const)("does not implicitly replay a %s after refresh", async (method) => {
+        const fetchMock = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ error: "Unauthorized" }), {
+                    status: 401,
+                    headers: { "content-type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+        const result = await apiRequest("/api/protected-mutation", {
+            method,
+            data: { value: 1 },
+        });
+
+        expect(result).toMatchObject({ success: false, status: 401 });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/protected-mutation");
+        expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/auth/refresh");
     });
 
     it("sends FormData without forcing JSON content-type", async () => {

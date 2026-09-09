@@ -12,12 +12,12 @@ import { enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";
 import { appendAuditBestEffort } from "@/modules/audit";
 import { refreshHybridSession } from "@/modules/auth";
 
-function unauthorizedResponse(): NextResponse {
+function unauthorizedResponse(input: { preserveCookies?: boolean } = {}): NextResponse {
     const response = NextResponse.json(
         { error: AUTH_ERROR_MESSAGES.unauthorized },
         { status: 401 },
     );
-    clearHybridAuthCookies(response);
+    if (!input.preserveCookies) clearHybridAuthCookies(response);
     return response;
 }
 
@@ -67,7 +67,7 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             if (result.securityEvent) {
                 await logRefreshSecurityEvent(result.securityEvent);
             }
-            return unauthorizedResponse();
+            return unauthorizedResponse(result);
         }
 
         const response = NextResponse.json({ success: true });

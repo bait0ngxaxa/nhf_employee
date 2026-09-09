@@ -21,6 +21,11 @@ export function shouldAttemptHybridRefresh(url: string): boolean {
     return !isHybridInternalPath(url);
 }
 
+export function isHybridReplayableMethod(method: string | undefined): boolean {
+    const normalizedMethod = method?.toUpperCase() ?? "GET";
+    return normalizedMethod === "GET" || normalizedMethod === "HEAD";
+}
+
 export async function refreshHybridSession(): Promise<boolean> {
     if (refreshInFlight) {
         return refreshInFlight;
@@ -58,7 +63,7 @@ export async function fetchWithRefresh(
         shouldAttemptHybridRefresh(url)
     ) {
         const refreshed = await refreshHybridSession();
-        if (refreshed) {
+        if (refreshed && isHybridReplayableMethod(init?.method)) {
             response = await fetch(url, init);
         }
     }

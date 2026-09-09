@@ -1319,6 +1319,192 @@ harness. Implementation choices should follow those results; L0 does not
 preselect a grace window, token-version design, row-lock design, or schema
 change.
 
+### 15.2 L1 Gate A — pre-implementation real-MySQL characterization
+
+The first L1 test pass added
+`__tests__/integration/auth-session-concurrency.integration.test.ts` and ran
+the existing `scripts/run-mysql-integration-tests.mjs` harness against
+MySQL `127.0.0.1:3309/employee_nhf_integration`. The test uses real Prisma
+operations and checks refresh rows, family state, User state, Employee state,
+tokenVersion, and protected-account resolution. It does not use repository
+mocks for the race scenarios.
+
+Observed baseline matrix before production changes:
+
+| Scenario | Interleaving / sample | Observed database result | Evidence classification |
+| --- | --- | --- | --- |
+| Refresh vs refresh, same source | Eight concurrent runs | Each run produced exactly one successor; the source was revoked; all eight families were then revoked. The successful access token was therefore destroyed by the losing caller's reuse path. | Reproduced in every run of the repeated sample; the exact lock schedule is MySQL-dependent. |
+| Refresh vs logout-current | Controlled commit order: termination first, then refresh; refresh first, then termination | Termination first left no active rows. Refresh first left the source revoked but its successor active, so the family remained usable. | Deterministic under the two controlled commit orders. This is the current source-only logout behavior, not a probabilistic inference. |
+| Refresh vs logout-all | Eight concurrent runs | One refresh succeeded across the eight runs; all eight final families had zero active rows. | Final state contained in every repeated run; the relative statement order is inferred from the result and was not controlled by a barrier. |
+| Refresh vs per-session family revoke | Eight concurrent runs | Two refreshes succeeded across the eight runs; all eight final families had zero active rows and all eight revoke calls found/processed the family. | Final state contained in every repeated run; the relative statement order is inferred from the result and was not controlled by a barrier. |
+| Refresh vs password reset | One concurrent run | Refresh returned success in the sample; reset committed, User.tokenVersion became 2, all family rows were inactive, and protected-account resolution rejected the issued access token. | Observed final state; serializable reset transaction and conditional rotation explain the containment, but no deterministic barrier was inserted. |
+| Refresh vs Employee OFFBOARD | One concurrent run | Refresh returned success in the sample; Employee became INACTIVE, User became inactive, tokenVersion became 2, all family rows were inactive, and protected-account resolution rejected the issued access token. | Observed final state; existing Employee/Auth transaction composition and row locks are the relevant evidence. |
+| Refresh vs Employee SUSPEND | One concurrent run | Refresh returned success in the sample; Employee became SUSPENDED, User became inactive, tokenVersion became 2, all family rows were inactive, and protected-account resolution rejected the issued access token. | Observed final state; existing Employee/Auth transaction composition and row locks are the relevant evidence. |
+| Refresh vs Employee REACTIVATE | One concurrent run from a suspended/inactive account | Lifecycle reactivation committed, User became active, tokenVersion became 2, all family rows were inactive, and the refresh attempt did not succeed. | Observed final state; no refresh successor escaped the lifecycle transaction. |
+
+The baseline suite passed 73 tests across 11 integration files. The
+characterization establishes two implementation facts needed for Gate B:
+the same-token `alreadyRotated` path is currently a false-positive family
+revocation for the repeated concurrent sample, and logout-current cannot
+meet the termination invariant when a successor already exists. The other
+termination races in this first sample ended contained, but their concurrent
+statement ordering was not controlled and remains part of the implementation
+regression suite.
+
+### 15.3 L1 implementation / closure
+
+L1 implementation was completed from the Gate A evidence above. The final
+contract below is the current source of truth for Auth/session refresh and
+generic browser 401 recovery.
+
+#### Gate A and final MySQL evidence
+
+The characterization suite was retained and strengthened as
+`__tests__/integration/auth-session-concurrency.integration.test.ts`. The
+final run used the same MySQL harness and exercised 75 tests across 11
+integration files. It repeated refresh/refresh, logout-all, and per-session
+revoke schedules; used controlled commit-order checks for logout-current; and
+asserted final database state, User.tokenVersion, Employee lifecycle state,
+and `resolveAuthenticatedAccount()` results.
+
+Final repeated observations were:
+
+| Scenario | Final observed result after the correction |
+| --- | --- |
+| Refresh vs refresh | 8/8 runs had one normal successor and remained usable after the one concurrent completion; a further reuse of the old source revoked the family in 8/8 runs. |
+| Refresh vs logout-current | Both termination-before-refresh and refresh-before-termination ended with zero active rows; a successor created first was revoked by logout-current. |
+| Refresh vs logout-all | 8/8 concurrent runs ended with zero active rows. |
+| Refresh vs per-session revoke | 8/8 concurrent runs ended with zero active rows; a different user could not revoke the family. |
+| Refresh vs password reset | Reset committed with tokenVersion 2, zero active refresh rows, and protected resolution rejected any access token issued before the reset completed. |
+| Refresh vs OFFBOARD/SUSPEND | Employee and User lifecycle state committed, tokenVersion incremented, zero active refresh rows remained, and protected resolution rejected any access token issued before invalidation. |
+| Refresh vs REACTIVATE | Reactivation also increments tokenVersion and revokes the old family; the old refresh credential did not become usable. |
+| Account eligibility | Deleted and suspended linked accounts were rejected and their families revoked; an active unlinked account remained supported and could refresh. |
+
+#### Chosen refresh state machine
+
+`rotateRefreshTokenAtomically` now locks the User row before reading the
+source state, rereads the current User and Employee eligibility, and keeps
+the existing conditional source claim and unique `rotatedFromId` constraint.
+The application result names are precise rather than using the old
+`alreadyRotated` ambiguity:
+
+1. `rotated`: an eligible, unexpired, unrevoked source is claimed once and
+   creates exactly one successor. The access token uses the account role and
+   tokenVersion read under the same User-row coordination.
+2. `concurrentCompletion`: the source is already revoked, exactly one active
+   direct successor exists, and its existing `lastUsedAt` completion marker is
+   atomically claimed. This result does not mint a second successor, does not
+   revoke the family, and does not emit a malicious-reuse Audit event. The
+   HTTP result remains the existing 401 shape, but preserves cookies so a
+   winning concurrent response is not erased.
+3. `confirmedReuse`: the source has already completed its accepted concurrent
+   completion or has no unconsumed completion marker. The entire family is
+   revoked in the same User-coordinated transaction and the existing
+   `refresh_token_reuse_or_expired` security event is emitted.
+4. `expired`: the family is revoked and the existing reuse/expired security
+   event is emitted.
+5. `revoked`: an explicitly terminated family cannot create a successor and
+   does not create a false malicious-reuse event.
+6. `inactiveAccount`: current `User.isActive`, `User.deletedAt`, or the
+   existing `hasEligibleEmployeeLifecycle` contract rejects issuance; the
+   family is revoked and the existing inactive-user security event is emitted.
+7. `invalid`: missing or inconsistent source state produces no successor.
+
+The one-time marker uses the existing successor `lastUsedAt` column. It is
+not a grace window and does not make the old token a bearer token: the
+concurrent caller receives 401 and no new credential. After that marker is
+consumed, another use of the old source is confirmed reuse and revokes the
+family. This is the smallest bounded policy supported by the existing
+schema and preserves containment while avoiding the observed false-positive
+family destruction.
+
+#### Why this design and rejected alternatives
+
+The User row lock is already used by Employee lifecycle code and can be
+shared by refresh, logout, reset, and family revocation. It gives all
+relevant operations one ordering point without weakening the source claim or
+the `rotatedFromId` uniqueness invariant. The existing `lastUsedAt` field
+provides one durable, conditional completion marker; no new persistent state
+was needed.
+
+The following alternatives were rejected: unconditional family revocation
+for every already-rotated source (the reproduced L0-AUTH-01 failure), making
+all already-rotated reuse harmless (unbounded stolen-token reuse), an
+unbounded grace window, a generation model, a new token table, a distributed
+lock, and a schema migration. Gate A did not demonstrate that the existing
+schema was insufficient for a bounded one-time completion contract.
+
+The exact security tradeoff is that one ambiguous old-source request may
+consume the completion marker without revoking the family. It still cannot
+mint a credential or independent successor. A second/out-of-contract reuse
+revokes the family. This bounded ambiguity is accepted to prevent a single
+legitimate near-simultaneous browser request from destroying the successful
+session.
+
+#### Termination ordering contract
+
+All successful termination paths now coordinate through the User row before
+refresh-family writes. If termination commits first, refresh observes the
+revoked/ineligible state and cannot create a successor. If refresh commits
+first, termination observes and revokes the newly created successor. If both
+overlap, the User row lock serializes them; the final state, independent of
+which request returns first, has no usable targeted refresh successor.
+
+- logout-current resolves the supplied token's family and revokes every
+  unrevoked row in that family, including a successor already created from
+  the supplied source. Repeated logout remains idempotent.
+- logout-all locks the account User row before revoking all of that user's
+  refresh rows.
+- per-session revoke retains the user/family ownership check, then locks the
+  owning User row before family revocation.
+- password reset retains the one-time reset-token claim and serializable
+  transaction, and now locks User before claiming, updating the password and
+  tokenVersion, and revoking refresh rows.
+- Employee OFFBOARD, SUSPEND, and REACTIVATE retain Employee-owned lifecycle
+  policy and the existing serializable Employee/Auth composition. Auth still
+  owns account/session effects; User tokenVersion and refresh revocation are
+  committed with the lifecycle transition.
+
+#### Generic browser 401 replay contract
+
+The shared browser transport may recover a 401 through the single-flight Auth
+refresh request. Only GET and HEAD are replayable after successful recovery.
+POST, PUT, PATCH, and DELETE still attempt session recovery so subsequent
+requests can use the refreshed session, but return the original unauthorized
+response and never automatically resend the mutation. No production mutation
+caller was found that requires an implicit replay contract.
+
+The policy applies to `fetchWithRefresh`, `lib/client/api-client.ts`, and the
+Auth browser API. JSON strings, FormData, URLSearchParams, Blob, ArrayBuffer,
+and ReadableStream bodies are not cloned or silently resent for mutations.
+Auth-internal paths remain excluded from recursive recovery. LIFF keeps its
+existing safe-read-only replay behavior; regression tests cover all four
+mutation methods and GET/HEAD recovery.
+
+#### Finding dispositions
+
+| Finding | L1 disposition |
+| --- | --- |
+| L0-AUTH-01 | Closed. Real MySQL reproduced the false-positive; User coordination plus bounded one-time completion now preserves the legitimate successor and retains confirmed-reuse containment. |
+| L0-AUTH-02 | Closed. Refresh, current-family logout, logout-all, per-session revoke, password reset, and Employee lifecycle invalidation share an explicit final-state ordering contract. |
+| L0-AUTH-03 | Closed as defense-in-depth. Refresh now rereads the protected account eligibility contract before issuance; unlinked valid accounts remain supported. This was not an authorization-bypass finding. |
+| L0-AUTH-TEST-01 | Closed. The real-MySQL characterization and final repeated concurrency suite are part of the repository integration tests. |
+| L0-REPLAY-01 | Closed. Shared browser recovery now replays only GET/HEAD; mutation and one-shot-body tests prove no implicit resend; LIFF remains strict. |
+
+#### Schema, migration, and remaining risk
+
+No Prisma schema, migration, cookie name, route URL, or external Auth
+response shape changed. The existing User row, refresh-family rows,
+`rotatedFromId` uniqueness, and `lastUsedAt` column satisfy the final
+invariants. The only accepted residual Auth/session risk is the documented
+one-time ambiguity for an old source during legitimate near-simultaneous
+completion; it is bounded, cannot mint a credential, and escalates to family
+revocation on the next reuse. Distributed rate limiting and other abuse
+controls remain L2 scope.
+
+The exact command/results record is maintained below after the final
+repository verification pass.
+
 ## 16. L0 closure acceptance criteria
 
 L0 is ready to close when all of the following are true:
@@ -1362,3 +1548,30 @@ Required checks:
 The absence of a real refresh concurrency integration test is recorded as
 L0-AUTH-TEST-01 and is an explicit L1 prerequisite, not an assumption that
 the mocked route tests prove database atomicity.
+
+## 18. L1 verification record
+
+The L1 implementation verification record is separate from the historical L0
+record above.
+
+- baseline `git status --short --branch`: PASS; the repository was clean on
+  `main` before L1 changes;
+- Gate A and final `npm.cmd run test:integration:mysql`: PASS against
+  `127.0.0.1:3309/employee_nhf_integration`; Prisma reported no pending
+  migrations and Vitest passed 11 files / 75 tests;
+- focused Auth/session, Auth API, browser transport, LIFF, critical-flow,
+  reset, and Employee lifecycle command: PASS, 8 files / 98 tests;
+- `npm.cmd run architecture:check`: PASS;
+- `npm.cmd run lint:strict`: PASS;
+- `npm.cmd run typecheck`: PASS;
+- `npm.cmd run test:run`: PASS after updating existing transaction mocks for
+  the shared User-row lock; the initial run exposed five stale test-double
+  failures and was not counted as the final pass;
+- `git diff --check`: PASS;
+- development server: NOT RUN;
+- production build: NOT RUN;
+- Prisma schema/migration diff: NONE; the integration harness applied no new
+  migration.
+
+On Windows PowerShell, `npm.ps1` is blocked by the local execution policy, so
+all npm script verification above used the equivalent `npm.cmd` command.

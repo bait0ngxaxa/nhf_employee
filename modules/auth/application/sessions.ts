@@ -8,6 +8,7 @@ import {
     findAccountForLogout,
     findAccountForResolution,
 } from "../infrastructure/persistence/account-repository";
+import { hasEligibleEmployeeLifecycle } from "@/modules/employee";
 import {
     findActiveOwnedRefreshToken,
     findRefreshTokenByHash,
@@ -45,8 +46,20 @@ export async function refreshHybridSession(input: {
     }
 
     const now = new Date();
-    if (existingToken.revokedAt || existingToken.expiresAt <= now) {
-        await revokeRefreshFamily(existingToken.familyId);
+    const nextToken = buildRefreshTokenRecord({
+        userId: existingToken.userId,
+        familyId: existingToken.familyId,
+        userAgent: input.metadata.userAgent,
+        ipAddress: input.metadata.ipAddress,
+    });
+    const rotation = await rotateRefreshTokenAtomically({
+        userId: existingToken.userId,
+        tokenId: existingToken.id,
+        now,
+        nextToken: nextToken.record,
+    });
+
+    if (rotation.status === "confirmedReuse" || rotation.status === "expired") {
         return {
             status: "unauthorized",
             securityEvent: {
@@ -60,8 +73,11 @@ export async function refreshHybridSession(input: {
         };
     }
 
-    if (!existingToken.user.isActive) {
-        await revokeRefreshFamily(existingToken.familyId);
+    if (rotation.status === "revoked") {
+        return { status: "unauthorized" };
+    }
+
+    if (rotation.status === "inactiveAccount") {
         return {
             status: "unauthorized",
             securityEvent: {
@@ -75,41 +91,22 @@ export async function refreshHybridSession(input: {
         };
     }
 
-    const nextToken = buildRefreshTokenRecord({
-        userId: existingToken.userId,
-        familyId: existingToken.familyId,
-        userAgent: input.metadata.userAgent,
-        ipAddress: input.metadata.ipAddress,
-    });
-    const rotation = await rotateRefreshTokenAtomically({
-        tokenId: existingToken.id,
-        now,
-        nextToken: nextToken.record,
-    });
-
-    if (rotation.status === "alreadyRotated") {
-        await revokeRefreshFamily(existingToken.familyId);
+    if (rotation.status === "concurrentCompletion") {
         return {
             status: "unauthorized",
-            securityEvent: {
-                userId: existingToken.userId,
-                email: existingToken.user.email,
-                familyId: existingToken.familyId,
-                reason: "refresh_token_reuse_or_expired",
-                ipAddress: input.metadata.ipAddress,
-                userAgent: input.metadata.userAgent,
-            },
+            preserveCookies: true,
         };
     }
+
     if (rotation.status === "invalid") {
         return { status: "unauthorized" };
     }
 
     const accessToken = await issueAccessToken({
         userId: existingToken.userId,
-        role: existingToken.user.role,
+        role: rotation.account.role,
         sessionId: existingToken.familyId,
-        tokenVersion: existingToken.user.tokenVersion ?? 1,
+        tokenVersion: rotation.account.tokenVersion,
     });
 
     return {
@@ -147,14 +144,13 @@ export async function resolveAuthenticatedAccount(
         if (!hasActiveSession) return null;
 
         const user = await findAccountForResolution(userId);
-        const hasActiveEmployee = !user?.employee
-            || (user.employee.status === "ACTIVE" && user.employee.deletedAt === null);
+        const hasEligibleEmployee = hasEligibleEmployeeLifecycle(user?.employee ?? null);
 
         if (
             user?.isActive !== true
             || user.deletedAt !== null
             || user.tokenVersion !== claims.tokenVersion
-            || !hasActiveEmployee
+            || !hasEligibleEmployee
         ) {
             return null;
         }

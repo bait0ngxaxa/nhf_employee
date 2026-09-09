@@ -1,5 +1,8 @@
 import { AUTH_MUTATION_HEADERS } from "@/lib/auth/mutation-headers";
-import { fetchWithRefresh } from "./browser-transport";
+import {
+    fetchWithRefresh,
+    isHybridReplayableMethod,
+} from "./browser-transport";
 
 type AuthApiErrorCode =
     | "UNAUTHORIZED"
@@ -152,7 +155,7 @@ export async function authApiRequest<T>(
                 { refreshOnUnauthorized: !skipAuthRefresh },
             );
             if (
-                (method === "GET" || method === "HEAD")
+                isHybridReplayableMethod(method)
                 && attempt < SAFE_READ_RETRY_COUNT
                 && (response.status === 429 || response.status >= 500)
             ) {
@@ -186,7 +189,7 @@ export async function authApiRequest<T>(
             };
         } catch (error) {
             if (
-                (method === "GET" || method === "HEAD")
+                isHybridReplayableMethod(method)
                 && attempt < SAFE_READ_RETRY_COUNT
                 && !isAbortError(error)
             ) {

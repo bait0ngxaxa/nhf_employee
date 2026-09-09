@@ -56,6 +56,7 @@ export interface RefreshSuccess {
 export interface RefreshUnauthorized {
     status: "unauthorized";
     securityEvent?: RefreshSecurityEvent;
+    preserveCookies?: boolean;
 }
 
 export type RefreshResult = RefreshSuccess | RefreshUnauthorized;

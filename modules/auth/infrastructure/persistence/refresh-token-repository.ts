@@ -1,5 +1,7 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 
+import { hasEligibleEmployeeLifecycle } from "@/modules/employee";
+import { lockUserRows } from "@/lib/db/row-locks";
 import { prisma } from "@/lib/db/prisma";
 
 const AUTH_REFRESH_USER_SELECT = {
@@ -8,6 +10,13 @@ const AUTH_REFRESH_USER_SELECT = {
     role: true,
     isActive: true,
     tokenVersion: true,
+    deletedAt: true,
+    employee: {
+        select: {
+            status: true,
+            deletedAt: true,
+        },
+    },
 } as const satisfies Prisma.UserSelect;
 
 const REFRESH_TOKEN_WITH_USER_INCLUDE = {
@@ -31,8 +40,12 @@ export type RefreshSessionRecord = {
 };
 
 export type RefreshRotationResult =
-    | { status: "rotated" }
-    | { status: "alreadyRotated" }
+    | { status: "rotated"; account: { role: Role; tokenVersion: number } }
+    | { status: "concurrentCompletion" }
+    | { status: "confirmedReuse" }
+    | { status: "expired" }
+    | { status: "revoked" }
+    | { status: "inactiveAccount" }
     | { status: "invalid" };
 
 export interface RefreshTokenDraftRecord {
@@ -96,9 +109,18 @@ export async function revokeRefreshFamily(
     familyId: string,
     revokedAt = new Date(),
 ): Promise<void> {
-    await prisma.authRefreshToken.updateMany({
-        where: { familyId, revokedAt: null },
-        data: { revokedAt },
+    await prisma.$transaction(async (tx) => {
+        const familyToken = await tx.authRefreshToken.findFirst({
+            where: { familyId },
+            select: { userId: true },
+        });
+        if (!familyToken) return;
+
+        await lockUserRows(tx, [familyToken.userId]);
+        await tx.authRefreshToken.updateMany({
+            where: { familyId, revokedAt: null },
+            data: { revokedAt },
+        });
     });
 }
 
@@ -106,9 +128,12 @@ export async function revokeAllRefreshTokensForUser(
     userId: number,
     revokedAt = new Date(),
 ): Promise<void> {
-    await prisma.authRefreshToken.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt },
+    await prisma.$transaction(async (tx) => {
+        await lockUserRows(tx, [userId]);
+        await tx.authRefreshToken.updateMany({
+            where: { userId, revokedAt: null },
+            data: { revokedAt },
+        });
     });
 }
 
@@ -117,6 +142,7 @@ export async function revokeAllRefreshTokensForUserInTransaction(
     userId: number,
     revokedAt: Date,
 ): Promise<void> {
+    await lockUserRows(tx, [userId]);
     await tx.authRefreshToken.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt },
@@ -141,38 +167,155 @@ function isRotatedFromUniqueConflict(error: unknown): boolean {
     return hasRotatedFromUniqueTarget(error.meta.target);
 }
 
-async function hasSuccessorToken(
+type RefreshTransactionUser = Prisma.UserGetPayload<{
+    select: typeof AUTH_REFRESH_USER_SELECT;
+}>;
+
+async function findActiveSuccessor(
     rotatedFromId: string,
+    now: Date,
     client: RefreshTokenStore,
-): Promise<boolean> {
-    const successor = await client.authRefreshToken.findFirst({
+): Promise<{ id: string; lastUsedAt: Date | null } | null> {
+    return client.authRefreshToken.findFirst({
         where: {
             rotatedFromId,
             revokedAt: null,
-            expiresAt: { gt: new Date() },
+            expiresAt: { gt: now },
         },
-        select: { id: true },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, lastUsedAt: true },
     });
+}
 
-    return successor !== null;
+async function classifyRevokedSource(input: {
+    tokenId: string;
+    familyId: string;
+    sourceLastUsedAt: Date | null;
+    now: Date;
+    client: RefreshTokenStore;
+}): Promise<Extract<RefreshRotationResult, { status: "concurrentCompletion" | "confirmedReuse" | "revoked" }>> {
+    const successor = await findActiveSuccessor(
+        input.tokenId,
+        input.now,
+        input.client,
+    );
+    if (successor?.lastUsedAt === null) {
+        const marked = await input.client.authRefreshToken.updateMany({
+            where: {
+                id: successor.id,
+                rotatedFromId: input.tokenId,
+                revokedAt: null,
+                expiresAt: { gt: input.now },
+                lastUsedAt: null,
+            },
+            data: { lastUsedAt: input.now },
+        });
+        if (marked.count === 1) {
+            return { status: "concurrentCompletion" };
+        }
+    }
+
+    if (input.sourceLastUsedAt !== null) {
+        await input.client.authRefreshToken.updateMany({
+            where: { familyId: input.familyId, revokedAt: null },
+            data: { revokedAt: input.now },
+        });
+        return { status: "confirmedReuse" };
+    }
+
+    return { status: "revoked" };
+}
+
+function isRefreshAccountEligible(user: RefreshTransactionUser): boolean {
+    return user.isActive
+        && user.deletedAt === null
+        && hasEligibleEmployeeLifecycle(user.employee);
 }
 
 export async function rotateRefreshTokenAtomically(input: {
+    userId: number;
     tokenId: string;
     now: Date;
     nextToken: RefreshTokenDraftRecord;
 }): Promise<RefreshRotationResult> {
     return prisma.$transaction(async (tx) => {
+        await lockUserRows(tx, [input.userId]);
+
+        const user = await tx.user.findUnique({
+            where: { id: input.userId },
+            select: AUTH_REFRESH_USER_SELECT,
+        });
+        const source = await tx.authRefreshToken.findUnique({
+            where: { id: input.tokenId },
+            select: {
+                userId: true,
+                familyId: true,
+                revokedAt: true,
+                expiresAt: true,
+                lastUsedAt: true,
+            },
+        });
+
+        if (
+            !user
+            || !source
+            || source.userId !== input.userId
+            || source.familyId !== input.nextToken.familyId
+        ) {
+            return { status: "invalid" as const };
+        }
+
+        if (!isRefreshAccountEligible(user)) {
+            await tx.authRefreshToken.updateMany({
+                where: { familyId: source.familyId, revokedAt: null },
+                data: { revokedAt: input.now },
+            });
+            return { status: "inactiveAccount" as const };
+        }
+
+        if (source.revokedAt !== null) {
+            return classifyRevokedSource({
+                tokenId: input.tokenId,
+                familyId: source.familyId,
+                sourceLastUsedAt: source.lastUsedAt,
+                now: input.now,
+                client: tx,
+            });
+        }
+
+        if (source.expiresAt <= input.now) {
+            await tx.authRefreshToken.updateMany({
+                where: { familyId: source.familyId, revokedAt: null },
+                data: { revokedAt: input.now },
+            });
+            return { status: "expired" as const };
+        }
+
         const claimedToken = await tx.authRefreshToken.updateMany({
             where: { id: input.tokenId, revokedAt: null },
             data: { revokedAt: input.now, lastUsedAt: input.now },
         });
 
         if (claimedToken.count === 0) {
-            const hasSuccessor = await hasSuccessorToken(input.tokenId, tx);
-            return hasSuccessor
-                ? { status: "alreadyRotated" as const }
-                : { status: "invalid" as const };
+            const latestSource = await tx.authRefreshToken.findUnique({
+                where: { id: input.tokenId },
+                select: {
+                    familyId: true,
+                    revokedAt: true,
+                    lastUsedAt: true,
+                },
+            });
+            if (!latestSource) return { status: "invalid" as const };
+            if (latestSource.revokedAt !== null) {
+                return classifyRevokedSource({
+                    tokenId: input.tokenId,
+                    familyId: latestSource.familyId,
+                    sourceLastUsedAt: latestSource.lastUsedAt,
+                    now: input.now,
+                    client: tx,
+                });
+            }
+            return { status: "invalid" as const };
         }
 
         try {
@@ -189,37 +332,70 @@ export async function rotateRefreshTokenAtomically(input: {
             });
         } catch (error) {
             if (isRotatedFromUniqueConflict(error)) {
-                return { status: "alreadyRotated" as const };
+                return classifyRevokedSource({
+                    tokenId: input.tokenId,
+                    familyId: source.familyId,
+                    sourceLastUsedAt: input.now,
+                    now: input.now,
+                    client: tx,
+                });
             }
             throw error;
         }
 
-        return { status: "rotated" as const };
+        return {
+            status: "rotated" as const,
+            account: {
+                role: user.role,
+                tokenVersion: user.tokenVersion ?? 1,
+            },
+        };
     });
 }
 
 export async function revokeCurrentRefreshToken(
     tokenHash: string,
 ): Promise<{ userId: number; email: string } | null> {
-    const tokenRecord = await prisma.authRefreshToken.findUnique({
+    const tokenReference = await prisma.authRefreshToken.findUnique({
         where: { tokenHash },
-        include: {
-            user: {
-                select: { id: true, email: true },
+        select: { userId: true },
+    });
+
+    if (!tokenReference) return null;
+
+    return prisma.$transaction(async (tx) => {
+        await lockUserRows(tx, [tokenReference.userId]);
+
+        const tokenRecord = await tx.authRefreshToken.findUnique({
+            where: { tokenHash },
+            include: {
+                user: {
+                    select: { id: true, email: true },
+                },
             },
-        },
+        });
+        if (!tokenRecord) return null;
+
+        const familyRows = await tx.authRefreshToken.count({
+            where: {
+                userId: tokenRecord.user.id,
+                familyId: tokenRecord.familyId,
+                revokedAt: null,
+            },
+        });
+        if (familyRows === 0) return null;
+
+        await tx.authRefreshToken.updateMany({
+            where: {
+                userId: tokenRecord.user.id,
+                familyId: tokenRecord.familyId,
+                revokedAt: null,
+            },
+            data: { revokedAt: new Date() },
+        });
+
+        return { userId: tokenRecord.user.id, email: tokenRecord.user.email };
     });
-
-    if (!tokenRecord || tokenRecord.revokedAt) {
-        return null;
-    }
-
-    await prisma.authRefreshToken.update({
-        where: { id: tokenRecord.id },
-        data: { revokedAt: new Date(), lastUsedAt: new Date() },
-    });
-
-    return { userId: tokenRecord.user.id, email: tokenRecord.user.email };
 }
 
 export async function listActiveRefreshSessions(

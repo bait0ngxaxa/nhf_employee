@@ -2,6 +2,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
+import { lockUserRows } from "@/lib/db/row-locks";
 import {
     findAccountForRecovery,
     findAccountForReset,
@@ -68,6 +69,7 @@ export async function resetPassword(
 
     const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
     const didClaim = await runSerializableTransaction(async (tx) => {
+        await lockUserRows(tx, [user.id]);
         const claimedAt = new Date();
         const claimed = await claimPasswordResetToken(tx, resetToken.id, claimedAt);
         if (!claimed) return false;

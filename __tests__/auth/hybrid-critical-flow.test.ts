@@ -13,6 +13,8 @@ const { prismaMock } = vi.hoisted(() => ({
             findUnique: vi.fn(),
             updateMany: vi.fn(),
         },
+        $queryRaw: vi.fn(),
+        $transaction: vi.fn(),
         auditLog: {
             create: vi.fn(),
         },
@@ -51,6 +53,11 @@ describe("Hybrid critical flow", () => {
         prismaMock.authRefreshToken.create.mockResolvedValue({ id: "rt_1" });
         prismaMock.authRefreshToken.findFirst.mockResolvedValue({ id: "rt_1" });
         prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 2 });
+        prismaMock.$queryRaw.mockResolvedValue([]);
+        prismaMock.$transaction.mockImplementation(
+            async (operation: (client: typeof prismaMock) => Promise<unknown>) =>
+                operation(prismaMock),
+        );
     });
 
     it("valid hybrid access token can access /dashboard", async () => {

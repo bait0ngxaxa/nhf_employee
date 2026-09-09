@@ -6,7 +6,10 @@
  */
 
 import { AUTH_MUTATION_HEADERS } from "@/lib/auth/mutation-headers";
-import { fetchWithRefresh } from "@/modules/auth/client";
+import {
+    fetchWithRefresh,
+    isHybridReplayableMethod,
+} from "@/modules/auth/client";
 
 export type ApiErrorCode =
     | "UNAUTHORIZED"
@@ -164,12 +167,8 @@ function extractErrorMessage(responseData: unknown, fallback: string): string {
     return fallback;
 }
 
-function isSafeReadMethod(method: string): boolean {
-    return method === "GET" || method === "HEAD";
-}
-
 function shouldRetry(method: string, attempt: number, retryCount: number): boolean {
-    return isSafeReadMethod(method) && attempt < retryCount;
+    return isHybridReplayableMethod(method) && attempt < retryCount;
 }
 
 function shouldRetryResponse(response: Response): boolean {
@@ -250,7 +249,7 @@ export async function apiRequest<T>(
     } = config;
     const method = customConfig.method?.toUpperCase() ?? "GET";
     const requestId = customRequestId ?? createRequestId();
-    const finalRetryCount = isSafeReadMethod(method)
+    const finalRetryCount = isHybridReplayableMethod(method)
         ? (retryCount ?? DEFAULT_SAFE_READ_RETRY_COUNT)
         : 0;
     const finalTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -303,7 +302,7 @@ export async function apiRequest<T>(
                 if (
                     recoveryResult.recovered
                     && recoveryResult.replay
-                    && isSafeReadMethod(method)
+                    && isHybridReplayableMethod(method)
                     && !signal.aborted
                 ) {
                     response = await fetchWithRefresh(endpoint, {

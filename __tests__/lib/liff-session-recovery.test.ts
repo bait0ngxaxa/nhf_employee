@@ -43,30 +43,40 @@ describe("central LIFF session recovery", () => {
         unregister();
     });
 
-    it("never replays a mutation after a session recovery", async () => {
-        const recover = vi.fn().mockResolvedValue(true);
-        const rebootstrap = vi.fn();
-        const unregister = registerLiffSessionRecovery(recover, rebootstrap);
-        const fetchMock = vi
-            .spyOn(globalThis, "fetch")
-            .mockResolvedValueOnce(jsonResponse({ error: "Unauthorized" }, 401));
+    it.each(["POST", "PUT", "PATCH", "DELETE"])(
+        "never replays a %s mutation after a session recovery",
+        async (method) => {
+            const recover = vi.fn().mockResolvedValue(true);
+            const rebootstrap = vi.fn();
+            const unregister = registerLiffSessionRecovery(recover, rebootstrap);
+            const fetchMock = vi
+                .spyOn(globalThis, "fetch")
+                .mockResolvedValueOnce(jsonResponse({ error: "Unauthorized" }, 401));
 
-        const result = await apiPost(
-            "/api/line/leave/decision",
-            { leaveId: "leave-1", action: "APPROVE" },
-            LIFF_API_REQUEST_OPTIONS,
-        );
+            const result = method === "POST"
+                ? await apiPost(
+                    "/api/line/leave/decision",
+                    { leaveId: "leave-1", action: "APPROVE" },
+                    LIFF_API_REQUEST_OPTIONS,
+                )
+                : await apiRequest("/api/line/leave/decision", {
+                    ...LIFF_API_REQUEST_OPTIONS,
+                    method,
+                    data: { leaveId: "leave-1", action: "APPROVE" },
+                    retryCount: 0,
+                });
 
-        expect(result).toMatchObject({
-            success: false,
-            status: 401,
-            unauthorizedRecovery: { recovered: true, replayed: false },
-        });
-        expect(recover).toHaveBeenCalledOnce();
-        expect(rebootstrap).not.toHaveBeenCalled();
-        expect(fetchMock).toHaveBeenCalledOnce();
-        unregister();
-    });
+            expect(result).toMatchObject({
+                success: false,
+                status: 401,
+                unauthorizedRecovery: { recovered: true, replayed: false },
+            });
+            expect(recover).toHaveBeenCalledOnce();
+            expect(rebootstrap).not.toHaveBeenCalled();
+            expect(fetchMock).toHaveBeenCalledOnce();
+            unregister();
+        },
+    );
 
     it("rebootstraps once when recovery cannot restore the session", async () => {
         const recover = vi.fn().mockResolvedValue(false);
