@@ -23,7 +23,7 @@ async function sendLineApiRequest(
             body: JSON.stringify(body),
         });
 
-        if (response.ok || (retryKey !== undefined && response.status === 409)) {
+        if (response.ok || (Boolean(retryKey) && response.status === 409)) {
             return true;
         }
 

@@ -1,5 +1,6 @@
 import type { NotificationOutbox } from "@prisma/client";
 
+import { createOutboxLineRetryKey } from "@/lib/services/outbox/provider-key";
 import { sendStockRequestResultNotification } from "./email";
 import {
     dispatchStockRequestResultLineOutbox,
@@ -60,7 +61,10 @@ export async function dispatchStockOutbox(
         case "STOCK_REQUEST_LINE": {
             const parsedPayload = parseStockRequestLinePayload(payload);
             await notifyAdminsStockRequestLineInApp(parsedPayload);
-            if (!(await sendStockRequestNotification(parsedPayload))) {
+            if (!(await sendStockRequestNotification(
+                parsedPayload,
+                createOutboxLineRetryKey(notification.type, notification.id),
+            ))) {
                 throw new Error("LINE stock request notification failed");
             }
             return "SENT";
@@ -68,7 +72,10 @@ export async function dispatchStockOutbox(
         case "STOCK_LOW_LINE": {
             const parsedPayload = parseStockLowLinePayload(payload);
             await notifyAdminsLowStockInApp(parsedPayload);
-            if (!(await sendStockLowNotification(parsedPayload))) {
+            if (!(await sendStockLowNotification(
+                parsedPayload,
+                createOutboxLineRetryKey(notification.type, notification.id),
+            ))) {
                 throw new Error("LINE low stock notification failed");
             }
             return "SENT";

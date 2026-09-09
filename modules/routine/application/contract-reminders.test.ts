@@ -12,6 +12,7 @@ import {
     getRoutineContractExpiryNotificationDate,
     getRoutineContractExpiryScheduledFor,
 } from "./contract-reminders";
+import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
 const sendRoutineContractExpiryNotificationMock = vi.hoisted(() => vi.fn());
@@ -431,7 +432,9 @@ describe("Routine contract expiry dispatch", () => {
             taskId: 71,
             userId: 17,
             contractEndDate: "2026-12-31",
-            retryKey: "123e4567-e89b-42d3-a456-426614174000",
+            retryKey: createLineRetryKey(
+                buildRoutineContractExpiryLineEventKey(71, "2026-12-31", 17),
+            ),
         };
         const notification: NotificationOutbox = {
             ...buildNotification(),

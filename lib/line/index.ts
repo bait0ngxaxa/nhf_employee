@@ -46,12 +46,14 @@ export async function sendLineBroadcast(
 }
 
 export async function sendStockLineBroadcast(
-    message: LineFlexMessage
+    message: LineFlexMessage,
+    retryKey?: string,
 ): Promise<boolean> {
     return sendLineApiRequest(
         "https://api.line.me/v2/bot/message/broadcast",
         getConfig().stockChannelAccessToken,
         { messages: [message] },
+        retryKey,
     );
 }
 
@@ -102,7 +104,8 @@ async function sendToITTeamOrBroadcast(
 }
 
 export async function sendEmailRequestNotification(
-    emailRequestData: EmailRequestData
+    emailRequestData: EmailRequestData,
+    retryKey?: string,
 ): Promise<boolean> {
     const { baseUrl } = getConfig();
     const flexMessage = generateEmailRequestFlexMessage(
@@ -110,7 +113,7 @@ export async function sendEmailRequestNotification(
         baseUrl
     );
 
-    return await sendToITTeamOrBroadcast(flexMessage);
+    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
 }
 
 // Export as object for backward compatibility

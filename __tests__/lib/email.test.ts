@@ -60,11 +60,14 @@ describe("Email transport", () => {
         }));
     });
 
-    it("retries transient failures", { timeout: 15000 }, async () => {
+    it("reconnects after a transient failure and retries successfully", { timeout: 15000 }, async () => {
         vi.useFakeTimers();
         sendMailMock
-            .mockRejectedValueOnce(new Error("Fail 1"))
-            .mockRejectedValueOnce(new Error("Fail 2"))
+            .mockRejectedValueOnce(
+                Object.assign(new Error("connection reset"), {
+                    code: "ECONNRESET",
+                }),
+            )
             .mockResolvedValueOnce({ messageId: "OK" } as never);
 
         const promise = sendEmail({
@@ -72,19 +75,78 @@ describe("Email transport", () => {
             subject: "s",
             html: "h",
             text: "t",
+            messageId: "<nhf-retry@example.test>",
         });
 
         await vi.advanceTimersByTimeAsync(3000);
-        await vi.advanceTimersByTimeAsync(5000);
 
         expect(await promise).toBe(true);
+        expect(sendMailMock).toHaveBeenCalledTimes(2);
+        expect(sendMailMock.mock.calls[0]?.[0].messageId).toBe(
+            sendMailMock.mock.calls[1]?.[0].messageId,
+        );
+        expect(verifyMock).toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    it("keeps the same Message-ID across an ambiguous timeout retry", { timeout: 15000 }, async () => {
+        vi.useFakeTimers();
+        sendMailMock
+            .mockRejectedValueOnce(
+                Object.assign(new Error("timeout after acceptance"), {
+                    code: "ETIMEDOUT",
+                }),
+            )
+            .mockResolvedValueOnce({ messageId: "OK" } as never);
+
+        const promise = sendEmail({
+            to: "t",
+            subject: "s",
+            html: "h",
+            text: "t",
+            messageId: "<nhf-ambiguous@example.test>",
+        });
+
+        await vi.advanceTimersByTimeAsync(3000);
+
+        expect(await promise).toBe(true);
+        expect(sendMailMock).toHaveBeenCalledTimes(2);
+        expect(sendMailMock.mock.calls[0]?.[0].messageId).toBe(
+            sendMailMock.mock.calls[1]?.[0].messageId,
+        );
+        vi.useRealTimers();
+    });
+
+    it("returns false after repeated transient failures", { timeout: 15000 }, async () => {
+        vi.useFakeTimers();
+        sendMailMock.mockRejectedValue(
+            Object.assign(new Error("temporary SMTP outage"), {
+                code: "ECONNRESET",
+            }),
+        );
+
+        const promise = sendEmail({
+            to: "t",
+            subject: "s",
+            html: "h",
+            text: "t",
+            messageId: "<nhf-transient@example.test>",
+        });
+
+        await vi.advanceTimersByTimeAsync(20000);
+
+        expect(await promise).toBe(false);
         expect(sendMailMock).toHaveBeenCalledTimes(3);
         vi.useRealTimers();
     });
 
-    it("fails after the maximum retries", { timeout: 15000 }, async () => {
+    it("returns false after repeated non-transient failures", { timeout: 15000 }, async () => {
         vi.useFakeTimers();
-        sendMailMock.mockRejectedValue(new Error("Fail always"));
+        sendMailMock.mockRejectedValue(
+            Object.assign(new Error("authentication rejected"), {
+                code: "EAUTH",
+            }),
+        );
 
         const promise = sendEmail({
             to: "t",

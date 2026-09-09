@@ -450,6 +450,16 @@ async function dispatchRoutineContractExpiryLineOutbox(
         );
         return "SUPERSEDED";
     }
+    if (payload.retryKey !== createLineRetryKey(expectedEventKey)) {
+        await runSerializableTransaction((tx) =>
+            markRoutineContractExpirySuperseded(
+                tx,
+                notification.id,
+                "Superseded mismatched Routine contract expiry LINE retry key",
+            ),
+        );
+        return "SUPERSEDED";
+    }
 
     const prepared = await prepareContractDelivery(notification, payload);
     if (!prepared) return "SUPERSEDED";

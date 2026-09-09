@@ -4,6 +4,7 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { sendAppLineNotification } from "@/lib/line/app-notification";
 import { sendStockLineBroadcast } from "@/lib/line";
 import { getPublicOrigin } from "@/lib/network/public-url";
+import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import { buildStockLiffRequestUrl } from "../../presentation/liff-links";
 import { generateStockRequestFlexMessage } from "./line-messages/stock";
 import { generateStockLowFlexMessage } from "./line-messages/stock-low";
@@ -22,17 +23,21 @@ export const STOCK_REQUEST_RESULT_LINE_OUTBOX_TYPE =
 
 export async function sendStockRequestNotification(
     payload: StockRequestLineData,
+    retryKey?: string,
 ): Promise<boolean> {
     return sendStockLineBroadcast(
         generateStockRequestFlexMessage(payload, getPublicOrigin()),
+        retryKey,
     );
 }
 
 export async function sendStockLowNotification(
     payload: StockLowLineData,
+    retryKey?: string,
 ): Promise<boolean> {
     return sendStockLineBroadcast(
         generateStockLowFlexMessage(payload, getPublicOrigin()),
+        retryKey,
     );
 }
 
@@ -74,15 +79,22 @@ export async function dispatchStockRequestResultLineOutbox(
         return "SUPERSEDED";
     }
 
-    if (
-        notification.eventKey !== buildStockRequestResultLineEventKey(
-            payload.requestId,
-            payload.status,
-        )
-    ) {
+    const expectedEventKey = buildStockRequestResultLineEventKey(
+        payload.requestId,
+        payload.status,
+    );
+    if (notification.eventKey !== expectedEventKey) {
         await markStockLineSuperseded(
             notification.id,
             "Superseded mismatched Stock request result LINE event key",
+        );
+        return "SUPERSEDED";
+    }
+
+    if (payload.retryKey !== createLineRetryKey(expectedEventKey)) {
+        await markStockLineSuperseded(
+            notification.id,
+            "Superseded mismatched Stock request result LINE retry key",
         );
         return "SUPERSEDED";
     }

@@ -9,7 +9,11 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 import { sendEmail } from "@/lib/email/transport";
 import { lineNotificationService, sendStockLineBroadcast } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
-import { processOutbox } from "@/lib/services/outbox/processor";
+import {
+    dispatchNotification,
+    processOutbox,
+} from "@/lib/services/outbox/processor";
+import { createOutboxLineRetryKey } from "@/lib/services/outbox/provider-key";
 import { EMAIL_REQUEST_INAPP_RECIPIENTS_ENV } from "@/lib/services/email-request/notifications";
 import {
     dispatchCurrentLeaveAction,
@@ -20,6 +24,11 @@ import {
     sendLeaveNotTakenRequestedNotifications,
 } from "@/modules/leave";
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
+import {
+    MAX_OUTBOX_ATTEMPTS,
+    OUTBOX_RETRY_BASE_DELAY_MS,
+    STALE_OUTBOX_PROCESSING_MINUTES,
+} from "@/lib/services/outbox/types";
 
 const leaveNotificationMocks = vi.hoisted(() => ({
     createLeaveActionInAppNotification: vi.fn(),
@@ -184,7 +193,7 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 0 });
-        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledTimes(2);
+        expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
     });
 
     it("processes EMAIL_REQUEST successfully", async () => {
@@ -222,7 +231,184 @@ describe("processOutbox", () => {
                 needsDocumentSystem: false,
                 sharedDriveAccess: [],
             }),
+            createOutboxLineRetryKey("EMAIL_REQUEST", 102),
         );
+    });
+
+    it("characterizes crash-after-IT-LINE acceptance with the same retry key", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
+        vi.mocked(
+            lineNotificationService.sendEmailRequestNotification,
+        ).mockResolvedValue(true);
+        const payload = JSON.stringify({
+            thaiName: "Test",
+            englishName: "Test",
+            phone: "123",
+            position: "IT",
+            department: "IT",
+            replyEmail: "test@nhf.or.th",
+            requestedAt: "2026-07-01T03:00:00.000Z",
+        });
+        const notification = buildNotification(
+            150,
+            "EMAIL_REQUEST",
+            payload,
+            "email-request:150:created",
+        );
+        const retryNotification = {
+            ...notification,
+            status: "FAILED" as const,
+            attempts: 1,
+            nextAttemptAt: new Date("2026-07-13T02:59:00.000Z"),
+            updatedAt: new Date("2026-07-13T02:50:00.000Z"),
+        };
+
+        try {
+            await expect(dispatchNotification({
+                ...notification,
+                status: "PROCESSING",
+            })).resolves.toBe("SENT");
+
+            // The first call was accepted, but the worker lost the final SENT update.
+            prismaMock.notificationOutbox.findMany
+                .mockResolvedValueOnce(asNever([notification]))
+                .mockResolvedValueOnce(asNever([retryNotification]));
+
+            const result = await processOutbox();
+
+            expect(result).toEqual({ processed: 1, failed: 0 });
+            expect(
+                lineNotificationService.sendEmailRequestNotification,
+            ).toHaveBeenCalledTimes(2);
+            expect(
+                vi.mocked(lineNotificationService.sendEmailRequestNotification)
+                    .mock.calls[0]?.[1],
+            ).toBe(
+                vi.mocked(lineNotificationService.sendEmailRequestNotification)
+                    .mock.calls[1]?.[1],
+            );
+            expect(
+                vi.mocked(lineNotificationService.sendEmailRequestNotification)
+                    .mock.calls[0]?.[1],
+            ).toBe(createOutboxLineRetryKey(
+                "EMAIL_REQUEST",
+                150,
+                "email-request:150:created",
+            ));
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 150, status: "PROCESSING" },
+                    data: { status: "SENT", lastError: null },
+                }),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("characterizes crash-after-Stock-broadcast acceptance with a row retry key", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
+        vi.mocked(sendStockLineBroadcast).mockResolvedValue(true);
+        const payload = JSON.stringify({
+            alertedAt: "2026-07-01T03:00:00.000Z",
+            itemCount: 1,
+            items: [{
+                itemId: 10,
+                name: "ปากกา",
+                sku: "PEN-001",
+                quantity: 3,
+                minStock: 5,
+                unit: "ด้าม",
+            }],
+        });
+        const notification = buildNotification(151, "STOCK_LOW_LINE", payload);
+        const retryNotification = {
+            ...notification,
+            status: "FAILED" as const,
+            attempts: 1,
+            nextAttemptAt: new Date("2026-07-13T02:59:00.000Z"),
+            updatedAt: new Date("2026-07-13T02:50:00.000Z"),
+        };
+
+        try {
+            await expect(dispatchNotification({
+                ...notification,
+                status: "PROCESSING",
+            })).resolves.toBe("SENT");
+            prismaMock.notificationOutbox.findMany
+                .mockResolvedValueOnce(asNever([notification]))
+                .mockResolvedValueOnce(asNever([retryNotification]));
+
+            await expect(processOutbox()).resolves.toEqual({
+                processed: 1,
+                failed: 0,
+            });
+
+            expect(sendStockLineBroadcast).toHaveBeenCalledTimes(2);
+            expect(vi.mocked(sendStockLineBroadcast).mock.calls[0]?.[1]).toBe(
+                vi.mocked(sendStockLineBroadcast).mock.calls[1]?.[1],
+            );
+            expect(vi.mocked(sendStockLineBroadcast).mock.calls[0]?.[1]).toBe(
+                createOutboxLineRetryKey("STOCK_LOW_LINE", 151),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("characterizes crash-after-SMTP-acceptance with repeated Message-ID ambiguity", async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
+        vi.mocked(sendEmail).mockResolvedValue(true);
+        const payload = buildStockRequestResultPayload("ISSUED");
+        const notification = {
+            ...buildNotification(
+                152,
+                "STOCK_REQUEST_RESULT_EMAIL",
+                JSON.stringify(payload),
+                "stock-request:77:ISSUED:email",
+            ),
+            status: "PROCESSING" as const,
+            updatedAt: new Date("2026-07-13T02:50:00.000Z"),
+        };
+        const retryNotification = {
+            ...notification,
+            status: "FAILED" as const,
+            attempts: 1,
+            nextAttemptAt: new Date("2026-07-13T02:59:00.000Z"),
+        };
+
+        try {
+            await expect(dispatchNotification(notification)).resolves.toBe("SENT");
+
+            // The SMTP provider call was accepted, but the worker lost the final SENT update.
+            prismaMock.notificationOutbox.findMany
+                .mockResolvedValueOnce(asNever([notification]))
+                .mockResolvedValueOnce(asNever([retryNotification]));
+
+            await expect(processOutbox()).resolves.toEqual({
+                processed: 1,
+                failed: 0,
+            });
+
+            expect(sendEmail).toHaveBeenCalledTimes(2);
+            expect(vi.mocked(sendEmail).mock.calls[0]?.[0].messageId).toBe(
+                vi.mocked(sendEmail).mock.calls[1]?.[0].messageId,
+            );
+            expect(vi.mocked(sendEmail).mock.calls[0]?.[0].messageId).toBe(
+                "<nhf-stock-request-77-issued@notifications.thainhf.org>",
+            );
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 152, status: "PROCESSING" },
+                    data: { status: "SENT", lastError: null },
+                }),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("creates email request in-app notification only for configured recipients before failed LINE delivery", async () => {
@@ -573,6 +759,7 @@ describe("processOutbox", () => {
                 type: "flex",
                 altText: "มีคำขอเบิกวัสดุใหม่ #77",
             }),
+            createOutboxLineRetryKey("STOCK_REQUEST_LINE", 105),
         );
     });
 
@@ -666,6 +853,7 @@ describe("processOutbox", () => {
                 type: "flex",
                 altText: "สต็อกต่ำถึงจุดสั่งซื้อ: ปากกา",
             }),
+            createOutboxLineRetryKey("STOCK_LOW_LINE", 106),
         );
     });
 
@@ -702,6 +890,7 @@ describe("processOutbox", () => {
                 type: "flex",
                 altText: "สต็อกต่ำถึงจุดสั่งซื้อ: หมึกพิมพ์",
             }),
+            createOutboxLineRetryKey("STOCK_LOW_LINE", 116),
         );
     });
 
@@ -923,10 +1112,9 @@ describe("processOutbox", () => {
                 ),
             ]),
         );
-        prismaMock.notificationOutbox.updateMany
-            .mockResolvedValueOnce(asNever({ count: 1 }))
-            .mockResolvedValueOnce(asNever({ count: 1 }))
-            .mockResolvedValueOnce(asNever({ count: 0 }));
+        prismaMock.notificationOutbox.updateMany.mockResolvedValue(
+            asNever({ count: 0 }),
+        );
 
         const result = await processOutbox();
 
@@ -981,6 +1169,266 @@ describe("processOutbox", () => {
             },
         });
         vi.useRealTimers();
+    });
+
+    it.each([
+        { attempts: 0, nextStatus: "FAILED", terminal: false },
+        { attempts: 1, nextStatus: "FAILED", terminal: false },
+        { attempts: 2, nextStatus: "DEAD", terminal: true },
+    ] as const)(
+        "recovers stale PROCESSING at attempt $attempts with the bounded transition",
+        async ({ attempts, nextStatus, terminal }) => {
+            const now = new Date("2026-07-13T03:00:00.000Z");
+            vi.useFakeTimers();
+            vi.setSystemTime(now);
+            const infoSpy = vi
+                .spyOn(console, "warn")
+                .mockImplementation(() => undefined);
+            const notification = {
+                ...buildNotification(
+                    140 + attempts,
+                    "LEAVE_CANCELLED",
+                    JSON.stringify(buildLeavePayload()),
+                ),
+                status: "PROCESSING" as const,
+                attempts,
+                updatedAt: new Date(
+                    now.getTime()
+                        - (STALE_OUTBOX_PROCESSING_MINUTES * 60_000 + 1),
+                ),
+            };
+            prismaMock.notificationOutbox.findMany
+                .mockResolvedValueOnce(asNever([notification]))
+                .mockResolvedValueOnce(asNever([]));
+
+            try {
+                const result = await processOutbox();
+
+                expect(result).toEqual({ processed: 0, failed: 0 });
+                const recoveryCall = prismaMock.notificationOutbox.updateMany
+                    .mock.calls[0]?.[0];
+                expect(recoveryCall).toEqual({
+                    where: {
+                        id: notification.id,
+                        status: "PROCESSING",
+                        updatedAt: {
+                            lt: new Date(
+                                now.getTime()
+                                    - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
+                            ),
+                        },
+                        attempts,
+                    },
+                    data: expect.objectContaining({
+                        status: nextStatus,
+                        lastError: "Processing timeout",
+                        ...(terminal
+                            ? {}
+                            : {
+                                nextAttemptAt: new Date(
+                                    now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS,
+                                ),
+                            }),
+                    }),
+                });
+                if (terminal) {
+                    expect(recoveryCall?.data).not.toHaveProperty(
+                        "nextAttemptAt",
+                    );
+                } else {
+                    expect(recoveryCall?.data).toEqual(expect.objectContaining({
+                        attempts: { increment: 1 },
+                    }));
+                }
+
+                const eventNames = infoSpy.mock.calls.map(([event]) => event);
+                expect(eventNames).toContain("outbox_stale_recovered");
+                expect(eventNames).toContain(
+                    terminal
+                        ? "outbox_dead_lettered"
+                        : "outbox_retry_scheduled",
+                );
+                expect(infoSpy.mock.calls).toContainEqual([
+                    "outbox_stale_recovered",
+                    expect.objectContaining({
+                        event: "outbox_stale_recovered",
+                        outboxId: notification.id,
+                        outboxType: notification.type,
+                        attempt: Math.min(
+                            attempts + 1,
+                            MAX_OUTBOX_ATTEMPTS,
+                        ),
+                        nextStatus,
+                    }),
+                ]);
+            } finally {
+                infoSpy.mockRestore();
+                vi.useRealTimers();
+            }
+        },
+    );
+
+    it("leaves fresh and terminal non-PROCESSING rows untouched during stale recovery", async () => {
+        const now = new Date("2026-07-13T03:00:00.000Z");
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
+        const infoSpy = vi
+            .spyOn(console, "warn")
+            .mockImplementation(() => undefined);
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(asNever([]));
+
+        try {
+            await processOutbox();
+
+            expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: {
+                        status: "PROCESSING",
+                        updatedAt: {
+                            lt: new Date(
+                                now.getTime()
+                                    - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
+                            ),
+                        },
+                    },
+                }),
+            );
+            expect(infoSpy).not.toHaveBeenCalled();
+        } finally {
+            infoSpy.mockRestore();
+            vi.useRealTimers();
+        }
+    });
+
+    it("does not increment an already exhausted stale PROCESSING row", async () => {
+        const now = new Date("2026-07-13T03:00:00.000Z");
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
+        const notification = {
+            ...buildNotification(
+                144,
+                "LEAVE_CANCELLED",
+                JSON.stringify(buildLeavePayload()),
+            ),
+            status: "PROCESSING" as const,
+            attempts: MAX_OUTBOX_ATTEMPTS,
+            updatedAt: new Date(
+                now.getTime()
+                    - (STALE_OUTBOX_PROCESSING_MINUTES * 60_000 + 1),
+            ),
+        };
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([notification]))
+            .mockResolvedValueOnce(asNever([]));
+
+        try {
+            await processOutbox();
+
+            const recoveryData = prismaMock.notificationOutbox.updateMany
+                .mock.calls[0]?.[0].data;
+            expect(recoveryData).toEqual({
+                status: "DEAD",
+                lastError: "Processing timeout",
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("emits safe structured metadata for repeated provider attempts and retries", async () => {
+        const infoSpy = vi
+            .spyOn(console, "warn")
+            .mockImplementation(() => undefined);
+        const notification = {
+            ...buildNotification(
+                145,
+                "LEAVE_CANCELLED",
+                JSON.stringify(buildLeavePayload()),
+            ),
+            status: "FAILED" as const,
+            attempts: 1,
+        };
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(asNever([notification]));
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
+            new Error("temporary provider failure"),
+        );
+
+        try {
+            await processOutbox();
+
+            expect(infoSpy.mock.calls).toContainEqual([
+                "outbox_provider_attempt",
+                expect.objectContaining({
+                    event: "outbox_provider_attempt",
+                    outboxId: 145,
+                    outboxType: "LEAVE_CANCELLED",
+                    attempt: 2,
+                    nextStatus: "PROCESSING",
+                    isRetry: true,
+                }),
+            ]);
+            expect(infoSpy.mock.calls).toContainEqual([
+                "outbox_retry_scheduled",
+                expect.objectContaining({
+                    event: "outbox_retry_scheduled",
+                    outboxId: 145,
+                    outboxType: "LEAVE_CANCELLED",
+                    attempt: 2,
+                    nextStatus: "FAILED",
+                }),
+            ]);
+            const loggedMetadata = JSON.stringify(infoSpy.mock.calls);
+            expect(loggedMetadata).not.toContain("employee@example.com");
+            expect(loggedMetadata).not.toContain("ลาป่วย");
+        } finally {
+            infoSpy.mockRestore();
+        }
+    });
+
+    it("emits a safe DEAD event after a terminal provider failure", async () => {
+        const infoSpy = vi
+            .spyOn(console, "warn")
+            .mockImplementation(() => undefined);
+        const notification = {
+            ...buildNotification(
+                146,
+                "LEAVE_CANCELLED",
+                JSON.stringify(buildLeavePayload()),
+            ),
+            attempts: MAX_OUTBOX_ATTEMPTS - 1,
+        };
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(asNever([notification]));
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
+            new Error("permanent provider failure"),
+        );
+
+        try {
+            await processOutbox();
+
+            expect(infoSpy.mock.calls).toContainEqual([
+                "outbox_dead_lettered",
+                expect.objectContaining({
+                    event: "outbox_dead_lettered",
+                    outboxId: 146,
+                    outboxType: "LEAVE_CANCELLED",
+                    attempt: MAX_OUTBOX_ATTEMPTS,
+                    nextStatus: "DEAD",
+                    nextAttemptAt: null,
+                }),
+            ]);
+            expect(JSON.stringify(infoSpy.mock.calls)).not.toContain(
+                "permanent provider failure",
+            );
+        } finally {
+            infoSpy.mockRestore();
+        }
     });
 
     it("retries a due failed entry without a new API mutation", async () => {
@@ -1076,7 +1524,9 @@ describe("processOutbox", () => {
             JSON.stringify(buildLeavePayload()),
         );
         prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
             .mockResolvedValueOnce(asNever([notification]))
+            .mockResolvedValueOnce(asNever([]))
             .mockResolvedValueOnce(asNever([]));
 
         await processOutbox();

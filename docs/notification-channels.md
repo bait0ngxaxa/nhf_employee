@@ -28,7 +28,8 @@ Business event
     │   LINE_APP_CHANNEL_ACCESS_TOKEN
     │       ↓
     │   NHFapp LINE OA → LIFF deep link
-    └── Stock operational outbox → legacy Stock LINE broadcast (unchanged)
+    └── Stock operational outbox → legacy Stock LINE broadcast
+            (LINE retry key only at the Outbox boundary; token/audience unchanged)
 ```
 
 Feature service เป็นเจ้าของ event semantics, recipient intent, message data และ destination
@@ -142,7 +143,9 @@ Stock แบ่งเป็นสองกลุ่ม:
 - Personal request result เพิ่ม `STOCK_REQUEST_RESULT_LINE` สำหรับ requester และใช้
   `LINE_APP_CHANNEL_ACCESS_TOKEN` ผ่าน `LineAccountLink` และ Stock LIFF
 - Operational/team events (`STOCK_REQUEST_LINE` และ `STOCK_LOW_LINE`) ยังใช้
-  `sendStockLineBroadcast()` และ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` ตามเดิม
+  `sendStockLineBroadcast()` และ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` ตามเดิม; เฉพาะ
+  Outbox dispatch จะส่ง retry key ที่ derive จาก `NotificationOutbox.id` เพื่อให้
+  retry ของ row เดิมใช้ provider identity เดิม โดยไม่สร้าง eventKey contract ใหม่
 
 ห้ามนำ `LINE_APP_CHANNEL_ACCESS_TOKEN` ไปแทน legacy Stock token ใน operational broadcast
 และห้ามลบ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` ใน phase นี้
@@ -155,12 +158,23 @@ Stock แบ่งเป็นสองกลุ่ม:
   `eventKey` ทำให้ enqueue ซ้ำจาก parent retry ไม่สร้าง child ซ้ำ
 - `sendLineAppMessage()` ส่ง `X-Line-Retry-Key`; provider duplicate acknowledgement (`409`)
   ที่มี retry key ถือว่าสำเร็จตาม implementation ปัจจุบัน
+- Email Request ยังคงเป็น deferred IT capability ในตำแหน่งเดิม; Outbox dispatch ใช้
+  `eventKey` เดิมสร้าง retry key เมื่อมีค่า และใช้ `outbox:<type>:<id>` เป็น fallback
+  สำหรับ historical row ที่ไม่มี `eventKey` ทั้ง push และ broadcast ใช้ identity เดียวกัน
+- Stock operational broadcast ใช้ `outbox:<type>:<id>` เป็น retry identity โดยตรง
+  เพราะสอง historical event types นี้ไม่มี eventKey contract ที่เชื่อถือได้
+- LINE retry key ของ Messaging API มี retention window 24 ชั่วโมงเท่านั้น การใช้ key
+  เดิมหลัง window อาจถูก provider รับเป็นคำขอใหม่ จึงช่วยลด duplicate ในช่วง recovery
+  แต่ไม่ใช่ deduplication ถาวร และไม่รับประกัน end-user delivery
 - User/Employee ที่ inactive, deleted, ผูก link ไม่ได้ หรือไม่มี `LineAccountLink` เป็น
   business state ที่ valid: ไม่ throw จาก business action; ถ้ามี child row แล้วจะถูก
   `SUPERSEDED` เพื่อไม่ retry ถาวร (Routine อาจไม่สร้าง child ตั้งแต่ enqueue เมื่อยังไม่ link)
 - ความล้มเหลวชั่วคราวของ LINE provider จะ throw จาก child processor เพื่อใช้ outbox retry
   เดิม สูงสุด 3 attempts ก่อน `DEAD`; Email และ In-app row ไม่ถูก duplicate จาก retry นี้
 - Routine ยังคง stale validation และ `DEFERRED`/`SUPERSEDED` behavior เดิม
+- SMTP ยังคง at-least-once: deterministic `Message-ID` เป็น correlation hint ไม่ใช่
+  provider idempotency key; timeout หรือ connection failure หลัง server รับข้อความแล้ว
+  ยังอาจทำให้ retry ส่งซ้ำได้
 
 ## Configuration and operations
 

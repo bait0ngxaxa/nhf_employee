@@ -126,4 +126,25 @@ describe("Stock request result NHFapp LINE delivery", () => {
             },
         });
     });
+
+    it("supersedes a row whose stored retry key does not match its event key", async () => {
+        const payload = {
+            ...buildPayload(),
+            retryKey: createLineRetryKey("different-stock-event"),
+        };
+
+        await expect(dispatchStockRequestResultLineOutbox(
+            buildNotification(buildPayload()),
+            payload,
+        )).resolves.toBe("SUPERSEDED");
+
+        expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 800, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded mismatched Stock request result LINE retry key",
+            },
+        });
+    });
 });

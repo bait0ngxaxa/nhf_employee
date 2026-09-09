@@ -9,6 +9,7 @@ import {
     buildRoutineReminderLineEventKey,
     dispatchRoutineReminderOutbox,
 } from "./reminders";
+import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import { routineReminderEmailOutboxPayloadSchema } from "../schemas/routine";
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
@@ -137,7 +138,7 @@ function buildEmailNotification(payload: ReturnType<typeof buildEmailPayload>): 
 }
 
 function buildLinePayload(overrides: Record<string, unknown> = {}) {
-    return {
+    const payload = {
         occurrenceId: 91,
         taskId: 71,
         ruleId: 31,
@@ -150,8 +151,21 @@ function buildLinePayload(overrides: Record<string, unknown> = {}) {
         daysBefore: 2,
         scheduledFor: "2026-08-03T02:00:00.000Z",
         isAssignee: true,
-        retryKey: "123e4567-e89b-42d3-a456-426614174000",
         ...overrides,
+    };
+
+    return {
+        ...payload,
+        retryKey: typeof overrides.retryKey === "string"
+            ? overrides.retryKey
+            : createLineRetryKey(
+                buildRoutineReminderLineEventKey(
+                    payload.occurrenceId as number,
+                    payload.ruleId as number,
+                    payload.userId as number,
+                    payload.reminderVersion as number,
+                ),
+            ),
     };
 }
 
@@ -1175,6 +1189,22 @@ describe("Routine reminder dispatch", () => {
         );
         expect(mismatchedResult).toBe("SUPERSEDED");
         expect(sendLineAppMessageMock).not.toHaveBeenCalled();
+
+        const mismatchedRetryResult = await dispatchRoutineReminderOutbox(
+            notification,
+            {
+                ...payload,
+                retryKey: createLineRetryKey("different-routine-event"),
+            },
+        );
+        expect(mismatchedRetryResult).toBe("SUPERSEDED");
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 503, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded mismatched Routine reminder LINE retry key",
+            },
+        });
     });
 
     it("throws on a LINE provider failure so the generic outbox can retry", async () => {

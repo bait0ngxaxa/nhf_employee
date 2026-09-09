@@ -1,6 +1,7 @@
 import type { NotificationOutbox } from "@prisma/client";
 import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
+import { createOutboxLineRetryKey } from "./provider-key";
 import type { EmailRequestData } from "@/types/api";
 import { createEmailRequestInAppNotification } from "@/lib/services/email-request/notifications";
 import { dispatchStockOutbox } from "@/modules/stock";
@@ -50,6 +51,29 @@ type OutboxProcessResult = {
 };
 
 type DispatchOutcome = "SENT" | "SUPERSEDED" | "DEFERRED";
+
+type OutboxOperationalEvent =
+    | "outbox_provider_attempt"
+    | "outbox_retry_scheduled"
+    | "outbox_stale_recovered"
+    | "outbox_dead_lettered";
+
+type OutboxOperationalMetadata = {
+    event: OutboxOperationalEvent;
+    outboxId: number | null;
+    outboxType: string;
+    attempt: number | null;
+    nextStatus: string;
+    nextAttemptAt: string | null;
+    isRetry?: boolean;
+};
+
+function emitOutboxOperationalEvent(
+    event: OutboxOperationalEvent,
+    metadata: Omit<OutboxOperationalMetadata, "event">,
+): void {
+    console.warn(event, { event, ...metadata });
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
@@ -131,32 +155,70 @@ async function markStaleProcessingRows(): Promise<void> {
         now.getTime() - STALE_OUTBOX_PROCESSING_MINUTES * 60_000,
     );
 
-    await prisma.notificationOutbox.updateMany({
+    const staleRows = await prisma.notificationOutbox.findMany({
         where: {
             status: OUTBOX_STATUS_PROCESSING,
             updatedAt: { lt: staleBefore },
-            attempts: { gte: MAX_OUTBOX_ATTEMPTS - 1 },
         },
-        data: {
-            status: OUTBOX_STATUS_DEAD,
-            lastError: "Processing timeout",
-            attempts: { increment: 1 },
+        select: {
+            id: true,
+            type: true,
+            attempts: true,
         },
     });
 
-    await prisma.notificationOutbox.updateMany({
-        where: {
-            status: OUTBOX_STATUS_PROCESSING,
-            updatedAt: { lt: staleBefore },
-            attempts: { lt: MAX_OUTBOX_ATTEMPTS - 1 },
-        },
-        data: {
-            status: OUTBOX_STATUS_FAILED,
-            lastError: "Processing timeout",
-            attempts: { increment: 1 },
-            nextAttemptAt: new Date(now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS),
-        },
-    });
+    for (const row of staleRows) {
+        const nextAttempts = Math.min(
+            row.attempts + 1,
+            MAX_OUTBOX_ATTEMPTS,
+        );
+        const isTerminal = row.attempts >= MAX_OUTBOX_ATTEMPTS - 1;
+        const nextAttemptAt = isTerminal
+            ? null
+            : new Date(now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS);
+        const recovered = await prisma.notificationOutbox.updateMany({
+            where: {
+                id: row.id,
+                status: OUTBOX_STATUS_PROCESSING,
+                updatedAt: { lt: staleBefore },
+                attempts: row.attempts,
+            },
+            data: {
+                status: isTerminal ? OUTBOX_STATUS_DEAD : OUTBOX_STATUS_FAILED,
+                lastError: "Processing timeout",
+                ...(row.attempts < MAX_OUTBOX_ATTEMPTS
+                    ? { attempts: { increment: 1 } }
+                    : {}),
+                ...(nextAttemptAt ? { nextAttemptAt } : {}),
+            },
+        });
+        if (recovered.count !== 1) continue;
+
+        emitOutboxOperationalEvent("outbox_stale_recovered", {
+            outboxId: row.id,
+            outboxType: row.type,
+            attempt: nextAttempts,
+            nextStatus: isTerminal ? OUTBOX_STATUS_DEAD : OUTBOX_STATUS_FAILED,
+            nextAttemptAt: nextAttemptAt?.toISOString() ?? null,
+        });
+        if (isTerminal) {
+            emitOutboxOperationalEvent("outbox_dead_lettered", {
+                outboxId: row.id,
+                outboxType: row.type,
+                attempt: nextAttempts,
+                nextStatus: OUTBOX_STATUS_DEAD,
+                nextAttemptAt: null,
+            });
+        } else {
+            emitOutboxOperationalEvent("outbox_retry_scheduled", {
+                outboxId: row.id,
+                outboxType: row.type,
+                attempt: nextAttempts,
+                nextStatus: OUTBOX_STATUS_FAILED,
+                nextAttemptAt: nextAttemptAt?.toISOString() ?? null,
+            });
+        }
+    }
 }
 
 async function claimNotification(
@@ -185,7 +247,7 @@ function getNextAttemptAt(attempts: number, now: Date): Date {
     );
 }
 
-async function dispatchNotification(
+export async function dispatchNotification(
     notification: NotificationOutbox,
 ): Promise<DispatchOutcome> {
     if (!isOutboxNotificationType(notification.type)) {
@@ -241,6 +303,11 @@ async function dispatchNotification(
             await assertLineSent(
                 await lineNotificationService.sendEmailRequestNotification(
                     parsedPayload,
+                    createOutboxLineRetryKey(
+                        notification.type,
+                        notification.id,
+                        notification.eventKey,
+                    ),
                 ),
                 "LINE email request notification",
             );
@@ -340,6 +407,15 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
             continue;
         }
 
+        emitOutboxOperationalEvent("outbox_provider_attempt", {
+            outboxId: notification.id,
+            outboxType: notification.type,
+            attempt: notification.attempts + 1,
+            nextStatus: OUTBOX_STATUS_PROCESSING,
+            nextAttemptAt: null,
+            isRetry: notification.attempts > 0,
+        });
+
         try {
             const outcome = await dispatchNotification(notification);
 
@@ -370,9 +446,26 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
                 error,
             );
 
-            const retryData = isTerminal
-                ? {}
-                : { nextAttemptAt: getNextAttemptAt(nextAttempts, now) };
+            let retryData: { nextAttemptAt?: Date } = {};
+            if (isTerminal) {
+                emitOutboxOperationalEvent("outbox_dead_lettered", {
+                    outboxId: notification.id,
+                    outboxType: notification.type,
+                    attempt: nextAttempts,
+                    nextStatus: OUTBOX_STATUS_DEAD,
+                    nextAttemptAt: null,
+                });
+            } else {
+                const nextAttemptAt = getNextAttemptAt(nextAttempts, now);
+                retryData = { nextAttemptAt };
+                emitOutboxOperationalEvent("outbox_retry_scheduled", {
+                    outboxId: notification.id,
+                    outboxType: notification.type,
+                    attempt: nextAttempts,
+                    nextStatus: OUTBOX_STATUS_FAILED,
+                    nextAttemptAt: nextAttemptAt.toISOString(),
+                });
+            }
             await prisma.notificationOutbox.updateMany({
                 where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
                 data: {

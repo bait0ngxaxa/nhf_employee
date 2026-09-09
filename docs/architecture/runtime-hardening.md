@@ -2540,3 +2540,282 @@ the new cursor.
 
 **L0-NOTIF-01 — CLOSED.** L4 acceptance is complete. L3 remains closed, and
 L5/L6 were not started.
+
+## 22. L5 — Outbox / Provider Reliability Hardening
+
+L5 is a provider-specific hardening of the existing shared Outbox boundary.
+It does not redesign the delivery model as exactly-once. The global contract
+remains at-least-once: a provider request may be accepted before the worker
+records `SENT`, so recovery retries boundedly and uses a provider mechanism
+only where the provider actually supports one. No database transaction is
+held open around an external provider request, and `NotificationOutbox`
+remains a shared platform boundary rather than a Notification module concern.
+
+L1-L4 remain closed. L6 cleanup was not started. Historical `TICKET_*`
+enum/storage values remain compatibility-only and are not active runtime
+dispatch types.
+
+### 22.1 Active provider-path inventory
+
+The following is the inventory of every type in
+`OUTBOX_NOTIFICATION_TYPES` (25 active runtime types). “Failure” means the
+dispatch result observed by the shared processor; a provider failure is
+retryable until the configured three-attempt budget is exhausted. Capability
+revalidation can intentionally return `SUPERSEDED`, and Routine can return
+`DEFERRED`, which writes the row back to `PENDING` at its scheduled time.
+
+| Outbox type | Owning capability | Side effects performed | Provider/channel | Stable event identity | Provider idempotency/retry mechanism | Current ambiguity window | Stale/supersede validation | Failure result / terminal state |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `EMAIL_REQUEST` | Deferred Email Request / IT capability | Configured IT in-app rows, then one IT LINE notification | LINE IT push when `LINE_IT_TEAM_USER_ID` is configured, otherwise IT broadcast; `LINE_IT_CHANNEL_ACCESS_TOKEN` | Existing `eventKey` when present (`email-request:<id>:created`); historical row identity fallback | `createOutboxLineRetryKey(type, id, eventKey)`; the same key reaches push or broadcast | LINE key retention is 24 hours; after that a recovery retry may be accepted as a new request; end-user delivery is not guaranteed | Payload is boundary-validated; no Email Request migration or new module | LINE `false`/error -> `FAILED`, then `DEAD`; no business supersede introduced |
+| `LEAVE_ACTION` | Leave | Current-action revalidation, Leave in-app entry, child personal LINE row, SMTP email | SMTP plus deferred NHFapp personal LINE child | Payload leave/action delivery identity; parent `eventKey` is historically optional | Deterministic Leave `Message-ID`; child key is `createLineRetryKey(LEAVE_LINE eventKey)` | SMTP acceptance can be ambiguous; child LINE key has the provider retention window | Current approver/action generation is rechecked; stale action -> `SUPERSEDED` | Provider error -> `FAILED`/`DEAD`; stale current action -> `SUPERSEDED` |
+| `LEAVE_RESULT` | Leave | In-app result, child personal LINE row, SMTP result email | SMTP plus NHFapp personal LINE push child | Payload `leaveId`/result identity; parent `eventKey` is historically optional | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Child enqueue is duplicate-safe and Leave state remains capability-owned | Provider error -> `FAILED`/`DEAD` |
+| `LEAVE_CANCELLED` | Leave | In-app cancellation, child personal LINE row, SMTP email | SMTP plus NHFapp personal LINE push child | Payload leave/cancellation identity; parent `eventKey` is historically optional | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Existing Leave recipient/state checks remain in child dispatch | Provider error -> `FAILED`/`DEAD` |
+| `LEAVE_CANCELLATION_REQUESTED` | Leave | In-app request, child personal LINE row, SMTP email | SMTP plus NHFapp personal LINE push child | Existing cancellation `eventKey` where persisted plus payload identity | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Current cancellation action/recipient is revalidated; stale -> `SUPERSEDED` | Provider error -> `FAILED`/`DEAD`; stale -> `SUPERSEDED` |
+| `LEAVE_CANCELLED_AFTER_APPROVAL` | Leave | In-app result, child personal LINE row, SMTP email | SMTP plus NHFapp personal LINE push child | Existing cancellation `eventKey` plus payload identity | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Existing Leave state/recipient behavior | Provider error -> `FAILED`/`DEAD` |
+| `LEAVE_NOT_TAKEN_REQUESTED` | Leave | In-app request, child personal LINE row, SMTP email | SMTP plus NHFapp personal LINE push child | Existing not-taken `eventKey` plus payload identity | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Current not-taken action/recipient is revalidated; stale -> `SUPERSEDED` | Provider error -> `FAILED`/`DEAD`; stale -> `SUPERSEDED` |
+| `LEAVE_NOT_TAKEN_CONFIRMED` | Leave | In-app result, child personal LINE row, SMTP email | SMTP plus NHFapp personal LINE push child | Existing not-taken `eventKey` plus payload identity | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Existing Leave state/recipient behavior | Provider error -> `FAILED`/`DEAD` |
+| `LEAVE_ACTION_LINE` | Leave | None beyond the personal LINE provider request | NHFapp personal LINE push via `LINE_APP_CHANNEL_ACCESS_TOKEN` | `buildLeaveLineEventKey` includes leave, action generation, recipient, and type | Persisted `retryKey` must equal `createLineRetryKey(eventKey)`; provider 409 with that key is accepted | 24-hour LINE retry-key retention; accepted does not mean user received it | Event key, retry key, current action generation, recipient, authorization, and LIFF destination are checked | Invalid/stale/unavailable recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `LEAVE_RESULT_LINE` | Leave | None beyond personal LINE provider request | NHFapp personal LINE push | `buildLeaveLineEventKey` with leave, result type, and recipient | Persisted deterministic `retryKey`; 2xx or keyed 409 is accepted | Same LINE retention/delivery limitation | Leave payload and recipient/state validation | Invalid/stale/unavailable recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `LEAVE_CANCELLED_LINE` | Leave | None beyond personal LINE provider request | NHFapp personal LINE push | `buildLeaveLineEventKey` | Persisted deterministic `retryKey`; keyed 409 accepted | Same LINE retention/delivery limitation | Leave payload and recipient/state validation | Invalid/stale/unavailable recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `LEAVE_CANCELLATION_REQUESTED_LINE` | Leave | None beyond personal LINE provider request | NHFapp personal LINE push | `buildLeaveLineEventKey` | Persisted deterministic `retryKey`; keyed 409 accepted | Same LINE retention/delivery limitation | Current cancellation action, recipient, authorization, and LIFF destination are checked | Stale/unavailable recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `LEAVE_CANCELLED_AFTER_APPROVAL_LINE` | Leave | None beyond personal LINE provider request | NHFapp personal LINE push | `buildLeaveLineEventKey` | Persisted deterministic `retryKey`; keyed 409 accepted | Same LINE retention/delivery limitation | Leave payload and recipient/state validation | Invalid/stale/unavailable recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `LEAVE_NOT_TAKEN_REQUESTED_LINE` | Leave | None beyond personal LINE provider request | NHFapp personal LINE push | `buildLeaveLineEventKey` | Persisted deterministic `retryKey`; keyed 409 accepted | Same LINE retention/delivery limitation | Current not-taken action, recipient, authorization, and LIFF destination are checked | Stale/unavailable recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `LEAVE_NOT_TAKEN_CONFIRMED_LINE` | Leave | None beyond personal LINE provider request | NHFapp personal LINE push | `buildLeaveLineEventKey` | Persisted deterministic `retryKey`; keyed 409 accepted | Same LINE retention/delivery limitation | Leave payload and recipient/state validation | Invalid/stale/unavailable recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `STOCK_REQUEST_LINE` | Stock | Admin in-app rows, then operational broadcast | Legacy Stock LINE broadcast with `LINE_STOCK_CHANNEL_ACCESS_TOKEN` | Historical row identity; no new `eventKey` contract | `createOutboxLineRetryKey("STOCK_REQUEST_LINE", notification.id)` | 24-hour LINE key retention; broadcast acceptance is not end-user delivery proof | Existing Stock payload parsing and audience semantics | Provider failure -> `FAILED`/`DEAD`; existing Stock behavior is otherwise unchanged |
+| `STOCK_LOW_LINE` | Stock | Admin in-app rows, then operational broadcast | Legacy Stock LINE broadcast with `LINE_STOCK_CHANNEL_ACCESS_TOKEN` | Historical row identity; no new `eventKey` contract | `createOutboxLineRetryKey("STOCK_LOW_LINE", notification.id)` | Same LINE retention/delivery limitation | Existing Stock payload parsing and audience semantics | Provider failure -> `FAILED`/`DEAD`; existing Stock behavior is otherwise unchanged |
+| `STOCK_REQUEST_RESULT_EMAIL` | Stock | None beyond the requester email provider request | SMTP | `stock-request:<requestId>:<status>:email` payload/event identity | Deterministic Stock `Message-ID` | SMTP server acceptance/timeout is ambiguous; Message-ID is not provider deduplication | Existing Stock result payload and recipient semantics | `false`/error -> `FAILED`, then `DEAD` |
+| `STOCK_REQUEST_RESULT_LINE` | Stock | None beyond personal LINE provider request | NHFapp personal LINE push via `LineAccountLink` | `stock-request:<requestId>:<status>:line` | Persisted retry key must equal `createLineRetryKey(eventKey)`; keyed 409 accepted | Same LINE retention/delivery limitation | Stock requester/link/LIFF state and canonical event/retry identity are checked | Unavailable or mismatched business work -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `ROUTINE_REMINDER_IN_APP` | Routine | Routine in-app rows and child email/LINE outbox rows | Database writes; deferred child provider work | `routine:<occurrence>:rule:<rule>:version:<version>` | Event-key uniqueness/dedupe for enqueue; provider identity belongs to child rows | Database transaction/claim failure is retryable; no external provider request in this dispatch | Rule, occurrence, version, due date, schedule, recipient state, and current channel are checked | Not due -> `DEFERRED`/`PENDING`; stale/invalid -> `SUPERSEDED`; persistence failure -> `FAILED`/`DEAD` |
+| `ROUTINE_REMINDER_EMAIL` | Routine | None beyond reminder email request | SMTP | `routine:<occurrence>:rule:<rule>:user:<user>:version:<version>:email` | Deterministic Routine `Message-ID` | SMTP ambiguity; Message-ID is a correlation/idempotency hint only | Event key, current task/rule/recipient state and email eligibility are checked | Stale/unavailable -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `ROUTINE_REMINDER_LINE` | Routine | None beyond personal LINE provider request | NHFapp personal LINE push | `routine:<occurrence>:rule:<rule>:user:<user>:version:<version>:line` | Persisted `retryKey` must equal `createLineRetryKey(eventKey)`; keyed 409 accepted | Same LINE retention/delivery limitation | Event/retry key, current due state, recipient/link, assignment, content, and destination are checked | Not due -> `DEFERRED`; stale/unavailable/mismatched -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `ROUTINE_CONTRACT_EXPIRY_IN_APP` | Routine | Contract-expiry in-app rows and child email/LINE outbox rows | Database writes; deferred child provider work | `routine-contract:<task>:end:<date>` | Event-key uniqueness/dedupe for enqueue; provider identity belongs to child rows | Database transaction/claim failure is retryable; no external provider request in this dispatch | Current contract, notification date, schedule, due state, and recipients are checked | Not due -> `DEFERRED`/`PENDING`; stale/invalid -> `SUPERSEDED`; persistence failure -> `FAILED`/`DEAD` |
+| `ROUTINE_CONTRACT_EXPIRY_EMAIL` | Routine | None beyond contract-expiry email request | SMTP | `routine-contract:<task>:end:<date>:user:<user>` | Deterministic Routine contract `Message-ID` | SMTP ambiguity; Message-ID is not provider deduplication | Event key, current contract, assignee and valid-email state are checked | Stale/unavailable -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `ROUTINE_CONTRACT_EXPIRY_LINE` | Routine | None beyond personal LINE provider request | NHFapp personal LINE push | `routine-contract:<task>:end:<date>:user:<user>:line` | Persisted `retryKey` must equal `createLineRetryKey(eventKey)`; keyed 409 accepted | Same LINE retention/delivery limitation | Event/retry key, current contract, recipient/link, due state, and destination are checked | Not due -> `DEFERRED`; stale/unavailable/mismatched -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+
+The matrix separates the three LINE channels deliberately: NHFapp personal
+push uses `LINE_APP_CHANNEL_ACCESS_TOKEN`, Stock operational broadcast keeps
+`LINE_STOCK_CHANNEL_ACCESS_TOKEN`, and Email Request uses the existing IT
+configuration and target selection. It also separates SMTP email from LINE;
+the shared processor does not turn their different provider guarantees into a
+common exactly-once abstraction.
+
+### 22.2 LINE retry-key contract and coverage
+
+The implementation follows the verified official LINE Messaging API contract:
+`X-Line-Retry-Key` is sent on the first request intended to be retryable, the
+same key is reused for the same logical request, and recipient/content remain
+unchanged for that key. A 2xx response means accepted. A 409 response is
+treated as accepted only when a non-empty retry key was sent, representing the
+same request having already been accepted. Ordinary 4xx responses remain
+failures; network/provider failures remain retryable through the Outbox.
+
+The official provider retention is 24 hours, not permanent deduplication:
+[LINE Messaging API reference](https://github.com/line/line-developers-docs-source/blob/main/docs/en/reference/messaging-api/index.html.md).
+The repository does not persist a provider-acceptance timestamp and does not
+pretend that `updatedAt` or `createdAt` is one. Recovery that happens after
+the retention window may therefore produce a duplicate rather than silently
+discarding the committed event. A keyed accepted response also does not prove
+that the end user received or viewed the message.
+
+Before L5, Leave, Routine, and Stock request-result personal LINE producers
+already persisted deterministic retry keys. L5 audited their dispatchers and
+added explicit event/retry-key consistency checks for Routine reminder,
+Routine contract-expiry, and Stock request-result child rows. A malformed or
+mismatched stored key now follows the existing capability-specific stale
+policy and becomes `SUPERSEDED`; a provider failure still throws/retries and
+is not converted into a business supersede.
+
+The two legacy Stock operational types had no reliable `eventKey` contract.
+L5 does not add a schema field or migration. At the Outbox dispatch boundary
+only, each row gets a deterministic key derived from
+`outbox:<type>:<NotificationOutbox.id>`. It is stable across retries, unique
+to the row/type, provider-format-safe after UUID derivation, independent of
+recipient and secrets, and does not alter the legacy token, audience, or
+direct helper behavior.
+
+Email Request remains deferred and in its current ownership location. Its
+dispatch now uses the non-blank existing `eventKey` when available and the
+same `outbox:<type>:<id>` fallback for historical rows without one. The key
+is threaded through the existing IT push-or-broadcast transport, so both
+variants use the same identity for one Outbox row. No Email Request business
+payload or recipient semantics changed.
+
+### 22.3 SMTP contract and internal retry characterization
+
+The active SMTP Outbox paths are Leave action/result/event email, Routine
+reminder email, Routine contract-expiry email, and Stock request-result email.
+Each has a deterministic `Message-ID` derived from its stable capability
+identity. The ID is preserved across the internal Nodemailer retry loop and
+across a later Outbox retry for the same logical delivery.
+
+`Message-ID` is not an SMTP provider idempotency key. After a timeout or
+connection failure, the SMTP server may already have accepted the message;
+retrying the same ID may still deliver a duplicate. SMTP Outbox therefore
+remains explicitly at-least-once. L5 did not remove or redesign the existing
+transport retry loop. Focused fake-timer tests characterize:
+
+- first-attempt success;
+- transient connection failure, reconnect, and success;
+- repeated transient failures returning `false`;
+- repeated non-transient failures returning `false`; and
+- an ambiguous timeout followed by retry, with the same `messageId` passed to
+  Nodemailer.
+
+These tests prove correlation identity preservation and the boolean failure
+contract, not provider deduplication.
+
+### 22.4 Crash-after-provider evidence
+
+The regression tests model the actual L0 failure window at the dispatch seam:
+
+```text
+PROCESSING
+  -> provider invocation accepted
+  -> final SENT write intentionally omitted (worker loss)
+  -> stale recovery
+  -> bounded retry
+```
+
+Coverage includes:
+
+- Email Request IT LINE: the recovered request reuses the same event-derived
+  retry key;
+- Stock legacy broadcast: the recovered request reuses the same Outbox-row
+  retry key;
+- Stock request-result personal LINE: the persisted canonical retry key is
+  reused and the provider acceptance/duplicate path is represented by the
+  mocked provider seam; and
+- Stock request-result SMTP: the recovered invocation is made again with the
+  same deterministic Message-ID, explicitly recording duplicate ambiguity
+  rather than claiming deduplication.
+
+LINE transport tests cover keyed 409 acceptance for personal push, IT/normal
+broadcast, and legacy Stock broadcast. Provider HTTP remains mocked; no test
+uses an external network.
+
+### 22.5 Stale PROCESSING state machine and final transitions
+
+The stale recovery state machine is now conditional per row. The conditional
+update checks the row ID, `PROCESSING` status, stale timestamp, and the
+observed attempt count, so a competing worker cannot overwrite a newer state.
+The configured budget remains three attempts and stale recovery uses the
+existing one-minute base retry delay:
+
+| Current stale state | Recovery state | Attempts after recovery | `nextAttemptAt` |
+| --- | --- | --- | --- |
+| `PROCESSING`, attempts `0` | `FAILED` | `1` | `now + 60s` |
+| `PROCESSING`, attempts `1` | `FAILED` | `2` | `now + 60s` |
+| `PROCESSING`, attempts `2` | `DEAD` | `3` | no new schedule |
+| `PROCESSING`, attempts `>= 3` | `DEAD` | remains capped at `3` | no new schedule |
+
+Focused tests pin these exact boundaries, fresh `PROCESSING` rows, the
+`PROCESSING` selection predicate that excludes `SENT`, `DEAD`, and
+`SUPERSEDED`, exhausted-row capping, and the claim race in which only one of
+two workers dispatches the row. Existing capability tests retain Leave,
+Routine, and Stock stale/superseded behavior.
+
+The final-state coverage includes:
+
+```text
+PENDING -> PROCESSING -> SENT
+PENDING -> PROCESSING -> FAILED
+FAILED  -> PROCESSING -> SENT
+FAILED  -> PROCESSING -> DEAD
+PROCESSING stale -> FAILED
+PROCESSING stale terminal -> DEAD
+PROCESSING -> SUPERSEDED
+PROCESSING -> DEFERRED (dispatch outcome; persisted row is PENDING)
+```
+
+The processor still claims conditionally, never wraps a provider call in a
+database transaction, preserves exponential Outbox retry/backoff, and leaves
+the cron URL and secret boundary unchanged.
+
+### 22.6 Operational observability and DEAD-letter contract
+
+The shared processor emits safe structured process-log events:
+
+```text
+outbox_provider_attempt
+outbox_retry_scheduled
+outbox_stale_recovered
+outbox_dead_lettered
+```
+
+Metadata is limited to operational fields such as `outboxId`, `outboxType`,
+`attempt`, `nextStatus`, `nextAttemptAt`, and `isRetry`. It does not include
+payload/body content, LINE user IDs, recipient email addresses, access tokens,
+SMTP passwords, cookies, ID tokens, refresh tokens, or provider response
+bodies. A repeated attempt is therefore machine-detectable without exposing
+delivery data. Existing error behavior remains in place and an observability
+sink is not required for a state transition to complete.
+
+The repository proves that terminal provider failures and stale-to-`DEAD`
+recovery emit `outbox_dead_lettered`. Production operations must configure
+the supervisor/log platform to alert on that event and should surface repeated
+provider attempts and `outbox_retry_scheduled`. Repository tests cannot prove
+that an external deployment retains these logs or has an active alert, so L5
+does not claim production alerting is already enabled. No dashboard or new
+metrics stack was introduced.
+
+### 22.7 Schema, compatibility, and implementation record
+
+No Prisma schema change or migration was added. Existing
+`NotificationOutbox.id`, nullable unique `eventKey`, `status`, `attempts`,
+`nextAttemptAt`, `createdAt`, `updatedAt`, and `lastError` are sufficient for
+the L5 contract. The exact provider-acceptance timestamp is not fabricated,
+and no receipt table, delivery ledger, or metrics table was introduced.
+Historical `TICKET_*` storage compatibility is unchanged.
+
+L5 changed:
+
+- `lib/services/outbox/provider-key.ts` — stable Outbox-row LINE fallback;
+- `lib/line/index.ts`, `lib/line/messaging.ts`, and the existing Stock
+  notification boundary — optional retry-key threading without token/channel
+  changes;
+- `lib/services/outbox/processor.ts` — Email Request retry identity, bounded
+  conditional stale recovery, safe operational events, and exported dispatch
+  seam for crash-window regression evidence;
+- `modules/stock/infrastructure/notifications/outbox.ts` and
+  `line-notifications.ts` — legacy broadcast key coverage and personal key
+  consistency validation;
+- `modules/routine/application/reminders.ts` and
+  `contract-reminders.ts` — personal LINE key consistency validation;
+- `__tests__/integration/outbox-state-transitions.integration.test.ts` — real
+  MySQL stale-recovery and concurrent-claim evidence;
+- focused provider, transport, processor, Leave, Routine, Stock, cron, and
+  real-MySQL state-transition tests; and
+- `docs/notification-channels.md` and this architecture record.
+
+No provider configuration names, tokens, recipients, Thai notification
+content, Leave/Routine/Stock business flow, Email Request ownership, cron URL,
+or cron secret contract changed.
+
+### 22.8 Verification and residual risk
+
+The final command results are:
+
+- `npm.cmd run architecture:check` — PASS; 1,012 repository source files
+  checked;
+- `npm.cmd run lint:strict` — PASS with zero warnings;
+- `npm.cmd run typecheck` — PASS;
+- focused Outbox/provider command — PASS; 15 files / 164 tests;
+- `npm.cmd run test:run` — PASS; 265 files / 2,205 tests;
+- `npm.cmd run test:integration:mysql` — PASS; Prisma reported 65 migrations
+  with no pending migrations, then 13 files / 85 tests passed; and
+- `git diff --check` — PASS.
+
+The focused command was:
+
+```text
+npm.cmd run test:run -- --silent=true __tests__/services/outbox/processor.test.ts __tests__/services/outbox/app-line-processor.test.ts __tests__/services/outbox/provider-key.test.ts __tests__/services/outbox/routine-processor.test.ts __tests__/lib/line.test.ts __tests__/lib/email.test.ts __tests__/lib/app-line-notification.test.ts __tests__/api/notification-outbox-cron.test.ts modules/leave/infrastructure/notifications/line.test.ts modules/leave/infrastructure/notifications/email.test.ts modules/routine/application/reminders.test.ts modules/routine/application/contract-reminders.test.ts modules/routine/application/notifications/email.test.ts modules/stock/__tests__/line-notifications.test.ts modules/stock/__tests__/email.test.ts
+```
+
+Residual risks are intentional and bounded rather than hidden: SMTP may
+duplicate after ambiguous acceptance; LINE retry keys expire after 24 hours
+and do not guarantee end-user delivery; and production log retention/alerting
+is deployment-owned. A committed event is not discarded merely because the
+LINE retention window may have elapsed.
+
+**L0-OUTBOX-01 — CLOSED as an explicit provider-specific at-least-once
+reliability contract, with residual SMTP/provider ambiguity documented.**

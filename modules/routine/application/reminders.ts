@@ -379,6 +379,13 @@ async function dispatchRoutineReminderLineOutbox(
         );
         return "SUPERSEDED";
     }
+    if (payload.retryKey !== createLineRetryKey(expectedEventKey)) {
+        await supersedeInvalidRoutineLine(
+            notification.id,
+            "Superseded mismatched Routine reminder LINE retry key",
+        );
+        return "SUPERSEDED";
+    }
 
     const prepared = await runSerializableTransaction(async (tx) => {
         const claimed = await tx.notificationOutbox.findFirst({

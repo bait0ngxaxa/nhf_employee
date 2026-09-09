@@ -19,6 +19,18 @@ export function createLineRetryKey(eventKey: string): string {
     return createProviderUuid(eventKey);
 }
 
+export function createOutboxLineRetryKey(
+    outboxType: string,
+    outboxId: number,
+    eventKey?: string | null,
+): string {
+    const stableIdentity = eventKey?.trim()
+        ? eventKey
+        : `outbox:${outboxType}:${outboxId}`;
+
+    return createLineRetryKey(stableIdentity);
+}
+
 export function createEmailMessageId(eventKey: string): string {
     return `<nhf-${createProviderUuid(eventKey)}@notifications.thainhf.org>`;
 }

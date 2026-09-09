@@ -5,7 +5,10 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 import { sendEmail } from "@/lib/email/transport";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { buildStockRequestResultLineEventKey } from "@/modules/stock";
+import {
+    buildStockRequestResultLineEventKey,
+    dispatchStockRequestResultLineOutbox,
+} from "@/modules/stock";
 import type { StockRequestResultLinePayload } from "@/modules/stock";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 
@@ -112,6 +115,47 @@ describe("personal LINE outbox processor isolation", () => {
                     status: "FAILED",
                     lastError: "Stock request result LINE delivery failed",
                 }),
+            }),
+        );
+    });
+
+    it("reuses the personal LINE retry key after a simulated crash before SENT", async () => {
+        const payload = buildPayload();
+        const notification = buildNotification(payload);
+        sendAppLineNotificationMock.mockResolvedValue({ status: "SENT" });
+
+        await expect(dispatchStockRequestResultLineOutbox(
+            { ...notification, status: "PROCESSING" },
+            payload,
+        )).resolves.toBe("SENT");
+
+        // The first provider call was accepted; no final Outbox update is made here.
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([notification]))
+            .mockResolvedValueOnce(asNever([{
+                ...notification,
+                status: "FAILED" as const,
+                attempts: 1,
+                nextAttemptAt: new Date("2026-08-05T07:59:00.000Z"),
+                updatedAt: new Date("2026-08-05T07:50:00.000Z"),
+            }]));
+
+        await expect(processOutbox()).resolves.toEqual({
+            processed: 1,
+            failed: 0,
+        });
+
+        expect(sendAppLineNotificationMock).toHaveBeenCalledTimes(2);
+        expect(sendAppLineNotificationMock.mock.calls[0]?.[0].retryKey).toBe(
+            sendAppLineNotificationMock.mock.calls[1]?.[0].retryKey,
+        );
+        expect(sendAppLineNotificationMock.mock.calls[0]?.[0].retryKey).toBe(
+            payload.retryKey,
+        );
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 900, status: "PROCESSING" },
+                data: { status: "SENT", lastError: null },
             }),
         );
     });
