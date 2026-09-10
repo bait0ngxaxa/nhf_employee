@@ -223,9 +223,11 @@ The supported server entry is `@/modules/audit`. It exposes generic
 `getAuditEntityHistory`, and retention cleanup capabilities plus neutral
 contracts. Physical AuditLog access is owned exclusively by
 `modules/audit/infrastructure/persistence/audit-log-repository.ts`.
-`lib/server/audit.ts` and the legacy query/retention paths are compatibility
-adapters and no longer own physical persistence. Employee, Leave, Stock, and
-Routine use only the public Audit server entry for their producers/read seam;
+`lib/server/audit.ts` remains a compatibility adapter for deferred producers
+and export delivery; the former `lib/services/audit-log/**` query/retention
+compatibility paths were removed in L6 and no longer own or expose Audit
+behavior. Employee, Leave, Stock, and Routine use only the public Audit server
+entry for their producers/read seam;
 their feature-specific detail contracts remain in their own modules. The
 browser-safe `@/modules/audit/client` entry exposes the Audit Dashboard section
 and loading skeleton; its implementation is under

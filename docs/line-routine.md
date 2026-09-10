@@ -171,7 +171,7 @@ NEXT_PUBLIC_FEATURE_ROUTINE=false
 | --- | --- | --- |
 | Existing Stock Messaging integration | `LINE_STOCK_CHANNEL_ACCESS_TOKEN`, `LINE_STOCK_CHANNEL_SECRET` | Stock request LINE broadcast และ low-stock LINE broadcast |
 | Existing IT Messaging integration | `LINE_IT_CHANNEL_ACCESS_TOKEN`, `LINE_IT_CHANNEL_SECRET`, `LINE_IT_TEAM_USER_ID` | IT/email-request LINE notification; ส่งหา IT team user หรือ broadcast ตาม configuration |
-| Webhook / Email Request support | `LINE_WEBHOOK_URL` | existing webhook integration ตาม code; ไม่ใช่ LIFF endpoint และไม่ใช่ `LINE_APP` token |
+| Retained legacy outbound webhook compatibility | `LINE_WEBHOOK_URL` | optional external compatibility integration; แยกจาก inbound `/api/line/webhook`, ไม่ใช่ LIFF endpoint และไม่ใช่ `LINE_APP` token; live external usage ต้องยืนยันก่อนถอดออก |
 
 Flow แยกจาก Unified NHFapp Messaging API:
 

@@ -19,6 +19,16 @@ This record is the source of truth for the Audit capability migration. Its
 baseline sections record the repository state observed during Phase I0, while
 the I1 and I2 implementation sections record the current ownership result.
 
+Current post-I3/L6 status: `modules/audit/` remains the authoritative Audit
+server/application, query, retention, persistence, and client-presentation
+boundary. The former `lib/services/audit-log/**` compatibility files were
+removed in L6 after repository, package, deployment, and build-source
+evidence was reviewed. The duplicate Audit `UserContext` was not moved to
+another shared location. References to those files in the I0/I1 sections
+below are historical migration evidence; the final current ownership result
+is recorded in Sections 25 and 26 and in the L6 closure of
+`docs/architecture/runtime-hardening.md`.
+
 ## 1. Scope
 
 Phase I0 covered the complete production repository, including application
@@ -1222,3 +1232,12 @@ exclusivity complete.
 Audit capability migration I0-I3 CLOSED.
 Auth/Session/Identity J1-J3 implementation NOT STARTED; Phase J0 discovery is
 closed in the current architecture record.
+
+## 27. L6 current compatibility status
+
+L6 independently reviewed the old query/retention facade paths named in the
+historical I0/I1 sections. No current repository source, test contract,
+script, operator artifact, package export, or deployment build path imports
+`lib/services/audit-log/**`; those files are therefore **REMOVED**. The
+authoritative public contract and all current query/retention behavior remain
+under `@/modules/audit`.

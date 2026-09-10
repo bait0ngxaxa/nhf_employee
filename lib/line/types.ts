@@ -8,7 +8,3 @@ export interface LineWebhookData {
     emailRequest: EmailRequestData;
     flexMessage: LineFlexMessage;
 }
-
-export interface VerifiedLineIdentity {
-    lineUserId: string;
-}

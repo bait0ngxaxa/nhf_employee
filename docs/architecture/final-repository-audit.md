@@ -138,14 +138,13 @@ Classification uses A-F from the K0 brief:
 | types/api.ts Stock payload types | Stock-specific line payload DTOs mixed with generic LINE Flex types and deferred Email Request data | Mixed shared type surface | Stock notification code and provider facades import StockRequestLineData and StockLowLineData | F | Split capability payloads from generic provider message types in the same later Stock correction |
 | components/dashboard/shared/RequestStatusBadge.tsx | Status-to-label/color mapping for Leave and Stock workflows | Shared UI location | Imports from Leave/Stock presentation use it, but the component itself defines PENDING, APPROVED, REJECTED, NOT_TAKEN, ISSUED, and related business semantics | F | Keep the visual primitive generic; move feature status metadata into Leave/Stock or pass feature-owned metadata |
 | lib/services/email-request/**, app/api/email-request/**, components/email/**, dashboard Email Request surfaces, hooks/useEmailRequestHistory.ts, types/email-request.ts, and lib/line/flex-messages/email-request.ts | Email Request business workflow, UI, persistence access, recipient policy, Audit production, and delivery payloads | Transitional application/lib surface | Active API, UI, outbox, in-app, Audit, and LINE consumers; no modules/email-request exists | D | Preserve as-is in K0 and define the complete future modules/it boundary before migration |
-| lib/services/audit-log/** | Re-exported Audit service/types from the pre-module location | Orphaned migration residue | Repository search found no production consumer; current routes import modules/audit directly | E | Remove in a later cleanup after external/package consumers are ruled out |
-| lib/line/index.ts sendLineWebhook and lib/line/types.ts unused webhook/identity types | Legacy exported helper/type definitions | Orphaned migration residue candidate | No repository production consumer beyond their definitions/exports; app/api/line/webhook only verifies the incoming signature | E | Verify external consumers and remove as a separate cleanup; do not delete in K0 |
+| lib/line/index.ts `sendLineWebhook`, lib/line/types.ts `LineWebhookData`, and `LINE_WEBHOOK_URL` | Retained legacy outbound webhook compatibility integration | Shared/platform compatibility seam | No repository-local production caller; README, `.env.example`, `docs/line-routine.md`, and the local ignored environment still advertise the outbound contract; `app/api/line/webhook` is a separate inbound signature-verification route | C | FORMALLY RETAINED in L6; remove only after every active deployment and external integration confirms the variable/path is unused |
 | scripts/stock-inventory-audit.ts, scripts/stock-default-variant-backfill.ts, and MySQL test runner | Operator/data-maintenance/test tooling | tooling/application boundary | Explicit scripts, fixtures, and integration harnesses; not runtime business ownership | A | Keep outside modules unless a future operational design requires otherwise |
 | prisma/schema.prisma, prisma/migrations/**, and prisma/seed.ts | Single physical schema, migration history, and seed/support code | shared persistence/tooling | User, capability, deferred Email Request, and outbox models remain in one Prisma boundary; seed is an explicit support exception | B | Preserve the single schema and migration boundary; no K0 schema changes |
 
 The F rows are the only current ownership findings. The D row is intentional
-deferment, not a violation. The E rows are candidates for later cleanup and
-are not deleted in K0.
+deferment, not a violation. The former E rows were L6 candidates; their
+current dispositions are recorded in Sections 11 and the L6 closure below.
 
 ## 4. Compatibility Seam Ledger
 
@@ -161,9 +160,11 @@ are not deleted in K0.
 
 Compatibility code is not removed merely because the authoritative capability
 has moved. Each seam above has a concrete remaining consumer or contract. The
-orphaned Audit re-exports and unused LINE webhook definitions are listed
-separately as obsolete candidates because repository evidence found no
-consumer.
+L6 removed the Audit re-export seam only after package/deployment evidence
+showed that the private source path was not a supported repository-visible
+consumer. The outbound LINE compatibility contract remains listed as a seam
+because current configuration/documentation and unavailable live deployment
+evidence do not justify deleting it.
 
 ## 5. Deferred Boundary Inventory
 
@@ -382,20 +383,22 @@ Request / future IT remains deferred and is not part of that hardening track.
 
 ## 11. Obsolete-Code Candidates
 
-These are not deleted in K0. “Obsolete candidate” means no legitimate
-repository production consumer was found; external consumers or operational
-contracts must still be ruled out before removal.
+This section preserves the historical K0 candidate inventory. “Obsolete
+candidate” means no legitimate repository production consumer was found; the
+L6 action column records whether the candidate was removed or formally
+retained after external/operator evidence review.
 
 | Path | Evidence it is obsolete | Removal risk | Recommended future action |
 | ---- | ----------------------- | ------------ | ------------------------- |
-| lib/services/audit-log/index.ts, mutations.ts, queries.ts, and types.ts | Repository-wide production search found no consumer; current app routes use modules/audit directly; files are re-exports/types from the migrated location | Low inside the repository, but package/operational imports must be checked | Remove in a separate cleanup after external consumer verification |
-| lib/line/index.ts sendLineWebhook export and lib/line/types.ts LineWebhookData | No production caller found; app/api/line/webhook verifies the incoming signature and does not send a webhook payload | Unknown external/API consumer risk | Confirm deployment/package consumers, then remove or formally document the contract |
-| lib/line/types.ts duplicate VerifiedLineIdentity type | Current authoritative identity type is modules/line/application/types.ts and no repository consumer of the legacy type was found | Low inside the repository; external type import risk | Remove with the unused webhook definitions after consumer verification |
+| lib/services/audit-log/index.ts, mutations.ts, queries.ts, and types.ts | Repository-wide production search found no consumer; current app routes use modules/audit directly; files were re-exports/types from the migrated location | Low inside the repository; package is private, has no export map, deployment instructions build from source, and no repository deployment/operator consumer was found | **REMOVED in L6** after the repository/package/deployment/build-source evidence review; the duplicate legacy `UserContext` was not moved |
+| lib/line/index.ts `sendLineWebhook` export and lib/line/types.ts `LineWebhookData` | No production caller found; `app/api/line/webhook` verifies the incoming signature and does not send a webhook payload; current docs/config still advertise `LINE_WEBHOOK_URL` | External deployment/integration usage is not observable from the repository | **FORMALLY RETAINED in L6**; remove only after deployment owner and every external integration confirm `LINE_WEBHOOK_URL` and the outbound helper are unused |
+| lib/line/types.ts duplicate `VerifiedLineIdentity` type | Current authoritative identity type is `modules/line/application/types.ts`; no repository consumer, package export, or runtime use of the legacy type was found | No runtime transport dependency; a direct external source import cannot be observed | **REMOVED in L6** independently; `modules/line` exports the authoritative type and LIFF verification remains unchanged |
 
 No other runtime artifact was classified as obsolete solely because its path
 looks legacy. In particular, lib/auth, lib/email/transport, lib/line
 transport/configuration, lib/services/outbox, and compatibility adapters with
-active callers are not obsolete migration residue.
+active callers are not obsolete migration residue. Email Request remains
+deferred and was not migrated as part of L6.
 
 ## 12. Recommended Post-K0 Roadmap
 
@@ -478,3 +481,24 @@ part of K1.
 Stock modular-monolith ownership boundary COMPLETE.
 No additional K2 modular-boundary phase is currently justified.
 Future IT / Email Request remains deferred.
+
+## L6 closure — compatibility and obsolete residue cleanup
+
+L6 is closed for the two candidate groups named by the runtime hardening
+audit. The current source tree and compatibility ledger now distinguish
+removed residue from a retained external contract:
+
+- `L0-COMPAT-01`: **REMOVED** — all four files under
+  `lib/services/audit-log/`.
+- `L0-COMPAT-02`: mixed symbol-level result — `sendLineWebhook`,
+  `lineNotificationService.sendLineWebhook`, `LineWebhookData`, and
+  `LINE_WEBHOOK_URL` are **FORMALLY RETAINED**; the duplicate legacy
+  `VerifiedLineIdentity` type is **REMOVED**.
+
+The inbound `/api/line/webhook` route, signature verification, active LINE
+channel secrets, LINE/LIFF identity contract, Email Request delivery,
+Outbox retry keys, Stock legacy broadcast, and NHFapp personal LINE paths were
+not redesigned or removed. No Prisma schema or migration changed. Live
+deployment variables, Cloudflare/LINE Console configuration, and external
+operator consumers were not accessible from this repository, so the retained
+outbound contract must not be removed based on repository-local unused status.

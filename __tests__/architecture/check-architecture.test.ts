@@ -1453,6 +1453,24 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
+    it("continues to reject the shared LINE server boundary from the Audit client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/audit/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/audit/presentation/example.ts": [
+                'import { x } from "@/lib/line/messaging";',
+                "export { x };",
+            ].join("\n"),
+            "lib/line/messaging.ts": "export const x = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/audit/client",
+        );
+    });
+
     it("rejects a transitive Prisma runtime dependency from the Audit client graph", async () => {
         const rootPath = await createFixture({
             ...fixtureFiles,

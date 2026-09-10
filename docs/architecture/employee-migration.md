@@ -1103,7 +1103,7 @@ planned.
 | Consumer | Employee concept read | Future owner/contract |
 | --- | --- | --- |
 | `lib/audit-log/display.ts`, `components/audit/AuditLogViewer.tsx` | Employee/User display name in generic audit presentation | Audit remains platform-owned; use a safe structural formatter or `@/modules/employee/client`, never the Employee server barrel from a client graph |
-| `lib/services/audit-log/queries.ts` | Employee names for audit search/display | Audit query infrastructure remains shared/platform; Employee identity projection is a narrow input contract |
+| `modules/audit/application/queries.ts` | Employee names for audit search/display | Audit query infrastructure remains module-owned; Employee identity projection is a narrow input contract |
 | `lib/server/audit.ts` | Employee event names/snapshots and generic data-export events | Generic audit delivery remains platform; Employee owns the event meaning/data shape supplied by its use cases |
 | `lib/line/app-notification.ts` | Combined User + Employee eligibility and linked LINE account | LINE/notification platform owns delivery/link state; Auth/Workforce owns combined eligibility composition |
 | `lib/line/liff-session.ts`, `lib/line/liff-types.ts` | `employeeId` claim and workforce identity type | LINE/LIFF owns session token mechanics; Employee does not own LIFF JWT/cookies |

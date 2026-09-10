@@ -153,7 +153,7 @@ openssl rand -base64 48
 | `LINE_STOCK_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับ Stock |
 | `LINE_STOCK_CHANNEL_SECRET` | ใช้ตรวจ signature ของ Stock webhook |
 | `LINE_IT_TEAM_USER_ID` | LINE user/group ID ผู้รับคำร้องพนักงานใหม่ |
-| `LINE_WEBHOOK_URL` | URL ปลายทางเสริมสำหรับ integration ของ Email Request |
+| `LINE_WEBHOOK_URL` | URL สำหรับ retained legacy outbound compatibility integration; แยกจาก inbound `/api/line/webhook` และไม่ใช่เส้นทางส่ง Email Request ปัจจุบัน |
 
 Webhook route ของแอปคือ `/api/line/webhook`
 

@@ -57,6 +57,14 @@ export async function sendStockLineBroadcast(
     );
 }
 
+/**
+ * Send the retained legacy outbound webhook compatibility payload.
+ *
+ * This is separate from the inbound signature-verification route at
+ * /api/line/webhook. The current Email Request dispatcher uses the IT LINE
+ * Messaging API path; this helper remains for an externally configured
+ * compatibility integration.
+ */
 export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
     const { lineWebhookUrl } = getConfig();
 

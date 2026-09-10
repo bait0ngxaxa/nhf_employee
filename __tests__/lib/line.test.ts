@@ -4,6 +4,7 @@ import {
     sendLineMessage,
     sendLineBroadcast,
     sendStockLineBroadcast,
+    sendLineWebhook,
 } from "@/lib/line";
 import { sendLineAppMessage } from "@/lib/line/messaging";
 import type { LineFlexMessage } from "@/types/api";
@@ -23,6 +24,23 @@ const flexMessage: LineFlexMessage = {
             contents: [{ type: "text", text: "Hello" }],
         },
     },
+};
+
+const webhookData = {
+    type: "email_request" as const,
+    emailRequest: {
+        thaiName: "Test",
+        englishName: "Test",
+        phone: "123",
+        nickname: "",
+        position: "IT",
+        department: "IT",
+        replyEmail: "test@example.com",
+        needsDocumentSystem: false,
+        sharedDriveAccess: [],
+        requestedAt: "2026-07-01T03:00:00.000Z",
+    },
+    flexMessage,
 };
 
 describe("LINE Notification Service", () => {
@@ -174,6 +192,33 @@ describe("LINE Notification Service", () => {
                 flexMessage,
                 "123e4567-e89b-52d3-a456-426614174000",
             )).resolves.toBe(true);
+        });
+    });
+
+    describe("sendLineWebhook compatibility integration", () => {
+        it("posts the legacy payload to the configured outbound URL", async () => {
+            vi.stubEnv("LINE_WEBHOOK_URL", "https://hooks.example.com/line");
+
+            const result = await sendLineWebhook(webhookData);
+
+            expect(result).toBe(true);
+            expect(fetchMock).toHaveBeenCalledWith(
+                "https://hooks.example.com/line",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(webhookData),
+                },
+            );
+        });
+
+        it("does not call the network when the outbound URL is not configured", async () => {
+            vi.stubEnv("LINE_WEBHOOK_URL", "");
+
+            const result = await sendLineWebhook(webhookData);
+
+            expect(result).toBe(false);
+            expect(fetchMock).not.toHaveBeenCalled();
         });
     });
 

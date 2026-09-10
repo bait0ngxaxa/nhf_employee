@@ -1,6 +1,6 @@
 # Runtime Security and Reliability Hardening Baseline
 
-Status: L0 complete — discovery and threat-modeling record
+Status: L6 complete — L0 discovery and L1-L6 closure record
 Track: L-series runtime/security/reliability hardening
 Evidence date: 2026-09-09
 Authority: This document is the authoritative baseline for L1-L7.
@@ -1137,7 +1137,9 @@ Request create paths.
 
 ## 12. Compatibility and obsolete-code candidates
 
-These are cleanup candidates, not defects. They remain in place during L0.
+These are cleanup candidates, not defects. The L0 descriptions below preserve
+the original discovery evidence. The L6 dispositions are the current status;
+historical L0 wording is labelled where it no longer describes the source tree.
 
 ### 12.1 Finding L0-COMPAT-01 — lib/services/audit-log residue
 
@@ -1149,8 +1151,8 @@ These are cleanup candidates, not defects. They remain in place during L0.
   lib/services/audit-log/queries.ts;
   lib/services/audit-log/types.ts;
   modules/audit/index.ts;
-  scripts/check-architecture.mjs:2098-2188.
-- Current behavior: The legacy path re-exports or wraps modules/audit. No
+  scripts/check-architecture.mjs (L0 baseline server-only directory lists).
+- L0 baseline behavior: The legacy path re-exported or wrapped modules/audit. No
   production source import was found in the repository; the architecture
   checker still knows the path as a server-only directory.
 - Security/reliability invariant: Removing a compatibility path must not
@@ -1160,19 +1162,28 @@ These are cleanup candidates, not defects. They remain in place during L0.
   operator import still references the old path. Removing it causes a
   runtime or deployment failure even though repository-local imports are
   absent.
-- Current mitigation: The current modules/audit entry owns active behavior;
+- L0 mitigation (historical at L0): The current modules/audit entry owned active behavior;
   the residue is retained and the architecture checker accounts for it.
-- Residual risk: External consumers and deployed bundles are not visible from
-  repository search.
+- L0 residual risk (historical at L0): External consumers and deployed bundles were not visible
+  from repository search.
 - Severity: Informational.
 - Confidence: High for no in-repository production caller; Low for external
   consumer absence.
+- L6 disposition: **REMOVED**. The four files were removed after the complete
+  repository consumer scan found no production, test-contract, script,
+  operator, deployment, build, or package consumer; `package.json` is private
+  and has no export map; and the repository deployment instructions build from
+  a fresh source checkout. An untracked script in an external checkout cannot
+  be inspected, so that residual assumption is recorded in the L6 closure.
+- Current state: `modules/audit` is the only Audit application/query/retention
+  owner. The duplicate legacy `UserContext` disappeared with the removed
+  compatibility types file and was not moved elsewhere.
 - Whether production behavior must change: No intended behavior change, but
   deletion is itself a compatibility change until evidence is complete.
 - Whether schema/migration may be required: No.
 - Compatibility constraints: Preserve modules/audit API, historical Audit
   export/display representations, scripts, and architecture checks.
-- Recommended future phase: L6.
+- Historical recommendation at L0: L6.
 - Acceptance criteria: Search source, tests, build outputs, deployment
   scripts, runbooks, CI, package consumers, and operator documentation;
   obtain deployment-owner confirmation; remove only with a diff that updates
@@ -1193,7 +1204,7 @@ These are cleanup candidates, not defects. They remain in place during L0.
   app/api/line/webhook/route.ts;
   README.md:153-156;
   __tests__/lib/line.test.ts.
-- Current behavior: sendLineWebhook, LineWebhookData, and the legacy
+- L0 baseline behavior: sendLineWebhook, LineWebhookData, and the legacy
   VerifiedLineIdentity type remain exported. No repository-local production
   caller of sendLineWebhook or lib/line/types.ts was found. The inbound
   /api/line/webhook route is a separate signature-verification endpoint and
@@ -1208,21 +1219,35 @@ These are cleanup candidates, not defects. They remain in place during L0.
   though no repository caller remains; deletion silently removes delivery.
   Removing the duplicate type without checking package/build consumers can
   also break external imports.
-- Current mitigation: Current application LINE identity verification uses
+- L0 mitigation (historical at L0): Current application LINE identity verification uses
   modules/line/application/types.ts; inbound webhook signature verification
   remains present; legacy exports remain available.
-- Residual risk: Environment and external integration usage are not proven by
-  repository search.
+- L0 residual risk (historical at L0): Environment and external integration usage are not proven
+  by repository search.
 - Severity: Informational.
 - Confidence: Medium for repository-local unused status; Low for external
   absence.
+- L6 symbol dispositions:
+  - `sendLineWebhook`, `lineNotificationService.sendLineWebhook`,
+    `LineWebhookData`, and `LINE_WEBHOOK_URL`: **FORMALLY RETAINED**. The
+    variable remains in the local ignored environment, `.env.example`,
+    README, and `docs/line-routine.md`; no live deployment, LINE Console,
+    Cloudflare, or operator environment was available to verify whether an
+    external integration consumes it.
+  - `lib/line/types.ts` `VerifiedLineIdentity`: **REMOVED** independently.
+    The repository has no consumer, the type is compile-time only, the package
+    is private with no export map, and the authoritative type remains exported
+    by `modules/line`.
+- Current state: Inbound `/api/line/webhook` and its signature verifier are
+  unchanged. Active IT, Stock, NHFapp, Email Request, LINE/LIFF identity, and
+  Outbox paths remain on their existing channel contracts.
 - Whether production behavior must change: No intended change; cleanup may
   remove externally visible compatibility.
 - Whether schema/migration may be required: No.
 - Compatibility constraints: Preserve LINE/LIFF contracts, inbound webhook
   behavior, Email Request deferral, README/deployment truth, and historical
   configuration until external validation is complete.
-- Recommended future phase: L6.
+- Historical recommendation at L0: L6.
 - Acceptance criteria: Inventory deployed environment variables, Cloudflare/
   LINE console webhook configuration, external callbacks, operator runbooks,
   package consumers, and tests; decide whether to deprecate, retain, or
@@ -1249,8 +1274,8 @@ security vulnerability.
 | Low | L0-AUDIT-01 | C | Raw familyId is sensitive correlation metadata | Policy decision | L3 |
 | Informational | L0-AUTH-TEST-01 | C | Refresh concurrency evidence gap | No by itself | L1 |
 | Informational | L0-AUDIT-02 | D/C | Security-event Audit persistence is best effort | No by itself | L3/L7 |
-| Informational | L0-COMPAT-01 | F | lib/services/audit-log residue | No intended change | L6 |
-| Informational | L0-COMPAT-02 | F | LINE webhook residue and duplicate identity types | No intended change | L6 |
+| Informational | L0-COMPAT-01 | F | lib/services/audit-log residue — REMOVED in L6 | No intended change | L6 CLOSED |
+| Informational | L0-COMPAT-02 | F | LINE compatibility residue — outbound surface FORMALLY RETAINED; duplicate identity type REMOVED in L6 | No intended change | L6 CLOSED |
 
 There are no Critical or High findings supported by the L0 evidence. In
 particular, L0 did not establish a current account-takeover path through the
@@ -1293,7 +1318,7 @@ phases rather than adding a K2 phase or inventing work.
 | L3 — LINE / LIFF Identity & Audit Metadata Hardening | Link stale-window policy, unlink/relink invalidation, LIFF session enforcement, family-ID representation, Audit failure/retention monitoring | Keep separate from L1 because LIFF credentials and Audit compatibility have distinct contracts and operators. |
 | L4 — Notification History Cursor Correctness | Stable ordered key, cursor encoding/backward compatibility, equal-timestamp and browser tests | Confirmed defect makes this a required phase; no schema change is assumed until index/performance evidence exists. |
 | L5 — Outbox / Provider Reliability Hardening | Provider-specific ambiguity, retry-key coverage, SMTP limitations, stale recovery, DEAD visibility, superseding tests | Narrowed to evidence-backed provider/recovery hardening. Do not redesign the shared processor or claim exactly-once delivery generically. |
-| L6 — Compatibility and Obsolete Residue Cleanup | External/operator validation and removal or formal retention of the two candidate groups | Keep deferred until external-consumer evidence is collected; no deletion in L0. |
+| L6 — Compatibility and Obsolete Residue Cleanup | External/operator validation and removal or formal retention of the two candidate groups | COMPLETE: Audit compatibility files were REMOVED; the outbound LINE compatibility surface was FORMALLY RETAINED because live external usage is not observable; the duplicate legacy identity type was REMOVED. |
 | L7 — Final Production Hardening Re-audit | Re-run source/contract/threat-model review, verify deployment assumptions, confirm no scope drift, and close residual risks | Retained as the final gate; it must not reopen K2, Email Request migration, tenant work, or historical compatibility work. |
 
 ### 15.1 Recommended L1 scope
@@ -2551,9 +2576,10 @@ only where the provider actually supports one. No database transaction is
 held open around an external provider request, and `NotificationOutbox`
 remains a shared platform boundary rather than a Notification module concern.
 
-L1-L4 remain closed. L6 cleanup was not started. Historical `TICKET_*`
-enum/storage values remain compatibility-only and are not active runtime
-dispatch types.
+L1-L4 remain closed. At the time of the L5 closure, L6 cleanup had not
+started; the current L6 closure is recorded in Section 23. Historical
+`TICKET_*` enum/storage values remain compatibility-only and are not active
+runtime dispatch types.
 
 ### 22.1 Active provider-path inventory
 
@@ -2830,3 +2856,174 @@ LINE retention window may have elapsed.
 
 **L0-OUTBOX-01 — CLOSED as an explicit provider-specific at-least-once
 reliability contract, with residual SMTP/provider ambiguity documented.**
+
+## 23. L6 — Compatibility and Obsolete Residue Cleanup
+
+L6 is **CLOSED**. L1-L5 remain closed, and L7 has not started. This closure
+covers only `L0-COMPAT-01` and `L0-COMPAT-02`; Email Request remains deferred
+and no unrelated F/D/A finding was reopened.
+
+### 23.1 Evidence sources and consumer inventory
+
+The evidence review inspected:
+
+- Section 12, the L6 roadmap entry, and the L5 closure in this document;
+- `docs/architecture/final-repository-audit.md`,
+  `audit-migration.md`, `auth-session-identity-migration.md`,
+  `module-boundaries.md`, `dependency-rules.md`, and
+  `employee-migration.md`;
+- `modules/audit/**`, `modules/line/**`, the candidate `lib/line/**` files,
+  `app/api/audit-logs/**`, and `app/api/line/webhook/route.ts`;
+- `README.md`, `.env.example`, `.env` variable names only,
+  `docs/line-routine.md`, `docs/notification-channels.md`, `package.json`,
+  and `scripts/check-architecture.mjs`;
+- all repository-visible scripts, tests, Prisma support, Docker Compose,
+  deployment/Nginx files, Cloudflare setup guides, and Git history for the
+  candidate paths.
+
+The repository-wide `rg -uu` scan covered static imports, type-only imports,
+re-exports, dynamic-import/`require()` strings, mocks, scripts, configuration,
+and documentation while excluding `.git`, `node_modules`, `.next`, coverage,
+and the ignored TypeScript build-info file. The focused source/test scan found
+**0** `lib/services/audit-log` or `auditLogService` matches. The retained LINE
+scan found the helper/configuration only in `lib/line/index.ts` plus its
+focused tests; `LineWebhookData` remains only as the retained helper contract,
+and `VerifiedLineIdentity` matches only the four authoritative
+`modules/line` definition/export/verification references. Deployment/config
+scanning found **0** Audit legacy or `LINE_WEBHOOK_URL` references outside
+the source/documentation contract described below.
+
+Consumer classification:
+
+| Candidate | Production runtime | Tests | Tool/operator | Deployment/configuration | Documentation |
+| --- | --- | --- | --- | --- | --- |
+| `lib/services/audit-log/**` | No consumer; Audit routes use `@/modules/audit` | No intentional legacy-path contract | No consumer | No consumer | Historical migration references only, plus current L6 disposition |
+| `sendLineWebhook` / `LineWebhookData` / `LINE_WEBHOOK_URL` | Helper definition/export only; no repository production caller | Retained outbound compatibility tests | No repository operator caller | `LINE_WEBHOOK_URL` is present in ignored local `.env` and `.env.example`; no deployment artifact consumer | README and `docs/line-routine.md` advertise the retained optional contract |
+| legacy `VerifiedLineIdentity` | No consumer | No consumer | No consumer | No runtime use | No current contract; authoritative type is under `modules/line` |
+
+### 23.2 Package, build, and deployment evidence
+
+`package.json` has `"private": true` and no explicit `exports`, `main`,
+`module`, or `types` publication fields. The repository has no `.github`
+workflows, PM2/ecosystem files, systemd/supervisor files, Dockerfile, or
+LINE provisioning script. `docker-compose.yml` and
+`docker-compose.integration.yml` provide MySQL only; they do not define an
+application image or import a candidate path. `git ls-files` reports **0**
+tracked `.next`, `out`, or `build` artifacts, while `.gitignore` excludes
+`.next` and build output. The checked-in deployment instructions perform a
+fresh source install/check/build/start sequence, so the existing untracked
+`.next` directory was not treated as authoritative production source and was
+not inspected for removal evidence.
+
+The live production environment, Cloudflare dashboard/Tunnel state, LINE
+Console webhook configuration, deployment-owner environment variables, and
+external operator checkouts were not accessible. No deployment-owner
+confirmation is claimed. This limitation is decisive for the outbound LINE
+surface and is an explicit residual assumption for the private Audit source
+path removal.
+
+### 23.3 L0-COMPAT-01 disposition — Audit compatibility residue
+
+**REMOVED.** The following files were deleted:
+
+- `lib/services/audit-log/index.ts`;
+- `lib/services/audit-log/mutations.ts`;
+- `lib/services/audit-log/queries.ts`; and
+- `lib/services/audit-log/types.ts`.
+
+The removed surface included the legacy `auditLogService`, legacy re-exports
+of `getAuditLogs` and `cleanupExpiredAuditLogs`,
+`AUDIT_LOG_RETENTION_DAYS`, `calculateAuditLogRetentionCutoff`, the Audit
+filter/result types, and the duplicate legacy `UserContext`. No duplicate
+context was moved elsewhere.
+
+Removal evidence satisfies the L6 policy: no production repository consumer,
+no intentional test contract, no script/operator import, no indirect source
+resolution, no package/export contract, no repository deployment/build
+artifact consumer, and complete capability ownership under `modules/audit`.
+The private package/no-export-map and fresh-source-build evidence makes this
+an unsupported deployment contract rather than an exposed package surface;
+an untracked external checkout-local import remains unobservable and is not
+claimed absent.
+
+Audit behavior was not moved or redesigned. `modules/audit` remains the
+authoritative owner for query, retention cleanup, neutral contracts, and
+presentation; current API routes still use its public server entry. Existing
+Audit query, retention, export/display, and route tests remain in place.
+
+### 23.4 L0-COMPAT-02 symbol-level disposition — LINE compatibility residue
+
+| Symbol/path | Disposition | Evidence and retained/removal condition |
+| --- | --- | --- |
+| `lib/line/index.ts :: sendLineWebhook` | **FORMALLY RETAINED** | README, `.env.example`, `docs/line-routine.md`, and the ignored local `.env` still expose `LINE_WEBHOOK_URL`; live deployment/external integration usage cannot be inspected. Remove only after deployment owner confirms the variable is unset/unused in every active environment and no external integration consumes the helper. |
+| `lineNotificationService.sendLineWebhook` | **FORMALLY RETAINED** | Retained as the object-form compatibility export of the same outbound contract; it is not the inbound route. The same external confirmation condition applies. |
+| `lib/line/types.ts :: LineWebhookData` | **FORMALLY RETAINED** | Its only current source consumer is the retained outbound helper, and it describes the advertised compatibility payload. Remove only with the helper and configuration after the same external confirmation. |
+| `LINE_WEBHOOK_URL` | **FORMALLY RETAINED** | Kept in runtime configuration and `.env.example`; current docs now identify it as optional legacy outbound compatibility, separate from `/api/line/webhook` and the current IT Messaging API Email Request path. |
+| `lib/line/types.ts :: VerifiedLineIdentity` | **REMOVED** | No repository/package/runtime consumer; compile-time-only duplicate; `package.json` is private with no export map; authoritative `modules/line/application/types.ts` and `modules/line/index.ts` remain unchanged. |
+
+The inbound `POST /api/line/webhook` route and `lib/line/verify-signature.ts`
+were not changed. Active `LINE_IT_CHANNEL_SECRET`,
+`LINE_STOCK_CHANNEL_SECRET`, IT push/broadcast, Stock legacy broadcast,
+NHFapp personal LINE/LIFF identity, Email Request delivery, and L5 Outbox
+retry-key behavior remain unchanged. The retained outbound helper is now
+explicitly documented as distinct from inbound signature verification.
+
+### 23.5 Architecture, documentation, and schema changes
+
+- Removed the obsolete `lib/services/audit-log` entry from the Audit and Auth
+  client-graph server-directory lists in `scripts/check-architecture.mjs`.
+  The `lib/line` server boundary and all Audit/Auth client graph invariants
+  remain active; an architecture regression test proves Audit client code
+  still rejects the shared LINE server boundary.
+- Added inbound webhook route tests for missing signature, missing channel
+  configuration, invalid signature, and valid IT/Stock signatures. Added
+  retained outbound helper tests for configured and absent URL behavior.
+- Updated current README, `.env.example`, `docs/line-routine.md`, the final
+  repository audit, module-boundary/current identity records, and the Audit
+  migration current-status note. Historical migration sections retain old
+  paths where they describe the earlier I0/I1 state.
+- No Prisma schema, migration, enum, AuditLog, NotificationOutbox,
+  LineAccountLink, User, or Employee identity change was made.
+- Email Request was not migrated or redesigned; no `modules/email-request` or
+  `modules/it` was created, and no unrelated F/D/A finding was changed.
+
+### 23.6 Verification record
+
+The following commands were executed after the L6 changes:
+
+- `npm.cmd run architecture:check` — **PASS**; 1,009 repository source files
+  checked;
+- `npm.cmd run lint:strict` — **PASS** with zero warnings;
+- `npm.cmd run typecheck` — **PASS**;
+- `npm.cmd run test:run` — **PASS**; 266 test files / 2,215 tests;
+- focused compatibility command — **PASS**; 6 test files / 254 tests:
+  `__tests__/lib/line.test.ts`, `__tests__/lib/line-verify-signature.test.ts`,
+  `__tests__/api/line-webhook-route.test.ts`,
+  `__tests__/api/audit-log-route.test.ts`,
+  `__tests__/api/audit-log-cleanup-route.test.ts`, and
+  `__tests__/architecture/check-architecture.test.ts`;
+- `npm.cmd run test:integration:mysql` — **PASS**; Prisma found 65 migrations
+  with no pending migrations, then 13 integration files / 85 tests passed;
+- `git diff --check` — **PASS**;
+- development server — **NOT RUN**;
+- production build — **NOT RUN**; no tracked/prebuilt deployment artifact
+  required build-output validation, and source resolution was covered by the
+  architecture check and typecheck.
+
+The integration command emitted the existing Prisma warning that the
+`package.json#prisma` configuration property is deprecated for Prisma 7; it
+did not fail the command and was not changed in L6.
+
+### 23.7 Closure and residual assumptions
+
+`L0-COMPAT-01` is **CLOSED — REMOVED**. `L0-COMPAT-02` is **CLOSED with a
+mixed symbol-level disposition**: the outbound compatibility helper, payload
+type, object export, and URL are **FORMALLY RETAINED**; the duplicate legacy
+identity type is **REMOVED**. Remaining compatibility risk is limited to an
+unobservable external consumer of `LINE_WEBHOOK_URL`/`sendLineWebhook` or a
+direct external source import of the removed private Audit path. The former
+must be confirmed before any future removal; the latter is not a supported
+package/deployment contract based on the inspected repository evidence, but
+cannot be proven absent outside the workspace.
+
+L6 is ready to hand off to L7. L7 has not started.
