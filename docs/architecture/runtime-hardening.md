@@ -1,8 +1,8 @@
 # Runtime Security and Reliability Hardening Baseline
 
-Status: L6 complete — L0 discovery and L1-L6 closure record
+Status: L7 repository gate passed — production deployment acceptance pending
 Track: L-series runtime/security/reliability hardening
-Evidence date: 2026-09-09
+Evidence date: 2026-09-10
 Authority: This document is the authoritative baseline for L1-L7.
 
 This is a source-backed discovery record. It does not authorize or implement
@@ -39,7 +39,13 @@ L0 covers:
 L0 does not implement a solution. The proposed follow-up work is organized
 in section 15.
 
-## 2. Current baseline and repository state
+## 2. L0 baseline and repository state (historical record)
+
+> **Historical-state marker:** Sections 2.1–2.2 preserve the L0 baseline
+> observed before L1-L6. Phrases such as “current control” and “remaining
+> observation” in this section mean “current at L0”; they are not claims about
+> the final implementation. The post-L1-L6 current state is recorded in
+> Sections 18–23 and the final L7 re-audit is in Section 24.
 
 ### 2.1 Architecture baseline
 
@@ -181,7 +187,11 @@ being reachable only through the trusted proxy/tunnel configuration.
 | SMTP provider | May accept a message and time out or return an ambiguous response; Message-ID is not assumed to be a provider-level idempotency key. | Outbox/SMTP |
 | LINE Messaging provider | Supports X-Line-Retry-Key behavior used by current notification sends; network and provider errors remain possible. | Outbox/LINE |
 
-### 4.4 Threat/reliability scenarios
+### 4.4 Threat/reliability scenarios (L0 historical baseline)
+
+> The scenarios below preserve the L0 threat model. Their “can” and “does
+> not” statements describe the pre-hardening behavior used to justify L1-L6;
+> compare the current closure sections and Section 24 for the final result.
 
 The detailed finding cards below are the authoritative per-finding model. The
 principal application-specific sequences are:
@@ -208,9 +218,14 @@ principal application-specific sequences are:
    later retries stale work. Provider-specific retry keys may suppress a
    duplicate; SMTP acceptance is not universally deduplicated.
 
-## 5. Auth refresh and session findings
+## 5. Auth refresh and session findings (L0 historical baseline)
 
-### 5.1 Current refresh lifecycle
+> The finding cards in Sections 5–12 are retained L0 evidence. Their
+> “Current behavior”, “Current mitigation”, and “Recommended future phase”
+> labels are historical-at-L0 labels. They must not be read as current source
+> claims after the closure records in Sections 18–23.
+
+### 5.1 L0 historical refresh lifecycle
 
 The current lifecycle is:
 
@@ -518,9 +533,9 @@ an unconditional two-successor path.
   runs and assertions on rows, cookies, response status, family status, and
   Audit events.
 
-## 6. Generic web mutation replay findings
+## 6. Generic web mutation replay findings (L0 historical baseline)
 
-### 6.1 Current transport behavior
+### 6.1 L0 historical transport behavior
 
 modules/auth/presentation/browser-transport.ts implements:
 
@@ -616,7 +631,7 @@ endpoint contract currently left to each mutation implementation.
   endpoint tests for Leave/Stock/Routine/Employee/auth mutations; response
   ambiguity tests with provider/outbox side effects.
 
-## 7. Rate-limit and abuse-control findings
+## 7. Rate-limit and abuse-control findings (L0 historical baseline)
 
 ### 7.1 Inventory
 
@@ -733,9 +748,9 @@ origin bypass.
   Cloudflare-header origin tests; login, refresh, signup, forgot-password,
   and authenticated mutation abuse scenarios.
 
-## 8. LINE / LIFF identity findings
+## 8. LINE / LIFF identity findings (L0 historical baseline)
 
-### 8.1 Current account-link and LIFF lifecycle
+### 8.1 L0 historical account-link and LIFF lifecycle
 
 LINE ID-token verification calls the LINE verification endpoint and validates
 the token audience, expiry, and issuer shape before returning lineUserId.
@@ -818,9 +833,9 @@ LineAccountLink. The repository contains no user-facing unlink operation.
   concurrent bootstrap/recovery; two-account uniqueness/race tests; API
   authorization tests for the selected enforcement mechanism.
 
-## 9. Refresh security Audit metadata findings
+## 9. Refresh security Audit metadata findings (L0 historical baseline)
 
-### 9.1 Current metadata and consumers
+### 9.1 L0 historical metadata and consumers
 
 When refresh detects a reused/expired token or inactive User, the route
 persists a LOGIN_FAILED Audit record with:
@@ -940,9 +955,9 @@ it logs the failure instead.
   structured operational logging tests, and verification that family
   revocation still occurs when Audit append fails.
 
-## 10. Notification history cursor findings
+## 10. Notification history cursor findings (L0 historical baseline)
 
-### 10.1 Current query and API contract
+### 10.1 L0 historical query and API contract
 
 GET /api/notifications/all accepts the existing filter and cursor query
 parameters. The application passes the authenticated user ID to a 20-row
@@ -1024,9 +1039,9 @@ also reach the generic error path rather than a documented cursor error.
   filters; invalid and legacy cursor behavior; browser append/reset tests;
   API contract tests.
 
-## 11. Outbox and external-provider reliability findings
+## 11. Outbox and external-provider reliability findings (L0 historical baseline)
 
-### 11.1 Current claim/retry/state behavior
+### 11.1 L0 historical claim/retry/state behavior
 
 The global processor:
 
@@ -1135,7 +1150,7 @@ Request create paths.
   after business state changes; final SENT/FAILED/DEAD/SUPERSEDED transitions;
   metrics/alerting for DEAD and repeated provider attempts.
 
-## 12. Compatibility and obsolete-code candidates
+## 12. Compatibility and obsolete-code candidates (L0 historical baseline)
 
 These are cleanup candidates, not defects. The L0 descriptions below preserve
 the original discovery evidence. The L6 dispositions are the current status;
@@ -1256,7 +1271,7 @@ historical L0 wording is labelled where it no longer describes the source tree.
   outbound transport tests if retained; deployment configuration validation;
   external integration acceptance test if an integration exists.
 
-## 13. Severity-ranked finding ledger
+## 13. Severity-ranked finding ledger (L0 historical baseline)
 
 The severity is a prioritization signal, not a claim that every item is a
 security vulnerability.
@@ -1283,17 +1298,17 @@ refresh pre-check gap, a current double-execution path caused by a 401-after-
 commit response, or an origin-bypass deployment failure. Those remain
 acceptance/evidence requirements, not inflated severity labels.
 
-## 14. Accepted/current design tradeoffs
+## 14. Accepted design tradeoffs at L0 (historical record)
 
-The following are current choices that should not be “fixed” without an
-explicit requirement:
+The following was the L0 decision context. It is retained as historical
+evidence; the final accepted tradeoffs are restated in Section 24 and should
+be used for current decisions:
 
-1. Refresh-family revocation on confirmed/reported token reuse is a security
-   containment tradeoff. L1 must decide how to reduce legitimate concurrency
-   false positives without making stolen-token replay harmless.
-2. LIFF does not reread LineAccountLink after issuance. This is a
-   latency/availability tradeoff retained by the Auth migration. L3 must
-   decide the stale-link maximum and enforcement mechanism.
+1. Refresh-family revocation on confirmed/reported token reuse was a security
+   containment tradeoff. L1 later bounded same-client completion without
+   making stolen-token replay harmless.
+2. LIFF did not reread LineAccountLink after issuance at L0. L3 later selected
+   immediate current-link enforcement for protected requests.
 3. Global Outbox delivery is at-least-once. A provider-specific duplicate
    contract is preferable to a generic exactly-once redesign.
 4. Audit append is best effort so an Audit outage does not change the
@@ -1306,10 +1321,12 @@ explicit requirement:
    transports, and current Outbox ownership are compatibility constraints,
    not obsolete code to delete during L0.
 
-## 15. Proposed L1-L7 roadmap
+## 15. Proposed L1-L7 roadmap (historical plan)
 
-The proposed phase count and order remain valid. L0 adjusted scope within
-phases rather than adding a K2 phase or inventing work.
+The proposed phase count and order are retained as the historical handoff.
+Actual implementation and final status are recorded in Sections 18–24.
+L0 adjusted scope within phases rather than adding a K2 phase or inventing
+work.
 
 | Phase | Validated scope | Adjustment supported by evidence |
 | --- | --- | --- |
@@ -1784,11 +1801,12 @@ The explicit answers to the topology gate are:
 
 It is technically possible to start additional Node processes or point a
 Tunnel directly at port 3000, but those are not supported deployment modes.
-The direct `localhost:3000` Tunnel examples are now labeled as operator
-configuration that bypasses the supported Nginx trust boundary. Before any
-future multi-instance deployment, the limiter state, upload storage, health
-behavior, cleanup, failure policy, and integration tests must be redesigned
-and accepted together.
+The current Tunnel guide publishes the complete application hostname without
+path-specific ingress rules and routes it through Nginx. The former
+path-specific examples and obsolete hostnames are no longer current guidance.
+Before any future multi-instance deployment, the limiter state, upload storage,
+health behavior, cleanup, failure policy, and integration tests must be
+redesigned and accepted together.
 
 There is no current operational requirement for Auth or mutation counters to
 survive a process restart. Restart clearing is therefore an explicit accepted
@@ -1885,12 +1903,13 @@ This correction depends on the origin reachability invariant: port 3000 must
 remain loopback-only and the origin firewall must not expose a bypass. A
 Cloudflare Tunnel pointed directly at `localhost:3000` bypasses this Nginx
 canonicalization and is therefore not supported for production under this
-record. If Tunnel is required, it must not point directly at port 3000; routing
-through Nginx still requires an operator-verified trusted tunnel-to-Nginx
-client-IP contract. The repository configuration trusts the listed Cloudflare
-source ranges, not local `cloudflared`, by default. Cloudflare dashboard,
-tunnel ingress, and firewall state cannot be verified from this repository and
-remain operator acceptance requirements.
+record. The current public Tunnel contract routes the complete application
+hostname, without path-specific ingress rules, through Nginx. This still
+requires an operator-verified trusted tunnel-to-Nginx client-IP contract. The
+repository configuration trusts the listed Cloudflare source ranges, not local
+`cloudflared`, by default. Cloudflare dashboard, tunnel ingress, and firewall
+state cannot be verified from this repository and remain operator acceptance
+requirements.
 
 The Nginx behavior was checked against the official real-IP and proxy-header
 contracts: [NGINX realip module](https://nginx.org/en/docs/http/ngx_http_realip_module.html),
@@ -2859,7 +2878,8 @@ reliability contract, with residual SMTP/provider ambiguity documented.**
 
 ## 23. L6 — Compatibility and Obsolete Residue Cleanup
 
-L6 is **CLOSED**. L1-L5 remain closed, and L7 has not started. This closure
+At the L6 closure point, L6 was **CLOSED** and L1-L5 remained closed. L7 had
+not yet started at that historical point. This closure
 covers only `L0-COMPAT-01` and `L0-COMPAT-02`; Email Request remains deferred
 and no unrelated F/D/A finding was reopened.
 
@@ -3026,4 +3046,5 @@ must be confirmed before any future removal; the latter is not a supported
 package/deployment contract based on the inspected repository evidence, but
 cannot be proven absent outside the workspace.
 
-L6 is ready to hand off to L7. L7 has not started.
+L6 was ready to hand off to L7. Section 24 records the subsequent final
+re-audit and current L7 disposition.

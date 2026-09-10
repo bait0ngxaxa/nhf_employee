@@ -294,13 +294,14 @@ atomic พร้อม deployment, failure policy, cleanup, integration test แ
 Cloudflare source ranges, ใช้ `real_ip_header CF-Connecting-IP` แล้วเขียนทับ
 `CF-Connecting-IP` ที่ส่งให้แอปจากค่า `$remote_addr` ที่ canonical แล้ว. แอปจึง
 ไม่ใช้ `X-Forwarded-For`, `X-Real-IP` หรือ forwarding header อื่นเป็น fallback.
-ห้ามเปิด `127.0.0.1:3000` ออก Internet และต้องให้ origin firewall รับ traffic
-เฉพาะทางเข้าที่อนุมัติ. หากใช้ Cloudflare Tunnel ห้ามชี้ตรงไป `localhost:3000`;
-การ route ผ่าน Nginx ต้องมี trusted tunnel-to-Nginx client-IP contract ที่ operator
-ตรวจสอบเพิ่ม เพราะ config ใน repository นี้ trust เฉพาะ Cloudflare source ranges
-และไม่ถือว่า local `cloudflared` เป็น trusted proxy โดยอัตโนมัติ. ตัวอย่างที่ชี้ตรงไป
-`localhost:3000` ในคู่มือ Tunnel จึงเป็นเพียง operator configuration ที่ไม่ใช่
-production topology ที่รองรับของ repository.
+ห้ามเปิด `127.0.0.1:3000` ออก Internet. หากใช้ Cloudflare Tunnel ให้ public
+hostname route ผ่าน Nginx เพื่อเปิดใช้งาน **ทั้งแอปพลิเคชัน** โดย configuration
+ของ Tunnel ไม่กำหนด `path` allowlist; การ route ผ่าน Nginx ต้องมี trusted
+tunnel-to-Nginx client-IP contract ที่ operator ตรวจสอบเพิ่ม เพราะ config ใน
+repository นี้ trust เฉพาะ Cloudflare source ranges และไม่ถือว่า local
+`cloudflared` เป็น trusted proxy โดยอัตโนมัติ. การเปิด public ทุก path เป็นเพียง
+network reachability; Auth, authorization, role, LIFF และ webhook signature
+ยังต้องถูกบังคับโดยแอปพลิเคชัน.
 
 ถ้าไม่มีหรือมีค่า client identity ที่ไม่ถูกต้อง request จะอยู่ใน shared
 `unknown` bucket สำหรับ pre-auth controls. local development/test ใช้ bucket นี้
@@ -331,10 +332,14 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-ขั้นตอน Cloudflare Tunnel และ Zero Trust แบบละเอียด:
+ขั้นตอน Cloudflare Tunnel แบบปัจจุบัน:
 
 - [Cloudflare Tunnel Setup](./CLOUDFLARE_TUNNEL_SETUP.md)
-- [Cloudflare Zero Trust Setup](./CLOUDFLARE_ZERO_TRUST_SETUP.md)
+- [Cloudflare Zero Trust Setup — Superseded](./CLOUDFLARE_ZERO_TRUST_SETUP.md)
+
+เอกสาร Zero Trust เป็นบันทึกแนวทางเดิมเท่านั้น ไม่ใช่ขั้นตอนที่ต้องทำในการ
+deploy ปัจจุบัน ระบบใช้ public Cloudflare Tunnel และไม่ใช้ Cloudflare Access
+หรือ Zero Trust authentication gate.
 
 > รายการ Cloudflare IP ใน `cloudflare-real-ip.conf` ต้องตรวจเทียบกับรายการทางการเป็นระยะ และ origin firewall ควรอนุญาตเฉพาะ Cloudflare หรือ tunnel ที่ใช้งาน
 
@@ -442,7 +447,7 @@ counters เมื่อบางรายการทำงานไม่ส�
 - [ ] `npm run start` bind ที่ `127.0.0.1:3000` และ port นี้ไม่ reachable จาก Internet โดยตรง
 - [ ] `.uploads/` เป็น persistent storage และมี backup
 - [ ] Nginx `nginx -t` ผ่าน, ใช้ Cloudflare real-IP ranges ที่ตรวจสอบแล้ว และ overwrite application `CF-Connecting-IP` จาก `$remote_addr`
-- [ ] ถ้าใช้ Cloudflare Tunnel ให้ route ผ่าน Nginx; ไม่ชี้ production traffic ตรงไป `localhost:3000`
+- [ ] ถ้าใช้ Cloudflare Tunnel ให้ public hostname route ผ่าน Nginx ไปยังทั้งแอป; configuration ไม่กำหนด `path` และไม่ชี้ตรงไป `localhost:3000`
 - [ ] รับทราบว่า rate-limit counters เป็น process-local และหายเมื่อ restart; ยังไม่เปิด PM2 cluster/multiple app hosts
 - [ ] scheduled maintenance ทั้ง 5 endpoints ทำงาน, cron โหลด environment ได้ และเก็บ secrets อย่างปลอดภัย
 - [ ] ทดสอบ dry-run ของ leave attachment cleanup และตรวจ disk usage/permission
@@ -530,4 +535,7 @@ npm run db:seed
 - [Prisma — Deploying database changes](https://www.prisma.io/docs/orm/prisma-client/deployment/deploy-database-changes-with-prisma-migrate)
 - [Docker Compose CLI](https://docs.docker.com/compose/reference/)
 
-โปรเจกต์นี้เป็นระบบภายในองค์กร ควรจำกัดการเข้าถึง production ด้วย Cloudflare Zero Trust และนโยบายเครือข่ายขององค์กร
+โปรเจกต์นี้เผยแพร่ผ่าน public Cloudflare Tunnel โดยไม่ใช้ Cloudflare Zero Trust;
+การจำกัดการใช้งานของแต่ละ route ต้องบังคับด้วย Auth, authorization และ
+application security controls ของระบบ รวมถึงนโยบาย firewall/network ที่ผู้ดูแล
+กำหนดไว้.

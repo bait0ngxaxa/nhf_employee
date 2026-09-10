@@ -17,6 +17,12 @@ the completed server ownership move. J1 does not change API contracts,
 cookies, token contents/TTLs, Prisma schema, UI, LINE/LIFF behavior, or Auth
 Audit producers.
 
+Sections 1–28 retain historical J0–J2 snapshots and closure decisions. Any
+phrase such as “current behavior”, “not started”, or a pre-J3 LINE/LIFF
+limitation in those sections is scoped to that historical baseline. Section 29
+and the current runtime-hardening record supersede those snapshots for the
+post-J3 implementation.
+
 ## 1. J0 scope and closure
 
 J0 covered repository-wide discovery of:
@@ -1849,14 +1855,15 @@ purpose, issuer, audience, timestamps, TTL, validation, and secret behavior.
 The `nhf_liff_session` cookie and its HttpOnly/Secure/SameSite/path/max-age
 options are unchanged and remain separate from web Auth cookies.
 
-`requireLiffWorkforceSession()` is now owned by `@/modules/line`. It still
-maps missing/invalid/expired cookies to 401, configuration failure to 500,
-and an invalid current workforce identity or Employee-ID mismatch to 403.
-It rereads current User and Employee state on every protected request but
-intentionally does **not** reread `LineAccountLink` after issuance. Bootstrap,
-account linking, and fresh ID-token recovery still reread the link. This
-no-link-rerevalidation rule remains an explicit compatibility/security-policy
-debt and was not changed in J3.
+`requireLiffWorkforceSession()` is now owned by `@/modules/line`. It maps
+missing/invalid/expired or legacy-unbound cookies to 401, configuration
+failure to 500, and an invalid current workforce identity or Employee-ID
+mismatch to 403. On every protected request it rereads current User and
+Employee state, then rereads the current `LineAccountLink.lineUserId` and
+compares it with the identity-bound LIFF claim. A missing or changed link
+therefore fails closed with 401. Bootstrap, account linking, and fresh
+ID-token recovery also reread the link. This immediate current-link policy is
+the L3-selected behavior and is no longer an open stale-link decision.
 
 The browser recovery contract remains separate from web refresh: recovery is
 single-flight, bootstraps once with a fresh LINE ID token, replays only GET and
@@ -1875,8 +1882,11 @@ logout-all (`LOGOUT`), selected session-family revoke (`LOGOUT`), successful
 password reset (`PASSWORD_RESET`), and successful signup (`USER_CREATE`).
 The routes retain event action/entity/actor/email/details choices, timing after
 the relevant Auth persistence result, trusted IP/User-Agent top-level request
-metadata, family-ID compatibility metadata, and non-fatal best-effort
-behavior. Generic Audit does not interpret Auth semantics.
+metadata, and non-fatal best-effort behavior. Refresh-security and selected
+session-revoke details use the truncated `familyCorrelation` representation;
+new relevant Audit rows do not persist raw runtime `familyId`. Generic Audit
+does not interpret Auth meaning, and historical rows containing `familyId`
+remain readable.
 
 `lib/server/audit.ts` remains a thin compatibility adapter for legitimate
 non-Auth consumers: Email Request, Employee export, Leave export, and Audit
@@ -1913,10 +1923,13 @@ active.
 Phase J3 is **CLOSED — LINE/LIFF identity integration and Auth Audit producer
 migration complete.** The Auth / Session / Identity migration is
 **COMPLETE**. This closure does not claim that unrelated repository debt is
-gone. Explicitly retained debts are generic web mutation replay after
-refresh, refresh family-race behavior, process-local Auth rate limits, the
-no-post-issuance `LineAccountLink` reread policy, and refresh Audit family-ID
-metadata.
+gone. The runtime hardening track subsequently closed the generic web mutation
+replay, refresh family-race, and current-link reread findings. The remaining
+related tradeoffs are process-local Auth rate limits under the supported
+single-process topology, the bounded five-second same-client refresh
+completion ambiguity, the per-request current-link database dependency, and
+the truncated `familyCorrelation` collision residual; new Audit rows do not
+persist raw family IDs.
 
 ### 29.6 Verification record
 

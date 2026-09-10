@@ -426,14 +426,17 @@ the narrow LINE read contract and preserve existing transaction contexts.
 One-to-one/idempotent/conflict/race behavior, no reassignment/unlink policy,
 LINE ID-token verification, LIFF JWT/cookie semantics, and provider/outbox
 delivery semantics remain unchanged. Protected LIFF requests reread current
-User/Employee state but intentionally do not reread `LineAccountLink` after
-issuance; bootstrap and fresh ID-token recovery still do.
+User/Employee state and the current `LineAccountLink.lineUserId`, comparing it
+with the identity-bound LIFF claim; bootstrap and fresh ID-token recovery also
+re-read the link. A missing or changed current link therefore fails closed.
 
 Auth producer routes now call `appendAuditBestEffort()` directly from
-`@/modules/audit` for all seven existing Auth event surfaces. The generic
-Audit capability does not interpret Auth meaning. `lib/server/audit.ts` remains
-only for Email Request, Employee export, Leave export, and Audit Log export
-compatibility consumers.
+`@/modules/audit` for all seven existing Auth event surfaces. Refresh-security
+and selected-session-revoke details use the truncated `familyCorrelation`
+representation; new relevant Audit rows do not persist raw runtime
+`familyId`. The generic Audit capability does not interpret Auth meaning.
+`lib/server/audit.ts` remains only for Email Request, Employee export, Leave
+export, and Audit Log export compatibility consumers.
 
 ## Shared/platform ownership
 

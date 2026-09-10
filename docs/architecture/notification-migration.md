@@ -186,9 +186,9 @@ The current model is in `prisma/schema.prisma` and is mapped to the
 | `actionUrl String?` | Optional producer-supplied destination. Client presentation normalizes legacy dashboard tab aliases before navigation. | The producer owns the destination; Notification presentation owns safe client navigation behavior. |
 | `referenceId String?` | Optional opaque ID of the related domain record. There is no foreign key or domain-specific relation. | Notification stores a reference but must not own Leave/Stock/Routine records. |
 | `dedupeKey String? @unique` | Optional globally unique key. Multiple `NULL` values remain allowed by normal nullable-unique behavior; non-null collisions are used as idempotency. Existing helper treats Prisma `P2002` as a no-op. | Preserve global uniqueness and event-specific key construction. Do not silently scope or invent dedupe keys. |
-| `createdAt DateTime @default(now())` | Creation timestamp used for latest ordering and history cursoring. There is no `updatedAt`. | Preserve ordering and cursor behavior before considering a stable tie-breaker in a separate change. |
+| `createdAt DateTime @default(now())` | Creation timestamp used for latest ordering and as the first component of the history cursor. There is no `updatedAt`. | Preserve latest ordering and the current composite history cursor; accept legacy timestamp cursors for compatibility. |
 | `@@index([userId, isRead])` | Supports user/unread filtering. | Preserve user/read query behavior and index unless a later migration proves a safe schema change. |
-| `@@index([createdAt])` | Supports timestamp ordering/cursor access. | The current history cursor is timestamp-only; this is a known compatibility risk. |
+| `@@index([createdAt])` | Supports timestamp ordering and remains useful for the current history query. | The current composite query has no production cardinality/latency evidence requiring a new composite index; that is an accepted future performance question. |
 | absence of other uniqueness/foreign keys | No composite `(userId, createdAt)` index, no user-scoped dedupe constraint, and no FK for `referenceId`. | H1/H3 must not assume stronger guarantees than the schema currently provides. |
 
 ### `NotificationType` inventory
@@ -233,7 +233,7 @@ session user ID. Invalid session IDs return the existing 400
 | Route | Current behavior and response contract | Compatibility evidence |
 | --- | --- | --- |
 | `app/api/notifications/route.ts` `GET` | Runs the latest query and unread count in parallel. Latest query is `findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 10 })`. Count is `count({ where: { userId, isRead: false } })`. Success is `{ notifications, unreadCount }` with 200. Prisma serialization currently returns the full model fields selected by `findMany`, not a hand-written DTO. Failure logs server-side and returns 500 `{ error: "Failed to fetch notifications" }`. | `__tests__/api/notifications.test.ts` asserts auth, user scope, descending order, `take: 10`, and unread count. |
-| `app/api/notifications/all/route.ts` `GET` | Uses `PAGE_SIZE = 20`. `filter=unread` adds `isRead: false`; any other filter behaves as all. `cursor` is an ISO timestamp string from the last row. The query applies `createdAt < new Date(cursor)`, orders descending by `createdAt`, and takes 21 rows. It returns the first 20 plus `{ notifications, nextCursor, hasMore, totalCount }`. The cursor is `null` when there is no next page. Invalid cursor parsing currently falls into the generic 500 path. | The route is consumed by `NotificationsPageContent`; current repository tests cover the main Notification API contracts but do not establish a new cursor contract. |
+| `app/api/notifications/all/route.ts` `GET` | Uses `PAGE_SIZE = 20`. `filter=unread` adds `isRead: false`; any other filter behaves as all. New cursors are opaque version-one Base64URL JSON containing `createdAt` and `id`; legacy ISO timestamp cursors remain accepted with their historical `createdAt < cursor` boundary. The query orders by `createdAt DESC, id DESC`, applies the composite continuation for new cursors, and takes 21 rows. It returns the first 20 plus `{ notifications, nextCursor, hasMore, totalCount }`. The cursor is `null` when there is no next page. Malformed/unsupported cursors retain the existing generic 500 error path. | The route is consumed by `NotificationsPageContent`; cursor, equal-timestamp, legacy-compatibility, API, and presentation tests cover the current contract. |
 | `app/api/notifications/[id]/read/route.ts` `PATCH` | Parses the route ID as a string and executes `update({ where: { id: notificationId, userId }, data: { isRead: true } })`. Success is `{ success: true, notification }` with 200. A missing row, non-owned row, or Prisma error currently reaches the catch path and returns 500 `{ error: "Failed to mark notification as read" }`; it is not converted to 404 in H0. | Tests assert the user-scoped `where` and `isRead: true`; the user-scope is the security boundary. |
 | `app/api/notifications/mark-all-read/route.ts` `POST` | Executes `updateMany({ where: { userId, isRead: false }, data: { isRead: true } })`. Success is `{ success: true, updatedCount: result.count }` with 200. Repeating it with no unread rows succeeds with count 0. Failures return 500 `{ error: "Failed to mark all notifications as read" }`. | Tests assert the user/unread scope and returned count. |
 
@@ -255,7 +255,7 @@ browser-safe `@/modules/notification/client` entry after H2:
 | `modules/notification/presentation/dashboard/NotificationShared.tsx` | Browser-safe Notification item/list contracts, fetcher, loading/empty/error states, badge formatting, action-URL normalization, and type-to-icon mapping. `NotificationItem` exposes `id`, `type`, `title`, `message`, `isRead`, `actionUrl`, and `createdAt`; it intentionally does not expose every Prisma field. |
 | `modules/notification/presentation/dashboard/NotificationPageParts.tsx` | Notification history header, filter tabs, mark-all affordance, list rows, unread styling/dot, type icon, and relative-time display. |
 | `modules/notification/presentation/dashboard/NotificationDropdown.tsx` | Navbar inbox dropdown; SWR list fetch, 60-second polling, no focus revalidation, no automatic retry, 30-second dedupe, single-read and mark-all mutations, badge, and navigation to the history route. |
-| `modules/notification/presentation/dashboard/NotificationsPageContent.tsx` | Full history page; SWR filter fetch, timestamp cursor loading, append behavior, optimistic read/mark-all behavior, total count, and action navigation. |
+| `modules/notification/presentation/dashboard/NotificationsPageContent.tsx` | Full history page; SWR filter fetch, opaque composite-cursor loading, append behavior, optimistic read/mark-all behavior, total count, and action navigation. |
 | `modules/notification/presentation/dashboard/NotificationSkeletons.tsx` | Notification history loading presentation formerly embedded in generic Dashboard feedback; it is now owned by Notification without moving generic skeleton primitives. |
 
 The current type-to-icon mapping is semantic presentation, not business policy:
@@ -282,7 +282,8 @@ preserved by H2 include:
   endpoint uses `/api/notifications/all?filter=...`.
 - The dropdown polls every 60 seconds, does not revalidate on focus, and does
   not retry failed requests automatically.
-- The history page uses the server timestamp cursor, appends later pages, and
+- The history page treats the server cursor as opaque composite-cursor data,
+  appends later pages, and
   resets items/cursor/has-more when the filter changes.
 - `actionUrl` is normalized before `router.push`: the legacy
   `tab=it-equipment` alias is converted to Stock, disabled tabs fall back to
@@ -682,7 +683,7 @@ change explicitly supersedes them:
 - the dropdown returns the ten newest rows ordered by descending `createdAt`
   and the unread count covers all unread rows for that user;
 - the history page uses the current all/unread filter, 20-row page size,
-  timestamp cursor, `hasMore`, `nextCursor`, and `totalCount` response shape;
+  opaque cursor, `hasMore`, `nextCursor`, and `totalCount` response shape;
 - single-read and mark-all-read remain idempotent in their current forms;
 - current 401, invalid-session 400, and sanitized 500 response behavior stays
   compatible for existing consumers/tests until a deliberate API migration;
@@ -704,10 +705,16 @@ change explicitly supersedes them:
 - Email/LINE delivery is not made implicitly dependent on Inbox persistence or
   absorbed by Notification.
 
-## Risks and follow-up (not H0 fixes)
+## Risks and follow-up (H0 historical baseline; superseded where noted)
 
-- The history cursor is timestamp-only and has no stable ID tie-breaker. Rows
-  sharing a timestamp can create ordering/skip ambiguity.
+> The bullets below preserve the H0 risk inventory. The L4 closure later
+> changed the first item and its related current HTTP description; the
+> remaining bullets are historical follow-up context unless a later closure
+> section says otherwise.
+
+- H0 observed that the history cursor was timestamp-only and had no stable ID
+  tie-breaker. L4 closed that defect with a version-one composite cursor;
+  legacy timestamp input retains its historical limitation.
 - The history route does not validate the cursor or reject unknown filters;
   malformed cursors currently reach a generic 500 response.
 - The latest/history routes serialize Prisma results rather than a dedicated
@@ -744,14 +751,14 @@ symbol in that responsibility; grouping does not imply ownership transfer.
 | `prisma/schema.prisma :: NotificationType` | Current active semantic values plus historical IT values | Shared Prisma schema; semantic values supplied by producers | Notification stores the contract; business modules own meaning | Keep enum/storage compatibility and document active vs historical values | H1/H3 | Do not remove `TICKET_CREATED`, `NEW_COMMENT`, or `TICKET_UPDATED`. Preserve `@map` values. |
 | `prisma/schema.prisma :: NotificationOutbox`, `NotificationOutboxType`, `NotificationOutboxStatus` | Reliable event row, event identity, payload, lifecycle status, retry timestamps | Global platform outbox infrastructure | Global platform outbox infrastructure | Keep outside Notification; migrate only callers/contracts as approved | H3 audit only | First ten TICKET outbox values are storage-only compatibility; runtime whitelist is narrower. |
 | `app/api/notifications/route.ts` `GET` | Latest ten rows plus complete unread count | App HTTP adapter | App HTTP adapter delegating through `@/modules/notification` | H1 migrated direct Prisma calls to the public Notification query | H1 | Preserve session, user scope, order, take 10, response shape, and sanitized 500. |
-| `app/api/notifications/all/route.ts` `GET` | 20-row all/unread history with timestamp cursor and total count | App HTTP adapter | App HTTP adapter delegating through `@/modules/notification` | H1 migrated route query behavior behind the public contract | H1 | Preserve filter fallback, cursor shape, `hasMore`, `nextCursor`, `totalCount`; timestamp ties remain unresolved by design. |
+| `app/api/notifications/all/route.ts` `GET` | 20-row all/unread history with version-one composite cursor plus legacy timestamp input and total count | App HTTP adapter | App HTTP adapter delegating through `@/modules/notification` | H1 migrated route query behavior behind the public contract; L4 later hardened continuation | H1/L4 | Preserve filter fallback, opaque cursor shape, `hasMore`, `nextCursor`, `totalCount`; legacy timestamp ties retain their historical limitation. |
 | `app/api/notifications/[id]/read/route.ts` `PATCH` | User-scoped single mark-read | App HTTP adapter | Notification application command via app adapter | H1 moved persistence behind the public command | H1 | Preserve current 500 behavior for missing/non-owned rows unless separately approved. |
 | `app/api/notifications/mark-all-read/route.ts` `POST` | User-scoped mark-all-read and count | App HTTP adapter | Notification application command via app adapter | H1 moved update behind the public command | H1 | Preserve idempotent zero count and response. |
-| `__tests__/api/notifications.test.ts`; `modules/notification/application/*.test.ts`; `modules/notification/infrastructure/persistence/repository.test.ts` | Auth, public app contract, query semantics, read commands, create-once dedupe/context tests | API/module compatibility suites | Notification API/application/persistence contract suites | H1 added focused boundary coverage while preserving existing route contracts | H1 | Full cursor tie correctness remains a later approved change. |
+| `__tests__/api/notifications.test.ts`; `modules/notification/application/*.test.ts`; `modules/notification/infrastructure/persistence/repository.test.ts` | Auth, public app contract, query semantics, read commands, create-once dedupe/context tests, and L4 cursor semantics | API/module compatibility suites | Notification API/application/persistence contract suites | H1 added focused boundary coverage while preserving existing route contracts; L4 added composite-cursor coverage | H1/L4 | Legacy timestamp cursor limitation remains explicit; newly generated cursors have a stable tie-breaker. |
 | `modules/notification/presentation/dashboard/NotificationShared.tsx` | Browser-safe item/list types, fetcher, states, action URL normalization, badge, icon mapping | Notification client/presentation | Notification client/presentation | H2 moved implementation with local contracts | H2 (closed) | Preserve legacy Stock tab alias, disabled-tab fallback, unknown icon fallback, and client-safe graph. |
 | `modules/notification/presentation/dashboard/NotificationPageParts.tsx` | History header, filters, rows, unread visual semantics | Notification client/presentation | Notification client/presentation | H2 moved with minimal behavior-preserving component contract | H2 (closed) | Preserve all/unread labels, mark-all affordance, relative time, and row navigation. |
 | `modules/notification/presentation/dashboard/NotificationDropdown.tsx` | Navbar SWR polling and mutations | Notification client/presentation | Notification client/presentation; mounted by Dashboard | H2 moved implementation behind the client entry; navbar mount remains external | H2 (closed) | Preserve 60s polling, no focus revalidation/retry, 30s dedupe, toast/navigation behavior. |
-| `modules/notification/presentation/dashboard/NotificationsPageContent.tsx` | History SWR, timestamp cursor append, optimistic read mutations | Notification client/presentation | Notification client/presentation | H2 moved implementation with local contracts | H2 (closed) | Preserve filter reset, append behavior, local unread quirk, and action navigation. |
+| `modules/notification/presentation/dashboard/NotificationsPageContent.tsx` | History SWR, opaque composite-cursor append, optimistic read mutations | Notification client/presentation | Notification client/presentation | H2 moved implementation with local contracts; L4 preserved browser opacity | H2/L4 (closed) | Preserve filter reset, append behavior, local unread quirk, and action navigation. |
 | `modules/notification/presentation/dashboard/NotificationSkeletons.tsx` | Notification history loading presentation | Generic Dashboard feedback | Notification client/presentation | H2 moved the Notification-specific skeleton only | H2 (closed) | Generic skeleton primitives remain in Dashboard feedback. |
 | `app/dashboard/notifications/page.tsx`, `loading.tsx` | App Router metadata, Suspense, route composition, skeleton | App/Dashboard delivery | App/Dashboard composition + Notification client entry | H2 changed imports only | H2 (closed) | Routes consume `@/modules/notification/client`; route ownership remains in `app/`. |
 | `components/dashboard/layout/DashboardNavbar.tsx` | Generic navbar/user-menu composition and dropdown mount | Dashboard shell | Dashboard shell | H2 updated only the Notification mount import | H2 (closed) | Navbar remains Dashboard-owned and uses the Notification client entry. |
@@ -833,12 +840,13 @@ server boundary:
   context and treats existing `P2002` dedupe conflicts as idempotent no-ops.
 
 H1 preserved the full Prisma-serialized response rows, current filter and
-timestamp-cursor behavior, user scoping, error compatibility, and zero-count
-mark-all behavior. It did not change the Prisma schema, business producer
-writes, NotificationOutbox, global processor, Email/LINE behavior, or
-Notification presentation. The timestamp-only cursor tie risk remains
-intentionally unresolved. Email Request/IT remains deferred; H2 subsequently
-moved presentation ownership and H3 owns producer integration and
+user scoping, error compatibility, and zero-count mark-all behavior. It did
+not change the Prisma schema, business producer writes, NotificationOutbox,
+global processor, Email/LINE behavior, or Notification presentation. At the
+H1 baseline the timestamp-only cursor tie risk remained intentionally
+unresolved; L4 later closed it for newly generated cursors while preserving
+legacy timestamp compatibility. Email Request/IT remains deferred; H2
+subsequently moved presentation ownership and H3 owns producer integration and
 compatibility cleanup.
 
 For outbox-originated writes, H1 preserves the canonical
@@ -860,8 +868,10 @@ Dashboard feedback, while generic skeleton primitives stayed in Dashboard.
 
 The notification page and loading route consume `@/modules/notification/client`.
 `DashboardNavbar` remains Dashboard-owned and mounts the dropdown through the
-same client entry. H2 preserves HTTP API access, SWR/polling, filters, the
-timestamp cursor behavior, action URL normalization, icon mapping,
+same client entry. H2 preserved HTTP API access, SWR/polling, filters, and the
+then-current timestamp-cursor behavior. L4 later changed only the history
+continuation to an opaque composite cursor with legacy timestamp input
+support. Action URL normalization, icon mapping,
 unread/read UX, Thai wording, accessibility, and loading/error/empty states;
 it does not redesign UI or change the H1 server boundary.
 
@@ -892,8 +902,9 @@ The admin compatibility helper was removed. The generic adapter remains only
 for deferred Email Request, which still owns its current wording, audience,
 action URL, dedupe, and outbox behavior. NotificationOutbox, the global
 processor, Email, and LINE remain outside Notification. H1 API behavior, H2
-presentation, the Prisma schema, legacy `TICKET_*` storage values, and the
-timestamp-only cursor ambiguity remain unchanged.
+presentation, the Prisma schema, and legacy `TICKET_*` storage values remain
+unchanged. L4 subsequently changed only history cursor encoding/ordering and
+continuation while retaining legacy timestamp input compatibility.
 
 ## H0 closure
 
@@ -913,7 +924,8 @@ Processor.
 
 **Phase H3 CLOSED — Notification producer integration and final migration audit complete.**
 
-Notification H0-H3 migration complete. Timestamp-only history cursor ambiguity
-remains an unresolved compatibility risk. Email Request/IT remains deferred,
-and the global Outbox Processor plus Email/LINE delivery remain outside
-Notification.
+Notification H0-H3 migration complete. L4 separately closed the equal-
+timestamp history continuation defect with a deterministic composite cursor;
+legacy timestamp cursors retain their historical limitation. Email Request/IT
+remains deferred, and the global Outbox Processor plus Email/LINE delivery
+remain outside Notification.

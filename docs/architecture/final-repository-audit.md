@@ -1,6 +1,8 @@
 # K0 — Final Repository Audit and Deferred-Boundary Inventory
 
-Status: K0 audit record
+Historical status: K0 audit record
+Current status: K1 closed; L7 repository gate passed; production deployment
+acceptance pending
 Repository: bait0ngxaxa/nhf_employee
 Scope: discovery, classification, and documentation only
 
@@ -10,6 +12,13 @@ access searches, the architecture checker, the architecture tests, and the
 completed migration records. Historical migration documents remain useful
 evidence of sequence and intent, but current code takes precedence where the
 two differ.
+
+Sections before the K1 closure below preserve the original K0 discovery
+snapshot. Their findings, “current” descriptions, and deferred roadmap are
+historical unless a later closure section explicitly updates them. The current
+repository state after K1 and L6 is synchronized below; the final L-series
+runtime/security/reliability gate is authoritative in
+[runtime-hardening.md](./runtime-hardening.md).
 
 The audit treats tests, fixtures, generated output, Prisma migrations, and
 operator tooling as non-production surfaces unless they affect a production
@@ -367,7 +376,7 @@ path exist.
 
 | Item | Type | Current impact | Why not K0 | Trigger / future action |
 | ---- | ---- | -------------- | ---------- | ----------------------- |
-| Notification history cursor uses timestamp-only ordering/continuation semantics | Technical debt / query compatibility risk | Equal timestamps can make history continuation ambiguous | It does not change module ownership and a cursor redesign would alter API/query behavior | Define a stable unique cursor contract, then add focused query/API tests |
+| Notification history cursor used timestamp-only ordering/continuation semantics at the K0 baseline | Historical technical debt / query compatibility risk | Equal timestamps could make history continuation ambiguous at K0 | K0 did not change module ownership or API/query behavior | L4 later added the stable composite cursor; legacy timestamp input retains its documented limitation |
 | Historical TICKET_* enum/storage values | Data compatibility constraint / intentional legacy compatibility | Old rows and historical display/filter behavior depend on retained values | Removing or rewriting values would be a data migration and behavior change | Only revisit with an explicit data-compatibility plan and migration |
 | Auth refresh replay/race, process-local rate limits, and related hardening notes | Security/technical debt | Narrow operational and concurrency risks remain documented by the Auth migration | K0 is not an Auth behavior hardening phase and changing it would alter security/runtime behavior | Separate security hardening review with threat model and tests |
 | LINE account-link reread and refresh/audit metadata hardening notes | Security/technical debt | Operational consistency and audit detail can be improved | No current boundary violation or required migration | Address through a focused Auth/LINE security slice |
@@ -502,3 +511,32 @@ not redesigned or removed. No Prisma schema or migration changed. Live
 deployment variables, Cloudflare/LINE Console configuration, and external
 operator consumers were not accessible from this repository, so the retained
 outbound contract must not be removed based on repository-local unused status.
+
+## L7 current-state synchronization
+
+The L7 repository re-audit at commit `6032381072cf589578f46188a4af2dbe50287fec`
+confirmed the current architecture and did not reopen modular-monolith work:
+
+- the modular monolith remains structurally complete; K1 is closed and no K2
+  phase is currently justified;
+- Email Request and future IT remain deferred and were not migrated;
+- NotificationOutbox remains shared/platform infrastructure, while generic SMTP
+  and LINE transport remain shared integration infrastructure;
+- current Auth refresh/session invariants, GET/HEAD-only browser replay, LIFF
+  current-link enforcement, process-local L2 limiter constraints, deterministic
+  Notification pagination, Outbox/provider state handling, and L6
+  compatibility dispositions match the implementation and focused tests;
+- no direct production persistence ownership regression was found for Auth
+  refresh state, LineAccountLink, AuditLog, Notification, NotificationOutbox,
+  User tokenVersion, or Employee lifecycle state; and
+- repository verification passed architecture, strict lint, typecheck, the
+  full unit suite, MySQL integration suite, and production build. Live
+  supervisor, Cloudflare/Tunnel, logging/alerting, scheduler, LINE Console,
+  SMTP, environment, and production-database evidence remained unavailable;
+  therefore live production acceptance is pending operator verification.
+
+The complete invariant matrix, deployment acceptance matrix, residual-risk
+register, and operator checklist are maintained in
+[runtime-hardening.md](./runtime-hardening.md) Section 24. This section is a
+current synchronization note; the K0 findings and historical roadmap above
+remain preserved as historical evidence.

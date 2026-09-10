@@ -1,49 +1,90 @@
-# Cloudflare Tunnel Setup — Leave Approve Magic Link
+# Cloudflare Tunnel — Public Application Deployment
 
-## Architecture
+สถานะ: **CURRENT**
 
+เอกสารนี้เป็นคู่มือปัจจุบันสำหรับการเผยแพร่แอปพลิเคชัน `nhf_employee` ผ่าน
+Cloudflare Tunnel แบบ public application โดยใช้ public hostname เดียวสำหรับ
+ทั้งแอปพลิเคชัน
+
+## 1. ขอบเขตและสัญญาการติดตั้ง
+
+สถาปัตยกรรมที่รองรับคือ:
+
+```text
+ผู้ใช้งานจาก Internet
+        ↓ HTTPS public hostname: <PUBLIC_HOSTNAME>
+Cloudflare edge
+        ↓ Cloudflare Tunnel (cloudflared)
+Nginx :443
+        ↓
+Next.js :3000 (127.0.0.1)
+        ↓
+MySQL และ persistent storage
 ```
-Manager คลิกลิงก์ Email
-       ↓
-https://approve.baitongtestdeploy.online/leave/action?token=eyJ...
-       ↓
-Cloudflare Tunnel (cloudflared)
-       ↓  (อนุญาตเฉพาะ /leave/action และ /api/leave/decision)
-Intranet Server (192.168.x.x:3000)
-       ↓
-Next.js App → ถอด JWT → อัปเดตข้อมูล LeaveRequest
+
+การตั้งค่าปัจจุบันมีคุณสมบัติดังต่อไปนี้:
+
+- public hostname เปิดให้เข้าถึง **ทุก path ของแอปพลิเคชัน** ผ่าน Tunnel
+- configuration ของ Tunnel **ไม่กำหนด `path` allowlist** สำหรับเส้นทางของแอป
+- การควบคุมสิทธิ์ของแต่ละหน้าและ API เป็นหน้าที่ของ Next.js และ application
+  authentication/authorization ไม่ใช่หน้าที่ของ path rule ใน Tunnel
+- ไม่ใช้ Cloudflare Zero Trust หรือ Cloudflare Access เป็นด่านยืนยันตัวตน
+- ยังคงไม่เปิด `127.0.0.1:3000` ออก Internet โดยตรง และให้ Tunnel เชื่อมต่อผ่าน
+  Nginx ตาม deployment contract ของ repository
+
+การเปิด public ทุก path หมายถึง request สามารถเดินทางมาถึงแอปพลิเคชันได้ในระดับ
+เครือข่าย ไม่ได้หมายความว่าทุกฟังก์ชันสามารถใช้งานได้โดยไม่ยืนยันตัวตน ระบบยัง
+ต้องบังคับ Auth, role, workforce eligibility, LIFF session, signature และ
+business authorization ในชั้นแอปพลิเคชันตาม route นั้น ๆ
+
+> **ข้อกำหนดด้านความปลอดภัย:** Nginx ต้องใช้ Cloudflare real-IP configuration
+> และส่งต่อ `CF-Connecting-IP` จากค่า client IP ที่ canonical แล้วเท่านั้น
+> ห้ามให้ผู้เรียกส่ง header ดังกล่าวตรงถึง Next.js และห้ามเปลี่ยน service ใน
+> Tunnel ให้ชี้ตรงไป `localhost:3000` หาก deployment ต้องคง trusted Nginx
+> boundary ของ repository นี้
+
+## 2. ค่าที่ต้องแทนที่ในคู่มือ
+
+ตัวอย่างทั้งหมดใช้ placeholder ต่อไปนี้ ห้ามนำ placeholder ไปใช้เป็นค่าจริง:
+
+| Placeholder | ความหมาย |
+| --- | --- |
+| `<PUBLIC_HOSTNAME>` | hostname สาธารณะใน Cloudflare DNS เช่น `app.example.com` |
+| `<ORIGIN_SERVER_NAME>` | ชื่อที่อยู่ใน certificate ของ Nginx สำหรับ TLS ระหว่าง `cloudflared` กับ origin |
+| `<TUNNEL_NAME>` | ชื่อ Tunnel ที่สร้างในบัญชี Cloudflare |
+| `<TUNNEL_UUID>` | UUID ของ Tunnel |
+| `<CREDENTIALS_FILE>` | absolute path ไปยังไฟล์ credentials ของ Tunnel บน origin server |
+| `<PUBLIC_APP_URL>` | URL สาธารณะเต็มรูปแบบ เช่น `https://app.example.com` |
+
+โดเมนที่เคยใช้ในเอกสารรุ่นก่อนเป็นข้อมูลเก่าและไม่ใช่ค่าปัจจุบันของระบบนี้
+
+## 3. การเตรียม public hostname
+
+1. ตรวจสอบว่า zone ขององค์กรอยู่ในบัญชี Cloudflare ที่ผู้ดูแลมีสิทธิ์จัดการ
+2. สร้างหรือเลือก Tunnel สำหรับแอปพลิเคชันนี้
+3. กำหนด public hostname เป็น `<PUBLIC_HOSTNAME>` และให้ชี้มายัง Tunnel
+4. ไม่สร้าง Access Application, Access Policy หรือ OTP gate เพราะ deployment นี้
+   ไม่ใช้ Zero Trust/Access
+
+สำหรับ locally-managed Tunnel สามารถสร้าง DNS route ด้วยคำสั่งต่อไปนี้หลังจาก
+แทนที่ placeholder แล้ว:
+
+```bash
+cloudflared tunnel route dns <TUNNEL_NAME> <PUBLIC_HOSTNAME>
 ```
 
-> **สำคัญ:** Cloudflare Tunnel จะเปิดรับ request เฉพาะเส้นทาง (paths) ที่กำหนดเท่านั้น ไม่ได้เปิดให้ใช้งานหน้าเว็บ Intranet ทั้งหมดจากภายนอก
+คำสั่งนี้สร้าง DNS CNAME ของ public hostname ไปยัง Tunnel hostname ของ Cloudflare
+ตามรูปแบบที่ Cloudflare รองรับ
 
-> **L2 production constraint:** ตัวอย่าง `service: http://localhost:3000` ในคู่มือนี้
-> ชี้ Tunnel ตรงเข้า Next.js และข้าม Nginx จึงไม่ใช่ production topology ที่ repository
-> รองรับสำหรับ rate limiting. Production ต้องให้ traffic ผ่าน Nginx ตามเส้นทาง
-> `Cloudflare → Nginx → Next.js` เพื่อให้ Nginx ตรวจ source ranges และ overwrite
-> application-facing `CF-Connecting-IP` จากค่า client IP ที่ canonical แล้ว. การ route
-> ผ่าน Nginx เพียงอย่างเดียวไม่ทำให้ local `cloudflared` เป็น trusted proxy; operator
-> ต้องตรวจสอบ trusted tunnel-to-Nginx client-IP contract เพิ่ม. ห้ามเปิด
-> port `3000` ออก Internet หรือใช้ incoming `CF-Connecting-IP` จาก Tunnel/client เป็น
-> trusted identity โดยตรง. การชี้ Tunnel ไปยัง Nginx และการตรวจ Cloudflare/Tunnel
-> configuration เป็น operator action ที่ repository นี้ไม่ได้ยืนยันแทน.
-
----
-
-## Step 1: เตรียม Domain บน Cloudflare
-
-1. นำ domain ขององค์กร (เช่น `baitongtestdeploy.online`) ไปจัดการ DNS บน Cloudflare Dashboard
-2. ไม่ต้องเปิด A/CNAME record เอง — เดี๋ยว Tunnel จะเป็นคนสร้าง record ให้อัตโนมัติ
-
----
-
-## Step 2: ติดตั้ง cloudflared บน Server (เครื่อง Intranet)
+## 4. การติดตั้ง `cloudflared`
 
 ### Linux (Ubuntu/Debian)
 
 ```bash
 curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-archive-keyring.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/cloudflare-archive-keyring.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
-sudo apt update && sudo apt install cloudflared -y
+sudo apt update
+sudo apt install cloudflared -y
 ```
 
 ### Windows
@@ -52,139 +93,148 @@ sudo apt update && sudo apt install cloudflared -y
 winget install --id Cloudflare.cloudflared
 ```
 
----
-
-## Step 3: Login และสร้าง Tunnel
+## 5. การสร้าง Tunnel และ credentials
 
 ```bash
-# พิมพ์คำสั่ง login (ระบบจะเปิดลิงก์ให้กด authorize ในเบราว์เซอร์)
 cloudflared tunnel login
-
-# สร้าง tunnel ชื่อสำหรับโปรเจคนี้ เช่น nhf-approve
-cloudflared tunnel create nhf-approve
-
-# เมื่อสร้างเสร็จจะได้ Tunnel ID กลับมา ตัวอย่าง: a1b2c3d4-e5f6-7890-abcd-ef1234567890
-# (ให้คัดลอกเก็บไว้ใช้ใน Step 4)
+cloudflared tunnel create <TUNNEL_NAME>
 ```
 
----
+เก็บ Tunnel UUID และ credentials file ในตำแหน่งที่ผู้ใช้บริการ
+`cloudflared` อ่านได้เท่านั้น ห้าม commit ไฟล์ credentials และห้ามแสดงค่า
+ภายในไฟล์ใน log, issue หรือเอกสาร
 
-## Step 4: สร้างไฟล์ Configuration สำหรับ Ingress Rules
+## 6. Configuration สำหรับ public application ทั้งแอป
 
-ก่อนสร้างไฟล์ ต้องสร้างโฟลเดอร์ `.cloudflared` ก่อน (ถ้ายังไม่มี):
-
-```bash
-# สำหรับ Linux
-mkdir -p ~/.cloudflared
-```
-
-จากนั้นสร้างไฟล์ `~/.cloudflared/config.yml` (Linux) หรือ `%USERPROFILE%\.cloudflared\config.yml` (Windows)
-โดยเพิ่มเนื้อหาตามนี้:
+สำหรับ locally-managed Tunnel ให้สร้างไฟล์ `config.yml` ใน directory ที่
+`cloudflared` รองรับ เช่น `~/.cloudflared/config.yml` บน Linux หรือ
+`%USERPROFILE%\\.cloudflared\\config.yml` บน Windows:
 
 ```yaml
-tunnel: 04a59b7c-ab41-45da-9512-a32c2379bfa7 # ← เปลี่ยนเป็น Tunnel ID ของตัวเอง
-credentials-file: /home/yingyot/.cloudflared/04a59b7c-ab41-45da-9512-a32c2379bfa7.json # ← เปลี่ยน path ให้ตรงกับเครื่องของตัวเอง
+tunnel: <TUNNEL_UUID>
+credentials-file: <CREDENTIALS_FILE>
 
 ingress:
-    # 1) อนุญาตเฉพาะหน้า Approve Page (Frontend)
-    - hostname: approve.baitongtestdeploy.online
-      path: /leave/action*
-      service: http://localhost:3000
+  # Route ทุก path ของ public hostname ไปยังแอปพลิเคชันผ่าน Nginx
+  - hostname: <PUBLIC_HOSTNAME>
+    service: https://127.0.0.1:443
+    originRequest:
+      originServerName: <ORIGIN_SERVER_NAME>
 
-    # 2) อนุญาตเฉพาะ API endpoint ของการ Approve
-    - hostname: approve.baitongtestdeploy.online
-      path: /api/leave/decision*
-      service: http://localhost:3000
-
-    # 3) อนุญาตไฟล์ Static Assets เพื่อให้หน้าเว็บโหลด CSS/JS ได้สมบูรณ์
-    - hostname: approve.baitongtestdeploy.online
-      path: /_next/*
-      service:
-          http://localhost:3000
-
-          # เพิ่มบรรทัดนี้ — ให้ hybrid auth endpoints ทำงานได้
-    - hostname: approve.baitongtestdeploy.online
-      path: /api/auth/*
-      service: http://localhost:3000
-
-    # Rule สุดท้าย: ถ้า path ไม่เข้าเงื่อนไขด้านบน ให้ผลักเป็น 404 (Block ทั้งหมด)
-    - service: http_status:404
+  # Required final rule for hostnames that do not match the public route above
+  - service: http_status:404
 ```
 
----
+ความหมายของ configuration หลัก:
 
-## Step 5: สร้าง DNS Route เพื่อเชื่อม Domain กับ Tunnel
+- `tunnel`: UUID ของ Tunnel ที่สร้างไว้
+- `credentials-file`: path ของ credentials สำหรับให้ connector authenticate
+  กับ Cloudflare; ต้องเป็น path จริงบนเครื่องที่รัน `cloudflared`
+- `hostname`: public hostname เดียวที่เปิดใช้งาน; เมื่อไม่มี `path` ทุก path
+  ที่มากับ hostname นี้จะถูกส่งต่อไปยัง service เดียวกัน
+- `service`: local Nginx HTTPS listener ซึ่งเป็น trusted reverse-proxy boundary
+  ก่อนถึง Next.js
+- `originRequest.originServerName`: ชื่อที่ `cloudflared` ใช้ตรวจสอบ certificate
+  ของ origin ใน TLS handshake; ต้องตรงกับชื่อใน certificate หรือ SAN ของ Nginx
+- กฎ `http_status:404` ท้ายสุดเป็น catch-all สำหรับ hostname ที่ไม่ตรงกับ route
+  ไม่ใช่ path allowlist และไม่บล็อก path ใด ๆ ของ `<PUBLIC_HOSTNAME>`
 
-```bash
-cloudflared tunnel route dns nhf-approve approve.baitongtestdeploy.online
+Cloudflare ระบุว่า `originServerName` คือ hostname ที่ `cloudflared` คาดหวังจาก
+certificate ของ origin และ configuration ของ locally-managed Tunnel สามารถกำหนด
+ค่าเหล่านี้ในไฟล์ config ได้ ดูรายละเอียดจาก [Cloudflare origin parameters]
+(https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/origin-parameters/)
+และ [การสร้าง locally-managed tunnel]
+(https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/local-management/create-local-tunnel/)
+
+ห้ามเพิ่มรายการลักษณะต่อไปนี้กลับเข้า configuration ของ public application:
+
+```yaml
+path: /some/path/*
 ```
 
-> **ผลลัพธ์:** Cloudflare จะจัดการสร้าง CNAME `approve.baitongtestdeploy.online` ชี้ไปที่ `<tunnel-id>.cfargotunnel.com` ให้ในหน้า Dashboard โดยอัตโนมัติ
+เนื่องจากจะเปลี่ยน deployment contract จาก public ทั้งแอปเป็น path-restricted
+โดยไม่ได้รับการอนุมัติให้เปลี่ยนสถาปัตยกรรม
 
----
+## 7. การตรวจสอบ configuration และการรัน Tunnel
 
-## Step 6: ทดลองรัน Tunnel (และตั้งค่าเป็น Service)
-
-### ลองรันแบบ Foreground เพื่อทดสอบ
+แทนที่ `<CONFIG_PATH>` และ `<TUNNEL_NAME>` ด้วยค่าจริงก่อนรัน:
 
 ```bash
-cloudflared tunnel run nhf-approve
+cloudflared tunnel ingress validate --config <CONFIG_PATH>
+cloudflared tunnel --config <CONFIG_PATH> run <TUNNEL_NAME>
 ```
 
-(หากไม่มี error แสดงว่าเซิร์ฟเวอร์เชื่อมกับ Cloudflare สำเร็จ)
-
-### รันเป็น Background Service (สำหรับ Production)
+เมื่อตรวจสอบ foreground สำเร็จแล้ว ให้ติดตั้งเป็น service ตามระบบปฏิบัติการ
+และใช้ supervisor เพียงหนึ่ง instance ของ Next.js ตาม contract ของ repository:
 
 ```bash
-# สำหรับ Linux (systemd)
+# Linux
 sudo cloudflared service install
 sudo systemctl enable cloudflared
 sudo systemctl start cloudflared
+```
 
-# สำหรับ Windows
+```powershell
+# Windows (run in an elevated PowerShell)
 cloudflared service install
 ```
 
----
+ตรวจสอบสถานะ connector, error log และ public hostname หลังติดตั้ง service แล้ว
+โดยไม่เปิดเผย tunnel token หรือ credentials
 
-## Step 7: เพิ่ม Environment Variable ในแอป Next.js
+## 8. Environment variable ของแอปพลิเคชัน
 
-เปิดไฟล์ `.env` ของโปรเจค `employee_nhf` แล้วเพิ่ม 1 บรรทัดดังนี้:
+ตั้ง public URL ที่แอปใช้สร้างลิงก์ approval/notification ให้เป็น hostname เดียว
+กับ public Tunnel:
 
-```env
-# URL สาธารณะ ผ่าน Cloudflare Tunnel (สร้างขึ้นใหม่)
-PUBLIC_APPROVE_URL=https://approve.baitongtestdeploy.online
+```dotenv
+PUBLIC_APPROVE_URL="<PUBLIC_APP_URL>"
 ```
 
-> **Note:** โค้ดในส่วนของการสร้างลิงก์สาธารณะจะอ่าน `PUBLIC_APPROVE_URL` เท่านั้น เพื่อไม่ให้สับสนกับ URL ภายในหรือ localhost
+ตัวอย่างเชิงรูปแบบคือ `PUBLIC_APPROVE_URL="https://app.example.com"` โดยต้อง
+แทนที่ด้วย URL จริงของ deployment ก่อน build/release
 
----
+## 9. การทดสอบจากภายนอก origin network
 
-## Step 8: ทดสอบการทำงาน
-
-ให้คุณหยิบมือถือ หรือเชื่อมต่อเน็ตเวิร์ก **ที่อยู่ภายนอกออฟฟิศ (นอก LAN)** แล้วทดสอบการเข้าถึง URL:
+ให้ทดสอบจาก network ที่ไม่ใช่ LAN เดียวกับ origin และแทนที่
+`<PUBLIC_HOSTNAME>` ด้วยค่าจริง:
 
 ```bash
-# 1. ลองเข้าหน้า approve → ควรจะเข้าได้ปกติ ได้ Status 200 (แต่ก็จะเจอข้อความว่าลิงก์ไม่ถูกต้อง เพราะไม่มี token ส่งไป)
-curl -I https://approve.baitongtestdeploy.online/leave/action
+# Root และหน้า application ต้องเดินทางถึงแอป ไม่ใช่ Tunnel path allowlist
+curl -I "https://<PUBLIC_HOSTNAME>/"
+curl -I "https://<PUBLIC_HOSTNAME>/dashboard"
 
-# 2. ลองแอบเข้าหน้า dashboard โดยตรง → ควรจะโดน Block ด้วยเลข 404 Not Found (ตาม Rule ข้อ 4 ในไฟล์ config.yml)
-curl -I https://approve.baitongtestdeploy.online/dashboard
-
-# 3. ลองแอบเรียก API อื่นของระบบ → ควรจะโดน Block 404
-curl -I https://approve.baitongtestdeploy.online/api/employees/1
+# API และ inbound webhook ใช้ public hostname เดียวกัน
+curl -I "https://<PUBLIC_HOSTNAME>/api/line/webhook"
 ```
 
----
+ผลลัพธ์ของ `/dashboard` หรือ API อาจเป็น `200`, `3xx`, `401` หรือ `403` ตาม
+application authentication และ authorization ที่กำหนดไว้ แต่ไม่ควรเป็น `404`
+จาก Tunnel เพียงเพราะ path ไม่ได้อยู่ใน allowlist
 
-## Security Features Summary
+การทดสอบ `/api/line/webhook` ที่จะยอมรับ request ต้องใช้ signature และ payload
+ตามสัญญาของ LINE เท่านั้น การที่ route เดินทางถึงแอปได้ไม่ใช่หลักฐานว่า webhook
+ผ่านการยืนยันตัวตนแล้ว
 
-| สิ่งที่ช่วยป้องกัน            | รายละเอียด                                                                                                            |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Cloudflare Tunnel Ingress** | เปิดเฉพาะทางเข้าที่จำเป็นคือ `/leave/action` และ `/api/leave/decision` เพื่อลดความเสี่ยง                              |
-| **JWT Magic Link**            | "Token ยืนยันสิทธิ์" จะผูก `leaveId` + `approverId` + `action (approve/reject)` เข้าด้วยกันและถูก Sign ปลอมแปลงไม่ได้ |
-| **Token Expiration**          | Token จะมีอายุตามที่เราเขียนโค้ดกำหนดไว้ ตอนเลยระยะเวลาไปแล้วก็นำมาใช้ไม่ได้                                          |
-| **Strict Action Flow**        | ต่อให้คนอื่นเดาลิงก์มาได้ ระบบก็จะตรวจสอบสถานะคำขอลาด้วยว่าต้องเป็น "PENDING" เท่านั้น ป้องกันการกดย้ำซ้ำๆ            |
-| **SSL Enforcement**           | เข้าข่ายผ่านระบบ HTTPS ฟรีและอัตโนมัติ 100% จากทาง Cloudflare เอง                                                     |
+## 10. ข้อกำหนดด้านความปลอดภัยและการปฏิบัติการ
 
-_(Optional)_ หากต้องการเพิ่มการป้องกันให้รัดกุมไปอีก สามารถเข้าไปตั้งค่าที่ Cloudflare Dashboard เมนู Zero Trust » Access » Applications ให้บังคับล็อกอินผ่าน Microsoft 365 หรือส่งเลข OTP ไปที่อีเมล `@baitongtestdeploy.online` ก่อนถึงจะเข้าใช้งานลิงก์ดังกล่าวได้
+- ใช้ Cloudflare Tunnel เพื่อรับ traffic จาก public hostname โดยไม่เปิด inbound
+  port ของ origin โดยตรง
+- ตั้ง firewall ให้จำกัด origin ตาม deployment policy และคง Next.js ไว้ที่
+  `127.0.0.1:3000`
+- ให้ Nginx ควบคุม TLS, request-size limit, timeout และ canonical client IP
+- อย่าใช้ public hostname หรือ Tunnel path เป็น authorization boundary
+- อย่าเพิ่ม Cloudflare Zero Trust/Access policy ในคู่มือนี้ เพราะไม่ใช่ส่วนหนึ่ง
+  ของ current deployment contract
+- หากเปลี่ยนจาก single-process หรือเปลี่ยนเส้นทาง Tunnel ให้ทบทวน L2 trusted
+  client-IP และ process-local rate-limit contract ก่อน deploy
+
+การเผยแพร่ public ทั้งแอปทำให้ทุก route มี network reachability จาก Internet ดังนั้น
+การตรวจสอบก่อน release ต้องครอบคลุม Auth, admin role, active workforce, LIFF,
+webhook signature, mutation idempotency และ request/body limits ของ route ที่เปิดใช้
+
+## 11. แหล่งอ้างอิง
+
+- [Cloudflare Tunnel — Published applications](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/)
+- [Cloudflare Tunnel — Create a locally-managed tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/local-management/create-local-tunnel/)
+- [Cloudflare Tunnel — Origin parameters](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/origin-parameters/)
