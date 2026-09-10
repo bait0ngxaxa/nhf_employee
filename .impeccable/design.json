@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-10T14:56:55.0375860+07:00",
+  "title": "Design System: Employee Management System (NHF)",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Core Cool Blue",
+        "canonical": "oklch(0.588 0.158 241.966)",
+        "tonalRamp": ["#082f49", "#075985", "#0369a1", "#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#e0f2fe"]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "oklch(0.985 0.004 247)",
+        "tonalRamp": ["#020617", "#0f172a", "#1e293b", "#334155", "#64748b", "#cbd5e1", "#f1f5f9", "#f8fafc"]
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Raised White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#cbd5e1", "#f1f5f9", "#ffffff"]
+      },
+      "surface-subtle": {
+        "role": "neutral",
+        "displayName": "Quiet Slate",
+        "canonical": "#f8fafc",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#e2e8f0", "#f8fafc"]
+      },
+      "content-heading": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#020617",
+        "tonalRamp": ["#020617", "#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#cbd5e1", "#f8fafc"]
+      },
+      "content-body": {
+        "role": "neutral",
+        "displayName": "Work Slate",
+        "canonical": "#334155",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f1f5f9"]
+      },
+      "content-muted": {
+        "role": "neutral",
+        "displayName": "Muted Slate",
+        "canonical": "#64748b",
+        "tonalRamp": ["#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f8fafc"]
+      },
+      "border-subtle": {
+        "role": "neutral",
+        "displayName": "Soft Divider",
+        "canonical": "#e2e8f0",
+        "tonalRamp": ["#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#e2e8f0", "#f8fafc"]
+      },
+      "brand-solid": {
+        "role": "primary",
+        "displayName": "Brand Sky",
+        "canonical": "#0ea5e9",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#0ea5e9", "#38bdf8", "#e0f2fe"]
+      },
+      "brand-foreground": {
+        "role": "primary",
+        "displayName": "Brand Readable Blue",
+        "canonical": "#0284c7",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#0ea5e9", "#38bdf8", "#bae6fd"]
+      },
+      "brand-strong": {
+        "role": "primary",
+        "displayName": "Deep Brand Blue",
+        "canonical": "#0c4a6e",
+        "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#0ea5e9", "#7dd3fc", "#e0f2fe"]
+      },
+      "brand-deep": {
+        "role": "primary",
+        "displayName": "Brand Navy",
+        "canonical": "#082f49",
+        "tonalRamp": ["#020617", "#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#38bdf8", "#f0f9ff"]
+      },
+      "content-on-brand": {
+        "role": "neutral",
+        "displayName": "On Brand White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#cbd5e1", "#f1f5f9", "#ffffff"]
+      },
+      "action-primary-solid": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "canonical": "#2563eb",
+        "tonalRamp": ["#1e3a8a", "#1e40af", "#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd", "#dbeafe"]
+      },
+      "action-gradient-end": {
+        "role": "secondary",
+        "displayName": "Action Cyan",
+        "canonical": "#0891b2",
+        "tonalRamp": ["#083344", "#164e63", "#155e75", "#0e7490", "#0891b2", "#06b6d4", "#22d3ee", "#cffafe"]
+      },
+      "status-danger-solid": {
+        "role": "tertiary",
+        "displayName": "Danger Rose",
+        "canonical": "#e11d48",
+        "tonalRamp": ["#4c0519", "#881337", "#9f1239", "#be123c", "#e11d48", "#f43f5e", "#fb7185", "#ffe4e6"]
+      },
+      "status-success-solid": {
+        "role": "tertiary",
+        "displayName": "Success Emerald",
+        "canonical": "#059669",
+        "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#d1fae5"]
+      },
+      "status-warning-solid": {
+        "role": "tertiary",
+        "displayName": "Attention Amber",
+        "canonical": "#d97706",
+        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fef3c7"]
+      },
+      "status-info-solid": {
+        "role": "tertiary",
+        "displayName": "Guidance Cyan",
+        "canonical": "#0e7490",
+        "tonalRamp": ["#083344", "#164e63", "#155e75", "#0e7490", "#0891b2", "#06b6d4", "#22d3ee", "#cffafe"]
+      },
+      "module-leave": {
+        "role": "tertiary",
+        "displayName": "Leave Indigo",
+        "canonical": "#4f46e5",
+        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#e0e7ff"]
+      },
+      "module-stock": {
+        "role": "tertiary",
+        "displayName": "Stock Orange",
+        "canonical": "#ea580c",
+        "tonalRamp": ["#431407", "#7c2d12", "#9a3412", "#c2410c", "#ea580c", "#f97316", "#fb923c", "#ffedd5"]
+      },
+      "module-routine": {
+        "role": "tertiary",
+        "displayName": "Routine Teal",
+        "canonical": "#0d9488",
+        "tonalRamp": ["#042f2e", "#134e4a", "#115e59", "#0f766e", "#0d9488", "#14b8a6", "#2dd4bf", "#ccfbf1"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Dashboard welcome and public entry-point hero headings."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Workspace and section headings that orient an operational task."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card, navigation, and supporting page titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Thai-first explanatory copy, forms, table values, and workflow instructions."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Metadata, role labels, status labels, and compact navigation."
+      }
+    },
+    "shadows": [
+      {
+        "name": "brand-control-ambient",
+        "value": "0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%)",
+        "purpose": "Soft ambient shadow for the logo and compact sidebar toggle in the light theme."
+      },
+      {
+        "name": "table-edge-separation",
+        "value": "-10px 0 18px -18px rgb(15 23 42 / 45%)",
+        "purpose": "Directional separation at the sticky edge of horizontally scrollable employee tables."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-emphasized",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Settling curve for dashboard card entrance and hover responses."
+      },
+      {
+        "name": "dashboard-card-enter",
+        "value": "420ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Short opacity/translate entrance for dashboard quick-action cards."
+      },
+      {
+        "name": "module-sheen",
+        "value": "850ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Hover-only decorative sheen on the stock featured card."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "120ms",
+        "purpose": "Reduced transition duration used when the user prefers less motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      },
+      {
+        "name": "2xl",
+        "value": "1536px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Default action button for a clear next step.",
+      "html": "<button class=\"ds-btn-primary\">บันทึก</button>",
+      "css": ".ds-btn-primary { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 0; border-radius: var(--radius-md); background: var(--primary); color: var(--primary-foreground); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background-color 150ms ease, transform 150ms ease, opacity 150ms ease; } .ds-btn-primary:hover { background: color-mix(in oklch, var(--primary) 90%, transparent); } .ds-btn-primary:focus-visible { outline: 3px solid color-mix(in oklch, var(--ring) 50%, transparent); outline-offset: 2px; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:disabled { cursor: not-allowed; opacity: 0.5; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Quiet secondary action that preserves the work-surface background.",
+      "html": "<button class=\"ds-btn-outline\">ยกเลิก</button>",
+      "css": ".ds-btn-outline { display: inline-flex; min-height: 2.75rem; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 1px solid var(--input); border-radius: var(--radius-md); background: var(--background); color: var(--content-body); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; font-size: 0.875rem; font-weight: 500; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; } .ds-btn-outline:hover { background: var(--accent); border-color: var(--border); color: var(--accent-foreground); } .ds-btn-outline:focus-visible { outline: 3px solid color-mix(in oklch, var(--ring) 50%, transparent); outline-offset: 2px; } .ds-btn-outline:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Full-width field for search, forms, and workflow data entry.",
+      "html": "<label class=\"ds-field-label\">ค้นหาพนักงาน<input class=\"ds-input\" placeholder=\"พิมพ์ชื่อหรือรหัส\" /></label>",
+      "css": ".ds-field-label { display: grid; gap: 0.375rem; color: var(--content-body); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; font-size: 0.875rem; font-weight: 600; } .ds-input { display: block; width: 100%; min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--input); border-radius: var(--radius-md); background: transparent; color: var(--foreground); font: inherit; outline: none; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-input::placeholder { color: var(--muted-foreground); } .ds-input:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent); } .ds-input:disabled { cursor: not-allowed; opacity: 0.5; }"
+    },
+    {
+      "name": "Quiet Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Raised container for a focused piece of operational content.",
+      "html": "<article class=\"ds-card\"><h3>คำขอล่าสุด</h3><p>ติดตามสถานะงานที่เกี่ยวข้องกับคุณ</p></article>",
+      "css": ".ds-card { display: flex; min-width: 0; flex-direction: column; gap: 1.5rem; padding: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--card); color: var(--card-foreground); box-shadow: 0 1px 2px rgb(15 23 42 / 6%); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; } .ds-card h3 { margin: 0; color: var(--content-heading); font-size: 1.125rem; font-weight: 700; } .ds-card p { margin: 0; color: var(--content-muted); font-size: 0.875rem; line-height: 1.5; }"
+    },
+    {
+      "name": "Success Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-success",
+      "description": "Compact semantic marker for a completed or confirmed state.",
+      "html": "<span class=\"ds-status-badge\"><svg class=\"ds-icon\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"m3 8 3 3 7-7\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg>อนุมัติแล้ว</span>",
+      "css": ".ds-status-badge { display: inline-flex; max-width: 100%; align-items: center; gap: 0.25rem; padding: 0.125rem 0.75rem; overflow: hidden; border: 1px solid var(--status-success-border); border-radius: 9999px; background: var(--status-success-surface); color: var(--status-success-foreground); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; font-size: 0.75rem; font-weight: 700; line-height: 1.25rem; } .ds-status-badge .ds-icon { width: 0.75rem; height: 0.75rem; flex: 0 0 auto; } .ds-status-badge:focus-visible { outline: 3px solid color-mix(in oklch, var(--status-success-focus) 45%, transparent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Section Tabs",
+      "kind": "custom",
+      "refersTo": "section-tabs",
+      "description": "Scrollable workspace tabs with an explicit active underline.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"แท็บของส่วนงาน\"><button class=\"ds-tab is-active\" role=\"tab\" aria-selected=\"true\">ภาพรวม</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">รายการ</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">ประวัติ</button></div>",
+      "css": ".ds-tabs { display: flex; min-width: max-content; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border-subtle); } .ds-tab { min-height: 2.75rem; padding: 0.75rem 1rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--content-secondary); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; font-size: 0.875rem; font-weight: 500; white-space: nowrap; transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease; } .ds-tab:hover { background: var(--surface-subtle); color: var(--content-heading); } .ds-tab.is-active { border-bottom-color: var(--brand-tab); color: var(--brand-tab); } .ds-tab:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }"
+    },
+    {
+      "name": "Sidebar Navigation Item",
+      "kind": "nav",
+      "refersTo": "navigation-sidebar-item",
+      "description": "Persistent desktop navigation item with a compact active icon tile.",
+      "html": "<button class=\"ds-nav-item is-active\"><span class=\"ds-nav-icon\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z\" fill=\"none\" stroke=\"currentColor\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg></span><span>หน้าหลัก</span></button>",
+      "css": ".ds-nav-item { display: flex; min-height: 2.75rem; width: 100%; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid transparent; border-radius: var(--radius-xl); background: transparent; color: color-mix(in oklch, var(--sidebar-foreground) 75%, transparent); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; font-size: 0.875rem; font-weight: 500; text-align: left; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; } .ds-nav-item:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); } .ds-nav-item.is-active { border-color: var(--sidebar-border); background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); } .ds-nav-icon { display: grid; width: 1.75rem; height: 1.75rem; place-items: center; border-radius: var(--radius-lg); color: var(--sidebar-foreground); } .ds-nav-item.is-active .ds-nav-icon { background: var(--brand-solid); color: var(--content-on-brand); } .ds-nav-item:focus-visible { outline: 3px solid color-mix(in oklch, var(--sidebar-ring) 50%, transparent); outline-offset: 2px; } .ds-nav-item .ds-icon { width: 1rem; height: 1rem; }"
+    },
+    {
+      "name": "Featured Module Card",
+      "kind": "card",
+      "refersTo": "featured-module-card",
+      "description": "Rich dashboard quick action for a core NHF service module.",
+      "html": "<button class=\"ds-feature-card\"><span class=\"ds-feature-icon\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 7.5h16M7 4v3.5M17 4v3.5M5 20h14a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1Z\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg></span><span class=\"ds-feature-copy\"><span class=\"ds-feature-kicker\">Quick action</span><strong>บริการวันลา</strong><small>ยื่นคำขอและติดตามสถานะวันลา</small></span><span class=\"ds-feature-arrow\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 17 17 7M8 7h9v9\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg></span></button>",
+      "css": ".ds-feature-card { position: relative; display: flex; min-height: 12.25rem; width: 100%; align-items: center; gap: 1.25rem; overflow: hidden; padding: 1.25rem; border: 1px solid var(--module-leave-dashboard-accent); border-radius: 1rem; background: var(--module-leave-dashboard-surface); color: var(--content-on-brand); text-align: left; box-shadow: 0 10px 24px color-mix(in oklch, var(--module-leave-dashboard-strong) 15%, transparent); transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease; } .ds-feature-card::after { position: absolute; inset: 0 0 0 auto; width: 35%; background: linear-gradient(135deg, rgb(255 255 255 / 16%), rgb(255 255 255 / 0%) 45%); content: ''; pointer-events: none; } .ds-feature-card:hover { border-color: var(--module-leave-dashboard-accent-hover); box-shadow: 0 16px 32px color-mix(in oklch, var(--module-leave-dashboard-strong) 20%, transparent); transform: translateY(-2px); } .ds-feature-card:focus-visible { outline: 2px solid var(--module-leave-dashboard-focus); outline-offset: 2px; } .ds-feature-icon, .ds-feature-arrow { position: relative; z-index: 1; display: grid; flex: 0 0 auto; place-items: center; border: 1px solid rgb(255 255 255 / 25%); background: rgb(255 255 255 / 15%); } .ds-feature-icon { width: 4rem; height: 4rem; border-radius: 1rem; } .ds-feature-arrow { width: 3rem; height: 3rem; margin-left: auto; border-radius: 1rem; } .ds-feature-copy { position: relative; z-index: 1; display: grid; min-width: 0; gap: 0.5rem; } .ds-feature-kicker { width: max-content; padding: 0.25rem 0.625rem; border: 1px solid rgb(255 255 255 / 25%); border-radius: 9999px; background: var(--dashboard-featured-control-surface); color: var(--module-leave-badge-foreground); font-size: 0.75rem; font-weight: 700; } .ds-feature-copy strong { color: var(--content-on-brand); font-size: 1.5rem; line-height: 1.2; } .ds-feature-copy small { color: var(--module-leave-dashboard-muted); font-size: 0.875rem; font-weight: 500; line-height: 1.5; } .ds-feature-icon .ds-icon, .ds-feature-arrow .ds-icon { width: 1.5rem; height: 1.5rem; }"
+    },
+    {
+      "name": "LIFF Bottom Navigation",
+      "kind": "nav",
+      "refersTo": "liff-bottom-nav",
+      "description": "Four-destination mobile navigation shared by LINE/LIFF surfaces.",
+      "html": "<nav class=\"ds-liff-nav\" aria-label=\"เมนูบริการ NHFapp ผ่าน LINE\"><a class=\"ds-liff-item is-active\" href=\"#home\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z\" fill=\"none\" stroke=\"currentColor\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg><span>หน้าหลัก</span></a><a class=\"ds-liff-item\" href=\"#stock\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m4 7 8-4 8 4-8 4-8-4Zm0 0v10l8 4 8-4V7M12 11v10\" fill=\"none\" stroke=\"currentColor\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg><span>วัสดุ</span></a><a class=\"ds-liff-item\" href=\"#leave\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 6.5h16M7 3v3.5M17 3v3.5M5 20h14a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1Z\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg><span>วันลา</span></a><a class=\"ds-liff-item\" href=\"#routine\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 4h14v16H5zM8 8h8M8 12h8M8 16h5\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" /></svg><span>งานประจำ</span></a></nav>",
+      "css": ".ds-liff-nav { position: sticky; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.25rem; padding: 0.375rem max(0.5rem, env(safe-area-inset-right)) calc(0.625rem + env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left)); border-top: 1px solid color-mix(in oklch, var(--border-subtle) 80%, transparent); background: color-mix(in oklch, var(--surface) 98%, transparent); } .ds-liff-item { position: relative; display: flex; min-width: 0; min-height: 3rem; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; padding: 0.25rem; border-radius: var(--radius-md); color: var(--content-muted); font-family: var(--font-noto-sans-thai), ui-sans-serif, sans-serif; font-size: 0.6875rem; font-weight: 600; line-height: 1rem; text-decoration: none; transition: background-color 150ms ease, color 150ms ease; } .ds-liff-item:hover { background: var(--surface-subtle); color: var(--content-body); } .ds-liff-item.is-active { color: var(--brand-solid); } .ds-liff-item.is-active::before { position: absolute; top: 0; right: 1rem; left: 1rem; height: 0.125rem; background: var(--brand-solid); content: ''; } .ds-liff-item:focus-visible { outline: 2px solid color-mix(in oklch, var(--brand-focus) 40%, transparent); outline-offset: -2px; } .ds-liff-item .ds-icon { width: 1.25rem; height: 1.25rem; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Trusted Operations Desk",
+    "overview": "NHFapp is an Operate-first internal work surface. Its visual language should feel calm, structured, and dependable: a cool pale canvas, raised work surfaces, restrained borders, and high-contrast Thai typography make dense administrative tasks easier to scan. Sky blue and blue-cyan carry NHF's identity and the next clear action, while indigo, orange, and teal distinguish the major service modules without turning the interface into a marketing page.\n\nThe same language spans the desktop dashboard and the LINE/LIFF mobile experience. Desktop uses a persistent sidebar and sticky utility bar; mobile uses safe-area-aware sticky header and bottom navigation. The dashboard home intentionally gives the three core modules richer, lifted cards, while ordinary management sections remain quieter and information-first. Dark mode keeps the same semantic relationships with charcoal surfaces and brighter text, borders, and accents.",
+    "keyCharacteristics": [
+      "Thai-first, direct, polite, and work-oriented",
+      "Cool neutral canvas with blue-led identity",
+      "Clear status and ownership signals for operational workflows",
+      "Quiet data surfaces with a deliberate rich-card exception for core modules",
+      "Responsive density that preserves touch targets and scanability"
+    ],
+    "rules": [
+      {
+        "name": "The Signal-First Rule",
+        "body": "Blue identifies NHF and the next action; indigo, orange, and teal identify modules; semantic state colors communicate outcomes. Do not use those colors as arbitrary decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quiet Canvas Rule",
+        "body": "Keep most of a screen neutral. Reserve saturated fills, gradients, and lifted shadows for an action, a module entry point, or a state that needs attention.",
+        "section": "colors"
+      },
+      {
+        "name": "The Thai-First Hierarchy Rule",
+        "body": "Preserve natural Thai line wrapping and readable leading. Do not compress Thai labels to fit an English-shaped layout; let controls grow or wrap while retaining the minimum touch target.",
+        "section": "typography"
+      },
+      {
+        "name": "The Progressive Density Rule",
+        "body": "Add columns and breathing room as the viewport grows; do not shrink text or touch targets to force desktop density onto mobile.",
+        "section": "layout"
+      },
+      {
+        "name": "The Tonal Layer Rule",
+        "body": "Establish depth with surface roles and borders first; use a shadow only when it clarifies a floating, sticky, or interactive relationship.",
+        "section": "elevation"
+      },
+      {
+        "name": "The State-Only Lift Rule",
+        "body": "A component may lift on hover or active response when that movement explains interactivity. Static content should not look like a collection of floating cards.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Explicit Geometry Rule",
+        "body": "Use the shared radius scale for recurring components; reserve one-off radii such as the app logo mask or decorative dashboard corner for those signature elements only.",
+        "section": "shapes"
+      },
+      {
+        "name": "The One Touch Target Rule",
+        "body": "Keep interactive controls at least 2.75rem high and give keyboard focus a visible 2–3px ring with an offset where the surrounding surface is busy.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do use Noto Sans Thai for all product UI and preserve natural Thai wrapping.",
+      "Do keep page backgrounds, data surfaces, and ordinary containers in the cool neutral family.",
+      "Do map blue to NHF/next action, module colors to their module, and semantic colors to outcomes.",
+      "Do preserve 2.75rem touch targets, visible keyboard focus, and safe-area padding on mobile.",
+      "Do use borders and tonal layers before adding a shadow.",
+      "Do keep desktop and LINE/LIFF surfaces visually related through the same semantic tokens."
+    ],
+    "donts": [
+      "Don't turn an internal workflow screen into a marketing landing page or add unsupported claims.",
+      "Don't use saturated module or status colors as generic decoration.",
+      "Don't rely on color alone for status, errors, selection, or permission outcomes.",
+      "Don't introduce a second font family, arbitrary radius scale, or unrelated component style.",
+      "Don't compress Thai copy, hide important actions behind unpredictable patterns, or reduce mobile touch targets.",
+      "Don't make every card look elevated; reserve rich fills and strong lift for purposeful module entry points."
+    ]
+  }
+}
