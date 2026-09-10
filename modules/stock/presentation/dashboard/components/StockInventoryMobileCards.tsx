@@ -64,7 +64,7 @@ function InventoryMobileCard({
                     </div>
                     <Badge
                         variant="secondary"
-                        className="max-w-full justify-start whitespace-normal border-none bg-module-leave-badge-surface/80 text-left font-medium leading-snug text-module-leave-badge-foreground [overflow-wrap:anywhere]"
+                        className="max-w-full justify-start whitespace-normal border-none bg-module-stock-badge-surface/80 text-left font-medium leading-snug text-module-stock-badge-foreground [overflow-wrap:anywhere]"
                     >
                         {item.category.name}
                     </Badge>

@@ -67,7 +67,7 @@ function RoutineTaskListSkeletonContent(): ReactElement {
 
 function RoutineOccurrenceCardSkeleton(): ReactElement {
     return (
-        <div className="rounded-xl border border-brand-border/70 bg-surface-raised p-5 shadow-sm sm:p-6">
+        <div className="py-4 first:pt-0 last:pb-0">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1 space-y-3">
                     <Skeleton className="h-4 w-48 max-w-full" />
@@ -91,7 +91,7 @@ function RoutineOccurrenceCardSkeleton(): ReactElement {
 
 function RoutineOccurrenceListSkeletonContent(): ReactElement {
     return (
-        <div className="space-y-3">
+        <div className="divide-y divide-border-subtle">
             {Array.from({ length: 4 }).map((_, index) => (
                 <RoutineOccurrenceCardSkeleton key={index} />
             ))}

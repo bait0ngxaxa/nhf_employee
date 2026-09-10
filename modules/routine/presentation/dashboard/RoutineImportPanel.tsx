@@ -216,24 +216,20 @@ function SummaryItem({
 }) {
     const toneClasses = {
         default: {
-            surface: "border-brand-border bg-brand-surface",
             value: "text-brand-strong",
         },
         warning: {
-            surface: "border-status-warning-border bg-status-warning-surface",
             value: "text-status-warning-foreground",
         },
         success: {
-            surface: "border-status-success-border bg-status-success-surface",
             value: "text-status-success-foreground",
         },
         danger: {
-            surface: "border-status-danger-border bg-status-danger-surface",
             value: "text-status-danger-foreground",
         },
     }[tone];
     return (
-        <div className={`rounded-lg border ${toneClasses.surface} ${priority === "primary" ? "px-4 py-4" : "px-4 py-3"}`}>
+        <div className={`${priority === "primary" ? "px-3 py-3" : "px-3 py-2"}`}>
             <p className={`font-medium leading-5 text-content-secondary ${priority === "primary" ? "text-sm" : "text-xs sm:text-sm"}`}>
                 {label}
             </p>
@@ -243,6 +239,54 @@ function SummaryItem({
                 {value}
             </p>
         </div>
+    );
+}
+
+type ImportStage = 1 | 2 | 3;
+
+function ImportProgress({ currentStage }: { currentStage: ImportStage }) {
+    const stages = [
+        { number: 1, label: "อัปโหลดไฟล์" },
+        { number: 2, label: "ตรวจสอบรายการ" },
+        { number: 3, label: "ยืนยันนำเข้า" },
+    ] as const;
+
+    return (
+        <ol
+            className="grid grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle"
+            aria-label="ขั้นตอนการนำเข้าข้อมูล"
+        >
+            {stages.map((stage) => {
+                const isCurrent = stage.number === currentStage;
+                const isComplete = stage.number < currentStage;
+
+                return (
+                    <li
+                        key={stage.number}
+                        aria-current={isCurrent ? "step" : undefined}
+                        className={`min-w-0 px-3 py-3 text-sm ${
+                            isCurrent
+                                ? "font-semibold text-brand-strong"
+                                : isComplete
+                                    ? "font-medium text-content-body"
+                                    : "text-content-muted"
+                        }`}
+                    >
+                        <span
+                            aria-hidden="true"
+                            className={`mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                                isCurrent || isComplete
+                                    ? "bg-brand-surface text-brand-strong"
+                                    : "bg-surface-muted text-content-muted"
+                            }`}
+                        >
+                            {isComplete ? <Check className="h-3.5 w-3.5" /> : stage.number}
+                        </span>
+                        <span className="align-middle [overflow-wrap:anywhere]">{stage.label}</span>
+                    </li>
+                );
+            })}
+        </ol>
     );
 }
 
@@ -547,6 +591,7 @@ export function RoutineImportPanel() {
     if (!batchId) {
         return (
             <div className="space-y-5">
+                <ImportProgress currentStage={1} />
                 <div className="rounded-xl border border-brand-border/70 bg-brand-surface p-5 sm:p-6">
                     <div className="flex items-start gap-3">
                         <div className="rounded-lg bg-brand-surface p-2 text-brand-foreground">
@@ -641,9 +686,15 @@ export function RoutineImportPanel() {
                 : batch.selectedValidRows === 0
                     ? "กรุณาเลือกแถวที่พร้อมนำเข้าอย่างน้อย 1 รายการ"
                     : undefined;
+    const importStage: ImportStage = batch.status === "APPLYING"
+        || batch.status === "COMPLETED"
+        || canApply
+        ? 3
+        : 2;
 
     return (
         <div className="space-y-5">
+            <ImportProgress currentStage={importStage} />
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 className="text-xl font-semibold tracking-tight text-brand-strong">

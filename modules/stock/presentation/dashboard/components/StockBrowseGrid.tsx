@@ -66,7 +66,7 @@ export function StockBrowseGrid({
 
     return (
         <>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-[repeat(3,minmax(0,1fr))] xl:grid-cols-[repeat(4,minmax(0,1fr))]">
                 {items.map((item, index) => {
                     const totalInCart = cartQuantityByItemId.get(item.id) ?? 0;
 
@@ -140,15 +140,15 @@ function BrowseCardBase(props: BrowseCardProps) {
     const variantSummary = getVariantAttributeSummary(defaultVariant?.attributeValues);
 
     return (
-        <Card className={`group relative h-full overflow-hidden rounded-2xl border bg-surface-raised transition-colors duration-200 ${
+        <Card className={`group relative h-full overflow-hidden rounded-xl border bg-surface-raised transition-colors duration-200 ${
             isRecentlyAdded
                 ? "border-status-success-border-strong ring-2 ring-status-success-focus/70"
                 : availableQuantity === 0
                     ? "border-border-subtle/80"
                     : "border-action-primary-border-subtle/80 hover:border-action-primary-border-strong"
         }`}>
-            <CardContent className="flex h-full flex-col gap-2.5 p-3">
-                <div className="overflow-hidden rounded-2xl bg-surface-subtle ring-1 ring-border-subtle">
+            <CardContent className="flex h-full flex-col gap-3 p-4">
+                <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-subtle">
                     <div className="flex min-h-10 items-start border-b border-border-subtle bg-surface-subtle px-2 py-1">
                         <Badge
                             variant="secondary"
@@ -208,7 +208,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                     ) : null}
                 </div>
 
-                <div className="flex min-h-[5.75rem] flex-col justify-between rounded-2xl border border-border-subtle bg-surface-subtle/80 p-2.5">
+                <div className="flex min-h-[5.75rem] flex-col justify-between border-t border-border-subtle pt-3">
                     <div className="min-h-5 text-sm font-semibold leading-5 text-content-strong">
                         {hasSelectableVariants(item) ? (
                             <>มี {variantCount} ตัวเลือก</>
@@ -247,14 +247,14 @@ function BrowseCardBase(props: BrowseCardProps) {
 
                 <div className="mt-auto space-y-2">
                     {totalInCart > 0 && (
-                        <div className="flex min-h-9 items-center gap-2 rounded-xl border border-status-warning-border bg-status-warning-surface px-2.5 py-1.5 text-sm font-medium leading-5 text-status-warning-strong">
+                        <div className="flex min-h-9 items-center gap-2 rounded-lg border border-status-warning-border bg-status-warning-surface px-2.5 py-1.5 text-sm font-medium leading-5 text-status-warning-strong">
                             <ShoppingCart className="h-4 w-4" aria-hidden="true" />
                             อยู่ในรายการเบิกแล้ว {totalInCart} {item.unit}
                         </div>
                     )}
                     <Button
                         variant="default"
-                        className={`group/button relative isolate w-full overflow-hidden rounded-xl shadow-sm ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-action-primary-ring active:translate-y-0.5 active:scale-[0.98] ${
+                        className={`group/button relative isolate w-full overflow-hidden rounded-lg ring-offset-2 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-action-primary-ring active:translate-y-0.5 ${
                             availableQuantity === 0
                                 ? "border-border-subtle bg-surface-subtle/50 text-content-subtle"
                                 : isRecentlyAdded

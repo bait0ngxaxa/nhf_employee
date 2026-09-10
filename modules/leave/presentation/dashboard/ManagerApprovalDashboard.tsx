@@ -25,7 +25,7 @@ export function ManagerApprovalDashboard(): ReactElement {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <div className="space-y-3">
                 <ApprovalSectionHeader
                     title="รายการรอพิจารณา"
@@ -45,44 +45,46 @@ export function ManagerApprovalDashboard(): ReactElement {
                 />
             </div>
 
-            <div className="space-y-3">
-                <ApprovalSectionHeader
-                    title="รายการรอยืนยันไม่ได้ใช้วันลา"
-                    description="เมื่อยืนยันแล้วระบบจะคืนโควต้าตามวันลาสุทธิของคำขอเดิม"
-                    count={model.metadata?.notTakenPending.totalItems ?? model.notTakenPending.length}
-                    tone="info"
-                />
-                <NotTakenPendingList
-                    items={model.notTakenPending}
-                    isProcessing={model.isProcessing}
-                    onConfirm={model.confirmNotTaken}
-                />
-                <ApprovalPagination
-                    metadata={model.metadata?.notTakenPending}
-                    onPageChange={model.setNotTakenPage}
-                />
+            <div className="grid gap-8 border-t border-border-subtle pt-8 xl:grid-cols-2">
+                <div className="space-y-3">
+                    <ApprovalSectionHeader
+                        title="รายการรอยืนยันไม่ได้ใช้วันลา"
+                        description="เมื่อยืนยันแล้วระบบจะคืนโควต้าตามวันลาสุทธิของคำขอเดิม"
+                        count={model.metadata?.notTakenPending.totalItems ?? model.notTakenPending.length}
+                        tone="info"
+                    />
+                    <NotTakenPendingList
+                        items={model.notTakenPending}
+                        isProcessing={model.isProcessing}
+                        onConfirm={model.confirmNotTaken}
+                    />
+                    <ApprovalPagination
+                        metadata={model.metadata?.notTakenPending}
+                        onPageChange={model.setNotTakenPage}
+                    />
+                </div>
+
+                <div className="space-y-3">
+                    <ApprovalSectionHeader
+                        title="รายการรอยืนยันยกเลิกวันลา"
+                        description="ยืนยันเพื่อยกเลิกและคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"
+                        count={model.metadata?.cancellationPending.totalItems ?? model.cancellationPending.length}
+                        tone="attention"
+                    />
+                    <CancellationPendingList
+                        items={model.cancellationPending}
+                        isProcessing={model.isProcessing}
+                        onConfirm={model.confirmCancellation}
+                        onReject={model.rejectCancellation}
+                    />
+                    <ApprovalPagination
+                        metadata={model.metadata?.cancellationPending}
+                        onPageChange={model.setCancellationPage}
+                    />
+                </div>
             </div>
 
-            <div className="space-y-3 pt-2">
-                <ApprovalSectionHeader
-                    title="รายการรอยืนยันยกเลิกวันลา"
-                    description="ยืนยันเพื่อยกเลิกและคืนโควต้า หรือปิดคำขอเพื่อคงสถานะอนุมัติเดิม"
-                    count={model.metadata?.cancellationPending.totalItems ?? model.cancellationPending.length}
-                    tone="attention"
-                />
-                <CancellationPendingList
-                    items={model.cancellationPending}
-                    isProcessing={model.isProcessing}
-                    onConfirm={model.confirmCancellation}
-                    onReject={model.rejectCancellation}
-                />
-                <ApprovalPagination
-                    metadata={model.metadata?.cancellationPending}
-                    onPageChange={model.setCancellationPage}
-                />
-            </div>
-
-            <div className="space-y-3 pt-2">
+            <div className="space-y-3 border-t border-border-subtle pt-8">
                 <ApprovalSectionHeader
                     title="ประวัติการพิจารณา"
                     description="รายการที่มีการตัดสินใจแล้ว"

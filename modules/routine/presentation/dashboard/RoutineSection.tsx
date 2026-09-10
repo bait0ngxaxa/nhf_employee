@@ -52,12 +52,18 @@ function RoutineOccurrencePanel({
     taskId,
     occurrenceId,
     onTaskSaved,
+    summary,
+    summaryError,
+    summaryLoading,
 }: {
     isAdmin: boolean;
     scope: "mine" | "all";
     taskId: number | null;
     occurrenceId: number | null;
     onTaskSaved: () => void;
+    summary: RoutineSummaryResponse["summary"] | undefined;
+    summaryError: Error | undefined;
+    summaryLoading: boolean;
 }) {
     const [searchInput, setSearchInput] = useState("");
     const debouncedSearch = useDebouncedValue(searchInput);
@@ -127,6 +133,12 @@ function RoutineOccurrencePanel({
                 <h2 className="text-xl font-semibold tracking-tight text-brand-strong">ติดตามรายการตามกำหนด</h2>
                 <p className="max-w-prose text-sm leading-6 text-content-secondary">ค้นหารายการ ตรวจสถานะ และปรับเฉพาะรอบที่ต้องการได้จากหน้านี้</p>
             </div>
+            <RoutineKpiGrid summary={summary} isLoading={summaryLoading && !summary} />
+            {summaryError ? (
+                <p className="text-sm text-status-danger-foreground" role="alert">
+                    โหลดสรุปรายการไม่สำเร็จ: {summaryError.message}
+                </p>
+            ) : null}
             <div className="grid gap-4 rounded-xl border border-brand-border/70 bg-transparent p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-[minmax(16rem,1fr)_minmax(10rem,0.45fr)_minmax(10rem,0.45fr)_minmax(10rem,0.4fr)_auto] xl:items-end">
                 <div className="grid min-w-0 gap-1 text-sm font-medium text-brand-strong sm:col-span-2 xl:col-span-1">
                     <label htmlFor={searchInputId}>ค้นหารายการ</label>
@@ -478,35 +490,43 @@ export function RoutineSection() {
         {
             value: "mine",
             label: "รายการของฉัน",
-            content: <RoutineOccurrencePanel scope="mine" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
+            group: "work",
+            groupLabel: "รายการงาน",
+            content: <RoutineOccurrencePanel scope="mine" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
         },
         {
             value: "all",
             label: "รายการทั้งหมด",
-            content: <RoutineOccurrencePanel scope="all" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} />,
+            group: "work",
+            content: <RoutineOccurrencePanel scope="all" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
         },
         {
             value: "manage",
             label: "จัดการงานของฉัน",
+            group: "manage",
+            groupLabel: "จัดการ",
             visible: !isAdmin,
             content: <RoutineTaskSettings mode="SELF_SERVICE" onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "settings",
             label: "ตั้งค่างานประจำ",
+            group: "manage",
             visible: isAdmin,
             content: <RoutineTaskSettings mode="ADMIN" onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "import",
             label: "นำเข้าจาก Excel",
+            group: "tools",
+            groupLabel: "เครื่องมือ",
             visible: isAdmin,
             content: <RoutineImportPanel />,
         },
     ];
 
     return (
-        <SectionShell className="routine-section border-brand-border/70 bg-surface shadow-sm lg:rounded-2xl">
+        <SectionShell className="routine-section border-brand-border/70 bg-surface lg:rounded-2xl">
             <SectionHeader
                 title="NHF Routine"
                 subtitle="รวมรายการ Routine ตามกำหนดเวลา ผู้รับผิดชอบ และการแจ้งเตือนที่เกี่ยวข้อง"
@@ -525,17 +545,11 @@ export function RoutineSection() {
                     </Button>
                 )}
             />
-            <RoutineKpiGrid
-                summary={summaryData?.summary}
-                isLoading={summaryLoading && !summaryData}
-            />
-            {summaryError ? <p className="text-sm text-status-danger-foreground" role="alert">โหลดสรุปรายการไม่สำเร็จ: {summaryError.message}</p> : null}
             <SectionTabs
                 value={safeTab}
                 onValueChange={setActiveTab}
                 tabs={tabs}
                 activeColor="var(--module-routine-tab)"
-                listClassName="border-brand-border/70 bg-transparent"
                 ariaLabel="แท็บ NHF Routine"
             />
         </SectionShell>

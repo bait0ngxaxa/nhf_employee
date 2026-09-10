@@ -77,8 +77,8 @@ export function StockAdminRequests() {
     return (
         <div className="space-y-4">
             {/* Search & Filter bar */}
-            <div className="rounded-2xl border border-border-subtle bg-surface-subtle/70 p-3 shadow-sm">
-                <div className="mb-3 flex items-center justify-between px-1">
+            <div className="rounded-xl border border-border-subtle bg-surface-subtle/70 p-3">
+                <div className="mb-3 flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <div className="text-sm font-semibold text-content-primary">
                             ค้นหาและกรองคำขอเบิก
@@ -87,6 +87,15 @@ export function StockAdminRequests() {
                             ค้นหาจากเลขที่คำขอ รหัสโครงการ ชื่อผู้ขอ อีเมล หรือชื่อรายการที่ขอเบิก
                         </div>
                     </div>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant={statusFilter === "PENDING_ISSUE" ? "default" : "outline"}
+                        className="shrink-0 self-start border-action-primary-border text-action-primary-foreground hover:bg-action-primary-surface sm:self-auto"
+                        onClick={() => setStatusFilter("PENDING_ISSUE")}
+                    >
+                        ดูคิวรอจ่าย
+                    </Button>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
                     <div className="relative flex-1">
@@ -98,7 +107,7 @@ export function StockAdminRequests() {
                             value={requestSearchQuery}
                             onChange={(event) => setRequestSearchQuery(event.target.value)}
                             placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ ชื่อ อีเมล หรือรายการ"
-                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-action-primary-border-strong focus-visible:ring-action-primary-border"
+                            className="h-12 rounded-lg border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-action-primary-border-strong focus-visible:ring-action-primary-border"
                         />
                         {requestSearchQuery.trim().length > 0 && (
                             <Button
@@ -125,7 +134,7 @@ export function StockAdminRequests() {
                             }
                         >
                             <SelectTrigger
-                                className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-action-primary-border"
+                                className="h-12 rounded-lg border-border-subtle bg-surface-raised text-content-primary focus:ring-action-primary-border"
                                 aria-label="กรองสถานะคำขอเบิกวัสดุ"
                             >
                                 <SelectValue placeholder="กรองสถานะ" />
@@ -185,7 +194,7 @@ export function StockAdminRequests() {
                         }
                     />
 
-                    <div className="hidden overflow-x-auto rounded-2xl bg-surface-raised shadow-sm ring-1 ring-border-subtle xl:block">
+                    <div className="hidden overflow-x-auto rounded-xl border border-border-subtle bg-surface-raised xl:block">
                         <Table className="min-w-[1240px] border-separate border-spacing-0">
                             <TableHeader>
                                 <TableRow className="border-b border-border-subtle bg-surface-subtle hover:bg-surface-subtle">

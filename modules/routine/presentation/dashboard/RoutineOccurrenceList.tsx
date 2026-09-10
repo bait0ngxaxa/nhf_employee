@@ -98,7 +98,7 @@ export function RoutineOccurrenceList({
     }
 
     return (
-        <div className="space-y-3" aria-label="รายการ Routine">
+        <div className="divide-y divide-border-subtle" aria-label="รายการ Routine">
             {data.tasks.map((task) => {
                 const occurrence = task.relevantOccurrence;
                 const isFocusedOccurrence = occurrence !== null
@@ -111,8 +111,8 @@ export function RoutineOccurrenceList({
                     <article
                         key={task.id}
                         className={isFocusedOccurrence
-                            ? "rounded-xl border border-brand-foreground/50 bg-surface-raised p-4 shadow-sm ring-2 ring-brand-solid/15 sm:p-5"
-                            : "rounded-xl border border-brand-border/70 bg-surface-raised p-4 shadow-sm transition-colors hover:border-brand-foreground/45 sm:p-5"}
+                            ? "rounded-lg bg-brand-surface/50 px-3 py-4 ring-1 ring-brand-solid/15 sm:px-4"
+                            : "py-4 transition-colors first:pt-0 last:pb-0 hover:bg-surface-subtle/60"}
                     >
                         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">

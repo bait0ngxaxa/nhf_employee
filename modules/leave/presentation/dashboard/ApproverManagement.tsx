@@ -53,27 +53,13 @@ export function ApproverManagement() {
 
             <Card className="border-border-subtle shadow-sm">
                 <CardHeader className="pb-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="min-w-0">
-                            <CardTitle className="text-lg text-content-heading">
-                                กำหนดผู้อนุมัติ
-                            </CardTitle>
-                            <p className="mt-1 text-sm text-content-secondary">
-                                เลือกผู้อนุมัติการลาของพนักงานแต่ละคน
-                            </p>
-                        </div>
-                        <Button
-                            onClick={model.handleSave}
-                            className={LEAVE_THEME_BUTTON_CLASS}
-                            disabled={model.assignments.size === 0 || model.isSaving}
-                        >
-                            {model.isSaving ? (
-                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                            ) : (
-                                <Save className="h-4 w-4" aria-hidden="true" />
-                            )}
-                            บันทึก {model.assignments.size > 0 ? `(${model.assignments.size})` : ""}
-                        </Button>
+                    <div className="min-w-0">
+                        <CardTitle className="text-lg text-content-heading">
+                            กำหนดผู้อนุมัติ
+                        </CardTitle>
+                        <p className="mt-1 text-sm text-content-secondary">
+                            เลือกผู้อนุมัติการลาของพนักงานแต่ละคน
+                        </p>
                     </div>
 
                     {model.saveMsg ? (

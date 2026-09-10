@@ -116,8 +116,8 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 annualTotal={sickQuota.totalDays}
                 note="สิทธิประจำปี"
                 theme={{
-                    valueColor: "text-status-success-foreground",
-                    barColor: "bg-status-success-fill",
+                    valueColor: "text-content-strong",
+                    barColor: "bg-module-leave-solid",
                 }}
             />
             <QuotaCard
@@ -129,8 +129,8 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 carryBalance={personalQuota.carryBalanceDays}
                 note="สิทธิรวมหลังยอดยกมา"
                 theme={{
-                    valueColor: "text-brand-emphasis",
-                    barColor: "bg-brand-icon",
+                    valueColor: "text-content-strong",
+                    barColor: "bg-module-leave-solid",
                 }}
             />
             <QuotaCard
@@ -142,8 +142,8 @@ export function LeaveQuotaCards({ sickQuota, personalQuota, vacationQuota }: Lea
                 carryBalance={vacationQuota.carryBalanceDays}
                 note="สิทธิรวมหลังยอดยกมา"
                 theme={{
-                    valueColor: "text-status-warning-foreground",
-                    barColor: "bg-status-warning-fill",
+                    valueColor: "text-content-strong",
+                    barColor: "bg-module-leave-solid",
                 }}
             />
         </div>

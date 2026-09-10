@@ -22,35 +22,41 @@ function StockContent() {
         {
             value: "browse",
             label: "เบิกวัสดุ",
+            group: "work",
             content: <StockBrowse />,
         },
         {
             value: "my-requests",
             label: "ประวัติการเบิก",
+            group: "work",
             content: <StockMyRequests />,
         },
         {
             value: "inventory",
-            label: "จัดการสต็อค",
+            label: "จัดการสต็อก",
+            group: "admin",
+            groupLabel: "ผู้ดูแล",
             content: <StockAdminInventory />,
             visible: isAdmin,
         },
         {
             value: "admin-requests",
             label: "คำขอเบิก",
+            group: "admin",
             content: <StockAdminRequests />,
             visible: isAdmin,
         },
         {
             value: "reports",
-            label: "รีพอร์ต",
+            label: "รายงาน",
+            group: "admin",
             content: <StockAdminReports />,
             visible: isAdmin,
         },
     ];
 
     return (
-        <SectionShell className="border-border-subtle/70 bg-surface shadow-sm">
+        <SectionShell className="border-border-subtle/70 bg-surface">
             <SectionHeader
                 title="NHF Stock"
                 subtitle="เบิกจ่ายวัสดุสำนักงาน"

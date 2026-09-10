@@ -48,7 +48,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
             : "my-leave";
 
     return (
-        <SectionShell className="border-border-subtle/70 bg-surface shadow-sm">
+        <SectionShell className="border-border-subtle/70 bg-surface">
             <SectionHeader
                 title="NHF Leave"
                 subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"
@@ -77,29 +77,36 @@ function getLeaveTabs(
         {
             value: "my-leave",
             label: "วันลาของฉัน",
+            group: "work",
+            groupLabel: "งานหลัก",
             content: <EmployeeLeaveDashboard />,
         },
         {
             value: "approvals",
             label: "อนุมัติการลา",
+            group: "work",
             content: <ManagerApprovalDashboard />,
             visible: canApproveLeave,
         },
         {
             value: "recovery",
             label: "กู้คืนรายการลา",
+            group: "tools",
+            groupLabel: "เครื่องมือ",
             content: <AdminLeaveRecoveryDashboard />,
             visible: canRecoverLeave,
         },
         {
             value: "reports",
             label: "รีพอร์ต",
+            group: "tools",
             content: <LeaveReportsDashboard />,
             visible: canViewLeaveReports,
         },
         {
             value: "approver-settings",
             label: "จัดการผู้อนุมัติ",
+            group: "tools",
             content: <ApproverManagement />,
             visible: canRecoverLeave,
         },

@@ -101,7 +101,7 @@ export function StockMyRequests() {
                         }
                     />
 
-                    <div className="hidden overflow-x-auto rounded-2xl bg-surface-raised shadow-sm ring-1 ring-border-subtle xl:block">
+                    <div className="hidden overflow-x-auto rounded-xl border border-border-subtle bg-surface-raised xl:block">
                         <Table className="min-w-[1080px] border-separate border-spacing-0">
                             <TableHeader>
                                 <TableRow className="border-b border-border-subtle bg-surface-subtle hover:bg-surface-subtle">
@@ -174,7 +174,7 @@ function RequestFilters(props: {
     onStatusChange: (status: StockRequestStatus | undefined) => void;
 }) {
     return (
-        <div className="rounded-2xl border border-border-subtle bg-surface-subtle/70 p-3 shadow-sm">
+        <div className="rounded-xl border border-border-subtle bg-surface-subtle/70 p-3">
             <div className="mb-3 px-1">
                 <div className="text-sm font-semibold text-content-primary">
                     ค้นหาและกรองประวัติการเบิก
@@ -193,7 +193,7 @@ function RequestFilters(props: {
                         value={props.requestSearchQuery}
                         onChange={(event) => props.onSearchChange(event.target.value)}
                         placeholder="ค้นหาเลขที่คำขอ รหัสโครงการ หรือรายการ"
-                        className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-action-primary-border-strong focus-visible:ring-action-primary-border"
+                        className="h-12 rounded-lg border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-action-primary-border-strong focus-visible:ring-action-primary-border"
                     />
                     {props.requestSearchQuery.trim().length > 0 && (
                         <Button
@@ -220,7 +220,7 @@ function RequestFilters(props: {
                         }
                     >
                         <SelectTrigger
-                            className="h-12 rounded-2xl border-border-subtle bg-surface-raised text-content-primary focus:ring-action-primary-border"
+                            className="h-12 rounded-lg border-border-subtle bg-surface-raised text-content-primary focus:ring-action-primary-border"
                             aria-label="กรองสถานะประวัติคำขอเบิกวัสดุ"
                         >
                             <SelectValue placeholder="กรองสถานะ" />

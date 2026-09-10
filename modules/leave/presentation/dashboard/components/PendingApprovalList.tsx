@@ -80,7 +80,7 @@ function PendingApprovalCard({
     const LeaveTypeIcon = leaveTypeIcon(leave.leaveType);
 
     return (
-        <Card className="border-border-subtle p-5 shadow-sm">
+        <Card className="border-border-subtle bg-surface-raised p-5 shadow-none">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 flex-1 space-y-4">
                     <div className="flex min-w-0 items-start gap-3">
@@ -97,7 +97,7 @@ function PendingApprovalCard({
                         </div>
                     </div>
 
-                    <div className="grid gap-4 rounded-xl border border-module-leave-badge-border bg-module-leave-badge-surface/60 p-4 sm:grid-cols-2">
+                    <div className="grid gap-4 border-y border-border-subtle py-4 sm:grid-cols-2">
                         <InfoRow
                             icon={LeaveTypeIcon}
                             label="ประเภทการลา"
