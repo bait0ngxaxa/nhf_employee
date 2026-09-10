@@ -446,35 +446,40 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
                 error,
             );
 
-            let retryData: { nextAttemptAt?: Date } = {};
-            if (isTerminal) {
-                emitOutboxOperationalEvent("outbox_dead_lettered", {
-                    outboxId: notification.id,
-                    outboxType: notification.type,
-                    attempt: nextAttempts,
-                    nextStatus: OUTBOX_STATUS_DEAD,
-                    nextAttemptAt: null,
-                });
-            } else {
-                const nextAttemptAt = getNextAttemptAt(nextAttempts, now);
-                retryData = { nextAttemptAt };
-                emitOutboxOperationalEvent("outbox_retry_scheduled", {
-                    outboxId: notification.id,
-                    outboxType: notification.type,
-                    attempt: nextAttempts,
-                    nextStatus: OUTBOX_STATUS_FAILED,
-                    nextAttemptAt: nextAttemptAt.toISOString(),
-                });
-            }
-            await prisma.notificationOutbox.updateMany({
+            const nextStatus = isTerminal
+                ? OUTBOX_STATUS_DEAD
+                : OUTBOX_STATUS_FAILED;
+            const nextAttemptAt = isTerminal
+                ? null
+                : getNextAttemptAt(nextAttempts, now);
+            const failureTransition = await prisma.notificationOutbox.updateMany({
                 where: { id: notification.id, status: OUTBOX_STATUS_PROCESSING },
                 data: {
-                    status: isTerminal ? OUTBOX_STATUS_DEAD : OUTBOX_STATUS_FAILED,
+                    status: nextStatus,
                     attempts: { increment: 1 },
                     lastError: message,
-                    ...retryData,
+                    ...(nextAttemptAt ? { nextAttemptAt } : {}),
                 },
             });
+            if (failureTransition.count === 1) {
+                if (isTerminal) {
+                    emitOutboxOperationalEvent("outbox_dead_lettered", {
+                        outboxId: notification.id,
+                        outboxType: notification.type,
+                        attempt: nextAttempts,
+                        nextStatus,
+                        nextAttemptAt: null,
+                    });
+                } else {
+                    emitOutboxOperationalEvent("outbox_retry_scheduled", {
+                        outboxId: notification.id,
+                        outboxType: notification.type,
+                        attempt: nextAttempts,
+                        nextStatus,
+                        nextAttemptAt: nextAttemptAt?.toISOString() ?? null,
+                    });
+                }
+            }
             failedCount++;
         }
     }

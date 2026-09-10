@@ -2747,16 +2747,27 @@ Metadata is limited to operational fields such as `outboxId`, `outboxType`,
 payload/body content, LINE user IDs, recipient email addresses, access tokens,
 SMTP passwords, cookies, ID tokens, refresh tokens, or provider response
 bodies. A repeated attempt is therefore machine-detectable without exposing
-delivery data. Existing error behavior remains in place and an observability
-sink is not required for a state transition to complete.
+delivery data. `outbox_retry_scheduled`, `outbox_dead_lettered`, and
+`outbox_stale_recovered` represent successfully persisted `NotificationOutbox`
+state transitions: each is emitted only after its conditional persistence
+update succeeds with `count === 1`. They do not represent a transition that
+was merely attempted. A lost conditional update or a persistence error emits
+no retry/dead-letter state event. Existing error behavior remains in place and
+an observability sink is not required for a state transition to complete.
+
+`outbox_provider_attempt` remains a shared Outbox dispatch-attempt signal. Some
+dispatches can perform only database work or return `DEFERRED` before an
+external provider call, so operations should use `outboxType` to identify
+actual provider-bound work.
 
 The repository proves that terminal provider failures and stale-to-`DEAD`
-recovery emit `outbox_dead_lettered`. Production operations must configure
-the supervisor/log platform to alert on that event and should surface repeated
-provider attempts and `outbox_retry_scheduled`. Repository tests cannot prove
-that an external deployment retains these logs or has an active alert, so L5
-does not claim production alerting is already enabled. No dashboard or new
-metrics stack was introduced.
+recovery emit `outbox_dead_lettered` only after the corresponding persisted
+transition succeeds. Production operations must configure the supervisor/log
+platform to alert on that event and should surface repeated provider attempts
+and `outbox_retry_scheduled`. Repository tests cannot prove that an external
+deployment retains these logs or has an active alert, so L5 does not claim
+production alerting is already enabled. No dashboard or new metrics stack was
+introduced.
 
 ### 22.7 Schema, compatibility, and implementation record
 

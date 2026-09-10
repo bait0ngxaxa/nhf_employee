@@ -1354,6 +1354,9 @@ describe("processOutbox", () => {
         prismaMock.notificationOutbox.findMany
             .mockResolvedValueOnce(asNever([]))
             .mockResolvedValueOnce(asNever([notification]));
+        prismaMock.notificationOutbox.updateMany
+            .mockResolvedValueOnce(asNever({ count: 1 }))
+            .mockResolvedValueOnce(asNever({ count: 1 }));
         vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
             new Error("temporary provider failure"),
         );
@@ -1372,16 +1375,48 @@ describe("processOutbox", () => {
                     isRetry: true,
                 }),
             ]);
-            expect(infoSpy.mock.calls).toContainEqual([
-                "outbox_retry_scheduled",
-                expect.objectContaining({
-                    event: "outbox_retry_scheduled",
-                    outboxId: 145,
-                    outboxType: "LEAVE_CANCELLED",
-                    attempt: 2,
-                    nextStatus: "FAILED",
-                }),
+            const retryEvents = infoSpy.mock.calls.filter(
+                ([event]) => event === "outbox_retry_scheduled",
+            );
+            expect(retryEvents).toEqual([
+                [
+                    "outbox_retry_scheduled",
+                    expect.objectContaining({
+                        event: "outbox_retry_scheduled",
+                        outboxId: 145,
+                        outboxType: "LEAVE_CANCELLED",
+                        attempt: 2,
+                        nextStatus: "FAILED",
+                    }),
+                ],
             ]);
+            expect(
+                prismaMock.notificationOutbox.updateMany.mock.calls[0]?.[0],
+            ).toEqual(expect.objectContaining({
+                where: expect.objectContaining({
+                    id: 145,
+                    status: { in: ["PENDING", "FAILED"] },
+                }),
+                data: { status: "PROCESSING" },
+            }));
+            expect(
+                prismaMock.notificationOutbox.updateMany.mock.calls[1]?.[0],
+            ).toEqual(expect.objectContaining({
+                where: { id: 145, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    attempts: { increment: 1 },
+                }),
+            }));
+            const retryEventIndex = infoSpy.mock.calls.findIndex(
+                ([event]) => event === "outbox_retry_scheduled",
+            );
+            expect(
+                prismaMock.notificationOutbox.updateMany
+                    .mock.invocationCallOrder[1],
+            ).toBeLessThan(
+                infoSpy.mock.invocationCallOrder[retryEventIndex],
+            );
             const loggedMetadata = JSON.stringify(infoSpy.mock.calls);
             expect(loggedMetadata).not.toContain("employee@example.com");
             expect(loggedMetadata).not.toContain("ลาป่วย");
@@ -1405,6 +1440,9 @@ describe("processOutbox", () => {
         prismaMock.notificationOutbox.findMany
             .mockResolvedValueOnce(asNever([]))
             .mockResolvedValueOnce(asNever([notification]));
+        prismaMock.notificationOutbox.updateMany
+            .mockResolvedValueOnce(asNever({ count: 1 }))
+            .mockResolvedValueOnce(asNever({ count: 1 }));
         vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
             new Error("permanent provider failure"),
         );
@@ -1412,19 +1450,122 @@ describe("processOutbox", () => {
         try {
             await processOutbox();
 
-            expect(infoSpy.mock.calls).toContainEqual([
-                "outbox_dead_lettered",
-                expect.objectContaining({
-                    event: "outbox_dead_lettered",
-                    outboxId: 146,
-                    outboxType: "LEAVE_CANCELLED",
-                    attempt: MAX_OUTBOX_ATTEMPTS,
-                    nextStatus: "DEAD",
-                    nextAttemptAt: null,
-                }),
+            const deadLetterEvents = infoSpy.mock.calls.filter(
+                ([event]) => event === "outbox_dead_lettered",
+            );
+            expect(deadLetterEvents).toEqual([
+                [
+                    "outbox_dead_lettered",
+                    expect.objectContaining({
+                        event: "outbox_dead_lettered",
+                        outboxId: 146,
+                        outboxType: "LEAVE_CANCELLED",
+                        attempt: MAX_OUTBOX_ATTEMPTS,
+                        nextStatus: "DEAD",
+                        nextAttemptAt: null,
+                    }),
+                ],
             ]);
+            expect(
+                prismaMock.notificationOutbox.updateMany.mock.calls[1]?.[0],
+            ).toEqual(expect.objectContaining({
+                where: { id: 146, status: "PROCESSING" },
+                data: expect.objectContaining({
+                    status: "DEAD",
+                    attempts: { increment: 1 },
+                }),
+            }));
+            const deadLetterEventIndex = infoSpy.mock.calls.findIndex(
+                ([event]) => event === "outbox_dead_lettered",
+            );
+            expect(
+                prismaMock.notificationOutbox.updateMany
+                    .mock.invocationCallOrder[1],
+            ).toBeLessThan(
+                infoSpy.mock.invocationCallOrder[deadLetterEventIndex],
+            );
             expect(JSON.stringify(infoSpy.mock.calls)).not.toContain(
                 "permanent provider failure",
+            );
+        } finally {
+            infoSpy.mockRestore();
+        }
+    });
+
+    it("does not emit retry or DEAD events when the failure transition is lost", async () => {
+        const infoSpy = vi
+            .spyOn(console, "warn")
+            .mockImplementation(() => undefined);
+        const notification = buildNotification(
+            147,
+            "LEAVE_CANCELLED",
+            JSON.stringify(buildLeavePayload()),
+        );
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(asNever([notification]));
+        prismaMock.notificationOutbox.updateMany
+            .mockResolvedValueOnce(asNever({ count: 1 }))
+            .mockResolvedValueOnce(asNever({ count: 0 }));
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
+            new Error("lost transition"),
+        );
+
+        try {
+            await expect(processOutbox()).resolves.toEqual({
+                processed: 0,
+                failed: 1,
+            });
+
+            expect(infoSpy).not.toHaveBeenCalledWith(
+                "outbox_retry_scheduled",
+                expect.anything(),
+            );
+            expect(infoSpy).not.toHaveBeenCalledWith(
+                "outbox_dead_lettered",
+                expect.anything(),
+            );
+            expect(
+                prismaMock.notificationOutbox.updateMany.mock.calls[1]?.[0],
+            ).toEqual(expect.objectContaining({
+                where: { id: 147, status: "PROCESSING" },
+                data: expect.objectContaining({ status: "FAILED" }),
+            }));
+        } finally {
+            infoSpy.mockRestore();
+        }
+    });
+
+    it("propagates failure-transition persistence errors without emitting state events", async () => {
+        const infoSpy = vi
+            .spyOn(console, "warn")
+            .mockImplementation(() => undefined);
+        const persistenceError = new Error("Outbox persistence unavailable");
+        const notification = buildNotification(
+            148,
+            "LEAVE_CANCELLED",
+            JSON.stringify(buildLeavePayload()),
+        );
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(asNever([notification]));
+        prismaMock.notificationOutbox.updateMany
+            .mockResolvedValueOnce(asNever({ count: 1 }))
+            .mockRejectedValueOnce(persistenceError);
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
+            new Error("provider failure before persistence"),
+        );
+
+        try {
+            await expect(processOutbox()).rejects.toBe(persistenceError);
+
+            expect(infoSpy).not.toHaveBeenCalledWith(
+                "outbox_retry_scheduled",
+                expect.anything(),
+            );
+            expect(infoSpy).not.toHaveBeenCalledWith(
+                "outbox_dead_lettered",
+                expect.anything(),
             );
         } finally {
             infoSpy.mockRestore();
