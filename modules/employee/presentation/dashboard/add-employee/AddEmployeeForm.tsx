@@ -1,13 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import type { AddEmployeeFormProps } from "../types";
@@ -26,16 +20,8 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
     } = useAddEmployee({ onSuccess });
 
     return (
-        <Card className="mx-auto w-full max-w-3xl rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
-            <CardHeader>
-                <CardTitle className="text-xl font-bold text-content-heading [overflow-wrap:anywhere]">
-                    เพิ่มพนักงานใหม่
-                </CardTitle>
-                <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
-                    กรอกข้อมูลพนักงานใหม่เพื่อเพิ่มเข้าระบบ
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <Card className="mx-auto w-full max-w-3xl rounded-xl border-border-subtle bg-surface-raised shadow-none">
+            <CardContent className="pt-6">
                 <form onSubmit={handleSubmit} noValidate aria-busy={isLoading}>
                     <div className="flex flex-col gap-6">
                         <EmployeeFormFields

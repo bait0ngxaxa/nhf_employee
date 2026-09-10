@@ -14,7 +14,7 @@ export function AddEmployeeSection() {
     const { mutate } = useSWRConfig();
 
     return (
-        <div className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle bg-surface-subtle">
+        <div className="min-h-[calc(100dvh-6rem)]">
             <div className="space-y-8 p-4 md:p-8">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="min-w-0 space-y-1">

@@ -276,7 +276,7 @@
 
 :root {
     --radius: 0.65rem;
-    --background: oklch(1 0 0);
+    --background: oklch(0.985 0.004 247);
     --foreground: oklch(0.141 0.005 285.823);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.141 0.005 285.823);
@@ -546,12 +546,7 @@
     --employee-action-hover-end: #1d4ed8;
     --image-preview-shadow: #020617;
     --brand-tab: #0369a1;
-    --app-shell-background: linear-gradient(
-        to bottom right,
-        #f8fafc,
-        #eff6ff,
-        #eef2ff
-    );
+    --app-shell-background: var(--background);
     --sidebar-toggle-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --brand-logo-shadow: 0 4px 8px rgb(15 23 42 / 18%), 0 1px 2px rgb(15 23 42 / 12%);
     --employee-table-sticky-shadow: -10px 0 18px -18px rgb(15 23 42 / 45%);
@@ -888,6 +883,11 @@
 }
 
 /* Prevent loading spinner flash */
+html,
+body {
+    overflow-x: clip;
+}
+
 html {
     visibility: visible;
     opacity: 1;

@@ -50,8 +50,8 @@ export function PreviewStep({
                         : ""}
                 </div>
 
-                <div className="max-h-96 overflow-auto rounded-lg border border-border-subtle">
-                    <table className="min-w-[920px] divide-y divide-border-neutral-default">
+                <div className="max-h-96 overflow-auto overscroll-x-contain rounded-lg border border-border-subtle">
+                    <table className="min-w-[760px] divide-y divide-border-neutral-default">
                         <thead className="sticky top-0 z-10 bg-surface-neutral-subtle">
                             <tr>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-secondary">
@@ -83,7 +83,7 @@ export function PreviewStep({
                                     key={employee.sourceRow ?? index}
                                     className="hover:bg-surface-neutral-subtle"
                                 >
-                                    <td className="px-4 py-4 text-sm text-content-neutral-primary">
+                                    <td className="tabular-nums px-4 py-4 text-sm text-content-neutral-primary">
                                         {employee.sourceRow ?? index + 1}
                                     </td>
                                     <td className="max-w-56 px-4 py-4 text-sm font-medium text-content-neutral-primary [overflow-wrap:anywhere]">
@@ -103,7 +103,7 @@ export function PreviewStep({
                                             {getEmployeeDepartmentLabel(employee.department)}
                                         </Badge>
                                     </td>
-                                    <td className="max-w-40 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
+                                    <td className="tabular-nums max-w-40 px-4 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                         {formatEmployeePhone(employee.phone)}
                                     </td>
                                     <td className="max-w-44 px-4 py-4 text-sm text-content-neutral-secondary">

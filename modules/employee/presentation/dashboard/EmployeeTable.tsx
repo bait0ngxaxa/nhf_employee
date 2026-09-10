@@ -136,7 +136,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                             <td className="px-4 py-4">
                                 <EmailValue email={employee.email} />
                             </td>
-                            <td className="px-4 py-4">
+                            <td className="tabular-nums px-4 py-4">
                                 <div className="whitespace-nowrap text-sm text-content-strong">
                                     {formatEmployeePhone(employee.phone)}
                                 </div>

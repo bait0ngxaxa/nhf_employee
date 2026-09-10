@@ -167,12 +167,12 @@ export function DashboardNavbar(): ReactElement {
                                     "hidden sm:flex group",
                                 )}
                             >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-solid">
                                     <User className="h-5 w-5 text-content-on-brand" />
                                 </div>
                                 <div className="flex flex-col items-start text-left">
                                     <span className="text-sm font-black tracking-tight text-content-primary">
-                                        {user?.name || "User"}
+                                        {user?.name || "ผู้ใช้"}
                                     </span>
                                     <span className="text-xs font-bold uppercase leading-none tracking-widest text-brand-foreground">
                                         {getRoleLabelThai(user?.role)}
@@ -197,7 +197,7 @@ export function DashboardNavbar(): ReactElement {
                                         {user?.department}
                                     </span>
                                     <span className="rounded-full bg-brand-solid px-2 py-0.5 text-xs font-black uppercase tracking-widest text-content-on-brand">
-                                        {user?.role}
+                                        {getRoleLabelThai(user?.role)}
                                     </span>
                                 </div>
                             </div>
@@ -235,7 +235,7 @@ export function DashboardNavbar(): ReactElement {
                                 className="rounded-2xl border border-border-muted bg-surface sm:hidden"
                                 aria-label="เมนูผู้ใช้"
                             >
-                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-start to-brand-end">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-solid">
                                     <User className="h-4 w-4 text-content-on-brand" />
                                 </div>
                             </Button>

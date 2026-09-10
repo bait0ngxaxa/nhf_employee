@@ -58,7 +58,7 @@ describe("LIFF home", () => {
             "href",
             "/liff/stock",
         );
-        expect(screen.getByRole("link", { name: /ดูงาน Routine ของฉัน/ })).toHaveAttribute(
+        expect(screen.getByRole("link", { name: /ดูงานประจำของฉัน/ })).toHaveAttribute(
             "href",
             "/liff/routine",
         );

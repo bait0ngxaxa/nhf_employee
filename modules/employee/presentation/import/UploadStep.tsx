@@ -25,7 +25,7 @@ export function UploadStep({
         <Card className="rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
             <CardHeader>
                 <CardTitle className="text-xl font-bold text-content-heading">
-                    อัพโหลดไฟล์ CSV
+                    อัปโหลดไฟล์ CSV
                 </CardTitle>
                 <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     เลือกไฟล์ CSV ที่มีข้อมูลพนักงาน (ขนาดไฟล์สูงสุด 5MB)

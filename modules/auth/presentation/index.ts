@@ -5,3 +5,4 @@ export { HybridAuthProvider, useAuth } from "./HybridAuthProvider";
 export { ForgotPasswordForm } from "./forgot-password-form";
 export { ResetPasswordForm } from "./reset-password-form";
 export { RefreshSessionBridge } from "./RefreshSessionBridge";
+export { AuthPageShell } from "./AuthPageShell";

@@ -8,9 +8,9 @@ import { CollapsedSidebarTooltip } from "@/components/dashboard/layout/Collapsed
 
 const HOME_MENU_ITEM: MenuItem = {
     id: "dashboard",
-    label: "Overview",
+    label: "หน้าหลัก",
     icon: Home,
-    description: "Main Dashboard",
+    description: "ภาพรวมการใช้งานระบบ",
 };
 
 type MenuItemProps = {
@@ -95,7 +95,7 @@ function SidebarMenuItem({
                         className={cn(
                             "flex shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ease-out",
                             indented && sidebarOpen ? "size-5" : "size-7",
-                            isActive ? "bg-gradient-to-br from-brand-start to-brand-end text-content-on-brand" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
+                            isActive ? "bg-brand-solid text-content-on-brand" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
                         )}
                     >
                         <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />

@@ -96,7 +96,7 @@ export function LoginForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
+            <Card className="rounded-xl border-border-neutral-default/70 bg-surface-raised shadow-none">
                 <CardHeader className="text-center pb-2">
                     <CardTitle className="text-2xl font-bold text-action-primary-foreground">
                         เข้าสู่ระบบ
@@ -123,7 +123,7 @@ export function LoginForm({
                                     htmlFor="email"
                                     className="text-content-neutral-body"
                                 >
-                                    Email
+                                        อีเมล
                                 </Label>
                                 <Input
                                     id="email"
@@ -149,7 +149,7 @@ export function LoginForm({
                                         htmlFor="password"
                                         className="text-content-neutral-body"
                                     >
-                                        Password
+                                        รหัสผ่าน
                                     </Label>
                                     <Link
                                         href={APP_ROUTES.forgotPassword}
@@ -177,7 +177,7 @@ export function LoginForm({
                             <div className="flex flex-col gap-3">
                                 <Button
                                     type="submit"
-                                    className="w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end disabled:opacity-70"
+                                    className="w-full rounded-xl bg-action-primary-solid text-content-on-brand hover:bg-action-primary-solid-hover disabled:opacity-70"
                                     disabled={isLoading}
                                 >
                                     {isLoading ? (

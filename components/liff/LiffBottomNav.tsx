@@ -24,19 +24,19 @@ const NAV_ITEMS = [
     {
         key: "stock",
         href: APP_ROUTES.line.stock,
-        label: "Stock",
+        label: "วัสดุ",
         icon: Boxes,
     },
     {
         key: "leave",
         href: APP_ROUTES.line.leave,
-        label: "Leave",
+        label: "วันลา",
         icon: CalendarRange,
     },
     {
         key: "routine",
         href: APP_ROUTES.line.routine,
-        label: "Routine",
+        label: "งานประจำ",
         icon: ClipboardCheck,
     },
 ] as const;

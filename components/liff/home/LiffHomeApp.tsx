@@ -42,7 +42,7 @@ interface ModuleCardConfig {
 const MODULE_CARDS: readonly ModuleCardConfig[] = [
     {
         key: "stock",
-        label: "Stock",
+        label: "วัสดุ",
         title: "เบิกวัสดุและติดตามคำขอ",
         description: "จัดการงานวัสดุของคุณในที่เดียว",
         href: APP_ROUTES.line.stock,
@@ -52,7 +52,7 @@ const MODULE_CARDS: readonly ModuleCardConfig[] = [
     },
     {
         key: "leave",
-        label: "Leave",
+        label: "วันลา",
         title: "ดูสิทธิ์และจัดการวันลา",
         description: "ตรวจสอบข้อมูลวันลาและคำขอของคุณ",
         href: APP_ROUTES.line.leave,
@@ -62,8 +62,8 @@ const MODULE_CARDS: readonly ModuleCardConfig[] = [
     },
     {
         key: "routine",
-        label: "Routine",
-        title: "ดูงาน Routine ของฉัน",
+        label: "งานประจำ",
+        title: "ดูงานประจำของฉัน",
         description: "ติดตามงานประจำและกำหนดส่งที่ได้รับมอบหมาย",
         href: APP_ROUTES.line.routine,
         icon: ClipboardCheck,

@@ -115,7 +115,7 @@ export function EmployeeSearchControls({
                     <span>
                         {isExporting
                             ? "กำลังเตรียม\u2026"
-                            : `ดาวน์โหลด CSV (${totalEmployees} คน)`}
+                            : `ดาวน์โหลดข้อมูล CSV (${totalEmployees} คน)`}
                     </span>
                 </Button>
             )}

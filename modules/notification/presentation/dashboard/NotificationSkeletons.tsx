@@ -19,11 +19,11 @@ export function NotificationSectionSkeleton(): ReactElement {
                     </div>
                     <Skeleton className="h-9 w-32" />
                 </div>
-                <Skeleton className="h-[3.75rem] w-full rounded-xl" />
-                <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
-                    <div className="border-b border-border-subtle px-5 py-3">
-                        <Skeleton className="h-5 w-28" />
-                    </div>
+                <div className="flex flex-wrap items-center gap-3 border-b border-border-subtle pb-3">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-11 w-40 rounded-lg" />
+                </div>
+                <div className="overflow-hidden border-y border-border-subtle bg-surface-raised">
                     <div className="divide-y divide-border-muted">
                         {Array.from({ length: 5 }).map((_, index) => (
                             <div key={index} className="flex items-start gap-4 px-5 py-4">

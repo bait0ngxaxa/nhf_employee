@@ -10,9 +10,9 @@ export default function AccessDenied() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-subtle p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md rounded-xl border-border-subtle shadow-none">
         <CardHeader className="text-center">
-          <div className="mx-auto bg-status-error-surface-strong p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-status-error-border bg-status-error-surface-strong p-3">
             <Shield className="h-8 w-8 text-status-error-muted" />
           </div>
           <CardTitle className="text-2xl font-bold text-status-error-emphasis">

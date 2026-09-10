@@ -12,8 +12,9 @@ function FieldSkeleton(): ReactElement {
 
 function AccessSkeleton(): ReactElement {
     return (
-        <div className="space-y-4 md:col-span-2">
-            <div className="rounded-xl border border-border bg-muted/40 p-4">
+        <div className="space-y-5 border-t border-border-subtle pt-6">
+            <Skeleton className="h-5 w-28" />
+            <div className="border-b border-border-subtle pb-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-2">
                         <Skeleton className="h-4 w-40" />
@@ -22,7 +23,7 @@ function AccessSkeleton(): ReactElement {
                     <Skeleton className="h-7 w-12 rounded-full" />
                 </div>
             </div>
-            <div className="rounded-xl border border-border p-4">
+            <div className="border-t border-border-subtle pt-5">
                 <Skeleton className="h-4 w-52" />
                 <Skeleton className="mt-3 h-4 w-64 max-w-full" />
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -37,28 +38,36 @@ function AccessSkeleton(): ReactElement {
 
 function FormSkeleton(): ReactElement {
     return (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {Array.from({ length: 6 }).map((_, index) => (
-                    <FieldSkeleton key={index} />
-                ))}
-                <div className="md:col-span-2">
-                    <FieldSkeleton />
+        <div className="rounded-xl border border-border-subtle bg-surface-raised p-6 shadow-none md:p-8">
+            <div className="space-y-8">
+                <div className="space-y-4">
+                    <Skeleton className="h-5 w-36" />
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        {Array.from({ length: 6 }).map((_, index) => (
+                            <FieldSkeleton key={index} />
+                        ))}
+                        <div className="md:col-span-2">
+                            <FieldSkeleton />
+                        </div>
+                    </div>
                 </div>
                 <AccessSkeleton />
+                <div className="flex flex-col-reverse gap-3 border-t border-border-subtle pt-5 sm:flex-row sm:justify-end">
+                    <Skeleton className="h-11 w-full sm:w-28" />
+                    <Skeleton className="h-11 w-full sm:w-32" />
+                </div>
+                <div className="border-t border-border-subtle pt-5">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="mt-3 h-12 w-full" />
+                </div>
             </div>
-            <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <Skeleton className="h-11 w-full sm:w-28" />
-                <Skeleton className="h-11 w-full sm:w-32" />
-            </div>
-            <Skeleton className="mt-8 h-20 rounded-xl" />
         </div>
     );
 }
 
 function HistorySkeleton(): ReactElement {
     return (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="rounded-xl border border-border-subtle bg-surface-raised p-6 shadow-none">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-2">
                     <Skeleton className="h-5 w-56" />
@@ -66,8 +75,8 @@ function HistorySkeleton(): ReactElement {
                 </div>
                 <Skeleton className="h-10 w-24" />
             </div>
-            <div className="mt-6 overflow-hidden rounded-xl border border-border">
-                <div className="grid grid-cols-6 gap-4 border-b border-border bg-muted/60 p-4">
+            <div className="mt-6 overflow-hidden rounded-lg border border-border-subtle">
+                <div className="grid grid-cols-6 gap-4 border-b border-border-subtle bg-surface-subtle p-4">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <Skeleton key={index} className="h-4" />
                     ))}
@@ -89,7 +98,7 @@ function HistorySkeleton(): ReactElement {
 export function EmailRequestSectionSkeleton(): ReactElement {
     return (
         <div
-            className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border bg-muted/40"
+            className="min-h-[calc(100dvh-6rem)]"
             role="status"
             aria-live="polite"
             aria-busy="true"

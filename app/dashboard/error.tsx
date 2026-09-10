@@ -25,9 +25,9 @@ export default function DashboardError({ error, reset }: ErrorProps) {
 
     return (
         <div className="flex items-center justify-center min-h-[60vh] p-4">
-            <Card className="w-full max-w-md border-status-attention-border-subtle shadow-sm">
+            <Card className="w-full max-w-md rounded-xl border-status-attention-border-subtle shadow-none">
                 <CardHeader className="text-center pb-2">
-                    <div className="mx-auto mb-4 w-14 h-14 bg-status-attention-surface-strong rounded-full flex items-center justify-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-status-attention-border bg-status-attention-surface-strong">
                         <AlertTriangle className="w-7 h-7 text-status-attention-icon" />
                     </div>
                     <CardTitle className="text-lg text-content-neutral-strong">
@@ -40,7 +40,7 @@ export default function DashboardError({ error, reset }: ErrorProps) {
                     </p>
 
                     {process.env.NODE_ENV === "development" && (
-                        <div className="bg-status-attention-surface border border-status-attention-border rounded-lg p-2 text-left">
+                        <div className="rounded-lg border border-status-attention-border bg-status-attention-surface p-2 text-left">
                             <p className="text-xs font-mono text-status-attention-foreground break-all">
                                 {error.message}
                             </p>

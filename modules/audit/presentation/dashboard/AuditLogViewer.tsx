@@ -15,11 +15,11 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, X } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
+import { ErrorState } from "@/components/ui/state";
 import { useAuditLogsContext } from "./AuditLogsContext";
 import type { AuditLog } from "./types";
 import {
@@ -116,7 +116,7 @@ function AuditLogMobileCard({
                 </div>
                 <div className="min-w-0 sm:col-span-2">
                     <dt className="text-xs font-semibold text-content-neutral-muted">
-                        IP Address
+                        ที่อยู่ IP
                     </dt>
                     <dd className="mt-1 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                         {log.ipAddress || "-"}
@@ -161,22 +161,37 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
 
     if (error) {
         return (
-            <div className="text-center p-8">
-                <div className="text-status-error-muted bg-status-error-surface p-4 rounded-md">
-                    {error}
-                </div>
-            </div>
+            <ErrorState
+                title="โหลดบันทึกการใช้งานไม่สำเร็จ"
+                description={error}
+                action={{
+                    label: "โหลดใหม่",
+                    onClick: refresh,
+                    icon: <RefreshCw className="h-4 w-4" aria-hidden="true" />,
+                }}
+            />
         );
     }
 
+    const hasActiveFilters =
+        searchTerm.trim().length > 0
+        || actionFilter !== "all"
+        || entityTypeFilter !== "all";
+
+    const clearFilters = (): void => {
+        setSearchTerm("");
+        setActionFilter("all");
+        setEntityTypeFilter("all");
+    };
+
     return (
-        <Card className={className}>
-            <CardHeader>
+        <Card className={className ?? "rounded-xl border-border-subtle shadow-none"}>
+            <CardContent className="space-y-5 pt-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <CardTitle className="[overflow-wrap:anywhere]">บันทึกการใช้งาน (Audit Logs)</CardTitle>
-                        <CardDescription>
-                            ประวัติการดำเนินการในระบบ
+                        <CardTitle className="text-lg [overflow-wrap:anywhere]">รายการกิจกรรม</CardTitle>
+                        <CardDescription className="mt-1">
+                            ค้นหาและตรวจสอบการดำเนินการที่เกิดขึ้นในระบบ
                         </CardDescription>
                     </div>
                     <Button
@@ -189,17 +204,16 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                         รีเฟรช
                     </Button>
                 </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+
                 {/* Filters */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <div className="flex flex-col gap-3 border-y border-border-subtle py-4 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="relative min-w-0 flex-1 sm:min-w-[200px]">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-neutral-subtle h-4 w-4" />
                         <Input
                             id="audit-search"
                             type="text"
                             aria-label="ค้นหาในบันทึกการใช้งาน"
-                            placeholder="ค้นหาผู้ใช้, อีเมล…"
+                            placeholder="ค้นหาผู้ดำเนินการหรือรายละเอียดเหตุการณ์"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10"
@@ -241,6 +255,18 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
                             ))}
                         </SelectContent>
                     </Select>
+                    {hasActiveFilters ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="w-full text-content-secondary sm:w-auto"
+                        >
+                            <X className="h-4 w-4" aria-hidden="true" />
+                            ล้างตัวกรอง
+                        </Button>
+                    ) : null}
                 </div>
 
                 {/* Mobile list */}
@@ -266,23 +292,23 @@ export function AuditLogViewer({ className }: AuditLogViewerProps) {
 
                 {/* Desktop table */}
                 <div className="hidden overflow-x-auto rounded-lg border xl:block">
-                    <table className="min-w-full divide-y divide-border-neutral-default">
+                    <table className="min-w-full divide-y divide-border-neutral-default tabular-nums">
                         <thead className="bg-surface-neutral-subtle">
                             <tr>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted">
                                     เวลา
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted">
                                     เหตุการณ์
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted">
                                     ผู้ดำเนินการ
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted">
                                     ข้อมูลที่เกี่ยวข้อง
                                 </th>
-                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted uppercase">
-                                    IP Address
+                                <th className="px-4 py-3 text-left text-xs font-medium text-content-neutral-muted">
+                                    ที่อยู่ IP
                                 </th>
                             </tr>
                         </thead>

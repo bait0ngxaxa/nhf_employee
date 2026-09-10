@@ -134,7 +134,7 @@ export function DashboardHomeSkeleton(): ReactElement {
 export function FormSectionSkeleton(): ReactElement {
     return (
         <div
-            className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle bg-surface-subtle"
+            className="min-h-[calc(100dvh-6rem)]"
             role="status"
             aria-live="polite"
             aria-busy="true"
@@ -149,13 +149,17 @@ export function FormSectionSkeleton(): ReactElement {
                     <Skeleton className="h-11 w-full sm:w-36" />
                 </div>
 
-                <div className="mx-auto w-full max-w-3xl rounded-2xl border border-border-subtle bg-surface-raised p-6">
-                    <div className="space-y-2">
-                        <Skeleton className="h-7 w-48" />
-                        <Skeleton className="h-4 w-72 max-w-full" />
-                    </div>
-                    <div className="mt-6 grid gap-6 md:grid-cols-2">
-                        {Array.from({ length: 10 }).map((_, index) => (
+                <div className="mx-auto w-full max-w-3xl rounded-xl border border-border-subtle bg-surface-raised p-6 shadow-none">
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2">
+                            {Array.from({ length: 2 }).map((_, index) => (
+                                <div key={index} className="space-y-2">
+                                    <Skeleton className="h-4 w-28" />
+                                    <Skeleton className="h-11 w-full" />
+                                </div>
+                            ))}
+                        </div>
+                        {Array.from({ length: 6 }).map((_, index) => (
                             <div key={index} className="space-y-2">
                                 <Skeleton className="h-4 w-28" />
                                 <Skeleton className="h-11 w-full" />
@@ -185,15 +189,17 @@ export function ImportSectionSkeleton(): ReactElement {
                 </div>
                 <Skeleton className="h-11 w-full sm:w-36" />
             </div>
-            <div className="grid grid-cols-3 gap-3 rounded-xl border border-border-subtle bg-surface-raised p-4">
-                {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-3">
-                        <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-                        <Skeleton className="hidden h-4 flex-1 sm:block" />
-                    </div>
-                ))}
+            <div className="border-b border-border-subtle pb-4">
+                <div className="grid grid-cols-3 gap-2">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                        <div key={index} className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-2">
+                            <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+                            <Skeleton className="hidden h-4 min-w-0 flex-1 sm:block" />
+                        </div>
+                    ))}
+                </div>
             </div>
-            <div className="rounded-2xl border border-border-subtle bg-surface-raised p-6">
+            <div className="rounded-xl border border-border-subtle bg-surface-raised p-6 shadow-none">
                 <Skeleton className="mx-auto h-16 w-16 rounded-2xl" />
                 <Skeleton className="mx-auto mt-5 h-6 w-72 max-w-full" />
                 <Skeleton className="mx-auto mt-3 h-4 w-96 max-w-full" />

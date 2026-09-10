@@ -30,18 +30,18 @@ function DocumentSystemToggle({
     onChange,
 }: DocumentSystemToggleProps): ReactElement {
     return (
-        <div className="rounded-xl border border-border bg-muted/40 p-4">
+        <div className="border-b border-border-subtle pb-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                     <p
                         id="needsDocumentSystem-label"
-                        className="font-medium text-foreground"
+                        className="font-medium text-content-heading"
                     >
                         ต้องการใช้ระบบสารบรรณ
                     </p>
                     <p
                         id="needsDocumentSystem-description"
-                        className="mt-1 text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]"
+                        className="mt-1 text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]"
                     >
                         เปิดใช้เมื่อพนักงานใหม่ต้องได้รับสิทธิ์เข้าใช้งานระบบสารบรรณ
                     </p>
@@ -50,7 +50,7 @@ function DocumentSystemToggle({
                     htmlFor="needsDocumentSystem"
                     aria-disabled={disabled}
                     className={cn(
-                        "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full bg-muted-foreground/35 transition-colors has-[:checked]:bg-primary has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
+                        "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full bg-surface-muted transition-colors has-[:checked]:bg-brand-solid has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-brand-focus/50",
                         disabled && "cursor-not-allowed opacity-60",
                     )}
                 >
@@ -88,14 +88,14 @@ function SharedDriveChecklist({
             tabIndex={-1}
             disabled={disabled}
             aria-describedby="sharedDriveAccess-description"
-            className="rounded-xl border border-border p-4 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-70"
+            className="border-t border-border-subtle pt-5 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-70"
         >
-            <legend className="px-1 text-sm font-medium text-foreground">
-                Shared Drive ที่ต้องการใช้งาน
+            <legend className="px-1 text-sm font-medium text-content-heading">
+                พื้นที่ Shared Drive ที่ต้องการใช้งาน
             </legend>
             <p
                 id="sharedDriveAccess-description"
-                className="mt-2 text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]"
+                className="mt-2 text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]"
             >
                 เลือกได้หลายรายการ, เลือกแล้ว {selectedCount} จาก {totalCount} รายการ
             </p>
@@ -105,7 +105,7 @@ function SharedDriveChecklist({
                         key={drive}
                         aria-disabled={disabled}
                         className={cn(
-                            "flex min-h-11 min-w-0 cursor-pointer items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5 has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
+                            "flex min-h-11 min-w-0 cursor-pointer items-center gap-3 rounded-md border border-border-subtle bg-surface-raised px-3 py-2 text-sm font-medium text-content-heading transition-colors hover:bg-surface-subtle has-[:checked]:border-brand-border-strong has-[:checked]:bg-brand-surface has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-brand-focus/50",
                             disabled && "cursor-not-allowed opacity-70",
                         )}
                     >
@@ -116,7 +116,7 @@ function SharedDriveChecklist({
                             checked={selectedDrives.has(drive)}
                             disabled={disabled}
                             onChange={onChange}
-                            className="size-4 shrink-0 rounded border-border accent-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed"
+                            className="size-4 shrink-0 rounded border-border-subtle accent-brand-solid focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-brand-focus/50 disabled:cursor-not-allowed"
                         />
                         <span className="min-w-0 [overflow-wrap:anywhere]">
                             {drive}
@@ -135,7 +135,10 @@ export function EmailRequestAccessFields({
     onChange,
 }: EmailRequestAccessFieldsProps): ReactElement {
     return (
-        <div className="md:col-span-2 space-y-4">
+        <fieldset className="space-y-5 border-t border-border-subtle pt-6">
+            <legend className="text-base font-semibold text-content-heading">
+                สิทธิ์การใช้งาน
+            </legend>
             <DocumentSystemToggle
                 checked={needsDocumentSystem}
                 disabled={disabled}
@@ -146,6 +149,6 @@ export function EmailRequestAccessFields({
                 disabled={disabled}
                 onChange={onChange}
             />
-        </div>
+        </fieldset>
     );
 }

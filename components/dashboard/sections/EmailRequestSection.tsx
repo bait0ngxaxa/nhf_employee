@@ -9,19 +9,19 @@ function EmailRequestContent(): ReactElement {
     const { handleMenuClick } = useDashboardUIContext();
 
     return (
-        <div className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border bg-muted/40">
+        <section className="min-h-[calc(100dvh-6rem)]">
             <div className="space-y-8 p-4 md:p-8">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
                     <div className="min-w-0 space-y-1">
                         <h1
                             data-page-heading
                             tabIndex={-1}
-                            className="text-2xl font-bold tracking-tight text-foreground [overflow-wrap:anywhere] md:text-3xl"
+                            className="text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl"
                         >
                             ส่งคำร้องพนักงานใหม่
                         </h1>
-                        <p className="text-sm font-medium leading-6 text-muted-foreground [overflow-wrap:anywhere]">
-                            ส่งคำร้องอีเมล ระบบสารบรรณ และ Shared Drive ให้ทีมไอที
+                        <p className="text-sm font-medium leading-6 text-content-secondary [overflow-wrap:anywhere]">
+                            ส่งคำร้องอีเมล ระบบสารบรรณ และพื้นที่จัดเก็บไฟล์ให้ทีมไอที
                         </p>
                     </div>
                 </div>
@@ -37,7 +37,7 @@ function EmailRequestContent(): ReactElement {
                     <EmailRequestHistory />
                 </div>
             </div>
-        </div>
+        </section>
     );
 }
 

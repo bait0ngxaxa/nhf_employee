@@ -99,7 +99,7 @@ export function ResetPasswordForm({
     if (!token) {
         return (
             <div className={cn("flex flex-col gap-6", className)} {...props}>
-                <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
+                <Card className="rounded-xl border-border-neutral-default/70 bg-surface-raised shadow-none">
                     <CardContent className="pt-8 pb-8">
                         <div className="flex flex-col items-center text-center space-y-4">
                             <div className="w-16 h-16 rounded-full bg-status-error-surface-strong flex items-center justify-center">
@@ -126,7 +126,7 @@ export function ResetPasswordForm({
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card className="rounded-2xl border-border-neutral-default/70 bg-surface-raised/90 shadow-sm">
+            <Card className="rounded-xl border-border-neutral-default/70 bg-surface-raised shadow-none">
                 <CardHeader className="text-center pb-2">
                     <div className="w-12 h-12 rounded-full bg-action-primary-surface-strong flex items-center justify-center mx-auto mb-3">
                         <KeyRound className="h-6 w-6 text-action-primary-foreground-muted" />
@@ -274,7 +274,7 @@ export function ResetPasswordForm({
 
                             <Button
                                 type="submit"
-                                className="w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end disabled:opacity-70"
+                                className="w-full rounded-xl bg-action-primary-solid text-content-on-brand hover:bg-action-primary-solid-hover disabled:opacity-70"
                                 disabled={!canSubmit}
                             >
                                 {isLoading ? (

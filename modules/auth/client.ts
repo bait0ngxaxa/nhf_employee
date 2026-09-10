@@ -13,6 +13,7 @@ export type {
 } from "./presentation/HybridAuthProvider";
 export {
     AuthStatus,
+    AuthPageShell,
     ForgotPasswordForm,
     LoginForm,
     RefreshSessionBridge,

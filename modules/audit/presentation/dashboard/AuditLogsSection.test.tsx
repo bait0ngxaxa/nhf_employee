@@ -37,7 +37,7 @@ describe("AuditLogsSection", () => {
         expect(
             screen.getByRole("heading", { name: "บันทึกการใช้งาน" }),
         ).toBeInTheDocument();
-        expect(screen.getAllByText("ประวัติการดำเนินการในระบบ")).toHaveLength(2);
+        expect(screen.getByText("ประวัติการดำเนินการในระบบ")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "รีเฟรช" })).toBeInTheDocument();
         expect(screen.getByLabelText("ค้นหาในบันทึกการใช้งาน")).toBeInTheDocument();
         expect(screen.getAllByText("ไม่พบข้อมูล")).toHaveLength(2);

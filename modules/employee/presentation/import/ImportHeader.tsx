@@ -14,7 +14,7 @@ export function ImportHeader({ onBack }: ImportHeaderProps) {
                     นำเข้าข้อมูลพนักงานจาก CSV
                 </h1>
                 <p className="text-sm font-medium leading-6 text-content-secondary [overflow-wrap:anywhere]">
-                    อัพโหลดไฟล์ CSV เพื่อเพิ่มข้อมูลพนักงานหลายคนพร้อมกัน
+                    อัปโหลดไฟล์ CSV เพื่อเพิ่มข้อมูลพนักงานหลายคนพร้อมกัน
                 </p>
             </div>
             {onBack && (

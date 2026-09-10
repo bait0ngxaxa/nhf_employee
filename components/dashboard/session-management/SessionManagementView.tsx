@@ -30,7 +30,6 @@ import type { ConfirmAction, SessionItem } from "./types";
 
 interface SessionManagementViewProps {
     sessions: SessionItem[];
-    currentSession: SessionItem | null;
     revokingId: string | null;
     isRevokingOthers: boolean;
     isValidating: boolean;
@@ -79,7 +78,7 @@ function SessionRow({
                     {getDeviceTypeLabel(parsed.deviceType)}
                 </p>
                 <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs leading-5 text-content-secondary lg:grid-cols-2 2xl:grid-cols-4">
-                    <SessionDetail label="IP" value={session.ipAddress ?? "ไม่ทราบ"} />
+                    <SessionDetail label="ที่อยู่ IP" value={session.ipAddress ?? "ไม่ทราบ"} />
                     <SessionDetail label="เริ่มใช้งาน" value={formatDateTime(session.createdAt)} />
                     <SessionDetail label="ใช้งานล่าสุด" value={formatRelativeTime(lastActive)} />
                     <SessionDetail label="หมดอายุ" value={formatDateTime(session.expiresAt)} />
@@ -125,7 +124,6 @@ function SessionDetail({
 
 export function SessionManagementView({
     sessions,
-    currentSession,
     revokingId,
     isRevokingOthers,
     isValidating,
@@ -221,11 +219,6 @@ export function SessionManagementView({
                             <p className="mt-1 text-sm text-content-secondary">ลองโหลดข้อมูลใหม่อีกครั้ง</p>
                         </div>
                     )}
-                    {currentSession ? (
-                        <div className="border-t border-border-muted px-5 py-3 text-xs text-content-muted [overflow-wrap:anywhere]">
-                            รหัสเซสชันปัจจุบัน: {currentSession.familyId}
-                        </div>
-                    ) : null}
                 </div>
             </div>
 

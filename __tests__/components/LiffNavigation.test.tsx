@@ -35,18 +35,18 @@ describe("LIFF application shell navigation", () => {
             "href",
             APP_ROUTES.line.root,
         );
-        expect(screen.getByRole("link", { name: "Stock" })).toHaveAttribute(
+        expect(screen.getByRole("link", { name: "วัสดุ" })).toHaveAttribute(
             "href",
             APP_ROUTES.line.stock,
         );
-        expect(screen.getByRole("link", { name: "Leave" })).toHaveAttribute(
+        expect(screen.getByRole("link", { name: "วันลา" })).toHaveAttribute(
             "href",
             APP_ROUTES.line.leave,
         );
-        expect(screen.getByRole("link", { name: "Routine" })).toHaveAttribute(
+        expect(screen.getByRole("link", { name: "งานประจำ" })).toHaveAttribute(
             "aria-current",
             "page",
         );
-        expect(screen.getByText("Routine · งานประจำ")).toBeInTheDocument();
+        expect(screen.getAllByText("งานประจำ")).toHaveLength(2);
     });
 });

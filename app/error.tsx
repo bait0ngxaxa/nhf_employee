@@ -22,9 +22,9 @@ export default function GlobalError({ error, reset }: ErrorProps) {
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-surface-subtle p-4">
-            <Card className="w-full max-w-md border-status-error-border-subtle shadow-sm">
+            <Card className="w-full max-w-md rounded-xl border-status-error-border-subtle shadow-none">
                 <CardHeader className="text-center pb-2">
-                    <div className="mx-auto mb-4 w-16 h-16 bg-status-error-surface-strong rounded-full flex items-center justify-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-status-error-border bg-status-error-surface-strong">
                         <AlertTriangle className="w-8 h-8 text-status-error-muted" />
                     </div>
                     <CardTitle className="text-xl text-content-neutral-strong">
@@ -37,7 +37,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
                     </p>
 
                     {process.env.NODE_ENV === "development" && (
-                        <div className="bg-status-error-surface border border-status-error-border rounded-lg p-3 text-left">
+                        <div className="rounded-lg border border-status-error-border bg-status-error-surface p-3 text-left">
                             <p className="text-xs font-mono text-status-error-foreground break-all">
                                 {error.message}
                             </p>

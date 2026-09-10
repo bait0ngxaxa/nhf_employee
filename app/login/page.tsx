@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
 import { resolveSafeInternalPath } from "@/lib/auth/return-path";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import { AuthPageShell } from "@/modules/auth/client";
 
 export const metadata: Metadata = {
     title: "เข้าสู่ระบบ | NHFapp",
@@ -12,11 +13,9 @@ export const metadata: Metadata = {
 
 function LoginPageContent() {
     return (
-        <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-            <div className="w-full max-w-sm">
-                <LoginForm />
-            </div>
-        </div>
+        <AuthPageShell>
+            <LoginForm />
+        </AuthPageShell>
     );
 }
 
@@ -38,14 +37,12 @@ export default async function Page({
         <div className="app-shell-background min-h-screen">
             <Suspense
                 fallback={
-                    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-                        <div className="w-full max-w-sm">
-                            <div className="animate-pulse">
-                <div className="mb-4 h-8 rounded bg-surface-neutral-border" />
-                <div className="h-32 rounded bg-surface-neutral-border" />
-                            </div>
+                    <AuthPageShell>
+                        <div className="animate-pulse">
+                            <div className="mb-4 h-8 rounded bg-surface-neutral-border" />
+                            <div className="h-32 rounded bg-surface-neutral-border" />
                         </div>
-                    </div>
+                    </AuthPageShell>
                 }
             >
                 <LoginPageContent />

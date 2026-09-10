@@ -7,9 +7,18 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import { type ResultStepProps } from "./types";
+import { type ImportError, type ResultStepProps } from "./types";
 
 const ERROR_DETAIL_LIMIT = 50;
+
+function getImportErrorContext(error: ImportError): string | null {
+    const context = [
+        error.field ? `คอลัมน์ ${error.field}` : null,
+        error.value ? `ค่าที่พบ “${error.value}”` : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return context.length > 0 ? context.join(" · ") : null;
+}
 
 export function ResultStep({
     importResult,
@@ -74,28 +83,33 @@ export function ResultStep({
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {visibleErrors.map((err, index) => (
-                                <div
-                                    key={index}
-                                    className="rounded-lg border border-status-error-border bg-status-error-surface p-4"
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-status-error-icon" />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="font-medium text-status-error-strong">
-                                                แถวที่ {err.row}:
-                                            </div>
-                                            <div className="mt-1 text-sm leading-6 text-status-error-foreground [overflow-wrap:anywhere]">
-                                                {err.error}
-                                            </div>
-                                            <div className="mt-2 text-xs leading-5 text-status-error-muted [overflow-wrap:anywhere]">
-                                                ข้อมูล:{" "}
-                                                {JSON.stringify(err.data)}
+                            {visibleErrors.map((err, index) => {
+                                const errorContext = getImportErrorContext(err);
+
+                                return (
+                                    <div
+                                        key={index}
+                                        className="rounded-lg border border-status-error-border bg-status-error-surface p-4"
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-status-error-icon" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-medium text-status-error-strong">
+                                                    แถวที่ {err.row}:
+                                                </div>
+                                                <div className="mt-1 text-sm leading-6 text-status-error-foreground [overflow-wrap:anywhere]">
+                                                    {err.error}
+                                                </div>
+                                                {errorContext ? (
+                                                    <div className="mt-2 text-xs leading-5 text-status-error-muted [overflow-wrap:anywhere]">
+                                                        {errorContext}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>

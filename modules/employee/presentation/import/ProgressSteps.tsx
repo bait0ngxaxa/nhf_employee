@@ -1,4 +1,3 @@
-import { ArrowRight } from "lucide-react";
 import { type ProgressStepsProps } from "./types";
 
 export function ProgressSteps({ step }: ProgressStepsProps) {
@@ -23,34 +22,35 @@ export function ProgressSteps({ step }: ProgressStepsProps) {
     };
 
     const steps = [
-        { key: "upload" as const, label: "อัพโหลด", number: 1 },
+        { key: "upload" as const, label: "อัปโหลด", number: 1 },
         { key: "preview" as const, label: "ตรวจสอบ", number: 2 },
         { key: "result" as const, label: "ผลลัพธ์", number: 3 },
     ];
 
     return (
-        <div
-            className="flex flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-surface-raised p-3"
+        <nav
+            className="border-b border-border-subtle pb-4"
             aria-label="ขั้นตอนนำเข้าข้อมูล"
         >
-            {steps.map((s, index) => (
-                <div key={s.key} className="flex min-w-0 items-center gap-2">
-                    {index > 0 && (
-                        <ArrowRight className="h-4 w-4 shrink-0 text-content-neutral-subtle" aria-hidden="true" />
-                    )}
-                    <div
-                        className={`flex min-w-0 items-center gap-2 ${getStepColor(s.key)}`}
-                        aria-current={step === s.key ? "step" : undefined}
-                    >
+            <ol className="grid grid-cols-3 gap-2">
+                {steps.map((s) => (
+                    <li key={s.key} className="min-w-0">
                         <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${getBadgeColor(s.key)}`}
+                            className={`flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 ${getStepColor(s.key)}`}
+                            aria-current={step === s.key ? "step" : undefined}
                         >
-                            {s.number}
+                            <div
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${getBadgeColor(s.key)}`}
+                            >
+                                {s.number}
+                            </div>
+                            <span className="font-medium [overflow-wrap:anywhere]">
+                                {s.label}
+                            </span>
                         </div>
-                        <span className="font-medium [overflow-wrap:anywhere]">{s.label}</span>
-                    </div>
-                </div>
-            ))}
-        </div>
+                    </li>
+                ))}
+            </ol>
+        </nav>
     );
 }

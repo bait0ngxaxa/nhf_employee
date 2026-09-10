@@ -14,15 +14,15 @@ interface LiffAppShellProps {
 function getSectionLabel(pathname: string | null): string {
     if (pathname === APP_ROUTES.line.stock
         || pathname?.startsWith(`${APP_ROUTES.line.stock}/`)) {
-        return "Stock · บริการวัสดุ";
+        return "บริการวัสดุ";
     }
     if (pathname === APP_ROUTES.line.leave
         || pathname?.startsWith(`${APP_ROUTES.line.leave}/`)) {
-        return "Leave · บริการวันลา";
+        return "บริการวันลา";
     }
     if (pathname === APP_ROUTES.line.routine
         || pathname?.startsWith(`${APP_ROUTES.line.routine}/`)) {
-        return "Routine · งานประจำ";
+        return "งานประจำ";
     }
     return "บริการของฉัน";
 }

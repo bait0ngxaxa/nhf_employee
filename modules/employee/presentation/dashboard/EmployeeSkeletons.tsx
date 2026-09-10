@@ -126,7 +126,7 @@ export function EmployeeListSkeleton(): ReactElement {
 export function EmployeeManagementSectionSkeleton(): ReactElement {
     return (
         <div
-            className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle bg-surface-subtle"
+            className="min-h-[calc(100dvh-6rem)]"
             role="status"
             aria-live="polite"
             aria-busy="true"

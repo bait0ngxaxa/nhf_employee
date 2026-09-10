@@ -11,7 +11,7 @@ import { useSessionManagement } from "@/components/dashboard/session-management/
 
 function SessionErrorState({ onRetry }: { onRetry: () => void }) {
     return (
-        <div className="min-h-[calc(100dvh-6rem)] overflow-hidden rounded-2xl border border-border-subtle bg-surface-subtle">
+        <div className="min-h-[calc(100dvh-6rem)]">
             <div className="space-y-5 p-4 md:p-8">
                 <h1
                     data-page-heading
@@ -20,7 +20,7 @@ function SessionErrorState({ onRetry }: { onRetry: () => void }) {
                 >
                     จัดการเซสชัน
                 </h1>
-                <Card className="rounded-2xl border-status-danger-border bg-surface-raised shadow-sm">
+                <Card className="rounded-xl border-status-danger-border bg-surface-raised shadow-none">
                     <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex min-w-0 gap-3">
                             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-danger-foreground" />
@@ -53,7 +53,6 @@ export function SessionManagementSection() {
     const { handleSignOut } = useDashboardUIContext();
     const {
         sessions,
-        currentSession,
         error,
         isLoading,
         isValidating,
@@ -82,7 +81,6 @@ export function SessionManagementSection() {
     return (
         <SessionManagementView
             sessions={sessions}
-            currentSession={currentSession}
             revokingId={revokingId}
             isRevokingOthers={isRevokingOthers}
             isValidating={isValidating}

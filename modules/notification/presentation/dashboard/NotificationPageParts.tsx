@@ -75,7 +75,7 @@ export function NotificationFilterTabs({
     onChange: (filter: NotificationFilter) => void;
 }): React.ReactElement {
     return (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border-subtle bg-surface px-3 py-2">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border-subtle pb-3">
             <span className="text-sm font-medium text-content-secondary">แสดง</span>
             <div className="inline-flex rounded-lg bg-surface-muted p-1">
                 <FilterButton
@@ -131,10 +131,11 @@ export function NotificationPageList({
     onOpen: (notification: NotificationItem) => Promise<void>;
 }): React.ReactElement {
     return (
-        <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
-            <div className="border-b border-border-subtle px-5 py-3 text-sm font-semibold text-content-body">
-                กล่องข้อความ
-            </div>
+        <div
+            role="region"
+            aria-label="รายการแจ้งเตือน"
+            className="overflow-hidden border-y border-border-subtle bg-surface-raised"
+        >
             <div className="divide-y divide-border-muted">
                 {items.map((notification) => (
                     <NotificationPageRow
