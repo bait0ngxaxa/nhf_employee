@@ -11,16 +11,19 @@ interface LineAddFriendCardProps {
      * configuration. The dashboard intentionally has no fallback URL.
      */
     addFriendUrl?: string | null;
+    tone?: "brand" | "light";
     className?: string;
 }
 
 interface QrCodeFigureProps {
+    tone?: "brand" | "light";
     className?: string;
     imageClassName?: string;
     captionClassName?: string;
 }
 
 function QrCodeFigure({
+    tone = "brand",
     className,
     imageClassName,
     captionClassName,
@@ -32,7 +35,14 @@ function QrCodeFigure({
                 className,
             )}
         >
-            <div className="shrink-0 rounded-xl border border-content-on-brand/25 bg-white p-1.5">
+            <div
+                className={cn(
+                    "shrink-0 rounded-xl border p-1.5",
+                    tone === "light"
+                        ? "border-border-subtle bg-surface-raised"
+                        : "border-content-on-brand/25 bg-white",
+                )}
+            >
                 <Image
                     src={qrCodeImage}
                     width={360}
@@ -45,7 +55,10 @@ function QrCodeFigure({
             </div>
             <figcaption
                 className={cn(
-                    "max-w-full text-center text-xs font-semibold leading-5 text-dashboard-hero-muted [overflow-wrap:anywhere]",
+                    "max-w-full text-center text-xs font-semibold leading-5 [overflow-wrap:anywhere]",
+                    tone === "light"
+                        ? "text-content-secondary"
+                        : "text-dashboard-hero-muted",
                     captionClassName,
                 )}
             >
@@ -57,22 +70,32 @@ function QrCodeFigure({
 
 export function LineAddFriendCard({
     addFriendUrl,
+    tone = "brand",
     className,
 }: LineAddFriendCardProps = {}): ReactElement {
     const normalizedAddFriendUrl = addFriendUrl?.trim() || undefined;
+    const isLightTone = tone === "light";
 
     return (
         <section
             aria-labelledby="line-add-friend-heading"
             className={cn(
-                "w-full overflow-hidden rounded-2xl border border-content-on-brand/20 bg-content-on-brand/10 @container",
+                "w-full overflow-hidden rounded-2xl border @container",
+                isLightTone
+                    ? "border-brand-border bg-brand-surface"
+                    : "border-content-on-brand/20 bg-content-on-brand/10",
                 className,
             )}
         >
             <div className="grid min-w-0 items-center gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
                     <div
-                        className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-status-success-solid-strong text-content-on-brand shadow-sm sm:size-10"
+                        className={cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-xl text-content-on-brand shadow-sm sm:size-10",
+                            isLightTone
+                                ? "bg-status-success-solid"
+                                : "bg-status-success-solid-strong",
+                        )}
                         aria-hidden="true"
                     >
                         <MessageCircle className="size-5" strokeWidth={2.5} />
@@ -81,11 +104,23 @@ export function LineAddFriendCard({
                     <div className="min-w-0 flex-1">
                         <h2
                             id="line-add-friend-heading"
-                            className="text-base font-bold leading-6 tracking-tight text-content-on-brand [overflow-wrap:anywhere] sm:text-lg"
+                            className={cn(
+                                "text-base font-bold leading-6 tracking-tight [overflow-wrap:anywhere] sm:text-lg",
+                                isLightTone
+                                    ? "text-content-heading"
+                                    : "text-content-on-brand",
+                            )}
                         >
                             เพิ่ม NHF ใน LINE
                         </h2>
-                        <p className="mt-1 line-clamp-2 max-w-[28ch] text-xs font-medium leading-5 text-dashboard-hero-muted [overflow-wrap:anywhere] sm:text-sm">
+                        <p
+                            className={cn(
+                                "mt-1 line-clamp-2 max-w-[28ch] text-xs font-medium leading-5 [overflow-wrap:anywhere] sm:text-sm",
+                                isLightTone
+                                    ? "text-content-secondary"
+                                    : "text-dashboard-hero-muted",
+                            )}
+                        >
                             รับการแจ้งเตือนจาก NHF ได้สะดวกขึ้น
                         </p>
 
@@ -107,13 +142,21 @@ export function LineAddFriendCard({
 
                 <div className="hidden shrink-0 md:flex md:justify-end">
                     <QrCodeFigure
+                        tone={tone}
                         className="@sm:flex-row @sm:items-center"
                         captionClassName="max-w-[12ch]"
                     />
                 </div>
 
                 <details className="group md:hidden">
-                    <summary className="flex min-h-10 list-none items-center justify-between gap-3 rounded-xl border border-content-on-brand/20 bg-content-on-brand/10 px-3 py-2 text-xs font-bold text-content-on-brand transition-[background-color,border-color] duration-200 hover:border-content-on-brand/30 hover:bg-content-on-brand/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dashboard-focus focus-visible:ring-offset-2 sm:text-sm [&::-webkit-details-marker]:hidden">
+                    <summary
+                        className={cn(
+                            "flex min-h-10 list-none items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs font-bold transition-[background-color,border-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:text-sm [&::-webkit-details-marker]:hidden",
+                            isLightTone
+                                ? "border-border-subtle bg-surface-raised text-content-primary hover:border-brand-border hover:bg-brand-surface-strong focus-visible:ring-brand-solid"
+                                : "border-content-on-brand/20 bg-content-on-brand/10 text-content-on-brand hover:border-content-on-brand/30 hover:bg-content-on-brand/15 focus-visible:ring-dashboard-focus",
+                        )}
+                    >
                         <span className="flex min-w-0 items-center gap-2">
                             <QrCode className="size-3.5 shrink-0" aria-hidden="true" />
                             <span className="[overflow-wrap:anywhere]">ดู QR Code</span>
@@ -123,8 +166,16 @@ export function LineAddFriendCard({
                             aria-hidden="true"
                         />
                     </summary>
-                    <div className="mt-3 border-t border-content-on-brand/15 pt-3">
+                    <div
+                        className={cn(
+                            "mt-3 border-t pt-3",
+                            isLightTone
+                                ? "border-border-subtle"
+                                : "border-content-on-brand/15",
+                        )}
+                    >
                         <QrCodeFigure
+                            tone={tone}
                             className="flex-col gap-2"
                             imageClassName="w-36 sm:w-40"
                             captionClassName="text-center"

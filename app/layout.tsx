@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
+import { Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import { HybridAuthProvider } from "@/modules/auth/client";
 import { SWRProvider } from "../components/providers/SWRProvider";
@@ -7,10 +7,9 @@ import { ThemeColorSync } from "../components/providers/ThemeColorSync";
 import { ThemeProvider } from "../components/providers/ThemeProvider";
 import { ThemeToaster } from "../components/providers/ThemeToaster";
 
-const googleSans = localFont({
-    src: "../public/fonts/GoogleSans-VariableFont.woff2",
-    variable: "--font-google-sans",
-    weight: "100 900",
+const notoSansThai = Noto_Sans_Thai({
+    subsets: ["thai", "latin"],
+    variable: "--font-noto-sans-thai",
     display: "swap",
 });
 
@@ -35,7 +34,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="th" suppressHydrationWarning>
-            <body className={`${googleSans.variable} antialiased`}>
+            <body className={`${notoSansThai.variable} antialiased`}>
                 <ThemeProvider
                     attribute="class"
                     themes={["light", "dark"]}

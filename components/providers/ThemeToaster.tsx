@@ -18,7 +18,7 @@ export function ThemeToaster(): ReactElement {
             toastOptions={{
                 style: {
                     fontFamily:
-                        "var(--font-google-sans), ui-sans-serif, system-ui, sans-serif",
+                        "var(--font-noto-sans-thai), ui-sans-serif, system-ui, sans-serif",
                 },
             }}
         />

@@ -1,7 +1,11 @@
+/* Hallmark · macrostructure: Workbench (local dashboard hero) · tone: utilitarian · anchor hue: incumbent NHF blue
+ * pre-emit critique: P5 H5 E5 S5 R5 V5
+ */
+
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { ArrowUpRight, HeartPulse } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 import {
     useDashboardUIContext,
@@ -305,67 +309,69 @@ export function DashboardHomeSection() {
     return (
         <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
-                <div>
-                    <div className="relative isolate min-w-0 overflow-hidden rounded-2xl border border-dashboard-hero-border bg-dashboard-hero-surface p-5 text-content-on-brand shadow-lg shadow-dashboard-hero-shadow/15 sm:rounded-3xl md:p-8 @container">
-                        <div
-                            className="pointer-events-none absolute inset-0 z-0"
-                            aria-hidden="true"
-                        >
-                            <div className="brand-sheen-subtle absolute inset-0 opacity-60" />
-                            <div className="absolute -left-20 -top-24 size-64 rounded-full border border-content-on-brand/10" />
-                            <HeartPulse className="absolute bottom-[-5rem] left-[34%] hidden size-80 rotate-[-10deg] text-content-on-brand/5 stroke-[1.25] sm:block" />
+                <section
+                    aria-labelledby="dashboard-home-heading"
+                    className="grid gap-8 border-b border-border-subtle pb-8 @3xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] @3xl:items-end"
+                >
+                    <div className="min-w-0 max-w-3xl">
+                        <div className="mb-5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-foreground">
+                            <span
+                                className="size-2 rounded-[2px] bg-brand-solid"
+                                aria-hidden="true"
+                            />
+                            <span>NHFapp</span>
                         </div>
-                        <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] @3xl:items-center">
-                            <div className="relative z-10 min-w-0 max-w-2xl space-y-4">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <div className="rounded-full border border-content-on-brand/20 bg-dashboard-featured-control-surface px-3 py-1 text-xs font-bold text-dashboard-hero-badge-foreground shadow-sm">
-                                        NHFapp
-                                    </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <h1
-                                        data-page-heading
-                                        tabIndex={-1}
-                                        className="text-3xl font-bold leading-tight text-content-on-brand sm:text-4xl md:text-5xl"
-                                    >
-                                        <span className="inline-block whitespace-nowrap">
-                                            {greeting},
-                                        </span>{" "}
-                                        <span className="inline-block max-w-full whitespace-nowrap text-dashboard-hero-muted">
-                                            {primaryName}
+                        <div className="space-y-3">
+                            <h1
+                                id="dashboard-home-heading"
+                                data-page-heading
+                                tabIndex={-1}
+                                className="max-w-[22ch] text-3xl font-bold leading-[1.12] tracking-[-0.03em] text-content-heading [overflow-wrap:anywhere] sm:text-4xl @3xl:text-[2.75rem]"
+                            >
+                                <span>{greeting},</span>{" "}
+                                <span className="text-brand-foreground">
+                                    {primaryName}
+                                </span>
+                                {nickname ? (
+                                    <Fragment>
+                                        {" "}
+                                        <span className="text-brand-foreground">
+                                            {nickname}
                                         </span>
-                                        {nickname ? (
-                                            <Fragment>
-                                                {" "}
-                                                <span className="inline-block whitespace-nowrap text-dashboard-hero-muted">
-                                                    {nickname}
-                                                </span>
-                                            </Fragment>
-                                        ) : null}
-                                    </h1>
-                                    <p className="max-w-[64ch] text-sm font-medium leading-6 text-dashboard-hero-muted/90">
-                                        National Health Foundation 
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="relative z-10 flex min-w-0 flex-col gap-3 @3xl:items-end">
-                                <LineAddFriendCard />
-                                <div className="flex min-w-0 flex-wrap gap-3 @3xl:justify-end">
-                                    <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
-                                        <div className="h-2 w-2 shrink-0 rounded-full bg-content-on-brand" />
-                                        <span className="min-w-0 truncate">{userRole}</span>
-                                    </div>
-                                    <div className="flex min-w-0 max-w-full items-center gap-2.5 rounded-xl border border-content-on-brand/20 bg-content-on-brand/15 px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm sm:px-4">
-                                        <div className="h-2 w-2 shrink-0 rounded-full bg-dashboard-hero-dot" />
-                                        <span className="min-w-0 truncate">{userDepartment}</span>
-                                    </div>
-                                </div>
-                            </div>
+                                    </Fragment>
+                                ) : null}
+                            </h1>
+                            <p className="max-w-[50ch] text-sm font-medium leading-6 text-content-secondary sm:text-base sm:leading-7">
+                                National Health Foundation
+                            </p>
                         </div>
+
+                        <dl className="mt-8 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-4 border-t border-border-subtle pt-4 sm:gap-x-10">
+                            <div className="min-w-0">
+                                <dt className="text-xs font-semibold tracking-[0.08em] text-content-muted">
+                                    สถานะ
+                                </dt>
+                                <dd className="mt-1 truncate text-sm font-bold text-content-primary">
+                                    {userRole}
+                                </dd>
+                            </div>
+                            <div className="min-w-0">
+                                <dt className="text-xs font-semibold tracking-[0.08em] text-content-muted">
+                                    แผนก
+                                </dt>
+                                <dd className="mt-1 truncate text-sm font-bold text-content-primary">
+                                    {userDepartment}
+                                </dd>
+                            </div>
+                        </dl>
                     </div>
-                </div>
+
+                    <LineAddFriendCard
+                        tone="light"
+                        className="shadow-sm"
+                    />
+                </section>
 
                 <div className="pt-4">
                     {allMenuItems.length === 0 && (
