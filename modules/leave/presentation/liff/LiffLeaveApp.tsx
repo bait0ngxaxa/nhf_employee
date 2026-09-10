@@ -358,7 +358,7 @@ export function LiffLeaveApp(): ReactElement {
     if (state !== "READY" || !profile) {
         return (
             <LoadingState
-                label="กำลังโหลดข้อมูล Leave..."
+                label="กำลังโหลดข้อมูล Leave…"
                 className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );

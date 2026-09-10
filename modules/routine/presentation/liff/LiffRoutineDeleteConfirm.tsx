@@ -68,7 +68,7 @@ export function LiffRoutineDeleteConfirm({
                         ) : (
                             <Trash2 className="size-4" aria-hidden="true" />
                         )}
-                        {busy ? "กำลังลบ..." : "ลบงานนี้"}
+                        {busy ? "กำลังลบ…" : "ลบงานนี้"}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

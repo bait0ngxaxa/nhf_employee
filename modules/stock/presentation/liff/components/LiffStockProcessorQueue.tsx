@@ -56,20 +56,23 @@ export function LiffStockProcessorQueue({
                     ตรวจรายการให้ครบก่อนยืนยันจ่ายวัสดุ การจ่ายจะตัดสต็อกทันที
                 </p>
             </div>
-            <div className="relative rounded-2xl bg-surface-raised p-3 shadow-sm ring-1 ring-border-subtle">
+            <div className="relative border-y border-border-subtle py-3">
+                <label htmlFor="liff-stock-processing-search" className="sr-only">
+                    ค้นหาคำขอรอดำเนินการ
+                </label>
                 <Search
-                    className="pointer-events-none absolute left-6 top-1/2 size-4 -translate-y-1/2 text-content-muted"
+                    className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-content-muted"
                     aria-hidden="true"
                 />
                 <Input
-                    aria-label="ค้นหาคำขอรอดำเนินการ"
+                    id="liff-stock-processing-search"
                     type="search"
                     inputMode="search"
                     autoComplete="off"
                     value={search}
                     onChange={(event) => onSearchChange(event.target.value)}
                     placeholder="เลขที่คำขอ โครงการ ผู้เบิก หรือวัสดุ"
-                    className="h-12 rounded-xl border-border-subtle bg-surface pl-10 pr-12"
+                    className="h-12 border-border-subtle bg-surface pl-10 pr-12"
                 />
                 {search ? (
                     <Button
@@ -78,7 +81,7 @@ export function LiffStockProcessorQueue({
                         size="icon"
                         onClick={() => onSearchChange("")}
                         aria-label="ล้างคำค้นหาคิวรอดำเนินการ"
-                        className="absolute right-3.5 top-1/2 size-11 -translate-y-1/2 rounded-xl"
+                        className="absolute right-3.5 top-1/2 size-11 -translate-y-1/2"
                     >
                         <X className="size-4" aria-hidden="true" />
                     </Button>
@@ -94,11 +97,11 @@ export function LiffStockProcessorQueue({
                 />
             ) : loading && response.requests.length === 0 ? (
                 <LoadingState
-                    label="กำลังโหลดคิวรอดำเนินการ..."
+                    label="กำลังโหลดคิวรอดำเนินการ…"
                     className="min-h-64 border-0 bg-transparent"
                 />
             ) : response.requests.length === 0 ? (
-                <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl bg-surface-raised px-5 text-center shadow-sm ring-1 ring-border-subtle">
+                <div className="flex min-h-56 flex-col items-center justify-center border-y border-border-subtle px-5 text-center">
                     <ClipboardCheck className="size-9 text-status-success-icon" aria-hidden="true" />
                     <h2 className="mt-3 text-base font-bold text-content-heading">
                         ไม่มีคำขอรอดำเนินการ
@@ -109,7 +112,7 @@ export function LiffStockProcessorQueue({
                 </div>
             ) : (
                 <>
-                    <div className="space-y-3" aria-busy={loading}>
+                    <div className="border-t border-border-subtle" aria-busy={loading}>
                         {response.requests.map((request) => (
                             <LiffStockRequestCard
                                 key={request.id}

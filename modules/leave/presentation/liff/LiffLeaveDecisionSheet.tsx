@@ -164,11 +164,11 @@ export function LiffLeaveDecisionSheet({
                             </SheetDescription>
                         </SheetHeader>
                         <SheetScrollArea className="space-y-4 px-4 py-4 scroll-pb-4">
-                            <div className="rounded-xl border border-border-subtle bg-surface-subtle px-3 py-3 text-sm leading-6 text-content-body">
+                            <div className="border-y border-border-subtle py-3 text-sm leading-6 text-content-body">
                                 {content.consequence}
                             </div>
                             {intent.hasWarnings ? (
-                                <div className="flex items-start gap-2 rounded-xl border border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong">
+                                <div className="flex items-start gap-2 border-y border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong">
                                     <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                                     คำขอนี้มีเหตุผลฉุกเฉิน เหตุผลพิเศษ หรือวันลาเกินสิทธิ์ กรุณาตรวจรายละเอียดก่อนยืนยัน
                                 </div>
@@ -229,7 +229,7 @@ export function LiffLeaveDecisionSheet({
                                     {busy ? (
                                         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                                     ) : null}
-                                    {busy ? "กำลังดำเนินการ..." : content.confirmLabel}
+                                    {busy ? "กำลังดำเนินการ…" : content.confirmLabel}
                                 </Button>
                             </div>
                         </div>

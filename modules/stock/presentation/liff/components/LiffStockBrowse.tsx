@@ -83,11 +83,11 @@ export function LiffStockBrowse({
                 />
             ) : loading && catalog.items.length === 0 ? (
                 <LoadingState
-                    label="กำลังโหลดรายการวัสดุ..."
+                    label="กำลังโหลดรายการวัสดุ…"
                     className="min-h-64 border-0 bg-transparent"
                 />
             ) : catalog.items.length === 0 ? (
-                <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl bg-surface-raised px-5 text-center shadow-sm ring-1 ring-border-subtle">
+                <div className="flex min-h-56 flex-col items-center justify-center border-y border-border-subtle px-5 text-center">
                     <PackageSearch className="size-9 text-content-muted" aria-hidden="true" />
                     <h2 className="mt-3 text-base font-bold text-content-heading">
                         ไม่พบวัสดุที่ค้นหา
@@ -129,7 +129,7 @@ export function LiffStockBrowse({
                     <Button
                         type="button"
                         onClick={onOpenCart}
-                        className="min-h-14 w-full rounded-2xl bg-module-stock-solid px-4 text-base font-bold text-content-on-brand shadow-lg hover:bg-module-stock-solid-hover"
+                        className="min-h-14 w-full bg-module-stock-solid px-4 text-base font-bold text-content-on-brand shadow-sm hover:bg-module-stock-solid-hover"
                     >
                         <ShoppingCart className="size-5" aria-hidden="true" />
                         เปิดตะกร้า · {cartCount} ชิ้น

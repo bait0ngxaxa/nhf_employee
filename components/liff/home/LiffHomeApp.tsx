@@ -36,7 +36,6 @@ interface ModuleCardConfig {
     href: string;
     icon: LucideIcon;
     accentClassName: string;
-    iconClassName: string;
 }
 
 const MODULE_CARDS: readonly ModuleCardConfig[] = [
@@ -48,7 +47,6 @@ const MODULE_CARDS: readonly ModuleCardConfig[] = [
         href: APP_ROUTES.line.stock,
         icon: Boxes,
         accentClassName: "text-module-stock-badge-foreground",
-        iconClassName: "border-module-stock-badge-border bg-module-stock-badge-surface text-module-stock-solid",
     },
     {
         key: "leave",
@@ -58,7 +56,6 @@ const MODULE_CARDS: readonly ModuleCardConfig[] = [
         href: APP_ROUTES.line.leave,
         icon: CalendarRange,
         accentClassName: "text-module-leave-badge-foreground",
-        iconClassName: "border-module-leave-badge-border bg-module-leave-badge-surface text-module-leave-solid",
     },
     {
         key: "routine",
@@ -68,7 +65,6 @@ const MODULE_CARDS: readonly ModuleCardConfig[] = [
         href: APP_ROUTES.line.routine,
         icon: ClipboardCheck,
         accentClassName: "text-module-routine-badge-foreground",
-        iconClassName: "border-module-routine-badge-border bg-module-routine-badge-surface text-module-routine-solid",
     },
 ];
 
@@ -104,25 +100,24 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
     const content = (
         <>
             <div className="flex min-w-0 items-start gap-3">
-                <div
+                <Icon
                     className={cn(
-                        "flex size-10 shrink-0 items-center justify-center rounded-lg border",
-                        config.iconClassName,
+                        "mt-1 size-5 shrink-0",
+                        module.enabled ? config.accentClassName : "text-content-muted",
                     )}
-                >
-                    <Icon className="size-6" aria-hidden="true" />
-                </div>
+                    aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1 pt-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <h3 className="break-words text-base font-bold leading-6 text-content-heading">
                             {config.title}
                         </h3>
                         <span
                             className={cn(
-                                "rounded-md border px-2 py-0.5 text-[11px] font-bold leading-5",
+                                "text-xs font-semibold leading-5",
                                 module.enabled
-                                    ? `border-transparent bg-surface-subtle ${config.accentClassName}`
-                                    : "border-border-subtle bg-surface-muted text-content-muted",
+                                    ? config.accentClassName
+                                    : "text-content-muted",
                             )}
                         >
                             {statusLabel}
@@ -135,13 +130,16 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
                     </p>
                 </div>
             </div>
-            <ArrowUpRight
-                className={cn(
-                    "mt-1 size-5 shrink-0",
-                    module.enabled ? config.accentClassName : "text-content-muted",
+            <div className="mt-1 shrink-0">
+                {module.enabled ? (
+                    <ArrowUpRight
+                        className={cn("size-5", config.accentClassName)}
+                        aria-hidden="true"
+                    />
+                ) : (
+                    <LockKeyhole className="size-5 text-content-muted" aria-hidden="true" />
                 )}
-                aria-hidden="true"
-            />
+            </div>
         </>
     );
 
@@ -150,13 +148,9 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
             <div
                 aria-disabled="true"
                 data-module-enabled="false"
-                className="flex min-h-28 w-full items-start justify-between gap-3 rounded-md border border-border-subtle bg-surface-muted/70 p-4 opacity-75"
+                className="flex min-h-24 w-full items-start justify-between gap-3 border-b border-border-subtle py-4 opacity-70"
             >
-                <LockKeyhole
-                    className="mt-1 size-5 shrink-0 text-content-muted"
-                    aria-hidden="true"
-                />
-                <div className="min-w-0 flex-1">{content}</div>
+                {content}
             </div>
         );
     }
@@ -166,8 +160,8 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
             href={config.href}
             data-module-enabled="true"
             className={cn(
-                "group flex min-h-28 w-full items-start justify-between gap-3 rounded-md border border-border-subtle bg-surface-raised p-4 transition-[border-color,background-color] hover:border-brand-border-strong hover:bg-brand-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
-                config.key === "routine" && "min-h-32 border-brand-border bg-brand-surface/60",
+                "group flex min-h-24 w-full items-start justify-between gap-4 border-b border-border-subtle py-4 transition-[color,border-color] hover:border-brand-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
+                config.key === "routine" && "bg-brand-surface/30 px-3",
             )}
         >
             {content}
@@ -213,7 +207,7 @@ export function LiffHomeApp(): ReactElement {
     if (state !== "READY" || !home) {
         return (
             <LoadingState
-                label="กำลังโหลดบริการของคุณ..."
+                label="กำลังโหลดบริการของคุณ…"
                 className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );
@@ -252,7 +246,7 @@ export function LiffHomeApp(): ReactElement {
                             </p>
                         </div>
                     </div>
-                    <div className="space-y-3">
+                    <div className="border-t border-border-subtle">
                         {MODULE_CARDS.map((config) => (
                             <ModuleCard
                                 key={config.key}

@@ -27,7 +27,7 @@ export function LiffLeaveQuotaCards({
                     ยอดคงเหลือตามสิทธิ์ปีปัจจุบัน
                 </p>
             </div>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-3 divide-x divide-border-subtle border-y border-border-subtle">
                 {LEAVE_TYPES.map((type) => (
                     <QuotaCard
                         key={type}
@@ -50,18 +50,20 @@ function QuotaCard({
     const remaining = quota?.remainingDays ?? 0;
     const used = quota?.usedDays ?? 0;
     const total = quota?.effectiveTotalDays ?? 0;
-    const ratio = total > 0 ? Math.min(100, Math.max(0, (used / total) * 100)) : 0;
+    const progressMax = Math.max(total, used, 1);
+    const progressValue = Math.min(used, progressMax);
+    const ratio = Math.min(100, Math.max(0, (progressValue / progressMax) * 100));
+    const labelClassName = type === "SICK"
+        ? "text-status-danger-strong"
+        : type === "PERSONAL"
+            ? "text-status-info-strong"
+            : "text-module-leave-badge-foreground";
 
     return (
         <article
-            className={cn(
-                "min-w-0 rounded-2xl border px-3 py-3.5 shadow-sm",
-                type === "SICK" && "border-status-danger-border-subtle bg-status-danger-surface",
-                type === "PERSONAL" && "border-status-info-border-subtle bg-status-info-surface",
-                type === "VACATION" && "border-module-leave-badge-border bg-module-leave-badge-surface",
-            )}
+            className="min-w-0 px-2.5 py-3.5 first:pl-0 last:pr-0"
         >
-            <p className="min-h-10 text-xs font-semibold leading-5 text-content-secondary">
+            <p className={cn("min-h-10 text-xs font-semibold leading-5", labelClassName)}>
                 {getLeaveTypeLabel(type)}
             </p>
             <p className="mt-1 tabular-nums text-2xl font-bold tracking-tight text-content-heading">
@@ -69,15 +71,20 @@ function QuotaCard({
             </p>
             <p className="text-[11px] font-medium leading-4 text-content-muted">วันคงเหลือ</p>
             <div
-                className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface/80"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={progressMax}
+                aria-valuenow={progressValue}
+                aria-valuetext={`ใช้แล้ว ${formatLeaveDays(used)} จาก ${formatLeaveDays(total)} วัน`}
+                className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-subtle"
                 aria-label={`ใช้แล้ว ${formatLeaveDays(used)} จาก ${formatLeaveDays(total)} วัน`}
             >
                 <div
-                    className="h-full rounded-full bg-module-leave-solid transition-[width]"
+                    className="h-full rounded-full bg-module-leave-solid"
                     style={{ width: `${ratio}%` }}
                 />
             </div>
-            <p className="mt-1.5 text-[10px] font-medium leading-4 text-content-muted">
+            <p className="mt-1.5 text-xs font-medium leading-4 text-content-muted">
                 ใช้แล้ว {formatLeaveDays(used)} วัน
             </p>
         </article>

@@ -77,7 +77,7 @@ export function LiffStockCart({
                             ยังไม่มีวัสดุในตะกร้า
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="divide-y divide-border-subtle border-y border-border-subtle">
                             {items.map((item) => {
                                 const variantLabel = getVariantAttributeSummary(
                                     item.variant.attributeValues,
@@ -85,7 +85,7 @@ export function LiffStockCart({
                                 return (
                                     <article
                                         key={item.variant.id}
-                                        className="rounded-2xl bg-surface-subtle p-3 ring-1 ring-border-subtle"
+                                        className="py-4 first:pt-0 last:pb-0"
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
@@ -106,7 +106,7 @@ export function LiffStockCart({
                                                 onClick={() => onRemove(item.variant.id)}
                                                 disabled={submitting}
                                                 aria-label={`นำ ${item.item.name} ออกจากตะกร้า`}
-                                                className="size-11 shrink-0 rounded-xl text-status-danger-foreground"
+                                                className="size-11 shrink-0 text-status-danger-foreground"
                                             >
                                                 <Trash2 className="size-4" aria-hidden="true" />
                                             </Button>
@@ -119,7 +119,7 @@ export function LiffStockCart({
                                                 onClick={() => onChangeQuantity(item.variant.id, -1)}
                                                 disabled={submitting}
                                                 aria-label={`ลดจำนวน ${item.item.name}`}
-                                                className="size-11 rounded-xl"
+                                                className="size-11"
                                             >
                                                 <Minus className="size-4" aria-hidden="true" />
                                             </Button>
@@ -136,7 +136,7 @@ export function LiffStockCart({
                                                     || item.qty >= item.variant.availableQuantity
                                                 }
                                                 aria-label={`เพิ่มจำนวน ${item.item.name}`}
-                                                className="size-11 rounded-xl"
+                                                className="size-11"
                                             >
                                                 <Plus className="size-4" aria-hidden="true" />
                                             </Button>
@@ -160,7 +160,7 @@ export function LiffStockCart({
                             maxLength={STOCK_PROJECT_CODE_MAX_LENGTH}
                             placeholder="เช่น NHF-2569"
                             disabled={submitting}
-                            className="h-12 rounded-xl border-border-subtle bg-surface"
+                            className="h-12 border-border-subtle bg-surface"
                         />
                         <p className="text-xs leading-5 text-content-muted">
                             ระบบจะปรับเป็นตัวพิมพ์ใหญ่และตัดช่องว่างให้อัตโนมัติ
@@ -173,7 +173,7 @@ export function LiffStockCart({
                             variant="ghost"
                             onClick={onClear}
                             disabled={submitting}
-                            className="min-h-11 w-full rounded-xl text-status-danger-foreground"
+                            className="min-h-11 w-full text-status-danger-foreground"
                         >
                             ล้างตะกร้าทั้งหมด
                         </Button>
@@ -185,12 +185,12 @@ export function LiffStockCart({
                         type="button"
                         onClick={onSubmit}
                         disabled={!canSubmit || submitting}
-                        className="min-h-12 w-full rounded-xl bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
+                        className="min-h-12 w-full bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
                     >
                         {submitting ? (
                             <>
                                 <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                                กำลังส่งคำขอ...
+                                กำลังส่งคำขอ…
                             </>
                         ) : (
                             `ส่งคำขอเบิก ${totalQuantity} ชิ้น`

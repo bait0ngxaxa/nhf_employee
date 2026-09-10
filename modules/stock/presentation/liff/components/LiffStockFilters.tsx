@@ -38,7 +38,7 @@ export function LiffStockFilters({
     onCategoryChange,
 }: LiffStockFiltersProps): ReactElement {
     return (
-        <div className="space-y-3 rounded-2xl bg-surface-raised p-3 shadow-sm ring-1 ring-border-subtle">
+        <div className="space-y-3 border-y border-border-subtle py-3">
             <SearchInput
                 id="liff-stock-search"
                 label="ค้นหาวัสดุ"
@@ -46,27 +46,32 @@ export function LiffStockFilters({
                 value={search}
                 onChange={onSearchChange}
             />
-            <Select
-                value={categoryId === undefined ? "all" : String(categoryId)}
-                onValueChange={(value) =>
-                    onCategoryChange(value === "all" ? undefined : Number(value))
-                }
-            >
-                <SelectTrigger
-                    aria-label="กรองหมวดหมู่วัสดุ"
-                    className="h-12 w-full rounded-xl border-border-subtle bg-surface"
+            <div className="space-y-1.5">
+                <label htmlFor="liff-stock-category" className="text-sm font-semibold text-content-body">
+                    หมวดหมู่วัสดุ
+                </label>
+                <Select
+                    value={categoryId === undefined ? "all" : String(categoryId)}
+                    onValueChange={(value) =>
+                        onCategoryChange(value === "all" ? undefined : Number(value))
+                    }
                 >
-                    <SelectValue placeholder="ทุกหมวดหมู่" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">ทุกหมวดหมู่</SelectItem>
-                    {categories.map((category) => (
-                        <SelectItem key={category.id} value={String(category.id)}>
-                            {category.name}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+                    <SelectTrigger
+                        id="liff-stock-category"
+                        className="h-12 w-full border-border-subtle bg-surface"
+                    >
+                        <SelectValue placeholder="ทุกหมวดหมู่" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">ทุกหมวดหมู่</SelectItem>
+                        {categories.map((category) => (
+                            <SelectItem key={category.id} value={String(category.id)}>
+                                {category.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
         </div>
     );
 }
@@ -85,7 +90,7 @@ export function LiffStockRequestFilters({
     onStatusChange,
 }: LiffStockRequestFiltersProps): ReactElement {
     return (
-        <div className="space-y-3 rounded-2xl bg-surface-raised p-3 shadow-sm ring-1 ring-border-subtle">
+        <div className="space-y-3 border-y border-border-subtle py-3">
             <SearchInput
                 id="liff-stock-request-search"
                 label="ค้นหาคำขอเบิก"
@@ -93,28 +98,33 @@ export function LiffStockRequestFilters({
                 value={search}
                 onChange={onSearchChange}
             />
-            <Select
-                value={status ?? "all"}
-                onValueChange={(value) =>
-                    onStatusChange(
-                        value === "all" ? undefined : value as StockRequestStatus,
-                    )
-                }
-            >
-                <SelectTrigger
-                    aria-label="กรองสถานะคำขอเบิก"
-                    className="h-12 w-full rounded-xl border-border-subtle bg-surface"
+            <div className="space-y-1.5">
+                <label htmlFor="liff-stock-request-status" className="text-sm font-semibold text-content-body">
+                    สถานะคำขอ
+                </label>
+                <Select
+                    value={status ?? "all"}
+                    onValueChange={(value) =>
+                        onStatusChange(
+                            value === "all" ? undefined : value as StockRequestStatus,
+                        )
+                    }
                 >
-                    <SelectValue placeholder="ทุกสถานะ" />
-                </SelectTrigger>
-                <SelectContent>
-                    {REQUEST_STATUSES.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+                    <SelectTrigger
+                        id="liff-stock-request-status"
+                        className="h-12 w-full border-border-subtle bg-surface"
+                    >
+                        <SelectValue placeholder="ทุกสถานะ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {REQUEST_STATUSES.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
         </div>
     );
 }
@@ -134,20 +144,22 @@ function SearchInput({
 }): ReactElement {
     return (
         <div className="relative">
+            <label htmlFor={id} className="sr-only">
+                {label}
+            </label>
             <Search
                 className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-content-muted"
                 aria-hidden="true"
             />
             <Input
                 id={id}
-                aria-label={label}
                 type="search"
                 inputMode="search"
                 autoComplete="off"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 placeholder={placeholder}
-                className="h-12 rounded-xl border-border-subtle bg-surface pl-10 pr-12"
+                className="h-12 border-border-subtle bg-surface pl-10 pr-12"
             />
             {value ? (
                 <Button
@@ -156,7 +168,7 @@ function SearchInput({
                     size="icon"
                     onClick={() => onChange("")}
                     aria-label={`ล้าง${label}`}
-                    className="absolute right-0.5 top-1/2 size-11 -translate-y-1/2 rounded-xl text-content-muted"
+                    className="absolute right-0.5 top-1/2 size-11 -translate-y-1/2 text-content-muted"
                 >
                     <X className="size-4" aria-hidden="true" />
                 </Button>

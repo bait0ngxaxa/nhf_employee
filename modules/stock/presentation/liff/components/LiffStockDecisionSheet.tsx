@@ -56,7 +56,7 @@ export function LiffStockDecisionSheet({
             ? "ยืนยันไม่ดำเนินการ"
             : "ยืนยันยกเลิกคำขอ";
     const confirmationLabel = busy
-        ? "กำลังดำเนินการ..."
+        ? "กำลังดำเนินการ…"
         : issuing
             ? "ยืนยันจ่ายวัสดุ"
             : processorCancellation
@@ -95,7 +95,7 @@ export function LiffStockDecisionSheet({
                 </div>
 
                 <DialogScrollArea className="space-y-4 px-4 py-4 scroll-pb-4">
-                    <p className="rounded-2xl bg-surface-subtle px-4 py-3 text-sm font-semibold leading-6 text-content-strong">
+                    <p className="border-y border-border-subtle py-3 text-sm font-semibold leading-6 text-content-strong">
                         {!actionAvailable
                             ? "สถานะคำขอเปลี่ยนแปลงแล้ว ไม่สามารถดำเนินการนี้ได้ กรุณาปิดหน้าต่างเพื่อตรวจสอบรายละเอียดล่าสุด"
                             : issuing
@@ -107,11 +107,11 @@ export function LiffStockDecisionSheet({
                             ผู้เบิก: <span className="font-semibold text-content-strong">{intent.request.requester.name}</span>
                         </p>
                     ) : null}
-                    <div className="space-y-2">
+                    <div className="divide-y divide-border-subtle border-y border-border-subtle">
                         {intent.request.items.map((item, index) => (
                             <div
                                 key={`${item.itemSku}-${item.variantSku ?? "default"}-${index}`}
-                                className="flex items-start justify-between gap-3 rounded-xl bg-surface-subtle px-3 py-2.5"
+                                className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
                             >
                                 <div className="min-w-0">
                                     <p className="break-words text-sm font-semibold leading-6 text-content-strong">
@@ -140,7 +140,7 @@ export function LiffStockDecisionSheet({
                                 maxLength={500}
                                 disabled={busy}
                                 placeholder="ระบุเหตุผลเพื่อให้ผู้เกี่ยวข้องทราบ"
-                                className="min-h-24 rounded-xl border-border-subtle bg-surface"
+                                className="min-h-24 border-border-subtle bg-surface"
                             />
                         </div>
                     ) : null}
@@ -148,7 +148,7 @@ export function LiffStockDecisionSheet({
                     {error ? (
                         <div
                             role="alert"
-                            className="rounded-xl bg-status-error-surface px-3 py-2 text-sm leading-6 text-status-error-strong ring-1 ring-status-error-border"
+                            className="border-y border-status-error-border bg-status-error-surface px-3 py-2 text-sm leading-6 text-status-error-strong"
                         >
                             {error}
                         </div>

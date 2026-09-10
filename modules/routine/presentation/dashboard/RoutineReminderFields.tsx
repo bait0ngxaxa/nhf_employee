@@ -5,6 +5,7 @@ import { BellPlus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getRoutineFieldErrorId } from "./focus-invalid-field";
 import {
     parseRoutineSendTime,
     ROUTINE_REMINDER_TIME_OPTIONS,
@@ -100,6 +101,10 @@ export function RoutineReminderFields({
         return errors[`reminderRules.${index}.${key}`];
     }
 
+    function fieldErrorId(index: number, key: "daysBefore" | "sendHour"): string {
+        return getRoutineFieldErrorId(`reminderRules.${index}.${key}`);
+    }
+
     return (
         <fieldset className={variant === "embedded"
             ? "space-y-4 border-t border-border-subtle pt-5"
@@ -111,8 +116,7 @@ export function RoutineReminderFields({
             </legend>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
-                    <p className="text-base font-semibold text-content-heading">ตั้งค่ารอบการแจ้งเตือน</p>
-                    <p className="mt-1 max-w-prose text-sm leading-6 text-content-secondary">
+                    <p className="max-w-prose text-sm leading-6 text-content-secondary">
                         ตรวจตามเวลาไทย (Asia/Bangkok) และแจ้งเตือนในระบบ อีเมล และ LINE เมื่อผู้รับเชื่อมบัญชีไว้
                     </p>
                 </div>
@@ -165,6 +169,7 @@ export function RoutineReminderFields({
                                     <Input
                                         data-routine-field={`reminderRules.${index}.daysBefore`}
                                         aria-invalid={Boolean(daysBeforeError)}
+                                        aria-describedby={daysBeforeError ? fieldErrorId(index, "daysBefore") : undefined}
                                         type="number"
                                         min={0}
                                         max={365}
@@ -172,13 +177,14 @@ export function RoutineReminderFields({
                                         disabled={disabled}
                                         onChange={(event) => onUpdateRule(index, { daysBefore: event.target.value })}
                                     />
-                                    {daysBeforeError ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{daysBeforeError}</span> : null}
+                                    {daysBeforeError ? <span id={fieldErrorId(index, "daysBefore")} className="text-sm font-normal text-status-danger-foreground" role="alert">{daysBeforeError}</span> : null}
                                 </label>
                                 <label className="grid min-w-0 gap-1 text-sm font-medium text-content-body">
                                     เวลาแจ้งเตือน (เวลาไทย)
                                     <select
                                         data-routine-field={`reminderRules.${index}.sendHour`}
                                         aria-invalid={Boolean(sendHourError)}
+                                        aria-describedby={sendHourError ? fieldErrorId(index, "sendHour") : undefined}
                                         className="h-11 min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                                         value={rule.sendHour}
                                         disabled={disabled}
@@ -190,7 +196,7 @@ export function RoutineReminderFields({
                                             </option>
                                         ))}
                                     </select>
-                                    {sendHourError ? <span className="text-sm font-normal text-status-danger-foreground" role="alert">{sendHourError}</span> : null}
+                                    {sendHourError ? <span id={fieldErrorId(index, "sendHour")} className="text-sm font-normal text-status-danger-foreground" role="alert">{sendHourError}</span> : null}
                                 </label>
                                 {selfService ? (
                                     <div className="grid min-w-0 gap-1 text-sm font-medium text-content-body">

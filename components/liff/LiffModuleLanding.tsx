@@ -29,7 +29,6 @@ const MODULE_CONFIG: Record<
         nextDescription: string;
         icon: LucideIcon;
         accentClassName: string;
-        iconClassName: string;
     }
 > = {
     stock: {
@@ -38,8 +37,7 @@ const MODULE_CONFIG: Record<
         description: "บริการวัสดุบน LINE กำลังเตรียมให้ใช้งานในขั้นถัดไป",
         nextDescription: "ระยะนี้คุณยังใช้บริการวัสดุผ่าน NHFapp บนเว็บได้ตามสิทธิ์เดิม",
         icon: Boxes,
-        accentClassName: "bg-module-stock-badge-surface text-module-stock-badge-foreground",
-        iconClassName: "border-module-stock-badge-border bg-module-stock-badge-surface text-module-stock-solid",
+        accentClassName: "text-module-stock-badge-foreground",
     },
     leave: {
         label: "วันลา",
@@ -47,8 +45,7 @@ const MODULE_CONFIG: Record<
         description: "บริการวันลาบน LINE กำลังเตรียมให้ใช้งานในขั้นถัดไป",
         nextDescription: "ระยะนี้คุณยังใช้บริการวันลาผ่าน NHFapp บนเว็บได้ตามสิทธิ์เดิม",
         icon: CalendarRange,
-        accentClassName: "bg-module-leave-badge-surface text-module-leave-badge-foreground",
-        iconClassName: "border-module-leave-badge-border bg-module-leave-badge-surface text-module-leave-solid",
+        accentClassName: "text-module-leave-badge-foreground",
     },
     routine: {
         label: "งานประจำ",
@@ -56,8 +53,7 @@ const MODULE_CONFIG: Record<
         description: "บริการงานประจำบน LINE กำลังเตรียมให้ใช้งานในขั้นถัดไป",
         nextDescription: "ระยะนี้คุณยังใช้บริการงานประจำผ่าน NHFapp บนเว็บได้ตามสิทธิ์เดิม",
         icon: ClipboardCheck,
-        accentClassName: "bg-brand-surface text-brand-strong",
-        iconClassName: "border-brand-border bg-brand-surface text-brand-strong",
+        accentClassName: "text-brand-strong",
     },
 };
 
@@ -76,38 +72,39 @@ export function LiffModuleLanding({
         >
             <div className="space-y-6">
                 <section className="border-b border-border-subtle pb-5">
-                    <div className="flex items-center justify-between gap-3">
-                        <div
+                    <div className="flex items-start gap-3">
+                        <Icon
                             className={cn(
-                                "flex size-10 shrink-0 items-center justify-center rounded-lg border",
-                                config.iconClassName,
+                                "mt-1 size-6 shrink-0",
+                                enabled ? config.accentClassName : "text-content-muted",
                             )}
-                        >
-                            <Icon className="size-5" aria-hidden="true" />
+                            aria-hidden="true"
+                        />
+                        <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                <p className="text-sm font-bold text-brand-strong">
+                                    {config.label}
+                                </p>
+                                <span
+                                    className={cn(
+                                        "text-xs font-semibold",
+                                        enabled
+                                            ? config.accentClassName
+                                            : "text-content-muted",
+                                    )}
+                                >
+                                    {enabled ? "เร็ว ๆ นี้" : "ปิดการใช้งาน"}
+                                </span>
+                            </div>
+                            <h1 className="max-w-[24ch] text-2xl font-bold leading-tight tracking-tight text-content-heading sm:text-3xl">
+                                {enabled ? config.title : `${config.label} ยังไม่พร้อมใช้งาน`}
+                            </h1>
+                            <p className="max-w-[42ch] text-sm leading-6 text-content-secondary">
+                                {enabled
+                                    ? config.description
+                                    : "บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณในขณะนี้"}
+                            </p>
                         </div>
-                        <span
-                            className={cn(
-                                "rounded-md border px-2.5 py-1 text-xs font-semibold",
-                                enabled
-                                    ? config.accentClassName
-                                    : "border-border-subtle bg-surface-muted text-content-muted",
-                            )}
-                        >
-                            {enabled ? "เร็ว ๆ นี้" : "ปิดการใช้งาน"}
-                        </span>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                        <p className="text-sm font-bold text-brand-strong">
-                            {config.label}
-                        </p>
-                        <h1 className="max-w-[24ch] text-2xl font-bold leading-tight tracking-tight text-content-heading sm:text-3xl">
-                            {enabled ? config.title : `${config.label} ยังไม่พร้อมใช้งาน`}
-                        </h1>
-                        <p className="max-w-[42ch] text-sm leading-6 text-content-secondary">
-                            {enabled
-                                ? config.description
-                                : "บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณในขณะนี้"}
-                        </p>
                     </div>
                 </section>
 

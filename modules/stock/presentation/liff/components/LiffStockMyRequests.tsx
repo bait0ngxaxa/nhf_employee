@@ -76,11 +76,11 @@ export function LiffStockMyRequests({
                 />
             ) : loading && response.requests.length === 0 ? (
                 <LoadingState
-                    label="กำลังโหลดประวัติการเบิก..."
+                    label="กำลังโหลดประวัติการเบิก…"
                     className="min-h-64 border-0 bg-transparent"
                 />
             ) : response.requests.length === 0 ? (
-                <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl bg-surface-raised px-5 text-center shadow-sm ring-1 ring-border-subtle">
+                <div className="flex min-h-56 flex-col items-center justify-center border-y border-border-subtle px-1 text-center">
                     <ClipboardList className="size-9 text-content-muted" aria-hidden="true" />
                     <h2 className="mt-3 text-base font-bold text-content-heading">
                         ยังไม่มีประวัติการเบิก
@@ -91,7 +91,7 @@ export function LiffStockMyRequests({
                 </div>
             ) : (
                 <>
-                    <div className="space-y-3" aria-busy={loading}>
+                    <div className="border-t border-border-subtle" aria-busy={loading}>
                         {response.requests.map((request) => (
                             <LiffStockRequestCard
                                 key={request.id}

@@ -91,7 +91,7 @@ export function LiffLeaveRequestForm({
                         className="flex min-h-0 flex-1 flex-col bg-surface-subtle"
                     >
                         <SheetScrollArea className="scroll-pb-6 px-4 py-5">
-                            <div className="space-y-4 rounded-2xl bg-surface p-4 shadow-sm">
+                            <div className="space-y-4">
                                 {model.errorMsg ? (
                                     <Alert variant="destructive" role="alert">
                                         <AlertCircle className="size-4" aria-hidden="true" />
@@ -116,7 +116,7 @@ export function LiffLeaveRequestForm({
                                         </AlertDescription>
                                     </Alert>
                                 ) : null}
-                                <div className="rounded-xl border border-module-leave-badge-border bg-module-leave-badge-surface px-4 py-3">
+                                <div className="border-y border-module-leave-border px-1 py-3">
                                     <p className="text-xs font-semibold text-module-leave-badge-foreground">
                                         ระยะเวลาที่ขอ
                                     </p>
@@ -147,7 +147,7 @@ export function LiffLeaveRequestForm({
                                 {model.isSubmitting ? (
                                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                                 ) : null}
-                                {model.isSubmitting ? "กำลังส่ง..." : "ส่งคำขอลา"}
+                                {model.isSubmitting ? "กำลังส่ง…" : "ส่งคำขอลา"}
                             </Button>
                         </div>
                     </form>

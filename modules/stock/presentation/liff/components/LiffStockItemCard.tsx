@@ -40,10 +40,10 @@ export function LiffStockItemCard({
 
     return (
         <article
-            className={`flex min-w-0 flex-col overflow-hidden rounded-2xl bg-surface-raised shadow-sm ring-1 transition-[box-shadow,ring-color] ${
+            className={`flex min-w-0 flex-col overflow-hidden rounded-lg border bg-surface-raised transition-colors ${
                 recentlyAdded
-                    ? "ring-status-success-border-strong"
-                    : "ring-border-subtle"
+                    ? "border-status-success-border-strong"
+                    : "border-border-subtle"
             }`}
         >
             <div className="relative aspect-[4/3] overflow-hidden bg-surface-subtle">
@@ -102,7 +102,7 @@ export function LiffStockItemCard({
                             multiVariant ? onChooseVariant(item) : onAddDirect(item)
                         }
                         disabled={outOfStock}
-                        className="min-h-11 w-full rounded-xl bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
+                        className="min-h-11 w-full bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
                     >
                         {recentlyAdded ? (
                             <Check className="size-4" aria-hidden="true" />

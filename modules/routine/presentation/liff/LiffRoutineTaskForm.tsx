@@ -3,6 +3,7 @@
 import {
     forwardRef,
     useCallback,
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -63,7 +64,10 @@ import {
     type RoutineReminderRuleForm,
 } from "../dashboard/RoutineReminderFields";
 import { RoutineScheduleFields } from "../dashboard/RoutineScheduleFields";
-import { focusFirstRoutineInvalidField } from "../dashboard/focus-invalid-field";
+import {
+    focusFirstRoutineInvalidField,
+    getRoutineFieldErrorId,
+} from "../dashboard/focus-invalid-field";
 import { routineFormSnapshot } from "../dashboard/form-dirty-state";
 import { formatRoutineUnitLabel, uniqueRoutineUnits } from "../dashboard/labels";
 
@@ -217,9 +221,13 @@ function buildFormPayload(
         : payload;
 }
 
-function FieldError({ message }: { message?: string }): ReactElement | null {
+function FieldError({ field, message }: { field: string; message?: string }): ReactElement | null {
     return message ? (
-        <span className="text-sm font-normal leading-5 text-status-danger-foreground" role="alert">
+        <span
+            id={getRoutineFieldErrorId(field)}
+            className="text-sm font-normal leading-5 text-status-danger-foreground"
+            role="alert"
+        >
             {message}
         </span>
     ) : null;
@@ -251,8 +259,13 @@ export const LiffRoutineTaskForm = forwardRef<
     const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
     const [hasConflict, setHasConflict] = useState(false);
     const [latestConflictTask, setLatestConflictTask] = useState<LiffRoutineTaskDetail | null>(null);
+    const [extraDetailsOpen, setExtraDetailsOpen] = useState(Boolean(form.extraDetails));
     const initialSnapshotRef = useRef(routineFormSnapshot(taskToForm(formTask)));
     const versionRef = useRef<number | null>(formTask?.version ?? null);
+
+    useEffect(() => {
+        if (form.extraDetails || fieldErrors.extraDetails) setExtraDetailsOpen(true);
+    }, [fieldErrors.extraDetails, form.extraDetails]);
     const submitLockRef = useRef(false);
     const createIdempotencyKeyRef = useRef<string | null>(null);
 
@@ -417,7 +430,6 @@ export const LiffRoutineTaskForm = forwardRef<
                 const updatePayload = parsed.data as LiffRoutineTaskUpdateInput;
                 const response = await updateLiffRoutineTask(task.id, updatePayload);
                 savedTask = response.task;
-                toast.success("บันทึกการแก้ไข Routine สำเร็จ");
             } else {
                 const createPayload = parsed.data as LiffRoutineTaskCreateInput;
                 const idempotencyKey = createIdempotencyKeyRef.current
@@ -425,11 +437,6 @@ export const LiffRoutineTaskForm = forwardRef<
                 createIdempotencyKeyRef.current = idempotencyKey;
                 const response = await createLiffRoutineTask(createPayload, idempotencyKey);
                 savedTask = response.task;
-                toast.success(
-                    response.replayed
-                        ? "ยืนยันงาน Routine ที่สร้างไว้แล้ว"
-                        : "สร้าง Routine ของฉันสำเร็จ",
-                );
             }
             await onSaved(savedTask, mode);
         } catch (submitError) {
@@ -569,6 +576,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 <select
                                     data-routine-field="unitId"
                                     aria-invalid={Boolean(fieldErrors.unitId)}
+                                    aria-describedby={fieldErrors.unitId ? getRoutineFieldErrorId("unitId") : undefined}
                                     className="h-12 min-w-0 rounded-md border border-input bg-background px-3 text-base focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                                     value={form.unitId}
                                     disabled={controlsDisabled}
@@ -581,7 +589,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                         </option>
                                     ))}
                                 </select>
-                                <FieldError message={fieldErrors.unitId} />
+                                <FieldError field="unitId" message={fieldErrors.unitId} />
                             </label>
 
                             <label className="grid gap-1.5 text-sm font-semibold text-content-body">
@@ -589,6 +597,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 <select
                                     data-routine-field="categoryId"
                                     aria-invalid={Boolean(fieldErrors.categoryId)}
+                                    aria-describedby={fieldErrors.categoryId ? getRoutineFieldErrorId("categoryId") : undefined}
                                     className="h-12 min-w-0 rounded-md border border-input bg-background px-3 text-base focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                                     value={form.categoryId}
                                     disabled={controlsDisabled}
@@ -601,7 +610,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                         </option>
                                     ))}
                                 </select>
-                                <FieldError message={fieldErrors.categoryId} />
+                                <FieldError field="categoryId" message={fieldErrors.categoryId} />
                             </label>
 
                             <label className="grid gap-1.5 text-sm font-semibold text-content-body md:col-span-2">
@@ -609,6 +618,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 <Input
                                     data-routine-field="title"
                                     aria-invalid={Boolean(fieldErrors.title)}
+                                    aria-describedby={fieldErrors.title ? getRoutineFieldErrorId("title") : undefined}
                                     value={form.title}
                                     onChange={(event) => updateField("title", event.target.value)}
                                     placeholder="เช่น ตรวจสอบค่าใช้จ่ายประจำเดือน"
@@ -616,7 +626,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                     disabled={controlsDisabled}
                                     className="h-12 text-base"
                                 />
-                                <FieldError message={fieldErrors.title} />
+                                <FieldError field="title" message={fieldErrors.title} />
                             </label>
 
                             <label className="grid gap-1.5 text-sm font-semibold text-content-body md:col-span-2">
@@ -624,6 +634,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 <Textarea
                                     data-routine-field="description"
                                     aria-invalid={Boolean(fieldErrors.description)}
+                                    aria-describedby={fieldErrors.description ? getRoutineFieldErrorId("description") : undefined}
                                     value={form.description}
                                     onChange={(event) => updateField("description", event.target.value)}
                                     placeholder="รายละเอียดหรือขั้นตอนที่จำเป็น"
@@ -631,7 +642,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                     disabled={controlsDisabled}
                                     className="min-h-24 text-base leading-6"
                                 />
-                                <FieldError message={fieldErrors.description} />
+                                <FieldError field="description" message={fieldErrors.description} />
                             </label>
                         </div>
                     </section>
@@ -652,16 +663,18 @@ export const LiffRoutineTaskForm = forwardRef<
                         errors={fieldErrors}
                         disabled={controlsDisabled}
                         allowManual
+                        collapsibleContract
                         variant="embedded"
                     />
 
                     <section className="space-y-3 border-t border-border-subtle pt-5">
                         <h2 className="text-base font-bold text-content-heading">คำอธิบายกำหนดการ</h2>
                         <label className="grid gap-1.5 text-sm font-semibold text-content-body">
-                            <span>คำอธิบายกำหนดการ</span>
+                            <span className="sr-only">คำอธิบายกำหนดการ</span>
                             <Input
                                 data-routine-field="scheduleText"
                                 aria-invalid={Boolean(fieldErrors.scheduleText)}
+                                aria-describedby={fieldErrors.scheduleText ? getRoutineFieldErrorId("scheduleText") : undefined}
                                 value={form.scheduleText}
                                 onChange={(event) => updateField("scheduleText", event.target.value)}
                                 placeholder="เช่น ทุกวันที่ 10 ของเดือน"
@@ -669,7 +682,7 @@ export const LiffRoutineTaskForm = forwardRef<
                                 disabled={controlsDisabled}
                                 className="h-12 text-base"
                             />
-                            <FieldError message={fieldErrors.scheduleText} />
+                            <FieldError field="scheduleText" message={fieldErrors.scheduleText} />
                         </label>
                     </section>
 
@@ -686,22 +699,30 @@ export const LiffRoutineTaskForm = forwardRef<
                         variant="embedded"
                     />
 
-                    <section className="space-y-3 border-t border-border-subtle pt-5">
-                        <h2 className="text-base font-bold text-content-heading">รายละเอียดเพิ่มเติม</h2>
-                        <label className="grid gap-1.5 text-sm font-semibold text-content-body">
-                            <span>รายละเอียดเพิ่มเติม</span>
+                    <details
+                        className="border-t border-border-subtle pt-5"
+                        open={extraDetailsOpen}
+                        onToggle={(event) => setExtraDetailsOpen(event.currentTarget.open)}
+                    >
+                        <summary className="cursor-pointer text-base font-bold text-content-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40">
+                            รายละเอียดเพิ่มเติม
+                            <span className="ml-2 text-xs font-normal text-content-muted">ไม่บังคับ</span>
+                        </summary>
+                        <label className="mt-3 grid gap-1.5 text-sm font-semibold text-content-body">
+                            <span className="sr-only">รายละเอียดเพิ่มเติม</span>
                             <Textarea
                                 data-routine-field="extraDetails"
                                 aria-invalid={Boolean(fieldErrors.extraDetails)}
+                                aria-describedby={fieldErrors.extraDetails ? getRoutineFieldErrorId("extraDetails") : undefined}
                                 value={form.extraDetails}
                                 onChange={(event) => updateField("extraDetails", event.target.value)}
                                 maxLength={5000}
                                 disabled={controlsDisabled}
                                 className="min-h-24 text-base leading-6"
                             />
-                            <FieldError message={fieldErrors.extraDetails} />
+                            <FieldError field="extraDetails" message={fieldErrors.extraDetails} />
                         </label>
-                    </section>
+                    </details>
                 </div>
             </SheetScrollArea>
 
@@ -726,7 +747,7 @@ export const LiffRoutineTaskForm = forwardRef<
                         <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                     ) : null}
                     {isSubmitting
-                        ? "กำลังบันทึก..."
+                        ? "กำลังบันทึก…"
                         : mode === "CREATE"
                             ? "เพิ่ม Routine ของฉัน"
                             : "บันทึกการแก้ไข"}

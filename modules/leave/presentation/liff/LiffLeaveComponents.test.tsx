@@ -178,7 +178,7 @@ describe("LIFF Leave mobile components", () => {
                 onConfirm={onConfirm}
             />,
         );
-        expect(screen.getByRole("button", { name: "กำลังดำเนินการ..." })).toBeDisabled();
+        expect(screen.getByRole("button", { name: "กำลังดำเนินการ…" })).toBeDisabled();
     });
 
     it("validates an optional cancellation request reason only when provided", () => {

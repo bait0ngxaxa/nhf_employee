@@ -276,6 +276,7 @@
 
 :root {
     --radius: 0.65rem;
+    --motion-reduced-duration: 120ms;
     --background: oklch(0.985 0.004 247);
     --foreground: oklch(0.141 0.005 285.823);
     --card: oklch(1 0 0);
@@ -948,7 +949,8 @@ a,
     ::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+        transition-property: color, background-color, border-color, opacity, fill, stroke !important;
+        transition-duration: var(--motion-reduced-duration) !important;
         scroll-behavior: auto !important;
     }
 }

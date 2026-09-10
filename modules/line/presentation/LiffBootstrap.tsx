@@ -121,15 +121,15 @@ function toBootstrapError(error: unknown): LiffBootstrapError {
 function loadingLabel(state: LiffBootstrapState): string {
     switch (state) {
         case "INITIALIZING":
-            return "กำลังเตรียมบริการ NHFapp ผ่าน LINE...";
+            return "กำลังเตรียมบริการ NHFapp ผ่าน LINE…";
         case "LINE_AUTHENTICATING":
-            return "กำลังยืนยันตัวตนกับ LINE...";
+            return "กำลังยืนยันตัวตนกับ LINE…";
         case "SESSION_ESTABLISHING":
-            return "กำลังเตรียมสิทธิ์การเข้าถึง...";
+            return "กำลังเตรียมสิทธิ์การเข้าถึง…";
         case "LINKING":
-            return "กำลังเชื่อมบัญชีกับ NHFapp...";
+            return "กำลังเชื่อมบัญชีกับ NHFapp…";
         default:
-            return "กำลังโหลดข้อมูล...";
+            return "กำลังโหลดข้อมูล…";
     }
 }
 

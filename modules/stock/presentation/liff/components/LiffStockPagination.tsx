@@ -19,7 +19,7 @@ export function LiffStockPagination({
     return (
         <nav
             aria-label="เปลี่ยนหน้ารายการ Stock"
-            className="flex items-center justify-between gap-3 rounded-2xl bg-surface-raised p-2 shadow-sm ring-1 ring-border-subtle"
+            className="flex items-center justify-between gap-3 border-y border-border-subtle py-2"
         >
             <Button
                 type="button"
@@ -27,7 +27,7 @@ export function LiffStockPagination({
                 onClick={() => onPageChange(page - 1)}
                 disabled={page <= 1}
                 aria-label="หน้าก่อนหน้า"
-                className="min-h-11 rounded-xl px-3"
+                className="min-h-11 px-3"
             >
                 <ChevronLeft className="size-4" aria-hidden="true" />
                 ก่อนหน้า
@@ -41,7 +41,7 @@ export function LiffStockPagination({
                 onClick={() => onPageChange(page + 1)}
                 disabled={page >= totalPages}
                 aria-label="หน้าถัดไป"
-                className="min-h-11 rounded-xl px-3"
+                className="min-h-11 px-3"
             >
                 ถัดไป
                 <ChevronRight className="size-4" aria-hidden="true" />

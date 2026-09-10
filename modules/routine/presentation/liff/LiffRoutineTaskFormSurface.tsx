@@ -102,7 +102,7 @@ export function LiffRoutineTaskFormSurface({
                         className="flex min-h-56 flex-1 items-center justify-center gap-2 bg-surface-subtle px-4 text-sm font-medium text-content-secondary"
                     >
                         <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                        กำลังเตรียมข้อมูลสำหรับแบบฟอร์ม...
+                        กำลังเตรียมข้อมูลสำหรับแบบฟอร์ม…
                     </SheetScrollArea>
                 ) : referenceError ? (
                     <SheetScrollArea className="flex flex-1 items-center justify-center bg-surface-subtle px-4 py-8">

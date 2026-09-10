@@ -648,7 +648,7 @@ export function LiffStockApp(): ReactElement {
                 {focusNotice ? (
                     <div
                         role="status"
-                        className="rounded-xl bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong ring-1 ring-status-warning-border"
+                        className="border-y border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong"
                     >
                         {focusNotice}
                     </div>

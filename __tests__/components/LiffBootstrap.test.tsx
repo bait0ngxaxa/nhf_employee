@@ -186,7 +186,7 @@ describe("LiffBootstrap", () => {
         render(<LiffBootstrap><div>Routine</div></LiffBootstrap>);
 
         expect(
-            await screen.findByText("กำลังยืนยันตัวตนกับ LINE..."),
+            await screen.findByText("กำลังยืนยันตัวตนกับ LINE…"),
         ).toBeInTheDocument();
         expect(mocks.liff.login).toHaveBeenCalledWith({
             redirectUri:

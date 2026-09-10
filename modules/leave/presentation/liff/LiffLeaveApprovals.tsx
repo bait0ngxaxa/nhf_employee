@@ -43,7 +43,7 @@ export function LiffLeaveApprovals({
 
     if (total === 0) {
         return (
-            <div className="rounded-2xl border border-status-success-border bg-status-success-surface px-5 py-8 text-center">
+            <div className="border-y border-status-success-border bg-status-success-surface px-1 py-8 text-center">
                 <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-status-success-surface-strong text-status-success-strong">
                     <Check className="size-6" aria-hidden="true" />
                 </div>
@@ -134,7 +134,7 @@ function ApprovalSection({
                     {description}
                 </p>
             </div>
-            <div className="space-y-3">
+            <div className="divide-y divide-border-subtle border-y border-border-subtle">
                 {items.map((item) => (
                     <ApprovalCard
                         key={item.id}
@@ -193,7 +193,7 @@ function ApprovalCard({
     );
 
     return (
-        <article className="rounded-2xl bg-surface p-4 shadow-sm">
+        <article className="py-4 first:pt-0 last:pb-0">
             <div className="min-w-0">
                 <h3 className="break-words font-bold tracking-tight text-content-heading">
                     {employeeName}
@@ -202,7 +202,7 @@ function ApprovalCard({
                     {item.employee.position} · {item.employee.dept?.name ?? "ไม่ระบุแผนก"}
                 </p>
             </div>
-            <div className="mt-3 rounded-xl bg-module-leave-badge-surface px-3 py-3">
+            <div className="mt-3 border-y border-module-leave-border px-3 py-3">
                 <p className="font-semibold text-content-heading">
                     {getLeaveTypeLabel(item.leaveType)} · {formatLeaveDays(item.durationDays)} วัน
                 </p>
@@ -214,7 +214,7 @@ function ApprovalCard({
                 {item.reason}
             </p>
             {hasWarning ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-status-warning-border bg-status-warning-surface px-3 py-2 text-xs font-medium leading-5 text-status-warning-strong">
+                <div className="mt-3 flex items-start gap-2 border-y border-status-warning-border bg-status-warning-surface px-3 py-2 text-xs font-medium leading-5 text-status-warning-strong">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                     {item.overQuotaDays > 0
                         ? `มีเงื่อนไขพิเศษและเกินสิทธิ์ ${formatLeaveDays(item.overQuotaDays)} วัน`

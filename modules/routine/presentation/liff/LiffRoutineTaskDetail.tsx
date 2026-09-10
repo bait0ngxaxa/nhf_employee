@@ -164,7 +164,7 @@ export function LiffRoutineTaskDetail({
                                 className="flex min-h-64 items-center justify-center gap-2 border-y border-border-subtle bg-surface p-4 text-sm font-medium text-content-secondary"
                             >
                                 <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                                กำลังโหลดรายละเอียดงาน...
+                                กำลังโหลดรายละเอียดงาน…
                             </div>
                         ) : error ? (
                             <div

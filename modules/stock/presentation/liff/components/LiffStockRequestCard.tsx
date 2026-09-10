@@ -33,7 +33,7 @@ export function LiffStockRequestCard({
     onAction,
 }: LiffStockRequestCardProps): ReactElement {
     return (
-        <article className="rounded-2xl bg-surface-raised p-4 shadow-sm ring-1 ring-border-subtle">
+        <article className="border-b border-border-subtle py-4 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h3 className="text-base font-bold tabular-nums text-content-heading">
@@ -63,11 +63,11 @@ export function LiffStockRequestCard({
                 ) : null}
             </dl>
 
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 divide-y divide-border-subtle border-y border-border-subtle">
                 {request.items.map((item, index) => (
                     <div
                         key={`${item.itemSku}-${item.variantSku ?? "default"}-${index}`}
-                        className="rounded-xl bg-surface-subtle px-3 py-2.5"
+                        className="py-3 first:pt-0 last:pb-0"
                     >
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
@@ -80,7 +80,7 @@ export function LiffStockRequestCard({
                                     </p>
                                 ) : null}
                             </div>
-                            <span className="shrink-0 rounded-full bg-surface-raised px-2 py-1 text-xs font-bold tabular-nums text-content-secondary ring-1 ring-border-subtle">
+                            <span className="shrink-0 text-sm font-bold tabular-nums text-content-heading">
                                 {item.quantity} {item.unit}
                             </span>
                         </div>
@@ -99,19 +99,19 @@ export function LiffStockRequestCard({
             </div>
 
             {request.note || request.cancelReason ? (
-                <div className="mt-3 rounded-xl bg-surface-subtle px-3 py-2 text-sm leading-6 text-content-secondary">
+                <div className="mt-3 border-t border-border-subtle pt-3 text-sm leading-6 text-content-secondary">
                     {request.cancelReason
                         ? `เหตุผลยกเลิก: ${request.cancelReason}`
                         : `หมายเหตุ: ${request.note}`}
                 </div>
             ) : null}
 
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border-subtle pt-3">
                 <Button
                     type="button"
                     variant="ghost"
                     onClick={() => onOpenDetail(request.id)}
-                    className="min-h-11 rounded-xl px-3"
+                    className="min-h-11 px-3"
                 >
                     <Eye className="size-4" aria-hidden="true" />
                     รายละเอียด
@@ -125,8 +125,8 @@ export function LiffStockRequestCard({
                         disabled={busy}
                         className={
                             action === "ISSUE"
-                                ? "min-h-11 rounded-xl bg-status-success-solid px-3 font-bold text-content-on-brand hover:bg-status-success-solid-hover"
-                                : "min-h-11 rounded-xl border-status-danger-border px-3 font-bold text-status-danger-foreground hover:bg-status-danger-surface"
+                                ? "min-h-11 bg-status-success-solid px-3 font-bold text-content-on-brand hover:bg-status-success-solid-hover"
+                                : "min-h-11 border-status-danger-border px-3 font-bold text-status-danger-foreground hover:bg-status-danger-surface"
                         }
                     >
                         {action === "ISSUE" ? (

@@ -71,13 +71,13 @@ export function LiffLeaveRequestDetail({
                             {hasAuthorizedApproveIntent ? (
                                 <div
                                     role="status"
-                                    className="flex items-start gap-2 rounded-xl border border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong"
+                                    className="flex items-start gap-2 border-y border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong"
                                 >
                                     <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                                     เปิดจากลิงก์เพื่อพิจารณา กรุณาตรวจรายละเอียดและกดยืนยันด้วยตนเอง
                                 </div>
                             ) : null}
-                            <section className="space-y-4 rounded-2xl bg-surface p-4 shadow-sm">
+                            <section className="space-y-0">
                                 {detail.employee ? (
                                     <DetailRow
                                         label="พนักงาน"
@@ -140,8 +140,13 @@ function DetailRow({
     value: string;
     tone?: "default" | "warning" | "danger";
 }): ReactElement {
+    const className = tone === "default"
+        ? "border-b border-border-subtle py-3 last:border-b-0"
+        : tone === "danger"
+            ? "my-2 border-y border-status-danger-border bg-status-danger-surface px-3 py-2"
+            : "my-2 border-y border-status-warning-border bg-status-warning-surface px-3 py-2";
     return (
-        <div className={tone === "default" ? "" : "rounded-xl border border-status-warning-border bg-status-warning-surface px-3 py-2"}>
+        <div className={className}>
             <p className="text-xs font-semibold leading-5 text-content-muted">{label}</p>
             <p className={`mt-0.5 break-words text-sm leading-6 ${tone === "danger" ? "text-status-danger-strong" : "text-content-body"}`}>
                 {value}

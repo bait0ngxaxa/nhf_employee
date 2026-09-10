@@ -480,7 +480,7 @@ export function LiffRoutineApp(): ReactElement {
     if (state !== "READY" || !summary) {
         return (
             <LoadingState
-                label="กำลังโหลดงาน Routine..."
+                label="กำลังโหลดงาน Routine…"
                 className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );

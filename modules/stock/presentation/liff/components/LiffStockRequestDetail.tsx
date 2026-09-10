@@ -64,16 +64,16 @@ export function LiffStockRequestDetail({
                     {loading ? (
                         <div className="flex min-h-56 items-center justify-center gap-2 text-sm font-medium text-content-secondary" role="status">
                             <Loader2 className="size-5 animate-spin" aria-hidden="true" />
-                            กำลังโหลดรายละเอียด...
+                            กำลังโหลดรายละเอียด…
                         </div>
                     ) : error ? (
-                        <div className="min-h-56 rounded-2xl bg-status-warning-surface p-4 text-sm leading-6 text-status-warning-strong ring-1 ring-status-warning-border" role="alert">
+                        <div className="min-h-56 border-y border-status-warning-border bg-status-warning-surface p-4 text-sm leading-6 text-status-warning-strong" role="alert">
                             {error}
                         </div>
                     ) : detail ? (
                         <div className="space-y-4">
                             {processorIntent ? (
-                                <div className="rounded-2xl bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong ring-1 ring-status-warning-border">
+                                <div className="border-y border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong">
                                     เปิดจากลิงก์เพื่อดำเนินการ กรุณาตรวจรายละเอียดและกดยืนยันด้วยตนเอง
                                 </div>
                             ) : null}
@@ -89,7 +89,7 @@ export function LiffStockRequestDetail({
                                 <RequestStatusBadge meta={getStockRequestStatusMeta(detail.status)} />
                             </div>
 
-                            <dl className="grid gap-2 rounded-2xl bg-surface-subtle p-3 text-sm">
+                            <dl className="grid gap-2 border-y border-border-subtle py-3 text-sm">
                                 <div className="flex gap-2">
                                     <dt className="shrink-0 text-content-muted">โครงการ</dt>
                                     <dd className="break-all font-semibold text-content-strong">
@@ -110,40 +110,42 @@ export function LiffStockRequestDetail({
                                 <h3 className="text-sm font-bold text-content-heading">
                                     รายการที่ขอเบิก
                                 </h3>
-                                {detail.items.map((item, index) => (
-                                    <div
-                                        key={`${item.itemSku}-${item.variantSku ?? "default"}-${index}`}
-                                        className="rounded-2xl bg-surface-subtle p-3"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="break-words text-sm font-semibold leading-6 text-content-strong">
-                                                    {item.itemName}
-                                                </p>
-                                                <p className="break-words text-xs leading-5 text-content-muted">
-                                                    {item.variantLabel || item.variantSku || item.itemSku}
-                                                </p>
+                                <div className="divide-y divide-border-subtle border-y border-border-subtle">
+                                    {detail.items.map((item, index) => (
+                                        <div
+                                            key={`${item.itemSku}-${item.variantSku ?? "default"}-${index}`}
+                                            className="py-3 first:pt-0 last:pb-0"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="break-words text-sm font-semibold leading-6 text-content-strong">
+                                                        {item.itemName}
+                                                    </p>
+                                                    <p className="break-words text-xs leading-5 text-content-muted">
+                                                        {item.variantLabel || item.variantSku || item.itemSku}
+                                                    </p>
+                                                </div>
+                                                <span className="shrink-0 text-sm font-bold tabular-nums text-content-heading">
+                                                    {item.quantity} {item.unit}
+                                                </span>
                                             </div>
-                                            <span className="shrink-0 text-sm font-bold tabular-nums text-content-heading">
-                                                {item.quantity} {item.unit}
-                                            </span>
+                                            {detail.viewerRole === "PROCESSOR" ? (
+                                                <p className={`mt-1 text-xs tabular-nums ${
+                                                    item.isAvailableForIssue
+                                                        ? "text-status-success-foreground"
+                                                        : "text-status-danger-foreground"
+                                                }`}>
+                                                    คงเหลือจริง {item.currentQuantity ?? "–"} {item.unit}
+                                                    {item.isAvailableForIssue ? " · เพียงพอ" : " · ต้องตรวจสอบ"}
+                                                </p>
+                                            ) : null}
                                         </div>
-                                        {detail.viewerRole === "PROCESSOR" ? (
-                                            <p className={`mt-1 text-xs tabular-nums ${
-                                                item.isAvailableForIssue
-                                                    ? "text-status-success-foreground"
-                                                    : "text-status-danger-foreground"
-                                            }`}>
-                                                คงเหลือจริง {item.currentQuantity ?? "–"} {item.unit}
-                                                {item.isAvailableForIssue ? " · เพียงพอ" : " · ต้องตรวจสอบ"}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
 
                             {detail.note || detail.cancelReason ? (
-                                <div className="rounded-2xl bg-surface-subtle px-4 py-3 text-sm leading-6 text-content-secondary">
+                                <div className="border-t border-border-subtle pt-3 text-sm leading-6 text-content-secondary">
                                     {detail.cancelReason
                                         ? `เหตุผลยกเลิก: ${detail.cancelReason}`
                                         : `หมายเหตุ: ${detail.note}`}
@@ -163,8 +165,8 @@ export function LiffStockRequestDetail({
                                 onClick={() => onAction(action, detail)}
                                 className={
                                     action === "ISSUE"
-                                        ? "min-h-12 flex-1 rounded-xl bg-status-success-solid font-bold text-content-on-brand hover:bg-status-success-solid-hover"
-                                        : "min-h-12 flex-1 rounded-xl border-status-danger-border font-bold text-status-danger-foreground hover:bg-status-danger-surface"
+                                        ? "min-h-12 flex-1 bg-status-success-solid font-bold text-content-on-brand hover:bg-status-success-solid-hover"
+                                        : "min-h-12 flex-1 border-status-danger-border font-bold text-status-danger-foreground hover:bg-status-danger-surface"
                                 }
                             >
                                 {action === "ISSUE" ? (

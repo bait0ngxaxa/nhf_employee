@@ -92,10 +92,10 @@ export function LiffStockVariantPicker({
                         return (
                             <article
                                 key={variant.id}
-                                className={`rounded-2xl p-3 shadow-sm ring-1 ${
+                                className={`rounded-lg border p-3 ${
                                     quantity > 0
-                                        ? "bg-status-success-surface ring-status-success-border"
-                                        : "bg-surface-raised ring-border-subtle"
+                                        ? "border-status-success-border bg-status-success-surface"
+                                        : "border-border-subtle bg-surface-raised"
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-3">
@@ -125,7 +125,7 @@ export function LiffStockVariantPicker({
                                             onClick={() => updateQuantity(variant, -1)}
                                             disabled={quantity <= 0}
                                             aria-label={`ลดจำนวน ${label}`}
-                                            className="size-11 rounded-xl"
+                                            className="size-11"
                                         >
                                             <Minus className="size-4" aria-hidden="true" />
                                         </Button>
@@ -145,7 +145,7 @@ export function LiffStockVariantPicker({
                                                 || quantity >= variant.availableQuantity
                                             }
                                             aria-label={`เพิ่มจำนวน ${label}`}
-                                            className="size-11 rounded-xl"
+                                            className="size-11"
                                         >
                                             <Plus className="size-4" aria-hidden="true" />
                                         </Button>
@@ -160,7 +160,7 @@ export function LiffStockVariantPicker({
                         type="button"
                         onClick={() => onConfirm(selections)}
                         disabled={selections.length === 0}
-                        className="min-h-12 w-full rounded-xl bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
+                        className="min-h-12 w-full bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
                     >
                         เพิ่ม {selections.length} ตัวเลือก · {totalQuantity} ชิ้น
                     </Button>

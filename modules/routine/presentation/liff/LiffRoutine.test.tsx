@@ -1095,7 +1095,7 @@ describe("LiffRoutineApp", () => {
         fireEvent.click(confirmButton);
         fireEvent.click(confirmButton);
         await waitFor(() => expect(mocks.deleteLiffRoutineTask).toHaveBeenCalledTimes(1));
-        expect(within(confirmation).getByRole("button", { name: "กำลังลบ..." })).toBeDisabled();
+        expect(within(confirmation).getByRole("button", { name: "กำลังลบ…" })).toBeDisabled();
 
         pendingDelete.resolve();
         await waitFor(() => expect(screen.queryByText("รายละเอียดฉบับเต็ม")).not.toBeInTheDocument());

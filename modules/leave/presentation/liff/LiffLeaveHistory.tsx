@@ -77,7 +77,7 @@ export function LiffLeaveHistory({
             </div>
 
             {profile.history.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border-strong bg-surface px-5 py-8 text-center">
+                <div className="border-y border-dashed border-border-strong px-1 py-8 text-center">
                     <p className="font-semibold text-content-heading">
                         {hasFilters ? "ไม่พบรายการตามตัวกรอง" : "ยังไม่มีคำขอลา"}
                     </p>
@@ -88,7 +88,7 @@ export function LiffLeaveHistory({
                     </p>
                 </div>
             ) : (
-                <div className={`space-y-3 ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
+                <div className={`divide-y divide-border-subtle border-y border-border-subtle ${isLoading ? "opacity-60" : ""}`} aria-busy={isLoading}>
                     {profile.history.map((request) => (
                         <HistoryCard
                             key={request.id}
@@ -152,7 +152,7 @@ function HistoryCard({
     onAction: (action: EmployeeLeaveAction, request: LiffEmployeeLeaveRequest) => void;
 }): ReactElement {
     return (
-        <article className="rounded-2xl bg-surface p-4 shadow-sm">
+        <article className="py-4 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <h3 className="font-bold tracking-tight text-content-heading">

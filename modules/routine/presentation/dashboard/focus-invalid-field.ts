@@ -1,3 +1,7 @@
+export function getRoutineFieldErrorId(fieldPath: string): string {
+    return `liff-routine-field-error-${fieldPath.replace(/\./g, "-")}`;
+}
+
 export function focusFirstRoutineInvalidField(
     errors: Record<string, string>,
 ): void {
