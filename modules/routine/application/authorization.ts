@@ -14,7 +14,10 @@ import {
     RoutineForbiddenError,
     RoutineValidationError,
 } from "./errors";
-import type { RoutineCommandActor } from "./types";
+import type {
+    RoutineCommandActor,
+    RoutinePresentationCapabilities,
+} from "./types";
 
 type RoutineTransaction = Prisma.TransactionClient;
 
@@ -65,6 +68,16 @@ function isRoutineMigratedCapability(
     capability: string,
 ): capability is RoutineMigratedCapability {
     return ROUTINE_CAPABILITY_SET.has(capability);
+}
+
+class RoutineCapabilityDeniedError extends RoutineForbiddenError {
+    readonly authorizationReason: AuthorizationDecision["reason"];
+
+    constructor(reason: AuthorizationDecision["reason"]) {
+        super();
+        this.name = "RoutineCapabilityDeniedError";
+        this.authorizationReason = reason;
+    }
 }
 
 function parseUserRole(role: string): UserRole {
@@ -173,7 +186,7 @@ function getEffectiveScopes(
             ? legacyRoutineScopes(actor, capability, options)
             : null;
         if (legacyScopes === null) {
-            throw new RoutineForbiddenError();
+            throw new RoutineCapabilityDeniedError(decision.reason);
         }
         return {
             scopes: freezeScopes(legacyScopes),
@@ -194,7 +207,7 @@ function getEffectiveScopes(
 
     const selfServiceScopes = routineSelfServiceScopes(capability, options);
     if (selfServiceScopes === null) {
-        throw new RoutineForbiddenError();
+        throw new RoutineCapabilityDeniedError(decision.reason);
     }
     return {
         scopes: freezeScopes(selfServiceScopes),
@@ -239,6 +252,100 @@ export async function resolveRoutineCapabilityForMigration(
         decision,
         options,
     );
+}
+
+async function canResolveRoutinePresentationCapability(
+    actor: RoutineCommandActor,
+    employeeId: number | null,
+    capability: RoutineMigratedCapability,
+): Promise<boolean> {
+    try {
+        await resolveRoutineCapabilityForMigration(actor, employeeId, capability);
+        return true;
+    } catch (error) {
+        if (
+            error instanceof RoutineCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return false;
+        }
+        throw error;
+    }
+}
+
+export async function getRoutinePresentationCapabilities(
+    actor: RoutineCommandActor,
+    employeeId: number | null,
+): Promise<RoutinePresentationCapabilities> {
+    const [
+        canReadTasks,
+        canCreateTasks,
+        canUpdateTasks,
+        canDeleteTasks,
+        canReadOccurrences,
+        canOverrideOccurrences,
+        canReassignOccurrences,
+        canChangeOccurrenceDueDate,
+        canManageImports,
+    ] = await Promise.all([
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.task.read",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.task.create",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.task.update",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.task.delete",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.occurrence.read",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.occurrence.override",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.occurrence.reassign",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.occurrence.change_due_date",
+        ),
+        canResolveRoutinePresentationCapability(
+            actor,
+            employeeId,
+            "routine.import.manage",
+        ),
+    ]);
+
+    return Object.freeze({
+        canReadTasks,
+        canCreateTasks,
+        canUpdateTasks,
+        canDeleteTasks,
+        canReadOccurrences,
+        canOverrideOccurrences,
+        canReassignOccurrences,
+        canChangeOccurrenceDueDate,
+        canManageImports,
+    });
 }
 
 /**

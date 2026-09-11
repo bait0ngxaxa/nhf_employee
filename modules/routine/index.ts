@@ -2,6 +2,7 @@ export type {
     RoutineAssigneeSnapshot,
     RoutineCommandActor,
     RoutineGenerationResult,
+    RoutinePresentationCapabilities,
     RoutineQueryActor,
 } from "./application/types";
 export {
@@ -67,6 +68,7 @@ export {
 } from "./application/queries";
 export {
     assertRoutineCapabilityForMigration,
+    getRoutinePresentationCapabilities,
 } from "./application/authorization";
 export {
     prepareRoutineTaskExport,

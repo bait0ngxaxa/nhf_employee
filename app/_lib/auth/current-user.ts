@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { resolveAuthenticatedAccount } from "@/modules/auth";
 import { findCurrentEmployeeProjection } from "@/modules/employee";
 import { getCurrentEmployeeLeaveProjection } from "@/modules/leave";
+import { getRoutinePresentationCapabilities } from "@/modules/routine";
 import type { AuthenticatedUser } from "@/modules/auth/client";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { getUserDisplayName } from "@/shared/identity/display";
@@ -22,6 +23,14 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         employee.id,
         employee.isManager,
     );
+    const routineCapabilities = await getRoutinePresentationCapabilities(
+        {
+            id: account.userId,
+            role: account.role,
+            email: account.email,
+        },
+        employee.id,
+    );
 
     return {
         id: String(account.userId),
@@ -40,5 +49,6 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         isManager: employee.isManager,
         canApproveLeave: leave.canApproveLeave,
         canViewLeaveReports: leave.canViewLeaveReports,
+        routineCapabilities,
     };
 }

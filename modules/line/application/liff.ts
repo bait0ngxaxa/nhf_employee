@@ -4,6 +4,7 @@ import type { NextResponse } from "next/server";
 import { findAccountIdentityById } from "@/modules/auth";
 import { findLiffEmployeeByUserId } from "@/modules/employee";
 import { getLiffLeaveCapabilities } from "@/modules/leave";
+import { getRoutinePresentationCapabilities } from "@/modules/routine";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { forbidden, serverError, unauthorized } from "@/lib/ssot/http";
 import { isAdminRole } from "@/lib/ssot/permissions";
@@ -51,13 +52,23 @@ export async function getLiffCapabilities(
     const leaveCapabilities = leaveEnabled
         ? await getLiffLeaveCapabilities(session.employeeId)
         : { canApproveLeave: false };
+    const routineCapabilities = await getRoutinePresentationCapabilities(
+        {
+            id: session.user.id,
+            role: session.user.role,
+            email: session.user.email,
+            mode: "LIFF_SELF_SERVICE",
+        },
+        session.employeeId,
+    );
 
     return {
         canRequestStock: true,
         canProcessStockRequests: isAdminRole(session.user.role),
         canRequestLeave: leaveEnabled,
         canApproveLeave: leaveCapabilities.canApproveLeave,
-        canCreateOwnRoutine: routineEnabled,
+        canCreateOwnRoutine: routineEnabled && routineCapabilities.canCreateTasks,
+        routineCapabilities,
     };
 }
 

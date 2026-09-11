@@ -40,6 +40,17 @@ const HOME = {
         canRequestLeave: false,
         canApproveLeave: false,
         canCreateOwnRoutine: true,
+        routineCapabilities: {
+            canReadTasks: true,
+            canCreateTasks: true,
+            canUpdateTasks: true,
+            canDeleteTasks: true,
+            canReadOccurrences: false,
+            canOverrideOccurrences: false,
+            canReassignOccurrences: false,
+            canChangeOccurrenceDueDate: false,
+            canManageImports: false,
+        },
     },
 };
 

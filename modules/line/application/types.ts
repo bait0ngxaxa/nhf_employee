@@ -1,3 +1,5 @@
+import type { RoutinePresentationCapabilities } from "@/modules/routine";
+
 export interface LiffWorkforceIdentity {
     userId: number;
     employeeId: number;
@@ -43,6 +45,7 @@ export interface LiffCapabilities {
     canRequestLeave: boolean;
     canApproveLeave: boolean;
     canCreateOwnRoutine: boolean;
+    routineCapabilities: RoutinePresentationCapabilities;
 }
 
 export interface LiffHomeResponse {

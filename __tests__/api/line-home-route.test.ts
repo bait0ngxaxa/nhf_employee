@@ -43,6 +43,17 @@ const CAPABILITIES = {
     canRequestLeave: true,
     canApproveLeave: false,
     canCreateOwnRoutine: true,
+    routineCapabilities: {
+        canReadTasks: true,
+        canCreateTasks: true,
+        canUpdateTasks: true,
+        canDeleteTasks: true,
+        canReadOccurrences: false,
+        canOverrideOccurrences: false,
+        canReassignOccurrences: false,
+        canChangeOccurrenceDueDate: false,
+        canManageImports: false,
+    },
 };
 
 describe("LIFF home API", () => {

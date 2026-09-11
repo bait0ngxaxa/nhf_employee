@@ -1,3 +1,5 @@
+import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
+
 export interface AuthenticatedUser {
     id: string;
     role: string;
@@ -7,4 +9,5 @@ export interface AuthenticatedUser {
     isManager?: boolean;
     canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;
+    routineCapabilities?: RoutinePresentationCapabilities;
 }

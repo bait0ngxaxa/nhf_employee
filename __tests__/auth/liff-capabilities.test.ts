@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { leaveRequestFindFirstMock } = vi.hoisted(() => ({
+const { leaveRequestFindFirstMock, routineProjectionMock } = vi.hoisted(() => ({
     leaveRequestFindFirstMock: vi.fn(),
+    routineProjectionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -11,6 +12,9 @@ vi.mock("@/lib/db/prisma", () => ({
             findFirst: leaveRequestFindFirstMock,
         },
     },
+}));
+vi.mock("@/modules/routine", () => ({
+    getRoutinePresentationCapabilities: routineProjectionMock,
 }));
 
 import { getLiffCapabilities } from "@/modules/line";
@@ -30,6 +34,18 @@ const SESSION: LiffWorkforceSession = {
     employeeId: 20,
 };
 
+const ROUTINE_CAPABILITIES = {
+    canReadTasks: true,
+    canCreateTasks: true,
+    canUpdateTasks: true,
+    canDeleteTasks: true,
+    canReadOccurrences: false,
+    canOverrideOccurrences: false,
+    canReassignOccurrences: false,
+    canChangeOccurrenceDueDate: false,
+    canManageImports: false,
+};
+
 function expectActionableApproverQuery(): void {
     expect(leaveRequestFindFirstMock).toHaveBeenCalledWith({
         where: {
@@ -47,6 +63,7 @@ describe("LIFF capability derivation", () => {
         vi.clearAllMocks();
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "true");
+        routineProjectionMock.mockResolvedValue(ROUTINE_CAPABILITIES);
     });
 
     afterEach(() => {
@@ -58,7 +75,15 @@ describe("LIFF capability derivation", () => {
 
         const capabilities = await getLiffCapabilities(SESSION);
 
+        expect(capabilities.routineCapabilities).toEqual(ROUTINE_CAPABILITIES);
         expect(capabilities.canApproveLeave).toBe(true);
+        expect(capabilities.canCreateOwnRoutine).toBe(true);
+        expect(routineProjectionMock).toHaveBeenCalledWith({
+            id: SESSION.user.id,
+            role: SESSION.user.role,
+            email: SESSION.user.email,
+            mode: "LIFF_SELF_SERVICE",
+        }, SESSION.employeeId);
         expectActionableApproverQuery();
     });
 
@@ -102,5 +127,26 @@ describe("LIFF capability derivation", () => {
 
         expect(capabilities.canApproveLeave).toBe(false);
         expect(leaveRequestFindFirstMock).not.toHaveBeenCalled();
+    });
+
+    it("does not derive own Routine creation from the feature flag alone", async () => {
+        routineProjectionMock.mockResolvedValue({
+            ...ROUTINE_CAPABILITIES,
+            canCreateTasks: false,
+        });
+
+        const capabilities = await getLiffCapabilities(SESSION);
+
+        expect(capabilities.canCreateOwnRoutine).toBe(false);
+        expect(routineProjectionMock).toHaveBeenCalled();
+    });
+
+    it("keeps Routine unavailable when its feature is disabled", async () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
+
+        const capabilities = await getLiffCapabilities(SESSION);
+
+        expect(capabilities.canCreateOwnRoutine).toBe(false);
+        expect(capabilities.routineCapabilities).toEqual(ROUTINE_CAPABILITIES);
     });
 });

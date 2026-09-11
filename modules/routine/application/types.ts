@@ -14,6 +14,20 @@ export interface RoutineQueryActor {
     employeeId: number | null;
 }
 
+export interface RoutinePresentationCapabilities {
+    readonly canReadTasks: boolean;
+    readonly canCreateTasks: boolean;
+    readonly canUpdateTasks: boolean;
+    readonly canDeleteTasks: boolean;
+
+    readonly canReadOccurrences: boolean;
+    readonly canOverrideOccurrences: boolean;
+    readonly canReassignOccurrences: boolean;
+    readonly canChangeOccurrenceDueDate: boolean;
+
+    readonly canManageImports: boolean;
+}
+
 export interface RoutineGenerationResult {
     evaluated: number;
     created: number;

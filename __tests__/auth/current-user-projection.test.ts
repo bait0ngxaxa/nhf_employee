@@ -4,17 +4,27 @@ import type { AuthenticatedAccount } from "@/modules/auth";
 import type { CurrentEmployeeProjection } from "@/modules/employee";
 import type { CurrentEmployeeLeaveProjection } from "@/modules/leave";
 
-const { cookiesMock, resolveAccountMock, employeeProjectionMock, leaveProjectionMock } = vi.hoisted(() => ({
+const {
+    cookiesMock,
+    resolveAccountMock,
+    employeeProjectionMock,
+    leaveProjectionMock,
+    routineProjectionMock,
+} = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
     resolveAccountMock: vi.fn(),
     employeeProjectionMock: vi.fn(),
     leaveProjectionMock: vi.fn(),
+    routineProjectionMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
 vi.mock("@/modules/auth", () => ({ resolveAuthenticatedAccount: resolveAccountMock }));
 vi.mock("@/modules/employee", () => ({ findCurrentEmployeeProjection: employeeProjectionMock }));
 vi.mock("@/modules/leave", () => ({ getCurrentEmployeeLeaveProjection: leaveProjectionMock }));
+vi.mock("@/modules/routine", () => ({
+    getRoutinePresentationCapabilities: routineProjectionMock,
+}));
 
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
 
@@ -41,6 +51,18 @@ const LEAVE: CurrentEmployeeLeaveProjection = {
     canViewLeaveReports: false,
 };
 
+const ROUTINE = {
+    canReadTasks: true,
+    canCreateTasks: true,
+    canUpdateTasks: true,
+    canDeleteTasks: true,
+    canReadOccurrences: true,
+    canOverrideOccurrences: true,
+    canReassignOccurrences: true,
+    canChangeOccurrenceDueDate: true,
+    canManageImports: true,
+};
+
 describe("current-user application projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -50,9 +72,10 @@ describe("current-user application projection", () => {
         resolveAccountMock.mockResolvedValue(ACCOUNT);
         employeeProjectionMock.mockResolvedValue(EMPLOYEE);
         leaveProjectionMock.mockResolvedValue(LEAVE);
+        routineProjectionMock.mockResolvedValue(ROUTINE);
     });
 
-    it("returns the compatible Employee/Department/Leave projection", async () => {
+    it("returns the server-derived Routine projection with the compatible Employee/Department/Leave projection", async () => {
         await expect(getCurrentUserProjection()).resolves.toEqual({
             id: "41",
             role: "ADMIN",
@@ -62,10 +85,16 @@ describe("current-user application projection", () => {
             isManager: false,
             canApproveLeave: true,
             canViewLeaveReports: false,
+            routineCapabilities: ROUTINE,
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
         expect(leaveProjectionMock).toHaveBeenCalledWith(101, false);
+        expect(routineProjectionMock).toHaveBeenCalledWith({
+            id: 41,
+            role: "ADMIN",
+            email: "account@test.com",
+        }, 101);
     });
 
     it("keeps the broad projection unauthorized without an eligible Employee", async () => {
