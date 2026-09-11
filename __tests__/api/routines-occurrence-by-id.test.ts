@@ -13,6 +13,41 @@ const mocks = vi.hoisted(() => ({
     updateOverride: vi.fn(),
 }));
 
+const committedOccurrence = {
+    id: 91,
+    taskId: 71,
+    periodKey: "2026-08",
+    dueDate: new Date("2026-08-10T00:00:00.000Z"),
+    originalDueDate: new Date("2026-08-09T00:00:00.000Z"),
+    isDueDateOverridden: true,
+    scheduleVersion: 1,
+    reminderVersion: 5,
+    createdAt: new Date("2026-08-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-10T00:00:00.000Z"),
+    task: {
+        id: 71,
+        title: "งานประจำ",
+        description: null,
+        scheduleType: "MONTHLY",
+        scheduleText: null,
+        isActive: true,
+        unit: { id: 1, code: "OPS", name: "ปฏิบัติการ" },
+        category: { id: 2, name: "ทั่วไป" },
+    },
+    assignees: [{
+        employeeId: 42,
+        role: "OWNER",
+        employee: {
+            id: 42,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            nickname: null,
+            status: "ACTIVE",
+            deletedAt: null,
+        },
+    }],
+};
+
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
 }));
@@ -34,7 +69,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
         mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
-        mocks.updateOverride.mockResolvedValue(undefined);
+        mocks.updateOverride.mockResolvedValue(committedOccurrence);
         mocks.getOccurrence.mockResolvedValue({ occurrence: { id: 91 } });
     });
 
@@ -64,6 +99,46 @@ describe("PATCH /api/routines/occurrences/:id", () => {
             },
             expect.objectContaining({ id: 99, role: "ADMIN" }),
         );
+    });
+
+    it("returns the committed mutation result without requiring occurrence read access", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+        mocks.getOccurrence.mockResolvedValue(null);
+        mocks.updateOverride.mockResolvedValue(committedOccurrence);
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/occurrences/91", {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    expectedReminderVersion: 4,
+                    dueDate: "2026-08-10",
+                    assignees: [{ employeeId: 42, role: "OWNER" }],
+                }),
+            }),
+            { params: Promise.resolve({ id: "91" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 5, role: "USER" }),
+            21,
+            "routine.occurrence.override",
+        );
+        expect(mocks.getOccurrence).not.toHaveBeenCalled();
+        const body = await response.json();
+        expect(body).toEqual(expect.objectContaining({
+            occurrence: expect.objectContaining({
+                id: 91,
+                dueDate: expect.any(String),
+            }),
+        }));
+        expect(body.occurrence).not.toHaveProperty("isDueDateOverridden");
+        expect(body.occurrence.task).not.toHaveProperty("isActive");
     });
 
     it("does not mutate when the caller is not an admin", async () => {

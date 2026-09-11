@@ -242,14 +242,43 @@ function serializeOccurrence(
     const daysUntilDue = calendarDayDifference(today, dueDate);
     const timingStatus = getRoutineTimingStatus(today, dueDate);
     return {
-        ...row,
+        id: row.id,
+        taskId: row.taskId,
+        periodKey: row.periodKey,
         dueDate,
         originalDueDate: toBangkokCalendarDate(row.originalDueDate),
+        scheduleVersion: row.scheduleVersion,
+        reminderVersion: row.reminderVersion,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        task: {
+            id: row.task.id,
+            title: row.task.title,
+            description: row.task.description,
+            scheduleType: row.task.scheduleType,
+            scheduleText: row.task.scheduleText,
+            unit: {
+                id: row.task.unit.id,
+                code: row.task.unit.code,
+                name: row.task.unit.name,
+            },
+            category: {
+                id: row.task.category.id,
+                name: row.task.category.name,
+            },
+        },
+        assignees: row.assignees.map(serializeAssignee),
         timingStatus,
         isOverdue: timingStatus === "OVERDUE",
         daysUntilDue,
-        assignees: row.assignees.map(serializeAssignee),
     };
+}
+
+export function serializeRoutineOccurrenceResponse(
+    row: RoutineOccurrenceRow,
+    today = getCurrentBangkokDate(),
+): ReturnType<typeof serializeOccurrence> {
+    return serializeOccurrence(row, today);
 }
 
 function buildOccurrenceDueDateFilter(

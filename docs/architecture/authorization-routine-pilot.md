@@ -196,6 +196,13 @@ same transaction as their existing business checks. Import apply passes its
 than reusing `routine.task.create`, so import authorization and task creation
 business rules remain separate.
 
+The three occurrence mutation routes serialize the occurrence returned by the
+committed mutation transaction directly. They do not perform a post-commit
+`routine.occurrence.read` refetch, because an actor may have an administrative
+occurrence-action grant without a separate occurrence-read grant or current
+occurrence assignment. The GET route continues to enforce
+`routine.occurrence.read` and its resource predicate.
+
 ## Deliberate non-goals
 
 This pilot does not change navigation, buttons, tabs, Dashboard/LIFF global

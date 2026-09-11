@@ -63,6 +63,7 @@ export {
     getRoutineTaskWorkItems,
     getRoutineTaskById,
     getRoutineTasks,
+    serializeRoutineOccurrenceResponse,
 } from "./application/queries";
 export {
     assertRoutineCapabilityForMigration,

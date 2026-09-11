@@ -14,6 +14,7 @@ import {
 } from "@/modules/routine";
 import {
     getRoutineOccurrenceById,
+    serializeRoutineOccurrenceResponse,
     updateRoutineOccurrenceOverride,
 } from "@/modules/routine";
 import {
@@ -96,13 +97,14 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-        await updateRoutineOccurrenceOverride(Number(parsedId.data), parsed.data, actor);
-        const result = await getRoutineOccurrenceById(Number(parsedId.data), {
+        const occurrence = await updateRoutineOccurrenceOverride(
+            Number(parsedId.data),
+            parsed.data,
             actor,
-            employeeId: "employeeId" in auth ? auth.employeeId : null,
+        );
+        return NextResponse.json({
+            occurrence: serializeRoutineOccurrenceResponse(occurrence),
         });
-        if (!result) return NextResponse.json({ error: "ไม่พบรายการ Routine" }, { status: 404 });
-        return NextResponse.json({ occurrence: result.occurrence });
     } catch (error) {
         return routineErrorResponse(error, "Error overriding routine occurrence");
     }
