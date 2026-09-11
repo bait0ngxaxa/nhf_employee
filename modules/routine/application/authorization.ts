@@ -254,13 +254,18 @@ export async function resolveRoutineCapabilityForMigration(
     );
 }
 
-async function canResolveRoutinePresentationCapability(
-    actor: RoutineCommandActor,
-    employeeId: number | null,
+function projectRoutineCapabilityDecision(
+    actor: AuthorizationActor,
     capability: RoutineMigratedCapability,
-): Promise<boolean> {
+    decision: AuthorizationDecision,
+): boolean {
     try {
-        await resolveRoutineCapabilityForMigration(actor, employeeId, capability);
+        buildRoutineCapabilityAuthorization(
+            actor,
+            capability,
+            decision,
+            {},
+        );
         return true;
     } catch (error) {
         if (
@@ -273,78 +278,51 @@ async function canResolveRoutinePresentationCapability(
     }
 }
 
+function getRoutinePresentationDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: RoutineMigratedCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(
+            `Authorization resolver omitted Routine capability: ${capability}`,
+        );
+    }
+    return decision;
+}
+
 export async function getRoutinePresentationCapabilities(
     actor: RoutineCommandActor,
     employeeId: number | null,
 ): Promise<RoutinePresentationCapabilities> {
-    const [
-        canReadTasks,
-        canCreateTasks,
-        canUpdateTasks,
-        canDeleteTasks,
-        canReadOccurrences,
-        canOverrideOccurrences,
-        canReassignOccurrences,
-        canChangeOccurrenceDueDate,
-        canManageImports,
-    ] = await Promise.all([
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.task.read",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.task.create",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.task.update",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.task.delete",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.occurrence.read",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.occurrence.override",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.occurrence.reassign",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.occurrence.change_due_date",
-        ),
-        canResolveRoutinePresentationCapability(
-            actor,
-            employeeId,
-            "routine.import.manage",
-        ),
-    ]);
+    const authorizationActor = buildRoutineAuthorizationActor(
+        actor,
+        employeeId,
+    );
+    const decisions = await authorization.resolveMany(
+        authorizationActor,
+        ROUTINE_MIGRATED_CAPABILITIES,
+    );
+
+    const canResolve = (capability: RoutineMigratedCapability): boolean =>
+        projectRoutineCapabilityDecision(
+            authorizationActor,
+            capability,
+            getRoutinePresentationDecision(decisions, capability),
+        );
 
     return Object.freeze({
-        canReadTasks,
-        canCreateTasks,
-        canUpdateTasks,
-        canDeleteTasks,
-        canReadOccurrences,
-        canOverrideOccurrences,
-        canReassignOccurrences,
-        canChangeOccurrenceDueDate,
-        canManageImports,
+        canReadTasks: canResolve("routine.task.read"),
+        canCreateTasks: canResolve("routine.task.create"),
+        canUpdateTasks: canResolve("routine.task.update"),
+        canDeleteTasks: canResolve("routine.task.delete"),
+        canReadOccurrences: canResolve("routine.occurrence.read"),
+        canOverrideOccurrences: canResolve("routine.occurrence.override"),
+        canReassignOccurrences: canResolve("routine.occurrence.reassign"),
+        canChangeOccurrenceDueDate: canResolve(
+            "routine.occurrence.change_due_date",
+        ),
+        canManageImports: canResolve("routine.import.manage"),
     });
 }
 

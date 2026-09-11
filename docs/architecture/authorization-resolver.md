@@ -21,6 +21,10 @@ The server/application entry point is `@/modules/authorization`:
 import { authorization } from "@/modules/authorization";
 
 const decision = await authorization.resolve(actor, "routine.task.read");
+const decisions = await authorization.resolveMany(actor, [
+    "routine.task.read",
+    "routine.task.create",
+]);
 const allowed = await authorization.can(actor, "routine.task.read");
 const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
@@ -32,6 +36,14 @@ throws `AuthorizationDeniedError`. The error has no HTTP status or transport
 behavior. `AuthorizationConfigurationError` is reserved for invalid persisted
 configuration or an unsupported resolver contract and is allowed to propagate
 from detailed resolution.
+
+`resolveMany()` returns a read-only map of decisions keyed by the requested
+capability. For a `USER`, it loads one shared resolution snapshot through
+`repository.loadMany()` and evaluates each capability against the relevant
+slice of that snapshot. Unknown capabilities, channel denials, and `ADMIN`
+decisions do not trigger persistence reads. The batch operation preserves
+single-capability evaluator validation by isolating persisted grants per
+capability before evaluation.
 
 For transaction-sensitive mutations, the public resolver also exposes
 `resolveInTransaction(actor, capability, persistenceContext)`. It uses the
@@ -185,13 +197,19 @@ configuration error rather than producing unconstrained Team authority.
 ## Persistence query strategy
 
 `infrastructure/persistence/authorization-resolution-repository.ts` is a
-narrow read adapter. It performs a bounded set of Prisma reads:
+narrow read adapter. Single-capability resolution performs a bounded set of
+Prisma reads, and `loadMany()` performs the same set once for all requested
+capabilities:
 
 - direct User grants filtered by `userId` and capability key;
 - memberships filtered by `userId` and active Team, selecting only Team IDs,
   Team lifecycle/role metadata, and matching Team grants; and
 - matching TeamRole grants filtered to active roles belonging to an active
   Team with a membership for the actor.
+
+For a batch request, each grant query uses the requested capability-key set,
+so a USER projection needs one direct-grant read, one membership read, and at
+most one TeamRole-grant read rather than one set per capability.
 
 The first two reads run concurrently. The role-grant read uses the active
 role IDs from the membership result, so inactive roles are excluded at query

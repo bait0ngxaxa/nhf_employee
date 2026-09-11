@@ -14,6 +14,7 @@ import {
 import type {
     AuthorizationDecision,
     AuthorizationPersistenceContext,
+    AuthorizationResolutionData,
     AuthorizationResolutionRepository,
 } from "./types";
 import {
@@ -39,6 +40,10 @@ export interface AuthorizationResolver {
         actor: AuthorizationActor,
         capability: string,
     ): Promise<AuthorizationDecision>;
+    resolveMany(
+        actor: AuthorizationActor,
+        capabilities: readonly string[],
+    ): Promise<ReadonlyMap<string, AuthorizationDecision>>;
     resolveInTransaction(
         actor: AuthorizationActor,
         capability: string,
@@ -48,6 +53,26 @@ export interface AuthorizationResolver {
         actor: AuthorizationActor,
         capability: string,
     ): Promise<readonly AuthorizationScope[]>;
+}
+
+function selectResolutionDataForCapability(
+    resolutionData: AuthorizationResolutionData,
+    capability: string,
+): AuthorizationResolutionData {
+    return {
+        userGrants: resolutionData.userGrants.filter(
+            (grant) => grant.capabilityKey === capability,
+        ),
+        memberships: resolutionData.memberships.map((membership) => ({
+            ...membership,
+            teamGrants: membership.teamGrants.filter(
+                (grant) => grant.capabilityKey === capability,
+            ),
+        })),
+        teamRoleGrants: resolutionData.teamRoleGrants.filter(
+            (grant) => grant.capabilityKey === capability,
+        ),
+    };
 }
 
 export function createAuthorizationResolver(
@@ -93,6 +118,73 @@ export function createAuthorizationResolver(
     ): Promise<AuthorizationDecision> =>
         resolveWithRepository(actor, capability, repository);
 
+    const resolveMany = async (
+        actor: AuthorizationActor,
+        capabilities: readonly string[],
+    ): Promise<ReadonlyMap<string, AuthorizationDecision>> => {
+        const decisions = new Map<string, AuthorizationDecision>();
+        const userCapabilities: Array<{
+            readonly capability: string;
+            readonly definitionKey: string;
+        }> = [];
+
+        for (const capability of new Set(capabilities)) {
+            const context = getAuthorizationEvaluationContext(
+                actor,
+                capability,
+                registry,
+            );
+            if ("decision" in context) {
+                decisions.set(capability, context.decision);
+                continue;
+            }
+
+            if (context.isAdmin) {
+                decisions.set(
+                    capability,
+                    evaluateAuthorization(
+                        actor,
+                        capability,
+                        undefined,
+                        registry,
+                    ),
+                );
+                continue;
+            }
+
+            userCapabilities.push({
+                capability,
+                definitionKey: context.definition.key,
+            });
+        }
+
+        if (userCapabilities.length === 0) return decisions;
+
+        const resolutionData = await repository.loadMany({
+            userId: actor.userId,
+            capabilityKeys: userCapabilities.map(
+                ({ definitionKey }) => definitionKey,
+            ),
+        });
+
+        for (const { capability, definitionKey } of userCapabilities) {
+            decisions.set(
+                capability,
+                evaluateAuthorization(
+                    actor,
+                    capability,
+                    selectResolutionDataForCapability(
+                        resolutionData,
+                        definitionKey,
+                    ),
+                    registry,
+                ),
+            );
+        }
+
+        return decisions;
+    };
+
     const resolveInTransaction = async (
         actor: AuthorizationActor,
         capability: string,
@@ -130,6 +222,7 @@ export function createAuthorizationResolver(
         can,
         require,
         resolve,
+        resolveMany,
         resolveInTransaction,
         getScopes,
     });

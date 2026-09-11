@@ -146,8 +146,16 @@ export interface AuthorizationResolutionRequest {
     readonly capabilityKey: string;
 }
 
+export interface AuthorizationResolutionManyRequest {
+    readonly userId: number;
+    readonly capabilityKeys: readonly string[];
+}
+
 export interface AuthorizationResolutionRepository {
     load(
         request: AuthorizationResolutionRequest,
+    ): Promise<AuthorizationResolutionData>;
+    loadMany(
+        request: AuthorizationResolutionManyRequest,
     ): Promise<AuthorizationResolutionData>;
 }

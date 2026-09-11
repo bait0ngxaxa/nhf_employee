@@ -27,11 +27,12 @@ interface RoutinePresentationCapabilities {
 ```
 
 `getRoutinePresentationCapabilities()` is the one reusable server-side
-Routine projection. It resolves each of the nine migrated capabilities through
-`resolveRoutineCapabilityForMigration()` in
-`modules/routine/application/authorization.ts`. Dashboard and LIFF code do
-not call the generic authorization resolver directly and do not reproduce the
-Phase 4 compatibility table.
+Routine projection. It asks the central resolver for all nine migrated
+capabilities through one `resolveMany()` call, then applies the existing
+Routine-owned Phase 4 composition to each decision. For a USER, the central
+resolver loads one shared authorization snapshot through `loadMany()` before
+evaluation. Dashboard and LIFF code do not call the generic authorization
+resolver directly and do not reproduce the Phase 4 compatibility table.
 
 Expected Routine authorization denial is projected as `false`. Configuration,
 registry, persistence, and other system failures continue to propagate so a

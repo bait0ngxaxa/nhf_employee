@@ -576,8 +576,13 @@ describe("authorization public resolver API", () => {
                 userGrants: [userGrant("OWN", "stock.request.create")],
             }),
         );
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution({
+                userGrants: [userGrant("OWN", "stock.request.create")],
+            }),
+        );
         const resolver = createAuthorizationResolver({
-            repository: { load },
+            repository: { load, loadMany },
         });
         const currentActor = actor();
 
@@ -596,10 +601,105 @@ describe("authorization public resolver API", () => {
         expect(load).toHaveBeenCalledTimes(3);
     });
 
+    it("loads USER resolution data once for multiple capability decisions", async () => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => resolution(),
+        );
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution({
+                userGrants: [
+                    userGrant("CREATED", "routine.task.read"),
+                    userGrant("OWN", "routine.task.create"),
+                ],
+            }),
+        );
+        const resolver = createAuthorizationResolver({
+            repository: { load, loadMany },
+        });
+
+        const decisions = await resolver.resolveMany(
+            actor(),
+            ["routine.task.read", "routine.task.create"],
+        );
+
+        expect(decisions.get("routine.task.read")).toMatchObject({
+            allowed: true,
+            scopes: ["CREATED"],
+        });
+        expect(decisions.get("routine.task.create")).toMatchObject({
+            allowed: true,
+            scopes: ["OWN"],
+        });
+        expect(loadMany).toHaveBeenCalledTimes(1);
+        expect(loadMany).toHaveBeenCalledWith({
+            userId: USER_ID,
+            capabilityKeys: ["routine.task.read", "routine.task.create"],
+        });
+        expect(load).not.toHaveBeenCalled();
+    });
+
+    it("does not query persistence for ADMIN or rejected batch capabilities", async () => {
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution(),
+        );
+        const resolver = createAuthorizationResolver({
+            repository: {
+                load: async () => resolution(),
+                loadMany,
+            },
+        });
+
+        const adminDecisions = await resolver.resolveMany(
+            actor({ systemRole: "ADMIN" }),
+            ["routine.task.read", "routine.occurrence.override"],
+        );
+        expect(adminDecisions.get("routine.task.read")?.allowed).toBe(true);
+        expect(adminDecisions.get("routine.occurrence.override")?.allowed)
+            .toBe(true);
+
+        const rejectedDecisions = await resolver.resolveMany(
+            actor({ channel: "LIFF_SELF_SERVICE" }),
+            ["routine.task.unknown", "employee.read"],
+        );
+        expect(rejectedDecisions.get("routine.task.unknown")?.reason)
+            .toBe("UNKNOWN_CAPABILITY");
+        expect(rejectedDecisions.get("employee.read")?.reason)
+            .toBe("CHANNEL_NOT_SUPPORTED");
+        expect(loadMany).not.toHaveBeenCalled();
+    });
+
+    it("isolates evaluator validation to each requested capability", async () => {
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution({
+                userGrants: [
+                    userGrant("CREATED", "routine.task.read"),
+                    userGrant("CREATED", "routine.task.create"),
+                ],
+            }),
+        );
+        const resolver = createAuthorizationResolver({
+            repository: {
+                load: async () => resolution(),
+                loadMany,
+            },
+        });
+
+        const decisions = await resolver.resolveMany(
+            actor(),
+            ["routine.task.read"],
+        );
+
+        expect(decisions.get("routine.task.read")).toMatchObject({
+            allowed: true,
+            scopes: ["CREATED"],
+        });
+    });
+
     it("throws a framework-neutral denial error from require", async () => {
         const resolver = createAuthorizationResolver({
             repository: {
                 load: async () => resolution(),
+                loadMany: async () => resolution(),
             },
         });
 
@@ -619,8 +719,11 @@ describe("authorization public resolver API", () => {
         const load = vi.fn<AuthorizationResolutionRepository["load"]>(
             async () => resolution(),
         );
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution(),
+        );
         const resolver = createAuthorizationResolver({
-            repository: { load },
+            repository: { load, loadMany },
         });
 
         await expect(

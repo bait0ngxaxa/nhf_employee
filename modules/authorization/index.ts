@@ -58,6 +58,7 @@ export type {
     AuthorizationPersistedTeamRoleGrant,
     AuthorizationPersistedUserGrant,
     AuthorizationResolutionData,
+    AuthorizationResolutionManyRequest,
     AuthorizationResolutionRepository,
     AuthorizationResolutionRequest,
     AuthorizationPersistenceContext,

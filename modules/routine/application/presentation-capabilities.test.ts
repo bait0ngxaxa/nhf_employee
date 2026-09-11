@@ -7,18 +7,21 @@ import type {
 
 const mocks = vi.hoisted(() => ({
     resolve: vi.fn(),
+    resolveMany: vi.fn(),
     resolveInTransaction: vi.fn(),
 }));
 
 vi.mock("@/modules/authorization", () => ({
     authorization: {
         resolve: mocks.resolve,
+        resolveMany: mocks.resolveMany,
         resolveInTransaction: mocks.resolveInTransaction,
     },
 }));
 
 import {
     getRoutinePresentationCapabilities,
+    ROUTINE_MIGRATED_CAPABILITIES,
 } from "./authorization";
 import type { RoutineCommandActor } from "./types";
 
@@ -41,10 +44,33 @@ const IMPORT_GRANT: EffectiveAuthorizationGrant = {
     source: { type: "USER", userId: 7 },
 };
 
+function allowedDecisions(): ReadonlyMap<string, AuthorizationDecision> {
+    return new Map(
+        ROUTINE_MIGRATED_CAPABILITIES.map((capability) => [
+            capability,
+            { ...ALLOWED_DECISION, capability },
+        ]),
+    );
+}
+
+function mockResolveMany(
+    getDecision: (capability: string) => AuthorizationDecision,
+): void {
+    mocks.resolveMany.mockImplementation(
+        async (_actor: unknown, capabilities: readonly string[]) =>
+            new Map(
+                capabilities.map((capability) => [
+                    capability,
+                    getDecision(capability),
+                ]),
+            ),
+    );
+}
+
 describe("Routine presentation capability projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.resolve.mockResolvedValue(ALLOWED_DECISION);
+        mocks.resolveMany.mockResolvedValue(allowedDecisions());
     });
 
     it("projects the nine migrated capabilities into serializable booleans", async () => {
@@ -63,23 +89,29 @@ describe("Routine presentation capability projection", () => {
         });
     });
 
+    it("uses one central multi-capability resolution for the projection", async () => {
+        await getRoutinePresentationCapabilities(ACTOR, 21);
+
+        expect(mocks.resolveMany).toHaveBeenCalledTimes(1);
+        expect(mocks.resolve).not.toHaveBeenCalled();
+    });
+
     it("keeps the no-grant USER compatibility floor and honors a configured grant", async () => {
-        mocks.resolve.mockImplementation(
-            (_actor: unknown, capability: string): Promise<AuthorizationDecision> =>
-                capability === "routine.import.manage"
-                    ? Promise.resolve({
-                          capability,
-                          allowed: true,
-                          scopes: ["ALL"],
-                          grants: [IMPORT_GRANT],
-                      })
-                    : Promise.resolve({
-                          capability,
-                          allowed: false,
-                          scopes: [],
-                          grants: [],
-                          reason: "NO_APPLICABLE_GRANT",
-                      }),
+        mockResolveMany((capability) =>
+            capability === "routine.import.manage"
+                ? {
+                      capability,
+                      allowed: true,
+                      scopes: ["ALL"],
+                      grants: [IMPORT_GRANT],
+                  }
+                : {
+                      capability,
+                      allowed: false,
+                      scopes: [],
+                      grants: [],
+                      reason: "NO_APPLICABLE_GRANT",
+                  },
         );
 
         await expect(
@@ -98,19 +130,16 @@ describe("Routine presentation capability projection", () => {
     });
 
     it("projects Dashboard ADMIN authorization without applying the LIFF clamp", async () => {
-        mocks.resolve.mockImplementation(
-            (_actor: unknown, capability: string): Promise<AuthorizationDecision> =>
-                Promise.resolve({
-                    capability,
-                    allowed: true,
-                    scopes: ["ALL"],
-                    grants: [{
-                        capability: capability as EffectiveAuthorizationGrant["capability"],
-                        scope: "ALL",
-                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-                    }],
-                }),
-        );
+        mockResolveMany((capability) => ({
+            capability,
+            allowed: true,
+            scopes: ["ALL"],
+            grants: [{
+                capability: capability as EffectiveAuthorizationGrant["capability"],
+                scope: "ALL",
+                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+            }],
+        }));
 
         const dashboardAdmin: RoutineCommandActor = {
             ...ACTOR,
@@ -130,28 +159,32 @@ describe("Routine presentation capability projection", () => {
             canChangeOccurrenceDueDate: true,
             canManageImports: true,
         });
-        expect(mocks.resolve).toHaveBeenCalledWith(
+        expect(mocks.resolveMany).toHaveBeenCalledWith(
             {
                 userId: 7,
                 employeeId: null,
                 systemRole: "ADMIN",
                 channel: "DASHBOARD",
             },
-            "routine.occurrence.override",
+            ROUTINE_MIGRATED_CAPABILITIES,
         );
     });
 
     it("keeps no-grant USER compatibility for LIFF self-service", async () => {
-        mocks.resolve.mockImplementation(
-            (_actor: unknown, capability: string): Promise<AuthorizationDecision> =>
-                Promise.resolve({
-                    capability,
-                    allowed: false,
-                    scopes: [],
-                    grants: [],
-                    reason: "NO_APPLICABLE_GRANT",
-                }),
-        );
+        mockResolveMany((capability) => {
+            const dashboardOnly = capability.startsWith("routine.occurrence.")
+                || capability === "routine.import.manage";
+
+            return {
+                capability,
+                allowed: false,
+                scopes: [],
+                grants: [],
+                reason: dashboardOnly
+                    ? "CHANNEL_NOT_SUPPORTED" as const
+                    : "NO_APPLICABLE_GRANT" as const,
+            };
+        });
 
         await expect(
             getRoutinePresentationCapabilities({
@@ -163,7 +196,7 @@ describe("Routine presentation capability projection", () => {
             canCreateTasks: true,
             canUpdateTasks: true,
             canDeleteTasks: true,
-            canReadOccurrences: true,
+            canReadOccurrences: false,
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
@@ -172,16 +205,13 @@ describe("Routine presentation capability projection", () => {
     });
 
     it("maps an expected authorization denial to false", async () => {
-        mocks.resolve.mockImplementation(
-            (_actor: unknown, capability: string): Promise<AuthorizationDecision> =>
-                Promise.resolve({
-                    capability,
-                    allowed: false,
-                    scopes: [],
-                    grants: [],
-                    reason: "CHANNEL_NOT_SUPPORTED",
-                }),
-        );
+        mockResolveMany((capability) => ({
+            capability,
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "CHANNEL_NOT_SUPPORTED",
+        }));
 
         await expect(
             getRoutinePresentationCapabilities(ACTOR, 21),
@@ -200,12 +230,7 @@ describe("Routine presentation capability projection", () => {
 
     it("propagates authorization configuration failures", async () => {
         const configurationError = new Error("invalid persisted capability");
-        mocks.resolve.mockImplementation(
-            (_actor: unknown, capability: string): Promise<AuthorizationDecision> =>
-                capability === "routine.task.update"
-                    ? Promise.reject(configurationError)
-                    : Promise.resolve(ALLOWED_DECISION),
-        );
+        mocks.resolveMany.mockRejectedValue(configurationError);
 
         await expect(
             getRoutinePresentationCapabilities(ACTOR, 21),
@@ -213,16 +238,13 @@ describe("Routine presentation capability projection", () => {
     });
 
     it("does not mask an unknown capability decision as ordinary denial", async () => {
-        mocks.resolve.mockImplementation(
-            (_actor: unknown, capability: string): Promise<AuthorizationDecision> =>
-                Promise.resolve({
-                    capability,
-                    allowed: false,
-                    scopes: [],
-                    grants: [],
-                    reason: "UNKNOWN_CAPABILITY",
-                }),
-        );
+        mockResolveMany((capability) => ({
+            capability,
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "UNKNOWN_CAPABILITY",
+        }));
 
         await expect(
             getRoutinePresentationCapabilities(ACTOR, 21),
@@ -230,25 +252,23 @@ describe("Routine presentation capability projection", () => {
     });
 
     it("keeps Dashboard-only Routine administration unavailable to LIFF ADMIN", async () => {
-        mocks.resolve.mockImplementation(
-            (_actor: unknown, capability: string): Promise<AuthorizationDecision> => {
-                const dashboardOnly = capability === "routine.occurrence.read"
-                    || capability === "routine.occurrence.override"
-                    || capability === "routine.occurrence.reassign"
-                    || capability === "routine.occurrence.change_due_date"
-                    || capability === "routine.import.manage";
+        mockResolveMany((capability) => {
+            const dashboardOnly = capability === "routine.occurrence.read"
+                || capability === "routine.occurrence.override"
+                || capability === "routine.occurrence.reassign"
+                || capability === "routine.occurrence.change_due_date"
+                || capability === "routine.import.manage";
 
-                return Promise.resolve({
-                    capability,
-                    allowed: !dashboardOnly,
-                    scopes: dashboardOnly ? [] : ["ALL"],
-                    grants: [],
-                    ...(dashboardOnly
-                        ? { reason: "CHANNEL_NOT_SUPPORTED" as const }
-                        : {}),
-                });
-            },
-        );
+            return {
+                capability,
+                allowed: !dashboardOnly,
+                scopes: dashboardOnly ? [] : ["ALL"],
+                grants: [],
+                ...(dashboardOnly
+                    ? { reason: "CHANNEL_NOT_SUPPORTED" as const }
+                    : {}),
+            };
+        });
 
         const liffAdmin: RoutineCommandActor = {
             ...ACTOR,
@@ -269,14 +289,14 @@ describe("Routine presentation capability projection", () => {
             canChangeOccurrenceDueDate: false,
             canManageImports: false,
         });
-        expect(mocks.resolve).toHaveBeenCalledWith(
+        expect(mocks.resolveMany).toHaveBeenCalledWith(
             {
                 userId: 7,
                 employeeId: 21,
                 systemRole: "ADMIN",
                 channel: "LIFF_SELF_SERVICE",
             },
-            "routine.task.update",
+            ROUTINE_MIGRATED_CAPABILITIES,
         );
     });
 });
