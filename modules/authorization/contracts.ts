@@ -56,6 +56,7 @@ export interface AuthorizationActor {
 export interface CapabilityDefinition {
     key: CapabilityKey;
     domain: AuthorizationDomain;
+    description: string;
     scopes: readonly AuthorizationScope[];
     channels: readonly AuthorizationChannel[];
 }

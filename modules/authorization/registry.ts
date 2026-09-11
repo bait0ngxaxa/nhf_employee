@@ -25,48 +25,56 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
     defineCapability({
         key: "employee.read",
         domain: "employee",
+        description: "Read Employee records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "employee.stats.read",
         domain: "employee",
+        description: "Read aggregate Employee statistics within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "employee.create",
         domain: "employee",
+        description: "Create Employee records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "employee.update",
         domain: "employee",
+        description: "Update Employee records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "employee.delete",
         domain: "employee",
+        description: "Delete Employee records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "employee.import",
         domain: "employee",
+        description: "Import Employee records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "employee.export",
         domain: "employee",
+        description: "Export Employee records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "department.read",
         domain: "department",
+        description: "Read Department reference data within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
@@ -74,72 +82,84 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
     defineCapability({
         key: "routine.task.read",
         domain: "routine",
+        description: "Read Routine tasks within an authorized resource scope.",
         scopes: ["CREATED", "ASSIGNED", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "routine.task.create",
         domain: "routine",
+        description: "Create Routine tasks within an authorized resource scope.",
         scopes: ["OWN", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "routine.task.update",
         domain: "routine",
+        description: "Update Routine tasks within an authorized resource scope.",
         scopes: ["CREATED", "ASSIGNED", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "routine.task.delete",
         domain: "routine",
+        description: "Delete Routine tasks within an authorized resource scope.",
         scopes: ["CREATED", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "routine.occurrence.read",
         domain: "routine",
+        description: "Read Routine task occurrences within an authorized resource scope.",
         scopes: ["ASSIGNED", "ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "routine.occurrence.override",
         domain: "routine",
+        description: "Override Routine task occurrence details within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "routine.occurrence.reassign",
         domain: "routine",
+        description: "Reassign Routine task occurrences within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "routine.occurrence.change_due_date",
         domain: "routine",
+        description: "Change due dates for Routine task occurrences within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "routine.import.manage",
         domain: "routine",
+        description: "Manage Routine task imports within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "routine.task.export",
         domain: "routine",
+        description: "Export Routine task records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "routine.summary.read",
         domain: "routine",
+        description: "Read Routine task summaries within an authorized resource scope.",
         scopes: ["ASSIGNED", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "routine.reference.read",
         domain: "routine",
+        description: "Read Routine task reference data within an authorized resource scope.",
         scopes: ["OWN", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
@@ -147,42 +167,49 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
     defineCapability({
         key: "stock.catalog.read",
         domain: "stock",
+        description: "Read Stock catalog data within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "stock.inventory.manage",
         domain: "stock",
+        description: "Manage Stock inventory data within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "stock.request.read",
         domain: "stock",
+        description: "Read Stock requests within an authorized resource scope.",
         scopes: ["OWN", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "stock.request.create",
         domain: "stock",
+        description: "Create Stock requests within an authorized resource scope.",
         scopes: ["OWN"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "stock.request.cancel",
         domain: "stock",
+        description: "Cancel Stock requests within an authorized resource scope.",
         scopes: ["OWN", "ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "stock.request.process",
         domain: "stock",
+        description: "Process Stock requests within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "stock.report.export",
         domain: "stock",
+        description: "Export Stock reports within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
@@ -190,48 +217,56 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
     defineCapability({
         key: "leave.request.read",
         domain: "leave",
+        description: "Read Leave requests within an authorized resource scope.",
         scopes: ["OWN"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "leave.approval.read",
         domain: "leave",
+        description: "Read Leave approval work within an authorized resource scope.",
         scopes: ["ASSIGNED"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "leave.request.create",
         domain: "leave",
+        description: "Create Leave requests within an authorized resource scope.",
         scopes: ["OWN"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "leave.request.cancel",
         domain: "leave",
+        description: "Cancel Leave requests within an authorized resource scope.",
         scopes: ["OWN"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "leave.request.approve",
         domain: "leave",
+        description: "Approve Leave requests within an authorized resource scope.",
         scopes: ["ASSIGNED"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "leave.cancellation.decide",
         domain: "leave",
+        description: "Decide Leave request cancellations within an authorized resource scope.",
         scopes: ["ASSIGNED"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "leave.request.not_taken",
         domain: "leave",
+        description: "Record a Leave request as not taken within an authorized resource scope.",
         scopes: ["OWN", "ASSIGNED"] as const,
         channels: ["DASHBOARD", "LIFF_SELF_SERVICE"] as const,
     }),
     defineCapability({
         key: "leave.approver.manage",
         domain: "leave",
+        description: "Manage Leave approver assignments within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
@@ -239,6 +274,7 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
     defineCapability({
         key: "audit.read",
         domain: "audit",
+        description: "Read Audit records within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
@@ -246,12 +282,14 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
     defineCapability({
         key: "email.request.read",
         domain: "email",
+        description: "Read Email requests within an authorized resource scope.",
         scopes: ["OWN", "ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "email.request.create",
         domain: "email",
+        description: "Create Email requests within an authorized resource scope.",
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
@@ -259,12 +297,14 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
     defineCapability({
         key: "notification.inbox.read",
         domain: "notification",
+        description: "Read Notification inbox entries within an authorized resource scope.",
         scopes: ["OWN"] as const,
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
         key: "notification.inbox.update",
         domain: "notification",
+        description: "Update Notification inbox entries within an authorized resource scope.",
         scopes: ["OWN"] as const,
         channels: ["DASHBOARD"] as const,
     }),
@@ -369,6 +409,17 @@ function assertValidCapabilityDefinition(
         );
     }
 
+    const description = value.description;
+    if (
+        typeof description !== "string"
+        || description.trim().length === 0
+        || description !== description.trim()
+    ) {
+        throw new Error(
+            `Invalid capability definition at index ${index}: invalid description`,
+        );
+    }
+
     if (!isAuthorizationScopeArray(value.scopes)) {
         throw new Error(
             `Invalid capability definition at index ${index}: invalid scopes`,
@@ -407,6 +458,7 @@ export function createCapabilityRegistry<
             Object.freeze({
                 key: definition.key,
                 domain: definition.domain,
+                description: definition.description,
                 scopes: Object.freeze([...definition.scopes]),
                 channels: Object.freeze([...definition.channels]),
             }),

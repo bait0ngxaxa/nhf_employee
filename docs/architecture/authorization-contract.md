@@ -87,10 +87,16 @@ type AuthorizationScope =
 type CapabilityDefinition = {
     key: CapabilityKey;
     domain: AuthorizationDomain;
+    description: string;
     scopes: readonly AuthorizationScope[];
     channels: readonly AuthorizationChannel[];
 };
 ```
+
+`description` is canonical registry metadata. It concisely describes the
+application-level authority represented by the capability; it does not encode
+role grants, UI presentation, resource predicates, resolver behavior, or
+temporary compatibility policy.
 
 `AuthorizationActor` intentionally contains no department, manager,
 assignee, approver, workflow, resource, or UI state. A domain interprets its
@@ -158,6 +164,7 @@ Registry construction fails early when any of these invariants is violated:
 - a key is not a valid two- or three-segment capability identifier;
 - the key's domain is unknown or does not match `domain`;
 - `domain` is missing or unknown;
+- `description` is missing, blank, or has leading/trailing whitespace;
 - `scopes` is empty, contains an unknown scope, or repeats a scope; or
 - `channels` is empty, contains an unknown channel, or repeats a channel.
 

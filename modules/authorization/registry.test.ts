@@ -67,6 +67,8 @@ describe("authorization contracts", () => {
 
     it("declares supported scopes and channels for every capability", () => {
         for (const definition of CAPABILITY_REGISTRY.definitions) {
+            expect(definition.description).toBe(definition.description.trim());
+            expect(definition.description.length).toBeGreaterThan(0);
             expect(definition.scopes.length).toBeGreaterThan(0);
             expect(definition.channels.length).toBeGreaterThan(0);
             expect(
@@ -87,6 +89,7 @@ describe("authorization contracts", () => {
         expect(getCapabilityDefinition("routine.task.read")).toMatchObject({
             key: "routine.task.read",
             domain: "routine",
+            description: "Read Routine tasks within an authorized resource scope.",
         });
         expect(isRegisteredCapabilityKey("routine.task.read")).toBe(true);
         expect(getCapabilityDefinition("routine.task.archive")).toBeUndefined();
@@ -98,6 +101,7 @@ describe("authorization contracts", () => {
         const definition: CapabilityDefinition = {
             key: "employee.read",
             domain: "employee",
+            description: "Read Employee records within an authorized resource scope.",
             scopes: ["ALL"],
             channels: ["DASHBOARD"],
         };
@@ -129,6 +133,22 @@ describe("authorization contracts", () => {
                 },
             ]),
         ).toThrow("invalid channels");
+        expect(() =>
+            createCapabilityRegistry([
+                {
+                    ...definition,
+                    description: "",
+                },
+            ]),
+        ).toThrow("invalid description");
+        expect(() =>
+            createCapabilityRegistry([
+                {
+                    ...definition,
+                    description: "   ",
+                },
+            ]),
+        ).toThrow("invalid description");
     });
 
     it("keeps the registry and its definitions immutable", () => {
