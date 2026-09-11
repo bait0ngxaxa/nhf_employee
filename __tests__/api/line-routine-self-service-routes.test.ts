@@ -163,32 +163,43 @@ describe("LIFF Routine self-service route contracts", () => {
         mocks.deleteRoutineTask.mockResolvedValue(undefined);
     });
 
-    it("returns only self-service reference data", async () => {
-        const response = await getReference(
-            request("/api/line/routine/reference"),
-        );
-        const body = await response.json() as Record<string, unknown>;
+    it.each(["USER", "ADMIN"] as const)(
+        "does not expose employee references for a %s LIFF session",
+        async (role) => {
+            mocks.requireLiffWorkforceSession.mockResolvedValue({
+                ...AUTH,
+                user: {
+                    ...AUTH.user,
+                    role,
+                },
+            });
 
-        expect(response.status).toBe(200);
-        expect(body).toEqual({
-            units: [{ id: 1, code: "IT", name: "ฝ่าย IT" }],
-            categories: [{ id: 2, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
-            scheduleTypes: [
-                "MONTHLY_DAY",
-                "MONTH_END",
-                "INTERVAL_MONTHS",
-                "YEARLY_DATE",
-                "ONE_TIME",
-                "MANUAL",
-            ],
-            businessDayPolicies: [
-                "NONE",
-                "PREVIOUS_BUSINESS_DAY",
-                "NEXT_BUSINESS_DAY",
-            ],
-        });
-        expect(body).not.toHaveProperty("employees");
-    });
+            const response = await getReference(
+                request("/api/line/routine/reference"),
+            );
+            const body = await response.json() as Record<string, unknown>;
+
+            expect(response.status).toBe(200);
+            expect(body).toEqual({
+                units: [{ id: 1, code: "IT", name: "ฝ่าย IT" }],
+                categories: [{ id: 2, name: "ระบบคอมพิวเตอร์", sortOrder: 1 }],
+                scheduleTypes: [
+                    "MONTHLY_DAY",
+                    "MONTH_END",
+                    "INTERVAL_MONTHS",
+                    "YEARLY_DATE",
+                    "ONE_TIME",
+                    "MANUAL",
+                ],
+                businessDayPolicies: [
+                    "NONE",
+                    "PREVIOUS_BUSINESS_DAY",
+                    "NEXT_BUSINESS_DAY",
+                ],
+            });
+            expect(body).not.toHaveProperty("employees");
+        },
+    );
 
     it("creates with the linked employee as OWNER and preserves the idempotency key", async () => {
         const response = await createTask(

@@ -27,11 +27,12 @@ web access cookie / LIFF session / system secret
 - API legacy adapter ใช้ requireApiSession() และ requireAdminSession() เป็นแกนกลาง ค่าเริ่มต้นคือ unauthenticated 401 และ authenticated-but-not-admin 403 แต่บาง route ตั้ง response factory ให้ทั้งสองกรณีเป็น 403
 - getApiAuthSession() ไม่ได้ตรวจแค่ account แต่ยังคง legacy contract ที่ต้องมี Employee ที่ ACTIVE และไม่ถูกลบ
 - Dashboard layout ป้องกันการเข้าใช้งานโดยต้องได้ current active Employee projection แต่ role guard มีเฉพาะบาง page; navigation และการซ่อนปุ่มเป็น presentation เท่านั้น
-- Routine มี semantics แบบ channel-aware: Admin ของ Dashboard/API ได้ admin scope แต่ Admin ที่ผ่าน LIFF_SELF_SERVICE ถูกปฏิบัติเหมือนผู้ใช้ self-service สำหรับ task operations
+- Routine มี semantics แบบ channel-aware: Admin ของ Dashboard-owned API ได้ admin scope แต่ Admin ที่ผ่าน LIFF_SELF_SERVICE ถูกปฏิบัติเหมือนผู้ใช้ self-service สำหรับ task operations
 - Routine task work-item, summary และ export paths ปัจจุบันยอมรับ scope=all ของ USER และ query สามารถไม่มี assignee filter; พฤติกรรมนี้มี tests freeze ไว้และถูกบันทึกเป็น high-risk migration input
 - Stock แยก requester ownership กับ admin processor/inventory อย่างชัดเจนใน route/query แต่ command บางตัวเชื่อ route guard และรับ isAdmin จาก caller
 - Leave ไม่ใช่ Admin-vs-User อย่างเดียว: approval ใช้ effective approver จาก exceptionApproverId หรือ approverId; Admin override มีเฉพาะบาง Dashboard/API workflow และถูกปิดสำหรับ LIFF
 - canApproveLeave, canViewLeaveReports และ LiffCapabilities เป็น projections สำหรับ presentation/entry-point behavior ไม่ใช่ authoritative server permission
+- LIFF Routine reference route มี mode omission ที่อาจทำให้ internal query ใช้ Admin branch แต่ serializeLiffRoutineReference() ไม่ส่ง employee list ออกไป; จึงเป็น internal channel-context/least-data-access risk ไม่ใช่ client-visible employee disclosure ที่พิสูจน์แล้ว
 - ยังไม่พบ Team, TeamRole, Capability Registry, generic scope engine หรือ Department-based authorization ใน repository นี้
 
 ## 1. Scope, terms and classification
@@ -48,6 +49,17 @@ web access cookie / LIFF session / system secret
 | API | /api/** ที่ใช้ hybrid access cookie | middleware.ts ไม่ครอบ /api; route ต้องเรียก server guard เอง |
 | LIFF_SELF_SERVICE | LINE/LIFF route ที่ใช้ LIFF session cookie และ linked LINE identity | บาง domain โดยเฉพาะ Routine/Leave มี channel-specific restriction |
 | SYSTEM | Cron, cleanup, webhook หรือ infrastructure endpoint | ใช้ shared secret/HMAC ไม่ได้ใช้ User role |
+
+### 1.1.1 Entry-point surface vs authorization execution channel
+
+ใน Current Authorization Matrix คอลัมน์ `Channel` ใช้เป็นการจัดกลุ่ม **entry-point / transport surface** ของพฤติกรรมปัจจุบัน จึงยังมีค่า `API` เพื่อบอกว่า decision ถูกบังคับใช้ใน HTTP route handler ภายใต้ `/api/**` การใช้ `API` ใน matrix ไม่ได้หมายความว่าอนาคตต้องมี `API` เป็นค่าใน `AuthorizationActor.channel`
+
+ให้แยกคำสองชุดนี้ออกจากกัน:
+
+- **Entry-point / transport surface:** `DASHBOARD`, `API`, `LIFF`, `SYSTEM endpoint`
+- **Authorization execution channel:** `DASHBOARD`, `LIFF_SELF_SERVICE`, `SYSTEM`
+
+หลาย `/api/**` routes เป็น server endpoints ที่ Dashboard เรียกใช้ ดังนั้น Phase 1 ต้อง derive execution context จาก caller/security context: Dashboard-owned API calls โดยปกติยังเป็น `DASHBOARD` context, LIFF routes ใช้ `LIFF_SELF_SERVICE`, และ trusted background/platform operations ใช้ `SYSTEM` หรือ system principal model ที่ได้รับอนุมัติโดยเฉพาะ ห้ามเพิ่ม `API` เป็น actor channel เพียงเพราะ route ใช้ HTTP transport นี้
 
 ### 1.2 Authentication vs Authorization Classification
 
@@ -161,7 +173,7 @@ getLiffCapabilities() คืนค่า:
 
 ## 4. Current Authorization Matrix
 
-ตารางต่อไปนี้ใช้ field เดียวกันทุก domain:
+ตารางต่อไปนี้ใช้ field เดียวกันทุก domain โดย `Channel` ในตารางหมายถึง entry-point / transport surface ของ current implementation; ไม่ใช่ future `AuthorizationActor.channel`:
 
 Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requirement, Account / Workforce Lifecycle Requirement, Current Authorization Rule, System Role Dependency, Resource / Domain Relationship, Current Effective Scope Semantics, Feature Flag Dependency, Enforcement Location, Presentation Projection, Unauthorized Outcome, Relevant Tests และ Migration Invariant / Notes
 
@@ -206,7 +218,7 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 | Routine | API | Routine occurrence due-date/assignee/override mutations | Occurrence and occurrence assignees | requireAdminSession() plus validation/rate guard | assertActiveAdminInTransaction; target Employees must active | Admin only | ADMIN | Active target assignees; row/version/reminder locks | Admin all selected occurrences | Routine flag | app/api/routines/occurrences/[id]/**, updateRoutineOccurrenceOverride, updateRoutineOccurrenceDueDate, reassignRoutineOccurrence | Admin occurrence controls | Non-admin 403; validation/state/concurrency 400/409 | __tests__/api/routines-occurrence-by-id.test.ts, __tests__/api/routines-legacy-occurrence-mutations.test.ts, modules/routine/application/mutations.test.ts | Role gate and active target/business invariants both required |
 | Routine | API | Routine import preview/batches/rows/apply/cancel/reference | Import batch and staged RoutineTasks | requireAdminSession() | Active Admin transaction and active referenced Employees | Admin-only at every import route and service transaction | ADMIN | Batch/row ownership is not a normal USER scope | All import rows under Admin operation | Routine flag | app/api/routines/imports/**, assertActiveAdminInTransaction | Admin Import UI | Non-admin 403; validation/state 400/409 | __tests__/api/routine-import-preview.test.ts, __tests__/integration/routine-import-apply.integration.test.ts | Preserve staged import transactional behavior |
 | Routine | LIFF_SELF_SERVICE | LIFF task list/create/detail/update/delete | RoutineTask and relevant occurrence | requireLiffWorkforceSession() | Active linked LINE workforce | Actor mode explicitly LIFF_SELF_SERVICE; Admin is not elevated for task relationship/capabilities | Admin role intentionally constrained by mode | Creator, current active task assignee, or active occurrence-only assignee for detail; create forces linked Employee OWNER | Task list/summary forced MINE; creator/assignee relationship for detail; creator delete; assignee content edit | Routine LIFF flag; disabled 404 | app/api/line/routine/tasks/**, modules/routine/application/authorization.ts:isRoutineAdminActor, getLiffRoutineTaskById | canCreateOwnRoutine, serialized self-service fields/actions | LIFF session 401/403/500; relation/domain errors 403/404/409 | __tests__/api/line-routine-routes.test.ts, __tests__/api/line-routine-self-service-routes.test.ts, modules/routine/application/mutations.test.ts | Critical channel-aware Admin invariant |
-| Routine | LIFF_SELF_SERVICE | LIFF reference route | Active Employee reference data | LIFF workforce session | Active linked LINE workforce | Route creates actor without explicit mode LIFF_SELF_SERVICE; getRoutineReferenceData therefore treats LIFF Admin as Admin | ADMIN currently exposes all active employees on this route | USER gets own active Employee; Admin gets all active Employees | Current LIFF Admin reference scope differs from LIFF task self-service scope | Routine LIFF flag | app/api/line/routine/reference/route.ts, getRoutineReferenceData | serializeLiffRoutineReference | LIFF/auth/feature errors | __tests__/api/line-routine-self-service-routes.test.ts where covered | Current channel inconsistency; do not silently correct in Phase 0 |
+| Routine | LIFF_SELF_SERVICE | LIFF reference route | Active Employee reference data | LIFF workforce session | Active linked LINE workforce | Route creates actor without explicit mode LIFF_SELF_SERVICE; getRoutineReferenceData may therefore take the Admin branch and query all active Employees, but serializeLiffRoutineReference removes employees from the response | ADMIN affects the internal query branch only; no employee list is serialized to the LIFF client | Internal query: USER own active Employee vs Admin all active Employees; client-visible response omits employees for both | Client-visible reference response contains units, categories, scheduleTypes and businessDayPolicies only | Routine LIFF flag | app/api/line/routine/reference/route.ts, getRoutineReferenceData, modules/routine/server/liff-serialization.ts:serializeLiffRoutineReference | serializeLiffRoutineReference | LIFF/auth/feature errors | __tests__/api/line-routine-self-service-routes.test.ts | Preserve the no-employee-list response boundary; broader internal query is a channel-context/least-data-access risk, not a compatibility behavior to preserve |
 
 ### 4.4 Stock
 
@@ -295,6 +307,8 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 
 ### 5.3 API guards
 
+ใน inventory นี้ `API` หมายถึง transport surface ของ route เท่านั้น ไม่ใช่ค่าใน future `AuthorizationActor.channel`; ต้องดูว่า caller/security context เป็น Dashboard, LIFF หรือ SYSTEM ก่อนกำหนด execution channel
+
 - Generic session: lib/auth/api.ts:requireApiSession
 - Admin role: lib/auth/api.ts:requireAdminSession
 - Active Employee: lib/auth/workforce.ts:requireActiveWorkforceSession
@@ -309,6 +323,7 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 - Home projection: getLiffCapabilities
 - Stock processor role: requireLiffStockProcessorSession
 - Routine channel mode: createLiffRoutineActor(..., { mode: LIFF_SELF_SERVICE })
+- LIFF Routine reference exception: app/api/line/routine/reference/route.ts ไม่ส่ง mode ให้ createRoutineCommandActor(); getRoutineReferenceData() จึงอาจ query employee set แบบ Admin แต่ serializeLiffRoutineReference() ส่งออกเฉพาะ units, categories, scheduleTypes และ businessDayPolicies โดยไม่ส่ง employees
 - Leave capability: getLiffLeaveCapabilities checks actionable assigned effective approver work, not role
 - Leave/Routine/Stock LIFF routes independently enforce role/relationship/status after projection
 
@@ -322,6 +337,7 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 - buildWorkOccurrenceWhere: occurrence-level assignee scope; normal USER is mine even when requested all
 - buildTaskAssigneeWhere and buildTaskWhere: operational task path permits unscoped all when scope=all, without role predicate
 - buildLiffRoutineTaskAccessWhere: creator, current task assignee or occurrence-only assignee; active checks for assignment paths
+- getRoutineReferenceData plus serializeLiffRoutineReference: internal Admin query branch on the LIFF reference route is not the client-visible response scope; the serializer omits employees
 - Mutation transactions enforce active actor, active target Employees, version/reminder locks and creator-vs-assignee field restrictions
 
 ### 5.6 Stock domain authorization
@@ -384,6 +400,7 @@ Query and persistence scopes found include:
 | requireDashboardAdmin | AUTHENTICATION + ACCOUNT_LIFECYCLE + AUTHORIZATION; outcome เป็น redirect |
 | DashboardProvider, requiredRole, canApproveLeave, canViewLeaveReports และ LiffCapabilities | PRESENTATION_ONLY; บางค่าคำนวณจาก RESOURCE_RELATIONSHIP หรือ FEATURE_FLAG แต่ไม่ใช่ authority |
 | Routine isRoutineAdminActor | AUTHORIZATION + channel restriction |
+| LIFF Routine reference route, getRoutineReferenceData and serializeLiffRoutineReference | Internal query branch is AUTHORIZATION/channel-context behavior; broader employee query is a least-data-access risk, while the no-employee-list response is a client-visible response contract |
 | Routine build*AccessScope/Where และ creator-assignee checks | RESOURCE_RELATIONSHIP + ACCOUNT_LIFECYCLE สำหรับ active relation; query scope ไม่ใช่ generic capability |
 | Stock Admin processor/inventory route guards | AUTHENTICATION + ACCOUNT_LIFECYCLE + AUTHORIZATION |
 | Stock requester/processor query and command ownership checks | RESOURCE_RELATIONSHIP + BUSINESS_RULE + DATA_INTEGRITY/CONCURRENCY |
@@ -412,6 +429,7 @@ Query and persistence scopes found include:
 | Organization-wide | Empty or broad Prisma where after Admin/query path | Audit Admin read, Stock catalog/reports, Employee list/export, Routine all work items/export | ALL only where approved | Current broad USER surfaces require explicit policy decision |
 | Recovery candidate | Effective approver unavailable plus exclusions | Leave Admin recovery | OPEN | Special recovery operation; do not collapse into ordinary ALL |
 | System execution | Shared secret/HMAC | Cron, cleanup, webhook | Not a User scope | Separate system principal model is out of Phase 0 |
+| LIFF Routine reference query | Route actor without explicit LIFF_SELF_SERVICE mode; serializer omits employees from the response | Internal employee reference query only; LIFF response reference metadata | Not a client-visible employee scope; OPEN — requires Phase 1/4 hardening decision | Internal channel-context and least-data-access risk; do not freeze the broader query as compatibility behavior |
 
 No current behavior authorizes from departmentId, Department name, Team name or magic TeamRole name. No future Team/Capability mapping is binding in this document.
 
@@ -422,7 +440,7 @@ Later migration phases must preserve these behaviors until a policy change is ex
 1. **API authentication and status distinction** — default missing/invalid API session is 401; authenticated non-Admin against requireAdminSession() is 403; route-specific response factories can intentionally map both to 403, notably Audit, Email Request and Department paths.
 2. **Legacy API workforce eligibility** — current API session resolution requires an active, non-deleted account and an eligible active, non-deleted Employee before route-level authorization.
 3. **Admin is not a universal bypass** — Admin still passes active account/workforce, input validation, resource/business relationship where the domain requires it, valid workflow state and transaction/concurrency rules.
-4. **Routine channel behavior** — Dashboard/API Admin is elevated by isRoutineAdminActor; LIFF self-service Admin is not elevated for Routine task operations. The LIFF reference route currently has a separate mode omission and therefore exposes the Admin reference behavior; this discrepancy must not be silently changed.
+4. **Routine channel behavior and LIFF reference response** — Dashboard-owned API Admin is elevated by isRoutineAdminActor; LIFF self-service Admin is not elevated for Routine task operations. The LIFF Routine reference response must not expose the employee reference list, including for an authenticated LIFF Admin; serializeLiffRoutineReference() currently enforces that boundary. The route's missing LIFF_SELF_SERVICE mode and any broader internal employee query are implementation risks, not compatibility behavior to preserve.
 5. **Routine creator/assignee behavior** — USER creator can edit/delete; active task assignee can edit allowed content but cannot delete, change assignees/source or change lifecycle; occurrence-only assignment is a separate read/focus relationship.
 6. **Routine all-scope current behavior** — operational task work-item, summary and export paths currently accept all-scope for a normal USER; existing tests explicitly freeze this. Any later narrowing is an approved behavior change, not an incidental resolver refactor.
 7. **Stock requester/processor separation** — normal requester reads/cancels own pending requests; Admin can process and manage inventory; LIFF processor queue/issue requires Admin; unrelated LIFF request detail is hidden with not-found behavior.
@@ -451,7 +469,7 @@ Later migration phases must preserve these behaviors until a policy change is ex
 | Dashboard | __tests__/lib/dashboard-routes.test.ts, __tests__/constants/dashboard-menu.test.ts, __tests__/context/DashboardProvider.test.tsx | route/menu projection and feature/role presentation behavior; not a substitute for server guards |
 | Employee | __tests__/api/employees-routes.test.ts, modules/employee/application/mutations.test.ts, modules/employee/infrastructure/persistence/employee-queries.test.ts, modules/employee/infrastructure/export/employee-export.test.ts | Admin mutation/lifecycle, query filters, export shape and lifecycle rules |
 | Routine role/relationship | modules/routine/domain/capabilities.test.ts, modules/routine/application/delete.test.ts, modules/routine/application/mutations.test.ts, modules/routine/application/queries.test.ts | Admin/creator/assignee/inactive/deleted behavior, scopes, source redaction and channel mode |
-| Routine API/channel | __tests__/api/routines-tasks.test.ts, __tests__/api/routines-task-by-id.test.ts, __tests__/api/routines-occurrences.test.ts, __tests__/api/routines-occurrence-by-id.test.ts, __tests__/api/routine-summary.test.ts, __tests__/api/routine-export.test.ts, __tests__/api/line-routine-routes.test.ts, __tests__/api/line-routine-self-service-routes.test.ts | route authentication, current all/mine behavior, LIFF self-service, Admin distinction and export behavior |
+| Routine API/channel | __tests__/api/routines-tasks.test.ts, __tests__/api/routines-task-by-id.test.ts, __tests__/api/routines-occurrences.test.ts, __tests__/api/routines-occurrence-by-id.test.ts, __tests__/api/routine-summary.test.ts, __tests__/api/routine-export.test.ts, __tests__/api/line-routine-routes.test.ts, __tests__/api/line-routine-self-service-routes.test.ts | route authentication, current all/mine behavior, LIFF self-service, Admin distinction, export behavior and no-employee-list reference responses for USER and ADMIN LIFF sessions |
 | Stock | __tests__/api/stock-requests-routes.test.ts, __tests__/api/line-stock-routes.test.ts, __tests__/api/stock-items-route.test.ts, __tests__/api/stock-reports-export-route.test.ts, modules/stock/__tests__/queries.test.ts, modules/stock/__tests__/mutations.test.ts | requester/processor scope, Admin inventory, LIFF queue, 404 hiding, stock/concurrency invariants |
 | Leave | __tests__/api/leave-request.test.ts, leave-me.test.ts, leave-approvals.test.ts, leave-decision.test.ts, leave-cancel.test.ts, leave-not-taken.test.ts, leave-export.test.ts, leave-approvers.test.ts, leave-admin-recovery.test.ts, leave-attachment.test.ts, __tests__/api/line-leave-routes.test.ts | owner/approver/manager/participant/recovery/report/channel behavior and status outcomes |
 | Leave domain | modules/leave/application/approvals/approval-queries.test.ts, exception-approver.test.ts, approver-assignment.test.ts, offboarding-responsibilities.test.ts, modules/leave/domain/approver-eligibility.test.ts, modules/leave/domain/action-availability.test.ts, Leave request/cancellation integration tests | effective approver, unavailable fallback, actionable states, assignments, lifecycle and workflow invariants |
@@ -473,7 +491,7 @@ Later migration phases must preserve these behaviors until a policy change is ex
 
 1. **Routine all-scope data exposure candidate** — GET /api/routines/summary?scope=all, GET /api/routines/occurrences?view=tasks&scope=all และ /api/routines/export ส่ง all-scope ลง getRoutineTaskWorkItems; buildTaskAssigneeWhere คืน no assignee filter เมื่อ scope เป็น all โดยไม่ตรวจ role. Tests ใน modules/routine/application/queries.test.ts และ __tests__/api/routine-summary.test.ts รวมทั้ง export route test ยืนยัน current behavior. Phase 1 ต้องตัดสิน intended policy ก่อนเปลี่ยน
 2. **Employee organization-wide read/export** — Employee list, stats และ CSV export ใช้ authenticated API/workforce gate แต่ไม่มี Admin/relationship scope; export มีชื่อ, ตำแหน่ง, สังกัด, แผนก, email/phone ตาม query. ต้องตัดสิน PII/HR visibility ก่อน capability mapping
-3. **LIFF Routine reference mode inconsistency** — task routes สร้าง actor แบบ LIFF_SELF_SERVICE แต่ app/api/line/routine/reference/route.ts ไม่ส่ง mode ทำให้ LIFF Admin ได้ active employee references ทั้งหมด. ต้องตัดสินว่าจะ preserve compatibility หรือแก้เป็น explicit channel policy
+3. **LIFF Routine reference channel-context / least-data-access risk** — task routes สร้าง actor แบบ LIFF_SELF_SERVICE แต่ app/api/line/routine/reference/route.ts ไม่ส่ง mode ทำให้ getRoutineReferenceData() อาจใช้ Admin branch และ query active employees ทั้งหมดภายใน application layer. อย่างไรก็ตาม serializeLiffRoutineReference() ไม่ serialize employees ดังนั้นยังไม่พบ client-visible employee data exposure จากเส้นทางนี้. ให้ freeze เฉพาะ response boundary ที่ไม่ส่ง employee list; broader internal query เป็น Phase 1/4 hardening candidate ไม่ใช่ behavior ที่ต้อง preserve
 
 ### Medium risk / ambiguity
 
@@ -496,8 +514,9 @@ Later migration phases must preserve these behaviors until a policy change is ex
 ### Migration notes
 
 - ก่อนสร้าง Capability Contract ต้องแยก operation ที่เป็น read all, export all, relationship read, mutation และ workflow decision ออกจากกัน
-- ทุก capability ใน Phase 1 ต้องระบุ channel support และต้องชี้กลับมายัง domain relationship/business rule ที่ยังคงอยู่
+- ทุก capability ใน Phase 1 ต้องระบุ **authorization execution channel** ที่รองรับ (`DASHBOARD`, `LIFF_SELF_SERVICE`, `SYSTEM` ถ้าจำเป็น) และต้องชี้กลับมายัง domain relationship/business rule ที่ยังคงอยู่; ให้บันทึก `API` แยกเป็น entry-point / transport surface เท่านั้น ไม่ใช่ actor channel
 - Broad current behavior ที่มี test freeze ไม่ควรถูกเปลี่ยนเพียงเพราะย้าย helper; หากต้องแก้ให้เป็น approved policy/security remediation แยกจาก migration
+- สำหรับ LIFF Routine reference ให้ preserve เฉพาะ response contract ที่ไม่เปิดเผย employee list; การ query employee set ที่กว้างจาก mode omission เป็น internal hardening candidate ไม่ใช่ broad current behavior ที่ต้อง freeze
 - ต้องเพิ่ม regression tests สำหรับ intended policy ก่อนแก้ Routine all-scope, Employee export/read และ audit export semantics
 
 ## 10. Explicit non-goals for Phase 0
@@ -517,11 +536,11 @@ Phase 0 ไม่ได้ทำและไม่ควรตีความว
 Phase 1 ควรเริ่มจาก contract/registry ที่อธิบาย behavior ที่ freeze แล้ว โดยยังไม่ต้องเปลี่ยนทุก route เป็น resolver:
 
 1. กำหนด capability identifiers ที่ตรงกับ operation จริง เช่น employee.read, employee.export, routine.task.read, routine.task.create, routine.task.update, routine.task.delete, routine.occurrence.reassign, routine.occurrence.change_due_date, routine.import.manage, stock.request.create/read/cancel/process, stock.inventory.read/manage, leave.request.create/read/cancel, leave.request.approve, leave.manage, audit.read, data.export และ capability สำหรับ configuration เฉพาะที่พิสูจน์จาก route แล้ว
-2. สำหรับแต่ละ capability ระบุ supported channels (DASHBOARD, API, LIFF_SELF_SERVICE, SYSTEM ถ้าจำเป็น), authentication/workforce precondition, current unauthorized outcome และ whether it is a read, mutation, export, workflow decision or system operation
+2. สำหรับแต่ละ capability ระบุ supported **authorization execution channels** (`DASHBOARD`, `LIFF_SELF_SERVICE`, `SYSTEM` ถ้าจำเป็น), authentication/workforce precondition, current unauthorized outcome และ whether it is a read, mutation, export, workflow decision or system operation; บันทึก entry-point / transport surface แยกต่างหาก โดยไม่สร้าง `API` เป็น actor channel เพียงเพราะ route อยู่ใต้ `/api/**`. Dashboard-owned API calls โดยปกติยังคงเป็น `DASHBOARD` context, LIFF routes ใช้ `LIFF_SELF_SERVICE`, และ trusted background/platform operations ใช้ `SYSTEM` หรือ system principal model ที่ได้รับอนุมัติ
 3. ระบุ supported scope อย่าง explicit: self/created/assigned/team/all ตาม current semantics; ใช้ OPEN — requires Phase 1/domain review สำหรับ effective approver, participant, recovery และ report-history cases ที่ generic scope แปลไม่ได้ตรง ๆ
 4. เก็บ domain-owned predicates แยกจาก capability grant: active User/Employee, creator/assignee/requester/effective approver/manager, valid Leave/Stock/Routine state, quota, concurrency, active target references และ transaction rules
 5. สร้าง registry record จาก matrix ก่อนสร้าง resolver โดยห้ามอนุมาน grant จาก Department, Department name, Team name หรือ magic role name
-6. ตัดสิน policy อย่างเป็นลายลักษณ์อักษรสำหรับ Routine USER all-scope, Employee broad read/export, Audit export event endpoint และ Leave report visibility ก่อนเริ่ม route migration; เพิ่ม regression tests ของ policy ที่เลือก
+6. ตัดสิน policy อย่างเป็นลายลักษณ์อักษรสำหรับ Routine USER all-scope, Employee broad read/export, Audit export event endpoint, Leave report visibility และการ harden internal query ของ LIFF Routine reference ก่อนเริ่ม route migration; เพิ่ม regression tests ของ policy ที่เลือก โดยคง response boundary ที่ไม่ส่ง employee list
 7. เมื่อ contract ถูก review แล้วจึงออกแบบ mapping ของ ADMIN และ normal-user grants แบบ additive ALLOW โดยคง default DENY ของ future generic layer และคง channel restriction ของ LIFF
 
 ข้อเสนอข้างต้นเป็นขอบเขตสำหรับการออกแบบ Phase 1 เท่านั้น เอกสารนี้ไม่ได้เริ่ม implementation ของ Phase 1
