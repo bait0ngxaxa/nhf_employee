@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { seedAuthorizationConfiguration } from "@/modules/authorization";
 
 const prisma = new PrismaClient();
 
@@ -104,6 +105,10 @@ async function main() {
     );
     // eslint-disable-next-line no-console
     console.log("✅ สร้างหน่วยงานและหมวดหมู่ NHF Routine สำเร็จ");
+
+    await seedAuthorizationConfiguration();
+    // eslint-disable-next-line no-console
+    console.log("✅ ตรวจสอบ configuration ของ Authorization แล้ว (ยังไม่มี policy Team ที่อนุมัติ)");
 
     // eslint-disable-next-line no-console
     console.log("🎉 Seed เสร็จสิ้น!");

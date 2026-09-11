@@ -36,8 +36,92 @@ model User {
   routineImportLedgers        RoutineImportLedger[]       @relation("RoutineImportAppliedBy")
   routineImportBatches         RoutineImportBatch[]        @relation("RoutineImportUploadedBy")
   lineAccountLink              LineAccountLink?
+  teamMemberships             TeamMembership[]
+  userCapabilityGrants        UserCapabilityGrant[]
 
   @@map("users")
+}
+
+model Team {
+  id          Int                   @id @default(autoincrement())
+  key         String                @unique
+  name        String
+  description String?
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  roles       TeamRole[]
+  memberships TeamMembership[]
+  grants      TeamCapabilityGrant[]
+
+  @@index([isActive])
+  @@map("teams")
+}
+
+model TeamRole {
+  id          Int                       @id @default(autoincrement())
+  teamId      Int
+  key         String
+  name        String
+  isActive    Boolean                   @default(true)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  team        Team                      @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  memberships TeamMembership[]          @relation("TeamMembershipRole")
+  grants      TeamRoleCapabilityGrant[]
+
+  // Required so TeamMembership can reference (teamId, id) and the database
+  // can enforce same-Team role ownership.
+  @@unique([teamId, id])
+  @@unique([teamId, key])
+  @@index([teamId, isActive])
+  @@map("team_roles")
+}
+
+model TeamMembership {
+  teamId     Int
+  userId     Int
+  teamRoleId Int?
+  team       Team      @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role       TeamRole? @relation("TeamMembershipRole", fields: [teamId, teamRoleId], references: [teamId, id], onDelete: Restrict)
+
+  @@id([teamId, userId])
+  @@index([userId, teamId])
+  @@index([teamId, teamRoleId])
+  @@index([teamRoleId])
+  @@map("team_memberships")
+}
+
+model TeamCapabilityGrant {
+  teamId        Int
+  capabilityKey String
+  scope         String
+  team          Team   @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
+  @@id([teamId, capabilityKey, scope])
+  @@map("team_capability_grants")
+}
+
+model TeamRoleCapabilityGrant {
+  teamRoleId    Int
+  capabilityKey String
+  scope         String
+  teamRole      TeamRole @relation(fields: [teamRoleId], references: [id], onDelete: Restrict)
+
+  @@id([teamRoleId, capabilityKey, scope])
+  @@index([capabilityKey, scope])
+  @@map("team_role_capability_grants")
+}
+
+model UserCapabilityGrant {
+  userId        Int
+  capabilityKey String
+  scope         String
+  user          User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([userId, capabilityKey, scope])
+  @@map("user_capability_grants")
 }
 
 model LineAccountLink {

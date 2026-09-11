@@ -22,3 +22,13 @@ export {
     isRegisteredCapabilityKey,
 } from "./registry";
 export type { RegisteredCapabilityKey } from "./registry";
+export {
+    CapabilityGrantValidationError,
+    validateCapabilityGrant,
+} from "./application/grant-validation";
+export type {
+    CapabilityGrantInput,
+    CapabilityGrantValidationCode,
+    ValidatedCapabilityGrant,
+} from "./application/grant-validation";
+export { seedAuthorizationConfiguration } from "./application/seed";
