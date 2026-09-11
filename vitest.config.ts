@@ -14,6 +14,7 @@ const BASE_EXCLUDES = [
 const NODE_TESTS = [
         "__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
         "modules/auth/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+        "modules/authorization/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
         "modules/employee/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/department/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/audit/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
