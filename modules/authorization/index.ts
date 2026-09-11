@@ -32,3 +32,39 @@ export type {
     ValidatedCapabilityGrant,
 } from "./application/grant-validation";
 export { seedAuthorizationConfiguration } from "./application/seed";
+export {
+    AuthorizationConfigurationError,
+    AuthorizationDeniedError,
+} from "./application/errors";
+export type {
+    AuthorizationConfigurationErrorCode,
+    AuthorizationConfigurationErrorDetails,
+} from "./application/errors";
+export {
+    evaluateAuthorization,
+    getAuthorizationEvaluationContext,
+    normalizeAuthorizationScopes,
+} from "./application/evaluator";
+export type { AuthorizationEvaluationContext } from "./application/evaluator";
+export {
+    authorization,
+    createAuthorizationResolver,
+} from "./application/resolver";
+export type {
+    AuthorizationResolver,
+    AuthorizationResolverDependencies,
+} from "./application/resolver";
+export type {
+    AuthorizationDecision,
+    AuthorizationDecisionReason,
+    AuthorizationGrantSource,
+    AuthorizationMembershipResolution,
+    AuthorizationPersistedGrant,
+    AuthorizationPersistedTeamGrant,
+    AuthorizationPersistedTeamRoleGrant,
+    AuthorizationPersistedUserGrant,
+    AuthorizationResolutionData,
+    AuthorizationResolutionRepository,
+    AuthorizationResolutionRequest,
+    EffectiveAuthorizationGrant,
+} from "./application/types";
