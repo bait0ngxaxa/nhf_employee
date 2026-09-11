@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
-import { createRoutineCommandActor } from "@/modules/routine";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import {
+    assertRoutineCapabilityForMigration,
+    createRoutineCommandActor,
+} from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
@@ -32,8 +35,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
+        await assertRoutineCapabilityForMigration(
+            actor,
+            "employeeId" in auth ? auth.employeeId : null,
+            "routine.import.manage",
+        );
         const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "routine-import",
             auth.user.id,
@@ -52,14 +68,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!options.success) {
             return NextResponse.json({ error: "วันที่อ้างอิงไม่ถูกต้อง" }, { status: 400 });
         }
-        const actor = createRoutineCommandActor(
-            {
-                id: auth.user.id,
-                role: auth.user.role ?? "USER",
-                email: auth.user.email ?? "",
-            },
-            request.headers,
-        );
         const result = await createRoutineImportPreview(
             fileValue,
             actor,

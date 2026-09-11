@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
-import { createRoutineCommandActor } from "@/modules/routine";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import {
+    assertRoutineCapabilityForMigration,
+    createRoutineCommandActor,
+} from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     readRoutineJsonBody,
@@ -25,8 +28,21 @@ export async function POST(
     if (sizeResponse) return sizeResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
+        await assertRoutineCapabilityForMigration(
+            actor,
+            "employeeId" in auth ? auth.employeeId : null,
+            "routine.import.manage",
+        );
         const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "routine-import",
             auth.user.id,
@@ -39,14 +55,6 @@ export async function POST(
         if (!body.ok) return body.response;
         const parsedBody = routineImportApplySchema.safeParse(body.body);
         if (!parsedBody.success) return NextResponse.json({ error: "กรุณายืนยันการนำเข้า" }, { status: 400 });
-        const actor = createRoutineCommandActor(
-            {
-                id: auth.user.id,
-                role: auth.user.role ?? "USER",
-                email: auth.user.email ?? "",
-            },
-            request.headers,
-        );
         const result = await applyRoutineImportBatch(Number(parsedBatchId.data), actor);
         return NextResponse.json(result);
     } catch (error) {

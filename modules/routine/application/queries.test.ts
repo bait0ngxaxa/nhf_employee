@@ -19,9 +19,17 @@ import {
     getRoutineTasks,
 } from "./queries";
 import { routineTaskFiltersSchema } from "../schemas/routine";
+import type * as RoutineAuthorizationModule from "./authorization";
+
+const resolveRoutineCapabilityMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
+}));
+
+vi.mock("./authorization", async (importOriginal) => ({
+    ...(await importOriginal<typeof RoutineAuthorizationModule>()),
+    resolveRoutineCapabilityForMigration: resolveRoutineCapabilityMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -108,6 +116,50 @@ function occurrenceRow(
 describe("NHF Routine query authorization", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        resolveRoutineCapabilityMock.mockImplementation(async (
+            actor: { id: number; role: string; mode?: "LIFF_SELF_SERVICE" },
+            _employeeId: number | null,
+            capability: string,
+            options?: {
+                taskReadView?: "management" | "work-item";
+                requestedScope?: "mine" | "all";
+            },
+        ) => {
+            const isDashboardAdmin = actor.role === "ADMIN"
+                && actor.mode !== "LIFF_SELF_SERVICE";
+            const scopes = isDashboardAdmin
+                ? ["ALL"]
+                : capability === "routine.task.read"
+                    ? options?.taskReadView === "work-item"
+                        ? options?.requestedScope === "all"
+                            ? ["ALL"]
+                            : ["ASSIGNED"]
+                        : ["CREATED", "ASSIGNED"]
+                    : capability === "routine.task.update"
+                        ? ["CREATED", "ASSIGNED"]
+                        : capability === "routine.task.delete"
+                            ? ["CREATED"]
+                            : capability === "routine.occurrence.read"
+                                ? ["ASSIGNED"]
+                                : ["OWN"];
+            return {
+                actor: {
+                    userId: actor.id,
+                    employeeId: _employeeId,
+                    systemRole: actor.role,
+                    channel: actor.mode === "LIFF_SELF_SERVICE"
+                        ? "LIFF_SELF_SERVICE"
+                        : "DASHBOARD",
+                },
+                capability,
+                decision: { capability, allowed: true, scopes, grants: [] },
+                scopes,
+                isAdministrative: isDashboardAdmin,
+                usedMigrationCompatibility: !isDashboardAdmin
+                    && actor.mode !== "LIFF_SELF_SERVICE",
+                usedLiffSelfServiceCompatibility: actor.mode === "LIFF_SELF_SERVICE",
+            };
+        });
         prismaMock.routineOccurrence.findMany.mockResolvedValue([] as never);
         prismaMock.routineOccurrence.count.mockResolvedValue(0);
         prismaMock.routineOccurrence.findFirst.mockResolvedValue(null);
@@ -530,6 +582,25 @@ describe("NHF Routine query authorization", () => {
         ]);
     });
 
+    it("keeps a Dashboard Admin mine work-item query employee-scoped", async () => {
+        await getRoutineTaskWorkItems(
+            { scope: "mine", page: 1, limit: 20 },
+            {
+                actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+                employeeId: 42,
+            },
+        );
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    isActive: true,
+                    assignees: { some: { employeeId: 42 } },
+                },
+            }),
+        );
+    });
+
     it("keeps a MANUAL task with no occurrence in the operational list", async () => {
         prismaMock.routineTask.findMany.mockResolvedValue(asNever([
             taskRow(71),
@@ -724,6 +795,62 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({ id: 71 }),
+            }),
+        );
+    });
+
+    it("preserves occurrence-only access for a regular user's mine focus", async () => {
+        const today = getCurrentBangkokDate();
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(asNever({
+            taskId: 71,
+            task: { isActive: true },
+        }));
+        prismaMock.routineOccurrence.findFirst.mockResolvedValue(
+            asNever({ taskId: 71 }),
+        );
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            taskRow(71, 99),
+        ]));
+        prismaMock.routineTask.count.mockResolvedValue(1);
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            occurrenceRow(99, 71, addCalendarDays(today, 4)),
+        ]));
+
+        const result = await getRoutineTaskWorkItems(
+            {
+                scope: "mine",
+                taskId: 71,
+                occurrenceId: 99,
+                page: 1,
+                limit: 20,
+            },
+            {
+                actor: { id: 5, email: "user@example.com", role: "USER" },
+                employeeId: 42,
+            },
+        );
+
+        expect(result.tasks).toHaveLength(1);
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    OR: [
+                        expect.objectContaining({
+                            assignees: expect.objectContaining({
+                                some: expect.objectContaining({ employeeId: 42 }),
+                            }),
+                        }),
+                        expect.objectContaining({
+                            occurrences: expect.objectContaining({
+                                some: expect.objectContaining({
+                                    assignees: expect.objectContaining({
+                                        some: expect.objectContaining({ employeeId: 42 }),
+                                    }),
+                                }),
+                            }),
+                        }),
+                    ],
+                }),
             }),
         );
     });

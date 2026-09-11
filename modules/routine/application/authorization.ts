@@ -1,6 +1,14 @@
 import type { Prisma } from "@prisma/client";
 
+import {
+    authorization,
+    type AuthorizationActor,
+    type AuthorizationDecision,
+    type AuthorizationPersistenceContext,
+    type AuthorizationScope,
+} from "@/modules/authorization";
 import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
+import type { UserRole } from "@/lib/ssot/permissions";
 
 import {
     RoutineForbiddenError,
@@ -10,11 +18,85 @@ import type { RoutineCommandActor } from "./types";
 
 type RoutineTransaction = Prisma.TransactionClient;
 
-export interface RoutineActorAuthorization {
-    isAdmin: boolean;
-    employeeId: number | null;
+export const ROUTINE_MIGRATED_CAPABILITIES = [
+    "routine.task.read",
+    "routine.task.create",
+    "routine.task.update",
+    "routine.task.delete",
+    "routine.occurrence.read",
+    "routine.occurrence.override",
+    "routine.occurrence.reassign",
+    "routine.occurrence.change_due_date",
+    "routine.import.manage",
+] as const;
+
+export type RoutineMigratedCapability =
+    (typeof ROUTINE_MIGRATED_CAPABILITIES)[number];
+
+export type RoutineTaskReadView = "management" | "work-item";
+
+export interface RoutineCapabilityOptions {
+    readonly taskReadView?: RoutineTaskReadView;
+    readonly requestedScope?: "mine" | "all";
 }
 
+export interface RoutineCapabilityAuthorization {
+    readonly actor: AuthorizationActor;
+    readonly capability: RoutineMigratedCapability;
+    readonly decision: AuthorizationDecision;
+    /** Effective scopes after Routine's temporary migration compatibility rules. */
+    readonly scopes: readonly AuthorizationScope[];
+    /** True only for Dashboard ADMIN system-role authorization. */
+    readonly isAdministrative: boolean;
+    readonly usedMigrationCompatibility: boolean;
+    readonly usedLiffSelfServiceCompatibility: boolean;
+}
+
+export interface RoutineActorAuthorization {
+    readonly authorizationActor: AuthorizationActor;
+    readonly employeeId: number | null;
+}
+
+const ROUTINE_CAPABILITY_SET = new Set<string>(
+    ROUTINE_MIGRATED_CAPABILITIES,
+);
+
+function isRoutineMigratedCapability(
+    capability: string,
+): capability is RoutineMigratedCapability {
+    return ROUTINE_CAPABILITY_SET.has(capability);
+}
+
+function parseUserRole(role: string): UserRole {
+    if (role === "ADMIN" || role === "USER") return role;
+    throw new RoutineForbiddenError("บัญชีผู้ใช้ไม่พร้อมดำเนินการ");
+}
+
+function routineAuthorizationChannel(
+    actor: RoutineCommandActor,
+): AuthorizationActor["channel"] {
+    return actor.mode === "LIFF_SELF_SERVICE"
+        ? "LIFF_SELF_SERVICE"
+        : "DASHBOARD";
+}
+
+export function buildRoutineAuthorizationActor(
+    actor: RoutineCommandActor,
+    employeeId: number | null,
+    systemRole: string = actor.role,
+): AuthorizationActor {
+    return Object.freeze({
+        userId: actor.id,
+        employeeId,
+        systemRole: parseUserRole(systemRole),
+        channel: routineAuthorizationChannel(actor),
+    });
+}
+
+/**
+ * Legacy presentation predicate retained only by deferred summary/reference
+ * projections. Migrated capability decisions use the central resolver below.
+ */
 export function isRoutineAdminActor(
     role: string,
     mode: RoutineCommandActor["mode"] = undefined,
@@ -22,28 +104,175 @@ export function isRoutineAdminActor(
     return role === "ADMIN" && mode !== "LIFF_SELF_SERVICE";
 }
 
-export function buildRoutineTaskEditScope(
-    actorId: number,
-    authorization: RoutineActorAuthorization,
-): Prisma.RoutineTaskWhereInput {
-    if (authorization.isAdmin) return {};
-
-    const scopes: Prisma.RoutineTaskWhereInput[] = [
-        { createdById: actorId },
-    ];
-    if (authorization.employeeId !== null) {
-        scopes.push({
-            assignees: { some: { employeeId: authorization.employeeId } },
-        });
-    }
-    return { OR: scopes };
+function freezeScopes(
+    scopes: readonly AuthorizationScope[],
+): readonly AuthorizationScope[] {
+    return Object.freeze([...scopes]);
 }
 
-export function buildRoutineTaskDeleteScope(
-    actorId: number,
-    authorization: RoutineActorAuthorization,
-): Prisma.RoutineTaskWhereInput {
-    return authorization.isAdmin ? {} : { createdById: actorId };
+function legacyRoutineScopes(
+    actor: AuthorizationActor,
+    capability: RoutineMigratedCapability,
+    options: RoutineCapabilityOptions,
+): readonly AuthorizationScope[] | null {
+    if (actor.systemRole !== "USER") return null;
+
+    return routineSelfServiceScopes(capability, options);
+}
+
+function routineSelfServiceScopes(
+    capability: RoutineMigratedCapability,
+    options: RoutineCapabilityOptions,
+): readonly AuthorizationScope[] | null {
+
+    switch (capability) {
+        case "routine.task.read":
+            if (options.taskReadView === "work-item") {
+                return options.requestedScope === "all"
+                    ? ["ALL"]
+                    : ["ASSIGNED"];
+            }
+            return ["CREATED", "ASSIGNED"];
+        case "routine.task.create":
+            return ["OWN"];
+        case "routine.task.update":
+            return ["CREATED", "ASSIGNED"];
+        case "routine.task.delete":
+            return ["CREATED"];
+        case "routine.occurrence.read":
+            return ["ASSIGNED"];
+        case "routine.occurrence.override":
+        case "routine.occurrence.reassign":
+        case "routine.occurrence.change_due_date":
+        case "routine.import.manage":
+            return null;
+    }
+}
+
+function isDashboardSystemRoleAuthorization(
+    actor: AuthorizationActor,
+    decision: AuthorizationDecision,
+): boolean {
+    return actor.channel === "DASHBOARD"
+        && actor.systemRole === "ADMIN"
+        && decision.grants.some((grant) => grant.source.type === "SYSTEM_ROLE");
+}
+
+function getEffectiveScopes(
+    actor: AuthorizationActor,
+    capability: RoutineMigratedCapability,
+    decision: AuthorizationDecision,
+    options: RoutineCapabilityOptions,
+): {
+    scopes: readonly AuthorizationScope[];
+    usedMigrationCompatibility: boolean;
+    usedLiffSelfServiceCompatibility: boolean;
+} {
+    if (!decision.allowed) {
+        const legacyScopes = decision.reason === "NO_APPLICABLE_GRANT"
+            ? legacyRoutineScopes(actor, capability, options)
+            : null;
+        if (legacyScopes === null) {
+            throw new RoutineForbiddenError();
+        }
+        return {
+            scopes: freezeScopes(legacyScopes),
+            usedMigrationCompatibility: true,
+            usedLiffSelfServiceCompatibility: false,
+        };
+    }
+
+    const isLiffAdmin = actor.channel === "LIFF_SELF_SERVICE"
+        && actor.systemRole === "ADMIN";
+    if (!isLiffAdmin) {
+        return {
+            scopes: decision.scopes,
+            usedMigrationCompatibility: false,
+            usedLiffSelfServiceCompatibility: false,
+        };
+    }
+
+    const selfServiceScopes = routineSelfServiceScopes(capability, options);
+    if (selfServiceScopes === null) {
+        throw new RoutineForbiddenError();
+    }
+    return {
+        scopes: freezeScopes(selfServiceScopes),
+        usedMigrationCompatibility: false,
+        usedLiffSelfServiceCompatibility: true,
+    };
+}
+
+function buildRoutineCapabilityAuthorization(
+    actor: AuthorizationActor,
+    capability: RoutineMigratedCapability,
+    decision: AuthorizationDecision,
+    options: RoutineCapabilityOptions,
+): RoutineCapabilityAuthorization {
+    const effective = getEffectiveScopes(actor, capability, decision, options);
+    return Object.freeze({
+        actor,
+        capability,
+        decision,
+        scopes: effective.scopes,
+        isAdministrative: isDashboardSystemRoleAuthorization(actor, decision),
+        usedMigrationCompatibility: effective.usedMigrationCompatibility,
+        usedLiffSelfServiceCompatibility:
+            effective.usedLiffSelfServiceCompatibility,
+    });
+}
+
+export async function resolveRoutineCapabilityForMigration(
+    actor: RoutineCommandActor,
+    employeeId: number | null,
+    capability: string,
+    options: RoutineCapabilityOptions = {},
+): Promise<RoutineCapabilityAuthorization> {
+    if (!isRoutineMigratedCapability(capability)) {
+        throw new RoutineForbiddenError();
+    }
+    const authorizationActor = buildRoutineAuthorizationActor(actor, employeeId);
+    const decision = await authorization.resolve(authorizationActor, capability);
+    return buildRoutineCapabilityAuthorization(
+        authorizationActor,
+        capability,
+        decision,
+        options,
+    );
+}
+
+/**
+ * Route preflight for legacy Admin-guarded endpoints. The mutation service
+ * resolves the same capability again inside its transaction.
+ */
+export async function assertRoutineCapabilityForMigration(
+    actor: RoutineCommandActor,
+    employeeId: number | null,
+    capability: string,
+): Promise<void> {
+    await resolveRoutineCapabilityForMigration(actor, employeeId, capability);
+}
+
+export async function resolveRoutineCapabilityInTransaction(
+    tx: AuthorizationPersistenceContext,
+    activeActor: RoutineActorAuthorization,
+    capability: string,
+    options: RoutineCapabilityOptions = {},
+): Promise<RoutineCapabilityAuthorization> {
+    if (!isRoutineMigratedCapability(capability)) {
+        throw new RoutineForbiddenError();
+    }
+    const decision = await authorization.resolveInTransaction(
+        activeActor.authorizationActor,
+        capability,
+        tx,
+    );
+    return buildRoutineCapabilityAuthorization(
+        activeActor.authorizationActor,
+        capability,
+        decision,
+        options,
+    );
 }
 
 interface ActiveUserRecord {
@@ -92,12 +321,19 @@ export async function assertActiveRoutineActorInTransaction(
         throw new RoutineForbiddenError("บัญชีผู้ใช้ไม่พร้อมดำเนินการ");
     }
 
-    if (isRoutineAdminActor(user.role, actor.mode)) {
+    const systemRole = parseUserRole(user.role);
+    const isDashboardAdmin = systemRole === "ADMIN"
+        && actor.mode !== "LIFF_SELF_SERVICE";
+    if (isDashboardAdmin) {
         if (user.employee && !isActiveEmployee(user.employee)) {
             throw new RoutineForbiddenError("บัญชีผู้ดูแลระบบไม่พร้อมดำเนินการ");
         }
         return {
-            isAdmin: true,
+            authorizationActor: buildRoutineAuthorizationActor(
+                actor,
+                user.employee?.id ?? null,
+                user.role,
+            ),
             employeeId: user.employee?.id ?? null,
         };
     }
@@ -107,21 +343,14 @@ export async function assertActiveRoutineActorInTransaction(
     }
 
     await lockEmployeeRows(tx, [user.employee.id]);
-    return { isAdmin: false, employeeId: user.employee.id };
-}
-
-export async function assertActiveAdminInTransaction(
-    tx: RoutineTransaction,
-    actor: RoutineCommandActor,
-): Promise<void> {
-    const user = await findActiveUser(tx, actor.id);
-    if (!user || !user.isActive || user.deletedAt !== null || user.role !== "ADMIN") {
-        throw new RoutineForbiddenError();
-    }
-
-    if (user.employee && !isActiveEmployee(user.employee)) {
-        throw new RoutineForbiddenError("บัญชีผู้ดูแลระบบไม่พร้อมดำเนินการ");
-    }
+    return {
+        authorizationActor: buildRoutineAuthorizationActor(
+            actor,
+            user.employee.id,
+            user.role,
+        ),
+        employeeId: user.employee.id,
+    };
 }
 
 export async function assertActiveWorkforceInTransaction(
@@ -141,6 +370,81 @@ export async function assertActiveWorkforceInTransaction(
 
     await lockEmployeeRows(tx, [user.employee.id]);
     return user.employee.id;
+}
+
+export function buildRoutineTaskScope(
+    actorId: number,
+    employeeId: number | null,
+    scopes: readonly AuthorizationScope[],
+    options: { requireActiveAssignee?: boolean } = {},
+): Prisma.RoutineTaskWhereInput {
+    if (scopes.includes("ALL")) return {};
+
+    const predicates: Prisma.RoutineTaskWhereInput[] = [];
+    if (scopes.includes("CREATED")) {
+        predicates.push({ createdById: actorId });
+    }
+    if (scopes.includes("ASSIGNED") && employeeId !== null) {
+        predicates.push({
+            assignees: {
+                some: {
+                    employeeId,
+                    ...(options.requireActiveAssignee
+                        ? { employee: activeEmployeeWhere() }
+                        : {}),
+                },
+            },
+        });
+    }
+
+    if (predicates.length === 0) return { id: { in: [] } };
+    if (predicates.length === 1) return predicates[0];
+    return { OR: predicates };
+}
+
+export function buildRoutineOccurrenceScope(
+    employeeId: number | null,
+    scopes: readonly AuthorizationScope[],
+): Prisma.RoutineOccurrenceWhereInput {
+    if (scopes.includes("ALL")) return {};
+    if (!scopes.includes("ASSIGNED") || employeeId === null) {
+        return { id: { in: [] } };
+    }
+    return {
+        assignees: {
+            some: { employeeId },
+        },
+    };
+}
+
+function activeEmployeeWhere(): Prisma.EmployeeWhereInput {
+    return {
+        status: "ACTIVE",
+        deletedAt: null,
+        user: {
+            is: {
+                isActive: true,
+                deletedAt: null,
+            },
+        },
+    };
+}
+
+export function buildRoutineTaskAccessScope(
+    actorId: number,
+    employeeId: number | null,
+    scopes: readonly AuthorizationScope[],
+): Prisma.RoutineTaskWhereInput {
+    if (
+        employeeId === null
+        && scopes.includes("CREATED")
+        && scopes.includes("ASSIGNED")
+    ) {
+        return { OR: [{ createdById: actorId }] };
+    }
+    return buildRoutineTaskScope(actorId, employeeId, scopes, {
+        requireActiveAssignee: true,
+    });
 }
 
 export async function assertActiveEmployeesInTransaction(

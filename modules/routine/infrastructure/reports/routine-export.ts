@@ -20,6 +20,7 @@ export async function prepareRoutineTaskExport(
     const firstPage = await getRoutineTaskWorkItems(
         { scope: "all", page: 1, limit: pageSize },
         queryActor,
+        { authorizationMode: "DEFERRED_EXPORT" },
     );
     const recordCount = firstPage.pagination.total;
     if (recordCount > EXPORT_LIMITS.routine.maxRows) {
@@ -35,6 +36,7 @@ export async function prepareRoutineTaskExport(
         const nextPage = await getRoutineTaskWorkItems(
             { scope: "all", page, limit: pageSize },
             queryActor,
+            { authorizationMode: "DEFERRED_EXPORT" },
         );
         tasks.push(...nextPage.tasks);
     }

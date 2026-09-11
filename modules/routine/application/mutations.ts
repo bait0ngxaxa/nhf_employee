@@ -29,12 +29,12 @@ import {
 
 import { createRoutineAuditInTransaction } from "./audit";
 import {
-    assertActiveAdminInTransaction,
     assertActiveEmployeesInTransaction,
     assertActiveRoutineActorInTransaction,
-    buildRoutineTaskDeleteScope,
-    buildRoutineTaskEditScope,
+    buildRoutineTaskScope,
+    resolveRoutineCapabilityInTransaction,
     type RoutineActorAuthorization,
+    type RoutineCapabilityAuthorization,
 } from "./authorization";
 import {
     assertMatchingRoutineTaskIdempotency,
@@ -131,9 +131,11 @@ type RoutineReminderRuleRecord = {
 
 function canonicalizeReminderRules(
     rules: RoutineTaskCreateInput["reminderRules"] | RoutineTaskUpdateInput["reminderRules"],
-    authorization: RoutineActorAuthorization,
+    authorization: RoutineCapabilityAuthorization,
 ): typeof rules {
-    if (authorization.isAdmin || rules === undefined) return rules;
+    if (authorization.isAdministrative || rules === undefined) {
+        return rules;
+    }
     const canonicalRules = rules.map((rule) => ({
         ...rule,
         recipientScope: "ASSIGNEES" as const,
@@ -151,29 +153,36 @@ function canonicalizeReminderRules(
 
 function normalizeRoutineTaskCreateInput(
     input: RoutineTaskCreateInput,
-    authorization: RoutineActorAuthorization,
+    actorAuthorization: RoutineActorAuthorization,
+    capabilityAuthorization: RoutineCapabilityAuthorization,
+    operation: "TASK_CREATE" | "IMPORT_APPLY",
 ): RoutineTaskCreateInput {
-    if (authorization.isAdmin) return input;
-    if (authorization.employeeId === null) {
+    if (capabilityAuthorization.isAdministrative || operation === "IMPORT_APPLY") {
+        return input;
+    }
+    if (actorAuthorization.employeeId === null) {
         throw new RoutineValidationError("ไม่พบข้อมูลพนักงานของบัญชีผู้ใช้");
     }
 
     return {
         ...input,
-        assignees: [{ employeeId: authorization.employeeId, role: "OWNER" }],
+        assignees: [{ employeeId: actorAuthorization.employeeId, role: "OWNER" }],
         sourceFileName: undefined,
         sourceSheet: undefined,
         sourceRow: undefined,
-        reminderRules: canonicalizeReminderRules(input.reminderRules, authorization),
+        reminderRules: canonicalizeReminderRules(
+            input.reminderRules,
+            capabilityAuthorization,
+        ),
     };
 }
 
 function normalizeRoutineTaskUpdateInput(
     input: RoutineTaskUpdateInput,
-    authorization: RoutineActorAuthorization,
+    authorization: RoutineCapabilityAuthorization,
     options: { canChangeLifecycle: boolean },
 ): RoutineTaskUpdateInput {
-    if (authorization.isAdmin) return input;
+    if (authorization.isAdministrative) return input;
 
     return {
         ...input,
@@ -350,10 +359,24 @@ export async function createRoutineTaskInTransaction(
     tx: Prisma.TransactionClient,
     input: RoutineTaskCreateInput,
     actor: RoutineCommandActor,
-    generationOptions: RoutineGenerationOptions = {},
+    generationOptions: RoutineGenerationOptions & {
+        authorizationCapability?: "routine.task.create" | "routine.import.manage";
+    } = {},
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
-    const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
-    const normalizedInput = normalizeRoutineTaskCreateInput(input, authorization);
+    const actorAuthorization = await assertActiveRoutineActorInTransaction(tx, actor);
+    const capability = generationOptions.authorizationCapability
+        ?? "routine.task.create";
+    const capabilityAuthorization = await resolveRoutineCapabilityInTransaction(
+        tx,
+        actorAuthorization,
+        capability,
+    );
+    const normalizedInput = normalizeRoutineTaskCreateInput(
+        input,
+        actorAuthorization,
+        capabilityAuthorization,
+        capability === "routine.import.manage" ? "IMPORT_APPLY" : "TASK_CREATE",
+    );
     const scheduleType = normalizedInput.scheduleType as RoutineScheduleType;
     const scheduleConfig = parseScheduleConfig(scheduleType, normalizedInput.scheduleConfig);
     ensureContractRange(normalizedInput.contractStartDate, normalizedInput.contractEndDate);
@@ -412,7 +435,9 @@ export async function createRoutineTaskInTransaction(
             affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
             scheduleType,
             version: task.version,
-            ownershipMode: authorization.isAdmin ? "ADMIN" : "SELF_SERVICE",
+            ownershipMode: capabilityAuthorization.isAdministrative || capability === "routine.import.manage"
+                ? "ADMIN"
+                : "SELF_SERVICE",
             createdById: actor.id,
         },
     );
@@ -443,8 +468,18 @@ export async function createRoutineTask(
 
     try {
         return await runSerializableTransaction(async (tx) => {
-            const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
-            const normalizedInput = normalizeRoutineTaskCreateInput(input, authorization);
+            const actorAuthorization = await assertActiveRoutineActorInTransaction(tx, actor);
+            const capabilityAuthorization = await resolveRoutineCapabilityInTransaction(
+                tx,
+                actorAuthorization,
+                "routine.task.create",
+            );
+            const normalizedInput = normalizeRoutineTaskCreateInput(
+                input,
+                actorAuthorization,
+                capabilityAuthorization,
+                "TASK_CREATE",
+            );
             const normalizedRequestHash = createRoutineTaskRequestHash(normalizedInput);
             requestHash = normalizedRequestHash;
             const existing = await tx.routineTaskCreateIdempotency.findUnique({
@@ -472,7 +507,12 @@ export async function createRoutineTask(
                 return { task, replayed: true };
             }
 
-            const task = await createRoutineTaskInTransaction(tx, normalizedInput, actor);
+            const task = await createRoutineTaskInTransaction(
+                tx,
+                normalizedInput,
+                actor,
+                {},
+            );
             try {
                 await tx.routineTaskCreateIdempotency.create({
                     data: {
@@ -521,8 +561,13 @@ export async function deleteRoutineTask(
     actor: RoutineCommandActor,
 ): Promise<void> {
     await runSerializableTransaction(async (tx) => {
-        const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
-        const task = authorization.isAdmin
+        const actorAuthorization = await assertActiveRoutineActorInTransaction(tx, actor);
+        const capabilityAuthorization = await resolveRoutineCapabilityInTransaction(
+            tx,
+            actorAuthorization,
+            "routine.task.delete",
+        );
+        const task = capabilityAuthorization.scopes.includes("ALL")
             ? await tx.routineTask.findUnique({
                   where: { id: taskId },
                   select: {
@@ -535,7 +580,11 @@ export async function deleteRoutineTask(
             : await tx.routineTask.findFirst({
                   where: {
                       id: taskId,
-                      ...buildRoutineTaskDeleteScope(actor.id, authorization),
+                      ...buildRoutineTaskScope(
+                          actor.id,
+                          actorAuthorization.employeeId,
+                          capabilityAuthorization.scopes,
+                      ),
                   },
                   select: {
                       id: true,
@@ -614,7 +663,9 @@ export async function deleteRoutineTask(
                 taskId,
                 title: task.title,
                 version: task.version,
-                ownershipMode: authorization.isAdmin ? "ADMIN" : "SELF_SERVICE",
+                ownershipMode: capabilityAuthorization.isAdministrative
+                    ? "ADMIN"
+                    : "SELF_SERVICE",
                 createdById: task.createdById,
             },
         );
@@ -628,9 +679,18 @@ export async function updateRoutineTask(
     actor: RoutineCommandActor,
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
     return runSerializableTransaction(async (tx) => {
-        const authorization = await assertActiveRoutineActorInTransaction(tx, actor);
-        const taskScope = buildRoutineTaskEditScope(actor.id, authorization);
-        const current = authorization.isAdmin
+        const actorAuthorization = await assertActiveRoutineActorInTransaction(tx, actor);
+        const capabilityAuthorization = await resolveRoutineCapabilityInTransaction(
+            tx,
+            actorAuthorization,
+            "routine.task.update",
+        );
+        const taskScope = buildRoutineTaskScope(
+            actor.id,
+            actorAuthorization.employeeId,
+            capabilityAuthorization.scopes,
+        );
+        const current = capabilityAuthorization.scopes.includes("ALL")
             ? await tx.routineTask.findUnique({
                   where: { id: taskId },
                   include: ROUTINE_TASK_INCLUDE,
@@ -642,15 +702,21 @@ export async function updateRoutineTask(
         if (!current) throw new RoutineNotFoundError();
 
         const canChangeLifecycle =
-            authorization.isAdmin || current.createdById === actor.id;
-        const authorizationSource = authorization.isAdmin
+            capabilityAuthorization.isAdministrative || current.createdById === actor.id;
+        const isAssigned = actorAuthorization.employeeId !== null
+            && current.assignees.some(
+                (assignee) => assignee.employeeId === actorAuthorization.employeeId,
+            );
+        const authorizationSource = capabilityAuthorization.isAdministrative
             ? "ADMIN"
             : current.createdById === actor.id
                 ? "CREATOR"
-                : "ASSIGNEE";
+                : isAssigned
+                    ? "ASSIGNEE"
+                    : "CAPABILITY";
         const normalizedInput = normalizeRoutineTaskUpdateInput(
             input,
-            authorization,
+            capabilityAuthorization,
             { canChangeLifecycle },
         );
         const isActiveChanged =
@@ -795,7 +861,9 @@ export async function updateRoutineTask(
                 affectedEmployeeIds: nextAssignees?.map(
                     (assignee) => assignee.employeeId,
                 ) ?? current.assignees.map((assignee) => assignee.employeeId),
-                ownershipMode: authorization.isAdmin ? "ADMIN" : "SELF_SERVICE",
+                ownershipMode: capabilityAuthorization.isAdministrative
+                    ? "ADMIN"
+                    : "SELF_SERVICE",
                 authorizationSource,
                 createdById: current.createdById,
                 assigneesChanged,
@@ -839,7 +907,12 @@ export async function updateRoutineOccurrenceOverride(
     const assignees = normalizeAssignees(input.assignees);
 
     return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
+        const activeActor = await assertActiveRoutineActorInTransaction(tx, actor);
+        await resolveRoutineCapabilityInTransaction(
+            tx,
+            activeActor,
+            "routine.occurrence.override",
+        );
         const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
         if (input.expectedReminderVersion !== occurrence.reminderVersion) {
             throw new RoutineConflictError(
@@ -936,7 +1009,12 @@ export async function updateRoutineOccurrenceDueDate(
         throw new RoutineValidationError("รูปแบบวันกำหนดไม่ถูกต้อง");
     }
     return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
+        const activeActor = await assertActiveRoutineActorInTransaction(tx, actor);
+        await resolveRoutineCapabilityInTransaction(
+            tx,
+            activeActor,
+            "routine.occurrence.change_due_date",
+        );
         const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
         const oldDueDate = toBangkokCalendarDate(occurrence.dueDate);
         if (input.expectedReminderVersion !== occurrence.reminderVersion) {
@@ -994,7 +1072,12 @@ export async function reassignRoutineOccurrence(
 }>> {
     const assignees = normalizeAssignees(input.assignees);
     return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
+        const activeActor = await assertActiveRoutineActorInTransaction(tx, actor);
+        await resolveRoutineCapabilityInTransaction(
+            tx,
+            activeActor,
+            "routine.occurrence.reassign",
+        );
         const occurrence = await findOccurrenceForMutation(tx, occurrenceId);
         await assertActiveEmployeesInTransaction(
             tx,

@@ -8,9 +8,10 @@ capability contract in [authorization-contract.md](./authorization-contract.md),
 the persistence boundary in [authorization-persistence.md](./authorization-persistence.md),
 or the repository module rules in [module-boundaries.md](./module-boundaries.md).
 
-Phase 3 makes authorization resolution operational and independently testable.
-It does not migrate any existing route, service, Dashboard guard, or LIFF
-guard. Routine remains the planned Phase 4 pilot.
+Phase 3 made authorization resolution operational and independently testable.
+The Phase 4 Routine pilot now composes this boundary for its migrated
+server-side capabilities; this document continues to describe the generic
+resolver contract rather than Routine policy.
 
 ## Public API
 
@@ -25,12 +26,19 @@ const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
 
-All four methods use the same authoritative resolution implementation.
+These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
 throws `AuthorizationDeniedError`. The error has no HTTP status or transport
 behavior. `AuthorizationConfigurationError` is reserved for invalid persisted
 configuration or an unsupported resolver contract and is allowed to propagate
 from detailed resolution.
+
+For transaction-sensitive mutations, the public resolver also exposes
+`resolveInTransaction(actor, capability, persistenceContext)`. It uses the
+same registry, evaluator, grant validation, and default-deny behavior while
+reading authorization persistence through the supplied transaction context.
+The context is a narrow composition seam; the raw evaluator and persistence
+adapter remain private.
 
 The module also exposes `createAuthorizationResolver()` for a narrow registry
 and persistence-port test seam. The default `authorization` instance uses the
@@ -193,10 +201,11 @@ Prisma delegate is exposed.
 
 ## Phase boundary
 
-No production feature calls this resolver in Phase 3. Existing
-`requireAdminSession`, `requireApiSession`, `isAdminRole`, Routine/Stock/Leave
-helpers, Dashboard guards, and LIFF guards remain unchanged. No Team/grant
-administration API or UI, explicit deny model, authorization cache, or audit
-mutation workflow is introduced. Phase 4 will decide how the Routine pilot
-adapts existing authentication, domain predicates, and business invariants to
-this resolver; it is not part of this implementation.
+The Phase 4 pilot is limited to Routine server-side capability composition;
+existing `requireAdminSession`, `requireApiSession`, `isAdminRole`,
+Stock/Leave helpers, Dashboard guards, and LIFF guards outside the migrated
+Routine call chains remain unchanged. No Team/grant administration API or UI,
+explicit deny model, authorization cache, or audit mutation workflow is
+introduced. Routine-specific compatibility, scope translation, and transaction
+composition are documented in
+[authorization-routine-pilot.md](./authorization-routine-pilot.md).

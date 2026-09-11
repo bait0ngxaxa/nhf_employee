@@ -12,6 +12,7 @@ import {
 } from "./evaluator";
 import type {
     AuthorizationActor,
+    AuthorizationPersistenceContext,
     AuthorizationMembershipResolution,
     AuthorizationPersistedTeamGrant,
     AuthorizationPersistedTeamRoleGrant,
@@ -635,6 +636,29 @@ describe("authorization public resolver API", () => {
             ),
         ).resolves.toBe(false);
         expect(load).not.toHaveBeenCalled();
+    });
+
+    it("resolves USER grants through the supplied transaction context", async () => {
+        const userGrantFindMany = vi.fn().mockResolvedValue([
+            userGrant("CREATED"),
+        ]);
+        const teamMembershipFindMany = vi.fn().mockResolvedValue([]);
+        const persistenceContext = {
+            userCapabilityGrant: { findMany: userGrantFindMany },
+            teamMembership: { findMany: teamMembershipFindMany },
+        } as unknown as AuthorizationPersistenceContext;
+        const resolver = createAuthorizationResolver();
+
+        await expect(
+            resolver.resolveInTransaction(actor(), CAPABILITY, persistenceContext),
+        ).resolves.toMatchObject({
+            allowed: true,
+            scopes: ["CREATED"],
+        });
+        expect(userGrantFindMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: { userId: USER_ID, capabilityKey: CAPABILITY },
+        }));
+        expect(teamMembershipFindMany).toHaveBeenCalled();
     });
 });
 

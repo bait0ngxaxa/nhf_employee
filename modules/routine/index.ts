@@ -12,6 +12,7 @@ export {
 } from "./domain/schedule";
 export type {
     RoutineTaskDetailResult,
+    RoutineTaskWorkItemQueryOptions,
     SerializedRoutineTaskWorkItem,
 } from "./application/queries";
 export type { RoutineSchedulerResult } from "./application/scheduler";
@@ -63,6 +64,9 @@ export {
     getRoutineTaskById,
     getRoutineTasks,
 } from "./application/queries";
+export {
+    assertRoutineCapabilityForMigration,
+} from "./application/authorization";
 export {
     prepareRoutineTaskExport,
 } from "./infrastructure/reports/routine-export";

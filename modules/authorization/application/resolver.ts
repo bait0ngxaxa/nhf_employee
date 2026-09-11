@@ -13,9 +13,13 @@ import {
 } from "./evaluator";
 import type {
     AuthorizationDecision,
+    AuthorizationPersistenceContext,
     AuthorizationResolutionRepository,
 } from "./types";
-import { authorizationResolutionRepository } from "../infrastructure/persistence/authorization-resolution-repository";
+import {
+    authorizationResolutionRepository,
+    createAuthorizationResolutionRepository,
+} from "../infrastructure/persistence/authorization-resolution-repository";
 
 export interface AuthorizationResolverDependencies {
     readonly registry?: CapabilityRegistry;
@@ -35,6 +39,11 @@ export interface AuthorizationResolver {
         actor: AuthorizationActor,
         capability: string,
     ): Promise<AuthorizationDecision>;
+    resolveInTransaction(
+        actor: AuthorizationActor,
+        capability: string,
+        persistenceContext: AuthorizationPersistenceContext,
+    ): Promise<AuthorizationDecision>;
     getScopes(
         actor: AuthorizationActor,
         capability: string,
@@ -48,9 +57,10 @@ export function createAuthorizationResolver(
     const repository =
         dependencies.repository ?? authorizationResolutionRepository;
 
-    const resolve = async (
+    const resolveWithRepository = async (
         actor: AuthorizationActor,
         capability: string,
+        resolutionRepository: AuthorizationResolutionRepository,
     ): Promise<AuthorizationDecision> => {
         const context = getAuthorizationEvaluationContext(
             actor,
@@ -65,7 +75,7 @@ export function createAuthorizationResolver(
             return evaluateAuthorization(actor, capability, undefined, registry);
         }
 
-        const resolutionData = await repository.load({
+        const resolutionData = await resolutionRepository.load({
             userId: actor.userId,
             capabilityKey: context.definition.key,
         });
@@ -76,6 +86,23 @@ export function createAuthorizationResolver(
             registry,
         );
     };
+
+    const resolve = async (
+        actor: AuthorizationActor,
+        capability: string,
+    ): Promise<AuthorizationDecision> =>
+        resolveWithRepository(actor, capability, repository);
+
+    const resolveInTransaction = async (
+        actor: AuthorizationActor,
+        capability: string,
+        persistenceContext: AuthorizationPersistenceContext,
+    ): Promise<AuthorizationDecision> =>
+        resolveWithRepository(
+            actor,
+            capability,
+            createAuthorizationResolutionRepository(persistenceContext),
+        );
 
     const can = async (
         actor: AuthorizationActor,
@@ -103,6 +130,7 @@ export function createAuthorizationResolver(
         can,
         require,
         resolve,
+        resolveInTransaction,
         getScopes,
     });
 }

@@ -2,19 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-    requireAdminSession: vi.fn(),
+    requireActiveWorkforceOrAdminSession: vi.fn(),
+    assertRoutineCapabilityForMigration: vi.fn(),
     createRoutineImportPreview: vi.fn(),
     getRoutineImportReferenceData: vi.fn(),
     createRoutineCommandActor: vi.fn(),
     enforceAuthenticatedMutationRateLimit: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/api", () => ({
-    requireAdminSession: mocks.requireAdminSession,
+vi.mock("@/lib/auth/workforce", () => ({
+    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
     ...(await importOriginal()),
+    assertRoutineCapabilityForMigration: mocks.assertRoutineCapabilityForMigration,
     createRoutineImportPreview: mocks.createRoutineImportPreview,
     getRoutineImportReferenceData: mocks.getRoutineImportReferenceData,
     ROUTINE_IMPORT_MAX_FILE_BYTES: 10 * 1024 * 1024,
@@ -51,7 +53,8 @@ function buildRequest(file?: File): NextRequest {
 describe("POST /api/routines/imports/preview", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireAdminSession.mockResolvedValue(admin);
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(admin);
+        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
         mocks.enforceAuthenticatedMutationRateLimit.mockReturnValue(null);
         mocks.createRoutineCommandActor.mockReturnValue({ id: 7, role: "ADMIN", email: "admin@example.com" });
         mocks.getRoutineImportReferenceData.mockResolvedValue({
@@ -73,8 +76,8 @@ describe("POST /api/routines/imports/preview", () => {
         });
     });
 
-    it("requires an admin session before parsing or staging the upload", async () => {
-        mocks.requireAdminSession.mockResolvedValue({
+    it("requires an authenticated workforce or admin session before parsing or staging the upload", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: false,
             response: NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 }),
         });
@@ -116,7 +119,10 @@ describe("POST /api/routines/imports/preview", () => {
 
 describe("GET /api/routines/imports/reference", () => {
     beforeEach(() => {
-        mocks.requireAdminSession.mockResolvedValue(admin);
+        vi.clearAllMocks();
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(admin);
+        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
+        mocks.createRoutineCommandActor.mockReturnValue({ id: 7, role: "ADMIN", email: "admin@example.com" });
         mocks.getRoutineImportReferenceData.mockResolvedValue({
             units: [],
             categories: [],

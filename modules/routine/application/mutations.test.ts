@@ -155,6 +155,8 @@ describe("NHF Routine mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         prismaMock.$queryRaw.mockResolvedValue(asNever([]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         prismaMock.auditLog.create.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.routineOccurrence.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
@@ -367,6 +369,60 @@ describe("NHF Routine mutations", () => {
         expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
         expect(prismaMock.routineOccurrenceAssignee.deleteMany).not.toHaveBeenCalled();
         expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("allows a configured USER occurrence grant while retaining target validation", async () => {
+        const initial = occurrence();
+        const updated = occurrence({
+            dueDate: new Date("2026-02-10T00:00:00.000Z"),
+            isDueDateOverridden: true,
+            reminderVersion: 2,
+            assignees: [{
+                employeeId: 21,
+                role: "OWNER",
+                employee: {
+                    id: 21,
+                    firstName: "มานะ",
+                    lastName: "ดีใจ",
+                    nickname: null,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }],
+        });
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 3,
+            capabilityKey: "routine.occurrence.override",
+            scope: "ALL",
+        }]));
+        prismaMock.routineOccurrence.findUnique
+            .mockResolvedValueOnce(asNever(initial))
+            .mockResolvedValueOnce(asNever(updated));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 21 }]));
+
+        await updateRoutineOccurrenceOverride(
+            91,
+            {
+                expectedReminderVersion: 1,
+                dueDate: "2026-02-10",
+                assignees: [{ employeeId: 21, role: "OWNER" }],
+            },
+            actor(3, "USER"),
+        );
+
+        expect(prismaMock.routineOccurrence.updateMany).toHaveBeenCalledWith({
+            where: { id: 91, reminderVersion: 1 },
+            data: expect.objectContaining({
+                dueDate: new Date("2026-02-10T00:00:00.000Z"),
+                reminderVersion: { increment: 1 },
+            }),
+        });
+        expect(prismaMock.routineOccurrenceAssignee.createMany).toHaveBeenCalledWith({
+            data: [{ occurrenceId: 91, employeeId: 21, role: "OWNER" }],
+        });
     });
 
     it("snapshots new active assignees and increments the reminder version", async () => {
@@ -937,6 +993,8 @@ describe("NHF Routine mutations", () => {
         for (const { employeeId } of cases) {
             mockReset(prismaMock);
             prismaMock.$queryRaw.mockResolvedValue(asNever([]));
+            prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+            prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
             prismaMock.user.findUnique.mockResolvedValue(
                 asNever(activeUser("USER", employeeId)),
             );

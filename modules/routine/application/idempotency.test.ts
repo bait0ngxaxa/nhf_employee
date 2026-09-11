@@ -7,6 +7,7 @@ import { createRoutineTask } from "./mutations";
 import { createRoutineTaskRequestHash } from "./idempotency";
 
 const assertActiveRoutineActorMock = vi.hoisted(() => vi.fn());
+const resolveRoutineCapabilityInTransactionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -21,8 +22,8 @@ vi.mock("@/lib/db/transaction", () => ({
 }));
 
 vi.mock("./authorization", () => ({
-    assertActiveAdminInTransaction: vi.fn(),
     assertActiveRoutineActorInTransaction: assertActiveRoutineActorMock,
+    resolveRoutineCapabilityInTransaction: resolveRoutineCapabilityInTransactionMock,
     assertActiveEmployeesInTransaction: vi.fn(),
 }));
 
@@ -71,8 +72,32 @@ describe("Routine task create idempotency", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         assertActiveRoutineActorMock.mockResolvedValue({
-            isAdmin: true,
+            authorizationActor: {
+                userId: 99,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
             employeeId: null,
+        });
+        resolveRoutineCapabilityInTransactionMock.mockResolvedValue({
+            actor: {
+                userId: 99,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+            capability: "routine.task.create",
+            decision: {
+                capability: "routine.task.create",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [],
+            },
+            scopes: ["ALL"],
+            isAdministrative: true,
+            usedMigrationCompatibility: false,
+            usedLiffSelfServiceCompatibility: false,
         });
         prismaMock.routineTask.findUnique.mockResolvedValue(asNever(null));
         prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(task));
@@ -160,8 +185,32 @@ describe("Routine task create idempotency", () => {
             }],
         };
         assertActiveRoutineActorMock.mockResolvedValue({
-            isAdmin: false,
+            authorizationActor: {
+                userId: 3,
+                employeeId: 11,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
             employeeId: 11,
+        });
+        resolveRoutineCapabilityInTransactionMock.mockResolvedValue({
+            actor: {
+                userId: 3,
+                employeeId: 11,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            capability: "routine.task.create",
+            decision: {
+                capability: "routine.task.create",
+                allowed: true,
+                scopes: ["OWN"],
+                grants: [],
+            },
+            scopes: ["OWN"],
+            isAdministrative: false,
+            usedMigrationCompatibility: true,
+            usedLiffSelfServiceCompatibility: false,
         });
 
         await createRoutineTask(spoofedInput, userActor, {

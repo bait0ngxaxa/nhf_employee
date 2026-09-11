@@ -92,6 +92,7 @@ describe("Routine task Excel export", () => {
         expect(mocks.getRoutineTaskWorkItems).toHaveBeenCalledWith(
             { scope: "all", page: 1, limit: 100 },
             queryActor,
+            { authorizationMode: "DEFERRED_EXPORT" },
         );
         if (preparation.status !== "ready") return;
 

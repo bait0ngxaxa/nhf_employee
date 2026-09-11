@@ -1,8 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { createRoutineCommandActor } from "@/modules/routine";
+import {
+    assertRoutineCapabilityForMigration,
+    createRoutineCommandActor,
+} from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     readRoutineJsonBody,
@@ -62,8 +64,21 @@ export async function PATCH(
     if (sizeResponse) return sizeResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
+        await assertRoutineCapabilityForMigration(
+            actor,
+            "employeeId" in auth ? auth.employeeId : null,
+            "routine.occurrence.override",
+        );
         const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "routine-occurrence-admin",
             auth.user.id,
@@ -81,18 +96,10 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-        const actor = createRoutineCommandActor(
-            {
-                id: auth.user.id,
-                role: auth.user.role ?? "ADMIN",
-                email: auth.user.email ?? "",
-            },
-            request.headers,
-        );
         await updateRoutineOccurrenceOverride(Number(parsedId.data), parsed.data, actor);
         const result = await getRoutineOccurrenceById(Number(parsedId.data), {
             actor,
-            employeeId: null,
+            employeeId: "employeeId" in auth ? auth.employeeId : null,
         });
         if (!result) return NextResponse.json({ error: "ไม่พบรายการ Routine" }, { status: 404 });
         return NextResponse.json({ occurrence: result.occurrence });

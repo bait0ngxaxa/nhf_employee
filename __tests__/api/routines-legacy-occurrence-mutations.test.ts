@@ -2,18 +2,20 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-    requireAdminSession: vi.fn(),
+    requireActiveWorkforceOrAdminSession: vi.fn(),
+    assertRoutineCapabilityForMigration: vi.fn(),
     getOccurrence: vi.fn(),
     updateDueDate: vi.fn(),
     reassign: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/api", () => ({
-    requireAdminSession: mocks.requireAdminSession,
+vi.mock("@/lib/auth/workforce", () => ({
+    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
     ...(await importOriginal()),
+    assertRoutineCapabilityForMigration: mocks.assertRoutineCapabilityForMigration,
     getRoutineOccurrenceById: mocks.getOccurrence,
     updateRoutineOccurrenceDueDate: mocks.updateDueDate,
     reassignRoutineOccurrence: mocks.reassign,
@@ -25,10 +27,11 @@ import { PATCH as patchDueDate } from "@/app/api/routines/occurrences/[id]/due-d
 describe("legacy Routine occurrence mutation routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
+        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
         mocks.getOccurrence.mockResolvedValue({ occurrence: { id: 91 } });
         mocks.updateDueDate.mockResolvedValue(undefined);
         mocks.reassign.mockResolvedValue(undefined);

@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
-import { createRoutineCommandActor } from "@/modules/routine";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import {
+    assertRoutineCapabilityForMigration,
+    createRoutineCommandActor,
+} from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     routineErrorResponse,
@@ -21,16 +24,8 @@ export async function POST(
     if (sizeResponse) return sizeResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
-        const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
-            "routine-import",
-            auth.user.id,
-        );
-        if (rateLimitResponse) return rateLimitResponse;
-        const { batchId: rawBatchId } = await params;
-        const parsedBatchId = routineImportBatchIdSchema.safeParse(rawBatchId);
-        if (!parsedBatchId.success) return NextResponse.json({ error: "รหัสไม่ถูกต้อง" }, { status: 400 });
         const actor = createRoutineCommandActor(
             {
                 id: auth.user.id,
@@ -39,6 +34,19 @@ export async function POST(
             },
             request.headers,
         );
+        await assertRoutineCapabilityForMigration(
+            actor,
+            "employeeId" in auth ? auth.employeeId : null,
+            "routine.import.manage",
+        );
+        const rateLimitResponse = enforceAuthenticatedMutationRateLimit(
+            "routine-import",
+            auth.user.id,
+        );
+        if (rateLimitResponse) return rateLimitResponse;
+        const { batchId: rawBatchId } = await params;
+        const parsedBatchId = routineImportBatchIdSchema.safeParse(rawBatchId);
+        if (!parsedBatchId.success) return NextResponse.json({ error: "รหัสไม่ถูกต้อง" }, { status: 400 });
         const batch = await cancelRoutineImportBatch(Number(parsedBatchId.data), actor);
         return NextResponse.json({ batch });
     } catch (error) {

@@ -20,6 +20,12 @@ const xlsxSafetyMocks = vi.hoisted(() => ({
     getRoutineXlsxContainerIssue: vi.fn(),
 }));
 
+const routineAuthorizationMocks = vi.hoisted(() => ({
+    assertActiveRoutineActorInTransaction: vi.fn(),
+    resolveRoutineCapabilityForMigration: vi.fn(),
+    resolveRoutineCapabilityInTransaction: vi.fn(),
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
 }));
@@ -30,9 +36,7 @@ vi.mock("@/lib/db/transaction", () => ({
     ) => callback(prisma as unknown as Prisma.TransactionClient)),
 }));
 
-vi.mock("../authorization", () => ({
-    assertActiveAdminInTransaction: vi.fn(),
-}));
+vi.mock("../authorization", () => routineAuthorizationMocks);
 
 vi.mock("./workbook", () => workbookMocks);
 
@@ -198,6 +202,43 @@ const inactiveEmployee = {
 describe("routine import preview reuse", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        routineAuthorizationMocks.assertActiveRoutineActorInTransaction.mockResolvedValue({
+            authorizationActor: {
+                userId: 7,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+            employeeId: null,
+        });
+        routineAuthorizationMocks.resolveRoutineCapabilityForMigration.mockResolvedValue({
+            actor: {
+                userId: 7,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+            capability: "routine.import.manage",
+            decision: { capability: "routine.import.manage", allowed: true, scopes: ["ALL"], grants: [] },
+            scopes: ["ALL"],
+            isAdministrative: true,
+            usedMigrationCompatibility: false,
+            usedLiffSelfServiceCompatibility: false,
+        });
+        routineAuthorizationMocks.resolveRoutineCapabilityInTransaction.mockResolvedValue({
+            actor: {
+                userId: 7,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+            capability: "routine.import.manage",
+            decision: { capability: "routine.import.manage", allowed: true, scopes: ["ALL"], grants: [] },
+            scopes: ["ALL"],
+            isAdministrative: true,
+            usedMigrationCompatibility: false,
+            usedLiffSelfServiceCompatibility: false,
+        });
         vi.clearAllMocks();
         configureReference([activeEmployee]);
         xlsxSafetyMocks.getRoutineXlsxContainerIssue.mockReturnValue(null);
@@ -281,7 +322,7 @@ describe("routine import staging row updates", () => {
     });
 
     it("returns import reference employees with lifecycle and notification readiness", async () => {
-        const result = await getRoutineImportReferenceData();
+        const result = await getRoutineImportReferenceData(actor());
 
         expect(result.employees).toEqual(expect.arrayContaining([
             expect.objectContaining({

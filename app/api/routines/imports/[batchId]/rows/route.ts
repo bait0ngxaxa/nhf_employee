@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import {
+    assertRoutineCapabilityForMigration,
+    createRoutineCommandActor,
+} from "@/modules/routine";
 import {
     routineErrorResponse,
     routineFeatureGuard,
@@ -19,8 +23,21 @@ export async function GET(
     if (featureResponse) return featureResponse;
 
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
+        await assertRoutineCapabilityForMigration(
+            actor,
+            "employeeId" in auth ? auth.employeeId : null,
+            "routine.import.manage",
+        );
         const { batchId: rawBatchId } = await params;
         const parsedBatchId = routineImportBatchIdSchema.safeParse(rawBatchId);
         if (!parsedBatchId.success) return NextResponse.json({ error: "รหัสไม่ถูกต้อง" }, { status: 400 });
@@ -30,7 +47,11 @@ export async function GET(
             return NextResponse.json({ error: "พารามิเตอร์ไม่ถูกต้อง" }, { status: 400 });
         }
         return NextResponse.json({
-            ...(await getRoutineImportRows(Number(parsedBatchId.data), parsedQuery.data)),
+            ...(await getRoutineImportRows(
+                Number(parsedBatchId.data),
+                parsedQuery.data,
+                actor,
+            )),
         });
     } catch (error) {
         return routineErrorResponse(error, "Error fetching routine import rows");

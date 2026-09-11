@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
-import { createRoutineCommandActor } from "@/modules/routine";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import {
+    assertRoutineCapabilityForMigration,
+    createRoutineCommandActor,
+} from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import {
     readRoutineJsonBody,
@@ -24,8 +27,14 @@ export async function PATCH(
     const sizeResponse = routineRequestSizeGuard(request);
     if (sizeResponse) return sizeResponse;
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        const actor = createRoutineCommandActor({ id: auth.user.id, role: auth.user.role ?? "USER", email: auth.user.email ?? "" }, request.headers);
+        await assertRoutineCapabilityForMigration(
+            actor,
+            "employeeId" in auth ? auth.employeeId : null,
+            "routine.occurrence.change_due_date",
+        );
         const rateLimitResponse = enforceAuthenticatedMutationRateLimit("routine-occurrence-admin", auth.user.id);
         if (rateLimitResponse) return rateLimitResponse;
         const { id: rawId } = await params;
@@ -35,11 +44,10 @@ export async function PATCH(
         if (!body.ok) return body.response;
         const parsed = routineDueDateSchema.safeParse(body.body);
         if (!parsed.success) return NextResponse.json({ error: "ข้อมูลไม่ถูกต้อง", details: parsed.error.flatten().fieldErrors }, { status: 400 });
-        const actor = createRoutineCommandActor({ id: auth.user.id, role: auth.user.role ?? "ADMIN", email: auth.user.email ?? "" }, request.headers);
         await updateRoutineOccurrenceDueDate(Number(parsedId.data), parsed.data, actor);
         const result = await getRoutineOccurrenceById(Number(parsedId.data), {
             actor,
-            employeeId: null,
+            employeeId: "employeeId" in auth ? auth.employeeId : null,
         });
         if (!result) return NextResponse.json({ error: "ไม่พบรายการ Routine" }, { status: 404 });
         return NextResponse.json({ occurrence: result.occurrence });

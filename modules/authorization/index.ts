@@ -60,5 +60,6 @@ export type {
     AuthorizationResolutionData,
     AuthorizationResolutionRepository,
     AuthorizationResolutionRequest,
+    AuthorizationPersistenceContext,
     EffectiveAuthorizationGrant,
 } from "./application/types";

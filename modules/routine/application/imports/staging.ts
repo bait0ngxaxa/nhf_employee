@@ -21,7 +21,11 @@ import {
     toBangkokCalendarDate,
 } from "../../domain/schedule";
 import { isRoutineNotificationReady } from "../../domain/notification-readiness";
-import { assertActiveAdminInTransaction } from "../authorization";
+import {
+    assertActiveRoutineActorInTransaction,
+    resolveRoutineCapabilityForMigration,
+    resolveRoutineCapabilityInTransaction,
+} from "../authorization";
 import { createRoutineTaskInTransaction } from "../mutations";
 import type { RoutineCommandActor } from "../types";
 import {
@@ -527,6 +531,11 @@ export async function createRoutineImportPreview(
     actor: RoutineCommandActor,
     asOfDate = getCurrentBangkokDate(),
 ): Promise<{ batch: RoutineImportBatchView; reusedExisting: boolean }> {
+    await resolveRoutineCapabilityForMigration(
+        actor,
+        null,
+        "routine.import.manage",
+    );
     const upload = await readUploadFile(file);
     const workbook = parseWorkbookBytes(upload.fileName, upload.bytes);
     let scope: ReturnType<typeof getRoutineImportSheetScope>;
@@ -571,6 +580,12 @@ export async function createRoutineImportPreview(
     }
 
     const created = await runSerializableTransaction(async (tx) => {
+        const activeActor = await assertActiveRoutineActorInTransaction(tx, actor);
+        await resolveRoutineCapabilityInTransaction(
+            tx,
+            activeActor,
+            "routine.import.manage",
+        );
         const concurrentExisting = await tx.routineImportBatch.findFirst({
             where: {
                 fileHash: upload.hash,
@@ -736,13 +751,26 @@ async function loadRoutineReferenceDataForImport(): Promise<RoutineImportReferen
     });
 }
 
-export async function getRoutineImportReferenceData(): Promise<RoutineImportReferenceData> {
+export async function getRoutineImportReferenceData(
+    actor: RoutineCommandActor,
+): Promise<RoutineImportReferenceData> {
+    await resolveRoutineCapabilityForMigration(
+        actor,
+        null,
+        "routine.import.manage",
+    );
     return loadRoutineReferenceDataForImport();
 }
 
 export async function getRoutineImportBatch(
     batchId: number,
+    actor: RoutineCommandActor,
 ): Promise<RoutineImportBatchView> {
+    await resolveRoutineCapabilityForMigration(
+        actor,
+        null,
+        "routine.import.manage",
+    );
     const batch = await expireBatchIfNeeded(await loadBatchOrThrow(batchId));
     const selectedValidRows = await countSelectedValidRows(prisma, batchId);
     return getBatchView(batch, selectedValidRows);
@@ -751,8 +779,9 @@ export async function getRoutineImportBatch(
 export async function getRoutineImportRows(
     batchId: number,
     filters: RoutineImportRowsFilter,
+    actor: RoutineCommandActor,
 ): Promise<RoutineImportRowsPage> {
-    await getRoutineImportBatch(batchId);
+    await getRoutineImportBatch(batchId, actor);
     const search = filters.search?.trim();
     const where: Prisma.RoutineImportRowWhereInput = {
         batchId,
@@ -1059,7 +1088,12 @@ export async function updateRoutineImportRow(
     actor: RoutineCommandActor,
 ): Promise<RoutineImportRowView> {
     return runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
+        const activeActor = await assertActiveRoutineActorInTransaction(tx, actor);
+        await resolveRoutineCapabilityInTransaction(
+            tx,
+            activeActor,
+            "routine.import.manage",
+        );
         const row = await tx.routineImportRow.findUnique({
             where: { id: rowId },
             include: { batch: true },
@@ -1176,7 +1210,12 @@ export async function applyRoutineImportBatch(
     actor: RoutineCommandActor,
 ): Promise<RoutineImportApplyView> {
     const result = await runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
+        const activeActor = await assertActiveRoutineActorInTransaction(tx, actor);
+        await resolveRoutineCapabilityInTransaction(
+            tx,
+            activeActor,
+            "routine.import.manage",
+        );
         const batch = await tx.routineImportBatch.findUnique({ where: { id: batchId } });
         if (!batch) throw new RoutineNotFoundError("ไม่พบรายการนำเข้า");
         if (batch.status === "COMPLETED") {
@@ -1230,7 +1269,10 @@ export async function applyRoutineImportBatch(
                 tx,
                 taskInput,
                 actor,
-                { excludePastDue: true },
+                {
+                    excludePastDue: true,
+                    authorizationCapability: "routine.import.manage",
+                },
             );
             await tx.routineImportLedger.create({
                 data: {
@@ -1319,7 +1361,12 @@ export async function cancelRoutineImportBatch(
     actor: RoutineCommandActor,
 ): Promise<RoutineImportBatchView> {
     const batch = await runSerializableTransaction(async (tx) => {
-        await assertActiveAdminInTransaction(tx, actor);
+        const activeActor = await assertActiveRoutineActorInTransaction(tx, actor);
+        await resolveRoutineCapabilityInTransaction(
+            tx,
+            activeActor,
+            "routine.import.manage",
+        );
         const current = await tx.routineImportBatch.findUnique({ where: { id: batchId } });
         if (!current) throw new RoutineNotFoundError("ไม่พบรายการนำเข้า");
         if (current.status === "COMPLETED") throw new RoutineConflictError("นำเข้าชุดข้อมูลนี้เสร็จแล้ว ไม่สามารถยกเลิกได้");

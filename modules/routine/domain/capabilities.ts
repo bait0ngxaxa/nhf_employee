@@ -1,3 +1,5 @@
+import type { AuthorizationScope } from "@/modules/authorization";
+
 export interface RoutineTaskCapabilities {
     canEdit: boolean;
     canDelete: boolean;
@@ -6,7 +8,10 @@ export interface RoutineTaskCapabilities {
 export interface RoutineTaskCapabilityActor {
     actorId: number;
     employeeId: number | null;
-    isAdmin: boolean;
+    /** Retained for callers that only expose legacy presentation projections. */
+    isAdmin?: boolean;
+    editScopes?: readonly AuthorizationScope[];
+    deleteScopes?: readonly AuthorizationScope[];
 }
 
 export interface RoutineTaskCapabilityAssignee {
@@ -34,8 +39,26 @@ export function resolveRoutineTaskCapabilities(
                 && assignee.employee.deletedAt === null,
         );
 
+    const canUseScope = (
+        scopes: readonly AuthorizationScope[] | undefined,
+        fallback: boolean,
+    ): boolean => {
+        if (scopes === undefined) return fallback;
+        if (scopes.includes("ALL")) return true;
+        return (
+            (scopes.includes("CREATED") && isCreator)
+            || (scopes.includes("ASSIGNED") && isCurrentMasterAssignee)
+        );
+    };
+
     return {
-        canEdit: actor.isAdmin || isCreator || isCurrentMasterAssignee,
-        canDelete: actor.isAdmin || isCreator,
+        canEdit: canUseScope(
+            actor.editScopes,
+            actor.isAdmin === true || isCreator || isCurrentMasterAssignee,
+        ),
+        canDelete: canUseScope(
+            actor.deleteScopes,
+            actor.isAdmin === true || isCreator,
+        ),
     };
 }

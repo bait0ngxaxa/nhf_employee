@@ -3,20 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     RoutineConflictError,
+    RoutineForbiddenError,
 } from "@/modules/routine";
 
 const mocks = vi.hoisted(() => ({
-    requireAdminSession: vi.fn(),
+    requireActiveWorkforceOrAdminSession: vi.fn(),
+    assertRoutineCapabilityForMigration: vi.fn(),
     getOccurrence: vi.fn(),
     updateOverride: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/api", () => ({
-    requireAdminSession: mocks.requireAdminSession,
+vi.mock("@/lib/auth/workforce", () => ({
+    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
     ...(await importOriginal()),
+    assertRoutineCapabilityForMigration: mocks.assertRoutineCapabilityForMigration,
     getRoutineOccurrenceById: mocks.getOccurrence,
     updateRoutineOccurrenceOverride: mocks.updateOverride,
 }));
@@ -26,10 +29,11 @@ import { PATCH } from "@/app/api/routines/occurrences/[id]/route";
 describe("PATCH /api/routines/occurrences/:id", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
+        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
         mocks.updateOverride.mockResolvedValue(undefined);
         mocks.getOccurrence.mockResolvedValue({ occurrence: { id: 91 } });
     });
@@ -63,7 +67,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
     });
 
     it("does not mutate when the caller is not an admin", async () => {
-        mocks.requireAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: false,
             response: NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 }),
         });
@@ -82,6 +86,27 @@ describe("PATCH /api/routines/occurrences/:id", () => {
 
         expect(response.status).toBe(403);
         expect(mocks.updateOverride).not.toHaveBeenCalled();
+    });
+
+    it("keeps capability denial ahead of legacy input parsing", async () => {
+        mocks.assertRoutineCapabilityForMigration.mockRejectedValue(
+            new RoutineForbiddenError(),
+        );
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/occurrences/91", {
+                method: "PATCH",
+            }),
+            { params: Promise.resolve({ id: "not-a-number" }) },
+        );
+
+        expect(response.status).toBe(403);
+        expect(mocks.updateOverride).not.toHaveBeenCalled();
+        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 99, role: "ADMIN" }),
+            null,
+            "routine.occurrence.override",
+        );
     });
 
     it("rejects an atomic override without an expected reminder version", async () => {
