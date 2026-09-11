@@ -5,9 +5,11 @@ import {
     AuthorizationDeniedError,
     createAuthorizationResolver,
     createCapabilityRegistry,
+} from "@/modules/authorization";
+import {
     evaluateAuthorization,
     normalizeAuthorizationScopes,
-} from "@/modules/authorization";
+} from "./evaluator";
 import type {
     AuthorizationActor,
     AuthorizationMembershipResolution,

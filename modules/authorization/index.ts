@@ -41,12 +41,6 @@ export type {
     AuthorizationConfigurationErrorDetails,
 } from "./application/errors";
 export {
-    evaluateAuthorization,
-    getAuthorizationEvaluationContext,
-    normalizeAuthorizationScopes,
-} from "./application/evaluator";
-export type { AuthorizationEvaluationContext } from "./application/evaluator";
-export {
     authorization,
     createAuthorizationResolver,
 } from "./application/resolver";
