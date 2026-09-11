@@ -113,6 +113,8 @@ Departments, users, manager relationships, positions, or existing `USER` /
 `ADMIN` roles to Teams or grants. The existing `prisma/seed.ts` invokes the
 authorization seed boundary, but it creates no Team, membership, role grant,
 Team grant, or direct user grant today.
+All seed operations use the shared `@/lib/db/prisma` client, and the seed
+entrypoint disconnects that single client on completion or failure.
 
 If an approved configuration is added later, the mechanism is deterministic and
 idempotent: it validates all references and grants before writing, upserts only

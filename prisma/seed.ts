@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/db/prisma";
 import { seedAuthorizationConfiguration } from "@/modules/authorization";
-
-const prisma = new PrismaClient();
 
 function getPrimaryBootstrapAdminEmail(): string {
     const raw = process.env.BOOTSTRAP_ADMIN_EMAILS;
