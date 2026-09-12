@@ -94,10 +94,12 @@ export function AdminLeaveRecoveryDashboard(): ReactElement {
                     count={model.metadata?.notTakenPending.totalItems ?? model.notTakenPending.length}
                     tone="info"
                 />
+                {/* Recovery is the deferred Admin-only Leave path, not a generic capability. */}
                 <NotTakenPendingList
                     items={model.notTakenPending}
                     isProcessing={model.isProcessing}
                     onConfirm={(leaveId) => openRecoveryDialog("NOT_TAKEN", leaveId)}
+                    canConfirmAssignedNotTaken
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.notTakenPending}
@@ -112,6 +114,7 @@ export function AdminLeaveRecoveryDashboard(): ReactElement {
                     count={model.metadata?.cancellationPending.totalItems ?? model.cancellationPending.length}
                     tone="attention"
                 />
+                {/* Recovery is the deferred Admin-only Leave path, not a generic capability. */}
                 <CancellationPendingList
                     items={model.cancellationPending}
                     isProcessing={model.isProcessing}
@@ -119,6 +122,7 @@ export function AdminLeaveRecoveryDashboard(): ReactElement {
                         openRecoveryDialog("CONFIRM_CANCELLATION", leaveId)}
                     onReject={(leaveId) =>
                         openRecoveryDialog("REJECT_CANCELLATION", leaveId)}
+                    canDecideAssignedCancellations
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.cancellationPending}

@@ -15,3 +15,4 @@ export type {
     LeaveTypeValue,
 } from "./application/notifications/notification-format";
 export type { LeavePeriodValue } from "./domain/utils";
+export type { LeavePresentationCapabilities } from "./application/types";

@@ -11,6 +11,8 @@ import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
 
+import type { LeavePresentationCapabilities } from "./types";
+
 export const LEAVE_MIGRATED_CAPABILITIES = [
     "leave.request.read",
     "leave.approval.read",
@@ -165,6 +167,111 @@ function buildLeaveCapabilityAuthorization(
         decision,
         scopes: decision.scopes,
         usedMigrationCompatibility: false,
+    });
+}
+
+function getLeavePresentationDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: LeaveMigratedCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(
+            `Authorization resolver omitted Leave capability: ${capability}`,
+        );
+    }
+    return decision;
+}
+
+function projectLeaveCapabilityDecision(
+    actor: LeaveAuthorizationActor,
+    capability: LeaveMigratedCapability,
+    decision: AuthorizationDecision,
+): readonly AuthorizationScope[] | null {
+    try {
+        return buildLeaveCapabilityAuthorization(
+            actor,
+            capability,
+            decision,
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof LeaveCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+function hasLeaveScope(
+    scopes: readonly AuthorizationScope[] | null,
+    scope: AuthorizationScope,
+): boolean {
+    return scopes?.includes(scope) === true || scopes?.includes("ALL") === true;
+}
+
+/**
+ * Projects the registered Leave capability inventory for presentation only.
+ * Resource ownership, effective approver relationships, and workflow state
+ * remain separate Leave-owned checks.
+ */
+export async function getLeavePresentationCapabilities(
+    context: LeaveAuthorizationContext,
+): Promise<LeavePresentationCapabilities> {
+    const actor = context.authorizationActor;
+    const decisions = await authorization.resolveMany(
+        actor,
+        LEAVE_MIGRATED_CAPABILITIES,
+    );
+
+    const project = (
+        capability: LeaveMigratedCapability,
+    ): readonly AuthorizationScope[] | null =>
+        projectLeaveCapabilityDecision(
+            actor,
+            capability,
+            getLeavePresentationDecision(decisions, capability),
+        );
+
+    return Object.freeze({
+        canReadOwnRequests: hasLeaveScope(
+            project("leave.request.read"),
+            "OWN",
+        ),
+        canReadAssignedApprovals: hasLeaveScope(
+            project("leave.approval.read"),
+            "ASSIGNED",
+        ),
+        canCreateOwnRequests: hasLeaveScope(
+            project("leave.request.create"),
+            "OWN",
+        ),
+        canCancelOwnRequests: hasLeaveScope(
+            project("leave.request.cancel"),
+            "OWN",
+        ),
+        canApproveAssignedRequests: hasLeaveScope(
+            project("leave.request.approve"),
+            "ASSIGNED",
+        ),
+        canDecideAssignedCancellations: hasLeaveScope(
+            project("leave.cancellation.decide"),
+            "ASSIGNED",
+        ),
+        canRequestOwnNotTaken: hasLeaveScope(
+            project("leave.request.not_taken"),
+            "OWN",
+        ),
+        canConfirmAssignedNotTaken: hasLeaveScope(
+            project("leave.request.not_taken"),
+            "ASSIGNED",
+        ),
+        canManageApprovers: hasLeaveScope(
+            project("leave.approver.manage"),
+            "ALL",
+        ),
     });
 }
 

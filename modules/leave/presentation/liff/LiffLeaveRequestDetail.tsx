@@ -32,6 +32,7 @@ interface LiffLeaveRequestDetailProps {
     actionIntent?: string | null;
     onOpenChange: (open: boolean) => void;
     onAction: (action: LiffLeaveAvailableAction, detail: LiffLeaveRequestDetailData) => void;
+    canUseAction?: (action: LiffLeaveAvailableAction) => boolean;
 }
 
 export function LiffLeaveRequestDetail({
@@ -39,11 +40,13 @@ export function LiffLeaveRequestDetail({
     actionIntent,
     onOpenChange,
     onAction,
+    canUseAction = () => true,
 }: LiffLeaveRequestDetailProps): ReactElement {
+    const availableActions = detail?.availableActions.filter(canUseAction) ?? [];
     const hasAuthorizedApproveIntent = Boolean(
         actionIntent === "approve"
         && detail?.viewerRole === "APPROVER"
-        && detail.availableActions.includes("APPROVE"),
+        && availableActions.includes("APPROVE"),
     );
 
     return (
@@ -110,10 +113,10 @@ export function LiffLeaveRequestDetail({
                                 <LiffLeaveAttachments attachments={detail.attachments} />
                             </section>
                         </SheetScrollArea>
-                        {detail.availableActions.length > 0 ? (
+                        {availableActions.length > 0 ? (
                             <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3">
                                 <section className="space-y-2" aria-label="การดำเนินการคำขอลา">
-                                    {detail.availableActions.map((action) => (
+                                    {availableActions.map((action) => (
                                         <ActionButton
                                             key={action}
                                             action={action}

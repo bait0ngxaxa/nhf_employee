@@ -53,6 +53,17 @@ const CAPABILITIES = {
     canProcessStockRequests: false,
     canRequestLeave: true,
     canApproveLeave: false,
+    leaveCapabilities: {
+        canReadOwnRequests: true,
+        canReadAssignedApprovals: false,
+        canCreateOwnRequests: true,
+        canCancelOwnRequests: true,
+        canApproveAssignedRequests: false,
+        canDecideAssignedCancellations: false,
+        canRequestOwnNotTaken: true,
+        canConfirmAssignedNotTaken: false,
+        canManageApprovers: false,
+    },
     canCreateOwnRoutine: true,
     routineCapabilities: {
         canReadTasks: true,

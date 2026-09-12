@@ -20,6 +20,12 @@ function createMetadata() {
 
 function createModel(overrides: Record<string, unknown> = {}) {
     return {
+        canReadAssignedApprovals: true,
+        canApproveAssignedRequests: true,
+        canConfirmAssignedNotTaken: true,
+        canDecideAssignedCancellations: true,
+        hasApprovalRelationship: true,
+        canShowApprovalSurface: true,
         pending: [],
         notTakenPending: [],
         history: [],

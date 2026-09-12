@@ -50,13 +50,13 @@ export interface CurrentEmployeeLeaveProjection {
     canViewLeaveReports: boolean;
 }
 
-export interface LiffLeaveCapabilities {
-    canApproveLeave: boolean;
+export interface LiffLeaveRelationshipProjection {
+    readonly hasActionableApproval: boolean;
 }
 
-export async function getLiffLeaveCapabilities(
+export async function getLiffLeaveRelationshipProjection(
     employeeId: number,
-): Promise<LiffLeaveCapabilities> {
+): Promise<LiffLeaveRelationshipProjection> {
     const actionableApproval = await prisma.leaveRequest.findFirst({
         where: {
             AND: [
@@ -67,7 +67,20 @@ export async function getLiffLeaveCapabilities(
         select: { id: true },
     });
 
-    return { canApproveLeave: actionableApproval !== null };
+    return { hasActionableApproval: actionableApproval !== null };
+}
+
+/** @deprecated Use getLiffLeaveRelationshipProjection for relationship data. */
+export interface LiffLeaveCapabilities {
+    readonly canApproveLeave: boolean;
+}
+
+/** @deprecated Use getLiffLeaveRelationshipProjection. */
+export async function getLiffLeaveCapabilities(
+    employeeId: number,
+): Promise<LiffLeaveCapabilities> {
+    const projection = await getLiffLeaveRelationshipProjection(employeeId);
+    return { canApproveLeave: projection.hasActionableApproval };
 }
 
 export async function getCurrentEmployeeLeaveProjection(

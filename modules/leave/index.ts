@@ -21,11 +21,13 @@ export {
     getCurrentEmployeeLeaveProjection,
     getAssignedLeaveApproverWhere,
     getLiffLeaveCapabilities,
+    getLiffLeaveRelationshipProjection,
     parseLeaveApprovalPage,
 } from "./application/approvals/approval-queries";
 export type {
     CurrentEmployeeLeaveProjection,
     LiffLeaveCapabilities,
+    LiffLeaveRelationshipProjection,
 } from "./application/approvals/approval-queries";
 export { getLeaveApprovalList } from "./application/approvals/approval-list";
 export {
@@ -64,6 +66,7 @@ export {
     buildLeaveAuthorizationActor,
     buildLeaveAuthorizationContext,
     canUseLeaveAdminRecoveryOverride,
+    getLeavePresentationCapabilities,
     LEAVE_MIGRATED_CAPABILITIES,
     resolveLeaveCapabilityForMigration,
     resolveLeaveCapabilityInTransaction,
@@ -76,6 +79,7 @@ export type {
     LeaveMigratedCapability,
 } from "./application/authorization";
 export { LeaveCapabilityDeniedError } from "./application/authorization";
+export type { LeavePresentationCapabilities } from "./application/types";
 
 // HTTP adapters and response serializers used by the existing route families.
 export {

@@ -1,6 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
+import type { LeavePresentationCapabilities } from "../../../application/types";
 import { useEmployeeLeaveDashboardModel } from "./useEmployeeLeaveDashboardModel";
 import { useLeaveProfile } from "./useLeaveProfile";
 
@@ -16,6 +17,17 @@ vi.mock("sonner", () => ({
 }));
 
 describe("useEmployeeLeaveDashboardModel", () => {
+    const LEAVE_CAPABILITIES: LeavePresentationCapabilities = {
+        canReadOwnRequests: true,
+        canReadAssignedApprovals: true,
+        canCreateOwnRequests: true,
+        canCancelOwnRequests: true,
+        canApproveAssignedRequests: true,
+        canDecideAssignedCancellations: true,
+        canRequestOwnNotTaken: true,
+        canConfirmAssignedNotTaken: true,
+        canManageApprovers: false,
+    };
     const mutate = vi.fn();
     const cancelLeave = vi.fn();
     const requestApprovedCancellation = vi.fn();
@@ -78,7 +90,14 @@ describe("useEmployeeLeaveDashboardModel", () => {
                     remainingDays: 6,
                 },
             ] as unknown as ReturnType<typeof useLeaveProfile>["quotas"],
-            history: [],
+            history: [
+                {
+                    ...pendingLeave,
+                    id: "leave-3",
+                    status: "APPROVED" as const,
+                    endDate: "2020-01-01T00:00:00.000Z",
+                },
+            ],
             metadata: {
                 currentPage: 1,
                 totalPages: 1,
@@ -96,7 +115,7 @@ describe("useEmployeeLeaveDashboardModel", () => {
     });
 
     it("opens and closes request form", () => {
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
         expect(result.current.isRequestFormOpen).toBe(false);
         act(() => result.current.openRequestForm());
@@ -106,7 +125,7 @@ describe("useEmployeeLeaveDashboardModel", () => {
     });
 
     it("closes request form after successful submit callback", async () => {
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
         act(() => result.current.openRequestForm());
         await act(async () => {
@@ -118,7 +137,7 @@ describe("useEmployeeLeaveDashboardModel", () => {
     });
 
     it("resets employee history pagination when a filter changes", () => {
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
         act(() => result.current.setPage(3));
         act(() => result.current.setHistoryLeaveType("SICK"));
@@ -128,11 +147,12 @@ describe("useEmployeeLeaveDashboardModel", () => {
         expect(vi.mocked(useLeaveProfile).mock.calls.at(-1)?.[0]).toEqual({
             page: 1,
             filters: { leaveType: "SICK" },
+            enabled: true,
         });
     });
 
     it("resets all employee history filters and keeps the first page", () => {
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
         act(() => {
             result.current.setPage(4);
@@ -152,25 +172,27 @@ describe("useEmployeeLeaveDashboardModel", () => {
 
     it("debounces employee history text search before requesting filtered data", () => {
         vi.useFakeTimers();
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
         act(() => result.current.setHistoryQuery(" ไข้ "));
         expect(vi.mocked(useLeaveProfile).mock.calls.at(-1)?.[0]).toEqual({
             page: 1,
             filters: {},
+            enabled: true,
         });
 
         act(() => vi.advanceTimersByTime(300));
         expect(vi.mocked(useLeaveProfile).mock.calls.at(-1)?.[0]).toEqual({
             page: 1,
             filters: { query: "ไข้" },
+            enabled: true,
         });
         vi.useRealTimers();
     });
 
     it("confirms cancel leave and resets dialog state", async () => {
         cancelLeave.mockResolvedValue(true);
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
         act(() => result.current.openCancelDialog(pendingLeave));
         await act(async () => {
@@ -184,7 +206,7 @@ describe("useEmployeeLeaveDashboardModel", () => {
 
     it("submits not-taken request and resets dialog state", async () => {
         requestNotTaken.mockResolvedValue(true);
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel());
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
         act(() => {
             result.current.openNotTakenDialog("leave-3");
@@ -198,6 +220,62 @@ describe("useEmployeeLeaveDashboardModel", () => {
         expect(requestNotTaken).toHaveBeenCalledWith("leave-3", "ไม่ได้ลาเพราะมีงานด่วน");
         expect(result.current.notTakenRequestId).toBeNull();
         expect(toast.success).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not load or open self-service controls without the relevant capabilities", () => {
+        const capabilities: LeavePresentationCapabilities = {
+            ...LEAVE_CAPABILITIES,
+            canReadOwnRequests: false,
+            canCreateOwnRequests: false,
+            canCancelOwnRequests: false,
+            canRequestOwnNotTaken: false,
+        };
+        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(capabilities));
+
+        expect(vi.mocked(useLeaveProfile).mock.calls.at(-1)?.[0]).toEqual({
+            page: 1,
+            filters: {},
+            enabled: false,
+        });
+        act(() => {
+            result.current.openRequestForm();
+            result.current.openCancelDialog(pendingLeave);
+            result.current.openNotTakenDialog("leave-3");
+        });
+
+        expect(result.current.isRequestFormOpen).toBe(false);
+        expect(result.current.cancelConfirmRequest).toBeNull();
+        expect(result.current.notTakenRequestId).toBeNull();
+    });
+
+    it("closes open self-service controls when a refreshed projection removes capability", () => {
+        const { result, rerender } = renderHook(
+            ({ capabilities }: { capabilities: LeavePresentationCapabilities }) =>
+                useEmployeeLeaveDashboardModel(capabilities),
+            { initialProps: { capabilities: LEAVE_CAPABILITIES } },
+        );
+
+        act(() => {
+            result.current.openRequestForm();
+            result.current.openCancelDialog(pendingLeave);
+            result.current.openNotTakenDialog("leave-3");
+        });
+        expect(result.current.isRequestFormOpen).toBe(true);
+        expect(result.current.cancelConfirmRequest).not.toBeNull();
+        expect(result.current.notTakenRequestId).toBe("leave-3");
+
+        rerender({
+            capabilities: {
+                ...LEAVE_CAPABILITIES,
+                canCreateOwnRequests: false,
+                canCancelOwnRequests: false,
+                canRequestOwnNotTaken: false,
+            },
+        });
+
+        expect(result.current.isRequestFormOpen).toBe(false);
+        expect(result.current.cancelConfirmRequest).toBeNull();
+        expect(result.current.notTakenRequestId).toBeNull();
     });
 });
 

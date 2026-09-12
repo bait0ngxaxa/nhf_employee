@@ -106,6 +106,8 @@ describe("leave attachment list controls", () => {
                 onCancelRequest={vi.fn()}
                 onNotTakenRequest={vi.fn()}
                 onPageChange={vi.fn()}
+                canCancelOwnRequests
+                canRequestOwnNotTaken
             />,
         );
 
@@ -128,6 +130,8 @@ describe("leave attachment list controls", () => {
                 onCancelRequest={vi.fn()}
                 onNotTakenRequest={vi.fn()}
                 onPageChange={vi.fn()}
+                canCancelOwnRequests
+                canRequestOwnNotTaken
             />,
         );
 
@@ -149,6 +153,7 @@ describe("leave attachment list controls", () => {
                 isProcessing={false}
                 onApprove={vi.fn()}
                 onOpenReject={vi.fn()}
+                canApproveAssignedRequests
             />,
         );
 
@@ -195,6 +200,7 @@ describe("leave attachment list controls", () => {
                 items={[notTakenLeave]}
                 isProcessing={false}
                 onConfirm={vi.fn()}
+                canConfirmAssignedNotTaken
             />,
         );
 
@@ -208,5 +214,20 @@ describe("leave attachment list controls", () => {
             evidenceButton.compareDocumentPosition(confirmButton)
             & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
+    });
+
+    it("does not expose approval mutation controls without approve capability", () => {
+        render(
+            <PendingApprovalList
+                pending={[createPendingLeave()]}
+                isProcessing={false}
+                onApprove={vi.fn()}
+                onOpenReject={vi.fn()}
+                canApproveAssignedRequests={false}
+            />,
+        );
+
+        expect(screen.queryByRole("button", { name: "อนุมัติ" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ไม่อนุมัติ" })).not.toBeInTheDocument();
     });
 });

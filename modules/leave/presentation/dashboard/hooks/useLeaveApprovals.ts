@@ -34,6 +34,7 @@ export interface UseLeaveApprovalsOptions {
     historyPage: number;
     cancellationPage: number;
     historyFilters?: LeaveHistoryFilters;
+    enabled?: boolean;
 }
 
 export interface UseLeaveApprovalsResult {
@@ -80,10 +81,11 @@ export function buildLeaveApprovalsUrl({
 
 export function useLeaveApprovals({
     historyFilters,
+    enabled = true,
     ...pages
 }: UseLeaveApprovalsOptions): UseLeaveApprovalsResult {
     const { data, error, isLoading, mutate } = useSWR<LeaveApprovalsResponse, unknown>(
-        buildLeaveApprovalsUrl({ ...pages, historyFilters }),
+        enabled ? buildLeaveApprovalsUrl({ ...pages, historyFilters }) : null,
         fetcher,
         {
             revalidateOnFocus: false,

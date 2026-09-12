@@ -1,5 +1,6 @@
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
+import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 
 export interface AuthenticatedUser {
     id: string;
@@ -10,6 +11,7 @@ export interface AuthenticatedUser {
     isManager?: boolean;
     canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;
+    leaveCapabilities?: LeavePresentationCapabilities;
     routineCapabilities?: RoutinePresentationCapabilities;
     stockCapabilities?: StockPresentationCapabilities;
 }

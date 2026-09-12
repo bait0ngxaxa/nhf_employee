@@ -45,6 +45,8 @@ describe("EmployeeLeaveHistoryList", () => {
                 onCancelRequest={vi.fn()}
                 onNotTakenRequest={vi.fn()}
                 onPageChange={vi.fn()}
+                canCancelOwnRequests
+                canRequestOwnNotTaken
             />,
         );
 
@@ -66,6 +68,8 @@ describe("EmployeeLeaveHistoryList", () => {
                 onCancelRequest={vi.fn()}
                 onNotTakenRequest={vi.fn()}
                 onPageChange={vi.fn()}
+                canCancelOwnRequests
+                canRequestOwnNotTaken
             />,
         );
 
@@ -76,5 +80,34 @@ describe("EmployeeLeaveHistoryList", () => {
             screen.getByText("ลองปรับหรือล้างตัวกรองเพื่อดูรายการอื่น"),
         ).toBeInTheDocument();
         expect(screen.queryByText("ยังไม่มีประวัติการยื่นคำขอลา")).not.toBeInTheDocument();
+    });
+
+    it("does not expose employee actions when their capabilities are absent", () => {
+        render(
+            <EmployeeLeaveHistoryList
+                history={[
+                    createLeaveRequest({
+                        id: "leave-pending",
+                        status: "PENDING",
+                    }),
+                    createLeaveRequest({
+                        id: "leave-not-taken",
+                        status: "APPROVED",
+                        startDate: "2020-01-01T00:00:00.000Z",
+                        endDate: "2020-01-01T00:00:00.000Z",
+                    }),
+                ]}
+                isSubmitting={false}
+                onCancelRequest={vi.fn()}
+                onNotTakenRequest={vi.fn()}
+                onPageChange={vi.fn()}
+                canCancelOwnRequests={false}
+                canRequestOwnNotTaken={false}
+            />,
+        );
+
+        expect(screen.queryByRole("button", { name: "ยกเลิก" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "แจ้งไม่ได้ใช้วันลา" }))
+            .not.toBeInTheDocument();
     });
 });

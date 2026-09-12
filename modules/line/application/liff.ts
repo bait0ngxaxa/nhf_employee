@@ -3,7 +3,11 @@ import type { NextResponse } from "next/server";
 
 import { findAccountIdentityById } from "@/modules/auth";
 import { findLiffEmployeeByUserId } from "@/modules/employee";
-import { getLiffLeaveCapabilities } from "@/modules/leave";
+import {
+    buildLeaveAuthorizationContext,
+    getLeavePresentationCapabilities,
+    getLiffLeaveRelationshipProjection,
+} from "@/modules/leave";
 import { getRoutinePresentationCapabilities } from "@/modules/routine";
 import {
     buildStockAuthorizationContext,
@@ -19,6 +23,20 @@ import type {
     LiffCapabilities,
     LiffWorkforceSession,
 } from "./types";
+import type { LeavePresentationCapabilities } from "@/modules/leave";
+
+const EMPTY_LEAVE_PRESENTATION_CAPABILITIES: LeavePresentationCapabilities =
+    Object.freeze({
+        canReadOwnRequests: false,
+        canReadAssignedApprovals: false,
+        canCreateOwnRequests: false,
+        canCancelOwnRequests: false,
+        canApproveAssignedRequests: false,
+        canDecideAssignedCancellations: false,
+        canRequestOwnNotTaken: false,
+        canConfirmAssignedNotTaken: false,
+        canManageApprovers: false,
+    });
 
 export async function findActiveLiffWorkforceIdentity(
     userId: number,
@@ -53,8 +71,18 @@ export async function getLiffCapabilities(
     const leaveEnabled = isFeatureEnabled(FEATURE_KEYS.leave);
     const routineEnabled = isFeatureEnabled(FEATURE_KEYS.routine);
     const leaveCapabilities = leaveEnabled
-        ? await getLiffLeaveCapabilities(session.employeeId)
-        : { canApproveLeave: false };
+        ? await getLeavePresentationCapabilities(
+            buildLeaveAuthorizationContext(
+                session.user,
+                session.employeeId,
+                "LIFF_SELF_SERVICE",
+            ),
+        )
+        : EMPTY_LEAVE_PRESENTATION_CAPABILITIES;
+    const leaveRelationship = leaveEnabled
+        && leaveCapabilities.canReadAssignedApprovals
+        ? await getLiffLeaveRelationshipProjection(session.employeeId)
+        : { hasActionableApproval: false };
     const routineCapabilities = await getRoutinePresentationCapabilities(
         {
             id: session.user.id,
@@ -78,8 +106,15 @@ export async function getLiffCapabilities(
             stockCapabilities.canReadCatalog
             && stockCapabilities.canCreateRequests,
         canProcessStockRequests: stockCapabilities.canProcessRequests,
-        canRequestLeave: leaveEnabled,
-        canApproveLeave: leaveCapabilities.canApproveLeave,
+        canRequestLeave:
+            leaveEnabled
+            && leaveCapabilities.canReadOwnRequests
+            && leaveCapabilities.canCreateOwnRequests,
+        canApproveLeave:
+            leaveEnabled
+            && leaveCapabilities.canReadAssignedApprovals
+            && leaveRelationship.hasActionableApproval,
+        leaveCapabilities,
         canCreateOwnRoutine: routineEnabled && routineCapabilities.canCreateTasks,
         routineCapabilities,
     };

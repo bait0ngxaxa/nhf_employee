@@ -23,6 +23,8 @@ interface EmployeeLeaveHistoryListProps {
     onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
     onPageChange: (page: number) => void;
+    canCancelOwnRequests: boolean;
+    canRequestOwnNotTaken: boolean;
 }
 
 const leaveTypeLabel = (leaveType: LeaveRequest["leaveType"]): string => {
@@ -45,6 +47,8 @@ export function EmployeeLeaveHistoryList({
     onCancelRequest,
     onNotTakenRequest,
     onPageChange,
+    canCancelOwnRequests,
+    canRequestOwnNotTaken,
 }: EmployeeLeaveHistoryListProps) {
     if (history.length === 0) {
         return <EmptyLeaveHistory isFiltered={isFiltered} />;
@@ -59,6 +63,8 @@ export function EmployeeLeaveHistoryList({
                     isSubmitting={isSubmitting}
                     onCancelRequest={onCancelRequest}
                     onNotTakenRequest={onNotTakenRequest}
+                    canCancelOwnRequests={canCancelOwnRequests}
+                    canRequestOwnNotTaken={canRequestOwnNotTaken}
                 />
             ))}
 
@@ -83,18 +89,24 @@ function LeaveHistoryItem({
     isSubmitting,
     onCancelRequest,
     onNotTakenRequest,
+    canCancelOwnRequests,
+    canRequestOwnNotTaken,
 }: {
     request: LeaveRequest;
     isSubmitting: boolean;
     onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
+    canCancelOwnRequests: boolean;
+    canRequestOwnNotTaken: boolean;
 }) {
     const availableActions = getEmployeeLeaveActions(request);
     const canCancel = availableActions.includes("CANCEL")
         || availableActions.includes("REQUEST_CANCELLATION");
     const canRequestNotTakenAction = availableActions.includes("REQUEST_NOT_TAKEN");
+    const canShowCancel = canCancelOwnRequests && canCancel;
+    const canShowNotTaken = canRequestOwnNotTaken && canRequestNotTakenAction;
     const hasActions =
-        request.attachments.length > 0 || canCancel || canRequestNotTakenAction;
+        request.attachments.length > 0 || canShowCancel || canShowNotTaken;
 
     return (
         <Card className="border-border-subtle p-5 shadow-sm">
@@ -166,7 +178,7 @@ function LeaveHistoryItem({
                         <p className="text-xs/5 font-semibold text-content-muted">การดำเนินการ</p>
                         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                             <LeaveAttachmentViewerButton attachments={request.attachments} />
-                            {canCancel ? (
+                            {canShowCancel ? (
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -178,7 +190,7 @@ function LeaveHistoryItem({
                                     {request.status === "PENDING" ? "ยกเลิก" : "ขอยกเลิก"}
                                 </Button>
                             ) : null}
-                            {canRequestNotTakenAction ? (
+                            {canShowNotTaken ? (
                                 <Button
                                     variant="outline"
                                     size="sm"

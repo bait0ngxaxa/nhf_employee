@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LeaveStatusValue as LeaveStatus, LeaveTypeValue as LeaveType } from "../../types";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -8,6 +8,7 @@ import {
     type PendingLeave,
 } from "./useLeaveApprovals";
 import type { LeaveHistoryFilters, LeaveHistoryMetadata } from "../../../application/queries/history-filters";
+import type { LeavePresentationCapabilities } from "../../../application/types";
 import {
     confirmLeaveCancellation,
     confirmLeaveNotTaken,
@@ -17,6 +18,12 @@ import {
 } from "../api";
 
 export interface UseManagerApprovalModelResult {
+    canReadAssignedApprovals: boolean;
+    canApproveAssignedRequests: boolean;
+    canConfirmAssignedNotTaken: boolean;
+    canDecideAssignedCancellations: boolean;
+    hasApprovalRelationship: boolean;
+    canShowApprovalSurface: boolean;
     pending: PendingLeave[];
     notTakenPending: PendingLeave[];
     history: PendingLeave[];
@@ -60,7 +67,20 @@ export interface UseManagerApprovalModelResult {
     rejectLeave: () => Promise<void>;
 }
 
-export function useManagerApprovalModel(): UseManagerApprovalModelResult {
+interface UseManagerApprovalModelOptions {
+    leaveCapabilities?: LeavePresentationCapabilities;
+    hasApprovalRelationship?: boolean;
+}
+
+export function useManagerApprovalModel({
+    leaveCapabilities,
+    hasApprovalRelationship = false,
+}: UseManagerApprovalModelOptions = {}): UseManagerApprovalModelResult {
+    const canReadAssignedApprovals = leaveCapabilities?.canReadAssignedApprovals === true;
+    const canApproveAssignedRequests = leaveCapabilities?.canApproveAssignedRequests === true;
+    const canConfirmAssignedNotTaken = leaveCapabilities?.canConfirmAssignedNotTaken === true;
+    const canDecideAssignedCancellations = leaveCapabilities?.canDecideAssignedCancellations === true;
+    const canShowApprovalSurface = canReadAssignedApprovals && hasApprovalRelationship;
     const [pendingPage, setPendingPage] = useState(1);
     const [notTakenPage, setNotTakenPage] = useState(1);
     const [historyPage, setHistoryPage] = useState(1);
@@ -100,12 +120,28 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         historyPage,
         cancellationPage,
         historyFilters,
+        enabled: canShowApprovalSurface,
     });
     const [selectedLeave, setSelectedLeave] = useState<PendingLeave | null>(null);
     const [approvalConfirmLeave, setApprovalConfirmLeave] = useState<PendingLeave | null>(null);
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
+
+    useEffect(() => {
+        if (!canApproveAssignedRequests) {
+            setSelectedLeave(null);
+            setApprovalConfirmLeave(null);
+            setIsRejectDialogOpen(false);
+            setRejectReason("");
+        }
+    }, [canApproveAssignedRequests]);
+
+    useEffect(() => {
+        if (!canConfirmAssignedNotTaken) {
+            setApprovalConfirmLeave(null);
+        }
+    }, [canConfirmAssignedNotTaken]);
 
     const handleHistoryQueryChange = (value: string): void => {
         setHistoryQuery(value);
@@ -150,6 +186,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     };
 
     const executeAction = async (action: LeaveDecisionAction, leaveId: string, reason?: string): Promise<void> => {
+        if (!canApproveAssignedRequests) return;
         setIsProcessing(true);
         try {
             await submitLeaveDecision({ leaveId, action, reason });
@@ -172,6 +209,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     };
 
     const approveLeave = async (leave: PendingLeave): Promise<void> => {
+        if (!canApproveAssignedRequests) return;
         if (hasApprovalWarnings(leave)) {
             setApprovalConfirmLeave(leave);
             return;
@@ -180,7 +218,8 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     };
 
     const confirmApproveLeave = async (): Promise<void> => {
-        if (!approvalConfirmLeave) {
+        if (!canApproveAssignedRequests || !approvalConfirmLeave) {
+            if (!canApproveAssignedRequests) setApprovalConfirmLeave(null);
             return;
         }
 
@@ -190,6 +229,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     };
 
     const confirmNotTaken = async (leaveId: string, reason?: string): Promise<boolean> => {
+        if (!canConfirmAssignedNotTaken) return false;
         setIsProcessing(true);
         try {
             await confirmLeaveNotTaken({ leaveId, reason });
@@ -209,6 +249,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     };
 
     const confirmCancellation = async (leaveId: string, reason?: string): Promise<boolean> => {
+        if (!canDecideAssignedCancellations) return false;
         setIsProcessing(true);
         try {
             await confirmLeaveCancellation({ leaveId, reason });
@@ -228,6 +269,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     };
 
     const rejectCancellation = async (leaveId: string, reason?: string): Promise<boolean> => {
+        if (!canDecideAssignedCancellations) return false;
         setIsProcessing(true);
         try {
             await rejectLeaveCancellation({ leaveId, reason });
@@ -247,6 +289,12 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
     };
 
     return {
+        canReadAssignedApprovals,
+        canApproveAssignedRequests,
+        canConfirmAssignedNotTaken,
+        canDecideAssignedCancellations,
+        hasApprovalRelationship,
+        canShowApprovalSurface,
         pending,
         notTakenPending,
         history,
@@ -275,6 +323,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         setHistoryYear: handleHistoryYearChange,
         resetHistoryFilters,
         openRejectDialog: (leave: PendingLeave) => {
+            if (!canApproveAssignedRequests) return;
             setSelectedLeave(leave);
             setIsRejectDialogOpen(true);
         },
@@ -286,7 +335,7 @@ export function useManagerApprovalModel(): UseManagerApprovalModelResult {
         confirmCancellation,
         rejectCancellation,
         rejectLeave: async () => {
-            if (!selectedLeave) return;
+            if (!canApproveAssignedRequests || !selectedLeave) return;
             await executeAction("REJECT", selectedLeave.id, rejectReason);
         },
     };

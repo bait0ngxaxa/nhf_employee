@@ -1,13 +1,13 @@
-# Phase 5C — Routine presentation capability projection
+# Authorization presentation capability projections
 
-Status: Phase 5C LIFF integration complete
+Status: Routine Phase 5C and Stock Phase 6B complete; Leave Phase 7B complete
 
-This record defines the server-derived presentation contract added for the
-Routine authorization migration. It extends the Phase 4 Routine pilot; it does
-not replace the locked authorization source-of-truth or server-side
-enforcement. Phase 5A established the projection, Phase 5B integrated it into
-the Dashboard, and Phase 5C integrates the same projection into the LIFF home
-contract and Routine client.
+This record defines the server-derived presentation contracts added for the
+Routine, Stock, and Leave authorization migrations. These projections do not
+replace the locked authorization source-of-truth or server-side enforcement.
+The Routine and Stock sections retain their completed migration records; the
+Leave Phase 7B section records the new Leave projection and presentation
+integration.
 
 ## Contract and ownership
 
@@ -107,7 +107,8 @@ LiffBootstrap
 modules from that response. Routine is enabled only when both the Routine
 feature flag and `routineCapabilities.canReadTasks` are true. The composition
 helper does not resolve authorization again and does not introduce a second
-policy table. Stock and Leave module behavior remains unchanged.
+policy table. Stock behavior remains unchanged; Leave behavior is recorded in
+the Leave Phase 7B section below.
 
 The existing `canCreateOwnRoutine` field remains in the LIFF contract for
 compatibility and is derived as:
@@ -246,7 +247,156 @@ Read ALL never implies process or cancel ALL. Any remaining Stock role check is
 descriptive only (for example, a role badge); it does not select a tab, query
 scope, expose a control or authorize a mutation.
 
-Stock server enforcement remains authoritative. Leave, Employee, Audit, Email
+Stock server enforcement remains authoritative. Employee, Audit, Email
 Request, Settings and other non-Routine/non-Stock presentation and
 authorization paths remain on their existing compatibility behavior until
 their approved migration phases. Routine behavior is unchanged by Phase 6B.
+
+## Leave Phase 7B projection
+
+สถานะ: **Phase 7A Leave server enforcement closed; Phase 7B Leave presentation projection complete**
+
+Phase 7B adds a Leave-owned, server-derived presentation contract. It projects
+the registered Phase 7A capability eligibility into immutable serializable
+booleans for Dashboard and LIFF. It does not redesign Leave policy and does
+not replace server authorization, resource relationships, workflow state,
+transactions, or concurrency checks.
+
+`modules/leave/application/types.ts` owns the contract:
+
+```ts
+interface LeavePresentationCapabilities {
+    readonly canReadOwnRequests: boolean;
+    readonly canReadAssignedApprovals: boolean;
+
+    readonly canCreateOwnRequests: boolean;
+    readonly canCancelOwnRequests: boolean;
+
+    readonly canApproveAssignedRequests: boolean;
+    readonly canDecideAssignedCancellations: boolean;
+
+    readonly canRequestOwnNotTaken: boolean;
+    readonly canConfirmAssignedNotTaken: boolean;
+
+    readonly canManageApprovers: boolean;
+}
+```
+
+`getLeavePresentationCapabilities()` makes exactly one
+`authorization.resolveMany()` call for the eight registered Leave decisions in
+`LEAVE_MIGRATED_CAPABILITIES`. It projects the two scopes of
+`leave.request.not_taken` into the two corresponding fields. Each decision is
+translated by the same Leave adapter (`buildLeaveCapabilityAuthorization`)
+used by Phase 7A server enforcement, so the compatibility floor is not
+duplicated in the presentation path. Only the existing `NO_APPLICABLE_GRANT`
+compatibility behavior is reused. Expected channel/authorization denials
+project to `false`; unknown capabilities, invalid configuration, persistence
+failures, and structural/system failures propagate.
+
+### Capability eligibility and Leave relationships
+
+The projection is deliberately separate from Leave-owned resource/work
+relationships:
+
+```text
+global capability eligibility
+    + Leave resource/state/work relationship
+    -> presentation surface or action hint
+```
+
+`canReadAssignedApprovals` is only a prerequisite. The Dashboard approval tab
+also requires the existing `canApproveLeave` work/relationship hint. The LIFF
+approval tab and approval list likewise require assigned-read capability and
+the existing actionable effective-approver relationship. Exception approver
+precedence, owner exclusion, effective assignment, actionable status, report
+history, and participant access remain Leave-owned queries and server rules.
+One action capability never implies another: approval read, approve,
+cancellation decision, not-taken confirmation, and approver management remain
+independent fields.
+
+### Dashboard projection and presentation
+
+The trusted current-user path is:
+
+```text
+authenticated account + active Employee projection
+    -> Leave actor (DASHBOARD)
+    -> getLeavePresentationCapabilities() [one resolveMany()]
+    -> existing Leave relationship/report projection
+    -> CurrentUserProjection / AuthenticatedUser / DashboardUser
+```
+
+My Leave data is requested only with `canReadOwnRequests`. Create, own cancel,
+own not-taken request, assigned approve/reject, assigned not-taken confirmation,
+and Dashboard cancellation decision controls each use their matching granular
+field together with the existing domain action/state and effective-assignment
+checks. Handlers repeat the presentation checks and stale open forms/dialogs
+are closed or disabled when the projection changes.
+
+The legacy Dashboard fields remain temporarily:
+
+```text
+canApproveLeave
+    = leaveCapabilities.canReadAssignedApprovals
+      AND existing Leave approval-surface relationship/work hint
+
+canViewLeaveReports
+    = existing manager/direct-report or original-approver-history projection
+```
+
+Reports are intentionally not represented by `LeavePresentationCapabilities`;
+there is still no approved generic `leave.report.export` capability. Admin
+recovery is also intentionally outside the generic contract and continues to
+use the existing Admin-only Leave recovery presentation rule. In particular,
+`canManageApprovers` does not imply recovery or approval authority; an explicit
+normal USER `leave.approver.manage / ALL` grant can expose approver settings
+without exposing recovery.
+
+### LIFF projection and presentation
+
+`getLiffCapabilities()` builds the trusted actor from the verified LIFF
+session's account and `employeeId`, with `LIFF_SELF_SERVICE`, and calls the
+same Leave projection as Dashboard. `/api/line/home` returns
+`leaveCapabilities` inside `LiffCapabilities` before capability-dependent
+Leave data is loaded. The Leave home module is available only when Leave is
+enabled and at least one of own-read or assigned-read is true.
+
+The legacy LIFF aliases remain for compatibility:
+
+```text
+canRequestLeave
+    = Leave feature enabled
+      AND canReadOwnRequests
+      AND canCreateOwnRequests
+
+canApproveLeave
+    = Leave feature enabled
+      AND canReadAssignedApprovals
+      AND existing actionable effective-approver relationship hint
+```
+
+Own profile/history is loaded only with own-read capability. The approval list
+is loaded only with assigned-read capability and actionable work. LIFF action
+buttons intersect server-provided `availableActions` with the matching global
+capability for employee cancellation/not-taken and normal approve/reject/not-
+taken confirmation actions. Participant/detail deep links remain governed by
+the existing server participant boundary and are not rejected solely because a
+generic read boolean is false.
+
+The LIFF cancellation decision exception is explicit: the registry supports
+`leave.cancellation.decide` only on Dashboard, so
+`canDecideAssignedCancellations` is false in LIFF. `CONFIRM_CANCELLATION` and
+`REJECT_CANCELLATION` continue to use the server's `availableActions`, the
+effective-approver relationship, and Phase 7A Leave-domain enforcement. LIFF
+does not receive a fake capability, a channel bridge, or Admin recovery
+override. After ambiguous session recovery, LIFF refreshes `/api/line/home`
+first, replaces the capability snapshot, closes revoked controls, refreshes
+only newly permitted data, and never retries with the old snapshot.
+
+### Deferred policy and security boundary
+
+Phase 7B does not migrate report/export, participant/detail, attachment,
+manager/direct-report scope, or Admin recovery policy. All presentation
+booleans are UX hints only. Every Leave route and application mutation remains
+responsible for authentication, server-side authorization, resource
+relationships, workflow/business rules, and transaction-time revalidation.

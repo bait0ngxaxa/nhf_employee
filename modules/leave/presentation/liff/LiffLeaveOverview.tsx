@@ -9,11 +9,13 @@ import { LiffLeaveQuotaCards } from "./LiffLeaveQuotaCards";
 interface LiffLeaveOverviewProps {
     quotas: LiffLeaveQuotaSummary[];
     onCreateRequest: () => void;
+    canCreateRequests?: boolean;
 }
 
 export function LiffLeaveOverview({
     quotas,
     onCreateRequest,
+    canCreateRequests = true,
 }: LiffLeaveOverviewProps): ReactElement {
     return (
         <div className="space-y-5">
@@ -25,14 +27,16 @@ export function LiffLeaveOverview({
                             ดูสิทธิ์ ส่งคำขอ และติดตามสถานะได้จาก LINE
                         </p>
                     </div>
-                    <Button
-                        type="button"
-                        className="min-h-11 w-full shrink-0 bg-module-leave-solid font-bold text-content-on-brand hover:bg-module-leave-solid-hover min-[360px]:w-auto"
-                        onClick={onCreateRequest}
-                    >
-                        <Plus aria-hidden="true" />
-                        ยื่นลา
-                    </Button>
+                    {canCreateRequests ? (
+                        <Button
+                            type="button"
+                            className="min-h-11 w-full shrink-0 bg-module-leave-solid font-bold text-content-on-brand hover:bg-module-leave-solid-hover min-[360px]:w-auto"
+                            onClick={onCreateRequest}
+                        >
+                            <Plus aria-hidden="true" />
+                            ยื่นลา
+                        </Button>
+                    ) : null}
                 </div>
             </section>
             <LiffLeaveQuotaCards quotas={quotas} />

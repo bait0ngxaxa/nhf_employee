@@ -29,6 +29,7 @@ interface UseLeaveRequestFormModelArgs {
         attachments: readonly File[],
         idempotencyKey: string,
     ) => Promise<void>;
+    canSubmit?: boolean;
 }
 
 interface UseLeaveRequestFormModelResult {
@@ -119,6 +120,7 @@ export function useLeaveRequestFormModel({
     onSubmitError,
     quotas = [],
     submitRequest = submitLeaveRequest,
+    canSubmit = true,
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -212,7 +214,7 @@ export function useLeaveRequestFormModel({
     };
 
     const submit = async (data: LeaveRequestValues): Promise<void> => {
-        if (submittingRef.current) {
+        if (!canSubmit || submittingRef.current) {
             return;
         }
 

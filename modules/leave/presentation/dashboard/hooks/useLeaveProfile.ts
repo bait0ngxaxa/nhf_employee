@@ -37,6 +37,7 @@ export interface LeaveProfileResponse {
 export interface UseLeaveProfileOptions {
     page?: number;
     filters?: LeaveHistoryFilters;
+    enabled?: boolean;
 }
 
 export interface UseLeaveProfileResult {
@@ -85,8 +86,9 @@ export function useLeaveProfile(
         : options;
     const normalizedPage = normalizedOptions.page ?? 1;
     const normalizedFilters = normalizedOptions.filters ?? {};
+    const enabled = normalizedOptions.enabled !== false;
     const { data, error, isLoading, mutate } = useSWR<LeaveProfileResponse, unknown>(
-        buildLeaveProfileUrl(normalizedPage, normalizedFilters),
+        enabled ? buildLeaveProfileUrl(normalizedPage, normalizedFilters) : null,
         fetcher,
         {
             revalidateOnFocus: false,

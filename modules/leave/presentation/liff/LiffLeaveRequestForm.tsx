@@ -25,6 +25,7 @@ import type { LiffLeaveQuotaSummary } from "../types";
 interface LiffLeaveRequestFormProps {
     open: boolean;
     quotas: LiffLeaveQuotaSummary[];
+    canCreateRequests?: boolean;
     onOpenChange: (open: boolean) => void;
     onSuccess: () => void | Promise<void>;
     onAmbiguousSubmit?: () => void | Promise<void>;
@@ -33,6 +34,7 @@ interface LiffLeaveRequestFormProps {
 export function LiffLeaveRequestForm({
     open,
     quotas,
+    canCreateRequests = true,
     onOpenChange,
     onSuccess,
     onAmbiguousSubmit,
@@ -40,6 +42,7 @@ export function LiffLeaveRequestForm({
     const model = useLeaveRequestFormModel({
         quotas,
         submitRequest: submitLiffLeaveRequest,
+        canSubmit: canCreateRequests,
         onSuccess: async () => {
             await onSuccess();
             onOpenChange(false);
@@ -141,7 +144,7 @@ export function LiffLeaveRequestForm({
                             <Button
                                 type="submit"
                                 className="min-h-12 bg-module-leave-solid text-content-on-brand hover:bg-module-leave-solid-hover"
-                                disabled={model.isSubmitting}
+                                disabled={model.isSubmitting || !canCreateRequests}
                                 aria-busy={model.isSubmitting}
                             >
                                 {model.isSubmitting ? (

@@ -2,6 +2,7 @@ import { type useRouter } from "next/navigation";
 import { type MenuGroup } from "@/types/dashboard";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
+import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 
 export interface DashboardUser {
     id?: string;
@@ -12,6 +13,7 @@ export interface DashboardUser {
     isManager?: boolean;
     canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;
+    leaveCapabilities?: LeavePresentationCapabilities;
     routineCapabilities?: RoutinePresentationCapabilities;
     stockCapabilities?: StockPresentationCapabilities;
 }

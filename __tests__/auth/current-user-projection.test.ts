@@ -2,13 +2,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthenticatedAccount } from "@/modules/auth";
 import type { CurrentEmployeeProjection } from "@/modules/employee";
-import type { CurrentEmployeeLeaveProjection } from "@/modules/leave";
+import type {
+    CurrentEmployeeLeaveProjection,
+    LeavePresentationCapabilities,
+} from "@/modules/leave";
 
 const {
     cookiesMock,
     resolveAccountMock,
     employeeProjectionMock,
     leaveProjectionMock,
+    leaveCapabilitiesMock,
+    leaveAuthorizationContextMock,
     routineProjectionMock,
     stockContextMock,
     stockProjectionMock,
@@ -17,6 +22,8 @@ const {
     resolveAccountMock: vi.fn(),
     employeeProjectionMock: vi.fn(),
     leaveProjectionMock: vi.fn(),
+    leaveCapabilitiesMock: vi.fn(),
+    leaveAuthorizationContextMock: vi.fn(),
     routineProjectionMock: vi.fn(),
     stockContextMock: vi.fn(),
     stockProjectionMock: vi.fn(),
@@ -25,7 +32,11 @@ const {
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
 vi.mock("@/modules/auth", () => ({ resolveAuthenticatedAccount: resolveAccountMock }));
 vi.mock("@/modules/employee", () => ({ findCurrentEmployeeProjection: employeeProjectionMock }));
-vi.mock("@/modules/leave", () => ({ getCurrentEmployeeLeaveProjection: leaveProjectionMock }));
+vi.mock("@/modules/leave", () => ({
+    buildLeaveAuthorizationContext: leaveAuthorizationContextMock,
+    getCurrentEmployeeLeaveProjection: leaveProjectionMock,
+    getLeavePresentationCapabilities: leaveCapabilitiesMock,
+}));
 vi.mock("@/modules/routine", () => ({
     getRoutinePresentationCapabilities: routineProjectionMock,
 }));
@@ -57,6 +68,18 @@ const EMPLOYEE: CurrentEmployeeProjection = {
 const LEAVE: CurrentEmployeeLeaveProjection = {
     canApproveLeave: true,
     canViewLeaveReports: false,
+};
+
+const LEAVE_CAPABILITIES: LeavePresentationCapabilities = {
+    canReadOwnRequests: true,
+    canReadAssignedApprovals: true,
+    canCreateOwnRequests: true,
+    canCancelOwnRequests: true,
+    canApproveAssignedRequests: true,
+    canDecideAssignedCancellations: true,
+    canRequestOwnNotTaken: true,
+    canConfirmAssignedNotTaken: true,
+    canManageApprovers: true,
 };
 
 const ROUTINE = {
@@ -92,6 +115,15 @@ describe("current-user application projection", () => {
         resolveAccountMock.mockResolvedValue(ACCOUNT);
         employeeProjectionMock.mockResolvedValue(EMPLOYEE);
         leaveProjectionMock.mockResolvedValue(LEAVE);
+        leaveCapabilitiesMock.mockResolvedValue(LEAVE_CAPABILITIES);
+        leaveAuthorizationContextMock.mockReturnValue({
+            authorizationActor: {
+                userId: 41,
+                employeeId: 101,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+        });
         routineProjectionMock.mockResolvedValue(ROUTINE);
         stockContextMock.mockReturnValue({ authorizationActor: "stock-actor" });
         stockProjectionMock.mockResolvedValue(STOCK);
@@ -107,12 +139,21 @@ describe("current-user application projection", () => {
             isManager: false,
             canApproveLeave: true,
             canViewLeaveReports: false,
+            leaveCapabilities: LEAVE_CAPABILITIES,
             routineCapabilities: ROUTINE,
             stockCapabilities: STOCK,
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
         expect(leaveProjectionMock).toHaveBeenCalledWith(101, false);
+        expect(leaveCapabilitiesMock).toHaveBeenCalledWith({
+            authorizationActor: {
+                userId: 41,
+                employeeId: 101,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+        });
         expect(routineProjectionMock).toHaveBeenCalledWith({
             id: 41,
             role: "ADMIN",
@@ -132,6 +173,7 @@ describe("current-user application projection", () => {
 
         await expect(getCurrentUserProjection()).resolves.toBeNull();
         expect(leaveProjectionMock).not.toHaveBeenCalled();
+        expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
     });
 
     it.each(["inactive", "suspended", "deleted"])(
@@ -154,6 +196,7 @@ describe("current-user application projection", () => {
             isManager: true,
             canApproveLeave: true,
             canViewLeaveReports: true,
+            leaveCapabilities: LEAVE_CAPABILITIES,
         });
         expect(leaveProjectionMock).toHaveBeenCalledWith(101, true);
     });
@@ -170,11 +213,30 @@ describe("current-user application projection", () => {
         });
     });
 
+    it("keeps the legacy approval alias relationship-sensitive when the read capability is absent", async () => {
+        leaveProjectionMock.mockResolvedValue({
+            canApproveLeave: true,
+            canViewLeaveReports: false,
+        });
+        leaveCapabilitiesMock.mockResolvedValue({
+            ...LEAVE_CAPABILITIES,
+            canReadAssignedApprovals: false,
+        });
+
+        await expect(getCurrentUserProjection()).resolves.toMatchObject({
+            canApproveLeave: false,
+            leaveCapabilities: {
+                canReadAssignedApprovals: false,
+            },
+        });
+    });
+
     it("keeps unauthorized Auth separate from Employee projection", async () => {
         resolveAccountMock.mockResolvedValue(null);
 
         await expect(getCurrentUserProjection()).resolves.toBeNull();
         expect(employeeProjectionMock).not.toHaveBeenCalled();
         expect(leaveProjectionMock).not.toHaveBeenCalled();
+        expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
     });
 });

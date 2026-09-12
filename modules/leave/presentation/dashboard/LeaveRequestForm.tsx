@@ -26,12 +26,23 @@ interface Props {
     onSuccess: () => void | Promise<void>;
     onCancel: () => void;
     quotas: LeaveQuota[];
+    canCreateRequests?: boolean;
 }
 
 type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
 
-export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
-    const model = useLeaveRequestFormModel({ onSuccess, quotas });
+export function LeaveRequestForm({
+    open,
+    onSuccess,
+    onCancel,
+    quotas,
+    canCreateRequests = true,
+}: Props) {
+    const model = useLeaveRequestFormModel({
+        onSuccess,
+        quotas,
+        canSubmit: canCreateRequests,
+    });
 
     return (
         <AsyncFormDialog
@@ -82,7 +93,7 @@ export function LeaveRequestForm({ open, onSuccess, onCancel, quotas }: Props) {
                             <Button
                                 type="submit"
                                 className={LEAVE_THEME_BUTTON_CLASS}
-                                disabled={model.isSubmitting}
+                                disabled={model.isSubmitting || !canCreateRequests}
                                 aria-busy={model.isSubmitting}
                             >
                                 {model.isSubmitting ? (

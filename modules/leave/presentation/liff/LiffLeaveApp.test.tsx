@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
-import type { ApproverLeaveAction, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
+import type { LeavePresentationCapabilities } from "../../application/types";
+import type { ApproverLeaveAction, EmployeeLeaveAction, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
 
 const mocks = vi.hoisted(() => {
     class MockLiffApiError extends Error {
@@ -70,10 +71,18 @@ vi.mock("@/modules/line/client", () => ({
 }));
 
 vi.mock("./LiffLeaveOverview", () => ({
-    LiffLeaveOverview: ({ onCreateRequest }: { onCreateRequest: () => void }) => (
+    LiffLeaveOverview: ({
+        onCreateRequest,
+        canCreateRequests = true,
+    }: {
+        onCreateRequest: () => void;
+        canCreateRequests?: boolean;
+    }) => (
         <section>
             <h1>Leave</h1>
-            <button type="button" onClick={onCreateRequest}>ยื่นลา</button>
+            {canCreateRequests ? (
+                <button type="button" onClick={onCreateRequest}>ยื่นลา</button>
+            ) : null}
             <p>สิทธิ์วันลาของฉัน</p>
         </section>
     ),
@@ -179,27 +188,30 @@ vi.mock("./LiffLeaveRequestDetail", () => ({
         actionIntent,
         onOpenChange,
         onAction,
+        canUseAction = () => true,
     }: {
         detail: LiffLeaveRequestDetailData | null;
         actionIntent: string | null;
         onOpenChange: (open: boolean) => void;
         onAction: (
-            action: ApproverLeaveAction,
+            action: ApproverLeaveAction | EmployeeLeaveAction,
             detail: LiffLeaveRequestDetailData,
         ) => void;
+        canUseAction?: (action: ApproverLeaveAction | EmployeeLeaveAction) => boolean;
     }) => detail
         ? (
             <div>
                 รายละเอียด {detail.id} intent {actionIntent ?? "none"}
-                {detail.availableActions?.includes("APPROVE") ? (
+                {detail.availableActions?.filter(canUseAction).map((action) => (
                     <button
+                        key={action}
                         type="button"
-                        data-testid="detail-approve"
-                        onClick={() => onAction("APPROVE", detail)}
+                        data-testid={`detail-${action.toLowerCase()}`}
+                        onClick={() => onAction(action, detail)}
                     >
-                        detail-approve
+                        detail-{action.toLowerCase()}
                     </button>
-                ) : null}
+                ))}
                 <button
                     type="button"
                     data-testid="close-detail"
@@ -252,6 +264,18 @@ const PROFILE = {
     },
 };
 
+const LEAVE_CAPABILITIES: LeavePresentationCapabilities = {
+    canReadOwnRequests: true,
+    canReadAssignedApprovals: true,
+    canCreateOwnRequests: true,
+    canCancelOwnRequests: true,
+    canApproveAssignedRequests: true,
+    canDecideAssignedCancellations: false,
+    canRequestOwnNotTaken: true,
+    canConfirmAssignedNotTaken: true,
+    canManageApprovers: false,
+};
+
 function approvals(hasActionableWork: boolean) {
     return {
         pending: [],
@@ -287,7 +311,10 @@ describe("LIFF Leave app orchestration", () => {
         mocks.fetchHome.mockResolvedValue({
             workforce: { userId: 1, employeeId: 1, name: "พนักงาน ทดสอบ" },
             modules: {},
-            capabilities: { canApproveLeave: false },
+            capabilities: {
+                canApproveLeave: false,
+                leaveCapabilities: LEAVE_CAPABILITIES,
+            },
         });
         mocks.fetchProfile.mockResolvedValue(PROFILE);
         mocks.fetchApprovals.mockResolvedValue(approvals(false));
@@ -304,11 +331,76 @@ describe("LIFF Leave app orchestration", () => {
         expect(mocks.fetchApprovals).not.toHaveBeenCalled();
     });
 
+    it("does not load own Leave data when own-read capability is unavailable", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {
+                canApproveLeave: false,
+                leaveCapabilities: {
+                    ...LEAVE_CAPABILITIES,
+                    canReadOwnRequests: false,
+                    canReadAssignedApprovals: false,
+                },
+            },
+        });
+
+        render(<LiffLeaveApp />);
+
+        expect(await screen.findByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+            .toBeInTheDocument();
+        expect(mocks.fetchProfile).not.toHaveBeenCalled();
+        expect(mocks.fetchApprovals).not.toHaveBeenCalled();
+    });
+
+    it("keeps the request form unavailable when create capability is absent", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {
+                canApproveLeave: false,
+                leaveCapabilities: {
+                    ...LEAVE_CAPABILITIES,
+                    canCreateOwnRequests: false,
+                },
+            },
+        });
+
+        render(<LiffLeaveApp />);
+
+        expect(await screen.findByText("สิทธิ์วันลาของฉัน")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ยื่นลา" })).not.toBeInTheDocument();
+        expect(mocks.fetchProfile).toHaveBeenCalledWith({ page: 1 });
+    });
+
+    it("does not load assigned Leave data without assigned-read capability", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: {
+                canApproveLeave: true,
+                leaveCapabilities: {
+                    ...LEAVE_CAPABILITIES,
+                    canReadAssignedApprovals: false,
+                },
+            },
+        });
+
+        render(<LiffLeaveApp />);
+
+        expect(await screen.findByText("สิทธิ์วันลาของฉัน")).toBeInTheDocument();
+        expect(screen.queryByRole("tab", { name: /รอพิจารณา/ })).not.toBeInTheDocument();
+        expect(mocks.fetchApprovals).not.toHaveBeenCalled();
+    });
+
     it("loads approvals and shows the approver tab for a capable approver", async () => {
         mocks.fetchHome.mockResolvedValueOnce({
             workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
             modules: {},
-            capabilities: { canApproveLeave: true },
+            capabilities: {
+                canApproveLeave: true,
+                leaveCapabilities: LEAVE_CAPABILITIES,
+            },
         });
         mocks.fetchApprovals.mockResolvedValueOnce(approvals(true));
 
@@ -326,7 +418,10 @@ describe("LIFF Leave app orchestration", () => {
         mocks.fetchHome.mockResolvedValueOnce({
             workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
             modules: {},
-            capabilities: { canApproveLeave: true },
+            capabilities: {
+                canApproveLeave: true,
+                leaveCapabilities: LEAVE_CAPABILITIES,
+            },
         });
         mocks.fetchApprovals.mockRejectedValueOnce(new Error("approval unavailable"));
 
@@ -371,7 +466,21 @@ describe("LIFF Leave app orchestration", () => {
         mocks.fetchHome.mockResolvedValueOnce({
             workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
             modules: {},
-            capabilities: { canApproveLeave: true },
+            capabilities: {
+                canApproveLeave: true,
+                leaveCapabilities: LEAVE_CAPABILITIES,
+            },
+        });
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: {
+                canApproveLeave: true,
+                leaveCapabilities: {
+                    ...LEAVE_CAPABILITIES,
+                    canApproveAssignedRequests: false,
+                },
+            },
         });
         const detail = {
             id: "leave-1",
@@ -386,7 +495,7 @@ describe("LIFF Leave app orchestration", () => {
         } as unknown as LiffLeaveRequestDetailData;
         mocks.fetchRequest
             .mockResolvedValueOnce(detail)
-            .mockResolvedValueOnce({ ...detail, availableActions: [] });
+            .mockResolvedValueOnce({ ...detail, availableActions: ["APPROVE"] });
         mocks.submitDecision.mockRejectedValueOnce(
             new LiffApiError(
                 "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
@@ -493,7 +602,10 @@ describe("LIFF Leave app orchestration", () => {
         mocks.fetchHome.mockResolvedValueOnce({
             workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
             modules: {},
-            capabilities: { canApproveLeave: true },
+            capabilities: {
+                canApproveLeave: true,
+                leaveCapabilities: LEAVE_CAPABILITIES,
+            },
         });
         mocks.fetchApprovals.mockResolvedValue(approvals(true));
 

@@ -1,5 +1,8 @@
+import type { LeavePresentationCapabilities } from "@/modules/leave";
 import type { RoutinePresentationCapabilities } from "@/modules/routine";
 import type { StockPresentationCapabilities } from "@/modules/stock";
+
+export type { LeavePresentationCapabilities } from "@/modules/leave";
 
 export interface LiffWorkforceIdentity {
     userId: number;
@@ -46,6 +49,7 @@ export interface LiffCapabilities {
     canProcessStockRequests: boolean;
     canRequestLeave: boolean;
     canApproveLeave: boolean;
+    leaveCapabilities: LeavePresentationCapabilities;
     canCreateOwnRoutine: boolean;
     routineCapabilities: RoutinePresentationCapabilities;
 }

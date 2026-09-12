@@ -6,6 +6,8 @@ import { LiffLeaveDecisionSheet } from "./LiffLeaveDecisionSheet";
 import { LiffLeaveHistory } from "./LiffLeaveHistory";
 import { LiffLeaveQuotaCards } from "./LiffLeaveQuotaCards";
 import { LiffLeaveRequestDetail } from "./LiffLeaveRequestDetail";
+import { canUseLiffLeaveAction } from "./LiffLeaveApp";
+import type { LeavePresentationCapabilities } from "../../application/types";
 import type { LiffEmployeeLeaveRequest, LiffLeaveApprovalsResponse, LiffLeaveProfileResponse, LiffLeaveQuotaSummary, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
 
 const QUOTAS: LiffLeaveQuotaSummary[] = [
@@ -87,6 +89,18 @@ const EMPTY_APPROVALS: LiffLeaveApprovalsResponse = {
         cancellationPending: { currentPage: 1, totalPages: 0, totalItems: 0, itemsPerPage: 10 },
     },
     hasActionableWork: false,
+};
+
+const LIFF_CAPABILITIES: LeavePresentationCapabilities = {
+    canReadOwnRequests: true,
+    canReadAssignedApprovals: true,
+    canCreateOwnRequests: true,
+    canCancelOwnRequests: true,
+    canApproveAssignedRequests: true,
+    canDecideAssignedCancellations: false,
+    canRequestOwnNotTaken: true,
+    canConfirmAssignedNotTaken: true,
+    canManageApprovers: false,
 };
 
 describe("LIFF Leave mobile components", () => {
@@ -292,5 +306,50 @@ describe("LIFF Leave mobile components", () => {
         expect(screen.getByRole("button", { name: "ยกเลิกคำขอลา" })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "อนุมัติ" })).not.toBeInTheDocument();
         expect(screen.queryByText(/เปิดจากลิงก์เพื่อพิจารณา/)).not.toBeInTheDocument();
+    });
+
+    it("keeps LIFF cancellation decisions available through the server action exception", () => {
+        const detail: LiffLeaveRequestDetailData = {
+            ...HISTORY_ITEM,
+            status: "CANCELLATION_REQUESTED",
+            viewerRole: "APPROVER",
+            availableActions: ["CONFIRM_CANCELLATION", "REJECT_CANCELLATION"],
+        };
+
+        render(
+            <LiffLeaveRequestDetail
+                detail={detail}
+                onOpenChange={vi.fn()}
+                onAction={vi.fn()}
+                canUseAction={(action) => canUseLiffLeaveAction(action, LIFF_CAPABILITIES)}
+            />,
+        );
+
+        expect(screen.getByRole("button", { name: "ยืนยันยกเลิกและคืนโควต้า" }))
+            .toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ไม่ยืนยันการยกเลิก" }))
+            .toBeInTheDocument();
+        expect(LIFF_CAPABILITIES.canDecideAssignedCancellations).toBe(false);
+    });
+
+    it("maps each LIFF mutation action to its own capability", () => {
+        expect(canUseLiffLeaveAction("APPROVE", {
+            ...LIFF_CAPABILITIES,
+            canApproveAssignedRequests: false,
+        })).toBe(false);
+        expect(canUseLiffLeaveAction("CONFIRM_NOT_TAKEN", {
+            ...LIFF_CAPABILITIES,
+            canConfirmAssignedNotTaken: false,
+        })).toBe(false);
+        expect(canUseLiffLeaveAction("REQUEST_NOT_TAKEN", {
+            ...LIFF_CAPABILITIES,
+            canRequestOwnNotTaken: false,
+        })).toBe(false);
+        expect(canUseLiffLeaveAction("CANCEL", {
+            ...LIFF_CAPABILITIES,
+            canCancelOwnRequests: false,
+        })).toBe(false);
+        expect(canUseLiffLeaveAction("CONFIRM_CANCELLATION", LIFF_CAPABILITIES)).toBe(true);
+        expect(canUseLiffLeaveAction("REJECT_CANCELLATION", LIFF_CAPABILITIES)).toBe(true);
     });
 });

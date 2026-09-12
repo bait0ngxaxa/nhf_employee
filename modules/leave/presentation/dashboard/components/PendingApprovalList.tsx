@@ -21,6 +21,7 @@ interface PendingApprovalListProps {
     isProcessing: boolean;
     onApprove: (leave: PendingLeave) => Promise<void>;
     onOpenReject: (leave: PendingLeave) => void;
+    canApproveAssignedRequests: boolean;
 }
 
 const leaveTypeLabel = (leaveType: PendingLeave["leaveType"]): string => {
@@ -46,6 +47,7 @@ export function PendingApprovalList({
     isProcessing,
     onApprove,
     onOpenReject,
+    canApproveAssignedRequests,
 }: PendingApprovalListProps) {
     if (pending.length === 0) {
         return <EmptyPendingApproval />;
@@ -60,6 +62,7 @@ export function PendingApprovalList({
                     isProcessing={isProcessing}
                     onApprove={onApprove}
                     onOpenReject={onOpenReject}
+                    canApproveAssignedRequests={canApproveAssignedRequests}
                 />
             ))}
         </div>
@@ -71,11 +74,13 @@ function PendingApprovalCard({
     isProcessing,
     onApprove,
     onOpenReject,
+    canApproveAssignedRequests,
 }: {
     leave: PendingLeave;
     isProcessing: boolean;
     onApprove: (leave: PendingLeave) => Promise<void>;
     onOpenReject: (leave: PendingLeave) => void;
+    canApproveAssignedRequests: boolean;
 }) {
     const LeaveTypeIcon = leaveTypeIcon(leave.leaveType);
 
@@ -149,23 +154,27 @@ function PendingApprovalCard({
                         attachments={leave.attachments}
                         className="w-full"
                     />
-                    <Button
-                        onClick={() => onApprove(leave)}
-                        disabled={isProcessing}
-                        className={LEAVE_THEME_BUTTON_CLASS}
-                    >
-                        <CheckCircle className="h-4 w-4" aria-hidden="true" />
-                        อนุมัติ
-                    </Button>
-                    <Button
-                        onClick={() => onOpenReject(leave)}
-                        disabled={isProcessing}
-                        variant="outline"
-                        className="border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-heading"
-                    >
-                        <XCircle className="h-4 w-4" aria-hidden="true" />
-                        ไม่อนุมัติ
-                    </Button>
+                    {canApproveAssignedRequests ? (
+                        <>
+                            <Button
+                                onClick={() => onApprove(leave)}
+                                disabled={isProcessing}
+                                className={LEAVE_THEME_BUTTON_CLASS}
+                            >
+                                <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                                อนุมัติ
+                            </Button>
+                            <Button
+                                onClick={() => onOpenReject(leave)}
+                                disabled={isProcessing}
+                                variant="outline"
+                                className="border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-heading"
+                            >
+                                <XCircle className="h-4 w-4" aria-hidden="true" />
+                                ไม่อนุมัติ
+                            </Button>
+                        </>
+                    ) : null}
                 </div>
             </div>
         </Card>

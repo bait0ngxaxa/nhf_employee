@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { LeaveStatusValue as LeaveStatus, LeaveTypeValue as LeaveType } from "../../types";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -10,6 +10,8 @@ import {
     type LeaveRequest,
 } from "./useLeaveProfile";
 import type { LeaveHistoryFilters } from "../../../application/queries/history-filters";
+import type { LeavePresentationCapabilities } from "../../../application/types";
+import { getEmployeeLeaveActions } from "../../../domain/action-availability";
 
 const EMPTY_LEAVE_QUOTA: LeaveQuotaBalance = {
     totalDays: 0,
@@ -20,6 +22,10 @@ const EMPTY_LEAVE_QUOTA: LeaveQuotaBalance = {
 };
 
 export interface EmployeeLeaveDashboardModel {
+    canReadOwnRequests: boolean;
+    canCreateOwnRequests: boolean;
+    canCancelOwnRequests: boolean;
+    canRequestOwnNotTaken: boolean;
     isLoading: boolean;
     isRequestFormOpen: boolean;
     quotas: LeaveQuota[];
@@ -59,7 +65,13 @@ export interface EmployeeLeaveDashboardModel {
     confirmNotTakenRequest: () => Promise<void>;
 }
 
-export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
+export function useEmployeeLeaveDashboardModel(
+    leaveCapabilities?: LeavePresentationCapabilities,
+): EmployeeLeaveDashboardModel {
+    const canReadOwnRequests = leaveCapabilities?.canReadOwnRequests === true;
+    const canCreateOwnRequests = leaveCapabilities?.canCreateOwnRequests === true;
+    const canCancelOwnRequests = leaveCapabilities?.canCancelOwnRequests === true;
+    const canRequestOwnNotTaken = leaveCapabilities?.canRequestOwnNotTaken === true;
     const [isRequestFormOpen, setIsRequestFormOpen] = useState(false);
     const [page, setPage] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,7 +117,25 @@ export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
         cancelLeave,
         requestApprovedCancellation,
         requestNotTaken,
-    } = useLeaveProfile({ page, filters: historyFilters });
+    } = useLeaveProfile({
+        page,
+        filters: historyFilters,
+        enabled: canReadOwnRequests,
+    });
+
+    useEffect(() => {
+        if (!canCreateOwnRequests) {
+            setIsRequestFormOpen(false);
+        }
+        if (!canCancelOwnRequests) {
+            setCancelConfirmRequest(null);
+            setCancelReason("");
+        }
+        if (!canRequestOwnNotTaken) {
+            setNotTakenRequestId(null);
+            setNotTakenNote("");
+        }
+    }, [canCancelOwnRequests, canCreateOwnRequests, canRequestOwnNotTaken]);
 
     const getQuota = (type: LeaveType): LeaveQuotaBalance =>
         quotas.find((quota) => quota.leaveType === type) ?? EMPTY_LEAVE_QUOTA;
@@ -143,15 +173,24 @@ export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
     };
 
     const openRequestForm = (): void => {
+        if (!canCreateOwnRequests) return;
         setIsRequestFormOpen(true);
     };
 
     const onRequestSuccess = async (): Promise<void> => {
-        await mutate();
+        if (canReadOwnRequests) {
+            await mutate();
+        }
         setIsRequestFormOpen(false);
     };
 
     const openCancelDialog = (request: LeaveRequest): void => {
+        const availableActions = getEmployeeLeaveActions(request);
+        if (
+            !canCancelOwnRequests
+            || (!availableActions.includes("CANCEL")
+                && !availableActions.includes("REQUEST_CANCELLATION"))
+        ) return;
         setCancelConfirmRequest(request);
         setCancelReason("");
     };
@@ -162,6 +201,12 @@ export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
     };
 
     const openNotTakenDialog = (leaveId: string): void => {
+        const request = history.find((item) => item.id === leaveId);
+        if (
+            !canRequestOwnNotTaken
+            || !request
+            || !getEmployeeLeaveActions(request).includes("REQUEST_NOT_TAKEN")
+        ) return;
         setNotTakenRequestId(leaveId);
         setNotTakenNote("");
     };
@@ -172,7 +217,16 @@ export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
     };
 
     const confirmCancelLeave = async (): Promise<void> => {
-        if (!cancelConfirmRequest) {
+        if (!canCancelOwnRequests || !cancelConfirmRequest) {
+            if (!canCancelOwnRequests) closeCancelDialog();
+            return;
+        }
+        const availableActions = getEmployeeLeaveActions(cancelConfirmRequest);
+        if (
+            !availableActions.includes("CANCEL")
+            && !availableActions.includes("REQUEST_CANCELLATION")
+        ) {
+            closeCancelDialog();
             return;
         }
 
@@ -198,13 +252,22 @@ export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
     };
 
     const confirmNotTakenRequest = async (): Promise<void> => {
-        if (!notTakenRequestId || !notTakenNote.trim()) {
+        const leaveId = notTakenRequestId;
+        const request = history.find((item) => item.id === leaveId);
+        if (
+            !canRequestOwnNotTaken
+            || !leaveId
+            || !request
+            || !getEmployeeLeaveActions(request).includes("REQUEST_NOT_TAKEN")
+            || !notTakenNote.trim()
+        ) {
+            if (!canRequestOwnNotTaken) closeNotTakenDialog();
             return;
         }
 
         try {
             setIsSubmitting(true);
-            await requestNotTaken(notTakenRequestId, notTakenNote);
+            await requestNotTaken(leaveId, notTakenNote);
             toast.success("ส่งคำขอแจ้งไม่ได้ใช้วันลาแล้ว");
         } catch (error: unknown) {
             toast.error(
@@ -219,7 +282,11 @@ export function useEmployeeLeaveDashboardModel(): EmployeeLeaveDashboardModel {
     };
 
     return {
-        isLoading,
+        canReadOwnRequests,
+        canCreateOwnRequests,
+        canCancelOwnRequests,
+        canRequestOwnNotTaken,
+        isLoading: canReadOwnRequests && isLoading,
         isRequestFormOpen,
         quotas,
         history,

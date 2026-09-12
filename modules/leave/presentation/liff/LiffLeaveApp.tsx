@@ -29,6 +29,7 @@ import {
     LiffApiError,
 } from "@/modules/line/client";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
+import type { LeavePresentationCapabilities } from "../../application/types";
 import type { ApproverLeaveAction, EmployeeLeaveAction, LiffEmployeeLeaveRequest, LiffLeaveApprovalItem, LiffLeaveApprovalsResponse, LiffLeaveProfileResponse, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
 
 import { LiffLeaveApprovals } from "./LiffLeaveApprovals";
@@ -44,6 +45,7 @@ import {
     formatLeaveDateRange,
     getLeaveTypeLabel,
 } from "./leave-format";
+import type { LiffHomeResponse } from "@/modules/line/client";
 
 type LeaveViewState = "LOADING" | "READY" | "ERROR";
 type LeaveTab = "mine" | "approvals";
@@ -69,6 +71,30 @@ const EMPTY_APPROVALS: LiffLeaveApprovalsResponse = {
 
 const DEEP_LINK_ACTIONS = new Set(["approve", "review", "cancel", "not-taken"]);
 
+export function canUseLiffLeaveAction(
+    action: EmployeeLeaveAction | ApproverLeaveAction,
+    capabilities: LeavePresentationCapabilities | null,
+): boolean {
+    if (!capabilities) return false;
+
+    switch (action) {
+        case "CANCEL":
+        case "REQUEST_CANCELLATION":
+            return capabilities.canCancelOwnRequests;
+        case "REQUEST_NOT_TAKEN":
+            return capabilities.canRequestOwnNotTaken;
+        case "APPROVE":
+        case "REJECT":
+            return capabilities.canApproveAssignedRequests;
+        case "CONFIRM_NOT_TAKEN":
+            return capabilities.canConfirmAssignedNotTaken;
+        case "CONFIRM_CANCELLATION":
+        case "REJECT_CANCELLATION":
+            // LIFF cancellation decisions remain Leave-domain-authorized.
+            return true;
+    }
+}
+
 function getViewError(error: unknown): string {
     if (error instanceof LiffApiError) return error.message;
     return "ไม่สามารถโหลดข้อมูล Leave ได้ กรุณาลองใหม่อีกครั้ง";
@@ -86,7 +112,7 @@ export function LiffLeaveApp(): ReactElement {
     const [viewError, setViewError] = useState<string | null>(null);
     const [profile, setProfile] = useState<LiffLeaveProfileResponse | null>(null);
     const [approvals, setApprovals] = useState<LiffLeaveApprovalsResponse>(EMPTY_APPROVALS);
-    const [canApproveLeave, setCanApproveLeave] = useState(false);
+    const [leaveCapabilities, setLeaveCapabilities] = useState<LeavePresentationCapabilities | null>(null);
     const [approvalError, setApprovalError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<LeaveTab>("mine");
     const [hadApprovalWork, setHadApprovalWork] = useState(false);
@@ -109,6 +135,8 @@ export function LiffLeaveApp(): ReactElement {
     const approvalsRequestSequenceRef = useRef(0);
     const capabilityRequestSequenceRef = useRef(0);
     const detailRequestSequenceRef = useRef(0);
+    const leaveCapabilitiesRef = useRef<LeavePresentationCapabilities | null>(null);
+    const hasApprovalRelationshipRef = useRef(false);
 
     useEffect(() => () => {
         initialRequestSequenceRef.current += 1;
@@ -121,6 +149,18 @@ export function LiffLeaveApp(): ReactElement {
     const refreshApprovals = useCallback(async (
         pages: typeof INITIAL_APPROVAL_PAGES,
     ): Promise<void> => {
+        const currentCapabilities = leaveCapabilitiesRef.current;
+        if (
+            currentCapabilities?.canReadAssignedApprovals !== true
+            || !hasApprovalRelationshipRef.current
+        ) {
+            approvalsRequestSequenceRef.current += 1;
+            setApprovals(EMPTY_APPROVALS);
+            setApprovalError(null);
+            setIsApprovalsLoading(false);
+            return;
+        }
+
         const requestSequence = ++approvalsRequestSequenceRef.current;
         setIsApprovalsLoading(true);
         setApprovalError(null);
@@ -128,7 +168,10 @@ export function LiffLeaveApp(): ReactElement {
             const nextApprovals = await fetchLiffLeaveApprovals(pages);
             if (requestSequence !== approvalsRequestSequenceRef.current) return;
             setApprovals(nextApprovals);
-            if (nextApprovals.hasActionableWork) setHadApprovalWork(true);
+            if (nextApprovals.hasActionableWork) {
+                hasApprovalRelationshipRef.current = true;
+                setHadApprovalWork(true);
+            }
         } catch (error) {
             if (requestSequence !== approvalsRequestSequenceRef.current) return;
             const message = getViewError(error);
@@ -141,19 +184,67 @@ export function LiffLeaveApp(): ReactElement {
         }
     }, []);
 
-    const loadApproverExperience = useCallback(async (): Promise<void> => {
-        const requestSequence = ++capabilityRequestSequenceRef.current;
-        try {
-            const home = await fetchLiffHome();
-            if (requestSequence !== capabilityRequestSequenceRef.current) return;
-            if (!home.capabilities.canApproveLeave) return;
+    const applyTrustedHomeProjection = useCallback((home: LiffHomeResponse): void => {
+        const nextCapabilities = home.capabilities.leaveCapabilities;
+        const nextHasApprovalRelationship = home.capabilities.canApproveLeave === true;
+        leaveCapabilitiesRef.current = nextCapabilities;
+        hasApprovalRelationshipRef.current = nextHasApprovalRelationship;
+        setLeaveCapabilities(nextCapabilities);
+        setHadApprovalWork(nextHasApprovalRelationship);
 
-            setCanApproveLeave(true);
-            await refreshApprovals(INITIAL_APPROVAL_PAGES);
-        } catch {
-            // Capability is an optimization hint; employee Leave and deep links remain usable.
+        if (!nextCapabilities.canReadOwnRequests) {
+            profileRequestSequenceRef.current += 1;
+            setProfile(null);
+            setRequestFormOpen(false);
         }
-    }, [refreshApprovals]);
+        if (!nextCapabilities.canCreateOwnRequests) {
+            setRequestFormOpen(false);
+        }
+        if (
+            !nextCapabilities.canReadAssignedApprovals
+            || !nextHasApprovalRelationship
+        ) {
+            approvalsRequestSequenceRef.current += 1;
+            setApprovals(EMPTY_APPROVALS);
+            setApprovalError(null);
+            setIsApprovalsLoading(false);
+        }
+        setMutationIntent((current) => current && canUseLiffLeaveAction(
+            current.action,
+            nextCapabilities,
+        ) ? current : null);
+    }, []);
+
+    const clearTrustedLeaveProjection = useCallback((): void => {
+        leaveCapabilitiesRef.current = null;
+        hasApprovalRelationshipRef.current = false;
+        profileRequestSequenceRef.current += 1;
+        approvalsRequestSequenceRef.current += 1;
+        detailRequestSequenceRef.current += 1;
+        setLeaveCapabilities(null);
+        setProfile(null);
+        setApprovals(EMPTY_APPROVALS);
+        setHadApprovalWork(false);
+        setApprovalError(null);
+        setIsProfileLoading(false);
+        setIsApprovalsLoading(false);
+        setRequestFormOpen(false);
+        setSelectedDetail(null);
+        setSelectedDetailActionIntent(null);
+        setMutationIntent(null);
+        setMutationError(null);
+        setMutationFromDetail(false);
+    }, []);
+
+    const refreshTrustedHomeProjection = useCallback(async (): Promise<LiffHomeResponse> => {
+        const requestSequence = ++capabilityRequestSequenceRef.current;
+        const home = await fetchLiffHome();
+        if (requestSequence !== capabilityRequestSequenceRef.current) {
+            return home;
+        }
+        applyTrustedHomeProjection(home);
+        return home;
+    }, [applyTrustedHomeProjection]);
 
     const loadInitialData = useCallback(async (): Promise<void> => {
         const requestSequence = ++initialRequestSequenceRef.current;
@@ -164,7 +255,10 @@ export function LiffLeaveApp(): ReactElement {
         setState("LOADING");
         setViewError(null);
         setApprovalError(null);
-        setCanApproveLeave(false);
+        leaveCapabilitiesRef.current = null;
+        hasApprovalRelationshipRef.current = false;
+        setLeaveCapabilities(null);
+        setProfile(null);
         setApprovals(EMPTY_APPROVALS);
         setHadApprovalWork(false);
         setIsProfileLoading(false);
@@ -172,17 +266,27 @@ export function LiffLeaveApp(): ReactElement {
         setSelectedDetail(null);
         setSelectedDetailActionIntent(null);
         try {
-            const nextProfile = await fetchLiffLeaveProfile({ page: 1 });
+            const home = await fetchLiffHome();
+            if (requestSequence !== initialRequestSequenceRef.current) return;
+            applyTrustedHomeProjection(home);
+            const nextProfile = home.capabilities.leaveCapabilities.canReadOwnRequests
+                ? await fetchLiffLeaveProfile({ page: 1 })
+                : null;
             if (requestSequence !== initialRequestSequenceRef.current) return;
             setProfile(nextProfile);
             setState("READY");
-            void loadApproverExperience();
+            if (
+                home.capabilities.leaveCapabilities.canReadAssignedApprovals
+                && home.capabilities.canApproveLeave
+            ) {
+                void refreshApprovals(INITIAL_APPROVAL_PAGES);
+            }
         } catch (error) {
             if (requestSequence !== initialRequestSequenceRef.current) return;
             setViewError(getViewError(error));
             setState("ERROR");
         }
-    }, [loadApproverExperience]);
+    }, [applyTrustedHomeProjection, refreshApprovals]);
 
     useEffect(() => {
         void loadInitialData();
@@ -201,6 +305,7 @@ export function LiffLeaveApp(): ReactElement {
             if (requestSequence !== detailRequestSequenceRef.current) return;
             setSelectedDetail(detail);
             if (detail.viewerRole === "APPROVER" && detail.availableActions.length > 0) {
+                hasApprovalRelationshipRef.current = true;
                 setHadApprovalWork(true);
                 if (intent === "approve" || intent === "review") {
                     setActiveTab("approvals");
@@ -240,6 +345,14 @@ export function LiffLeaveApp(): ReactElement {
         page: number = profilePage,
         filters: LeaveHistoryFilters = historyFilters,
     ): Promise<void> => {
+        if (leaveCapabilitiesRef.current?.canReadOwnRequests !== true) {
+            profileRequestSequenceRef.current += 1;
+            setProfile(null);
+            setRequestFormOpen(false);
+            setIsProfileLoading(false);
+            return;
+        }
+
         const requestSequence = ++profileRequestSequenceRef.current;
         setIsProfileLoading(true);
         try {
@@ -260,6 +373,10 @@ export function LiffLeaveApp(): ReactElement {
         action: EmployeeLeaveAction | ApproverLeaveAction,
         request: LiffEmployeeLeaveRequest | LiffLeaveApprovalItem | LiffLeaveRequestDetailData,
     ): void => {
+        if (!canUseLiffLeaveAction(action, leaveCapabilitiesRef.current)) {
+            setFocusNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
+            return;
+        }
         const fromDetail = selectedDetail !== null;
         detailRequestSequenceRef.current += 1;
         setSelectedDetail(null);
@@ -281,6 +398,12 @@ export function LiffLeaveApp(): ReactElement {
     const executeMutation = async (reason: string | undefined): Promise<void> => {
         if (!mutationIntent || isMutating) return;
         const { requestId, action } = mutationIntent;
+        if (!canUseLiffLeaveAction(action, leaveCapabilitiesRef.current)) {
+            setMutationIntent(null);
+            setMutationError(null);
+            setFocusNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
+            return;
+        }
         setIsMutating(true);
         setMutationError(null);
         try {
@@ -322,15 +445,27 @@ export function LiffLeaveApp(): ReactElement {
                 const isEmployeeAction = action === "CANCEL"
                     || action === "REQUEST_CANCELLATION"
                     || action === "REQUEST_NOT_TAKEN";
-                if (isEmployeeAction) {
-                    await refreshProfile();
-                } else {
-                    const firstPages = { ...INITIAL_APPROVAL_PAGES };
-                    setApprovalPages(firstPages);
-                    await refreshApprovals(firstPages);
-                }
-                if (fromDetail) {
-                    await openDetail(requestId, null);
+                try {
+                    const refreshedHome = await refreshTrustedHomeProjection();
+                    if (isEmployeeAction) {
+                        if (refreshedHome.capabilities.leaveCapabilities.canReadOwnRequests) {
+                            await refreshProfile();
+                        }
+                    } else {
+                        const firstPages = { ...INITIAL_APPROVAL_PAGES };
+                        setApprovalPages(firstPages);
+                        if (
+                            refreshedHome.capabilities.leaveCapabilities.canReadAssignedApprovals
+                            && refreshedHome.capabilities.canApproveLeave
+                        ) {
+                            await refreshApprovals(firstPages);
+                        }
+                    }
+                    if (fromDetail) {
+                        await openDetail(requestId, null);
+                    }
+                } catch {
+                    clearTrustedLeaveProjection();
                 }
                 setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 setMutationIntent(null);
@@ -355,7 +490,7 @@ export function LiffLeaveApp(): ReactElement {
         );
     }
 
-    if (state !== "READY" || !profile) {
+    if (state !== "READY") {
         return (
             <LoadingState
                 label="กำลังโหลดข้อมูล Leave…"
@@ -364,9 +499,19 @@ export function LiffLeaveApp(): ReactElement {
         );
     }
 
-    const showApprovalTab = canApproveLeave
-        || hadApprovalWork
-        || approvals.hasActionableWork;
+    const canReadOwnRequests = leaveCapabilities?.canReadOwnRequests === true;
+    const canReadAssignedApprovals = leaveCapabilities?.canReadAssignedApprovals === true;
+    const canCreateOwnRequests = leaveCapabilities?.canCreateOwnRequests === true;
+    const showApprovalTab = canReadAssignedApprovals
+        && (hasApprovalRelationshipRef.current || hadApprovalWork || approvals.hasActionableWork);
+    const hasMineTab = canReadOwnRequests && profile !== null;
+    const effectiveActiveTab = activeTab === "approvals" && showApprovalTab
+        ? "approvals"
+        : hasMineTab
+            ? "mine"
+            : showApprovalTab
+                ? "approvals"
+                : "mine";
 
     return (
         <main
@@ -379,86 +524,123 @@ export function LiffLeaveApp(): ReactElement {
                         {focusNotice}
                     </div>
                 ) : null}
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as LeaveTab)}>
-                    {showApprovalTab ? (
-                        <TabsList className="grid w-full grid-cols-2 bg-surface-muted p-1">
-                            <TabsTrigger value="mine">วันลาของฉัน</TabsTrigger>
-                            <TabsTrigger value="approvals">
-                                รอพิจารณา
-                                {approvals.hasActionableWork ? (
-                                    <span className="ml-1 size-2 rounded-full bg-status-attention-icon" aria-label="มีรายการรอพิจารณา" />
-                                ) : null}
-                            </TabsTrigger>
-                        </TabsList>
-                    ) : null}
-                    <TabsContent value="mine" className="mt-5 space-y-7">
-                        <LiffLeaveOverview
-                            quotas={profile.quotas}
-                            onCreateRequest={() => setRequestFormOpen(true)}
-                        />
-                        <LiffLeaveHistory
-                            profile={profile}
-                            filters={historyFilters}
-                            isLoading={isProfileLoading}
-                            onApplyFilters={(filters) => {
-                                setHistoryFilters(filters);
-                                setProfilePage(1);
-                                void refreshProfile(1, filters);
-                            }}
-                            onPageChange={(page) => {
-                                setProfilePage(page);
-                                void refreshProfile(page);
-                            }}
-                            onOpenDetail={(requestId) => void openDetail(requestId)}
-                            onAction={startAction}
-                        />
-                    </TabsContent>
-                    {showApprovalTab ? (
-                        <TabsContent value="approvals" className="mt-5">
-                            {approvalError ? (
-                                <ErrorState
-                                    title="โหลดรายการรอพิจารณาไม่สำเร็จ"
-                                    description={approvalError}
-                                    action={{
-                                        label: "ลองโหลดรายการอีกครั้ง",
-                                        onClick: () => void refreshApprovals(approvalPages),
+                {hasMineTab || showApprovalTab ? (
+                    <Tabs
+                        value={effectiveActiveTab}
+                        onValueChange={(value) => {
+                            if (value === "mine" && hasMineTab) setActiveTab("mine");
+                            if (value === "approvals" && showApprovalTab) setActiveTab("approvals");
+                        }}
+                    >
+                        {showApprovalTab ? (
+                            <TabsList className={`grid w-full ${hasMineTab ? "grid-cols-2" : "grid-cols-1"} bg-surface-muted p-1`}>
+                                {hasMineTab ? <TabsTrigger value="mine">วันลาของฉัน</TabsTrigger> : null}
+                                <TabsTrigger value="approvals">
+                                    รอพิจารณา
+                                    {approvals.hasActionableWork ? (
+                                        <span className="ml-1 size-2 rounded-full bg-status-attention-icon" aria-label="มีรายการรอพิจารณา" />
+                                    ) : null}
+                                </TabsTrigger>
+                            </TabsList>
+                        ) : null}
+                        {hasMineTab && profile ? (
+                            <TabsContent value="mine" className="mt-5 space-y-7">
+                                <LiffLeaveOverview
+                                    quotas={profile.quotas}
+                                    canCreateRequests={canCreateOwnRequests}
+                                    onCreateRequest={() => {
+                                        if (leaveCapabilitiesRef.current?.canCreateOwnRequests === true) {
+                                            setRequestFormOpen(true);
+                                        }
                                     }}
-                                    className="min-h-64 border-border-subtle bg-surface-raised px-4 py-8"
                                 />
-                            ) : (
-                                <LiffLeaveApprovals
-                                    approvals={approvals}
-                                    isLoading={isApprovalsLoading}
+                                <LiffLeaveHistory
+                                    profile={profile}
+                                    filters={historyFilters}
+                                    isLoading={isProfileLoading}
+                                    onApplyFilters={(filters) => {
+                                        setHistoryFilters(filters);
+                                        setProfilePage(1);
+                                        void refreshProfile(1, filters);
+                                    }}
+                                    onPageChange={(page) => {
+                                        setProfilePage(page);
+                                        void refreshProfile(page);
+                                    }}
                                     onOpenDetail={(requestId) => void openDetail(requestId)}
                                     onAction={startAction}
-                                    onPageChange={(category, page) => {
-                                        const pageKey: Record<ApprovalCategory, keyof typeof approvalPages> = {
-                                            pending: "pendingPage",
-                                            notTakenPending: "notTakenPage",
-                                            cancellationPending: "cancellationPage",
-                                        };
-                                        const nextPages = { ...approvalPages, [pageKey[category]]: page };
-                                        setApprovalPages(nextPages);
-                                        void refreshApprovals(nextPages);
-                                    }}
+                                    canUseAction={(action) => canUseLiffLeaveAction(action, leaveCapabilities)}
                                 />
-                            )}
-                        </TabsContent>
-                    ) : null}
-                </Tabs>
+                            </TabsContent>
+                        ) : null}
+                        {showApprovalTab ? (
+                            <TabsContent value="approvals" className="mt-5">
+                                {approvalError ? (
+                                    <ErrorState
+                                        title="โหลดรายการรอพิจารณาไม่สำเร็จ"
+                                        description={approvalError}
+                                        action={{
+                                            label: "ลองโหลดรายการอีกครั้ง",
+                                            onClick: () => void refreshApprovals(approvalPages),
+                                        }}
+                                        className="min-h-64 border-border-subtle bg-surface-raised px-4 py-8"
+                                    />
+                                ) : (
+                                    <LiffLeaveApprovals
+                                        approvals={approvals}
+                                        isLoading={isApprovalsLoading}
+                                        onOpenDetail={(requestId) => void openDetail(requestId)}
+                                        onAction={startAction}
+                                        canUseAction={(action) => canUseLiffLeaveAction(action, leaveCapabilities)}
+                                        onPageChange={(category, page) => {
+                                            const pageKey: Record<ApprovalCategory, keyof typeof approvalPages> = {
+                                                pending: "pendingPage",
+                                                notTakenPending: "notTakenPage",
+                                                cancellationPending: "cancellationPage",
+                                            };
+                                            const nextPages = { ...approvalPages, [pageKey[category]]: page };
+                                            setApprovalPages(nextPages);
+                                            void refreshApprovals(nextPages);
+                                        }}
+                                    />
+                                )}
+                            </TabsContent>
+                        ) : null}
+                    </Tabs>
+                ) : (
+                    <div
+                        className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong"
+                        role="status"
+                    >
+                        บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่
+                    </div>
+                )}
             </div>
 
             <LiffLeaveRequestForm
-                open={requestFormOpen}
-                quotas={profile.quotas}
-                onOpenChange={setRequestFormOpen}
+                open={requestFormOpen && canCreateOwnRequests && profile !== null}
+                quotas={profile?.quotas ?? []}
+                canCreateRequests={canCreateOwnRequests}
+                onOpenChange={(open) => setRequestFormOpen(open && canCreateOwnRequests)}
                 onSuccess={async () => {
                     setProfilePage(1);
-                    await refreshProfile(1);
+                    if (leaveCapabilitiesRef.current?.canReadOwnRequests === true) {
+                        await refreshProfile(1);
+                    }
                 }}
                 onAmbiguousSubmit={async () => {
-                    setProfilePage(1);
-                    await refreshProfile(1);
+                    try {
+                        setProfilePage(1);
+                        const refreshedHome = await refreshTrustedHomeProjection();
+                        if (refreshedHome.capabilities.leaveCapabilities.canReadOwnRequests) {
+                            await refreshProfile(1);
+                        }
+                        if (!refreshedHome.capabilities.leaveCapabilities.canCreateOwnRequests) {
+                            setRequestFormOpen(false);
+                        }
+                    } catch {
+                        clearTrustedLeaveProjection();
+                    }
                     setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 }}
             />
@@ -473,6 +655,7 @@ export function LiffLeaveApp(): ReactElement {
                     }
                 }}
                 onAction={startAction}
+                canUseAction={(action) => canUseLiffLeaveAction(action, leaveCapabilities)}
             />
             <LiffLeaveDecisionSheet
                 intent={mutationIntent}

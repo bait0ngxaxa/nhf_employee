@@ -24,6 +24,7 @@ interface LiffLeaveApprovalsProps {
     isLoading: boolean;
     onOpenDetail: (requestId: string) => void;
     onAction: (action: ApproverLeaveAction, request: LiffLeaveApprovalItem) => void;
+    canUseAction?: (action: ApproverLeaveAction) => boolean;
     onPageChange: (
         category: "pending" | "notTakenPending" | "cancellationPending",
         page: number,
@@ -36,6 +37,7 @@ export function LiffLeaveApprovals({
     onOpenDetail,
     onAction,
     onPageChange,
+    canUseAction = () => true,
 }: LiffLeaveApprovalsProps): ReactElement {
     const total = approvals.metadata.pending.totalItems
         + approvals.metadata.notTakenPending.totalItems
@@ -69,6 +71,7 @@ export function LiffLeaveApprovals({
                 onOpenDetail={onOpenDetail}
                 onAction={onAction}
                 onPageChange={onPageChange}
+                canUseAction={canUseAction}
             />
             <ApprovalSection
                 title="รอยืนยันไม่ได้ใช้วันลา"
@@ -80,6 +83,7 @@ export function LiffLeaveApprovals({
                 onOpenDetail={onOpenDetail}
                 onAction={onAction}
                 onPageChange={onPageChange}
+                canUseAction={canUseAction}
             />
             <ApprovalSection
                 title="รอยืนยันยกเลิกวันลา"
@@ -91,6 +95,7 @@ export function LiffLeaveApprovals({
                 onOpenDetail={onOpenDetail}
                 onAction={onAction}
                 onPageChange={onPageChange}
+                canUseAction={canUseAction}
             />
         </div>
     );
@@ -106,6 +111,7 @@ function ApprovalSection({
     onOpenDetail,
     onAction,
     onPageChange,
+    canUseAction,
 }: {
     title: string;
     description: string;
@@ -116,6 +122,7 @@ function ApprovalSection({
     onOpenDetail: (requestId: string) => void;
     onAction: (action: ApproverLeaveAction, request: LiffLeaveApprovalItem) => void;
     onPageChange: LiffLeaveApprovalsProps["onPageChange"];
+    canUseAction: (action: ApproverLeaveAction) => boolean;
 }): ReactElement | null {
     if (metadata.totalItems === 0) return null;
 
@@ -142,6 +149,7 @@ function ApprovalSection({
                         disabled={disabled}
                         onOpenDetail={onOpenDetail}
                         onAction={onAction}
+                        canUseAction={canUseAction}
                     />
                 ))}
             </div>
@@ -181,16 +189,19 @@ function ApprovalCard({
     disabled,
     onOpenDetail,
     onAction,
+    canUseAction,
 }: {
     item: LiffLeaveApprovalItem;
     disabled: boolean;
     onOpenDetail: (requestId: string) => void;
     onAction: (action: ApproverLeaveAction, request: LiffLeaveApprovalItem) => void;
+    canUseAction: (action: ApproverLeaveAction) => boolean;
 }): ReactElement {
     const employeeName = `${item.employee.firstName} ${item.employee.lastName}${item.employee.nickname ? ` (${item.employee.nickname})` : ""}`;
     const hasWarning = Boolean(
         item.emergencyReason || item.specialReason || item.overQuotaDays > 0,
     );
+    const availableActions = item.availableActions.filter(canUseAction);
 
     return (
         <article className="py-4 first:pt-0 last:pb-0">
@@ -238,12 +249,12 @@ function ApprovalCard({
                 >
                     ดูรายละเอียด
                 </Button>
-                {item.availableActions.map((action) => (
+                {availableActions.map((action) => (
                     <ApprovalActionButton
                         key={action}
                         action={action}
                         disabled={disabled}
-                        fullWidth={item.availableActions.length === 1}
+                        fullWidth={availableActions.length === 1}
                         onClick={() => onAction(action, item)}
                     />
                 ))}

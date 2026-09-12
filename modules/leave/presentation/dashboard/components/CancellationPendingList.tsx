@@ -15,6 +15,7 @@ interface CancellationPendingListProps {
     isProcessing: boolean;
     onConfirm: (leaveId: string) => Promise<boolean>;
     onReject: (leaveId: string) => Promise<boolean>;
+    canDecideAssignedCancellations: boolean;
 }
 
 export function CancellationPendingList({
@@ -22,6 +23,7 @@ export function CancellationPendingList({
     isProcessing,
     onConfirm,
     onReject,
+    canDecideAssignedCancellations,
 }: CancellationPendingListProps): ReactElement {
     if (items.length === 0) {
         return (
@@ -45,6 +47,7 @@ export function CancellationPendingList({
                     isProcessing={isProcessing}
                     onConfirm={onConfirm}
                     onReject={onReject}
+                    canDecideAssignedCancellations={canDecideAssignedCancellations}
                 />
             ))}
         </div>
@@ -56,11 +59,13 @@ function CancellationPendingItem({
     isProcessing,
     onConfirm,
     onReject,
+    canDecideAssignedCancellations,
 }: {
     leave: PendingLeave;
     isProcessing: boolean;
     onConfirm: (leaveId: string) => Promise<boolean>;
     onReject: (leaveId: string) => Promise<boolean>;
+    canDecideAssignedCancellations: boolean;
 }) {
     const canConfirm = isBeforeLeaveStart(leave.startDate);
 
@@ -108,23 +113,27 @@ function CancellationPendingItem({
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:shrink-0 md:justify-end">
                     <LeaveAttachmentViewerButton attachments={leave.attachments} />
-                    <Button
-                        disabled={isProcessing || !canConfirm}
-                        className={LEAVE_THEME_BUTTON_CLASS}
-                        onClick={() => onConfirm(leave.id)}
-                    >
-                        <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                        ยืนยันยกเลิกและคืนโควต้า
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={isProcessing}
-                        onClick={() => onReject(leave.id)}
-                    >
-                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                        ปิดคำขอยกเลิก
-                    </Button>
+                    {canDecideAssignedCancellations ? (
+                        <>
+                            <Button
+                                disabled={isProcessing || !canConfirm}
+                                className={LEAVE_THEME_BUTTON_CLASS}
+                                onClick={() => onConfirm(leave.id)}
+                            >
+                                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                                ยืนยันยกเลิกและคืนโควต้า
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isProcessing}
+                                onClick={() => onReject(leave.id)}
+                            >
+                                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                                ปิดคำขอยกเลิก
+                            </Button>
+                        </>
+                    ) : null}
                 </div>
             </div>
         </Card>

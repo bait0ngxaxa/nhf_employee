@@ -34,6 +34,7 @@ interface LiffLeaveHistoryProps {
     onPageChange: (page: number) => void;
     onOpenDetail: (requestId: string) => void;
     onAction: (action: EmployeeLeaveAction, request: LiffEmployeeLeaveRequest) => void;
+    canUseAction?: (action: EmployeeLeaveAction) => boolean;
 }
 
 export function LiffLeaveHistory({
@@ -44,6 +45,7 @@ export function LiffLeaveHistory({
     onPageChange,
     onOpenDetail,
     onAction,
+    canUseAction = () => true,
 }: LiffLeaveHistoryProps): ReactElement {
     const [filterOpen, setFilterOpen] = useState(false);
     const hasFilters = Boolean(
@@ -96,6 +98,7 @@ export function LiffLeaveHistory({
                             disabled={isLoading}
                             onOpenDetail={onOpenDetail}
                             onAction={onAction}
+                            canUseAction={canUseAction}
                         />
                     ))}
                 </div>
@@ -145,12 +148,15 @@ function HistoryCard({
     disabled,
     onOpenDetail,
     onAction,
+    canUseAction,
 }: {
     request: LiffEmployeeLeaveRequest;
     disabled: boolean;
     onOpenDetail: (requestId: string) => void;
     onAction: (action: EmployeeLeaveAction, request: LiffEmployeeLeaveRequest) => void;
+    canUseAction: (action: EmployeeLeaveAction) => boolean;
 }): ReactElement {
+    const availableActions = request.availableActions.filter(canUseAction);
     return (
         <article className="py-4 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
@@ -189,7 +195,7 @@ function HistoryCard({
                 >
                     ดูรายละเอียด
                 </Button>
-                {request.availableActions.map((action) => (
+                {availableActions.map((action) => (
                     <Button
                         key={action}
                         type="button"

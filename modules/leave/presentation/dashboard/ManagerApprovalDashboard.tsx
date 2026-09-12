@@ -16,12 +16,35 @@ import {
     ApprovalSectionHeader,
 } from "./components/ApprovalDashboardPrimitives";
 import { ManagerApprovalDashboardSkeleton } from "./LeaveSkeletons";
+import type { LeavePresentationCapabilities } from "../../application/types";
 
-export function ManagerApprovalDashboard(): ReactElement {
-    const model = useManagerApprovalModel();
+interface ManagerApprovalDashboardProps {
+    leaveCapabilities?: LeavePresentationCapabilities;
+    hasApprovalRelationship?: boolean;
+}
+
+export function ManagerApprovalDashboard({
+    leaveCapabilities,
+    hasApprovalRelationship,
+}: ManagerApprovalDashboardProps = {}): ReactElement {
+    const model = useManagerApprovalModel({
+        leaveCapabilities,
+        hasApprovalRelationship,
+    });
 
     if (model.isLoading) {
         return <ManagerApprovalDashboardSkeleton />;
+    }
+
+    if (!model.canShowApprovalSurface) {
+        return (
+            <div
+                className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong"
+                role="status"
+            >
+                บัญชีนี้ยังไม่มีรายการอนุมัติการลาที่พร้อมให้แสดง
+            </div>
+        );
     }
 
     return (
@@ -38,6 +61,7 @@ export function ManagerApprovalDashboard(): ReactElement {
                     isProcessing={model.isProcessing}
                     onApprove={model.approveLeave}
                     onOpenReject={model.openRejectDialog}
+                    canApproveAssignedRequests={model.canApproveAssignedRequests}
                 />
                 <ApprovalPagination
                     metadata={model.metadata?.pending}
@@ -57,6 +81,7 @@ export function ManagerApprovalDashboard(): ReactElement {
                         items={model.notTakenPending}
                         isProcessing={model.isProcessing}
                         onConfirm={model.confirmNotTaken}
+                        canConfirmAssignedNotTaken={model.canConfirmAssignedNotTaken}
                     />
                     <ApprovalPagination
                         metadata={model.metadata?.notTakenPending}
@@ -76,6 +101,7 @@ export function ManagerApprovalDashboard(): ReactElement {
                         isProcessing={model.isProcessing}
                         onConfirm={model.confirmCancellation}
                         onReject={model.rejectCancellation}
+                        canDecideAssignedCancellations={model.canDecideAssignedCancellations}
                     />
                     <ApprovalPagination
                         metadata={model.metadata?.cancellationPending}
@@ -118,7 +144,7 @@ export function ManagerApprovalDashboard(): ReactElement {
             </div>
 
             <RejectLeaveDialog
-                open={model.isRejectDialogOpen}
+                open={model.isRejectDialogOpen && model.canApproveAssignedRequests}
                 selectedLeave={model.selectedLeave}
                 rejectReason={model.rejectReason}
                 isProcessing={model.isProcessing}
@@ -132,7 +158,7 @@ export function ManagerApprovalDashboard(): ReactElement {
             />
 
             <ApprovalConfirmDialog
-                leave={model.approvalConfirmLeave}
+                leave={model.canApproveAssignedRequests ? model.approvalConfirmLeave : null}
                 isProcessing={model.isProcessing}
                 onOpenChange={(open) => {
                     if (!open) {

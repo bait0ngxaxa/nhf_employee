@@ -14,6 +14,11 @@ type LiffHomeStockCapabilities = Pick<
     "canReadCatalog" | "canReadOwnRequests" | "canProcessRequests"
 >;
 
+type LiffHomeLeaveCapabilities = Pick<
+    LiffCapabilities["leaveCapabilities"],
+    "canReadOwnRequests" | "canReadAssignedApprovals"
+>;
+
 export function getLiffConfiguredModules(): LiffHomeResponse["modules"] {
     const leaveEnabled = isFeatureEnabled(FEATURE_KEYS.leave);
     const routineEnabled = isFeatureEnabled(FEATURE_KEYS.routine);
@@ -33,6 +38,7 @@ export function getLiffConfiguredModules(): LiffHomeResponse["modules"] {
 
 export function getLiffHomeModules(
     capabilities: {
+        leaveCapabilities: LiffHomeLeaveCapabilities;
         routineCapabilities: LiffHomeRoutineReadCapabilities;
         stockCapabilities: LiffHomeStockCapabilities;
     },
@@ -46,6 +52,11 @@ export function getLiffHomeModules(
         );
     const routineEnabled = configuredModules.routine.enabled
         && capabilities.routineCapabilities.canReadTasks === true;
+    const leaveEnabled = configuredModules.leave.enabled
+        && (
+            capabilities.leaveCapabilities.canReadOwnRequests
+            || capabilities.leaveCapabilities.canReadAssignedApprovals
+        );
 
     return {
         ...configuredModules,
@@ -56,6 +67,10 @@ export function getLiffHomeModules(
         routine: {
             enabled: routineEnabled,
             status: routineEnabled ? "available" : "unavailable",
+        },
+        leave: {
+            enabled: leaveEnabled,
+            status: leaveEnabled ? "available" : "unavailable",
         },
     };
 }

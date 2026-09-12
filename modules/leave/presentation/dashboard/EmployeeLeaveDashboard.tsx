@@ -12,12 +12,30 @@ import { LeaveHistoryFilters } from "./components/LeaveHistoryFilters";
 import { CancelLeaveDialog } from "./components/CancelLeaveDialog";
 import { NotTakenRequestDialog } from "./components/NotTakenRequestDialog";
 import { EmployeeLeaveDashboardSkeleton } from "./LeaveSkeletons";
+import type { LeavePresentationCapabilities } from "../../application/types";
 
-export function EmployeeLeaveDashboard() {
-    const model = useEmployeeLeaveDashboardModel();
+interface EmployeeLeaveDashboardProps {
+    leaveCapabilities?: LeavePresentationCapabilities;
+}
+
+export function EmployeeLeaveDashboard({
+    leaveCapabilities,
+}: EmployeeLeaveDashboardProps) {
+    const model = useEmployeeLeaveDashboardModel(leaveCapabilities);
 
     if (model.isLoading) {
         return <EmployeeLeaveDashboardSkeleton />;
+    }
+
+    if (!model.canReadOwnRequests) {
+        return (
+            <div
+                className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong"
+                role="status"
+            >
+                บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูลวันลาของตนเอง
+            </div>
+        );
     }
 
     return (
@@ -32,16 +50,19 @@ export function EmployeeLeaveDashboard() {
                         ดูสิทธิ์คงเหลือก่อนยื่นคำขอใหม่
                     </p>
                 </div>
-                <Button className={LEAVE_THEME_BUTTON_CLASS} onClick={model.openRequestForm}>
-                    <Plus data-icon="inline-start" /> ยื่นคำขอลา
-                </Button>
+                {model.canCreateOwnRequests ? (
+                    <Button className={LEAVE_THEME_BUTTON_CLASS} onClick={model.openRequestForm}>
+                        <Plus data-icon="inline-start" /> ยื่นคำขอลา
+                    </Button>
+                ) : null}
             </div>
 
             <LeaveRequestForm
-                open={model.isRequestFormOpen}
+                open={model.isRequestFormOpen && model.canCreateOwnRequests}
                 onSuccess={model.onRequestSuccess}
                 onCancel={model.closeRequestForm}
                 quotas={model.quotas}
+                canCreateRequests={model.canCreateOwnRequests}
             />
 
             <LeaveQuotaCards
@@ -88,11 +109,13 @@ export function EmployeeLeaveDashboard() {
                     onCancelRequest={model.openCancelDialog}
                     onNotTakenRequest={model.openNotTakenDialog}
                     onPageChange={model.setPage}
+                    canCancelOwnRequests={model.canCancelOwnRequests}
+                    canRequestOwnNotTaken={model.canRequestOwnNotTaken}
                 />
             </div>
 
             <CancelLeaveDialog
-                open={model.cancelConfirmRequest !== null}
+                open={model.cancelConfirmRequest !== null && model.canCancelOwnRequests}
                 isSubmitting={model.isSubmitting}
                 requiresApproval={model.cancelConfirmRequest?.status === "APPROVED"}
                 reason={model.cancelReason}
@@ -106,7 +129,7 @@ export function EmployeeLeaveDashboard() {
             />
 
             <NotTakenRequestDialog
-                open={model.notTakenRequestId !== null}
+                open={model.notTakenRequestId !== null && model.canRequestOwnNotTaken}
                 note={model.notTakenNote}
                 isSubmitting={model.isSubmitting}
                 onNoteChange={model.setNotTakenNote}

@@ -2,7 +2,11 @@ import { cookies } from "next/headers";
 
 import { resolveAuthenticatedAccount } from "@/modules/auth";
 import { findCurrentEmployeeProjection } from "@/modules/employee";
-import { getCurrentEmployeeLeaveProjection } from "@/modules/leave";
+import {
+    buildLeaveAuthorizationContext,
+    getCurrentEmployeeLeaveProjection,
+    getLeavePresentationCapabilities,
+} from "@/modules/leave";
 import { getRoutinePresentationCapabilities } from "@/modules/routine";
 import {
     buildStockAuthorizationContext,
@@ -23,10 +27,22 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
     const employee = await findCurrentEmployeeProjection(account.userId);
     if (!employee) return null;
 
-    const leave = await getCurrentEmployeeLeaveProjection(
-        employee.id,
-        employee.isManager,
-    );
+    const [leave, leaveCapabilities] = await Promise.all([
+        getCurrentEmployeeLeaveProjection(
+            employee.id,
+            employee.isManager,
+        ),
+        getLeavePresentationCapabilities(
+            buildLeaveAuthorizationContext(
+                {
+                    id: account.userId,
+                    role: account.role,
+                },
+                employee.id,
+                "DASHBOARD",
+            ),
+        ),
+    ]);
     const routineCapabilities = await getRoutinePresentationCapabilities(
         {
             id: account.userId,
@@ -61,8 +77,11 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         }),
         department: employee.departmentName ?? undefined,
         isManager: employee.isManager,
-        canApproveLeave: leave.canApproveLeave,
+        canApproveLeave:
+            leaveCapabilities.canReadAssignedApprovals
+            && leave.canApproveLeave,
         canViewLeaveReports: leave.canViewLeaveReports,
+        leaveCapabilities,
         routineCapabilities,
         stockCapabilities,
     };

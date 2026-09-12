@@ -50,6 +50,17 @@ const HOME = {
         canProcessStockRequests: false,
         canRequestLeave: false,
         canApproveLeave: false,
+        leaveCapabilities: {
+            canReadOwnRequests: false,
+            canReadAssignedApprovals: false,
+            canCreateOwnRequests: false,
+            canCancelOwnRequests: false,
+            canApproveAssignedRequests: false,
+            canDecideAssignedCancellations: false,
+            canRequestOwnNotTaken: false,
+            canConfirmAssignedNotTaken: false,
+            canManageApprovers: false,
+        },
         canCreateOwnRoutine: true,
         routineCapabilities: {
             canReadTasks: true,

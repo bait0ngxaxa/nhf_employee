@@ -21,6 +21,7 @@ export {
     useLiffWorkforce,
 } from "./presentation/LiffBootstrap";
 export type {
+    LeavePresentationCapabilities,
     LiffCapabilities,
     LiffHomeModule,
     LiffHomeModules,

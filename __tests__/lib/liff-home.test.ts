@@ -6,16 +6,19 @@ import {
 } from "@/modules/line";
 
 const ROUTINE_READ_ALLOWED = {
+    leaveCapabilities: { canReadOwnRequests: true, canReadAssignedApprovals: false },
     routineCapabilities: { canReadTasks: true },
     stockCapabilities: { canReadCatalog: true, canReadOwnRequests: true, canProcessRequests: false },
 };
 
 const ROUTINE_READ_DENIED = {
+    leaveCapabilities: { canReadOwnRequests: false, canReadAssignedApprovals: false },
     routineCapabilities: { canReadTasks: false },
     stockCapabilities: { canReadCatalog: false, canReadOwnRequests: false, canProcessRequests: false },
 };
 
 const STOCK_PROCESSOR_ONLY = {
+    leaveCapabilities: { canReadOwnRequests: false, canReadAssignedApprovals: false },
     routineCapabilities: { canReadTasks: false },
     stockCapabilities: { canReadCatalog: false, canReadOwnRequests: false, canProcessRequests: true },
 };
@@ -57,6 +60,25 @@ describe("LIFF home module availability", () => {
             status: "available",
         });
         expect(getLiffHomeModules(ROUTINE_READ_DENIED).stock).toEqual({
+            enabled: false,
+            status: "unavailable",
+        });
+    });
+
+    it("enables Leave for assigned approval reads even without request creation", () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
+
+        expect(getLiffHomeModules({
+            ...ROUTINE_READ_DENIED,
+            leaveCapabilities: {
+                canReadOwnRequests: false,
+                canReadAssignedApprovals: true,
+            },
+        }).leave).toEqual({
+            enabled: true,
+            status: "available",
+        });
+        expect(getLiffHomeModules(ROUTINE_READ_DENIED).leave).toEqual({
             enabled: false,
             status: "unavailable",
         });

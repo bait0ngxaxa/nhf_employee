@@ -12,6 +12,7 @@ import { isAdminRole } from "@/lib/ssot/permissions";
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
+import type { LeavePresentationCapabilities } from "../../application/types";
 
 interface LeaveManagementSectionProps {
     defaultTab?: string;
@@ -19,10 +20,14 @@ interface LeaveManagementSectionProps {
 
 export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagementSectionProps) {
     const { user } = useDashboardDataContext();
-    const canApproveLeave = user?.canApproveLeave === true;
+    const leaveCapabilities = user?.leaveCapabilities;
+    const canReadOwnRequests = leaveCapabilities?.canReadOwnRequests === true;
+    const canReadAssignedApprovals = leaveCapabilities?.canReadAssignedApprovals === true;
+    const hasApprovalRelationship = user?.canApproveLeave === true;
     const canViewLeaveReports = user?.canViewLeaveReports === true;
     const isAdmin = isAdminRole(user?.role);
     const canRecoverLeave = isAdmin;
+    const canManageApprovers = leaveCapabilities?.canManageApprovers === true;
 
     const [activeTab, setActiveTab] = useState(defaultTab);
     const [isMounted, setIsMounted] = useState(false);
@@ -38,14 +43,20 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
         setIsMounted(true);
     }, []);
 
-    const tabs = getLeaveTabs(canApproveLeave, canViewLeaveReports, canRecoverLeave);
-    const hasTabs = canApproveLeave || canViewLeaveReports || canRecoverLeave;
+    const tabs = getLeaveTabs({
+        leaveCapabilities,
+        canReadOwnRequests,
+        canReadAssignedApprovals,
+        hasApprovalRelationship,
+        canViewLeaveReports,
+        canRecoverLeave,
+        canManageApprovers,
+    });
+    const hasTabs = tabs.some((tab) => tab.visible !== false);
     const activeTabIsVisible = tabs.some((tab) => tab.value === activeTab && tab.visible !== false);
     const safeActiveTab = activeTabIsVisible
         ? activeTab
-        : canRecoverLeave
-            ? "recovery"
-            : "my-leave";
+        : tabs.find((tab) => tab.visible !== false)?.value ?? "my-leave";
 
     return (
         <SectionShell className="border-border-subtle/70 bg-surface">
@@ -62,31 +73,55 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
                     ariaLabel="แท็บระบบลางาน"
                 />
             ) : (
-                <EmployeeLeaveDashboard />
+                <EmployeeLeaveDashboard leaveCapabilities={leaveCapabilities} />
             )}
         </SectionShell>
     );
 }
 
-function getLeaveTabs(
-    canApproveLeave: boolean,
-    canViewLeaveReports: boolean,
-    canRecoverLeave: boolean,
-): SectionTabItem[] {
+interface LeaveTabOptions {
+    leaveCapabilities?: LeavePresentationCapabilities;
+    canReadOwnRequests: boolean;
+    canReadAssignedApprovals: boolean;
+    hasApprovalRelationship: boolean;
+    canViewLeaveReports: boolean;
+    canRecoverLeave: boolean;
+    canManageApprovers: boolean;
+}
+
+function getLeaveTabs({
+    leaveCapabilities,
+    canReadOwnRequests,
+    canReadAssignedApprovals,
+    hasApprovalRelationship,
+    canViewLeaveReports,
+    canRecoverLeave,
+    canManageApprovers,
+}: LeaveTabOptions): SectionTabItem[] {
     return [
         {
             value: "my-leave",
             label: "วันลาของฉัน",
             group: "work",
             groupLabel: "งานหลัก",
-            content: <EmployeeLeaveDashboard />,
+            content: (
+                <EmployeeLeaveDashboard
+                    leaveCapabilities={leaveCapabilities}
+                />
+            ),
+            visible: canReadOwnRequests,
         },
         {
             value: "approvals",
             label: "อนุมัติการลา",
             group: "work",
-            content: <ManagerApprovalDashboard />,
-            visible: canApproveLeave,
+            content: (
+                <ManagerApprovalDashboard
+                    leaveCapabilities={leaveCapabilities}
+                    hasApprovalRelationship={hasApprovalRelationship}
+                />
+            ),
+            visible: canReadAssignedApprovals && hasApprovalRelationship,
         },
         {
             value: "recovery",
@@ -108,7 +143,7 @@ function getLeaveTabs(
             label: "จัดการผู้อนุมัติ",
             group: "tools",
             content: <ApproverManagement />,
-            visible: canRecoverLeave,
+            visible: canManageApprovers,
         },
     ];
 }
