@@ -57,6 +57,26 @@ export {
     parseEmployeeLeaveHistoryFilters,
 } from "./application/queries/history-filters";
 
+// Central authorization adapter for registered Leave capabilities.
+export {
+    assertLeaveCapabilityForMigration,
+    assertLeaveCapabilityScope,
+    buildLeaveAuthorizationActor,
+    buildLeaveAuthorizationContext,
+    canUseLeaveAdminRecoveryOverride,
+    LEAVE_MIGRATED_CAPABILITIES,
+    resolveLeaveCapabilityForMigration,
+    resolveLeaveCapabilityInTransaction,
+} from "./application/authorization";
+export type {
+    LeaveAuthorizationActor,
+    LeaveAuthorizationChannel,
+    LeaveAuthorizationContext,
+    LeaveCapabilityAuthorization,
+    LeaveMigratedCapability,
+} from "./application/authorization";
+export { LeaveCapabilityDeniedError } from "./application/authorization";
+
 // HTTP adapters and response serializers used by the existing route families.
 export {
     enforceLeaveJsonBodySize,

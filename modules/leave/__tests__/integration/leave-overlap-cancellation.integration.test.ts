@@ -3,6 +3,7 @@ import { LeaveStatus } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
+import { buildLeaveAuthorizationContext } from "../../application/authorization";
 import {
     cancelLeaveRequest,
     confirmLeaveCancellation,
@@ -30,6 +31,18 @@ type Fixture = {
     employeeUserId: number;
     employeeUserEmail: string;
 };
+
+function authorization(
+    userId: number,
+    employeeId: number,
+    role: "ADMIN" | "USER" = "USER",
+) {
+    return buildLeaveAuthorizationContext(
+        { id: userId, role },
+        employeeId,
+        "DASHBOARD",
+    );
+}
 
 function assertDedicatedDatabase(): void {
     const rawUrl = process.env.DATABASE_URL;
@@ -177,6 +190,10 @@ async function createRequest(
         idempotencyKey,
         payload: LEAVE_PAYLOAD,
         attachments: [],
+        authorization: authorization(
+            fixture.employeeUserId,
+            fixture.employeeId,
+        ),
     });
     return result.request.id;
 }
@@ -216,6 +233,10 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
             {
                 userId: fixture.employeeUserId,
                 employeeId: fixture.employeeId,
+                authorization: authorization(
+                    fixture.employeeUserId,
+                    fixture.employeeId,
+                ),
             },
             originalLeaveId,
             "เปลี่ยนแผนการเดินทาง",
@@ -275,6 +296,10 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
                 {
                     userId: fixture.employeeUserId,
                     employeeId: fixture.employeeId,
+                    authorization: authorization(
+                        fixture.employeeUserId,
+                        fixture.employeeId,
+                    ),
                 },
                 originalLeaveId,
                 "เปลี่ยนแผนการเดินทาง",
@@ -293,6 +318,10 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
                     userId: fixture.approverUserId,
                     employeeId: fixture.approverEmployeeId,
                     role: "USER",
+                    authorization: authorization(
+                        fixture.approverUserId,
+                        fixture.approverEmployeeId,
+                    ),
                 },
                 originalLeaveId,
             ),
@@ -307,6 +336,10 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
                     userId: fixture.approverUserId,
                     employeeId: fixture.approverEmployeeId,
                     role: "USER",
+                    authorization: authorization(
+                        fixture.approverUserId,
+                        fixture.approverEmployeeId,
+                    ),
                 },
                 originalLeaveId,
             ),
@@ -366,6 +399,10 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
                 {
                     userId: fixture.employeeUserId,
                     employeeId: fixture.employeeId,
+                    authorization: authorization(
+                        fixture.employeeUserId,
+                        fixture.employeeId,
+                    ),
                 },
                 originalLeaveId,
                 "เปลี่ยนแผนการเดินทาง",
@@ -378,6 +415,10 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
                     userId: fixture.approverUserId,
                     employeeId: fixture.approverEmployeeId,
                     role: "USER",
+                    authorization: authorization(
+                        fixture.approverUserId,
+                        fixture.approverEmployeeId,
+                    ),
                 },
                 originalLeaveId,
             ),
@@ -386,6 +427,10 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
                     userId: fixture.approverUserId,
                     employeeId: fixture.approverEmployeeId,
                     role: "USER",
+                    authorization: authorization(
+                        fixture.approverUserId,
+                        fixture.approverEmployeeId,
+                    ),
                 },
                 originalLeaveId,
             ),

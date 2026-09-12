@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
+    assertLeaveCapabilityForMigration,
+    buildLeaveAuthorizationContext,
     getLeaveApprovalList,
+    LeaveCapabilityDeniedError,
     parseApproverLeaveHistoryFilters,
     parseLeaveApprovalPage,
 } from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
-import { jsonError, notFound } from "@/lib/ssot/http";
+import { forbidden, jsonError, notFound } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 const APPROVALS_PAGINATION_MESSAGES = {
@@ -37,6 +40,16 @@ export async function GET(req: Request): Promise<NextResponse> {
             return jsonError(filtersResult.error, 400);
         }
 
+        const authorization = buildLeaveAuthorizationContext(
+            auth.user,
+            auth.employeeId,
+            "DASHBOARD",
+        );
+        await assertLeaveCapabilityForMigration(
+            authorization,
+            "leave.approval.read",
+        );
+
         return NextResponse.json(await getLeaveApprovalList({
             managerId: auth.employeeId,
             pendingPage,
@@ -46,6 +59,9 @@ export async function GET(req: Request): Promise<NextResponse> {
             historyFilters: filtersResult.filters,
         }));
     } catch (error) {
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching leave approvals:", error);
         return jsonError(COMMON_API_MESSAGES.failedToFetchApprovals, 500);
     }

@@ -1,11 +1,14 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
+    buildLeaveAuthorizationContext,
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,
     decideLeaveRequest,
     LeaveApprovalError,
+    LeaveCapabilityDeniedError,
     leaveActionSchema,
     toLiffLeaveMutationResponse,
 } from "@/modules/leave";
@@ -51,6 +54,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 employeeId: auth.employeeId,
                 userEmail: auth.user.email,
                 name: auth.user.name,
+                authorization: buildLeaveAuthorizationContext(
+                    auth.user,
+                    auth.employeeId,
+                    "LIFF_SELF_SERVICE",
+                ),
             },
             parsed.data,
         );
@@ -68,6 +76,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch (error) {
         if (error instanceof LeaveApprovalError) {
             return jsonError(error.message, error.statusCode);
+        }
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", error.statusCode);
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", 403);
         }
         console.error("LIFF leave decision failed", {
             errorType: error instanceof Error ? error.name : "UnknownError",

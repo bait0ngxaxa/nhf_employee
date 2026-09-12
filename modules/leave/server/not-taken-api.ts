@@ -6,6 +6,8 @@ import {
     requestLeaveNotTaken,
     type LeaveNotTakenActor,
 } from "../application/not-taken";
+import { LeaveCapabilityDeniedError } from "../application/authorization";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { toLeaveRequestDays } from "../domain/half-days";
 import {
     leaveNotTakenConfirmSchema,
@@ -56,6 +58,12 @@ export async function handleLeaveNotTakenRequest(
         if (error instanceof LeaveNotTakenError) {
             return jsonError(error.message, error.statusCode);
         }
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", error.statusCode);
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", 403);
+        }
         return jsonError(COMMON_API_MESSAGES.operationFailed, 500);
     }
 }
@@ -97,6 +105,12 @@ export async function handleLeaveNotTakenConfirmation(
         console.error("Leave not-taken confirm error:", error);
         if (error instanceof LeaveNotTakenError) {
             return jsonError(error.message, error.statusCode);
+        }
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", error.statusCode);
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", 403);
         }
         return jsonError(COMMON_API_MESSAGES.operationFailed, 500);
     }

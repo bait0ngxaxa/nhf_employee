@@ -2,6 +2,12 @@ import type { LeaveRequest } from "@prisma/client";
 
 import { isActiveEmployeeInTransaction } from "./queries/active-employee-session";
 import {
+    assertLeaveCapabilityScope,
+    canUseLeaveAdminRecoveryOverride,
+    resolveLeaveCapabilityInTransaction,
+    type LeaveAuthorizationContext,
+} from "./authorization";
+import {
     getEffectiveLeaveApprover,
     getEffectiveLeaveApproverId,
     getLeaveDecisionAuthorization,
@@ -31,7 +37,6 @@ import {
 } from "../infrastructure/persistence/transaction";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { getEmployeeDisplayName } from "@/modules/employee";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_DASHBOARD_TABS, toDashboardMenuPath } from "@/lib/ssot/routes";
 import {
     createForUser,
@@ -68,6 +73,7 @@ export interface LeaveNotTakenActor {
         name: string | null;
     };
     employeeId: number;
+    authorization: LeaveAuthorizationContext;
 }
 
 export interface RequestLeaveNotTakenInput {
@@ -90,11 +96,29 @@ export interface LeaveNotTakenResult {
 export async function requestLeaveNotTaken(
     input: RequestLeaveNotTakenInput,
 ): Promise<LeaveNotTakenResult> {
-    const userId = input.actor.user.id;
-    const employeeId = input.actor.employeeId;
-
     return runSerializableTransaction(async (tx) => {
-        if (!await isActiveEmployeeInTransaction(tx, userId, employeeId)) {
+        if (!await isActiveEmployeeInTransaction(
+            tx,
+            input.actor.user.id,
+            input.actor.employeeId,
+        )) {
+            throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+        }
+        const capabilityAuthorization = assertLeaveCapabilityScope(
+            await resolveLeaveCapabilityInTransaction(
+                tx,
+                input.actor.authorization,
+                "leave.request.not_taken",
+            ),
+            "OWN",
+        );
+        const userId = capabilityAuthorization.actor.userId;
+        const employeeId = capabilityAuthorization.actor.employeeId;
+        if (
+            userId !== input.actor.user.id
+            || employeeId === null
+            || employeeId !== input.actor.employeeId
+        ) {
             throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
         }
 
@@ -215,14 +239,34 @@ export async function requestLeaveNotTaken(
 export async function confirmLeaveNotTaken(
     input: ConfirmLeaveNotTakenInput,
 ): Promise<LeaveNotTakenResult> {
-    const userId = input.actor.user.id;
-    const managerId = input.actor.employeeId;
-    const isAdmin = input.allowAdminOverride && isAdminRole(input.actor.user.role);
-
     return runSerializableTransaction(async (tx) => {
-        if (!await isActiveEmployeeInTransaction(tx, userId, managerId)) {
+        if (!await isActiveEmployeeInTransaction(
+            tx,
+            input.actor.user.id,
+            input.actor.employeeId,
+        )) {
             throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
         }
+        const capabilityAuthorization = assertLeaveCapabilityScope(
+            await resolveLeaveCapabilityInTransaction(
+                tx,
+                input.actor.authorization,
+                "leave.request.not_taken",
+            ),
+            "ASSIGNED",
+        );
+        const userId = capabilityAuthorization.actor.userId;
+        const managerId = capabilityAuthorization.actor.employeeId;
+        if (
+            userId !== input.actor.user.id
+            || managerId === null
+            || managerId !== input.actor.employeeId
+        ) {
+            throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
+        }
+        const isAdmin = canUseLeaveAdminRecoveryOverride(
+            capabilityAuthorization,
+        );
 
         await lockLeaveRequestRow(tx, input.leaveId);
         let leaveRequest = await tx.leaveRequest.findUnique({
@@ -369,7 +413,7 @@ export async function confirmLeaveNotTaken(
                 : currentApprover
                     ? getEmployeeDisplayName(currentApprover)
                     : null,
-            decisionActorRole: input.actor.user.role,
+            decisionActorRole: capabilityAuthorization.actor.systemRole,
             recoveryOverride: adminOverride,
             leaveType: leaveRequest.leaveType,
             startDate: leaveRequest.startDate.toISOString(),

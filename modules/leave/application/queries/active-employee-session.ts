@@ -1,12 +1,13 @@
 import type { Prisma } from "@prisma/client";
 
-import { lockEmployeeRows } from "@/modules/leave/infrastructure/persistence/transaction";
+import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 
 export async function isActiveEmployeeInTransaction(
     tx: Prisma.TransactionClient,
     userId: number,
     employeeId: number,
 ): Promise<boolean> {
+    await lockUserRows(tx, [userId]);
     await lockEmployeeRows(tx, [employeeId]);
 
     const user = await tx.user.findFirst({

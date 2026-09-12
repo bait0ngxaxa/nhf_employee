@@ -2,13 +2,16 @@ import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
+    assertLeaveCapabilityForMigration,
+    buildLeaveAuthorizationContext,
     getApproverLeaveActions,
     getLeaveApprovalList,
+    LeaveCapabilityDeniedError,
     parseLeaveApprovalPage,
     toLiffLeaveApprovalItem,
 } from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
-import { jsonError, notFound, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, notFound, serverError } from "@/lib/ssot/http";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -25,6 +28,16 @@ export async function GET(request: Request): Promise<NextResponse> {
         if (!pendingPage || !notTakenPage || !cancellationPage) {
             return jsonError("หมายเลขหน้ารายการรอพิจารณาไม่ถูกต้อง", 400);
         }
+
+        const authorization = buildLeaveAuthorizationContext(
+            auth.user,
+            auth.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        await assertLeaveCapabilityForMigration(
+            authorization,
+            "leave.approval.read",
+        );
 
         const approvals = await getLeaveApprovalList({
             managerId: auth.employeeId,
@@ -61,6 +74,9 @@ export async function GET(request: Request): Promise<NextResponse> {
             hasActionableWork: totalActionable > 0,
         });
     } catch (error) {
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching LIFF leave approvals", {
             errorType: error instanceof Error ? error.name : "UnknownError",
         });

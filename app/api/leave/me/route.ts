@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
+    assertLeaveCapabilityForMigration,
+    buildLeaveAuthorizationContext,
     getEmployeeLeaveProfile,
+    LeaveCapabilityDeniedError,
     parseEmployeeLeaveHistoryFilters,
 } from "@/modules/leave";
-import { jsonError, notFound } from "@/lib/ssot/http";
+import { forbidden, jsonError, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
@@ -40,6 +43,16 @@ export async function GET(req: Request): Promise<NextResponse> {
             return jsonError(filtersResult.error, 400);
         }
 
+        const authorization = buildLeaveAuthorizationContext(
+            auth.user,
+            employeeId,
+            "DASHBOARD",
+        );
+        await assertLeaveCapabilityForMigration(
+            authorization,
+            "leave.request.read",
+        );
+
         return NextResponse.json(await getEmployeeLeaveProfile({
             employeeId,
             page,
@@ -47,6 +60,9 @@ export async function GET(req: Request): Promise<NextResponse> {
             filters: filtersResult.filters,
         }));
     } catch (error) {
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching leave data:", error);
         return jsonError(COMMON_API_MESSAGES.failedToFetchLeaveData, 500);
     }

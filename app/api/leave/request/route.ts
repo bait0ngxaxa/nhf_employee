@@ -5,6 +5,7 @@ import {
     createLeaveRequestErrorResponse,
     handleLeaveRequestSubmission,
     assertLeaveRequestBodySize,
+    buildLeaveAuthorizationContext,
 } from "@/modules/leave";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -61,6 +62,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             userId: auth.user.id,
             employeeId: auth.employeeId,
             userEmail: auth.user.email,
+            authorization: buildLeaveAuthorizationContext(
+                auth.user,
+                auth.employeeId,
+                "DASHBOARD",
+            ),
         },
         undefined,
         undefined,

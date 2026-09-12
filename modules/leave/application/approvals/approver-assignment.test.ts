@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { buildLeaveAuthorizationContext } from "../authorization";
 import { assignLeaveApprovers } from "./approver-assignment";
 import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "../../domain/approver-eligibility";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
@@ -10,13 +11,22 @@ vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
         $queryRaw: vi.fn(),
+        user: { findFirst: vi.fn() },
         employee: { findMany: vi.fn(), update: vi.fn() },
         leaveRequest: { findMany: vi.fn() },
         auditLog: { create: vi.fn() },
     },
 }));
 
-const ACTOR = { userId: 1, email: "admin@thainhf.org" };
+const ACTOR = {
+    userId: 1,
+    email: "admin@thainhf.org",
+    authorization: buildLeaveAuthorizationContext(
+        { id: 1, role: "ADMIN" },
+        1,
+        "DASHBOARD",
+    ),
+};
 const ACTIVE_APPROVER = {
     id: 20,
     firstName: "Manager",
@@ -91,6 +101,13 @@ describe("assignLeaveApprovers", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({
+            id: 1,
+            role: "ADMIN",
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 1, status: "ACTIVE", deletedAt: null },
+        } as never);
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") return callback(prisma);
             return callback;

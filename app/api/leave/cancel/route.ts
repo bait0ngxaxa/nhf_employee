@@ -1,12 +1,15 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
+    buildLeaveAuthorizationContext,
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,
     cancelLeaveRequest,
     confirmLeaveCancellation,
     LeaveCancellationError,
+    LeaveCapabilityDeniedError,
     leaveCancelSchema,
     leaveCancellationDecisionSchema,
     rejectLeaveCancellation,
@@ -58,6 +61,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 userId: auth.user.id,
                 employeeId: auth.employeeId,
                 userEmail: auth.user.email,
+                authorization: buildLeaveAuthorizationContext(
+                    auth.user,
+                    auth.employeeId,
+                    "DASHBOARD",
+                ),
             },
             parsed.data.leaveId,
             parsed.data.reason,
@@ -77,6 +85,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         console.error("Cancel leave error:", error);
         if (error instanceof LeaveCancellationError) {
             return jsonError(error.message, error.statusCode);
+        }
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", error.statusCode);
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", 403);
         }
         return jsonError(COMMON_API_MESSAGES.internalServerError, 500);
     }
@@ -117,6 +131,11 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
             role: auth.user.role,
             name: auth.user.name,
             userEmail: auth.user.email,
+            authorization: buildLeaveAuthorizationContext(
+                auth.user,
+                auth.employeeId,
+                "DASHBOARD",
+            ),
         };
         const result = parsed.data.action === "REJECT"
             ? await rejectLeaveCancellation(actor, parsed.data.leaveId, parsed.data.reason)
@@ -136,6 +155,12 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         console.error("Leave cancellation decision error:", error);
         if (error instanceof LeaveCancellationError) {
             return jsonError(error.message, error.statusCode);
+        }
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", error.statusCode);
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", 403);
         }
         return jsonError(COMMON_API_MESSAGES.operationFailed, 500);
     }

@@ -3,6 +3,11 @@ import { NotificationOutboxType, type Prisma } from "@prisma/client";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { getEmployeeDisplayName } from "@/modules/employee";
 import { isActiveEmployeeInTransaction } from "@/modules/leave/application/queries/active-employee-session";
+import {
+    assertLeaveCapabilityScope,
+    resolveLeaveCapabilityInTransaction,
+    type LeaveAuthorizationContext,
+} from "@/modules/leave/application/authorization";
 import { getAssignedLeaveApproverWhere } from "@/modules/leave/application/approvals/approval-queries";
 import { buildLeaveAuditContext } from "@/modules/leave/application/notifications/audit-details";
 import { getLeaveDecisionAuthorization } from "@/modules/leave/application/approvals/exception-approver";
@@ -44,6 +49,7 @@ export interface LeaveDecisionActor {
     employeeId: number;
     userEmail: string;
     name: string | null;
+    authorization: LeaveAuthorizationContext;
 }
 
 export async function decideLeaveRequest(
@@ -52,6 +58,20 @@ export async function decideLeaveRequest(
 ): Promise<Prisma.LeaveRequestGetPayload<Record<string, never>>> {
     return runSerializableTransaction(async (tx) => {
         if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
+            throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
+        }
+        const capabilityAuthorization = assertLeaveCapabilityScope(
+            await resolveLeaveCapabilityInTransaction(
+                tx,
+                actor.authorization,
+                "leave.request.approve",
+            ),
+            "ASSIGNED",
+        );
+        if (
+            capabilityAuthorization.actor.userId !== actor.userId
+            || capabilityAuthorization.actor.employeeId !== actor.employeeId
+        ) {
             throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
         }
         const leaveRequest = await tx.leaveRequest.findUnique({
@@ -69,7 +89,11 @@ export async function decideLeaveRequest(
             throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.requestNotFound, 404);
         }
         if (
-            getLeaveDecisionAuthorization(actor.employeeId, false, leaveRequest)
+            getLeaveDecisionAuthorization(
+                capabilityAuthorization.actor.employeeId,
+                false,
+                leaveRequest,
+            )
             !== "ASSIGNED_APPROVER"
         ) {
             throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
@@ -88,7 +112,9 @@ export async function decideLeaveRequest(
             where: {
                 id: input.leaveId,
                 status: "PENDING",
-                ...getAssignedLeaveApproverWhere(actor.employeeId),
+                ...getAssignedLeaveApproverWhere(
+                    capabilityAuthorization.actor.employeeId,
+                ),
             },
             data: updateData,
         });

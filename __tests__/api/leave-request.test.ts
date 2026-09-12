@@ -11,6 +11,11 @@ import type * as NextServerModule from "next/server";
 import type * as LeaveModule from "@/modules/leave";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
 
+const authorizationMocks = vi.hoisted(() => ({
+    resolve: vi.fn(),
+    resolveInTransaction: vi.fn(),
+}));
+
 const uploadMocks = vi.hoisted(() => ({
     save: vi.fn(),
     delete: vi.fn(),
@@ -32,6 +37,13 @@ vi.mock("@/lib/auth/server", () => ({
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
+}));
+
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: authorizationMocks.resolve,
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
 }));
 
 vi.mock("@/modules/leave", async (importOriginal) => {
@@ -93,7 +105,12 @@ vi.mock("@/lib/db/prisma", () => ({
 
 describe("POST /api/leave/request", () => {
     const testIdempotencyKey = "leave-request-test-key";
-    const mockUser = { id: "1", name: "Test User" };
+    const mockUser = {
+        id: "1",
+        name: "Test User",
+        role: "USER",
+        email: "employee@example.com",
+    };
     const mockEmployeeId = 100;
     const mockManager = {
         id: 200,
@@ -136,11 +153,31 @@ describe("POST /api/leave/request", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         resetMutationRateLimit();
+        authorizationMocks.resolve.mockResolvedValue({
+            capability: "leave.request.create",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+        authorizationMocks.resolveInTransaction.mockResolvedValue({
+            capability: "leave.request.create",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             employee: { id: mockEmployeeId, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({
+            id: 1,
+            role: "USER",
+            isActive: true,
+            deletedAt: null,
+            employee: { id: mockEmployeeId, status: "ACTIVE", deletedAt: null },
+        } as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue(null);
         vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);

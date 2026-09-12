@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
+    assertLeaveCapabilityForMigration,
+    buildLeaveAuthorizationContext,
     ApproverAssignmentError,
     assignLeaveApprovers,
     getLeaveApproverEmployees,
+    LeaveCapabilityDeniedError,
     leaveApproverAssignmentsSchema,
 } from "@/modules/leave";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -17,15 +21,27 @@ export async function GET(): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireAdminSession({
-            unauthorizedResponse: () => forbidden(),
-        });
-        if (!auth.ok) return auth.response;
+        const auth = await requireActiveWorkforceOrAdminSession();
+        if (!auth.ok) {
+            return auth.response.status === 401 ? forbidden() : auth.response;
+        }
+
+        await assertLeaveCapabilityForMigration(
+            buildLeaveAuthorizationContext(
+                auth.user,
+                "employeeId" in auth ? auth.employeeId : null,
+                "DASHBOARD",
+            ),
+            "leave.approver.manage",
+        );
 
         const employees = await getLeaveApproverEmployees();
 
         return NextResponse.json({ employees });
     } catch (error) {
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching approver data:", error);
         return NextResponse.json(
             { error: COMMON_API_MESSAGES.failedToFetchApproverData },
@@ -40,10 +56,20 @@ export async function PUT(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireAdminSession({
-            unauthorizedResponse: () => forbidden(),
-        });
-        if (!auth.ok) return auth.response;
+        const auth = await requireActiveWorkforceOrAdminSession();
+        if (!auth.ok) {
+            return auth.response.status === 401 ? forbidden() : auth.response;
+        }
+
+        const authorization = buildLeaveAuthorizationContext(
+            auth.user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
+        await assertLeaveCapabilityForMigration(
+            authorization,
+            "leave.approver.manage",
+        );
 
         const body = await req.json();
         const parsed = leaveApproverAssignmentsSchema.safeParse(body);
@@ -58,6 +84,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
         await assignLeaveApprovers(parsed.data.assignments, {
             userId: auth.user.id,
             email: auth.user.email,
+            authorization,
         });
 
         return NextResponse.json({
@@ -70,6 +97,12 @@ export async function PUT(req: Request): Promise<NextResponse> {
                 { error: error.message },
                 { status: error.statusCode },
             );
+        }
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return forbidden();
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return forbidden();
         }
         console.error("Error updating approvers:", error);
         return NextResponse.json(

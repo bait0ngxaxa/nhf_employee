@@ -4,7 +4,19 @@ import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { LeaveAttachmentValidationError } from "../schemas/attachments";
+import { buildLeaveAuthorizationContext } from "../application/authorization";
 import { handleLeaveRequestSubmission } from "./request-api";
+
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: vi.fn().mockResolvedValue({
+            capability: "leave.request.create",
+            allowed: true,
+            scopes: ["OWN"],
+            grants: [],
+        }),
+    },
+}));
 
 describe("Leave request HTTP adapter", () => {
     it("returns a safe validation response before persistence when attachment storage rejects", async () => {
@@ -34,6 +46,11 @@ describe("Leave request HTTP adapter", () => {
                 userId: 1,
                 employeeId: 10,
                 userEmail: "employee@example.com",
+                authorization: buildLeaveAuthorizationContext(
+                    { id: 1, role: "USER" },
+                    10,
+                    "DASHBOARD",
+                ),
             },
             undefined,
             undefined,

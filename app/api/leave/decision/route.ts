@@ -1,11 +1,14 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
+    buildLeaveAuthorizationContext,
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,
     decideLeaveRequest,
     LeaveApprovalError,
+    LeaveCapabilityDeniedError,
     leaveActionSchema,
     toLeaveRequestDays,
 } from "@/modules/leave";
@@ -54,6 +57,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 employeeId: auth.employeeId,
                 userEmail: auth.user.email,
                 name: auth.user.name,
+                authorization: buildLeaveAuthorizationContext(
+                    auth.user,
+                    auth.employeeId,
+                    "DASHBOARD",
+                ),
             },
             parsed.data,
         );
@@ -74,6 +82,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
         if (error instanceof LeaveApprovalError) {
             return jsonError(error.message, error.statusCode);
+        }
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", error.statusCode);
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", 403);
         }
         return jsonError(COMMON_API_MESSAGES.failedToProcessLeaveApproval, 500);
     }

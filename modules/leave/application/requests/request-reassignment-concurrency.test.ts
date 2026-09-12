@@ -5,8 +5,19 @@ import {
     isActiveEmployeeInTransaction,
 } from "../queries/active-employee-session";
 import { assignLeaveApprovers } from "../approvals/approver-assignment";
+import { buildLeaveAuthorizationContext } from "../authorization";
 import { buildLeaveActionDeliveryIdentity } from "../notifications/notification-payloads";
 import { runSerializableTransaction } from "@/lib/db/transaction";
+
+const authorizationMocks = vi.hoisted(() => ({
+    resolveInTransaction: vi.fn(),
+}));
+
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
+}));
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -29,7 +40,15 @@ type LeaveState = {
 
 type TestTransaction = {
     $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<unknown[]>;
-    user: { findFirst: (args: unknown) => Promise<{ id: number } | null> };
+    user: {
+        findFirst: (args: unknown) => Promise<{
+            id: number;
+            role: string;
+            isActive: boolean;
+            deletedAt: Date | null;
+            employee: { id: number; status: string; deletedAt: Date | null } | null;
+        } | null>;
+    };
     employee: {
         findUnique: (args: unknown) => Promise<unknown>;
         findMany: (args: unknown) => Promise<unknown[]>;
@@ -75,6 +94,7 @@ function createHarness(options: {
             lockedBy = owner;
             return;
         }
+        if (lockedBy === owner) return;
         const waiter = { owner, signal: deferred() };
         waiters.push(waiter);
         await waiter.signal.promise;
@@ -109,7 +129,13 @@ function createHarness(options: {
             return [];
         },
         user: {
-            findFirst: async () => ({ id: owner === "request" ? 10 : 900 }),
+            findFirst: async () => ({
+                id: owner === "request" ? 10 : 1,
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+                employee: { id: 1, status: "ACTIVE", deletedAt: null },
+            }),
         },
         employee: {
             findUnique: async () => ({
@@ -222,6 +248,13 @@ async function createLeaveRequest(harness: ReturnType<typeof createHarness>): Pr
 describe("leave request and manager reassignment serialization", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authorizationMocks.resolveInTransaction.mockResolvedValue({
+            capability: "leave.approver.manage",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
     });
 
     it("lets request creation win, then rejects reassignment on the committed PENDING request", async () => {
@@ -234,7 +267,15 @@ describe("leave request and manager reassignment serialization", () => {
         harness.queueOwner("assignment");
         const assignmentPromise = assignLeaveApprovers(
             [{ employeeId: 10, managerId: 30 }],
-            { userId: 1, email: "admin@thainhf.org" },
+            {
+                userId: 1,
+                email: "admin@thainhf.org",
+                authorization: buildLeaveAuthorizationContext(
+                    { id: 1, role: "ADMIN" },
+                    1,
+                    "DASHBOARD",
+                ),
+            },
         );
         requestCreated.release.resolve();
 
@@ -251,7 +292,15 @@ describe("leave request and manager reassignment serialization", () => {
         harness.queueOwner("assignment");
         const assignmentPromise = assignLeaveApprovers(
             [{ employeeId: 10, managerId: 30 }],
-            { userId: 1, email: "admin@thainhf.org" },
+            {
+                userId: 1,
+                email: "admin@thainhf.org",
+                authorization: buildLeaveAuthorizationContext(
+                    { id: 1, role: "ADMIN" },
+                    1,
+                    "DASHBOARD",
+                ),
+            },
         );
         await assignmentUpdated.signal.promise;
 

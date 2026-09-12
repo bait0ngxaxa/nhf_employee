@@ -3,6 +3,13 @@ import type { Prisma } from "@prisma/client";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { isActiveEmployeeInTransaction } from "@/modules/leave/application/queries/active-employee-session";
 import {
+    assertLeaveCapabilityScope,
+    canUseLeaveAdminRecoveryOverride,
+    resolveLeaveCapabilityInTransaction,
+    type LeaveAuthorizationContext,
+    type LeaveCapabilityAuthorization,
+} from "@/modules/leave/application/authorization";
+import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
 } from "@/modules/leave/domain/approver-eligibility";
@@ -23,7 +30,6 @@ import {
     resolveLeaveExceptionApprover,
     type LeaveExceptionApproverSource,
 } from "@/modules/leave/application/approvals/exception-approver";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
 import {
     createLeaveAuditInTransaction,
@@ -107,6 +113,7 @@ type EmployeeActor = {
     userId: number;
     employeeId: number;
     userEmail?: string;
+    authorization: LeaveAuthorizationContext;
 };
 
 export async function cancelLeaveRequest(
@@ -116,6 +123,20 @@ export async function cancelLeaveRequest(
 ): Promise<LeaveCancellationResult> {
     return runSerializableTransaction(async (tx) => {
         if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
+            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+        }
+        const capabilityAuthorization = assertLeaveCapabilityScope(
+            await resolveLeaveCapabilityInTransaction(
+                tx,
+                actor.authorization,
+                "leave.request.cancel",
+            ),
+            "OWN",
+        );
+        if (
+            capabilityAuthorization.actor.userId !== actor.userId
+            || capabilityAuthorization.actor.employeeId !== actor.employeeId
+        ) {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
         }
 
@@ -291,6 +312,7 @@ export type CancellationDecisionActor = {
     name?: string | null;
     userEmail?: string;
     allowAdminOverride?: boolean;
+    authorization: LeaveAuthorizationContext;
 };
 
 export async function confirmLeaveCancellation(
@@ -299,9 +321,13 @@ export async function confirmLeaveCancellation(
     reason?: string | null,
 ): Promise<LeaveCancellationResult> {
     return runSerializableTransaction(async (tx) => {
-        const authorization = await getCancellationDecisionRequest(tx, actor, leaveId);
-        const leaveRequest = authorization.leaveRequest;
-        const adminOverrideReason = authorization.adminOverride
+        const decision = await getCancellationDecisionRequest(tx, actor, leaveId);
+        const leaveRequest = decision.leaveRequest;
+        const authorizedEmployeeId = decision.authorization.actor.employeeId;
+        if (authorizedEmployeeId === null) {
+            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+        }
+        const adminOverrideReason = decision.adminOverride
             ? requireAdminOverrideReason(reason)
             : null;
         if (!isBeforeLeaveStart(leaveRequest.startDate)) {
@@ -316,7 +342,11 @@ export async function confirmLeaveCancellation(
             where: {
                 id: leaveId,
                 status: "CANCELLATION_REQUESTED",
-                ...getCancellationApproverWhere(actor, leaveRequest, authorization.adminOverride),
+                ...getCancellationApproverWhere(
+                    authorizedEmployeeId,
+                    leaveRequest,
+                    decision.adminOverride,
+                ),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
             },
@@ -365,11 +395,11 @@ export async function confirmLeaveCancellation(
         const payload: LeaveCancelledAfterApprovalPayload = {
             leaveId,
             employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-            decisionActorName: isAdminRole(actor.role)
+            decisionActorName: decision.authorization.actor.systemRole === "ADMIN"
                 ? actor.name ?? null
                 : getExceptionApproverName(leaveRequest),
-            decisionActorRole: actor.role,
-            recoveryOverride: authorization.adminOverride,
+            decisionActorRole: decision.authorization.actor.systemRole,
+            recoveryOverride: decision.adminOverride,
             leaveType: leaveRequest.leaveType,
             startDate: leaveRequest.startDate.toISOString(),
             endDate: leaveRequest.endDate.toISOString(),
@@ -397,7 +427,7 @@ export async function confirmLeaveCancellation(
                     ...buildLeaveAuditContext(leaveRequest, {
                         reason: adminOverrideReason,
                     }),
-                    adminOverride: authorization.adminOverride,
+                    adminOverride: decision.adminOverride,
                     decision: "CONFIRM",
                     originalApproverId: leaveRequest.approverId,
                     exceptionApproverId: leaveRequest.exceptionApproverId,
@@ -423,9 +453,13 @@ export async function rejectLeaveCancellation(
     reason?: string | null,
 ): Promise<LeaveCancellationResult> {
     return runSerializableTransaction(async (tx) => {
-        const authorization = await getCancellationDecisionRequest(tx, actor, leaveId);
-        const leaveRequest = authorization.leaveRequest;
-        const adminOverrideReason = authorization.adminOverride
+        const decision = await getCancellationDecisionRequest(tx, actor, leaveId);
+        const leaveRequest = decision.leaveRequest;
+        const authorizedEmployeeId = decision.authorization.actor.employeeId;
+        if (authorizedEmployeeId === null) {
+            throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+        }
+        const adminOverrideReason = decision.adminOverride
             ? requireAdminOverrideReason(reason)
             : null;
 
@@ -433,7 +467,11 @@ export async function rejectLeaveCancellation(
             where: {
                 id: leaveId,
                 status: "CANCELLATION_REQUESTED",
-                ...getCancellationApproverWhere(actor, leaveRequest, authorization.adminOverride),
+                ...getCancellationApproverWhere(
+                    authorizedEmployeeId,
+                    leaveRequest,
+                    decision.adminOverride,
+                ),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
             },
@@ -461,7 +499,7 @@ export async function rejectLeaveCancellation(
                     ...buildLeaveAuditContext(leaveRequest, {
                         reason: reason ?? null,
                     }),
-                    adminOverride: authorization.adminOverride,
+                    adminOverride: decision.adminOverride,
                     decision: "REJECT",
                     originalApproverId: leaveRequest.approverId,
                     exceptionApproverId: leaveRequest.exceptionApproverId,
@@ -485,8 +523,29 @@ async function getCancellationDecisionRequest(
 ): Promise<{
     leaveRequest: LeaveCancellationRequest;
     adminOverride: boolean;
+    authorization: LeaveCapabilityAuthorization;
 }> {
     if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
+        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
+    }
+
+    const capabilityAuthorization = assertLeaveCapabilityScope(
+        await resolveLeaveCapabilityInTransaction(
+            tx,
+            actor.authorization,
+            "leave.cancellation.decide",
+        ),
+        "ASSIGNED",
+    );
+    const allowAdminOverride = canUseLeaveAdminRecoveryOverride(
+        capabilityAuthorization,
+    );
+    const actorEmployeeId = capabilityAuthorization.actor.employeeId;
+    if (
+        capabilityAuthorization.actor.userId !== actor.userId
+        || actorEmployeeId === null
+        || actorEmployeeId !== actor.employeeId
+    ) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
 
@@ -504,10 +563,8 @@ async function getCancellationDecisionRequest(
     ) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.invalidStatus, 409);
     }
-    const allowAdminOverride = isAdminRole(actor.role)
-        && actor.allowAdminOverride !== false;
     const decisionAuthorization = getLeaveDecisionAuthorization(
-        actor.employeeId,
+        actorEmployeeId,
         allowAdminOverride,
         leaveRequest,
     );
@@ -516,10 +573,18 @@ async function getCancellationDecisionRequest(
     }
     if (allowAdminOverride) {
         if (decisionAuthorization === "ASSIGNED_APPROVER") {
-            return { leaveRequest, adminOverride: false };
+            return {
+                leaveRequest,
+                adminOverride: false,
+                authorization: capabilityAuthorization,
+            };
         }
         if (decisionAuthorization === "ADMIN_OVERRIDE") {
-            return { leaveRequest, adminOverride: true };
+            return {
+                leaveRequest,
+                adminOverride: true,
+                authorization: capabilityAuthorization,
+            };
         }
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
@@ -549,28 +614,32 @@ async function getCancellationDecisionRequest(
     }
 
     const currentApprover = getEffectiveLeaveApprover(leaveRequest);
-    if (getEffectiveLeaveApproverId(leaveRequest) !== actor.employeeId) {
+    if (getEffectiveLeaveApproverId(leaveRequest) !== actorEmployeeId) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
     if (!isActiveLeaveApprover(currentApprover)) {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
 
-    return { leaveRequest, adminOverride: false };
+    return {
+        leaveRequest,
+        adminOverride: false,
+        authorization: capabilityAuthorization,
+    };
 }
 
 function getCancellationApproverWhere(
-    actor: CancellationDecisionActor,
+    actorEmployeeId: number,
     leaveRequest: LeaveCancellationRequest,
     adminOverride: boolean,
 ): Prisma.LeaveRequestWhereInput {
-    const ownerExclusion = { employeeId: { not: actor.employeeId } };
+    const ownerExclusion = { employeeId: { not: actorEmployeeId } };
     if (adminOverride) return ownerExclusion;
     return {
         ...ownerExclusion,
         ...(leaveRequest.exceptionApproverId !== null
-            ? { exceptionApproverId: actor.employeeId }
-            : { approverId: actor.employeeId }),
+            ? { exceptionApproverId: actorEmployeeId }
+            : { approverId: actorEmployeeId }),
     };
 }
 

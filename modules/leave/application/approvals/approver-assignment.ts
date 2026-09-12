@@ -10,6 +10,11 @@ import { defineLeaveAuditDetails } from "@/modules/leave/domain/audit";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { lockEmployeeRows } from "@/modules/leave/infrastructure/persistence/transaction";
 import {
+    assertLeaveCapabilityScope,
+    resolveLeaveCapabilityInTransaction,
+    type LeaveAuthorizationContext,
+} from "@/modules/leave/application/authorization";
+import {
     applyEmployeeManagerChangesInTransaction,
     getEmployeeDisplayName,
 } from "@/modules/employee";
@@ -22,6 +27,7 @@ export type ApproverAssignment = {
 export type ApproverAssignmentActor = {
     userId: number;
     email: string;
+    authorization: LeaveAuthorizationContext;
 };
 
 export class ApproverAssignmentError extends Error {
@@ -144,6 +150,20 @@ export async function assignLeaveApprovers(
     }
 
     await runSerializableTransaction(async (tx) => {
+        const capabilityAuthorization = assertLeaveCapabilityScope(
+            await resolveLeaveCapabilityInTransaction(
+                tx,
+                actor.authorization,
+                "leave.approver.manage",
+            ),
+            "ALL",
+        );
+        if (capabilityAuthorization.actor.userId !== actor.userId) {
+            throw new ApproverAssignmentError(
+                "คุณไม่มีสิทธิ์ดำเนินการ",
+                403,
+            );
+        }
         await lockEmployeeRows(tx, [...employeeIds].sort((left, right) => left - right));
 
         const managerIds = assignments.flatMap(({ managerId }) =>

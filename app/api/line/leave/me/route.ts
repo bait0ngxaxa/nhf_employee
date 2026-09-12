@@ -2,14 +2,17 @@ import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
+    assertLeaveCapabilityForMigration,
+    buildLeaveAuthorizationContext,
     getEmployeeLeaveActions,
     getEmployeeLeaveProfile,
+    LeaveCapabilityDeniedError,
     parseEmployeeLeaveHistoryFilters,
     toLiffEmployeeLeaveRequest,
     toLiffLeaveQuota,
 } from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
-import { jsonError, notFound, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, notFound, serverError } from "@/lib/ssot/http";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 const LIFF_LEAVE_PAGE_SIZE = 10;
@@ -33,6 +36,16 @@ export async function GET(request: Request): Promise<NextResponse> {
         const filters = parseEmployeeLeaveHistoryFilters(url);
         if (!filters.success) return jsonError(filters.error, 400);
 
+        const authorization = buildLeaveAuthorizationContext(
+            auth.user,
+            auth.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        await assertLeaveCapabilityForMigration(
+            authorization,
+            "leave.request.read",
+        );
+
         const profile = await getEmployeeLeaveProfile({
             employeeId: auth.employeeId,
             page,
@@ -48,6 +61,9 @@ export async function GET(request: Request): Promise<NextResponse> {
             metadata: profile.metadata,
         });
     } catch (error) {
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching LIFF leave profile", {
             errorType: error instanceof Error ? error.name : "UnknownError",
         });

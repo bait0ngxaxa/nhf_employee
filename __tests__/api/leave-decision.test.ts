@@ -7,6 +7,11 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
 
+const authorizationMocks = vi.hoisted(() => ({
+    resolve: vi.fn(),
+    resolveInTransaction: vi.fn(),
+}));
+
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
     return {
@@ -24,6 +29,13 @@ vi.mock("@/lib/auth/api", () => ({
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
+}));
+
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: authorizationMocks.resolve,
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -58,9 +70,26 @@ vi.mock("@/lib/db/prisma", () => ({
     },
 }));
 
+function activeAuthorizationUser(id: number): never {
+    return {
+        id,
+        role: "USER",
+        isActive: true,
+        deletedAt: null,
+        employee: { id, status: "ACTIVE", deletedAt: null },
+    } as never;
+}
+
 describe("POST /api/leave/decision", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authorizationMocks.resolveInTransaction.mockResolvedValue({
+            capability: "leave.request.approve",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
         vi.mocked(requireApiSession).mockResolvedValue({
             ok: true,
             session: {
@@ -83,7 +112,7 @@ describe("POST /api/leave/decision", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 20 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(20));
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue(null);
         vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);

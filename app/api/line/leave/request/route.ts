@@ -3,6 +3,7 @@ import { after, type NextRequest, type NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     assertLeaveRequestBodySize,
+    buildLeaveAuthorizationContext,
     createLeaveRequestErrorResponse,
     handleLeaveRequestSubmission,
     toLiffLeaveMutationResponse,
@@ -54,6 +55,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             userId: auth.user.id,
             employeeId: auth.employeeId,
             userEmail: auth.user.email,
+            authorization: buildLeaveAuthorizationContext(
+                auth.user,
+                auth.employeeId,
+                "LIFF_SELF_SERVICE",
+            ),
         },
         API_ROUTES.line.leaveAttachmentById,
         toLiffLeaveMutationResponse,

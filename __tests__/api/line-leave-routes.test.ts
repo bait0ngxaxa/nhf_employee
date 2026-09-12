@@ -263,7 +263,19 @@ describe("LIFF Leave route adapters", () => {
         expect(response.status).toBe(201);
         expect(mocks.handleLeaveRequestSubmission).toHaveBeenCalledWith(
             nextRequest,
-            { userId: 7, employeeId: 31, userEmail: "admin@example.com" },
+            {
+                userId: 7,
+                employeeId: 31,
+                userEmail: "admin@example.com",
+                authorization: {
+                    authorizationActor: {
+                        userId: 7,
+                        employeeId: 31,
+                        systemRole: "ADMIN",
+                        channel: "LIFF_SELF_SERVICE",
+                    },
+                },
+            },
             API_ROUTES.line.leaveAttachmentById,
             expect.any(Function),
             expect.any(Function),
@@ -354,7 +366,17 @@ describe("LIFF Leave route adapters", () => {
         );
         expect(mocks.handleLeaveNotTakenConfirmation).toHaveBeenCalledWith(
             notTakenRequest,
-            AUTH,
+            expect.objectContaining({
+                ...AUTH,
+                authorization: {
+                    authorizationActor: {
+                        userId: 7,
+                        employeeId: 31,
+                        systemRole: "ADMIN",
+                        channel: "LIFF_SELF_SERVICE",
+                    },
+                },
+            }),
             {
                 allowAdminOverride: false,
                 serializeResponse: expect.any(Function),

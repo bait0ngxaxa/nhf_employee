@@ -7,6 +7,11 @@ import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
 
+const authorizationMocks = vi.hoisted(() => ({
+    resolve: vi.fn(),
+    resolveInTransaction: vi.fn(),
+}));
+
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
     return { ...actual, after: vi.fn((callback) => callback()) };
@@ -14,6 +19,12 @@ vi.mock("next/server", async (importOriginal) => {
 
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: vi.fn() }));
 vi.mock("@/lib/services/outbox/processor", () => ({ processOutbox: vi.fn() }));
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: authorizationMocks.resolve,
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
+}));
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
@@ -32,6 +43,19 @@ vi.mock("@/lib/db/prisma", () => ({
         auditLog: { create: vi.fn() },
     },
 }));
+
+function activeAuthorizationUser(
+    id: number,
+    role: "ADMIN" | "USER" = "USER",
+): never {
+    return {
+        id,
+        role,
+        isActive: true,
+        deletedAt: null,
+        employee: { id, status: "ACTIVE", deletedAt: null },
+    } as never;
+}
 
 function buildCancellationRequest(
     overrides: Record<string, unknown> = {},
@@ -94,6 +118,20 @@ function buildCancellationRequest(
 describe("POST /api/leave/cancel", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authorizationMocks.resolve.mockResolvedValue({
+            capability: "leave.request.cancel",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+        authorizationMocks.resolveInTransaction.mockResolvedValue({
+            capability: "leave.request.cancel",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
         vi.mocked(requireApiSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "10", email: "employee@example.com", name: "Employee", role: "USER" } },
@@ -103,7 +141,7 @@ describe("POST /api/leave/cancel", () => {
             isActive: true,
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 10 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(10));
         vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
         vi.mocked(prisma.employee.findMany).mockResolvedValue([] as never);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
@@ -402,7 +440,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 20 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(20));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-confirm",
             employeeId: 10,
@@ -510,7 +548,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 30, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 30 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(30));
         vi.mocked(prisma.employee.findUnique).mockResolvedValue({
             manager: {
                 id: 30,
@@ -615,6 +653,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(20));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-expired-confirm",
             employeeId: 10,
@@ -663,6 +702,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(20));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
@@ -728,6 +768,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(20));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest({
             startDate: new Date("2000-01-10T00:00:00.000Z"),
         }));
@@ -770,8 +811,10 @@ describe("POST /api/leave/cancel", () => {
                 employee: { id: 10, status: "ACTIVE", deletedAt: null },
             } as never);
         vi.mocked(prisma.user.findFirst)
-            .mockResolvedValueOnce({ id: 20 } as never)
-            .mockResolvedValueOnce({ id: 10 } as never);
+            .mockResolvedValueOnce(activeAuthorizationUser(20))
+            .mockResolvedValueOnce(activeAuthorizationUser(20))
+            .mockResolvedValueOnce(activeAuthorizationUser(10))
+            .mockResolvedValueOnce(activeAuthorizationUser(10));
         vi.mocked(prisma.leaveRequest.findUnique)
             .mockResolvedValueOnce(buildCancellationRequest({
                 startDate: new Date("2000-01-10T00:00:00.000Z"),
@@ -834,7 +877,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 30, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 30 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(30));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
 
         const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
@@ -873,7 +916,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
             buildCancellationRequest({
                 employeeId: 99,
@@ -915,7 +958,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
 
         const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
@@ -943,7 +986,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
             buildCancellationRequest({
                 approverId: 99,
@@ -1001,7 +1044,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
             buildCancellationRequest({
                 approver: {
@@ -1061,7 +1104,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
             buildCancellationRequest({
                 approver: {
@@ -1100,6 +1143,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(20));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
         vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
             ...buildCancellationRequest(),
@@ -1136,7 +1180,7 @@ describe("POST /api/leave/cancel", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
             buildCancellationRequest({
                 id: "leave-confirm",

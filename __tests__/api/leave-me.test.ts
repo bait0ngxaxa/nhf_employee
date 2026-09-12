@@ -3,10 +3,21 @@ import { GET as getLeaveProfile } from "@/app/api/leave/me/route";
 import { getApiAuthSession, type ApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 
+const authorizationMocks = vi.hoisted(() => ({
+    resolve: vi.fn(),
+    resolveInTransaction: vi.fn(),
+}));
+
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
 }));
 
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: authorizationMocks.resolve,
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
+}));
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -43,6 +54,13 @@ describe("GET /api/leave/me", () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-12-31T17:30:00.000Z"));
         vi.mocked(getApiAuthSession).mockResolvedValue(MOCK_SESSION);
+        authorizationMocks.resolve.mockResolvedValue({
+            capability: "leave.request.read",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             employee: { id: 100, status: "ACTIVE", deletedAt: null },

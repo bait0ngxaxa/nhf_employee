@@ -5,10 +5,6 @@ import { prisma } from "@/lib/db/prisma";
 import {
     runSerializableTransaction,
 } from "@/lib/db/transaction";
-import {
-    isActiveEmployeeInTransaction,
-    isEmployeeInTransaction,
-} from "@/modules/leave/application/queries/active-employee-session";
 import { isActiveLeaveApprover } from "@/modules/leave/domain/approver-eligibility";
 import { buildCreatedLeaveRequestAuditDetails } from "@/modules/leave/application/requests/create-request-audit";
 import {
@@ -47,6 +43,15 @@ import {
     isLeaveRequestIdempotencyConflict,
 } from "@/modules/leave/application/requests/idempotency";
 import { createLeaveAuditInTransaction } from "@/modules/leave/infrastructure/persistence/transaction";
+import {
+    assertLeaveCapabilityScope,
+    resolveLeaveCapabilityInTransaction,
+    type LeaveAuthorizationContext,
+} from "@/modules/leave/application/authorization";
+import {
+    isActiveEmployeeInTransaction,
+    isEmployeeInTransaction,
+} from "@/modules/leave/application/queries/active-employee-session";
 
 interface PreparedLeaveRequest {
     payload: LeaveRequestValues;
@@ -59,6 +64,21 @@ interface PreparedLeaveRequest {
     specialReason: string | null;
 }
 
+async function assertActiveRequester(
+    tx: Prisma.TransactionClient,
+    input: CreateLeaveRequestInput,
+): Promise<void> {
+    if (!await isActiveEmployeeInTransaction(tx, input.userId, input.employeeId)) {
+        const employeeExists = await isEmployeeInTransaction(tx, input.employeeId);
+        throw new LeaveRequestError(
+            employeeExists
+                ? COMMON_API_MESSAGES.forbidden
+                : LEAVE_REQUEST_MESSAGES.employeeNotFound,
+            employeeExists ? 403 : 404,
+        );
+    }
+}
+
 export interface CreateLeaveRequestInput {
     id: string;
     userId: number;
@@ -67,6 +87,7 @@ export interface CreateLeaveRequestInput {
     idempotencyKey: string;
     payload: LeaveRequestValues;
     attachments: readonly StoredLeaveAttachment[];
+    authorization: LeaveAuthorizationContext;
 }
 
 export interface CreatedLeaveRequestResult {
@@ -100,21 +121,6 @@ function prepareLeaveRequest(payload: LeaveRequestValues): PreparedLeaveRequest 
         emergencyReason: payload.emergencyReason?.trim() || null,
         specialReason: payload.specialReason?.trim() || null,
     };
-}
-
-async function assertActiveRequester(
-    tx: Prisma.TransactionClient,
-    input: CreateLeaveRequestInput,
-): Promise<void> {
-    if (!await isActiveEmployeeInTransaction(tx, input.userId, input.employeeId)) {
-        const employeeExists = await isEmployeeInTransaction(tx, input.employeeId);
-        throw new LeaveRequestError(
-            employeeExists
-                ? COMMON_API_MESSAGES.forbidden
-                : LEAVE_REQUEST_MESSAGES.employeeNotFound,
-            employeeExists ? 403 : 404,
-        );
-    }
 }
 
 async function getEligibleEmployee(
@@ -258,6 +264,20 @@ async function createInTransaction(
     requestHash: string,
 ): Promise<CreatedLeaveRequestResult> {
     await assertActiveRequester(tx, input);
+    const authorization = assertLeaveCapabilityScope(
+        await resolveLeaveCapabilityInTransaction(
+            tx,
+            input.authorization,
+            "leave.request.create",
+        ),
+        "OWN",
+    );
+    if (
+        authorization.actor.userId !== input.userId
+        || authorization.actor.employeeId !== input.employeeId
+    ) {
+        throw new LeaveRequestError(COMMON_API_MESSAGES.forbidden, 403);
+    }
     const replayedRequest = await findReplayedLeaveRequest(tx, input, requestHash);
     if (replayedRequest) {
         return { request: replayedRequest, replayed: true };

@@ -7,6 +7,11 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 import type * as NextServerModule from "next/server";
 
+const authorizationMocks = vi.hoisted(() => ({
+    resolve: vi.fn(),
+    resolveInTransaction: vi.fn(),
+}));
+
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
     return {
@@ -24,6 +29,13 @@ vi.mock("@/lib/auth/server", () => ({
 
 vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
+}));
+
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: authorizationMocks.resolve,
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -59,9 +71,30 @@ vi.mock("@/lib/db/prisma", () => ({
     },
 }));
 
+function activeAuthorizationUser(
+    id: number,
+    employeeId: number = id,
+    role: "ADMIN" | "USER" = "USER",
+): never {
+    return {
+        id,
+        role,
+        isActive: true,
+        deletedAt: null,
+        employee: { id: employeeId, status: "ACTIVE", deletedAt: null },
+    } as never;
+}
+
 describe("/api/leave/not-taken", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authorizationMocks.resolveInTransaction.mockResolvedValue({
+            capability: "leave.request.not_taken",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: {
                 id: "1",
@@ -75,7 +108,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(1, 10));
         vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
         vi.mocked(prisma.employee.findMany).mockResolvedValue([{
             id: 99,
@@ -368,6 +401,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(1, 20));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-2",
             employeeId: 10,
@@ -507,7 +541,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, 99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-admin-recovery",
             employeeId: 10,
@@ -648,7 +682,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, 99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-admin-recovery-no-reason",
             employeeId: 10,
@@ -690,7 +724,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, 99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-admin-owner",
             employeeId: 99,
@@ -736,7 +770,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, 99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-active-manager",
             employeeId: 10,
@@ -787,7 +821,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 99, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 99 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, 99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-assigned-admin",
             employeeId: 10,
@@ -866,7 +900,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 30, status: "ACTIVE", deletedAt: null },
         } as never);
-        vi.mocked(prisma.user.findFirst).mockResolvedValue({ id: 30 } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(30));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-recovery",
             employeeId: 10,
@@ -906,6 +940,7 @@ describe("/api/leave/not-taken", () => {
             deletedAt: null,
             employee: { id: 20, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(1, 20));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-3",
             employeeId: 10,

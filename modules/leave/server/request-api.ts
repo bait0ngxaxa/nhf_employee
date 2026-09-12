@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
+    assertLeaveCapabilityForMigration,
+    LeaveCapabilityDeniedError,
+    type LeaveAuthorizationContext,
+} from "@/modules/leave/application/authorization";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
+import {
     createLeaveRequest,
     LeaveRequestError,
     LeaveRequestIdempotencyConflictError,
@@ -33,6 +39,7 @@ export interface LeaveRequestActor {
     userId: number;
     employeeId: number;
     userEmail: string;
+    authorization: LeaveAuthorizationContext;
 }
 
 export type LeaveRequestResponseSerializer = (
@@ -78,6 +85,12 @@ function createErrorResponse(error: unknown): NextResponse {
             code: LEAVE_REQUEST_IDEMPOTENCY_CONFLICT_CODE,
         });
     }
+    if (error instanceof LeaveCapabilityDeniedError) {
+        return jsonError("คุณไม่มีสิทธิ์ดำเนินการ", error.statusCode);
+    }
+    if (error instanceof WorkforceAuthorizationError) {
+        return jsonError(COMMON_API_MESSAGES.forbidden, 403);
+    }
     if (error instanceof LeaveRequestError) {
         return jsonError(error.message, error.statusCode);
     }
@@ -112,6 +125,10 @@ export async function handleLeaveRequestSubmission(
     let storedAttachments: StoredLeaveAttachment[] = [];
     let transactionCommitted = false;
     try {
+        await assertLeaveCapabilityForMigration(
+            actor.authorization,
+            "leave.request.create",
+        );
         const input = await parseLeaveRequestInput(request);
         const parsedIdempotencyKey = idempotencyKeySchema.safeParse(
             request.headers.get("Idempotency-Key"),
@@ -130,6 +147,7 @@ export async function handleLeaveRequestSubmission(
             userId: actor.userId,
             userEmail: actor.userEmail,
             employeeId: actor.employeeId,
+            authorization: actor.authorization,
             idempotencyKey: parsedIdempotencyKey.data,
             payload: input.payload,
             attachments: storedAttachments,

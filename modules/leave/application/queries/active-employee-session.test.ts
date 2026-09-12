@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isActiveEmployeeInTransaction } from "./active-employee-session";
 
 describe("active employee transaction guards", () => {
-    it("locks and checks the employee inside the transaction", async () => {
+    it("locks the user and employee before checking the workforce identity", async () => {
         const tx = {
             $queryRaw: vi.fn().mockResolvedValue([{ id: 10 }]),
             user: {
@@ -15,7 +15,7 @@ describe("active employee transaction guards", () => {
         };
 
         await expect(isActiveEmployeeInTransaction(tx as never, 10, 10)).resolves.toBe(true);
-        expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+        expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
         expect(tx.user.findFirst).toHaveBeenCalledTimes(1);
     });
 

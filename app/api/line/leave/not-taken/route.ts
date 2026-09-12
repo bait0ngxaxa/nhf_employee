@@ -2,6 +2,7 @@ import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
+    buildLeaveAuthorizationContext,
     enforceLeaveJsonBodySize,
     handleLeaveNotTakenConfirmation,
     handleLeaveNotTakenRequest,
@@ -67,7 +68,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!authorization.ok) return authorization.response;
     return handleLeaveNotTakenRequest(
         req,
-        authorization.auth,
+        {
+            ...authorization.auth,
+            authorization: buildLeaveAuthorizationContext(
+                authorization.auth.user,
+                authorization.auth.employeeId,
+                "LIFF_SELF_SERVICE",
+            ),
+        },
         toLiffLeaveMutationResponse,
         scheduleLeaveOutbox,
     );
@@ -76,7 +84,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 export async function PUT(req: NextRequest): Promise<NextResponse> {
     const authorization = await authorizeMutation(req);
     if (!authorization.ok) return authorization.response;
-    return handleLeaveNotTakenConfirmation(req, authorization.auth, {
+    return handleLeaveNotTakenConfirmation(req, {
+        ...authorization.auth,
+        authorization: buildLeaveAuthorizationContext(
+            authorization.auth.user,
+            authorization.auth.employeeId,
+            "LIFF_SELF_SERVICE",
+        ),
+    }, {
         allowAdminOverride: false,
         serializeResponse: toLiffLeaveMutationResponse,
         scheduleOutbox: scheduleLeaveNotTakenConfirmationOutbox,

@@ -5,8 +5,20 @@ import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import { getAssignedLeaveApproverWhere } from "@/modules/leave";
 
+const authorizationMocks = vi.hoisted(() => ({
+    resolve: vi.fn(),
+    resolveInTransaction: vi.fn(),
+}));
+
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: vi.fn(),
+}));
+
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: authorizationMocks.resolve,
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -71,10 +83,17 @@ function createLeaveRequest(
 describe("GET /api/leave/approvals", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authorizationMocks.resolve.mockResolvedValue({
+            capability: "leave.approval.read",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 200,
-            user: { role: "USER" },
+            user: { id: 200, role: "USER" },
         } as never);
         vi.mocked(prisma.leaveRequest.findMany)
             .mockResolvedValueOnce([createLeaveRequest("pending-1", "PENDING")] as never)

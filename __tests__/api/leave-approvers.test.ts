@@ -2,14 +2,27 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET, PUT } from "@/app/api/leave/approvers/route";
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import {
     ApproverAssignmentError,
     assignLeaveApprovers,
 } from "@/modules/leave";
 
-vi.mock("@/lib/auth/api", () => ({ requireAdminSession: vi.fn() }));
+const authorizationMocks = vi.hoisted(() => ({
+    resolve: vi.fn(),
+    resolveInTransaction: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/workforce", () => ({
+    requireActiveWorkforceOrAdminSession: vi.fn(),
+}));
+vi.mock("@/modules/authorization", () => ({
+    authorization: {
+        resolve: authorizationMocks.resolve,
+        resolveInTransaction: authorizationMocks.resolveInTransaction,
+    },
+}));
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         employee: { findMany: vi.fn() },
@@ -54,10 +67,18 @@ const ACTIVE_EMPLOYEE = {
 describe("GET /api/leave/approvers", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(requireAdminSession).mockResolvedValue({
+        authorizationMocks.resolve.mockResolvedValue({
+            capability: "leave.approver.manage",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "1", role: "ADMIN" } },
             user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+            employeeId: 1,
         });
         vi.mocked(prisma.employee.findMany).mockResolvedValue([ACTIVE_EMPLOYEE] as never);
     });
@@ -91,10 +112,18 @@ describe("GET /api/leave/approvers", () => {
 describe("PUT /api/leave/approvers", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(requireAdminSession).mockResolvedValue({
+        authorizationMocks.resolve.mockResolvedValue({
+            capability: "leave.approver.manage",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "1", role: "ADMIN" } },
             user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+            employeeId: 1,
         });
         vi.mocked(assignLeaveApprovers).mockResolvedValue(undefined);
     });
@@ -108,7 +137,18 @@ describe("PUT /api/leave/approvers", () => {
         expect(response.status).toBe(200);
         expect(assignLeaveApprovers).toHaveBeenCalledWith(
             [{ employeeId: 10, managerId: 20 }],
-            { userId: 1, email: "admin@example.com" },
+            {
+                userId: 1,
+                email: "admin@example.com",
+                authorization: {
+                    authorizationActor: {
+                        userId: 1,
+                        employeeId: 1,
+                        systemRole: "ADMIN",
+                        channel: "DASHBOARD",
+                    },
+                },
+            },
         );
     });
 
