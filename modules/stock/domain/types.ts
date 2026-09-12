@@ -16,8 +16,10 @@ export type ItemVariantSeed = {
     isActive: boolean;
 };
 
+export type StockCancellationNotificationMode = "REQUESTER" | "PROCESSOR";
+
 export type CancelRequestOptions = {
-    isAdmin: boolean;
+    readonly notificationMode?: StockCancellationNotificationMode;
 };
 
 export type StockCommandActor = {

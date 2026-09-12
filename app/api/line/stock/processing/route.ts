@@ -2,12 +2,15 @@ import { StockRequestStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import {
+    buildStockAuthorizationContext,
+    resolveStockCapabilityForMigration,
+    StockCapabilityDeniedError,
     requireLiffStockProcessorSession,
     stockService,
     toLiffStockRequestsResponse,
     stockRequestsFilterSchema,
 } from "@/modules/stock";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 
 export async function GET(request: Request): Promise<NextResponse> {
     const auth = await requireLiffStockProcessorSession();
@@ -27,14 +30,47 @@ export async function GET(request: Request): Promise<NextResponse> {
             });
         }
 
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            auth.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        const processAuthorization = await resolveStockCapabilityForMigration(
+            authorization,
+            "stock.request.process",
+            { requestedScope: "all" },
+        );
+        let canCancel = false;
+        try {
+            const cancelAuthorization =
+                await resolveStockCapabilityForMigration(
+                    authorization,
+                    "stock.request.cancel",
+                    { requestedScope: "all" },
+                );
+            canCancel = cancelAuthorization.scopes.includes("ALL");
+        } catch (error) {
+            if (!(error instanceof StockCapabilityDeniedError)) throw error;
+        }
         const result = await stockService.getRequests(
             parsed.data,
-            auth.user.id,
-            true,
+            {
+                userId: processAuthorization.actor.userId,
+                scopes: processAuthorization.scopes,
+            },
             "all",
         );
-        return NextResponse.json(toLiffStockRequestsResponse(result, "PROCESSOR"));
+        return NextResponse.json(
+            toLiffStockRequestsResponse(
+                result,
+                "PROCESSOR",
+                { canIssue: true, canCancel },
+            ),
+        );
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching LIFF stock processing queue", {
             errorType: error instanceof Error ? error.name : "UnknownError",
         });

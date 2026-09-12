@@ -3,14 +3,16 @@ import {
     requireActiveWorkforceOrAdminSession,
     requireActiveWorkforceSession,
 } from "@/lib/auth/workforce";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     createRequestSchema,
     createStockCommandActor,
     idempotencyKeySchema,
     omitStockRequestIdempotency,
     readStockJsonBody,
+    StockCapabilityDeniedError,
     stockService,
     StockRequestIdempotencyConflictError,
     stockRequestsFilterSchema,
@@ -32,7 +34,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const { searchParams } = new URL(request.url);
         const scopeParam = searchParams.get("scope");
         const scope = scopeParam === "all" ? "all" : "mine";
-        const isAdmin = isAdminRole(user.role);
+        const authorization = buildStockAuthorizationContext(
+            user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
 
         const parsed = stockRequestsFilterSchema.safeParse({
             status: searchParams.get("status"),
@@ -47,14 +53,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             });
         }
 
+        const capabilityAuthorization =
+            await assertStockCapabilityForMigration(
+                authorization,
+                "stock.request.read",
+                { requestedScope: scope },
+            );
+
         const result = await stockService.getRequests(
             parsed.data,
-            user.id,
-            isAdmin,
+            {
+                userId: capabilityAuthorization.actor.userId,
+                scopes: capabilityAuthorization.scopes,
+            },
             scope,
         );
         return NextResponse.json(result);
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching stock requests:", error);
         return serverError();
     }
@@ -98,7 +116,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             );
         if (principalRateLimitResponse) return principalRateLimitResponse;
 
-        const actor = createStockCommandActor(user, request.headers);
+        const authorization = buildStockAuthorizationContext(
+            user,
+            auth.employeeId,
+            "DASHBOARD",
+        );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.request.create",
+            { requestedScope: "mine" },
+        );
+        const actor = createStockCommandActor(
+            user,
+            request.headers,
+            authorization,
+        );
         const creation = await stockService.createRequest(
             result.data,
             actor,
@@ -118,6 +150,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: creation.replayed ? 200 : 201 },
         );
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         if (error instanceof WorkforceAuthorizationError) {
             return jsonError(error.message, 403);
         }

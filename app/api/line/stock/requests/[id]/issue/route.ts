@@ -1,9 +1,12 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     createStockCommandActor,
     executeIssueStockRequest,
     requireLiffStockProcessorSession,
+    StockCapabilityDeniedError,
 } from "@/modules/stock";
 import {
     enforceStockJsonBodySize,
@@ -14,7 +17,7 @@ import {
     enforcePreAuthIpRateLimit,
 } from "@/lib/security/mutation-rate-limit";
 import { processOutbox } from "@/lib/services/outbox/processor";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
     issueRequestSchema,
     stockRequestIdParamSchema,
@@ -40,6 +43,16 @@ export async function POST(
 
         const auth = await requireLiffStockProcessorSession();
         if (!auth.ok) return auth.response;
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            auth.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.request.process",
+            { requestedScope: "all" },
+        );
         const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
             "stock-request-issue",
             auth.user.id,
@@ -59,7 +72,11 @@ export async function POST(
 
         await executeIssueStockRequest({
             requestId: parsedId.data,
-            actor: createStockCommandActor(auth.user, request.headers),
+            actor: createStockCommandActor(
+                auth.user,
+                request.headers,
+                authorization,
+            ),
         });
         after(() => {
             processOutbox().catch((error) =>
@@ -68,6 +85,9 @@ export async function POST(
         });
         return NextResponse.json({ success: true });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         if (error instanceof SyntaxError) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400);
         }

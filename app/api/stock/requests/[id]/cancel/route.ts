@@ -1,13 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { isAdminRole } from "@/lib/ssot/permissions";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     cancelRequestSchema,
     createStockCommandActor,
     enforceStockJsonBodySize,
     executeCancelStockRequest,
     readStockJsonBody,
+    StockCapabilityDeniedError,
 } from "@/modules/stock";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
@@ -44,7 +46,17 @@ export async function POST(
             );
         if (principalRateLimitResponse) return principalRateLimitResponse;
 
-        const isAdmin = isAdminRole(user.role);
+        const authorization = buildStockAuthorizationContext(
+            user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
+        const capabilityAuthorization =
+            await assertStockCapabilityForMigration(
+                authorization,
+                "stock.request.cancel",
+                { requestedScope: "all" },
+            );
 
         const { id } = await params;
         const requestId = Number(id);
@@ -63,13 +75,24 @@ export async function POST(
 
         const updated = await executeCancelStockRequest({
             requestId,
-            actor: createStockCommandActor(user, request.headers),
+            actor: createStockCommandActor(
+                user,
+                request.headers,
+                authorization,
+            ),
             reason: parsed.data.cancelReason,
-            options: { isAdmin },
+            options: {
+                notificationMode: capabilityAuthorization.isAdministrative
+                    ? "PROCESSOR"
+                    : "REQUESTER",
+            },
         });
 
         return NextResponse.json({ request: updated });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         if (error instanceof WorkforceAuthorizationError) {
             return jsonError(error.message, 403);
         }
@@ -79,7 +102,9 @@ export async function POST(
             message.includes("ดำเนินการแล้ว") ||
             message.includes("ไม่มีสิทธิ์")
         ) {
-            return jsonError(message, 400);
+            return message.includes("ไม่มีสิทธิ์")
+                ? forbidden()
+                : jsonError(message, 400);
         }
 
         console.error("Error cancelling stock request:", error);

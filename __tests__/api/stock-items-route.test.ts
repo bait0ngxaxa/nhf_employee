@@ -7,8 +7,16 @@ import {
 } from "@/app/api/stock/items/[id]/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { isAdminRole } from "@/lib/ssot/permissions";
-import { stockService } from "@/modules/stock";
+import {
+    stockService,
+    StockCapabilityDeniedError,
+} from "@/modules/stock";
+
+const stockAuthorizationMock = vi.hoisted(() => ({
+    assert: vi.fn(),
+}));
 
 vi.mock("@/lib/auth/server", () => ({
     getApiAuthSession: vi.fn(),
@@ -22,12 +30,17 @@ vi.mock("@/lib/ssot/permissions", () => ({
     isAdminRole: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/workforce", () => ({
+    requireActiveWorkforceOrAdminSession: vi.fn(),
+}));
+
 vi.mock("@/modules/stock", async () => {
     const actual = await vi.importActual<typeof StockModule>(
         "@/modules/stock",
     );
     return {
         ...actual,
+        assertStockCapabilityForMigration: stockAuthorizationMock.assert,
         stockService: {
             ...actual.stockService,
             updateItem: vi.fn(),
@@ -55,12 +68,39 @@ function mockAdmin(): void {
         name: "Admin",
     });
     vi.mocked(isAdminRole).mockReturnValue(true);
+    vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        ok: true,
+        user: {
+            id: 1,
+            email: "admin@test.com",
+            role: "ADMIN",
+            name: "Admin",
+        },
+    } as never);
 }
 
 describe("Stock Item Routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockAdmin();
+        stockAuthorizationMock.assert.mockResolvedValue({
+            actor: {
+                userId: 1,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+            capability: "stock.inventory.manage",
+            decision: {
+                capability: "stock.inventory.manage",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [],
+            },
+            scopes: ["ALL"],
+            isAdministrative: true,
+            usedMigrationCompatibility: false,
+        });
     });
 
     it("passes request audit context when updating an item", async () => {
@@ -155,5 +195,82 @@ describe("Stock Item Routes", () => {
             }),
             "STOCK_ITEM_DELETE",
         );
+    });
+
+    it("denies a normal USER without the inventory grant", async () => {
+        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+            ok: true,
+            user: {
+                id: 2,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            },
+            employeeId: 20,
+        } as never);
+        stockAuthorizationMock.assert.mockRejectedValueOnce(
+            new StockCapabilityDeniedError(
+                "stock.inventory.manage",
+                "NO_APPLICABLE_GRANT",
+            ),
+        );
+
+        const response = await patchItemRoute(
+            new NextRequest("http://localhost/api/stock/items/42", {
+                method: "PATCH",
+                body: JSON.stringify({ name: "ปากกาใหม่" }),
+            }),
+            { params: Promise.resolve({ id: "42" }) },
+        );
+
+        expect(response.status).toBe(403);
+        expect(stockService.updateItem).not.toHaveBeenCalled();
+    });
+
+    it("allows an explicitly granted USER to reach the inventory operation", async () => {
+        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+            ok: true,
+            user: {
+                id: 2,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            },
+            employeeId: 20,
+        } as never);
+        stockAuthorizationMock.assert.mockResolvedValueOnce({
+            actor: {
+                userId: 2,
+                employeeId: 20,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            capability: "stock.inventory.manage",
+            decision: {
+                capability: "stock.inventory.manage",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [{
+                    capability: "stock.inventory.manage",
+                    scope: "ALL",
+                    source: { type: "USER", userId: 2 },
+                }],
+            },
+            scopes: ["ALL"],
+            isAdministrative: false,
+            usedMigrationCompatibility: false,
+        });
+        vi.mocked(stockService.updateItem).mockResolvedValue(updatedItem as never);
+
+        const response = await patchItemRoute(
+            new NextRequest("http://localhost/api/stock/items/42", {
+                method: "PATCH",
+                body: JSON.stringify({ name: "ปากกาใหม่" }),
+            }),
+            { params: Promise.resolve({ id: "42" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(stockService.updateItem).toHaveBeenCalledTimes(1);
     });
 });

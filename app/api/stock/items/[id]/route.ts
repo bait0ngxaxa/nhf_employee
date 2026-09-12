@@ -1,9 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { requireAdminSession } from "@/lib/auth/api";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     createStockCommandActor,
+    StockCapabilityDeniedError,
     stockService,
     updateItemSchema,
 } from "@/modules/stock";
@@ -17,7 +20,7 @@ export async function PATCH(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const { id } = await params;
@@ -32,10 +35,26 @@ export async function PATCH(
             });
         }
 
-        const actor = createStockCommandActor(auth.user, request.headers);
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.inventory.manage",
+        );
+        const actor = createStockCommandActor(
+            auth.user,
+            request.headers,
+            authorization,
+        );
         const item = await stockService.updateItem(itemId, result.data, actor);
         return NextResponse.json({ item });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("พบรายการย่อยไม่ถูกต้อง") ||
@@ -74,14 +93,27 @@ export async function DELETE(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const { id } = await params;
         const itemId = Number(id);
         if (isNaN(itemId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
-        const actor = createStockCommandActor(auth.user, request.headers);
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.inventory.manage",
+        );
+        const actor = createStockCommandActor(
+            auth.user,
+            request.headers,
+            authorization,
+        );
         await stockService.updateItem(
             itemId,
             { isActive: false },
@@ -90,6 +122,9 @@ export async function DELETE(
         );
         return NextResponse.json({ success: true });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         const message = error instanceof Error ? error.message : "";
         if (message.includes("คำขอรอจ่าย")) {
             return jsonError(message, 409);

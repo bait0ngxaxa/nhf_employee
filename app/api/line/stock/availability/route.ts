@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
-import { stockService } from "@/modules/stock";
-import { jsonError, serverError } from "@/lib/ssot/http";
-import { stockVariantAvailabilityQuerySchema } from "@/modules/stock";
+import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
+    StockCapabilityDeniedError,
+    stockService,
+    stockVariantAvailabilityQuerySchema,
+} from "@/modules/stock";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 
 export async function GET(request: Request): Promise<NextResponse> {
     const auth = await requireLiffWorkforceSession();
@@ -20,11 +25,22 @@ export async function GET(request: Request): Promise<NextResponse> {
             });
         }
 
+        await assertStockCapabilityForMigration(
+            buildStockAuthorizationContext(
+                auth.user,
+                auth.employeeId,
+                "LIFF_SELF_SERVICE",
+            ),
+            "stock.catalog.read",
+        );
         const variants = await stockService.getVariantAvailability(
             parsed.data.variantIds,
         );
         return NextResponse.json({ variants });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching LIFF stock availability", {
             errorType: error instanceof Error ? error.name : "UnknownError",
         });

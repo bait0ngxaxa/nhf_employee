@@ -1,14 +1,17 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/auth/api";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     createStockCommandActor,
     enforceStockJsonBodySize,
     executeCancelStockRequest,
     executeIssueStockRequest,
     readStockJsonBody,
     stockReviewActionSchema,
+    StockCapabilityDeniedError,
 } from "@/modules/stock";
 import {
     enforceAuthenticatedMutationRateLimit,
@@ -27,7 +30,7 @@ export async function POST(
         const bodySizeResponse = enforceStockJsonBodySize(request);
         if (bodySizeResponse) return bodySizeResponse;
 
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const body = await readStockJsonBody(request);
@@ -61,10 +64,26 @@ export async function POST(
         const requestId = Number(id);
         if (isNaN(requestId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
+        const actor = createStockCommandActor(
+            auth.user,
+            request.headers,
+            authorization,
+        );
+
         if (action === "approve" || action === "issue") {
+            await assertStockCapabilityForMigration(
+                authorization,
+                "stock.request.process",
+                { requestedScope: "all" },
+            );
             const issuedRequest = await executeIssueStockRequest({
                 requestId,
-                actor: createStockCommandActor(auth.user, request.headers),
+                actor,
             });
             after(() => {
                 processOutbox().catch((error) =>
@@ -80,14 +99,27 @@ export async function POST(
 
         const cancelReason =
             parsed.data.cancelReason ?? parsed.data.rejectReason ?? null;
+        const capabilityAuthorization =
+            await assertStockCapabilityForMigration(
+                authorization,
+                "stock.request.cancel",
+                { requestedScope: "all" },
+            );
         const updated = await executeCancelStockRequest({
             requestId,
-            actor: createStockCommandActor(auth.user, request.headers),
+            actor,
             reason: cancelReason,
-            options: { isAdmin: true },
+            options: {
+                notificationMode: capabilityAuthorization.isAdministrative
+                    ? "PROCESSOR"
+                    : "REQUESTER",
+            },
         });
         return NextResponse.json({ request: updated });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("ปิดใช้งานแล้ว") ||

@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
-import { stockService } from "@/modules/stock";
+import {
+    buildStockAuthorizationContext,
+    stockService,
+    type StockAuthorizedCommandActor,
+} from "@/modules/stock";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -23,15 +27,10 @@ function asNever<T>(value: T): never {
     return value as unknown as never;
 }
 
-function commandActor(id: number): {
-    id: number;
-    email: string;
-    name: string;
-    ipAddress: string;
-    userAgent: string;
-    requestId: string;
-    correlationId: string;
-} {
+function commandActor(
+    id: number,
+    role: "ADMIN" | "USER" = "ADMIN",
+): StockAuthorizedCommandActor {
     return {
         id,
         email: "user-" + id + "@example.com",
@@ -40,6 +39,11 @@ function commandActor(id: number): {
         userAgent: "stock-service-test",
         requestId: `req-${id}`,
         correlationId: `corr-${id}`,
+        authorization: buildStockAuthorizationContext(
+            { id, role },
+            100,
+            "DASHBOARD",
+        ),
     };
 }
 
@@ -126,8 +130,20 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockTransaction.upsert.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever({ employeeId: 100 }),
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
+        prismaMock.user.findUnique.mockImplementation((args) =>
+            asNever({
+                id: args.where.id,
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+                employee: {
+                    id: 100,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }),
         );
         prismaMock.user.findFirst.mockResolvedValue(asNever({ id: 7 }));
         prismaMock.stockRequest.findUniqueOrThrow.mockResolvedValue(
@@ -1292,7 +1308,7 @@ describe("Stock Service Mutations", () => {
             "754a463c6c01837c67a1b6ee5d3d9b9e36d2f6ff0f8adc3ef38fe76e265e6e57";
 
         it("should reject when workforce becomes inactive before the transaction", async () => {
-            prismaMock.user.findFirst.mockResolvedValue(null);
+            prismaMock.user.findUnique.mockResolvedValueOnce(null);
 
             await expect(
                 stockService.createRequest(
@@ -1302,7 +1318,7 @@ describe("Stock Service Mutations", () => {
                 ),
             ).rejects.toThrow("ไม่มีสิทธิ์ดำเนินการสำหรับสถานะพนักงานปัจจุบัน");
 
-            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
+            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
             expect(prismaMock.stockRequest.findUnique).not.toHaveBeenCalled();
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -1722,18 +1738,18 @@ describe("Stock Service Mutations", () => {
 
     describe("cancelRequest", () => {
         it("should reject user cancellation when workforce becomes inactive", async () => {
-            prismaMock.user.findFirst.mockResolvedValue(null);
+            prismaMock.user.findUnique.mockResolvedValueOnce(null);
 
             await expect(
                 stockService.cancelRequest(
                     55,
                     commandActor(3),
                     "ผู้เบิกไม่มารับ",
-                    { isAdmin: false },
+                    { notificationMode: "REQUESTER" },
                 ),
             ).rejects.toThrow("ไม่มีสิทธิ์ดำเนินการสำหรับสถานะพนักงานปัจจุบัน");
 
-            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
+            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
             expect(prismaMock.stockRequest.findUnique).not.toHaveBeenCalled();
             expect(prismaMock.stockRequest.updateMany).not.toHaveBeenCalled();
         });
@@ -1899,7 +1915,7 @@ describe("Stock Service Mutations", () => {
                 55,
                 commandActor(9),
                 "มีวัสดุทดแทนแล้ว",
-                { isAdmin: true },
+                { notificationMode: "PROCESSOR" },
             );
 
             expect(prismaMock.notificationOutbox.createMany).toHaveBeenCalledWith({
@@ -1978,7 +1994,7 @@ describe("Stock Service Mutations", () => {
                 55,
                 commandActor(9),
                 undefined,
-                { isAdmin: true },
+                { notificationMode: "PROCESSOR" },
             );
 
             const emailOutboxCall = prismaMock.notificationOutbox.createMany.mock
@@ -1992,12 +2008,28 @@ describe("Stock Service Mutations", () => {
         });
 
         it("should reject when non-admin tries to cancel another user's request", async () => {
+            prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
+                id: 3,
+                role: "USER",
+                isActive: true,
+                deletedAt: null,
+                employee: {
+                    id: 100,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }));
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({ status: "PENDING_ISSUE", requestedBy: 8 }),
             );
 
             await expect(
-                stockService.cancelRequest(55, commandActor(3), null, { isAdmin: false }),
+                stockService.cancelRequest(
+                    55,
+                    commandActor(3, "USER"),
+                    null,
+                    { notificationMode: "REQUESTER" },
+                ),
             ).rejects.toThrow("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
             expect(prismaMock.stockRequest.update).not.toHaveBeenCalled();
         });

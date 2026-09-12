@@ -1,14 +1,34 @@
 import { requireLiffWorkforceSession } from "@/modules/line";
 import { forbidden } from "@/lib/ssot/http";
-import { isAdminRole } from "@/lib/ssot/permissions";
+import {
+    buildStockAuthorizationContext,
+    resolveStockCapabilityForMigration,
+} from "../application/authorization";
+import { StockCapabilityDeniedError } from "../application/errors";
 
 export async function requireLiffStockProcessorSession(): Promise<
     Awaited<ReturnType<typeof requireLiffWorkforceSession>>
 > {
     const auth = await requireLiffWorkforceSession();
     if (!auth.ok) return auth;
-    if (!isAdminRole(auth.user.role)) {
-        return { ok: false, response: forbidden() };
+
+    const authorization = buildStockAuthorizationContext(
+        auth.user,
+        auth.employeeId,
+        "LIFF_SELF_SERVICE",
+    );
+    try {
+        await resolveStockCapabilityForMigration(
+            authorization,
+            "stock.request.process",
+            { requestedScope: "all" },
+        );
+    } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return { ok: false, response: forbidden() };
+        }
+        throw error;
     }
+
     return auth;
 }

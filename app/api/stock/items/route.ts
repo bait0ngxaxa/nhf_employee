@@ -1,10 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/auth/api";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     createItemSchema,
     createStockCommandActor,
+    StockCapabilityDeniedError,
     stockService,
     stockItemsFilterSchema,
 } from "@/modules/stock";
@@ -13,6 +15,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        await assertStockCapabilityForMigration(
+            buildStockAuthorizationContext(
+                auth.user,
+                "employeeId" in auth ? auth.employeeId : null,
+                "DASHBOARD",
+            ),
+            "stock.catalog.read",
+        );
 
         const { searchParams } = new URL(request.url);
         const parsed = stockItemsFilterSchema.safeParse({
@@ -32,6 +42,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const result = await stockService.getItems(parsed.data);
         return NextResponse.json(result);
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching stock items:", error);
         return serverError();
     }
@@ -39,7 +52,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const body = await request.json();
@@ -50,10 +63,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
         }
 
-        const actor = createStockCommandActor(auth.user, request.headers);
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.inventory.manage",
+        );
+        const actor = createStockCommandActor(
+            auth.user,
+            request.headers,
+            authorization,
+        );
         const item = await stockService.createItem(result.data, actor);
         return NextResponse.json({ item }, { status: 201 });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         const message = error instanceof Error ? error.message : "";
         if (message.includes("Unique constraint")) {
             return jsonError("รหัสวัสดุ (SKU) นี้มีอยู่แล้ว", 409);

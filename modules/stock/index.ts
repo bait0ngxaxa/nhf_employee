@@ -96,6 +96,26 @@ export {
 
 export { createStockCommandActor } from "./presentation/stock-command-actor";
 export {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationActor,
+    buildStockAuthorizationContext,
+    canResolveStockCapabilityForMigration,
+    resolveStockCapabilityForMigration,
+    resolveStockCapabilityInTransaction,
+    STOCK_MIGRATED_CAPABILITIES,
+} from "./application/authorization";
+export type {
+    StockAuthorizationChannel,
+    StockAuthorizationActor,
+    StockAuthorizationContext,
+    StockAuthorizedCommandActor,
+    StockCapabilityAuthorization,
+    StockCapabilityOptions,
+    StockMigratedCapability,
+    StockRequestQueryAuthorization,
+} from "./application/authorization";
+export { StockCapabilityDeniedError } from "./application/errors";
+export {
     enforceStockJsonBodySize,
     readStockJsonBody,
     STOCK_JSON_MUTATION_MAX_BYTES,

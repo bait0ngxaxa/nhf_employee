@@ -23,6 +23,11 @@ type StockRequestSource = NonNullable<
     Awaited<ReturnType<typeof getRequestById>>
 >;
 
+export interface LiffStockRequestActionAuthorization {
+    readonly canIssue: boolean;
+    readonly canCancel: boolean;
+}
+
 function toIsoString(value: Date | null): string | null {
     return value?.toISOString() ?? null;
 }
@@ -82,7 +87,17 @@ export function toLiffStockCategory(category: {
 export function toLiffStockRequestSummary(
     request: StockRequestSource,
     viewerRole: LiffStockViewerRole,
+    actionAuthorization?: LiffStockRequestActionAuthorization,
 ): LiffStockRequestSummary {
+    const defaultActions = getStockRequestActions(request.status, viewerRole);
+    const availableActions = actionAuthorization === undefined
+        ? defaultActions
+        : defaultActions.filter((action) =>
+            action === "ISSUE"
+                ? actionAuthorization.canIssue
+                : actionAuthorization.canCancel,
+        );
+
     return {
         id: request.id,
         projectCode: request.projectCode,
@@ -119,17 +134,18 @@ export function toLiffStockRequestSummary(
                 ),
             };
         }),
-        availableActions: getStockRequestActions(request.status, viewerRole),
+        availableActions,
     };
 }
 
 export function toLiffStockRequestsResponse(
     source: StockRequestListSource,
     viewerRole: LiffStockViewerRole,
+    actionAuthorization?: LiffStockRequestActionAuthorization,
 ): LiffStockRequestsResponse {
     return {
         requests: source.requests.map((request) =>
-            toLiffStockRequestSummary(request, viewerRole),
+            toLiffStockRequestSummary(request, viewerRole, actionAuthorization),
         ),
         total: source.total,
         page: source.page,
@@ -141,9 +157,14 @@ export function toLiffStockRequestsResponse(
 export function toLiffStockRequestDetail(
     request: StockRequestSource,
     viewerRole: LiffStockViewerRole,
+    actionAuthorization?: LiffStockRequestActionAuthorization,
 ): LiffStockRequestDetail {
     return {
-        ...toLiffStockRequestSummary(request, viewerRole),
+        ...toLiffStockRequestSummary(
+            request,
+            viewerRole,
+            actionAuthorization,
+        ),
         viewerRole,
     };
 }

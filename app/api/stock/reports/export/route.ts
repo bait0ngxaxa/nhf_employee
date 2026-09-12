@@ -1,7 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/auth/api";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     createStockBalanceReportXlsxResponse,
     createStockRequestReportXlsxResponse,
     getStockBalanceReportMeta,
@@ -9,12 +11,21 @@ import {
     getStockRequestReportYears,
     stockReportExportQuerySchema,
     StockInvariantViolationError,
+    StockCapabilityDeniedError,
 } from "@/modules/stock";
 
 export async function GET(request: NextRequest): Promise<Response> {
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
+        await assertStockCapabilityForMigration(
+            buildStockAuthorizationContext(
+                auth.user,
+                "employeeId" in auth ? auth.employeeId : null,
+                "DASHBOARD",
+            ),
+            "stock.report.export",
+        );
 
         const { searchParams } = new URL(request.url);
         const parsedQuery = stockReportExportQuerySchema.safeParse({
@@ -83,6 +94,9 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         return createStockRequestReportXlsxResponse(resolvedYear);
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Stock export error:", error);
 
         if (error instanceof StockInvariantViolationError) {

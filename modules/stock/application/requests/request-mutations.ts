@@ -5,7 +5,6 @@ import {
 } from "@prisma/client";
 import { defineStockAuditDetails } from "../../domain/audit-details";
 import { prisma } from "@/lib/db/prisma";
-import { assertActiveWorkforceInTransaction } from "@/lib/auth/workforce-transaction";
 import {
     hasPrismaErrorCode,
     runSerializableTransaction,
@@ -42,8 +41,9 @@ import type {
     CancelRequestOptions,
     IssueRequestResult,
     LowStockAlertCandidate,
-    StockCommandActor,
 } from "../../domain/types";
+import type { StockAuthorizedCommandActor } from "../authorization";
+import { resolveStockCapabilityInTransaction } from "../authorization";
 import { getUserDisplayName } from "@/shared/identity/display";
 
 export type CreateStockRequestResult = {
@@ -101,7 +101,7 @@ function buildVariantLowStockAlerts(
 
 export async function createRequest(
     data: CreateRequestInput,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
     options: CreateRequestOptions,
 ): Promise<CreateStockRequestResult> {
     const requestHash = createStockRequestHash(data);
@@ -114,7 +114,12 @@ export async function createRequest(
 
     try {
         return await runSerializableTransaction(async (tx) => {
-            await assertActiveWorkforceInTransaction(tx, actor.id);
+            await resolveStockCapabilityInTransaction(
+                tx,
+                actor,
+                "stock.request.create",
+                { requestedScope: "mine" },
+            );
 
             const existingRequest = await tx.stockRequest.findUnique({
                 where: idempotencyWhere,
@@ -155,9 +160,15 @@ export async function createRequest(
 
 export async function issueRequest(
     requestId: number,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
 ): Promise<IssueRequestResult<{ id: number; requestedBy: number }>> {
     return runSerializableTransaction(async (tx) => {
+        await resolveStockCapabilityInTransaction(
+            tx,
+            actor,
+            "stock.request.process",
+            { requestedScope: "all" },
+        );
         const issuedAt = new Date();
         const claimedRequest = await tx.stockRequest.updateMany({
             where: {
@@ -419,14 +430,18 @@ export async function issueRequest(
 
 export async function cancelRequest(
     requestId: number,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
     reason?: string | null,
-    options: CancelRequestOptions = { isAdmin: false },
+    options: CancelRequestOptions = {},
 ): Promise<Prisma.StockRequestGetPayload<Record<string, never>>> {
     return runSerializableTransaction(async (tx) => {
-        if (!options.isAdmin) {
-            await assertActiveWorkforceInTransaction(tx, actor.id);
-        }
+        const authorization = await resolveStockCapabilityInTransaction(
+            tx,
+            actor,
+            "stock.request.cancel",
+            { requestedScope: "all" },
+        );
+        const canCancelAnyRequest = authorization.scopes.includes("ALL");
 
         const request = await tx.stockRequest.findUnique({
             where: { id: requestId },
@@ -439,7 +454,7 @@ export async function cancelRequest(
         if (request.status !== "PENDING_ISSUE") {
             throw new Error("คำขอนี้ถูกดำเนินการแล้ว");
         }
-        if (!options.isAdmin && request.requestedBy !== actor.id) {
+        if (!canCancelAnyRequest && request.requestedBy !== actor.id) {
             throw new Error("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
         }
 
@@ -499,7 +514,7 @@ export async function cancelRequest(
             reason ?? null,
             cancelledAt,
         );
-        if (!options.isAdmin) {
+        if (options.notificationMode !== "PROCESSOR") {
             await notifyAdminsStockRequestCancelledByRequester(
                 requestId,
                 getUserDisplayName(request.requester),

@@ -15,7 +15,7 @@ import {
     loadActiveDefaultVariantsByItemIds,
     normalizeRequestItems,
 } from "../../infrastructure/persistence/shared";
-import type { StockCommandActor } from "../../domain/types";
+import type { StockAuthorizedCommandActor } from "../authorization";
 import { getUserDisplayName } from "@/shared/identity/display";
 import { createIdempotencyKeyAuditHash } from "./request-idempotency";
 
@@ -60,7 +60,7 @@ type AvailableVariant = {
 
 type PersistRequestCommand = {
     data: CreateRequestInput;
-    actor: StockCommandActor;
+    actor: StockAuthorizedCommandActor;
     identity: StockRequestIdentity;
     items: NormalizedRequestItem[];
 };
@@ -284,7 +284,7 @@ async function persistRequest(
 export async function createNewStockRequest(
     tx: Prisma.TransactionClient,
     data: CreateRequestInput,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
     identity: StockRequestIdentity,
 ): Promise<StockRequestWithDetails> {
     const context = await normalizeRequestedItems(tx, data);

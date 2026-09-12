@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
+    StockCapabilityDeniedError,
     stockService,
     toLiffStockCatalogResponse,
     stockItemsFilterSchema,
 } from "@/modules/stock";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 
 export async function GET(request: Request): Promise<NextResponse> {
     const auth = await requireLiffWorkforceSession();
@@ -27,9 +30,20 @@ export async function GET(request: Request): Promise<NextResponse> {
             });
         }
 
+        await assertStockCapabilityForMigration(
+            buildStockAuthorizationContext(
+                auth.user,
+                auth.employeeId,
+                "LIFF_SELF_SERVICE",
+            ),
+            "stock.catalog.read",
+        );
         const result = await stockService.getItems(parsed.data);
         return NextResponse.json(toLiffStockCatalogResponse(result));
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching LIFF stock items", {
             errorType: error instanceof Error ? error.name : "UnknownError",
         });

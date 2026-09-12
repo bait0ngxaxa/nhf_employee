@@ -1,9 +1,12 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/auth/api";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     adjustStockSchema,
     createStockCommandActor,
+    StockCapabilityDeniedError,
     stockService,
 } from "@/modules/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
@@ -27,7 +30,7 @@ export async function POST(
         );
         if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
 
-        const auth = await requireAdminSession();
+        const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
 
         const principalRateLimitResponse =
@@ -49,7 +52,20 @@ export async function POST(
             });
         }
 
-        const actor = createStockCommandActor(auth.user, request.headers);
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            "employeeId" in auth ? auth.employeeId : null,
+            "DASHBOARD",
+        );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.inventory.manage",
+        );
+        const actor = createStockCommandActor(
+            auth.user,
+            request.headers,
+            authorization,
+        );
         const adjustment = await stockService.adjustStock(itemId, result.data, actor);
 
         after(() => {
@@ -60,6 +76,9 @@ export async function POST(
 
         return NextResponse.json({ adjustment });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         const message = error instanceof Error ? error.message : "";
         if (
             message.includes("ไม่พบวัสดุ") ||

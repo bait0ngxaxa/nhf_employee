@@ -14,8 +14,12 @@ import { prisma } from "@/lib/db/prisma";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     stockService,
+    StockCapabilityDeniedError,
     StockRequestIdempotencyConflictError,
     STOCK_JSON_MUTATION_MAX_BYTES,
+    type StockAuthorizationContext,
+    type StockCapabilityAuthorization,
+    type StockMigratedCapability,
 } from "@/modules/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
@@ -25,6 +29,10 @@ import {
     PRE_AUTH_IP_RATE_LIMIT_POLICIES,
     resetMutationRateLimit,
 } from "@/lib/security/mutation-rate-limit";
+
+const stockAuthorizationMock = vi.hoisted(() => ({
+    assert: vi.fn(),
+}));
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -66,6 +74,7 @@ vi.mock("@/modules/stock", async () => {
     const getCategories = vi.fn();
     return {
         ...actual,
+        assertStockCapabilityForMigration: stockAuthorizationMock.assert,
         stockService: {
             ...actual.stockService,
             getRequests,
@@ -111,6 +120,33 @@ describe("Stock Request Routes", () => {
             deletedAt: null,
             employee: { id: 10, status: "ACTIVE", deletedAt: null },
         } as never);
+        stockAuthorizationMock.assert.mockImplementation(
+            async (
+                context: StockAuthorizationContext,
+                capability: string,
+            ): Promise<StockCapabilityAuthorization> => {
+                const actor = context.authorizationActor;
+                const isAdmin = actor.systemRole === "ADMIN";
+                const scopes = isAdmin
+                    ? (["ALL"] as const)
+                    : capability === "stock.catalog.read"
+                        ? (["ALL"] as const)
+                        : (["OWN"] as const);
+                return {
+                    actor,
+                    capability: capability as StockMigratedCapability,
+                    decision: {
+                        capability,
+                        allowed: true,
+                        scopes,
+                        grants: [],
+                    },
+                    scopes,
+                    isAdministrative: isAdmin,
+                    usedMigrationCompatibility: false,
+                };
+            },
+        );
     });
 
     it.each([
@@ -256,8 +292,7 @@ describe("Stock Request Routes", () => {
                     page: 1,
                     limit: 10,
                 }),
-                1,
-                true,
+                { userId: 1, scopes: ["ALL"] },
                 "all",
             );
         });
@@ -568,6 +603,12 @@ describe("Stock Request Routes", () => {
                 name: "User",
             });
             vi.mocked(isAdminRole).mockReturnValue(false);
+            stockAuthorizationMock.assert.mockRejectedValueOnce(
+                new StockCapabilityDeniedError(
+                    "stock.request.process",
+                    "NO_APPLICABLE_GRANT",
+                ),
+            );
 
             const request = new NextRequest(
                 "http://localhost/api/stock/requests/77/issue",
@@ -754,7 +795,7 @@ describe("Stock Request Routes", () => {
                     correlationId: expect.any(String),
                 }),
                 "ไม่อนุมัติ",
-                { isAdmin: true },
+                { notificationMode: "PROCESSOR" },
             );
             expect(processOutbox).not.toHaveBeenCalled();
         });
@@ -898,7 +939,7 @@ describe("Stock Request Routes", () => {
                     correlationId: expect.any(String),
                 }),
                 "ทดสอบยกเลิก",
-                { isAdmin: false },
+                { notificationMode: "REQUESTER" },
             );
         });
 

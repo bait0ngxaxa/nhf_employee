@@ -3,8 +3,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/modules/line";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     createStockCommandActor,
     executeCancelStockRequest,
+    StockCapabilityDeniedError,
 } from "@/modules/stock";
 import {
     enforceStockJsonBodySize,
@@ -14,8 +17,7 @@ import {
     enforceAuthenticatedMutationRateLimit,
     enforcePreAuthIpRateLimit,
 } from "@/lib/security/mutation-rate-limit";
-import { jsonError, serverError } from "@/lib/ssot/http";
-import { isAdminRole } from "@/lib/ssot/permissions";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
     cancelRequestSchema,
     stockRequestIdParamSchema,
@@ -58,14 +60,38 @@ export async function POST(
             });
         }
 
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            auth.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.request.cancel",
+            { requestedScope: "all" },
+        );
         await executeCancelStockRequest({
             requestId: parsedId.data,
-            actor: createStockCommandActor(auth.user, request.headers),
+            actor: createStockCommandActor(
+                auth.user,
+                request.headers,
+                authorization,
+            ),
             reason: parsedBody.data.cancelReason,
-            options: { isAdmin: isAdminRole(auth.user.role) },
+            options: {
+                // This selects the legacy notification path only. The
+                // transaction authorizes cancellation from resolved scopes.
+                notificationMode:
+                    authorization.authorizationActor.systemRole === "ADMIN"
+                        ? "PROCESSOR"
+                        : "REQUESTER",
+            },
         });
         return NextResponse.json({ success: true });
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         if (error instanceof SyntaxError) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400);
         }

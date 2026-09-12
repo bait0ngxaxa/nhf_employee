@@ -1,5 +1,5 @@
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
-import type { StockCommandActor } from "../domain/types";
+import type { StockAuthorizationContext, StockAuthorizedCommandActor } from "../application/authorization";
 import { randomUUID } from "node:crypto";
 
 type StockActorUser = {
@@ -18,7 +18,8 @@ function getTraceId(requestHeaders: Headers, name: string): string | undefined {
 export function createStockCommandActor(
     user: StockActorUser,
     requestHeaders: Headers,
-): StockCommandActor {
+    authorization: StockAuthorizationContext,
+): StockAuthorizedCommandActor {
     const requestId = getTraceId(requestHeaders, "x-request-id") ?? randomUUID();
     const correlationId =
         getTraceId(requestHeaders, "x-correlation-id") ?? requestId;
@@ -31,5 +32,6 @@ export function createStockCommandActor(
         userAgent: requestHeaders.get("user-agent") ?? undefined,
         requestId,
         correlationId,
+        authorization,
     };
 }

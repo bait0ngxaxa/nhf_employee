@@ -418,8 +418,7 @@ describe("Stock Queries", () => {
                     page: 1,
                     limit: 10,
                 },
-                99,
-                true,
+                { userId: 99, scopes: ["ALL"] },
                 "all",
             );
 
@@ -452,8 +451,7 @@ describe("Stock Queries", () => {
                     page: 1,
                     limit: 10,
                 },
-                7,
-                true,
+                { userId: 7, scopes: ["ALL"] },
                 "mine",
             );
 
@@ -466,14 +464,47 @@ describe("Stock Queries", () => {
             );
         });
 
+        it("must not broaden an OWN-only authorization when all is requested", async () => {
+            prismaMock.stockRequest.findMany.mockResolvedValue(asNever([]));
+            prismaMock.stockRequest.count.mockResolvedValue(asNever(0));
+
+            await getRequests(
+                { page: 1, limit: 10 },
+                { userId: 7, scopes: ["OWN"] },
+                "all",
+            );
+
+            expect(prismaMock.stockRequest.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({ requestedBy: 7 }),
+                }),
+            );
+        });
+
+        it("uses organization-wide predicates only for an ALL authorization", async () => {
+            prismaMock.stockRequest.findMany.mockResolvedValue(asNever([]));
+            prismaMock.stockRequest.count.mockResolvedValue(asNever(0));
+
+            await getRequests(
+                { page: 1, limit: 10 },
+                { userId: 7, scopes: ["ALL"] },
+                "all",
+            );
+
+            expect(prismaMock.stockRequest.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.not.objectContaining({ requestedBy: 7 }),
+                }),
+            );
+        });
+
         it("searches requester nickname without widening request scope", async () => {
             prismaMock.stockRequest.findMany.mockResolvedValue(asNever([]));
             prismaMock.stockRequest.count.mockResolvedValue(asNever(0));
 
             await getRequests(
                 { search: "ชาย", page: 1, limit: 10 },
-                7,
-                false,
+                { userId: 7, scopes: ["OWN"] },
                 "mine",
             );
 

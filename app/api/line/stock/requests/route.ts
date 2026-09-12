@@ -13,14 +13,17 @@ import {
 } from "@/lib/security/mutation-rate-limit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
+    assertStockCapabilityForMigration,
+    buildStockAuthorizationContext,
     stockService,
+    StockCapabilityDeniedError,
     StockRequestIdempotencyConflictError,
 } from "@/modules/stock";
 import {
     toLiffStockRequestsResponse,
     toLiffStockRequestSummary,
 } from "@/modules/stock";
-import { jsonError, serverError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
     createRequestSchema,
     idempotencyKeySchema,
@@ -45,14 +48,30 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             });
         }
 
+        const authorization = buildStockAuthorizationContext(
+            auth.user,
+            auth.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        const capabilityAuthorization =
+            await assertStockCapabilityForMigration(
+                authorization,
+                "stock.request.read",
+                { requestedScope: "mine" },
+            );
         const result = await stockService.getRequests(
             parsed.data,
-            auth.user.id,
-            false,
+            {
+                userId: capabilityAuthorization.actor.userId,
+                scopes: capabilityAuthorization.scopes,
+            },
             "mine",
         );
         return NextResponse.json(toLiffStockRequestsResponse(result, "REQUESTER"));
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching LIFF stock requests", {
             errorType: error instanceof Error ? error.name : "UnknownError",
         });
@@ -96,7 +115,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         const creation = await stockService.createRequest(
             parsedBody.data,
-            createStockCommandActor(auth.user, request.headers),
+            createStockCommandActor(
+                auth.user,
+                request.headers,
+                buildStockAuthorizationContext(
+                    auth.user,
+                    auth.employeeId,
+                    "LIFF_SELF_SERVICE",
+                ),
+            ),
             { idempotencyKey: parsedIdempotencyKey.data },
         );
         if (!creation.replayed) {
@@ -121,6 +148,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: creation.replayed ? 200 : 201 },
         );
     } catch (error) {
+        if (error instanceof StockCapabilityDeniedError) {
+            return forbidden();
+        }
         if (error instanceof SyntaxError) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400);
         }

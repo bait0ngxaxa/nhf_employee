@@ -38,6 +38,8 @@ import type {
     LowStockAlertCandidate,
     StockCommandActor,
 } from "../../domain/types";
+import type { StockAuthorizedCommandActor } from "../authorization";
+import { resolveStockCapabilityInTransaction } from "../authorization";
 import { lockStockInventoryRows } from "../../infrastructure/persistence/locks";
 import { setStockItemDefaultVariantIfUnset } from "../../infrastructure/persistence/default-variant-writer";
 import {
@@ -367,9 +369,14 @@ async function applyStockAdjustment(
 
 export async function createCategory(
     data: CreateCategoryInput,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
 ) {
     return prisma.$transaction(async (tx) => {
+        await resolveStockCapabilityInTransaction(
+            tx,
+            actor,
+            "stock.inventory.manage",
+        );
         const category = await tx.stockCategory.create({ data });
         await createStockCommandAudit(
             tx,
@@ -382,8 +389,16 @@ export async function createCategory(
     });
 }
 
-export async function deleteCategory(id: number, actor: StockCommandActor) {
+export async function deleteCategory(
+    id: number,
+    actor: StockAuthorizedCommandActor,
+) {
     return prisma.$transaction(async (tx) => {
+        await resolveStockCapabilityInTransaction(
+            tx,
+            actor,
+            "stock.inventory.manage",
+        );
         const category = await tx.stockCategory.delete({ where: { id } });
         await createStockCommandAudit(
             tx,
@@ -398,9 +413,8 @@ export async function deleteCategory(id: number, actor: StockCommandActor) {
 
 export async function createItem(
     data: CreateStockItemInput,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
 ) {
-    const categoryId = data.categoryId ?? (await ensureDefaultCategoryId());
     const sku = data.sku?.trim() ? data.sku.trim() : generateSku();
     const variants = data.variants ?? [];
     const totalQuantity =
@@ -414,6 +428,12 @@ export async function createItem(
     const fallbackUnit = variants[0]?.unit ?? data.unit ?? "ชิ้น";
 
     return prisma.$transaction(async (tx) => {
+        await resolveStockCapabilityInTransaction(
+            tx,
+            actor,
+            "stock.inventory.manage",
+        );
+        const categoryId = data.categoryId ?? (await ensureDefaultCategoryId(tx));
         const item = await tx.stockItem.create({
             data: {
                 name: data.name,
@@ -531,10 +551,15 @@ export async function createItem(
 export async function updateItem(
     id: number,
     data: UpdateItemInput,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
     auditAction: "STOCK_ITEM_UPDATE" | "STOCK_ITEM_DELETE" = "STOCK_ITEM_UPDATE",
 ) {
     const result = await runSerializableTransaction(async (tx) => {
+        await resolveStockCapabilityInTransaction(
+            tx,
+            actor,
+            "stock.inventory.manage",
+        );
         await lockStockInventoryRows(tx, [id]);
         const beforeItem = await tx.stockItem.findUniqueOrThrow({
             where: { id },
@@ -588,9 +613,14 @@ export async function updateItem(
 export async function adjustStock(
     itemId: number,
     input: AdjustStockInput,
-    actor: StockCommandActor,
+    actor: StockAuthorizedCommandActor,
 ): Promise<AdjustStockResult> {
     return runSerializableTransaction(async (tx) => {
+        await resolveStockCapabilityInTransaction(
+            tx,
+            actor,
+            "stock.inventory.manage",
+        );
         await lockStockInventoryRows(tx, [itemId]);
         const item = await tx.stockItem.findUnique({
             where: { id: itemId },

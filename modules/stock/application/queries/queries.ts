@@ -7,6 +7,7 @@ import type {
 import { buildResolvedDefaultVariantIds } from "../../domain/default-variant-shadow";
 import { summarizeVariantInventory } from "../../domain/inventory-quantity-read";
 import type { StockRequestWithDetails } from "../requests/request-creation";
+import type { StockRequestQueryAuthorization } from "../authorization";
 import {
     buildItemInclude,
     buildRequestInclude,
@@ -183,12 +184,12 @@ export async function getItemById(id: number) {
 
 export async function getRequests(
     filters: StockRequestsFilter,
-    userId: number,
-    isAdmin: boolean,
+    authorization: StockRequestQueryAuthorization,
     scope: "mine" | "all" = "mine",
 ) {
     const { status, search, page, limit } = filters;
-    const shouldShowAll = isAdmin && scope === "all";
+    const shouldShowAll =
+        scope === "all" && authorization.scopes.includes("ALL");
     const trimmedSearch = search?.trim();
     const numericSearch = trimmedSearch ? Number(trimmedSearch) : Number.NaN;
     const searchFilters: Prisma.StockRequestWhereInput[] = [];
@@ -221,7 +222,7 @@ export async function getRequests(
 
     const where: Prisma.StockRequestWhereInput = {
         ...(status !== undefined && { status }),
-        ...(!shouldShowAll && { requestedBy: userId }),
+        ...(!shouldShowAll && { requestedBy: authorization.userId }),
         ...(searchFilters.length > 0 && { OR: searchFilters }),
     };
 

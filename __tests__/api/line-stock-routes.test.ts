@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     requireLiffWorkforceSession: vi.fn(),
+    requireLiffStockProcessorSession: vi.fn(),
+    resolveStockCapabilityForMigration: vi.fn(),
     getItems: vi.fn(),
     getVariantAvailability: vi.fn(),
     getCategories: vi.fn(),
@@ -40,6 +42,10 @@ vi.mock("@/modules/stock", async () => {
     );
     return {
         ...actual,
+        requireLiffStockProcessorSession:
+            mocks.requireLiffStockProcessorSession,
+        resolveStockCapabilityForMigration:
+            mocks.resolveStockCapabilityForMigration,
         stockService: {
             ...actual.stockService,
             getItems: mocks.getItems,
@@ -93,7 +99,11 @@ import {
 } from "@/app/api/line/stock/requests/route";
 import {
     STOCK_JSON_MUTATION_MAX_BYTES,
+    StockCapabilityDeniedError,
     StockRequestIdempotencyConflictError,
+    type StockAuthorizationContext,
+    type StockCapabilityAuthorization,
+    type StockMigratedCapability,
 } from "@/modules/stock";
 
 const USER_AUTH = {
@@ -214,6 +224,51 @@ describe("LIFF Stock route adapters", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.requireLiffWorkforceSession.mockResolvedValue(USER_AUTH);
+        mocks.requireLiffStockProcessorSession.mockImplementation(async () => {
+            const auth = await mocks.requireLiffWorkforceSession();
+            if (!auth.ok) return auth;
+            if (auth.user.role !== "ADMIN") {
+                return {
+                    ok: false as const,
+                    response: NextResponse.json(
+                        { error: "Forbidden" },
+                        { status: 403 },
+                    ),
+                };
+            }
+            return auth;
+        });
+        mocks.resolveStockCapabilityForMigration.mockImplementation(
+            async (
+                context: StockAuthorizationContext,
+                capability: string,
+            ): Promise<StockCapabilityAuthorization> => {
+                const actor = context.authorizationActor;
+                const isAdmin = actor.systemRole === "ADMIN";
+                if (!isAdmin && capability === "stock.request.process") {
+                    throw new StockCapabilityDeniedError(
+                        capability,
+                        "NO_APPLICABLE_GRANT",
+                    );
+                }
+                const scopes = isAdmin || capability === "stock.catalog.read"
+                    ? (["ALL"] as const)
+                    : (["OWN"] as const);
+                return {
+                    actor,
+                    capability: capability as StockMigratedCapability,
+                    decision: {
+                        capability,
+                        allowed: true,
+                        scopes,
+                        grants: [],
+                    },
+                    scopes,
+                    isAdministrative: false,
+                    usedMigrationCompatibility: false,
+                };
+            },
+        );
         mocks.enforcePreAuthIpRateLimit.mockReturnValue(null);
         mocks.enforceAuthenticatedMutationRateLimit.mockReturnValue(null);
         mocks.processOutbox.mockResolvedValue(undefined);
@@ -338,8 +393,7 @@ describe("LIFF Stock route adapters", () => {
         expect(response.status).toBe(200);
         expect(mocks.getRequests).toHaveBeenCalledWith(
             expect.objectContaining({ search: "NHF", page: 1, limit: 10 }),
-            7,
-            false,
+            { userId: 7, scopes: ["OWN"] },
             "mine",
         );
         expect(body.requests[0]).not.toHaveProperty("requester");
@@ -361,8 +415,7 @@ describe("LIFF Stock route adapters", () => {
         expect(response.status).toBe(200);
         expect(mocks.getRequests).toHaveBeenCalledWith(
             expect.objectContaining({ status: StockRequestStatus.PENDING_ISSUE }),
-            1,
-            true,
+            { userId: 1, scopes: ["ALL"] },
             "all",
         );
         expect(body.requests[0].requester).toEqual({ name: "พนักงาน ทดสอบ" });
@@ -393,6 +446,53 @@ describe("LIFF Stock route adapters", () => {
         const processorBody = await processorResponse.json();
         expect(processorBody.viewerRole).toBe("PROCESSOR");
         expect(processorBody.availableActions).toEqual(["ISSUE", "CANCEL"]);
+    });
+
+    it("does not expose ISSUE just because a USER has read-all access", async () => {
+        mocks.requireLiffWorkforceSession.mockResolvedValueOnce({
+            ...USER_AUTH,
+            user: { ...USER_AUTH.user, id: 8 },
+        });
+        mocks.getRequestById.mockResolvedValueOnce({
+            ...RAW_REQUEST,
+            requestedBy: 7,
+        });
+        mocks.resolveStockCapabilityForMigration.mockImplementation(
+            async (
+                context: StockAuthorizationContext,
+                capability: string,
+            ): Promise<StockCapabilityAuthorization> => {
+                if (capability === "stock.request.read") {
+                    return {
+                        actor: context.authorizationActor,
+                        capability: capability as StockMigratedCapability,
+                        decision: {
+                            capability,
+                            allowed: true,
+                            scopes: ["ALL"],
+                            grants: [],
+                        },
+                        scopes: ["ALL"],
+                        isAdministrative: false,
+                        usedMigrationCompatibility: false,
+                    };
+                }
+                throw new StockCapabilityDeniedError(
+                    capability,
+                    "NO_APPLICABLE_GRANT",
+                );
+            },
+        );
+
+        const response = await getDetail(
+            request("/api/line/stock/requests/71"),
+            { params: Promise.resolve({ id: "71" }) },
+        );
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.viewerRole).toBe("REQUESTER");
+        expect(body.availableActions).toEqual([]);
     });
 
     it("creates with the authenticated actor and wakes outbox only for a new request", async () => {
@@ -609,7 +709,7 @@ describe("LIFF Stock route adapters", () => {
             71,
             expect.objectContaining({ id: 7 }),
             "ไม่ใช้แล้ว",
-            { isAdmin: false },
+            { notificationMode: "REQUESTER" },
         );
 
         const forgedIssueResponse = await issueRequest(request(
@@ -653,7 +753,7 @@ describe("LIFF Stock route adapters", () => {
             71,
             expect.objectContaining({ id: 1 }),
             "ไม่ดำเนินการ",
-            { isAdmin: true },
+            { notificationMode: "PROCESSOR" },
         );
     });
 

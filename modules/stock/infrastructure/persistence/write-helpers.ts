@@ -6,8 +6,12 @@ import {
 } from "../../domain/constants";
 import type { ItemVariantSeed } from "../../domain/types";
 
-export async function ensureDefaultCategoryId(): Promise<number> {
-    const category = await prisma.stockCategory.upsert({
+type StockCategoryContext = Pick<Prisma.TransactionClient, "stockCategory">;
+
+export async function ensureDefaultCategoryId(
+    context: StockCategoryContext = prisma,
+): Promise<number> {
+    const category = await context.stockCategory.upsert({
         where: { name: DEFAULT_STOCK_CATEGORY_NAME },
         update: {},
         create: { name: DEFAULT_STOCK_CATEGORY_NAME },

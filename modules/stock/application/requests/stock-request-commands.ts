@@ -4,12 +4,12 @@ import {
 } from "./request-mutations";
 import type {
     CancelRequestOptions,
-    StockCommandActor,
 } from "../../domain/types";
+import type { StockAuthorizedCommandActor } from "../authorization";
 
 type IssueStockRequestCommand = {
     requestId: number;
-    actor: StockCommandActor;
+    actor: StockAuthorizedCommandActor;
 };
 
 type CancelStockRequestCommand = IssueStockRequestCommand & {

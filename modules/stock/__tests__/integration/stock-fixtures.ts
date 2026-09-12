@@ -8,13 +8,16 @@ import type {
     User,
 } from "@prisma/client";
 
-import type { StockCommandActor } from "../../domain/types";
+import {
+    buildStockAuthorizationContext,
+    type StockAuthorizedCommandActor,
+} from "@/modules/stock";
 
 export type StockFixture = {
     requester: User;
     issuer: User;
-    requesterActor: StockCommandActor;
-    issuerActor: StockCommandActor;
+    requesterActor: StockAuthorizedCommandActor;
+    issuerActor: StockAuthorizedCommandActor;
     category: StockCategory;
     item: StockItem;
     variant: StockItemVariant;
@@ -39,6 +42,8 @@ export async function cleanIntegrationDatabase(
     await client.stockItemVariant.deleteMany();
     await client.stockItem.deleteMany();
     await client.stockCategory.deleteMany();
+    await client.employee.deleteMany();
+    await client.department.deleteMany();
     await client.user.deleteMany();
 }
 
@@ -46,13 +51,19 @@ function toActor(user: {
     id: number;
     email: string;
     name: string;
-}): StockCommandActor {
+    role: Role;
+}, employeeId: number): StockAuthorizedCommandActor {
     return {
         id: user.id,
         email: user.email,
         name: user.name,
         ipAddress: "127.0.0.1",
         userAgent: "mysql-integration-test",
+        authorization: buildStockAuthorizationContext(
+            user,
+            employeeId,
+            "DASHBOARD",
+        ),
     };
 }
 
@@ -69,6 +80,12 @@ export async function createStockFixture(
     const quantity = options.quantity ?? 10;
     const minStock = options.minStock ?? 2;
     const requestedQuantity = options.requestedQuantity ?? 3;
+    const department = await client.department.create({
+        data: {
+            name: `แผนกทดสอบ ${suffix}`,
+            code: `STOCK-TEST-${suffix}`,
+        },
+    });
     const requester = await client.user.create({
         data: {
             email: `requester-${suffix}@integration.test`,
@@ -83,6 +100,26 @@ export async function createStockFixture(
             name: `ผู้จ่าย ${suffix}`,
             password: "integration-test-only",
             role: Role.ADMIN,
+        },
+    });
+    const requesterEmployee = await client.employee.create({
+        data: {
+            firstName: `ผู้ขอ ${suffix}`,
+            lastName: "ทดสอบ",
+            email: `requester-employee-${suffix}@integration.test`,
+            position: "ผู้ใช้งานทดสอบ",
+            departmentId: department.id,
+            user: { connect: { id: requester.id } },
+        },
+    });
+    const issuerEmployee = await client.employee.create({
+        data: {
+            firstName: `ผู้จ่าย ${suffix}`,
+            lastName: "ทดสอบ",
+            email: `issuer-employee-${suffix}@integration.test`,
+            position: "ผู้ดูแลทดสอบ",
+            departmentId: department.id,
+            user: { connect: { id: issuer.id } },
         },
     });
     const category = await client.stockCategory.create({
@@ -127,8 +164,8 @@ export async function createStockFixture(
     return {
         requester,
         issuer,
-        requesterActor: toActor(requester),
-        issuerActor: toActor(issuer),
+        requesterActor: toActor(requester, requesterEmployee.id),
+        issuerActor: toActor(issuer, issuerEmployee.id),
         category,
         item,
         variant,
