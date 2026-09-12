@@ -152,6 +152,7 @@ describe("LIFF Stock mobile components", () => {
                 }}
                 canIssue={false}
                 canCancel
+                canOpenDetail
                 onOpenDetail={vi.fn()}
                 onAction={onAction}
             />,
@@ -163,5 +164,35 @@ describe("LIFF Stock mobile components", () => {
         );
         expect(screen.queryByRole("button", { name: "จ่ายวัสดุ" }))
             .not.toBeInTheDocument();
+    });
+
+    it("does not expose request detail when the read capability is absent", () => {
+        render(
+            <LiffStockRequestCard
+                request={{
+                    id: 71,
+                    projectCode: "NHF-2569",
+                    status: "PENDING_ISSUE",
+                    note: null,
+                    cancelReason: null,
+                    issuedAt: null,
+                    cancelledAt: null,
+                    createdAt: "2026-08-30T03:00:00.000Z",
+                    items: [],
+                    availableActions: ["ISSUE"],
+                    requester: { name: "ผู้เบิก ทดสอบ" },
+                }}
+                canIssue
+                canCancel={false}
+                canOpenDetail={false}
+                onOpenDetail={vi.fn()}
+                onAction={vi.fn()}
+            />,
+        );
+
+        expect(screen.queryByRole("button", { name: "รายละเอียด" }))
+            .not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "จ่ายวัสดุ" }))
+            .toBeEnabled();
     });
 });

@@ -295,6 +295,58 @@ describe("Stock Request Routes", () => {
                 "all",
             );
         });
+
+        it("allows a normal USER with an explicit read-all grant without administrative identity", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "4", email: "user@test.com", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 4,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(false);
+            stockAuthorizationMock.assert.mockResolvedValueOnce({
+                actor: {
+                    userId: 4,
+                    employeeId: 10,
+                    systemRole: "USER",
+                    channel: "DASHBOARD",
+                },
+                capability: "stock.request.read",
+                decision: {
+                    capability: "stock.request.read",
+                    allowed: true,
+                    scopes: ["ALL"],
+                    grants: [{
+                        capability: "stock.request.read",
+                        scope: "ALL",
+                        source: { type: "USER", userId: 4 },
+                    }],
+                },
+                scopes: ["ALL"],
+                isAdministrative: false,
+                usedMigrationCompatibility: false,
+            });
+            vi.mocked(stockService.getRequests).mockResolvedValue({
+                requests: [],
+                total: 0,
+                page: 1,
+                limit: 10,
+            } as never);
+
+            const response = await getRequestsRoute(new NextRequest(
+                "http://localhost/api/stock/requests?scope=all",
+            ));
+
+            expect(response.status).toBe(200);
+            expect(stockService.getRequests).toHaveBeenCalledWith(
+                expect.any(Object),
+                { userId: 4, scopes: ["ALL"] },
+                "all",
+            );
+        });
     });
 
     describe("Stock employee workforce access", () => {
@@ -669,6 +721,66 @@ describe("Stock Request Routes", () => {
                 correlationId: expect.any(String),
             }));
             expect(processOutbox).toHaveBeenCalledTimes(1);
+        });
+
+        it("allows a normal USER with an explicit process grant without ADMIN promotion", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "4", email: "user@test.com", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 4,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(false);
+            stockAuthorizationMock.assert.mockResolvedValueOnce({
+                actor: {
+                    userId: 4,
+                    employeeId: 10,
+                    systemRole: "USER",
+                    channel: "DASHBOARD",
+                },
+                capability: "stock.request.process",
+                decision: {
+                    capability: "stock.request.process",
+                    allowed: true,
+                    scopes: ["ALL"],
+                    grants: [{
+                        capability: "stock.request.process",
+                        scope: "ALL",
+                        source: { type: "USER", userId: 4 },
+                    }],
+                },
+                scopes: ["ALL"],
+                isAdministrative: false,
+                usedMigrationCompatibility: false,
+            });
+            vi.mocked(stockService.issueRequest).mockResolvedValue({
+                request: { id: 77, requestedBy: 3 },
+                lowStockAlerts: [],
+            } as never);
+
+            const response = await issueRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/77/issue",
+                    { method: "POST", body: JSON.stringify({}) },
+                ),
+                { params: Promise.resolve({ id: "77" }) },
+            );
+
+            expect(response.status).toBe(200);
+            expect(stockService.issueRequest).toHaveBeenCalledWith(
+                77,
+                expect.objectContaining({
+                    id: 4,
+                    authorization: {
+                        authorizationActor: expect.objectContaining({
+                            systemRole: "USER",
+                        }),
+                    },
+                }),
+            );
         });
 
         it("should map transaction workforce revocation to 403", async () => {

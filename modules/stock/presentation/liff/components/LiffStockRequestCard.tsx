@@ -24,6 +24,7 @@ interface LiffStockRequestCardProps {
     ) => void;
     canIssue: boolean;
     canCancel: boolean;
+    canOpenDetail: boolean;
 }
 
 export function LiffStockRequestCard({
@@ -35,6 +36,7 @@ export function LiffStockRequestCard({
     onAction,
     canIssue,
     canCancel,
+    canOpenDetail,
 }: LiffStockRequestCardProps): ReactElement {
     const visibleActions = request.availableActions.filter((action) =>
         action === "ISSUE" ? canIssue : canCancel,
@@ -114,15 +116,17 @@ export function LiffStockRequestCard({
             ) : null}
 
             <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border-subtle pt-3">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => onOpenDetail(request.id)}
-                    className="min-h-11 px-3"
-                >
-                    <Eye className="size-4" aria-hidden="true" />
-                    รายละเอียด
-                </Button>
+                {canOpenDetail ? (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => onOpenDetail(request.id)}
+                        className="min-h-11 px-3"
+                    >
+                        <Eye className="size-4" aria-hidden="true" />
+                        รายละเอียด
+                    </Button>
+                ) : null}
                 {visibleActions.map((action) => (
                     <Button
                         key={action}

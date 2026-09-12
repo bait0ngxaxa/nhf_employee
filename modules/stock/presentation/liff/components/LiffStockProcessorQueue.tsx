@@ -31,6 +31,7 @@ interface LiffStockProcessorQueueProps {
     ) => void;
     canProcessRequests: boolean;
     canCancelAnyRequests: boolean;
+    canReadAllRequests: boolean;
 }
 
 export function LiffStockProcessorQueue({
@@ -46,6 +47,7 @@ export function LiffStockProcessorQueue({
     onAction,
     canProcessRequests,
     canCancelAnyRequests,
+    canReadAllRequests,
 }: LiffStockProcessorQueueProps): ReactElement {
     return (
         <section aria-labelledby="liff-stock-processing-heading" className="space-y-4">
@@ -126,6 +128,7 @@ export function LiffStockProcessorQueue({
                                 busy={busyRequestId === request.id}
                                 canIssue={canProcessRequests}
                                 canCancel={canCancelAnyRequests}
+                                canOpenDetail={canReadAllRequests}
                                 onOpenDetail={onOpenDetail}
                                 onAction={onAction}
                             />

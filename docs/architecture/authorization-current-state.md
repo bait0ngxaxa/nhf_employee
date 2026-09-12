@@ -4,7 +4,7 @@
 วันที่สำรวจ: 2026-09-10<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
-หมายเหตุการปรับปรุง: หลัง Phase 6A การบังคับใช้ authorization ฝั่ง server ของ Stock ใช้ central resolver และมี compatibility floor ตามที่บันทึกใน [authorization-stock-migration.md](authorization-stock-migration.md) และ Phase 6B เพิ่ม Stock presentation projection จาก resolver เดียวกัน ส่วนโดเมนอื่นยังคงอ้างอิง baseline ของ Phase 0 ตามที่ระบุในแต่ละหัวข้อ
+หมายเหตุการปรับปรุง: หลัง Phase 6A การบังคับใช้ authorization ฝั่ง server ของ Stock ใช้ central resolver และมี compatibility floor ตามที่บันทึกใน [authorization-stock-migration.md](authorization-stock-migration.md), Phase 6B เพิ่ม Stock presentation projection จาก resolver เดียวกัน และ Phase 6C ปิด migration ด้วย complete-surface audit, query-level request-detail ownership และ regression hardening โดยยังคง compatibility bridge ไว้อย่างตั้งใจ ส่วนโดเมนอื่นยังคงอ้างอิง baseline ของ Phase 0 ตามที่ระบุในแต่ละหัวข้อ
 
 เอกสารนี้เป็น baseline ของพฤติกรรมปัจจุบัน ไม่ใช่ policy ใหม่และไม่ใช่การออกแบบ resolver ในอนาคต ทุกข้อความที่ระบุว่า “ปัจจุบัน” หมายถึงสิ่งที่ trace ได้จาก code หรือ test โดยตรง การพบพฤติกรรมที่เสี่ยงหรือดูไม่ตรงกับหลัก least privilege จะถูกบันทึกเป็น risk เพื่อให้ Phase ถัดไปตัดสินใจอย่างชัดเจน โดย Phase 0 ไม่แก้ผลลัพธ์ authorization เดิม
 

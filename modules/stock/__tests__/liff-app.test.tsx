@@ -425,6 +425,33 @@ describe("LIFF Stock app orchestration", () => {
         expect(mocks.issueRequest).not.toHaveBeenCalled();
     });
 
+    it("does not treat process capability as request-detail read authority", async () => {
+        mocks.search = "requestId=71&action=issue";
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {
+                stockCapabilities: {
+                    ...PROCESSOR_STOCK_CAPABILITIES,
+                    canReadOwnRequests: false,
+                    canReadAllRequests: false,
+                },
+                canRequestStock: true,
+                canProcessStockRequests: true,
+            },
+        });
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้"))
+            .toBeInTheDocument();
+        expect(await screen.findByRole("tab", { name: /รอดำเนินการ/ }))
+            .toBeInTheDocument();
+        await waitFor(() => expect(mocks.fetchProcessing).toHaveBeenCalled());
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+        expect(mocks.issueRequest).not.toHaveBeenCalled();
+    });
+
     it("keeps employee workflows usable when only the processor queue fails", async () => {
         mocks.fetchHome.mockResolvedValueOnce({
             workforce: { userId: 1, employeeId: 10, name: "ผู้ดูแล ทดสอบ" },

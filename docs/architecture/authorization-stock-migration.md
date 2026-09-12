@@ -1,6 +1,6 @@
-# Stock Authorization Migration — Phase 6A / Phase 6B
+# Stock Authorization Migration — Phase 6A / Phase 6B / Phase 6C
 
-สถานะ: Phase 6A **server enforcement** และ Phase 6B **presentation projection** เสร็จสิ้น<br>
+สถานะ: Phase 6A **server enforcement**, Phase 6B **presentation projection** และ Phase 6C **migration closure / regression hardening** เสร็จสิ้น<br>
 ขอบเขต: Stock เท่านั้น; ไม่รวม Leave, Employee, Audit หรือ Settings
 
 เอกสารนี้บันทึกการย้าย authorization ของ Stock จาก role/boolean checks ไปยัง central authorization resolver โดยคงพฤติกรรมเดิมเป็น compatibility floor ชั่วคราวตาม [authorization-contract.md](authorization-contract.md), [authorization-resolver.md](authorization-resolver.md) และ [stock-migration.md](stock-migration.md)
@@ -159,7 +159,128 @@ ABAC, Department/Team semantics, a policy DSL and authorization administration
 UI are out of scope. Leave, Employee, Audit, Settings and Routine behavior are
 not migrated by this phase.
 
-## 6. Verification record
+## 6. Phase 6C closure audit and hardening
+
+สถานะงานย้าย Stock authorization: **CLOSED**
+
+Phase 6C ตรวจเส้นทาง production และ tests ของ `app/api/stock/**`,
+`app/api/line/stock/**`, Stock image upload, Dashboard Stock route/menu/provider,
+LIFF Stock/home/session projection, `modules/stock/**`, Stock-related
+`modules/line/**` และ current-user projection ตั้งแต่ authentication ไปจนถึง
+resolver, adapter, query/resource predicate, transaction และ presentation
+consumer โดยไม่เปลี่ยน capability registry หรือ policy ที่อนุมัติไว้
+
+ผล audit ของ role/boolean/resource decisions:
+
+- ไม่พบ `requireAdminSession`, `isAdminRole` หรือ literal ADMIN เป็น authoritative
+  decision ใน Stock routes หรือ Stock use cases ที่ migrate แล้ว ทุก HTTP Stock
+  operation ในขอบเขต Phase 6 ผ่าน `modules/stock/application/authorization.ts` และ central
+  resolver ก่อนใช้ Stock-owned resource/workflow rules
+- `isAdmin` ใน Dashboard Stock ถูกเก็บไว้เฉพาะ role badge ซึ่งเป็น
+  presentation identity; tab, query, dialog, button และ mutation guard ใช้
+  `StockPresentationCapabilities`
+- `systemRole === "ADMIN"` ใน Stock adapter ถูกเก็บไว้เฉพาะ compatibility
+  floor, legacy Dashboard Admin workforce exception และ cancellation
+  notification classification ที่ freeze ไว้ ไม่ได้กระจายกลับไปยัง route/UI
+- `requestedBy` เป็น Stock-owned ownership predicate และ audit/notification
+  relationship โดย derive จาก trusted actor; ไม่มี client owner/user/team/scope
+  value กลายเป็น authority
+- `isAdministrative` ใน adapter เป็น descriptive decision metadata และไม่ถูกใช้
+  เพื่อ authorize Stock persistence หรือ presentation action
+- `canRequestStock` และ `canProcessStockRequests` ยังคงอยู่เฉพาะ LIFF
+  cross-module response contract เพื่อ compatibility และ derive จาก canonical
+  projection เท่านั้น ไม่มี active Stock presentation consumer ใช้ alias เหล่านี้
+  เป็น authorization source
+
+### 6.1 Server/resource closure
+
+Request list ยังคงบังคับ `scope=mine` เป็น requester-owned แม้ actor มี `ALL`;
+`scope=all` จะกว้างได้เฉพาะเมื่อ decision ของ `stock.request.read` มี `ALL`.
+Phase 6C เพิ่ม ownership predicate ที่ Prisma query ของ request detail ด้วย:
+OWN query ใช้ทั้ง request id และ authenticated `requestedBy`; ALL query ใช้ id
+โดยไม่เพิ่ม ownership predicate และ route ยังคง defensive relationship check กับ
+not-found behavior เดิมไว้
+
+LIFF processor queue ยังคงใช้ `stock.request.process / ALL` ของตัวเอง จึงรองรับ
+process-only actor โดยไม่สร้าง `stock.request.read / ALL`. General request-detail
+surface ใช้ `stock.request.read` เท่านั้น; Phase 6C แก้ Phase 6B presentation
+regression ที่เคยทำให้ process-only capability เปิดปุ่ม/deep link รายละเอียดได้
+แม้ detail route ไม่ได้ให้ read authority นั้น ปุ่ม issue/cancel ใน processor queue
+ยังใช้ process/cancel decisions ที่เป็นอิสระตามเดิม
+
+Cancel ยังคง resolve `stock.request.cancel` แยกจาก read/process ภายใน transaction:
+OWN ตรวจ `requestedBy`, ALL เข้าถึงคำขอของผู้อื่นได้ และ workflow state ยังคงต้อง
+เป็น pending ตาม invariant เดิม
+
+### 6.2 Transaction and lifecycle closure
+
+Request create, cancel, process/issue, category create/delete, item
+create/update/soft-delete และ quantity adjustment ยังคง re-read และ lock active
+User แล้ว resolve capability ผ่าน `resolveInTransaction()` ก่อน protected write
+ภายใน transaction เดียวกัน Request creation และ USER/LIFF actors ยังต้องมี active
+Employee; Dashboard ADMIN compatibility สำหรับ inventory/process/cancel ยังคง
+employee-optional ตาม behavior ที่ freeze ไว้ ไม่มี route preflight ใดมาแทน
+transaction-time authorization และ lifecycle revocation ยังคง fail closed เป็น 403
+
+Image upload ไม่มี Prisma business transaction และยังคงใช้ authenticated
+Dashboard identity ตามด้วย `stock.inventory.manage` preflight ก่อน filesystem write;
+scope ของ upload ถูกจำกัดเป็น `item|variant` และไม่รับ client permission/role
+
+Locks, serializable retry, pending claim, optimistic update, inventory validation,
+idempotency, audit, outbox และ notification ordering ไม่เปลี่ยนใน Phase 6C
+
+### 6.3 Presentation/channel closure
+
+Dashboard menu/direct route, visible tabs, SWR query keys และ actionable controls
+ใช้ projection เก้าค่าแบบ granular. Stale Dashboard tab ถูก normalize ไปยัง tab ที่
+ใช้งานได้ และ stale dialogs/actions ถูกปิดหรือ guard เมื่อ capability ที่เกี่ยวข้อง
+หายไป
+
+LIFF โหลด canonical Stock projection จาก home ก่อน query และ normalize tab/deep
+link ตาม read/process capability. Process-only actor ยังคงเห็น processor queue และ
+ทำ process action ได้ แต่ไม่ถูกอนุมานว่าอ่าน request detail แบบ ALL ได้ Session
+recovery ยังคง refresh projection/data และไม่ retry sensitive mutation อัตโนมัติ
+
+Channel compatibility คงเดิม: LIFF USER ได้ catalog/read-own/create-own/cancel-own
+จาก floor, LIFF ADMIN requester list ยังคง mine แต่ detail/cancel/process ใช้ ALL
+ตาม Stock compatibility และ explicit USER process/ALL grant ใช้ใน LIFF ได้
+`stock.inventory.manage` กับ `stock.report.export` ยังคง unsupported ใน
+`LIFF_SELF_SERVICE`
+
+### 6.4 Regression coverage
+
+Focused tests ครอบคลุม authentication/403/not-found, explicit normal USER grants,
+read/process/cancel independence, inventory/report independence, mine/all query
+translation, query-level detail ownership, transaction lifecycle revalidation,
+Dashboard route/menu/tab/query normalization, LIFF channel projection,
+process-only detail denial และ session-recovery no-retry behavior
+
+## 7. Intentionally retained compatibility bridge and remaining debt
+
+สถานะ compatibility bridge: **INTENTIONALLY RETAINED — ไม่ใช่งาน Stock migration
+ที่ยังเปิดอยู่**
+
+Stock migration ปิดแล้วโดยยังคง localized compatibility floor ใน Stock adapter
+เฉพาะ `NO_APPLICABLE_GRANT`. การลบ bridge ต้องรอ approved production Team /
+TeamRole / membership / direct-grant mapping ที่ครอบคลุมผู้ใช้ Stock เดิมทั้งหมด
+Unknown capability, unsupported channel, invalid authorization configuration และ
+structural resolver error จะไม่เข้า bridge
+
+หนี้ compatibility ที่เหลือมีเพียง:
+
+- Stock role-to-scope floor และ Dashboard ADMIN employee-optional lifecycle
+  exception ภายใน Stock adapter
+- legacy LIFF aliases `canRequestStock` / `canProcessStockRequests` ใน
+  cross-module response contract แม้ active Stock UI ใช้ `stockCapabilities`
+  โดยตรง
+- cancellation notification wording/classification ที่ต้องรักษา legacy ADMIN และ
+  requester/processor semantics; ค่านี้ไม่ใช่ authorization source
+
+Phase 6C ไม่สร้าง grant seed, Team policy, authorization administration UI,
+Prisma migration, capability key, DENY/wildcard/ABAC หรือเปลี่ยน Routine/Leave
+behavior
+
+## 8. Verification record
 
 Focused Stock projection, Dashboard, LIFF home, LIFF bootstrap/order,
 capability/tab/action and recovery tests cover compatibility, explicit grants,

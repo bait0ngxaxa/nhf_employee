@@ -446,6 +446,21 @@ describe("LIFF Stock route adapters", () => {
         const processorBody = await processorResponse.json();
         expect(processorBody.viewerRole).toBe("PROCESSOR");
         expect(processorBody.availableActions).toEqual(["ISSUE", "CANCEL"]);
+        expect(mocks.getRequestById).toHaveBeenNthCalledWith(
+            1,
+            71,
+            { userId: 7, scopes: ["OWN"] },
+        );
+        expect(mocks.getRequestById).toHaveBeenNthCalledWith(
+            2,
+            71,
+            { userId: 8, scopes: ["OWN"] },
+        );
+        expect(mocks.getRequestById).toHaveBeenNthCalledWith(
+            3,
+            71,
+            { userId: 1, scopes: ["ALL"] },
+        );
     });
 
     it("does not expose ISSUE just because a USER has read-all access", async () => {

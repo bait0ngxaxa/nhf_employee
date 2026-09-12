@@ -6,6 +6,7 @@ import {
     getCategories,
     getItemById,
     getItems,
+    getRequestById,
     getRequests,
     getVariantAvailability,
 } from "../application/queries/queries";
@@ -528,6 +529,30 @@ describe("Stock Queries", () => {
                     }),
                 }),
             );
+        });
+    });
+
+    describe("getRequestById", () => {
+        it("applies the authenticated requester predicate for OWN-only access", async () => {
+            prismaMock.stockRequest.findFirst.mockResolvedValue(asNever(null));
+
+            await getRequestById(71, { userId: 7, scopes: ["OWN"] });
+
+            expect(prismaMock.stockRequest.findFirst).toHaveBeenCalledWith({
+                where: { id: 71, requestedBy: 7 },
+                include: expect.any(Object),
+            });
+        });
+
+        it("does not add an ownership predicate for ALL access", async () => {
+            prismaMock.stockRequest.findFirst.mockResolvedValue(asNever(null));
+
+            await getRequestById(71, { userId: 7, scopes: ["ALL"] });
+
+            expect(prismaMock.stockRequest.findFirst).toHaveBeenCalledWith({
+                where: { id: 71 },
+                include: expect.any(Object),
+            });
         });
     });
 });

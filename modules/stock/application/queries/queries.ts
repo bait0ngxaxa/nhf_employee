@@ -242,9 +242,14 @@ export async function getRequests(
 
 export async function getRequestById(
     id: number,
+    authorization: StockRequestQueryAuthorization,
 ): Promise<StockRequestWithDetails | null> {
-    return prisma.stockRequest.findUnique({
-        where: { id },
+    const canReadAll = authorization.scopes.includes("ALL");
+    return prisma.stockRequest.findFirst({
+        where: {
+            id,
+            ...(!canReadAll && { requestedBy: authorization.userId }),
+        },
         include: buildRequestInclude(),
     });
 }

@@ -101,6 +101,7 @@ export function LiffStockMyRequests({
                                 busy={busyRequestId === request.id}
                                 canIssue={false}
                                 canCancel={canCancelOwnRequests}
+                                canOpenDetail
                                 onOpenDetail={onOpenDetail}
                                 onAction={onAction}
                             />

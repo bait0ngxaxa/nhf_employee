@@ -218,6 +218,41 @@ describe("Stock presentation capability projection", () => {
         });
     });
 
+    it("does not infer cancel-all or process from read-all", async () => {
+        mockDecisions((capability) => capability === "stock.request.read"
+            ? decision(capability, true, ["ALL"], undefined, [userGrant(capability, "ALL")])
+            : deniedDecision(capability));
+
+        await expect(getStockPresentationCapabilities(DASHBOARD_USER)).resolves.toMatchObject({
+            canReadAllRequests: true,
+            canCancelAnyRequests: false,
+            canProcessRequests: false,
+        });
+    });
+
+    it.each([
+        ["stock.inventory.manage", "canManageInventory", "canExportReports"],
+        ["stock.report.export", "canExportReports", "canManageInventory"],
+    ] as const)(
+        "keeps %s independent from the other administrative Stock surface",
+        async (grantedCapability, grantedProjection, deniedProjection) => {
+            mockDecisions((capability) => capability === grantedCapability
+                ? decision(
+                    capability,
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [userGrant(capability, "ALL")],
+                )
+                : deniedDecision(capability));
+
+            const projection = await getStockPresentationCapabilities(DASHBOARD_USER);
+
+            expect(projection[grantedProjection]).toBe(true);
+            expect(projection[deniedProjection]).toBe(false);
+        },
+    );
+
     it("denies Dashboard-only inventory and report capabilities in LIFF", async () => {
         const liffUser = buildStockAuthorizationContext(
             { id: 7, role: "USER" },

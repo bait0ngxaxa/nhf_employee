@@ -302,13 +302,14 @@ export function LiffStockApp(): ReactElement {
         const isProcessorIntent = actionIntent === "issue"
             || actionIntent === "review";
         const canReadRequest = capabilities?.canReadOwnRequests === true
-            || capabilities?.canReadAllRequests === true
-            || capabilities?.canProcessRequests === true;
-        if (!canReadRequest || (isProcessorIntent && capabilities?.canProcessRequests !== true)) {
+            || capabilities?.canReadAllRequests === true;
+        if (!canReadRequest) {
+            setFocusNotice("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้");
+            return;
+        }
+        if (isProcessorIntent && capabilities?.canProcessRequests !== true) {
             setFocusNotice(
-                isProcessorIntent
-                    ? "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"
-                    : "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้",
+                "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้",
             );
             return;
         }
@@ -487,14 +488,16 @@ export function LiffStockApp(): ReactElement {
         const isProcessorIntent = deepLinkActionIntent === "issue"
             || deepLinkActionIntent === "review";
         const canReadRequest = capabilities.canReadOwnRequests
-            || capabilities.canReadAllRequests
-            || capabilities.canProcessRequests;
-        if (!canReadRequest || (isProcessorIntent && !capabilities.canProcessRequests)) {
+            || capabilities.canReadAllRequests;
+        if (!canReadRequest) {
+            deepLinkHandledRef.current = deepLinkKey;
+            setFocusNotice("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้");
+            return;
+        }
+        if (isProcessorIntent && !capabilities.canProcessRequests) {
             deepLinkHandledRef.current = deepLinkKey;
             setFocusNotice(
-                isProcessorIntent
-                    ? "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"
-                    : "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้",
+                "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้",
             );
             return;
         }
@@ -966,6 +969,7 @@ export function LiffStockApp(): ReactElement {
                                 onAction={startAction}
                                 canProcessRequests={stockCapabilities.canProcessRequests}
                                 canCancelAnyRequests={stockCapabilities.canCancelAnyRequests}
+                                canReadAllRequests={stockCapabilities.canReadAllRequests}
                             />
                         </TabsContent>
                     ) : null}

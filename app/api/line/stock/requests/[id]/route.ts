@@ -26,9 +26,6 @@ export async function GET(
     if (!parsedId.success) return notFound();
 
     try {
-        const request = await stockService.getRequestById(parsedId.data);
-        if (!request) return notFound();
-
         const authorization = buildStockAuthorizationContext(
             auth.user,
             auth.employeeId,
@@ -40,6 +37,14 @@ export async function GET(
             { requestedScope: "all" },
         );
         const canReadAll = readAuthorization.scopes.includes("ALL");
+        const request = await stockService.getRequestById(
+            parsedId.data,
+            {
+                userId: readAuthorization.actor.userId,
+                scopes: readAuthorization.scopes,
+            },
+        );
+        if (!request) return notFound();
         if (!canReadAll && request.requestedBy !== auth.user.id) {
             return notFound();
         }
