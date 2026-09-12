@@ -44,6 +44,7 @@ import {
 
 type StockInventoryTableProps = {
     items: StockItem[];
+    canManageInventory: boolean;
     onAdjust: (item: StockItem) => void;
     onDeleted: (message: string) => void;
     onDeleteError: (message: string) => void;
@@ -51,6 +52,7 @@ type StockInventoryTableProps = {
 
 export function StockInventoryTable({
     items,
+    canManageInventory,
     onAdjust,
     onDeleted,
     onDeleteError,
@@ -59,11 +61,12 @@ export function StockInventoryTable({
     const [isDeleting, setIsDeleting] = useState(false);
 
     function handleDeleteRequest(item: StockItem): void {
+        if (!canManageInventory) return;
         setPendingDeleteItem(item);
     }
 
     async function handleConfirmDelete(): Promise<void> {
-        if (!pendingDeleteItem) {
+        if (!canManageInventory || !pendingDeleteItem) {
             return;
         }
 
@@ -91,7 +94,8 @@ export function StockInventoryTable({
                 items={items}
                 onAdjust={onAdjust}
                 onDelete={handleDeleteRequest}
-                deleteDisabled={isDeleting}
+                actionDisabled={!canManageInventory}
+                deleteDisabled={isDeleting || !canManageInventory}
             />
 
             <div className="hidden overflow-x-auto rounded-2xl bg-surface-raised shadow-sm ring-1 ring-border-subtle xl:block">
@@ -126,7 +130,8 @@ export function StockInventoryTable({
                                 item={item}
                                 onAdjust={onAdjust}
                                 onDelete={handleDeleteRequest}
-                                deleteDisabled={isDeleting}
+                                actionDisabled={!canManageInventory}
+                                deleteDisabled={isDeleting || !canManageInventory}
                             />
                         ))}
                     </TableBody>
@@ -154,14 +159,14 @@ export function StockInventoryTable({
                         <Button
                             variant="outline"
                             onClick={() => setPendingDeleteItem(null)}
-                            disabled={isDeleting}
+                            disabled={isDeleting || !canManageInventory}
                         >
                             ยกเลิก
                         </Button>
                         <Button
                             variant="destructive"
                             onClick={() => void handleConfirmDelete()}
-                            disabled={isDeleting}
+                            disabled={isDeleting || !canManageInventory}
                         >
                             {isDeleting ? (
                                 <>
@@ -183,10 +188,11 @@ type InventoryRowProps = {
     item: StockItem;
     onAdjust: (item: StockItem) => void;
     onDelete: (item: StockItem) => void;
+    actionDisabled: boolean;
     deleteDisabled: boolean;
 };
 
-function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRowProps) {
+function InventoryRow({ item, onAdjust, onDelete, actionDisabled, deleteDisabled }: InventoryRowProps) {
     const inventory = getItemInventoryMetrics(item);
 
     return (
@@ -244,6 +250,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                         size="icon"
                         className="h-11 w-11 text-action-primary-foreground-muted transition-colors hover:bg-action-primary-surface hover:text-action-primary-foreground"
                         onClick={() => onAdjust(item)}
+                        disabled={actionDisabled}
                         aria-label={`แก้ไข ${item.name}`}
                     >
                         <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -253,7 +260,7 @@ function InventoryRow({ item, onAdjust, onDelete, deleteDisabled }: InventoryRow
                         size="icon"
                         className="h-11 w-11 text-status-danger-icon transition-colors hover:bg-status-danger-surface hover:text-status-danger-strong"
                         onClick={() => onDelete(item)}
-                        disabled={deleteDisabled}
+                        disabled={deleteDisabled || actionDisabled}
                         aria-label={`ลบ ${item.name}`}
                     >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />

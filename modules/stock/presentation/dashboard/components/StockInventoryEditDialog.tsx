@@ -24,6 +24,7 @@ type CategoryOption = { id: number; name: string };
 type EditItemDialogProps = {
     item: StockItem;
     categories: CategoryOption[];
+    canManageInventory: boolean;
     onClose: () => void;
     onSuccess: () => void;
 };
@@ -152,6 +153,7 @@ function createEditSnapshot(params: {
 export function EditItemDialog({
     item,
     categories,
+    canManageInventory,
     onClose,
     onSuccess,
 }: EditItemDialogProps) {
@@ -212,6 +214,8 @@ export function EditItemDialog({
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
+
+        if (!canManageInventory) return;
 
         if (!hasChanges) {
             return;
@@ -296,6 +300,7 @@ export function EditItemDialog({
                                     id="edit-item-name"
                                     value={itemName}
                                     onChange={(event) => setItemName(event.target.value)}
+                                    disabled={!canManageInventory}
                                     required
                                     maxLength={200}
                                     placeholder="เช่น กระดาษ A4"
@@ -312,9 +317,10 @@ export function EditItemDialog({
                                 <Textarea
                                     id="edit-item-description"
                                     value={itemDescription}
-                                    onChange={(event) =>
-                                        setItemDescription(event.target.value)
-                                    }
+                                     onChange={(event) =>
+                                         setItemDescription(event.target.value)
+                                     }
+                                     disabled={!canManageInventory}
                                     maxLength={2000}
                                     placeholder={STOCK_ADMIN_TEXT.itemDescriptionPlaceholder}
                                     className="min-h-11 resize-y focus-visible:ring-action-primary-focus"
@@ -327,6 +333,7 @@ export function EditItemDialog({
                             value={selectedCategoryId}
                             onChange={setSelectedCategoryId}
                             required
+                            disabled={!canManageInventory}
                         />
 
                         <StockImageUploadField
@@ -334,6 +341,7 @@ export function EditItemDialog({
                             scope="item"
                             value={itemImageUrl}
                             onChange={setItemImageUrl}
+                            canManageInventory={canManageInventory}
                         />
 
                         <StockInventoryVariantEditor
@@ -407,7 +415,7 @@ export function EditItemDialog({
                                     ),
                                 )
                             }
-                            onRemoveAttribute={(variantIndex, attributeIndex) =>
+                             onRemoveAttribute={(variantIndex, attributeIndex) =>
                                 setVariants((current) =>
                                     current.map((variant, index) =>
                                         index === variantIndex &&
@@ -421,8 +429,9 @@ export function EditItemDialog({
                                               }
                                             : variant,
                                     ),
-                                )
-                            }
+                                 )
+                             }
+                             canManageInventory={canManageInventory}
                         />
                     </div>
                     <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border-subtle bg-surface-raised px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
@@ -430,14 +439,14 @@ export function EditItemDialog({
                             type="button"
                             variant="ghost"
                             onClick={onClose}
-                            disabled={loading}
+                            disabled={loading || !canManageInventory}
                             className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
                         >
                             {STOCK_ADMIN_TEXT.cancel}
                         </Button>
                         <Button
                             type="submit"
-                            disabled={loading || !hasChanges}
+                            disabled={loading || !hasChanges || !canManageInventory}
                             className="h-11 bg-action-primary-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-action-primary-solid-hover"
                         >
                             {loading ? STOCK_ADMIN_TEXT.saving : "บันทึกการแก้ไข"}

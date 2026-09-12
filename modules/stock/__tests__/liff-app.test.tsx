@@ -99,6 +99,25 @@ const EMPTY_REQUESTS = {
     totalPages: 0,
 };
 
+const EMPLOYEE_STOCK_CAPABILITIES = {
+    canReadCatalog: true,
+    canReadOwnRequests: true,
+    canReadAllRequests: false,
+    canCreateRequests: true,
+    canCancelOwnRequests: true,
+    canCancelAnyRequests: false,
+    canProcessRequests: false,
+    canManageInventory: false,
+    canExportReports: false,
+};
+
+const PROCESSOR_STOCK_CAPABILITIES = {
+    ...EMPLOYEE_STOCK_CAPABILITIES,
+    canReadAllRequests: true,
+    canCancelAnyRequests: true,
+    canProcessRequests: true,
+};
+
 const CATALOG = {
     items: [{
         id: 10,
@@ -255,6 +274,18 @@ function createProcessorDetail(
     };
 }
 
+function mockProcessorHome(): void {
+    mocks.fetchHome.mockResolvedValueOnce({
+        workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+        modules: {},
+        capabilities: {
+            stockCapabilities: PROCESSOR_STOCK_CAPABILITIES,
+            canRequestStock: true,
+            canProcessStockRequests: true,
+        },
+    });
+}
+
 describe("LIFF Stock app orchestration", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -268,7 +299,11 @@ describe("LIFF Stock app orchestration", () => {
         mocks.fetchHome.mockResolvedValue({
             workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
             modules: {},
-            capabilities: { canProcessStockRequests: false },
+            capabilities: {
+                stockCapabilities: EMPLOYEE_STOCK_CAPABILITIES,
+                canRequestStock: true,
+                canProcessStockRequests: false,
+            },
         });
         mocks.fetchItems.mockResolvedValue(CATALOG);
         mocks.fetchCategories.mockResolvedValue([{ id: 2, name: "เครื่องเขียน" }]);
@@ -286,6 +321,12 @@ describe("LIFF Stock app orchestration", () => {
         expect(await screen.findByRole("heading", { name: "เลือกวัสดุที่ต้องการเบิก" }))
             .toBeInTheDocument();
         expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        expect(mocks.fetchHome.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.fetchItems.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+        );
+        expect(mocks.fetchHome.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.fetchCategories.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+        );
         expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
             .not.toBeInTheDocument();
         expect(mocks.fetchProcessing).not.toHaveBeenCalled();
@@ -298,11 +339,101 @@ describe("LIFF Stock app orchestration", () => {
             .toBeInTheDocument();
     });
 
+    it("does not load catalog data without catalog read capability", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {
+                stockCapabilities: {
+                    ...EMPLOYEE_STOCK_CAPABILITIES,
+                    canReadCatalog: false,
+                    canCreateRequests: false,
+                },
+                canRequestStock: false,
+                canProcessStockRequests: false,
+            },
+        });
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByRole("tab", { name: "คำขอของฉัน" }))
+            .toBeInTheDocument();
+        expect(screen.queryByRole("tab", { name: "เบิกวัสดุ" }))
+            .not.toBeInTheDocument();
+        expect(mocks.fetchItems).not.toHaveBeenCalled();
+        expect(mocks.fetchCategories).not.toHaveBeenCalled();
+        expect(await screen.findByRole("heading", { name: "ยังไม่มีประวัติการเบิก" }))
+            .toBeInTheDocument();
+    });
+
+    it("does not load own request history without own-request read capability", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {
+                stockCapabilities: {
+                    ...EMPLOYEE_STOCK_CAPABILITIES,
+                    canReadOwnRequests: false,
+                    canCreateRequests: false,
+                    canCancelOwnRequests: false,
+                },
+                canRequestStock: false,
+                canProcessStockRequests: false,
+            },
+        });
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByRole("heading", { name: "เลือกวัสดุที่ต้องการเบิก" }))
+            .toBeInTheDocument();
+        expect(screen.queryByRole("tab", { name: "คำขอของฉัน" }))
+            .not.toBeInTheDocument();
+        expect(mocks.fetchMyRequests).not.toHaveBeenCalled();
+    });
+
+    it("keeps catalog browsing available but disables request creation without create capability", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {
+                stockCapabilities: {
+                    ...EMPLOYEE_STOCK_CAPABILITIES,
+                    canCreateRequests: false,
+                },
+                canRequestStock: false,
+                canProcessStockRequests: false,
+            },
+        });
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "เพิ่มลงตะกร้า" }))
+            .toBeDisabled();
+        expect(screen.queryByRole("button", { name: /เปิดตะกร้า/ }))
+            .not.toBeInTheDocument();
+    });
+
+    it("fails closed for an issue deep link without process capability", async () => {
+        mocks.search = "requestId=71&action=issue";
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+            .toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+        expect(mocks.issueRequest).not.toHaveBeenCalled();
+    });
+
     it("keeps employee workflows usable when only the processor queue fails", async () => {
         mocks.fetchHome.mockResolvedValueOnce({
             workforce: { userId: 1, employeeId: 10, name: "ผู้ดูแล ทดสอบ" },
             modules: {},
-            capabilities: { canProcessStockRequests: true },
+            capabilities: {
+                stockCapabilities: PROCESSOR_STOCK_CAPABILITIES,
+                canRequestStock: true,
+                canProcessStockRequests: true,
+            },
         });
         mocks.fetchProcessing.mockRejectedValueOnce(new Error("queue unavailable"));
 
@@ -323,6 +454,7 @@ describe("LIFF Stock app orchestration", () => {
 
     it("opens a processor deep link independently and never auto-issues", async () => {
         mocks.search = "requestId=71&action=issue";
+        mockProcessorHome();
 
         render(<LiffStockApp />);
 
@@ -342,6 +474,7 @@ describe("LIFF Stock app orchestration", () => {
 
     it("refreshes processor detail after an issue conflict without retrying", async () => {
         mocks.search = "requestId=71&action=issue";
+        mockProcessorHome();
         const refreshedDetail = {
             ...createProcessorDetail(71, 1, []),
             status: "ISSUED" as const,
@@ -377,6 +510,7 @@ describe("LIFF Stock app orchestration", () => {
 
     it("refreshes Stock state after recovered issue ambiguity without issuing twice", async () => {
         mocks.search = "requestId=71&action=issue";
+        mockProcessorHome();
         const refreshedDetail = {
             ...createProcessorDetail(71, 1, []),
             status: "ISSUED" as const,
@@ -481,6 +615,7 @@ describe("LIFF Stock app orchestration", () => {
 
         await waitFor(() => expect(mocks.submitRequest).toHaveBeenCalledTimes(1));
         expect(mocks.fetchAvailability).toHaveBeenCalledWith([101]);
+        expect(mocks.fetchHome).toHaveBeenCalledTimes(2);
         await waitFor(() => {
             expect(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }))
                 .not.toBeDisabled();
@@ -744,7 +879,11 @@ describe("LIFF Stock app orchestration", () => {
         mocks.fetchHome.mockResolvedValue({
             workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
             modules: {},
-            capabilities: { canProcessStockRequests: true },
+            capabilities: {
+                stockCapabilities: PROCESSOR_STOCK_CAPABILITIES,
+                canRequestStock: true,
+                canProcessStockRequests: true,
+            },
         });
         mocks.fetchProcessing.mockImplementation(({ search }: { search?: string }) => {
             if (search === "เก่า") return queueA.promise;

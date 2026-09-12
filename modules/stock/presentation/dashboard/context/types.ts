@@ -1,4 +1,5 @@
 import { type StockRequestStatus } from "@prisma/client";
+import type { StockPresentationCapabilities } from "@/modules/stock/client";
 
 export interface StockCategory {
     id: number;
@@ -106,6 +107,7 @@ export interface StockDataContextValue {
     totalRequests: number;
     isLoading: boolean;
     isAdmin: boolean;
+    stockCapabilities: StockPresentationCapabilities;
     refreshItems: () => void;
     refreshRequests: () => void;
     refreshCategories: () => void;

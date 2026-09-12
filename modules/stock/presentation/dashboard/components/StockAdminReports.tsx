@@ -6,8 +6,8 @@ import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyRep
 import { StockReportsSkeleton } from "./StockSkeletons";
 import { useStockAdminReports } from "./useStockAdminReports";
 
-export function StockAdminReports() {
-    const reports = useStockAdminReports();
+export function StockAdminReports({ canExportReports }: { canExportReports: boolean }) {
+    const reports = useStockAdminReports(canExportReports);
 
     if (reports.isPageLoading) {
         return <StockReportsSkeleton />;
@@ -29,7 +29,7 @@ export function StockAdminReports() {
                 exportLabel={reports.reportExportLabel}
                 badge={
                     <div className="inline-flex rounded-full border border-module-stock-badge-border bg-surface-raised/80 px-3 py-1 text-xs font-semibold text-module-stock-badge-foreground shadow-sm">
-                        รายงานผู้ดูแล
+                        รายงาน Stock
                     </div>
                 }
                 title="รีพอร์ตการใช้วัสดุรายปี"

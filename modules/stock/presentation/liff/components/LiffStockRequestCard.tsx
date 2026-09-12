@@ -22,6 +22,8 @@ interface LiffStockRequestCardProps {
         action: LiffStockRequestAction,
         request: LiffStockRequestSummary,
     ) => void;
+    canIssue: boolean;
+    canCancel: boolean;
 }
 
 export function LiffStockRequestCard({
@@ -31,7 +33,12 @@ export function LiffStockRequestCard({
     busy = false,
     onOpenDetail,
     onAction,
+    canIssue,
+    canCancel,
 }: LiffStockRequestCardProps): ReactElement {
+    const visibleActions = request.availableActions.filter((action) =>
+        action === "ISSUE" ? canIssue : canCancel,
+    );
     return (
         <article className="border-b border-border-subtle py-4 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
@@ -116,7 +123,7 @@ export function LiffStockRequestCard({
                     <Eye className="size-4" aria-hidden="true" />
                     รายละเอียด
                 </Button>
-                {request.availableActions.map((action) => (
+                {visibleActions.map((action) => (
                     <Button
                         key={action}
                         type="button"

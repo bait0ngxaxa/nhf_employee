@@ -62,7 +62,7 @@ describe("StockAdminReports", () => {
             } as never;
         });
 
-        render(<StockAdminReports />);
+        render(<StockAdminReports canExportReports />);
 
         await waitFor(() => {
             expect(apiGet).toHaveBeenCalledWith("/api/stock/reports/export?yearsOnly=1");
@@ -135,7 +135,7 @@ describe("StockAdminReports", () => {
             return null;
         });
 
-        render(<StockAdminReports />);
+        render(<StockAdminReports canExportReports />);
 
         await waitFor(() => {
             expect(screen.getByRole("button", { name: "ดาวน์โหลด Excel" })).toBeEnabled();
@@ -173,7 +173,7 @@ describe("StockAdminReports", () => {
             return null;
         });
 
-        render(<StockAdminReports />);
+        render(<StockAdminReports canExportReports />);
 
         await waitFor(() => {
             expect(

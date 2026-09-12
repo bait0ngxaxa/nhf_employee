@@ -7,6 +7,8 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 import { ensureStockApiSuccess } from "./stockAdminInventory.shared";
 
 type UseStockRequestActionsOptions = {
+    canCancelRequests: boolean;
+    canProcessRequests: boolean;
     onCancelSettled?: () => void;
     onCancelSuccess?: () => void;
     onIssueSettled?: () => void;
@@ -20,6 +22,8 @@ type UseStockRequestActionsResult = {
 };
 
 export function useStockRequestActions({
+    canCancelRequests,
+    canProcessRequests,
     onCancelSettled,
     onCancelSuccess,
     onIssueSettled,
@@ -31,6 +35,9 @@ export function useStockRequestActions({
         requestId: number,
         cancelReason?: string,
     ): Promise<void> {
+        if (!canCancelRequests) {
+            return;
+        }
         setProcessingRequestId(requestId);
 
         try {
@@ -52,6 +59,9 @@ export function useStockRequestActions({
     }
 
     async function runIssueRequest(requestId: number): Promise<void> {
+        if (!canProcessRequests) {
+            return;
+        }
         setProcessingRequestId(requestId);
 
         try {

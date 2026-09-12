@@ -1,4 +1,5 @@
 import type { RoutinePresentationCapabilities } from "@/modules/routine";
+import type { StockPresentationCapabilities } from "@/modules/stock";
 
 export interface LiffWorkforceIdentity {
     userId: number;
@@ -40,6 +41,7 @@ export interface LiffHomeModules {
 }
 
 export interface LiffCapabilities {
+    stockCapabilities: StockPresentationCapabilities;
     canRequestStock: boolean;
     canProcessStockRequests: boolean;
     canRequestLeave: boolean;

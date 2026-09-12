@@ -35,6 +35,17 @@ const HOME = {
         routine: { enabled: true, status: "available" as const },
     },
     capabilities: {
+        stockCapabilities: {
+            canReadCatalog: true,
+            canReadOwnRequests: true,
+            canReadAllRequests: false,
+            canCreateRequests: true,
+            canCancelOwnRequests: true,
+            canCancelAnyRequests: false,
+            canProcessRequests: false,
+            canManageInventory: false,
+            canExportReports: false,
+        },
         canRequestStock: true,
         canProcessStockRequests: false,
         canRequestLeave: false,

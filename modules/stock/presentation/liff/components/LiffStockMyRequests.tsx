@@ -31,6 +31,7 @@ interface LiffStockMyRequestsProps {
         action: LiffStockRequestAction,
         request: LiffStockRequestSummary,
     ) => void;
+    canCancelOwnRequests: boolean;
 }
 
 export function LiffStockMyRequests({
@@ -46,6 +47,7 @@ export function LiffStockMyRequests({
     onRetry,
     onOpenDetail,
     onAction,
+    canCancelOwnRequests,
 }: LiffStockMyRequestsProps): ReactElement {
     return (
         <section aria-labelledby="liff-stock-history-heading" className="space-y-4">
@@ -97,6 +99,8 @@ export function LiffStockMyRequests({
                                 key={request.id}
                                 request={request}
                                 busy={busyRequestId === request.id}
+                                canIssue={false}
+                                canCancel={canCancelOwnRequests}
                                 onOpenDetail={onOpenDetail}
                                 onAction={onAction}
                             />

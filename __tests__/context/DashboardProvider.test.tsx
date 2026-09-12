@@ -50,6 +50,18 @@ const routineCapabilities = {
     canManageImports: false,
 };
 
+const stockCapabilities = {
+    canReadCatalog: true,
+    canReadOwnRequests: true,
+    canReadAllRequests: true,
+    canCreateRequests: true,
+    canCancelOwnRequests: true,
+    canCancelAnyRequests: true,
+    canProcessRequests: true,
+    canManageInventory: true,
+    canExportReports: true,
+};
+
 function DashboardNavigationState(): ReactElement {
     const { selectedMenu, mobileNavOpen, desktopSidebarCollapsed } =
         useDashboardUIContext();
@@ -85,6 +97,7 @@ describe("DashboardProvider navigation state", () => {
             id: "employee-1",
             name: "สมชาย ใจดี",
             role: "EMPLOYEE",
+            stockCapabilities,
         };
     });
 

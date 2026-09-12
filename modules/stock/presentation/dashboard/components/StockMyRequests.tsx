@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardList, Search, X } from "lucide-react";
 import { type StockRequestStatus } from "@prisma/client";
 import { Pagination } from "@/components/Pagination";
@@ -39,7 +39,14 @@ import { StockRequestListSkeleton } from "./StockSkeletons";
 import { StockRequestMobileCards } from "./StockRequestMobileCards";
 
 export function StockMyRequests() {
-    const { requests, isLoading, totalRequests, refreshRequests } = useStockDataContext();
+    const {
+        requests,
+        isLoading,
+        totalRequests,
+        refreshRequests,
+        stockCapabilities,
+    } = useStockDataContext();
+    const canCancelOwnRequests = stockCapabilities.canCancelOwnRequests;
     const {
         requestsPage,
         setRequestsPage,
@@ -50,15 +57,25 @@ export function StockMyRequests() {
     } = useStockUIContext();
     const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
     const { processingRequestId, runCancelRequest } = useStockRequestActions({
+        canCancelRequests: canCancelOwnRequests,
+        canProcessRequests: false,
         onCancelSuccess: refreshRequests,
         onCancelSettled: () => setCancelTarget(null),
     });
+    useEffect(() => {
+        if (!canCancelOwnRequests) {
+            setCancelTarget(null);
+        }
+    }, [canCancelOwnRequests]);
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
     const isInitialLoading = isLoading && requests.length === 0;
+    const hasCancelableRequests = canCancelOwnRequests
+        && requests.some((request) => request.status === "PENDING_ISSUE");
 
     async function handleCancel(requestId: number, cancelReason?: string): Promise<void> {
+        if (!canCancelOwnRequests) return;
         await runCancelRequest(requestId, cancelReason);
     }
 
@@ -87,7 +104,7 @@ export function StockMyRequests() {
                     <StockRequestMobileCards
                         requests={requests}
                         renderActions={(request) =>
-                            request.status === "PENDING_ISSUE" ? (
+                            canCancelOwnRequests && request.status === "PENDING_ISSUE" ? (
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -120,10 +137,10 @@ export function StockMyRequests() {
                                     <TableHead className="w-32 border-r border-border-subtle font-semibold text-content-body">
                                         สถานะ
                                     </TableHead>
-                                    <TableHead className={`w-56 font-semibold text-content-body${requests.some((r) => r.status === "PENDING_ISSUE") ? " border-r border-border-subtle" : ""}`}>
+                                    <TableHead className={`w-56 font-semibold text-content-body${hasCancelableRequests ? " border-r border-border-subtle" : ""}`}>
                                         หมายเหตุ
                                     </TableHead>
-                                    {requests.some((r) => r.status === "PENDING_ISSUE") && (
+                                    {hasCancelableRequests && (
                                         <TableHead className="w-36 font-semibold text-content-body">
                                             ดำเนินการ
                                         </TableHead>
@@ -137,7 +154,8 @@ export function StockMyRequests() {
                                         request={request}
                                         processingId={processingRequestId}
                                         onOpenCancel={() => setCancelTarget(request)}
-                                        showActionColumn={requests.some((r) => r.status === "PENDING_ISSUE")}
+                                        showActionColumn={hasCancelableRequests}
+                                        canCancel={canCancelOwnRequests}
                                     />
                                 ))}
                             </TableBody>
@@ -244,8 +262,15 @@ function RequestRow(props: {
     processingId: number | null;
     onOpenCancel: () => void;
     showActionColumn: boolean;
+    canCancel: boolean;
 }) {
-    const { request, processingId, onOpenCancel, showActionColumn } = props;
+    const {
+        request,
+        processingId,
+        onOpenCancel,
+        showActionColumn,
+        canCancel,
+    } = props;
     const isPendingIssue = request.status === "PENDING_ISSUE";
 
     return (
@@ -282,7 +307,7 @@ function RequestRow(props: {
             </TableCell>
             {showActionColumn && (
                 <TableCell className="py-4">
-                    {isPendingIssue && (
+                    {isPendingIssue && canCancel && (
                         <Button
                             size="sm"
                             variant="outline"

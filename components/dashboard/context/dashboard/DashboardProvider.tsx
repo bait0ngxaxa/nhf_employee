@@ -10,6 +10,7 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import {
     DASHBOARD_MENU_ITEMS,
+    canAccessStockDashboard,
     getAvailableMenuGroups,
 } from "@/constants/dashboard";
 import { DashboardDataContext, DashboardUIContext } from "./DashboardContext";
@@ -52,8 +53,12 @@ export function DashboardProvider({
         useState(false);
 
     const availableMenuGroups = useMemo(
-        () => getAvailableMenuGroups(isAdmin, user?.routineCapabilities),
-        [isAdmin, user?.routineCapabilities],
+        () => getAvailableMenuGroups(
+            isAdmin,
+            user?.routineCapabilities,
+            user?.stockCapabilities,
+        ),
+        [isAdmin, user?.routineCapabilities, user?.stockCapabilities],
     );
 
     const handleMenuClick = useCallback(
@@ -74,6 +79,13 @@ export function DashboardProvider({
                 router.push(APP_ROUTES.accessDenied);
                 return;
             }
+            if (
+                menuId === "stock"
+                && !canAccessStockDashboard(user?.stockCapabilities)
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
             if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
@@ -84,7 +96,13 @@ export function DashboardProvider({
                 router.push(targetPath, { scroll: false });
             }
         },
-        [isAdmin, pathname, router, user?.routineCapabilities],
+        [
+            isAdmin,
+            pathname,
+            router,
+            user?.routineCapabilities,
+            user?.stockCapabilities,
+        ],
     );
 
     const handleSignOut = useCallback(async (): Promise<void> => {

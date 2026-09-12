@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type StockRequestStatus } from "@prisma/client";
 import { CheckCircle, ClipboardList, Loader2, Search, X, XCircle } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
@@ -41,8 +41,16 @@ import { StockRequestListSkeleton } from "./StockSkeletons";
 import { StockRequestMobileCards } from "./StockRequestMobileCards";
 
 export function StockAdminRequests() {
-    const { requests, isLoading, refreshRequests, refreshItems, totalRequests } =
-        useStockDataContext();
+    const {
+        requests,
+        isLoading,
+        refreshRequests,
+        refreshItems,
+        totalRequests,
+        stockCapabilities,
+    } = useStockDataContext();
+    const canProcessRequests = stockCapabilities.canProcessRequests;
+    const canCancelAnyRequests = stockCapabilities.canCancelAnyRequests;
     const {
         requestsPage,
         setRequestsPage,
@@ -54,6 +62,8 @@ export function StockAdminRequests() {
     const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
     const { processingRequestId, runCancelRequest, runIssueRequest } =
         useStockRequestActions({
+            canCancelRequests: canCancelAnyRequests,
+            canProcessRequests,
             onIssueSuccess: () => {
                 refreshRequests();
                 refreshItems();
@@ -61,16 +71,23 @@ export function StockAdminRequests() {
             onCancelSuccess: refreshRequests,
             onCancelSettled: () => setCancelTarget(null),
         });
+    useEffect(() => {
+        if (!canCancelAnyRequests) {
+            setCancelTarget(null);
+        }
+    }, [canCancelAnyRequests]);
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
     const isInitialLoading = isLoading && requests.length === 0;
 
     async function handleIssue(requestId: number): Promise<void> {
+        if (!canProcessRequests) return;
         await runIssueRequest(requestId);
     }
 
     async function handleCancel(requestId: number, reason: string): Promise<void> {
+        if (!canCancelAnyRequests) return;
         await runCancelRequest(requestId, reason);
     }
 
@@ -170,25 +187,29 @@ export function StockAdminRequests() {
                         renderActions={(req) =>
                             req.status === "PENDING_ISSUE" ? (
                                 <>
-                                    <Button
-                                        size="sm"
-                                        className="h-11 bg-status-success-solid text-content-on-brand shadow-sm transition-colors hover:bg-status-success-solid-hover"
-                                        disabled={processingRequestId === req.id}
-                                        onClick={() => void handleIssue(req.id)}
-                                    >
-                                        <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-                                        จ่ายแล้ว
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-11 border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
-                                        disabled={processingRequestId === req.id}
-                                        onClick={() => setCancelTarget(req)}
-                                    >
-                                        <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                        ยกเลิก
-                                    </Button>
+                                    {canProcessRequests ? (
+                                        <Button
+                                            size="sm"
+                                            className="h-11 bg-status-success-solid text-content-on-brand shadow-sm transition-colors hover:bg-status-success-solid-hover"
+                                            disabled={processingRequestId === req.id}
+                                            onClick={() => void handleIssue(req.id)}
+                                        >
+                                            <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
+                                            จ่ายแล้ว
+                                        </Button>
+                                    ) : null}
+                                    {canCancelAnyRequests ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-11 border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
+                                            disabled={processingRequestId === req.id}
+                                            onClick={() => setCancelTarget(req)}
+                                        >
+                                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                                            ยกเลิก
+                                        </Button>
+                                    ) : null}
                                 </>
                             ) : null
                         }
@@ -267,9 +288,9 @@ export function StockAdminRequests() {
                                                 <RequestStatusBadge meta={getStockRequestStatusMeta(req.status)} />
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                {isPendingIssue ? (
+                                                {isPendingIssue && (canProcessRequests || canCancelAnyRequests) ? (
                                                     <div className="flex justify-end gap-2">
-                                                        <Button
+                                                        {canProcessRequests ? <Button
                                                             size="sm"
                                                             className="bg-status-success-solid text-content-on-brand shadow-sm transition-colors hover:bg-status-success-solid-hover"
                                                             disabled={processingRequestId === req.id}
@@ -277,8 +298,8 @@ export function StockAdminRequests() {
                                                         >
                                                             <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
                                                             จ่ายแล้ว
-                                                        </Button>
-                                                        <Button
+                                                        </Button> : null}
+                                                        {canCancelAnyRequests ? <Button
                                                             size="sm"
                                                             variant="outline"
                                                             className="border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
@@ -287,7 +308,7 @@ export function StockAdminRequests() {
                                                         >
                                                             <XCircle className="mr-1.5 h-3.5 w-3.5" />
                                                             ยกเลิก
-                                                        </Button>
+                                                        </Button> : null}
                                                     </div>
                                                 ) : (
                                                     <StockRequestNote request={req} />

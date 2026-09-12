@@ -31,6 +31,7 @@ interface LiffStockCartProps {
     onRemove: (variantId: number) => void;
     onClear: () => void;
     onSubmit: () => void;
+    canCreateRequests: boolean;
 }
 
 export function LiffStockCart({
@@ -45,8 +46,11 @@ export function LiffStockCart({
     onRemove,
     onClear,
     onSubmit,
+    canCreateRequests,
 }: LiffStockCartProps): ReactElement {
-    const canSubmit = items.length > 0 && projectCode.trim().length > 0;
+    const canSubmit = canCreateRequests
+        && items.length > 0
+        && projectCode.trim().length > 0;
 
     return (
         <Dialog
@@ -104,7 +108,7 @@ export function LiffStockCart({
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => onRemove(item.variant.id)}
-                                                disabled={submitting}
+                                                disabled={submitting || !canCreateRequests}
                                                 aria-label={`นำ ${item.item.name} ออกจากตะกร้า`}
                                                 className="size-11 shrink-0 text-status-danger-foreground"
                                             >
@@ -117,7 +121,7 @@ export function LiffStockCart({
                                                 variant="outline"
                                                 size="icon"
                                                 onClick={() => onChangeQuantity(item.variant.id, -1)}
-                                                disabled={submitting}
+                                                disabled={submitting || !canCreateRequests}
                                                 aria-label={`ลดจำนวน ${item.item.name}`}
                                                 className="size-11"
                                             >
@@ -133,6 +137,7 @@ export function LiffStockCart({
                                                 onClick={() => onChangeQuantity(item.variant.id, 1)}
                                                 disabled={
                                                     submitting
+                                                    || !canCreateRequests
                                                     || item.qty >= item.variant.availableQuantity
                                                 }
                                                 aria-label={`เพิ่มจำนวน ${item.item.name}`}
@@ -159,7 +164,7 @@ export function LiffStockCart({
                             onChange={(event) => onProjectCodeChange(event.target.value)}
                             maxLength={STOCK_PROJECT_CODE_MAX_LENGTH}
                             placeholder="เช่น NHF-2569"
-                            disabled={submitting}
+                            disabled={submitting || !canCreateRequests}
                             className="h-12 border-border-subtle bg-surface"
                         />
                         <p className="text-xs leading-5 text-content-muted">
@@ -172,7 +177,7 @@ export function LiffStockCart({
                             type="button"
                             variant="ghost"
                             onClick={onClear}
-                            disabled={submitting}
+                        disabled={submitting || !canCreateRequests}
                             className="min-h-11 w-full text-status-danger-foreground"
                         >
                             ล้างตะกร้าทั้งหมด
@@ -183,7 +188,9 @@ export function LiffStockCart({
                 <div className="shrink-0 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                     <Button
                         type="button"
-                        onClick={onSubmit}
+                        onClick={() => {
+                            if (canCreateRequests) onSubmit();
+                        }}
                         disabled={!canSubmit || submitting}
                         className="min-h-12 w-full bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
                     >

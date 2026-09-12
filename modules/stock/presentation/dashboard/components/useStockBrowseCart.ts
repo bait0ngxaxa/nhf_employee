@@ -79,6 +79,7 @@ type CartAvailabilityReconciliationOutcome = {
 
 type UseStockBrowseCartParams = {
     userId: number | string | null | undefined;
+    canCreateRequests: boolean;
     onSubmitted: () => void;
     onSubmitError?: (error: unknown) => void | Promise<void>;
     submitRequest?: StockRequestSubmitter;
@@ -377,6 +378,7 @@ function reconcileCartAvailability(
 
 export function useStockBrowseCart({
     userId,
+    canCreateRequests,
     onSubmitted,
     onSubmitError,
     submitRequest: submitRequestTransport = submitDashboardStockRequest,
@@ -464,7 +466,7 @@ export function useStockBrowseCart({
             quantity: number;
         }>,
     ): void {
-        if (variants.length === 0) {
+        if (!canCreateRequests || variants.length === 0) {
             return;
         }
 
@@ -509,6 +511,9 @@ export function useStockBrowseCart({
     }
 
     function addDirectItem(item: StockBrowseItem): void {
+        if (!canCreateRequests) {
+            return;
+        }
         const defaultVariant = getPreferredVariant(item);
         if (!defaultVariant || getVariantAvailableQuantity(defaultVariant) === 0) {
             toast.error("รายการนี้ไม่มีสต็อกพร้อมเบิก");
@@ -519,6 +524,9 @@ export function useStockBrowseCart({
     }
 
     function removeFromCart(variantId: number): void {
+        if (!canCreateRequests) {
+            return;
+        }
         setCart((prev) => {
             const next = new Map(prev);
             next.delete(variantId);
@@ -527,6 +535,9 @@ export function useStockBrowseCart({
     }
 
     function updateCartQuantity(variantId: number, delta: number): void {
+        if (!canCreateRequests) {
+            return;
+        }
         setCart((prev) => {
             const next = new Map(prev);
             const existing = next.get(variantId);
@@ -587,7 +598,7 @@ export function useStockBrowseCart({
     );
 
     async function submitRequest(): Promise<void> {
-        if (submitting) {
+        if (!canCreateRequests || submitting) {
             return;
         }
 

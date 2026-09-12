@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type StockRequestStatus } from "@prisma/client";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { StockDataContext, StockUIContext } from "./StockContext";
 import {
@@ -43,6 +44,18 @@ import type {
 } from "./types";
 import { useAuth } from "@/modules/auth/client";
 
+const EMPTY_STOCK_CAPABILITIES: StockPresentationCapabilities = Object.freeze({
+    canReadCatalog: false,
+    canReadOwnRequests: false,
+    canReadAllRequests: false,
+    canCreateRequests: false,
+    canCancelOwnRequests: false,
+    canCancelAnyRequests: false,
+    canProcessRequests: false,
+    canManageInventory: false,
+    canExportReports: false,
+});
+
 interface StockProviderProps {
     children: ReactNode;
 }
@@ -53,10 +66,11 @@ export function StockProvider({ children }: StockProviderProps) {
     const searchParams = useSearchParams();
     const pathname = usePathname();
     const isAdmin = isAdminRole(user?.role);
+    const stockCapabilities = user?.stockCapabilities ?? EMPTY_STOCK_CAPABILITIES;
     const latestSearchParamsRef = useRef(searchParams);
     const tabFromUrl = normalizeStockTab(
         searchParams.get(STOCK_TAB_QUERY_KEY),
-        isAdmin,
+        stockCapabilities,
     );
 
     const [activeTab, setActiveTabState] = useState(tabFromUrl);
@@ -145,8 +159,12 @@ export function StockProvider({ children }: StockProviderProps) {
 
     const setActiveTab = useCallback(
         (tab: string) => {
-            const nextTab = normalizeStockTab(tab, isAdmin);
+            const nextTab = normalizeStockTab(tab, stockCapabilities);
             setActiveTabState(nextTab);
+
+            if (!nextTab) {
+                return;
+            }
 
             if (!isStockDashboardRoute(pathname)) {
                 return;
@@ -162,7 +180,7 @@ export function StockProvider({ children }: StockProviderProps) {
                 scroll: false,
             });
         },
-        [isAdmin, pathname, router, searchParams],
+        [pathname, router, searchParams, stockCapabilities],
     );
 
     const setRequestsPage = useCallback(
@@ -305,15 +323,23 @@ export function StockProvider({ children }: StockProviderProps) {
         [activeTab, debouncedSearchQuery, itemsPage, selectedCategoryId],
     );
 
-    const shouldFetchItems = activeTab === "browse" || activeTab === "inventory";
+    const shouldFetchCatalogData = stockCapabilities.canReadCatalog;
+    const shouldFetchItems =
+        (activeTab === "browse" && stockCapabilities.canReadCatalog)
+        || (
+            activeTab === "inventory"
+            && stockCapabilities.canReadCatalog
+            && stockCapabilities.canManageInventory
+        );
     const shouldFetchRequests =
-        activeTab === "my-requests" || activeTab === "admin-requests";
+        (activeTab === "my-requests" && stockCapabilities.canReadOwnRequests)
+        || (activeTab === "admin-requests" && stockCapabilities.canReadAllRequests);
 
     const requestsQuery = useMemo(
         () =>
             buildStockRequestsQuery({
                 activeTab,
-                isAdmin,
+                stockCapabilities,
                 requestSearchQuery: debouncedRequestSearchQuery,
                 requestsPage,
                 statusFilter,
@@ -321,9 +347,9 @@ export function StockProvider({ children }: StockProviderProps) {
         [
             activeTab,
             debouncedRequestSearchQuery,
-            isAdmin,
             requestsPage,
             statusFilter,
+            stockCapabilities,
         ],
     );
 
@@ -331,7 +357,7 @@ export function StockProvider({ children }: StockProviderProps) {
         data: categoriesData,
         isLoading: isCategoriesLoading,
         mutate: mutateCategories,
-    } = useStockCategoriesQuery();
+    } = useStockCategoriesQuery(shouldFetchCatalogData);
     const {
         data: itemsData,
         isLoading: isItemsLoading,
@@ -418,7 +444,7 @@ export function StockProvider({ children }: StockProviderProps) {
     );
     const totalItems = itemsData?.total ?? 0;
     const totalRequests = requestsData?.total ?? 0;
-    const isLoading = isCategoriesLoading
+    const isLoading = (shouldFetchCatalogData && isCategoriesLoading)
         || (shouldFetchItems && (isItemsLoading || !itemsData))
         || (shouldFetchRequests && (isRequestsLoading || !requestsData));
 
@@ -431,6 +457,7 @@ export function StockProvider({ children }: StockProviderProps) {
             totalRequests,
             isLoading,
             isAdmin,
+            stockCapabilities,
             refreshItems,
             refreshRequests,
             refreshCategories,
@@ -443,6 +470,7 @@ export function StockProvider({ children }: StockProviderProps) {
             totalRequests,
             isLoading,
             isAdmin,
+            stockCapabilities,
             refreshItems,
             refreshRequests,
             refreshCategories,

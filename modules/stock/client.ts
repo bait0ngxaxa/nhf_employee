@@ -20,6 +20,7 @@ export {
     normalizeStockProjectCode,
 } from "./presentation/dashboard/components/stockBrowseCart.shared";
 export { formatStockRequestDate } from "./presentation/dashboard/components/stockRequest.shared";
+export type { StockPresentationCapabilities } from "./application/types";
 
 export type {
     BrowseCartItem,

@@ -1,5 +1,6 @@
 import { type StockRequestStatus } from "@prisma/client";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import type { StockPresentationCapabilities } from "@/modules/stock/client";
 
 type SearchParamsLike = {
     get(name: string): string | null;
@@ -15,14 +16,19 @@ type BuildStockItemsQueryParams = {
 
 type BuildStockRequestsQueryParams = {
     activeTab: string;
-    isAdmin: boolean;
+    stockCapabilities: StockPresentationCapabilities;
     requestSearchQuery: string;
     requestsPage: number;
     statusFilter: StockRequestStatus | undefined;
 };
 
-const STOCK_DEFAULT_TAB = "browse";
-const STOCK_ADMIN_TABS = new Set(["inventory", "admin-requests", "reports"]);
+const STOCK_TAB_ORDER = [
+    "browse",
+    "my-requests",
+    "inventory",
+    "admin-requests",
+    "reports",
+] as const;
 
 export const STOCK_TAB_QUERY_KEY = "stockTab";
 export const STOCK_ITEMS_PAGE_QUERY_KEY = "stockItemsPage";
@@ -34,14 +40,34 @@ export const STOCK_BROWSE_LIMIT = 12;
 export const STOCK_ADMIN_ITEMS_LIMIT = 10;
 export const STOCK_REQUESTS_LIMIT = 10;
 
-export function normalizeStockTab(tab: string | null, isAdmin: boolean): string {
-    if (!tab) {
-        return STOCK_DEFAULT_TAB;
+export function getVisibleStockTabs(
+    capabilities: StockPresentationCapabilities,
+): string[] {
+    return STOCK_TAB_ORDER.filter((tab) => {
+        switch (tab) {
+            case "browse":
+                return capabilities.canReadCatalog;
+            case "my-requests":
+                return capabilities.canReadOwnRequests;
+            case "inventory":
+                return capabilities.canReadCatalog && capabilities.canManageInventory;
+            case "admin-requests":
+                return capabilities.canReadAllRequests;
+            case "reports":
+                return capabilities.canExportReports;
+        }
+    });
+}
+
+export function normalizeStockTab(
+    tab: string | null,
+    capabilities: StockPresentationCapabilities,
+): string {
+    const visibleTabs = getVisibleStockTabs(capabilities);
+    if (tab && visibleTabs.includes(tab)) {
+        return tab;
     }
-    if (!isAdmin && STOCK_ADMIN_TABS.has(tab)) {
-        return STOCK_DEFAULT_TAB;
-    }
-    return tab;
+    return visibleTabs[0] ?? "";
 }
 
 export function parsePositivePage(value: string | null): number {
@@ -119,13 +145,15 @@ export function buildStockItemsQuery({
 
 export function buildStockRequestsQuery({
     activeTab,
-    isAdmin,
+    stockCapabilities,
     requestSearchQuery,
     requestsPage,
     statusFilter,
 }: BuildStockRequestsQueryParams): string {
     const requestScope =
-        isAdmin && activeTab === "admin-requests" ? "all" : "mine";
+        stockCapabilities.canReadAllRequests && activeTab === "admin-requests"
+            ? "all"
+            : "mine";
     const params = new URLSearchParams({
         page: String(requestsPage),
         limit: String(STOCK_REQUESTS_LIMIT),

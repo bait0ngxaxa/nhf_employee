@@ -12,7 +12,7 @@ import {
     type StockReportMetaResponse,
 } from "../../client/api";
 
-export function useStockAdminReports() {
+export function useStockAdminReports(canExportReports: boolean) {
     const currentYear = new Date().getFullYear();
     const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
     const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -26,12 +26,12 @@ export function useStockAdminReports() {
     const reportExportLockRef = useRef(false);
     const balanceExportLockRef = useRef(false);
 
-    useStockReportYears(currentYear, setAvailableYears, setSelectedYear, setIsLoadingYears);
-    useStockReportMeta(selectedYear, setMeta, setIsLoadingMeta);
-    useStockBalanceMeta(setBalanceMeta, setIsLoadingBalanceMeta);
+    useStockReportYears(currentYear, canExportReports, setAvailableYears, setSelectedYear, setIsLoadingYears);
+    useStockReportMeta(selectedYear, canExportReports, setMeta, setIsLoadingMeta);
+    useStockBalanceMeta(canExportReports, setBalanceMeta, setIsLoadingBalanceMeta);
 
     async function handleReportExport(): Promise<void> {
-        if (reportExportLockRef.current) {
+        if (!canExportReports || reportExportLockRef.current) {
             return;
         }
 
@@ -58,7 +58,7 @@ export function useStockAdminReports() {
     }
 
     async function handleBalanceExport(): Promise<void> {
-        if (balanceExportLockRef.current) {
+        if (!canExportReports || balanceExportLockRef.current) {
             return;
         }
 
@@ -89,13 +89,15 @@ export function useStockAdminReports() {
         selectedYear,
         setSelectedYear,
         isPageLoading:
-            isLoadingYears
-            || (isLoadingMeta && meta === null)
-            || (isLoadingBalanceMeta && balanceMeta === null),
+            canExportReports && (
+                isLoadingYears
+                || (isLoadingMeta && meta === null)
+                || (isLoadingBalanceMeta && balanceMeta === null)
+            ),
         isExportingReport,
         isExportingBalance,
-        isReportDisabled: isExportingReport || isExportUnavailable(meta),
-        isBalanceDisabled: isExportingBalance || isExportUnavailable(balanceMeta),
+        isReportDisabled: !canExportReports || isExportingReport || isExportUnavailable(meta),
+        isBalanceDisabled: !canExportReports || isExportingBalance || isExportUnavailable(balanceMeta),
         reportExportLabel: isExportingReport ? "กำลังเตรียมไฟล์" : "ดาวน์โหลด Excel",
         balanceExportLabel: isExportingBalance
             ? "กำลังเตรียมไฟล์"
@@ -115,11 +117,18 @@ export function useStockAdminReports() {
 
 function useStockReportYears(
     currentYear: number,
+    canExportReports: boolean,
     setAvailableYears: (years: number[]) => void,
     setSelectedYear: (setter: (previous: number) => number) => void,
     setIsLoadingYears: (value: boolean) => void,
 ): void {
     useEffect(() => {
+        if (!canExportReports) {
+            setIsLoadingYears(false);
+            setAvailableYears([currentYear]);
+            setSelectedYear(() => currentYear);
+            return;
+        }
         let isCancelled = false;
 
         async function loadYears(): Promise<void> {
@@ -149,15 +158,21 @@ function useStockReportYears(
         return () => {
             isCancelled = true;
         };
-    }, [currentYear, setAvailableYears, setIsLoadingYears, setSelectedYear]);
+    }, [canExportReports, currentYear, setAvailableYears, setIsLoadingYears, setSelectedYear]);
 }
 
 function useStockReportMeta(
     selectedYear: number,
+    canExportReports: boolean,
     setMeta: (meta: StockReportMetaResponse | null) => void,
     setIsLoadingMeta: (value: boolean) => void,
 ): void {
     useEffect(() => {
+        if (!canExportReports) {
+            setIsLoadingMeta(false);
+            setMeta(null);
+            return;
+        }
         let isCancelled = false;
 
         async function loadMeta(): Promise<void> {
@@ -183,14 +198,20 @@ function useStockReportMeta(
         return () => {
             isCancelled = true;
         };
-    }, [selectedYear, setIsLoadingMeta, setMeta]);
+    }, [canExportReports, selectedYear, setIsLoadingMeta, setMeta]);
 }
 
 function useStockBalanceMeta(
+    canExportReports: boolean,
     setBalanceMeta: (meta: StockBalanceMetaResponse | null) => void,
     setIsLoadingBalanceMeta: (value: boolean) => void,
 ): void {
     useEffect(() => {
+        if (!canExportReports) {
+            setIsLoadingBalanceMeta(false);
+            setBalanceMeta(null);
+            return;
+        }
         let isCancelled = false;
 
         async function loadBalanceMeta(): Promise<void> {
@@ -216,7 +237,7 @@ function useStockBalanceMeta(
         return () => {
             isCancelled = true;
         };
-    }, [setBalanceMeta, setIsLoadingBalanceMeta]);
+    }, [canExportReports, setBalanceMeta, setIsLoadingBalanceMeta]);
 }
 
 function canExportStockReport(meta: StockReportMetaResponse, year: number): boolean {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Package } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
@@ -29,8 +29,16 @@ const StockVariantPickerDialog = dynamic(
 
 export function StockBrowse() {
     const { user } = useAuth();
-    const { items, categories, isLoading, refreshRequests, totalItems } =
-        useStockDataContext();
+    const {
+        items,
+        categories,
+        isLoading,
+        refreshRequests,
+        totalItems,
+        stockCapabilities,
+    } = useStockDataContext();
+    const canReadCatalog = stockCapabilities.canReadCatalog;
+    const canCreateRequests = stockCapabilities.canCreateRequests;
     const {
         searchQuery,
         setSearchQuery,
@@ -57,8 +65,25 @@ export function StockBrowse() {
         updateCartQuantity,
     } = useStockBrowseCart({
         userId: user?.id,
+        canCreateRequests,
         onSubmitted: refreshRequests,
     });
+    useEffect(() => {
+        if (!canCreateRequests) {
+            setVariantPickerItem(null);
+        }
+    }, [canCreateRequests]);
+
+    if (!canReadCatalog) {
+        return (
+            <div
+                className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong"
+                role="status"
+            >
+                บัญชีนี้ไม่มีสิทธิ์ดูรายการวัสดุ
+            </div>
+        );
+    }
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
     const isInitialLoading = isLoading && items.length === 0;
 
@@ -89,6 +114,7 @@ export function StockBrowse() {
                     onAddDirect={addDirectItem}
                     onOpenVariantPicker={setVariantPickerItem}
                     recentlyAddedItemId={recentlyAddedItemId}
+                    canCreateRequests={canCreateRequests}
                 />
             )}
 
@@ -103,7 +129,7 @@ export function StockBrowse() {
                 />
             ) : null}
 
-            {cartCount > 0 && (
+            {cartCount > 0 && canCreateRequests && (
                 <StockBrowseCartBar
                     items={cartItems}
                     cartSize={cartSize}
@@ -120,10 +146,10 @@ export function StockBrowse() {
 
             <StockVariantPickerDialog
                 item={variantPickerItem}
-                open={variantPickerItem !== null}
+                open={variantPickerItem !== null && canCreateRequests}
                 onClose={() => setVariantPickerItem(null)}
                 onConfirm={(selections) => {
-                    if (!variantPickerItem) {
+                    if (!variantPickerItem || !canCreateRequests) {
                         return;
                     }
                     addVariantsToCart(variantPickerItem, selections);

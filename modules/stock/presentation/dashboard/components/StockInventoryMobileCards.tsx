@@ -11,6 +11,7 @@ type StockInventoryMobileCardsProps = {
     items: StockItem[];
     onAdjust: (item: StockItem) => void;
     onDelete: (item: StockItem) => void;
+    actionDisabled: boolean;
     deleteDisabled: boolean;
 };
 
@@ -18,6 +19,7 @@ export function StockInventoryMobileCards({
     items,
     onAdjust,
     onDelete,
+    actionDisabled,
     deleteDisabled,
 }: StockInventoryMobileCardsProps) {
     return (
@@ -28,6 +30,7 @@ export function StockInventoryMobileCards({
                     item={item}
                     onAdjust={onAdjust}
                     onDelete={onDelete}
+                    actionDisabled={actionDisabled}
                     deleteDisabled={deleteDisabled}
                 />
             ))}
@@ -39,11 +42,13 @@ function InventoryMobileCard({
     item,
     onAdjust,
     onDelete,
+    actionDisabled,
     deleteDisabled,
 }: {
     item: StockItem;
     onAdjust: (item: StockItem) => void;
     onDelete: (item: StockItem) => void;
+    actionDisabled: boolean;
     deleteDisabled: boolean;
 }) {
     const inventory = getItemInventoryMetrics(item);
@@ -90,6 +95,7 @@ function InventoryMobileCard({
                     variant="outline"
                     className="h-11 px-3 text-action-primary-foreground"
                     onClick={() => onAdjust(item)}
+                    disabled={actionDisabled}
                 >
                     <Pencil className="mr-1.5 h-4 w-4" aria-hidden="true" />
                     แก้ไข
@@ -98,7 +104,7 @@ function InventoryMobileCard({
                     variant="outline"
                     className="h-11 px-3 text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                     onClick={() => onDelete(item)}
-                    disabled={deleteDisabled}
+                    disabled={deleteDisabled || actionDisabled}
                 >
                     <Trash2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
                     ลบ

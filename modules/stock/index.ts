@@ -100,10 +100,12 @@ export {
     buildStockAuthorizationActor,
     buildStockAuthorizationContext,
     canResolveStockCapabilityForMigration,
+    getStockPresentationCapabilities,
     resolveStockCapabilityForMigration,
     resolveStockCapabilityInTransaction,
     STOCK_MIGRATED_CAPABILITIES,
 } from "./application/authorization";
+export type { StockPresentationCapabilities } from "./application/types";
 export type {
     StockAuthorizationChannel,
     StockAuthorizationActor,

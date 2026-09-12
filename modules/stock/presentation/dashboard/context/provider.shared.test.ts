@@ -1,15 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
     buildStockItemsQuery,
+    buildStockRequestsQuery,
     createStockDashboardUrl,
+    getVisibleStockTabs,
     getStockItemsLimit,
     getStockItemsPageQueryKey,
     isStockDashboardRoute,
+    normalizeStockTab,
     STOCK_ADMIN_ITEMS_LIMIT,
     STOCK_BROWSE_LIMIT,
     STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY,
     STOCK_ITEMS_PAGE_QUERY_KEY,
 } from "./provider.shared";
+import type { StockPresentationCapabilities } from "@/modules/stock/client";
+
+const noCapabilities: StockPresentationCapabilities = {
+    canReadCatalog: false,
+    canReadOwnRequests: false,
+    canReadAllRequests: false,
+    canCreateRequests: false,
+    canCancelOwnRequests: false,
+    canCancelAnyRequests: false,
+    canProcessRequests: false,
+    canManageInventory: false,
+    canExportReports: false,
+};
 
 function getQueryParams(url: string): URLSearchParams {
     const query = url.split("?")[1] ?? "";
@@ -75,5 +91,42 @@ describe("stock provider shared pagination helpers", () => {
         expect(nextParams.has("tab")).toBe(false);
         expect(nextParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)).toBe("1");
         expect(nextParams.has(STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY)).toBe(false);
+    });
+
+    it("derives Stock tabs from granular capabilities in deterministic order", () => {
+        expect(getVisibleStockTabs({
+            ...noCapabilities,
+            canReadOwnRequests: true,
+            canReadAllRequests: true,
+            canProcessRequests: true,
+            canExportReports: true,
+        })).toEqual(["my-requests", "admin-requests", "reports"]);
+        expect(normalizeStockTab("inventory", {
+            ...noCapabilities,
+            canReadOwnRequests: true,
+        })).toBe("my-requests");
+    });
+
+    it("requests organization-wide data only for the authorized admin-request tab", () => {
+        const allCapabilities = {
+            ...noCapabilities,
+            canReadOwnRequests: true,
+            canReadAllRequests: true,
+        };
+
+        expect(getQueryParams(buildStockRequestsQuery({
+            activeTab: "admin-requests",
+            stockCapabilities: allCapabilities,
+            requestSearchQuery: "",
+            requestsPage: 1,
+            statusFilter: undefined,
+        })).get("scope")).toBe("all");
+        expect(getQueryParams(buildStockRequestsQuery({
+            activeTab: "my-requests",
+            stockCapabilities: allCapabilities,
+            requestSearchQuery: "",
+            requestsPage: 1,
+            statusFilter: undefined,
+        })).get("scope")).toBe("mine");
     });
 });

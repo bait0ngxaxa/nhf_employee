@@ -32,6 +32,7 @@ interface LiffStockBrowseProps {
     onAddDirect: (item: LiffStockCatalogItem) => void;
     onChooseVariant: (item: LiffStockCatalogItem) => void;
     onOpenCart: () => void;
+    canCreateRequests: boolean;
 }
 
 export function LiffStockBrowse({
@@ -51,6 +52,7 @@ export function LiffStockBrowse({
     onAddDirect,
     onChooseVariant,
     onOpenCart,
+    canCreateRequests,
 }: LiffStockBrowseProps): ReactElement {
     return (
         <section aria-labelledby="liff-stock-browse-heading" className="space-y-4">
@@ -113,6 +115,7 @@ export function LiffStockBrowse({
                                 priorityImage={index < 2}
                                 onAddDirect={onAddDirect}
                                 onChooseVariant={onChooseVariant}
+                                canCreateRequests={canCreateRequests}
                             />
                         ))}
                     </div>
@@ -124,7 +127,7 @@ export function LiffStockBrowse({
                 </>
             )}
 
-            {cartCount > 0 ? (
+            {cartCount > 0 && canCreateRequests ? (
                 <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 pt-1">
                     <Button
                         type="button"

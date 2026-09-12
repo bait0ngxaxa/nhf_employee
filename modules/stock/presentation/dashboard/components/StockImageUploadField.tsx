@@ -15,6 +15,7 @@ type StockImageUploadFieldProps = {
     scope: "item" | "variant";
     value: string;
     onChange: (value: string) => void;
+    canManageInventory: boolean;
 };
 
 type UploadResponse = {
@@ -29,6 +30,7 @@ export function StockImageUploadField({
     scope,
     value,
     onChange,
+    canManageInventory,
 }: StockImageUploadFieldProps) {
     const inputId = useId();
     const inputRef = useRef<HTMLInputElement | null>(null);
@@ -38,7 +40,7 @@ export function StockImageUploadField({
         event: ChangeEvent<HTMLInputElement>,
     ): Promise<void> {
         const file = event.target.files?.[0];
-        if (!file) {
+        if (!file || !canManageInventory) {
             return;
         }
 
@@ -108,7 +110,7 @@ export function StockImageUploadField({
                             <Button
                                 type="button"
                                 variant="outline"
-                                disabled={uploading}
+                                disabled={uploading || !canManageInventory}
                                 onClick={() => inputRef.current?.click()}
                                 className="border-action-primary-border text-action-primary-foreground hover:bg-action-primary-surface"
                             >
@@ -122,7 +124,7 @@ export function StockImageUploadField({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                disabled={uploading}
+                                disabled={uploading || !canManageInventory}
                                 onClick={() => onChange("")}
                                 className="text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                             >
@@ -134,7 +136,7 @@ export function StockImageUploadField({
                 ) : (
                     <button
                         type="button"
-                        disabled={uploading}
+                        disabled={uploading || !canManageInventory}
                         onClick={() => inputRef.current?.click()}
                         className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface-raised px-4 py-8 text-sm text-content-muted transition hover:border-action-primary-border-strong hover:text-action-primary-foreground disabled:cursor-not-allowed"
                     >

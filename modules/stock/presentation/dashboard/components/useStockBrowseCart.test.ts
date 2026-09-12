@@ -59,7 +59,7 @@ describe("useStockBrowseCart idempotency", () => {
         }));
         const onSubmitted = vi.fn();
         const { result } = renderHook(() =>
-            useStockBrowseCart({ userId: 7, onSubmitted }),
+            useStockBrowseCart({ canCreateRequests: true, userId: 7, onSubmitted }),
         );
 
         await waitFor(() => {
@@ -102,6 +102,7 @@ describe("useStockBrowseCart idempotency", () => {
             }],
         };
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
         }));
@@ -134,6 +135,43 @@ describe("useStockBrowseCart idempotency", () => {
         expect(result.current.projectCode).toBe("");
     });
 
+    it("does not mutate the cart or submit when request creation is unavailable", async () => {
+        const item = {
+            id: 10,
+            name: "กระดาษ",
+            imageUrl: null,
+            variants: [{
+                id: 101,
+                sku: "PAPER-A4",
+                unit: "รีม",
+                imageUrl: null,
+                availableQuantity: 3,
+                attributeValues: [],
+            }],
+        };
+        const submitTransport = vi.fn();
+        const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: false,
+            userId: 7,
+            onSubmitted: vi.fn(),
+            submitRequest: submitTransport,
+        }));
+
+        await waitFor(() => expect(result.current.cartSize).toBe(0));
+        act(() => {
+            result.current.addDirectItem(item);
+            result.current.addVariantToCart(item, item.variants[0], 1);
+            result.current.setProjectCode("NHF-2569");
+        });
+
+        await act(async () => {
+            await result.current.submitRequest();
+        });
+
+        expect(result.current.cartSize).toBe(0);
+        expect(submitTransport).not.toHaveBeenCalled();
+    });
+
     it("retains retry state after failure and clears it only after success", async () => {
         window.localStorage.setItem(storageKey, JSON.stringify({
             projectCode: payload.projectCode,
@@ -155,6 +193,7 @@ describe("useStockBrowseCart idempotency", () => {
             .mockResolvedValueOnce(undefined);
         const onSubmitted = vi.fn();
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted,
             submitRequest: submitTransport,
@@ -203,6 +242,7 @@ describe("useStockBrowseCart idempotency", () => {
             .mockRejectedValueOnce(new Error("network unavailable"))
             .mockResolvedValueOnce(undefined);
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
             submitRequest: submitTransport,
@@ -245,6 +285,7 @@ describe("useStockBrowseCart idempotency", () => {
             .mockRejectedValueOnce(new Error("Stock conflict"))
             .mockResolvedValueOnce(undefined);
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
             submitRequest: submitTransport,
@@ -300,6 +341,7 @@ describe("useStockBrowseCart availability reconciliation", () => {
 
     it("clamps quantity when latest availability decreases but remains positive", async () => {
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
         }));
@@ -327,6 +369,7 @@ describe("useStockBrowseCart availability reconciliation", () => {
 
     it("removes an entry when latest availability is zero", async () => {
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
         }));
@@ -351,6 +394,7 @@ describe("useStockBrowseCart availability reconciliation", () => {
 
     it("keeps requested quantity when latest availability increases", async () => {
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
         }));
@@ -378,6 +422,7 @@ describe("useStockBrowseCart availability reconciliation", () => {
 
     it("leaves variants absent from the current catalog response unchanged", async () => {
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
         }));
@@ -409,6 +454,7 @@ describe("useStockBrowseCart availability reconciliation", () => {
 
     it("reconciles targeted availability for the current cart variants", async () => {
         const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
             userId: 7,
             onSubmitted: vi.fn(),
         }));

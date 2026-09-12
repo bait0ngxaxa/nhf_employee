@@ -29,6 +29,7 @@ type StockBrowseGridProps = {
     onAddDirect: (item: StockItem) => void;
     onOpenVariantPicker: (item: StockItem) => void;
     recentlyAddedItemId: number | null;
+    canCreateRequests: boolean;
 };
 
 type ImagePreviewState = {
@@ -44,6 +45,7 @@ type BrowseCardProps = {
     onAddDirect: (item: StockItem) => void;
     onOpenVariantPicker: (item: StockItem) => void;
     onPreviewImage: (imageUrl: string, itemName: string) => void;
+    canCreateRequests: boolean;
 };
 
 export function StockBrowseGrid({
@@ -52,6 +54,7 @@ export function StockBrowseGrid({
     onAddDirect,
     onOpenVariantPicker,
     recentlyAddedItemId,
+    canCreateRequests,
 }: StockBrowseGridProps) {
     const [imagePreview, setImagePreview] = useState<ImagePreviewState>(null);
     const handlePreviewImage = useCallback(
@@ -80,6 +83,7 @@ export function StockBrowseGrid({
                             onAddDirect={onAddDirect}
                             onOpenVariantPicker={onOpenVariantPicker}
                             onPreviewImage={handlePreviewImage}
+                            canCreateRequests={canCreateRequests}
                         />
                     );
                 })}
@@ -261,12 +265,15 @@ function BrowseCardBase(props: BrowseCardProps) {
                                   ? "border border-status-success-solid bg-status-success-solid text-content-on-brand hover:bg-status-success-solid-hover"
                                 : "border border-action-primary-solid bg-action-primary-solid text-content-on-brand hover:border-action-primary-solid-hover hover:bg-action-primary-solid-hover"
                         }`}
-                        onClick={() =>
-                            hasSelectableVariants(item)
-                                ? props.onOpenVariantPicker(item)
-                                : props.onAddDirect(item)
-                        }
-                        disabled={availableQuantity === 0}
+                        onClick={() => {
+                            if (!props.canCreateRequests) return;
+                            if (hasSelectableVariants(item)) {
+                                props.onOpenVariantPicker(item);
+                            } else {
+                                props.onAddDirect(item);
+                            }
+                        }}
+                        disabled={availableQuantity === 0 || !props.canCreateRequests}
                     >
                         {availableQuantity > 0 && (
                             <span className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-surface-raised/45 opacity-60 transition-opacity duration-300 group-hover/button:opacity-100" />
@@ -355,5 +362,6 @@ function areBrowseCardPropsEqual(
         && prev.totalInCart === next.totalInCart
         && prev.isRecentlyAdded === next.isRecentlyAdded
         && prev.isPriorityImage === next.isPriorityImage
+        && prev.canCreateRequests === next.canCreateRequests
     );
 }

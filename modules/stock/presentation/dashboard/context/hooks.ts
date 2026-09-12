@@ -38,9 +38,9 @@ async function apiGetFetcher<T>(url: string): Promise<T> {
     return response.data;
 }
 
-export function useStockCategoriesQuery() {
+export function useStockCategoriesQuery(enabled = true) {
     return useSWR<StockCategoriesResponse>(
-        API_ROUTES.stock.categories,
+        enabled ? API_ROUTES.stock.categories : null,
         apiGetFetcher,
         {
             ...DEFAULT_SWR_OPTIONS,

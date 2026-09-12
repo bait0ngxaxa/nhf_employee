@@ -7,6 +7,7 @@ import {
 } from "@/constants/dashboard";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
+import type { StockPresentationCapabilities } from "@/modules/stock/client";
 
 const originalRoutineFlag = process.env.NEXT_PUBLIC_FEATURE_ROUTINE;
 
@@ -21,6 +22,18 @@ const routineCapabilities = {
     canChangeOccurrenceDueDate: false,
     canManageImports: false,
 } satisfies RoutinePresentationCapabilities;
+
+const stockCapabilities = {
+    canReadCatalog: true,
+    canReadOwnRequests: true,
+    canReadAllRequests: false,
+    canCreateRequests: false,
+    canCancelOwnRequests: false,
+    canCancelAnyRequests: false,
+    canProcessRequests: false,
+    canManageInventory: false,
+    canExportReports: false,
+} satisfies StockPresentationCapabilities;
 
 afterEach(() => {
     if (originalRoutineFlag === undefined) {
@@ -97,5 +110,28 @@ describe("dashboard menu", () => {
         expect(userMenuIds).toContain("routine");
         expect(adminMenuIds).toContain("email-request");
         expect(userMenuIds).not.toContain("email-request");
+    });
+
+    it("shows Stock only when a Stock presentation surface is usable", () => {
+        expect(
+            getAvailableMenuGroups(false, undefined, stockCapabilities)
+                .flatMap((group) => group.items.map((item) => item.id)),
+        ).toContain("stock");
+        expect(
+            getAvailableMenuGroups(true)
+                .flatMap((group) => group.items.map((item) => item.id)),
+        ).not.toContain("stock");
+    });
+
+    it("lets an explicit non-admin report capability expose Stock", () => {
+        expect(
+            getAvailableMenuGroups(false, undefined, {
+                ...stockCapabilities,
+                canReadCatalog: false,
+                canReadOwnRequests: false,
+                canExportReports: true,
+            })
+                .flatMap((group) => group.items.map((item) => item.id)),
+        ).toContain("stock");
     });
 });

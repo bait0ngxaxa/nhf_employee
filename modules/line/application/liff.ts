@@ -5,9 +5,12 @@ import { findAccountIdentityById } from "@/modules/auth";
 import { findLiffEmployeeByUserId } from "@/modules/employee";
 import { getLiffLeaveCapabilities } from "@/modules/leave";
 import { getRoutinePresentationCapabilities } from "@/modules/routine";
+import {
+    buildStockAuthorizationContext,
+    getStockPresentationCapabilities,
+} from "@/modules/stock";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { forbidden, serverError, unauthorized } from "@/lib/ssot/http";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { getUserDisplayName } from "@/shared/identity/display";
 import { LIFF_SESSION_COOKIE_NAME, verifyLiffSession } from "../infrastructure/session/liff-session";
 import { findLineUserIdByUserId } from "../infrastructure/persistence/account-link";
@@ -61,10 +64,20 @@ export async function getLiffCapabilities(
         },
         session.employeeId,
     );
+    const stockCapabilities = await getStockPresentationCapabilities(
+        buildStockAuthorizationContext(
+            session.user,
+            session.employeeId,
+            "LIFF_SELF_SERVICE",
+        ),
+    );
 
     return {
-        canRequestStock: true,
-        canProcessStockRequests: isAdminRole(session.user.role),
+        stockCapabilities,
+        canRequestStock:
+            stockCapabilities.canReadCatalog
+            && stockCapabilities.canCreateRequests,
+        canProcessStockRequests: stockCapabilities.canProcessRequests,
         canRequestLeave: leaveEnabled,
         canApproveLeave: leaveCapabilities.canApproveLeave,
         canCreateOwnRoutine: routineEnabled && routineCapabilities.canCreateTasks,

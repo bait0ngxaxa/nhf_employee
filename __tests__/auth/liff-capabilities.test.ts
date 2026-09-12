@@ -1,9 +1,16 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { leaveRequestFindFirstMock, routineProjectionMock } = vi.hoisted(() => ({
+const {
+    leaveRequestFindFirstMock,
+    routineProjectionMock,
+    stockContextMock,
+    stockProjectionMock,
+} = vi.hoisted(() => ({
     leaveRequestFindFirstMock: vi.fn(),
     routineProjectionMock: vi.fn(),
+    stockContextMock: vi.fn(),
+    stockProjectionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -15,6 +22,10 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 vi.mock("@/modules/routine", () => ({
     getRoutinePresentationCapabilities: routineProjectionMock,
+}));
+vi.mock("@/modules/stock", () => ({
+    buildStockAuthorizationContext: stockContextMock,
+    getStockPresentationCapabilities: stockProjectionMock,
 }));
 
 import { getLiffCapabilities } from "@/modules/line";
@@ -46,6 +57,18 @@ const ROUTINE_CAPABILITIES = {
     canManageImports: false,
 };
 
+const STOCK_CAPABILITIES = {
+    canReadCatalog: true,
+    canReadOwnRequests: true,
+    canReadAllRequests: false,
+    canCreateRequests: true,
+    canCancelOwnRequests: true,
+    canCancelAnyRequests: false,
+    canProcessRequests: false,
+    canManageInventory: false,
+    canExportReports: false,
+};
+
 function expectActionableApproverQuery(): void {
     expect(leaveRequestFindFirstMock).toHaveBeenCalledWith({
         where: {
@@ -64,6 +87,8 @@ describe("LIFF capability derivation", () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "true");
         routineProjectionMock.mockResolvedValue(ROUTINE_CAPABILITIES);
+        stockContextMock.mockReturnValue({ authorizationActor: "stock-actor" });
+        stockProjectionMock.mockResolvedValue(STOCK_CAPABILITIES);
     });
 
     afterEach(() => {
@@ -76,6 +101,9 @@ describe("LIFF capability derivation", () => {
         const capabilities = await getLiffCapabilities(SESSION);
 
         expect(capabilities.routineCapabilities).toEqual(ROUTINE_CAPABILITIES);
+        expect(capabilities.stockCapabilities).toEqual(STOCK_CAPABILITIES);
+        expect(capabilities.canRequestStock).toBe(true);
+        expect(capabilities.canProcessStockRequests).toBe(false);
         expect(capabilities.canApproveLeave).toBe(true);
         expect(capabilities.canCreateOwnRoutine).toBe(true);
         expect(routineProjectionMock).toHaveBeenCalledWith({
@@ -84,6 +112,14 @@ describe("LIFF capability derivation", () => {
             email: SESSION.user.email,
             mode: "LIFF_SELF_SERVICE",
         }, SESSION.employeeId);
+        expect(stockContextMock).toHaveBeenCalledWith(
+            SESSION.user,
+            SESSION.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        expect(stockProjectionMock).toHaveBeenCalledWith({
+            authorizationActor: "stock-actor",
+        });
         expectActionableApproverQuery();
     });
 

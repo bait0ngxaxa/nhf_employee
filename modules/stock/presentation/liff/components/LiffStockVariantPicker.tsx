@@ -27,6 +27,7 @@ interface LiffStockVariantPickerProps {
             quantity: number;
         }>,
     ) => void;
+    canCreateRequests: boolean;
 }
 
 export function LiffStockVariantPicker({
@@ -34,6 +35,7 @@ export function LiffStockVariantPicker({
     open,
     onOpenChange,
     onConfirm,
+    canCreateRequests,
 }: LiffStockVariantPickerProps): ReactElement | null {
     const [quantities, setQuantities] = useState<Record<number, number>>({});
 
@@ -59,6 +61,7 @@ export function LiffStockVariantPicker({
         variant: LiffStockCatalogVariant,
         delta: number,
     ): void {
+        if (!canCreateRequests) return;
         setQuantities((current) => ({
             ...current,
             [variant.id]: Math.min(
@@ -123,7 +126,7 @@ export function LiffStockVariantPicker({
                                             variant="outline"
                                             size="icon"
                                             onClick={() => updateQuantity(variant, -1)}
-                                            disabled={quantity <= 0}
+                                            disabled={!canCreateRequests || quantity <= 0}
                                             aria-label={`ลดจำนวน ${label}`}
                                             className="size-11"
                                         >
@@ -141,6 +144,8 @@ export function LiffStockVariantPicker({
                                             size="icon"
                                             onClick={() => updateQuantity(variant, 1)}
                                             disabled={
+                                                !canCreateRequests
+                                                ||
                                                 variant.availableQuantity <= 0
                                                 || quantity >= variant.availableQuantity
                                             }
@@ -158,8 +163,10 @@ export function LiffStockVariantPicker({
                 <div className="shrink-0 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
                     <Button
                         type="button"
-                        onClick={() => onConfirm(selections)}
-                        disabled={selections.length === 0}
+                        onClick={() => {
+                            if (canCreateRequests) onConfirm(selections);
+                        }}
+                        disabled={!canCreateRequests || selections.length === 0}
                         className="min-h-12 w-full bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
                     >
                         เพิ่ม {selections.length} ตัวเลือก · {totalQuantity} ชิ้น

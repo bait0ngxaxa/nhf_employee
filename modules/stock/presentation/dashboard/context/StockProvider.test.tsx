@@ -70,6 +70,18 @@ function capturedQueries(mock: ReturnType<typeof vi.fn>): string[] {
         .filter((query): query is string => typeof query === "string");
 }
 
+const stockCapabilities = {
+    canReadCatalog: true,
+    canReadOwnRequests: true,
+    canReadAllRequests: true,
+    canCreateRequests: true,
+    canCancelOwnRequests: true,
+    canCancelAnyRequests: true,
+    canProcessRequests: true,
+    canManageInventory: true,
+    canExportReports: true,
+};
+
 describe("StockProvider live search", () => {
     beforeEach(() => {
         vi.useFakeTimers();
@@ -82,6 +94,7 @@ describe("StockProvider live search", () => {
                 id: "7",
                 role: "ADMIN",
                 email: "admin@test.com",
+                stockCapabilities,
             },
         } as never);
         vi.mocked(useStockCategoriesQuery).mockReturnValue({
@@ -239,5 +252,77 @@ describe("StockProvider live search", () => {
             expect.stringContaining("stockItemsPage=1"),
             { scroll: false },
         );
+    });
+
+    it("normalizes an unauthorized stale tab before building data queries", () => {
+        navigationMocks.searchParams = new URLSearchParams(
+            "stockTab=inventory",
+        );
+        vi.mocked(useAuth).mockReturnValue({
+            user: {
+                id: "7",
+                role: "USER",
+                email: "user@test.com",
+                stockCapabilities: {
+                    ...stockCapabilities,
+                    canReadCatalog: false,
+                    canReadAllRequests: false,
+                    canCreateRequests: false,
+                    canCancelOwnRequests: false,
+                    canCancelAnyRequests: false,
+                    canProcessRequests: false,
+                    canManageInventory: false,
+                    canExportReports: false,
+                },
+            },
+        } as never);
+
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        expect(vi.mocked(useStockItemsQuery)).toHaveBeenCalledWith(null);
+        expect(vi.mocked(useStockCategoriesQuery)).toHaveBeenCalledWith(false);
+        expect(capturedQueries(vi.mocked(useStockRequestsQuery))).toEqual(
+            expect.arrayContaining([expect.stringContaining("scope=mine")]),
+        );
+        expect(capturedQueries(vi.mocked(useStockRequestsQuery))).not.toEqual(
+            expect.arrayContaining([expect.stringContaining("scope=all")]),
+        );
+    });
+
+    it("does not query any Stock data for a report-only actor on a stale report URL", () => {
+        navigationMocks.searchParams = new URLSearchParams("stockTab=reports");
+        vi.mocked(useAuth).mockReturnValue({
+            user: {
+                id: "7",
+                role: "USER",
+                email: "user@test.com",
+                stockCapabilities: {
+                    ...stockCapabilities,
+                    canReadCatalog: false,
+                    canReadOwnRequests: false,
+                    canReadAllRequests: false,
+                    canCreateRequests: false,
+                    canCancelOwnRequests: false,
+                    canCancelAnyRequests: false,
+                    canProcessRequests: false,
+                    canManageInventory: false,
+                    canExportReports: true,
+                },
+            },
+        } as never);
+
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        expect(vi.mocked(useStockItemsQuery)).toHaveBeenCalledWith(null);
+        expect(vi.mocked(useStockRequestsQuery)).toHaveBeenCalledWith(null);
+        expect(vi.mocked(useStockCategoriesQuery)).toHaveBeenCalledWith(false);
     });
 });

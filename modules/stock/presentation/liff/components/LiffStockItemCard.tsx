@@ -20,6 +20,7 @@ interface LiffStockItemCardProps {
     priorityImage: boolean;
     onAddDirect: (item: LiffStockCatalogItem) => void;
     onChooseVariant: (item: LiffStockCatalogItem) => void;
+    canCreateRequests: boolean;
 }
 
 export function LiffStockItemCard({
@@ -29,6 +30,7 @@ export function LiffStockItemCard({
     priorityImage,
     onAddDirect,
     onChooseVariant,
+    canCreateRequests,
 }: LiffStockItemCardProps): ReactElement {
     const imageUrl = getBrowseCardImageUrl(item);
     const preferredVariant = getPreferredVariant(item);
@@ -98,10 +100,12 @@ export function LiffStockItemCard({
                     </div>
                     <Button
                         type="button"
-                        onClick={() =>
-                            multiVariant ? onChooseVariant(item) : onAddDirect(item)
-                        }
-                        disabled={outOfStock}
+                        onClick={() => {
+                            if (!canCreateRequests) return;
+                            if (multiVariant) onChooseVariant(item);
+                            else onAddDirect(item);
+                        }}
+                        disabled={outOfStock || !canCreateRequests}
                         className="min-h-11 w-full bg-module-stock-solid font-bold text-content-on-brand hover:bg-module-stock-solid-hover"
                     >
                         {recentlyAdded ? (

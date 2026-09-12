@@ -26,6 +26,7 @@ type AddItemDialogProps = {
     open: boolean;
     onClose: () => void;
     categories: CategoryOption[];
+    canManageInventory: boolean;
     onSuccess: () => void;
 };
 
@@ -41,6 +42,7 @@ export function AddItemDialog({
     open,
     onClose,
     categories,
+    canManageInventory,
     onSuccess,
 }: AddItemDialogProps) {
     const [loading, setLoading] = useState(false);
@@ -63,6 +65,8 @@ export function AddItemDialog({
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
+
+        if (!canManageInventory) return;
 
         if (!selectedCategoryId) {
             toast.error("กรุณาเลือกหมวดหมู่");
@@ -129,6 +133,7 @@ export function AddItemDialog({
                             onCategoryChange={setSelectedCategoryId}
                             itemImageUrl={itemImageUrl}
                             onItemImageChange={setItemImageUrl}
+                            canManageInventory={canManageInventory}
                         />
                         <StockInventoryVariantEditor
                             variants={variants}
@@ -215,12 +220,14 @@ export function AddItemDialog({
                                     ),
                                 )
                             }
+                            canManageInventory={canManageInventory}
                         />
                     </div>
                     <InventoryDialogActions
                         loading={loading}
                         submitLabel={STOCK_ADMIN_TEXT.save}
                         onClose={onClose}
+                        disabled={!canManageInventory}
                     />
                 </form>
             </DialogContent>
@@ -234,6 +241,7 @@ function BaseFields(props: {
     onCategoryChange: (value: string) => void;
     itemImageUrl: string;
     onItemImageChange: (value: string) => void;
+    canManageInventory: boolean;
 }) {
     return (
         <>
@@ -243,12 +251,14 @@ function BaseFields(props: {
                     name="name"
                     label={STOCK_ADMIN_TEXT.itemName}
                     required
+                    disabled={!props.canManageInventory}
                 />
                 <InventoryTextField
                     id="sku"
                     name="sku"
                     label="SKU หลัก"
                     placeholder="เว้นว่างเพื่อให้ระบบสร้างให้อัตโนมัติ"
+                    disabled={!props.canManageInventory}
                 />
             </div>
             <InventoryTextField
@@ -256,18 +266,21 @@ function BaseFields(props: {
                 name="description"
                 label={STOCK_ADMIN_TEXT.itemDescription}
                 placeholder={STOCK_ADMIN_TEXT.itemDescriptionPlaceholder}
+                disabled={!props.canManageInventory}
             />
             <StockImageUploadField
                 label={STOCK_ADMIN_TEXT.imageUrl}
                 scope="item"
                 value={props.itemImageUrl}
                 onChange={props.onItemImageChange}
+                canManageInventory={props.canManageInventory}
             />
             <InventoryCategoryField
                 categories={props.categories}
                 value={props.selectedCategoryId}
                 onChange={props.onCategoryChange}
                 required
+                disabled={!props.canManageInventory}
             />
         </>
     );

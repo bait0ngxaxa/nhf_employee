@@ -10,12 +10,16 @@ const {
     employeeProjectionMock,
     leaveProjectionMock,
     routineProjectionMock,
+    stockContextMock,
+    stockProjectionMock,
 } = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
     resolveAccountMock: vi.fn(),
     employeeProjectionMock: vi.fn(),
     leaveProjectionMock: vi.fn(),
     routineProjectionMock: vi.fn(),
+    stockContextMock: vi.fn(),
+    stockProjectionMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
@@ -24,6 +28,10 @@ vi.mock("@/modules/employee", () => ({ findCurrentEmployeeProjection: employeePr
 vi.mock("@/modules/leave", () => ({ getCurrentEmployeeLeaveProjection: leaveProjectionMock }));
 vi.mock("@/modules/routine", () => ({
     getRoutinePresentationCapabilities: routineProjectionMock,
+}));
+vi.mock("@/modules/stock", () => ({
+    buildStockAuthorizationContext: stockContextMock,
+    getStockPresentationCapabilities: stockProjectionMock,
 }));
 
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
@@ -63,6 +71,18 @@ const ROUTINE = {
     canManageImports: true,
 };
 
+const STOCK = {
+    canReadCatalog: true,
+    canReadOwnRequests: true,
+    canReadAllRequests: false,
+    canCreateRequests: true,
+    canCancelOwnRequests: true,
+    canCancelAnyRequests: false,
+    canProcessRequests: false,
+    canManageInventory: false,
+    canExportReports: false,
+};
+
 describe("current-user application projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -73,6 +93,8 @@ describe("current-user application projection", () => {
         employeeProjectionMock.mockResolvedValue(EMPLOYEE);
         leaveProjectionMock.mockResolvedValue(LEAVE);
         routineProjectionMock.mockResolvedValue(ROUTINE);
+        stockContextMock.mockReturnValue({ authorizationActor: "stock-actor" });
+        stockProjectionMock.mockResolvedValue(STOCK);
     });
 
     it("returns the server-derived Routine projection with the compatible Employee/Department/Leave projection", async () => {
@@ -86,6 +108,7 @@ describe("current-user application projection", () => {
             canApproveLeave: true,
             canViewLeaveReports: false,
             routineCapabilities: ROUTINE,
+            stockCapabilities: STOCK,
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
@@ -95,6 +118,13 @@ describe("current-user application projection", () => {
             role: "ADMIN",
             email: "account@test.com",
         }, 101);
+        expect(stockContextMock).toHaveBeenCalledWith({
+            id: 41,
+            role: "ADMIN",
+        }, 101, "DASHBOARD");
+        expect(stockProjectionMock).toHaveBeenCalledWith({
+            authorizationActor: "stock-actor",
+        });
     });
 
     it("keeps the broad projection unauthorized without an eligible Employee", async () => {

@@ -27,6 +27,7 @@ type StockInventoryVariantEditorProps = {
     ) => void;
     onAddAttribute: (variantIndex: number) => void;
     onRemoveAttribute: (variantIndex: number, attributeIndex: number) => void;
+    canManageInventory: boolean;
 };
 
 export function StockInventoryVariantEditor(
@@ -79,6 +80,7 @@ export function StockInventoryVariantEditor(
                             onRemoveAttribute={(attributeIndex) =>
                                 props.onRemoveAttribute(index, attributeIndex)
                             }
+                            canManageInventory={props.canManageInventory}
                         />
                     ))}
 
@@ -95,6 +97,7 @@ export function StockInventoryVariantEditor(
                             <Button
                                 type="button"
                                 onClick={props.onAddVariant}
+                                disabled={!props.canManageInventory}
                                 className="bg-action-primary-solid text-content-on-brand hover:bg-action-primary-solid-hover"
                             >
                                 <Plus className="mr-1 h-4 w-4" />
@@ -123,6 +126,7 @@ function VariantCard(props: {
     ) => void;
     onAddAttribute: () => void;
     onRemoveAttribute: (attributeIndex: number) => void;
+    canManageInventory: boolean;
 }) {
     const { index, variant } = props;
 
@@ -137,6 +141,7 @@ function VariantCard(props: {
                     variant="ghost"
                     size="sm"
                     onClick={props.onRemove}
+                    disabled={!props.canManageInventory}
                     className="text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong"
                 >
                     <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />
@@ -163,6 +168,7 @@ function VariantCard(props: {
                                     sku: event.target.value,
                                 })
                             }
+                            disabled={!props.canManageInventory}
                             className="h-11 focus-visible:ring-action-primary-focus"
                         />
                     </FieldShell>
@@ -175,6 +181,7 @@ function VariantCard(props: {
                         onChange={(value) =>
                             props.onChange({ ...variant, imageUrl: value })
                         }
+                        canManageInventory={props.canManageInventory}
                     />
                 )}
             </div>
@@ -189,6 +196,7 @@ function VariantCard(props: {
                                 unit: event.target.value,
                             })
                         }
+                        disabled={!props.canManageInventory}
                         className="h-11 focus-visible:ring-action-primary-focus"
                     />
                 </FieldShell>
@@ -203,6 +211,7 @@ function VariantCard(props: {
                                 quantity: event.target.value,
                             })
                         }
+                        disabled={!props.canManageInventory}
                         className="h-11 focus-visible:ring-action-primary-focus"
                     />
                 </FieldShell>
@@ -217,6 +226,7 @@ function VariantCard(props: {
                                 minStock: event.target.value,
                             })
                         }
+                        disabled={!props.canManageInventory}
                         className="h-11 focus-visible:ring-action-primary-focus"
                     />
                 </FieldShell>
@@ -227,6 +237,7 @@ function VariantCard(props: {
                     onAttributeChange={props.onAttributeChange}
                     onAddAttribute={props.onAddAttribute}
                     onRemoveAttribute={props.onRemoveAttribute}
+                    canManageInventory={props.canManageInventory}
                 />
             )}
         </div>
@@ -242,6 +253,7 @@ function AttributeEditor(props: {
     ) => void;
     onAddAttribute: () => void;
     onRemoveAttribute: (attributeIndex: number) => void;
+    canManageInventory: boolean;
 }) {
     return (
         <div className="space-y-3">
@@ -254,6 +266,7 @@ function AttributeEditor(props: {
                     variant="outline"
                     size="sm"
                     onClick={props.onAddAttribute}
+                    disabled={!props.canManageInventory}
                     className="border-border-subtle"
                 >
                     <Plus className="mr-1 h-4 w-4" />
@@ -275,6 +288,7 @@ function AttributeEditor(props: {
                                     event.target.value,
                                 )
                             }
+                            disabled={!props.canManageInventory}
                             className="h-11 focus-visible:ring-action-primary-focus"
                         />
                         <Input
@@ -289,6 +303,7 @@ function AttributeEditor(props: {
                                     event.target.value,
                                 )
                             }
+                            disabled={!props.canManageInventory}
                             className="h-11 focus-visible:ring-action-primary-focus"
                         />
                         <Button
@@ -298,7 +313,7 @@ function AttributeEditor(props: {
                             onClick={() =>
                                 props.onRemoveAttribute(attributeIndex)
                             }
-                            disabled={props.variant.attributes.length === 1}
+                            disabled={!props.canManageInventory || props.variant.attributes.length === 1}
                             className="h-11 w-full text-status-danger-foreground hover:bg-status-danger-surface hover:text-status-danger-strong sm:w-11"
                             aria-label={`ลบคุณสมบัติที่ ${attributeIndex + 1}`}
                         >

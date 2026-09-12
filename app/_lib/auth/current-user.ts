@@ -4,6 +4,10 @@ import { resolveAuthenticatedAccount } from "@/modules/auth";
 import { findCurrentEmployeeProjection } from "@/modules/employee";
 import { getCurrentEmployeeLeaveProjection } from "@/modules/leave";
 import { getRoutinePresentationCapabilities } from "@/modules/routine";
+import {
+    buildStockAuthorizationContext,
+    getStockPresentationCapabilities,
+} from "@/modules/stock";
 import type { AuthenticatedUser } from "@/modules/auth/client";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { getUserDisplayName } from "@/shared/identity/display";
@@ -31,6 +35,16 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         },
         employee.id,
     );
+    const stockCapabilities = await getStockPresentationCapabilities(
+        buildStockAuthorizationContext(
+            {
+                id: account.userId,
+                role: account.role,
+            },
+            employee.id,
+            "DASHBOARD",
+        ),
+    );
 
     return {
         id: String(account.userId),
@@ -50,5 +64,6 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         canApproveLeave: leave.canApproveLeave,
         canViewLeaveReports: leave.canViewLeaveReports,
         routineCapabilities,
+        stockCapabilities,
     };
 }

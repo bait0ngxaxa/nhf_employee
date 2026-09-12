@@ -21,6 +21,7 @@ export function InventoryTextField(props: {
     required?: boolean;
     type?: string;
     placeholder?: string;
+    disabled?: boolean;
 }) {
     return (
         <div className="space-y-1.5">
@@ -34,6 +35,7 @@ export function InventoryTextField(props: {
                 required={props.required}
                 type={props.type}
                 placeholder={props.placeholder}
+                disabled={props.disabled}
                 className="h-11 focus-visible:ring-action-primary-focus"
             />
         </div>
@@ -69,6 +71,7 @@ export function InventoryCategoryField(props: {
     value: string;
     onChange: (value: string) => void;
     required?: boolean;
+    disabled?: boolean;
 }) {
     return (
         <div className="space-y-1.5">
@@ -77,7 +80,10 @@ export function InventoryCategoryField(props: {
                 {props.required && <span className="text-status-danger-icon">*</span>}
             </Label>
             <Select name="categoryId" value={props.value} onValueChange={props.onChange}>
-                <SelectTrigger className="h-11 focus:ring-action-primary-focus">
+                <SelectTrigger
+                    disabled={props.disabled}
+                    className="h-11 focus:ring-action-primary-focus"
+                >
                     <SelectValue placeholder={STOCK_ADMIN_TEXT.categoryPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -96,6 +102,7 @@ export function InventoryDialogActions(props: {
     loading: boolean;
     submitLabel: string;
     onClose: () => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border-subtle bg-surface-raised px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
@@ -103,14 +110,14 @@ export function InventoryDialogActions(props: {
                 type="button"
                 variant="ghost"
                 onClick={props.onClose}
-                disabled={props.loading}
+                disabled={props.loading || props.disabled}
                 className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
             >
                 {STOCK_ADMIN_TEXT.cancel}
             </Button>
             <Button
                 type="submit"
-                disabled={props.loading}
+                disabled={props.loading || props.disabled}
                 className="h-11 bg-action-primary-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-action-primary-solid-hover"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}

@@ -56,6 +56,7 @@ describe("LIFF Stock mobile components", () => {
                 priorityImage={false}
                 onAddDirect={vi.fn()}
                 onChooseVariant={onChooseVariant}
+                canCreateRequests
             />,
         );
 
@@ -69,6 +70,7 @@ describe("LIFF Stock mobile components", () => {
                 open
                 onOpenChange={vi.fn()}
                 onConfirm={onConfirm}
+                canCreateRequests
             />,
         );
         const addSmall = screen.getByRole("button", { name: "เพิ่มจำนวน ขนาด: S" });
@@ -103,6 +105,7 @@ describe("LIFF Stock mobile components", () => {
                 onRemove={vi.fn()}
                 onClear={vi.fn()}
                 onSubmit={onSubmit}
+                canCreateRequests
             />,
         );
 
@@ -147,6 +150,8 @@ describe("LIFF Stock mobile components", () => {
                     }],
                     availableActions: ["CANCEL"],
                 }}
+                canIssue={false}
+                canCancel
                 onOpenDetail={vi.fn()}
                 onAction={onAction}
             />,

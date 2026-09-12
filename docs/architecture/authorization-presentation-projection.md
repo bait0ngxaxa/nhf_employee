@@ -190,7 +190,63 @@ and reference compatibility behavior is preserved; the home gate only keeps
 actors without Routine read availability from reaching those requests through
 the Routine UI.
 
-Stock, Leave, Employee, Audit, Email Request, Settings, and other non-Routine
-presentation and authorization paths remain on their existing compatibility
-behavior until their approved migration phases, including Phase 6 where
-applicable.
+## Stock Phase 6B projection
+
+สถานะ: **Phase 6A server enforcement closed; Phase 6B presentation projection closed**
+
+Stock now owns the immutable `StockPresentationCapabilities` contract and
+resolves it through the same Stock adapter and compatibility translation used
+by Phase 6A. The projection is batched with one `authorization.resolveMany()`
+call per Dashboard current-user request or LIFF home request. It does not
+replace route guards, resource relationships, Stock domain state or
+transaction-time authorization.
+
+```text
+canReadCatalog
+canReadOwnRequests / canReadAllRequests
+canCreateRequests
+canCancelOwnRequests / canCancelAnyRequests
+canProcessRequests
+canManageInventory
+canExportReports
+```
+
+Dashboard constructs the trusted actor from the authenticated account and
+current workforce projection with `DASHBOARD`. The current-user contract sends
+`stockCapabilities` to `DashboardProvider`; Stock menu/direct-route access,
+tab normalization, query scope, and controls use the individual booleans. In
+particular, `scope=all` requires `canReadAllRequests`, while process,
+cancel-any, inventory and export remain independent gates. A stale or
+unauthorized `stockTab` is normalized to the first visible tab, or to the
+stable unavailable state when no surface is usable.
+
+LIFF `/api/line/home` constructs the Stock actor with `LIFF_SELF_SERVICE` and
+returns the same granular shape. The legacy aliases are compatibility fields
+derived only from it:
+
+```text
+canRequestStock = canReadCatalog && canCreateRequests
+canProcessStockRequests = canProcessRequests
+```
+
+The LIFF Stock module is available when catalog read, own-request read or
+processing is available. `LiffStockApp` obtains this trusted home contract
+before loading catalog, mine or processing data, and its tabs, deep links and
+mutation handlers repeat the global capability gates together with server
+`availableActions` and resource/state eligibility. Session recovery refreshes
+the home projection before another mutation attempt and never retries using a
+stale snapshot.
+
+Dashboard-only `stock.inventory.manage` and `stock.report.export` remain false
+in LIFF because the registry does not support those capabilities on
+`LIFF_SELF_SERVICE`. LIFF USER keeps requester compatibility; LIFF ADMIN
+intentionally remains processor-compatible, and an explicit USER process grant
+is honored. The Routine LIFF ADMIN self-service clamp is not applied to Stock.
+Read ALL never implies process or cancel ALL. Any remaining Stock role check is
+descriptive only (for example, a role badge); it does not select a tab, query
+scope, expose a control or authorize a mutation.
+
+Stock server enforcement remains authoritative. Leave, Employee, Audit, Email
+Request, Settings and other non-Routine/non-Stock presentation and
+authorization paths remain on their existing compatibility behavior until
+their approved migration phases. Routine behavior is unchanged by Phase 6B.

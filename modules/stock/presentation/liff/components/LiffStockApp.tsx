@@ -23,7 +23,9 @@ import {
     useLiffWorkforce,
 } from "@/modules/line/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { fetchLiffHome } from "@/modules/line/client";
+import type { StockPresentationCapabilities } from "../../../application/types";
 import {
     cancelLiffStockRequest,
     fetchLiffStockCategories,
@@ -148,6 +150,7 @@ export function LiffStockApp(): ReactElement {
     const refreshCartAvailabilityRef = useRef<() => Promise<void>>(
         () => Promise.resolve(),
     );
+    const stockCapabilitiesRef = useRef<StockPresentationCapabilities | null>(null);
 
     useEffect(() => () => {
         catalogRequestSequenceRef.current += 1;
@@ -180,7 +183,10 @@ export function LiffStockApp(): ReactElement {
     const [requestsLoading, setRequestsLoading] = useState(true);
     const [requestsError, setRequestsError] = useState<string | null>(null);
 
-    const [canProcessStockRequests, setCanProcessStockRequests] = useState(false);
+    const [stockCapabilities, setStockCapabilities] =
+        useState<StockPresentationCapabilities | null>(null);
+    const [stockHomeLoading, setStockHomeLoading] = useState(true);
+    const [stockHomeError, setStockHomeError] = useState<string | null>(null);
     const [processingQueue, setProcessingQueue] = useState<LiffStockRequestsResponse>(EMPTY_REQUESTS);
     const [processingSearch, setProcessingSearch] = useState("");
     const [processingPage, setProcessingPage] = useState(1);
@@ -201,6 +207,9 @@ export function LiffStockApp(): ReactElement {
     const [busyRequestId, setBusyRequestId] = useState<number | null>(null);
 
     const loadCatalog = useCallback(async (input: CatalogLoadInput): Promise<void> => {
+        if (stockCapabilitiesRef.current?.canReadCatalog !== true) {
+            return;
+        }
         const sequence = ++catalogRequestSequenceRef.current;
         setCatalogLoading(true);
         setCatalogError(null);
@@ -232,6 +241,9 @@ export function LiffStockApp(): ReactElement {
         search: string;
         status: StockRequestStatus | undefined;
     }): Promise<void> => {
+        if (stockCapabilitiesRef.current?.canReadOwnRequests !== true) {
+            return;
+        }
         const sequence = ++requestHistorySequenceRef.current;
         setRequestsLoading(true);
         setRequestsError(null);
@@ -257,6 +269,9 @@ export function LiffStockApp(): ReactElement {
         page: number;
         search: string;
     }): Promise<void> => {
+        if (stockCapabilitiesRef.current?.canProcessRequests !== true) {
+            return;
+        }
         const sequence = ++processingQueueSequenceRef.current;
         setProcessingLoading(true);
         setProcessingError(null);
@@ -283,6 +298,20 @@ export function LiffStockApp(): ReactElement {
         actionIntent: string | null,
         open: boolean,
     ): Promise<void> => {
+        const capabilities = stockCapabilitiesRef.current;
+        const isProcessorIntent = actionIntent === "issue"
+            || actionIntent === "review";
+        const canReadRequest = capabilities?.canReadOwnRequests === true
+            || capabilities?.canReadAllRequests === true
+            || capabilities?.canProcessRequests === true;
+        if (!canReadRequest || (isProcessorIntent && capabilities?.canProcessRequests !== true)) {
+            setFocusNotice(
+                isProcessorIntent
+                    ? "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"
+                    : "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้",
+            );
+            return;
+        }
         const sequence = ++detailRequestSequenceRef.current;
         if (open) {
             setDetailOpen(true);
@@ -302,11 +331,8 @@ export function LiffStockApp(): ReactElement {
                 }
                 return { ...currentIntent, request: nextDetail };
             });
-            if (nextDetail.viewerRole === "PROCESSOR") {
-                setCanProcessStockRequests(true);
-                if (open && (actionIntent === "issue" || actionIntent === "review")) {
-                    setActiveTab("processing");
-                }
+            if (open && isProcessorIntent && capabilities?.canProcessRequests === true) {
+                setActiveTab("processing");
             }
         } catch (error) {
             if (sequence !== detailRequestSequenceRef.current) return;
@@ -329,8 +355,49 @@ export function LiffStockApp(): ReactElement {
         await loadDetail(requestId, null, false);
     }, [loadDetail]);
 
+    const loadStockCapabilities = useCallback(async (): Promise<StockPresentationCapabilities | null> => {
+        stockCapabilitiesRef.current = null;
+        setStockCapabilities(null);
+        setStockHomeLoading(true);
+        setStockHomeError(null);
+        try {
+            const home = await fetchLiffHome();
+            const nextCapabilities = home.capabilities.stockCapabilities;
+            if (!nextCapabilities) {
+                throw new Error("ไม่พบสิทธิ์การใช้งาน Stock");
+            }
+            stockCapabilitiesRef.current = nextCapabilities;
+            setStockCapabilities(nextCapabilities);
+            return nextCapabilities;
+        } catch (error: unknown) {
+            stockCapabilitiesRef.current = null;
+            setStockCapabilities(null);
+            setStockHomeError(getStockError(error));
+            return null;
+        } finally {
+            setStockHomeLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadStockCapabilities();
+    }, [loadStockCapabilities]);
+
+    useEffect(() => {
+        if (stockCapabilities?.canCreateRequests !== true) {
+            setVariantPickerItem(null);
+            setCartOpen(false);
+        }
+    }, [stockCapabilities]);
+
     useEffect(() => {
         let cancelled = false;
+        if (stockCapabilitiesRef.current?.canReadCatalog !== true) {
+            setCategories([]);
+            return () => {
+                cancelled = true;
+            };
+        }
         void fetchLiffStockCategories()
             .then((nextCategories) => {
                 if (!cancelled) setCategories(nextCategories);
@@ -343,7 +410,7 @@ export function LiffStockApp(): ReactElement {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [stockCapabilities]);
 
     useEffect(() => {
         catalogQueryRef.current = {
@@ -354,6 +421,9 @@ export function LiffStockApp(): ReactElement {
     }, [catalogPage, catalogSearch, categoryId]);
 
     useEffect(() => {
+        if (stockCapabilitiesRef.current?.canReadCatalog !== true) {
+            return;
+        }
         const timeoutId = window.setTimeout(() => {
             void loadCatalog({
                 page: catalogPage,
@@ -362,9 +432,12 @@ export function LiffStockApp(): ReactElement {
             });
         }, SEARCH_DEBOUNCE_MS);
         return () => window.clearTimeout(timeoutId);
-    }, [catalogPage, catalogSearch, categoryId, loadCatalog]);
+    }, [catalogPage, catalogSearch, categoryId, loadCatalog, stockCapabilities]);
 
     useEffect(() => {
+        if (stockCapabilitiesRef.current?.canReadOwnRequests !== true) {
+            return;
+        }
         const timeoutId = window.setTimeout(() => {
             void loadMyRequests({
                 page: requestPage,
@@ -373,26 +446,10 @@ export function LiffStockApp(): ReactElement {
             });
         }, SEARCH_DEBOUNCE_MS);
         return () => window.clearTimeout(timeoutId);
-    }, [loadMyRequests, requestPage, requestSearch, requestStatus]);
+    }, [loadMyRequests, requestPage, requestSearch, requestStatus, stockCapabilities]);
 
     useEffect(() => {
-        let cancelled = false;
-        void fetchLiffHome()
-            .then((home) => {
-                if (!cancelled && home.capabilities.canProcessStockRequests) {
-                    setCanProcessStockRequests(true);
-                }
-            })
-            .catch(() => {
-                // Capability is a UX optimization; employee flows and deep links remain usable.
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!canProcessStockRequests) return;
+        if (stockCapabilitiesRef.current?.canProcessRequests !== true) return;
         const timeoutId = window.setTimeout(() => {
             void loadProcessingQueue({
                 page: processingPage,
@@ -401,10 +458,10 @@ export function LiffStockApp(): ReactElement {
         }, SEARCH_DEBOUNCE_MS);
         return () => window.clearTimeout(timeoutId);
     }, [
-        canProcessStockRequests,
         loadProcessingQueue,
         processingPage,
         processingSearch,
+        stockCapabilities,
     ]);
 
     useEffect(() => {
@@ -414,18 +471,36 @@ export function LiffStockApp(): ReactElement {
         }
         const deepLinkKey = `${deepLinkRequestId}:${deepLinkActionIntent ?? ""}`;
         if (deepLinkHandledRef.current === deepLinkKey) return;
-        deepLinkHandledRef.current = deepLinkKey;
         if (!/^[1-9]\d*$/.test(deepLinkRequestId)) {
+            deepLinkHandledRef.current = deepLinkKey;
             setFocusNotice("ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ");
             return;
         }
         const requestId = Number(deepLinkRequestId);
         if (!Number.isSafeInteger(requestId)) {
+            deepLinkHandledRef.current = deepLinkKey;
             setFocusNotice("ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ");
             return;
         }
+        const capabilities = stockCapabilitiesRef.current;
+        if (!capabilities) return;
+        const isProcessorIntent = deepLinkActionIntent === "issue"
+            || deepLinkActionIntent === "review";
+        const canReadRequest = capabilities.canReadOwnRequests
+            || capabilities.canReadAllRequests
+            || capabilities.canProcessRequests;
+        if (!canReadRequest || (isProcessorIntent && !capabilities.canProcessRequests)) {
+            deepLinkHandledRef.current = deepLinkKey;
+            setFocusNotice(
+                isProcessorIntent
+                    ? "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"
+                    : "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้",
+            );
+            return;
+        }
+        deepLinkHandledRef.current = deepLinkKey;
         void openDetail(requestId, deepLinkActionIntent);
-    }, [deepLinkActionIntent, deepLinkRequestId, openDetail]);
+    }, [deepLinkActionIntent, deepLinkRequestId, openDetail, stockCapabilities]);
 
     const {
         cartCount,
@@ -446,6 +521,7 @@ export function LiffStockApp(): ReactElement {
         updateCartQuantity,
     } = useStockBrowseCart({
         userId: workforce.userId,
+        canCreateRequests: stockCapabilities?.canCreateRequests === true,
         submitRequest: submitLiffStockRequest,
         onSubmitted: () => {
             setCartOpen(false);
@@ -458,14 +534,19 @@ export function LiffStockApp(): ReactElement {
         onSubmitError: async (error) => {
             if (isRecoveredLiffMutation(error)) {
                 setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
-                await Promise.allSettled([
-                    loadMyRequests({
+                const capabilities = await loadStockCapabilities();
+                const refreshes: Promise<void>[] = [];
+                if (capabilities?.canReadOwnRequests) {
+                    refreshes.push(loadMyRequests({
                         page: requestPage,
                         search: requestSearch,
                         status: requestStatus,
-                    }),
-                    refreshCartAvailabilityRef.current(),
-                ]);
+                    }));
+                }
+                if (capabilities?.canReadCatalog) {
+                    refreshes.push(refreshCartAvailabilityRef.current());
+                }
+                await Promise.allSettled(refreshes);
                 return;
             }
             if (isDeterministicStockConflict(error)) {
@@ -475,6 +556,9 @@ export function LiffStockApp(): ReactElement {
     });
 
     const refreshCartAvailability = useCallback(async (): Promise<void> => {
+        if (stockCapabilitiesRef.current?.canReadCatalog !== true) {
+            return;
+        }
         const variantIds = cartItems.map((cartItem) => cartItem.variant.id);
         if (variantIds.length === 0) {
             return;
@@ -516,6 +600,21 @@ export function LiffStockApp(): ReactElement {
         action: LiffStockRequestAction,
         request: LiffStockRequestSummary,
     ): void {
+        const capabilities = stockCapabilitiesRef.current;
+        const canUseAction = action === "ISSUE"
+            ? capabilities?.canProcessRequests === true
+            : request.requester
+                ? capabilities?.canCancelAnyRequests === true
+                : capabilities?.canCancelOwnRequests === true;
+        if (!canUseAction) {
+            setFocusNotice(
+                action === "ISSUE"
+                    ? "บัญชีนี้ไม่มีสิทธิ์จ่ายวัสดุ"
+                    : "บัญชีนี้ไม่มีสิทธิ์ยกเลิกคำขอนี้",
+            );
+            return;
+        }
+        if (!request.availableActions.includes(action)) return;
         setDecisionFromDetail(detailOpen);
         setDetailOpen(false);
         setMutationError(null);
@@ -542,6 +641,26 @@ export function LiffStockApp(): ReactElement {
     async function executeMutation(reason?: string): Promise<void> {
         if (!decisionIntent || busyRequestId !== null) return;
         const { action, request, actorMode } = decisionIntent;
+        const capabilities = stockCapabilitiesRef.current;
+        const canUseAction = action === "ISSUE"
+            ? capabilities?.canProcessRequests === true
+            : actorMode === "processor"
+                ? capabilities?.canCancelAnyRequests === true
+                : capabilities?.canCancelOwnRequests === true;
+        if (!canUseAction) {
+            setMutationError(
+                action === "ISSUE"
+                    ? "บัญชีนี้ไม่มีสิทธิ์จ่ายวัสดุ"
+                    : "บัญชีนี้ไม่มีสิทธิ์ยกเลิกคำขอนี้",
+            );
+            setDecisionIntent(null);
+            setDecisionFromDetail(false);
+            return;
+        }
+        if (!request.availableActions.includes(action)) {
+            setMutationError("สถานะคำขอเปลี่ยนแปลงแล้ว กรุณาตรวจสอบรายละเอียดล่าสุด");
+            return;
+        }
         setBusyRequestId(request.id);
         setMutationError(null);
         try {
@@ -565,7 +684,7 @@ export function LiffStockApp(): ReactElement {
                     categoryId,
                 }));
             }
-            if (canProcessStockRequests || actorMode === "processor") {
+            if (stockCapabilitiesRef.current?.canProcessRequests === true) {
                 refreshes.push(loadProcessingQueue({
                     page: processingPage,
                     search: processingSearch,
@@ -586,28 +705,35 @@ export function LiffStockApp(): ReactElement {
             if (isRecoveredLiffMutation(error)) {
                 setMutationError(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
-                const refreshes: Promise<void>[] = [
-                    loadMyRequests({
+                const refreshedCapabilities = await loadStockCapabilities();
+                const refreshes: Promise<void>[] = [];
+                if (refreshedCapabilities?.canReadOwnRequests) {
+                    refreshes.push(loadMyRequests({
                         page: requestPage,
                         search: requestSearch,
                         status: requestStatus,
-                    }),
-                ];
-                if (action === "ISSUE") {
+                    }));
+                }
+                if (action === "ISSUE" && refreshedCapabilities?.canReadCatalog) {
                     refreshes.push(loadCatalog({
                         page: catalogPage,
                         search: catalogSearch,
                         categoryId,
                     }));
                 }
-                if (canProcessStockRequests || actorMode === "processor") {
+                if (refreshedCapabilities?.canProcessRequests) {
                     refreshes.push(loadProcessingQueue({
                         page: processingPage,
                         search: processingSearch,
                     }));
                 }
                 await Promise.allSettled(refreshes);
-                if (decisionFromDetail) {
+                if (
+                    decisionFromDetail
+                    && (refreshedCapabilities?.canReadOwnRequests
+                        || refreshedCapabilities?.canReadAllRequests
+                        || refreshedCapabilities?.canProcessRequests)
+                ) {
                     await openDetail(request.id, null);
                 }
                 setDecisionIntent(null);
@@ -637,7 +763,71 @@ export function LiffStockApp(): ReactElement {
         }
     }
 
-    const showProcessorTab = canProcessStockRequests;
+    const canReadCatalog = stockCapabilities?.canReadCatalog === true;
+    const canReadOwnRequests = stockCapabilities?.canReadOwnRequests === true;
+    const canProcessRequests = stockCapabilities?.canProcessRequests === true;
+    const visibleTabs: StockTab[] = [
+        ...(canReadCatalog ? ["browse" as const] : []),
+        ...(canReadOwnRequests ? ["mine" as const] : []),
+        ...(canProcessRequests ? ["processing" as const] : []),
+    ];
+    const firstVisibleTab = visibleTabs[0] ?? null;
+    const safeActiveTab = visibleTabs.includes(activeTab)
+        ? activeTab
+        : firstVisibleTab;
+
+    useEffect(() => {
+        if (safeActiveTab && safeActiveTab !== activeTab) {
+            setActiveTab(safeActiveTab);
+        }
+    }, [activeTab, safeActiveTab]);
+
+    if (stockHomeLoading && !stockCapabilities) {
+        return (
+            <main
+                id="main"
+                className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
+            >
+                <div className="mx-auto flex min-h-64 w-full max-w-lg items-center justify-center text-sm font-medium text-content-secondary" role="status">
+                    กำลังตรวจสอบสิทธิ์การใช้งาน Stock…
+                </div>
+            </main>
+        );
+    }
+
+    if (stockHomeError && !stockCapabilities) {
+        return (
+            <main
+                id="main"
+                className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
+            >
+                <div className="mx-auto flex min-h-64 w-full max-w-lg flex-col items-center justify-center gap-3 px-4 text-center" role="alert">
+                    <p className="text-sm leading-6 text-status-danger-foreground">{stockHomeError}</p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void loadStockCapabilities()}
+                        className="min-h-11"
+                    >
+                        ลองตรวจสอบอีกครั้ง
+                    </Button>
+                </div>
+            </main>
+        );
+    }
+
+    if (!stockCapabilities || !firstVisibleTab || !safeActiveTab) {
+        return (
+            <main
+                id="main"
+                className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
+            >
+                <div className="mx-auto flex min-h-64 w-full max-w-lg items-center justify-center px-4 text-center text-sm leading-6 text-content-secondary" role="status">
+                    บัญชีนี้ยังไม่มีพื้นที่ใช้งาน Stock ใน NHFapp
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main
@@ -655,21 +845,32 @@ export function LiffStockApp(): ReactElement {
                 ) : null}
 
                 <Tabs
-                    value={activeTab}
-                    onValueChange={(value) => setActiveTab(value as StockTab)}
+                    value={safeActiveTab}
+                    onValueChange={(value) => {
+                        const nextTab = value as StockTab;
+                        if (visibleTabs.includes(nextTab)) setActiveTab(nextTab);
+                    }}
                 >
                     <TabsList
                         className={`grid w-full bg-surface-muted p-1 ${
-                            showProcessorTab ? "grid-cols-3" : "grid-cols-2"
+                            visibleTabs.length === 1
+                                ? "grid-cols-1"
+                                : visibleTabs.length === 2
+                                    ? "grid-cols-2"
+                                    : "grid-cols-3"
                         }`}
                     >
-                        <TabsTrigger value="browse" className="min-h-11">
-                            เบิกวัสดุ
-                        </TabsTrigger>
-                        <TabsTrigger value="mine" className="min-h-11">
-                            คำขอของฉัน
-                        </TabsTrigger>
-                        {showProcessorTab ? (
+                        {canReadCatalog ? (
+                            <TabsTrigger value="browse" className="min-h-11">
+                                เบิกวัสดุ
+                            </TabsTrigger>
+                        ) : null}
+                        {canReadOwnRequests ? (
+                            <TabsTrigger value="mine" className="min-h-11">
+                                คำขอของฉัน
+                            </TabsTrigger>
+                        ) : null}
+                        {canProcessRequests ? (
                             <TabsTrigger value="processing" className="min-h-11">
                                 รอดำเนินการ
                                 {processingQueue.total > 0 ? (
@@ -682,7 +883,7 @@ export function LiffStockApp(): ReactElement {
                         ) : null}
                     </TabsList>
 
-                    <TabsContent value="browse" className="mt-5">
+                    {canReadCatalog ? <TabsContent value="browse" className="mt-5">
                         <LiffStockBrowse
                             catalog={catalog}
                             categories={categories}
@@ -709,11 +910,14 @@ export function LiffStockApp(): ReactElement {
                             })}
                             onAddDirect={addDirectItem}
                             onChooseVariant={setVariantPickerItem}
-                            onOpenCart={() => setCartOpen(true)}
+                            onOpenCart={() => {
+                                if (stockCapabilities.canCreateRequests) setCartOpen(true);
+                            }}
+                            canCreateRequests={stockCapabilities.canCreateRequests}
                         />
-                    </TabsContent>
+                    </TabsContent> : null}
 
-                    <TabsContent value="mine" className="mt-5">
+                    {canReadOwnRequests ? <TabsContent value="mine" className="mt-5">
                         <LiffStockMyRequests
                             response={myRequests}
                             search={requestSearch}
@@ -737,10 +941,11 @@ export function LiffStockApp(): ReactElement {
                             })}
                             onOpenDetail={(requestId) => void openDetail(requestId)}
                             onAction={startAction}
+                            canCancelOwnRequests={stockCapabilities.canCancelOwnRequests}
                         />
-                    </TabsContent>
+                    </TabsContent> : null}
 
-                    {showProcessorTab ? (
+                    {canProcessRequests ? (
                         <TabsContent value="processing" className="mt-5">
                             <LiffStockProcessorQueue
                                 response={processingQueue}
@@ -759,6 +964,8 @@ export function LiffStockApp(): ReactElement {
                                 })}
                                 onOpenDetail={(requestId) => void openDetail(requestId)}
                                 onAction={startAction}
+                                canProcessRequests={stockCapabilities.canProcessRequests}
+                                canCancelAnyRequests={stockCapabilities.canCancelAnyRequests}
                             />
                         </TabsContent>
                     ) : null}
@@ -772,10 +979,11 @@ export function LiffStockApp(): ReactElement {
                     if (!open) setVariantPickerItem(null);
                 }}
                 onConfirm={(selections) => {
-                    if (!variantPickerItem) return;
+                    if (!variantPickerItem || stockCapabilities.canCreateRequests !== true) return;
                     addVariantsToCart(variantPickerItem, selections);
                     setVariantPickerItem(null);
                 }}
+                canCreateRequests={stockCapabilities.canCreateRequests}
             />
             <LiffStockCart
                 open={cartOpen}
@@ -789,6 +997,7 @@ export function LiffStockApp(): ReactElement {
                 onRemove={removeFromCart}
                 onClear={clearCart}
                 onSubmit={() => void submitRequest()}
+                canCreateRequests={stockCapabilities.canCreateRequests}
             />
             <LiffStockRequestDetailSheet
                 open={detailOpen}
@@ -796,6 +1005,9 @@ export function LiffStockApp(): ReactElement {
                 loading={detailLoading}
                 error={detailError}
                 actionIntent={detailActionIntent}
+                canProcessRequests={stockCapabilities.canProcessRequests}
+                canCancelOwnRequests={stockCapabilities.canCancelOwnRequests}
+                canCancelAnyRequests={stockCapabilities.canCancelAnyRequests}
                 onOpenChange={handleDetailOpenChange}
                 onAction={startAction}
             />

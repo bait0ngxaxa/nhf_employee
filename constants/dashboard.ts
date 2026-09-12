@@ -13,6 +13,7 @@ import {
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
+import type { StockPresentationCapabilities } from "@/modules/stock/client";
 
 /** Flat lookup used by handleMenuClick for role validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -122,6 +123,15 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
     },
 ];
 
+export function canAccessStockDashboard(
+    capabilities?: StockPresentationCapabilities,
+): boolean {
+    return capabilities?.canReadCatalog === true
+        || capabilities?.canReadOwnRequests === true
+        || capabilities?.canReadAllRequests === true
+        || capabilities?.canExportReports === true;
+}
+
 /**
  * Filter groups by role and feature availability. Routine also requires its
  * server-derived read projection; non-Routine menu behavior remains role-based.
@@ -129,6 +139,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
 export function getAvailableMenuGroups(
     isAdmin: boolean,
     routineCapabilities?: RoutinePresentationCapabilities,
+    stockCapabilities?: StockPresentationCapabilities,
 ): MenuGroup[] {
     return DASHBOARD_MENU_GROUPS.map((group) => {
         const filteredItems = group.items.filter(
@@ -143,8 +154,12 @@ export function getAvailableMenuGroups(
                 (item) => item.id !== "routine"
                     || routineCapabilities?.canReadTasks === true,
             );
-        if (filteredItems.length === 0) return null;
-        return { ...group, items: filteredItems };
+        const stockAvailable = canAccessStockDashboard(stockCapabilities);
+        const stockFilteredItems = filteredItems.filter(
+            (item) => item.id !== "stock" || stockAvailable,
+        );
+        if (stockFilteredItems.length === 0) return null;
+        return { ...group, items: stockFilteredItems };
     }).filter((g): g is MenuGroup => g !== null);
 }
 

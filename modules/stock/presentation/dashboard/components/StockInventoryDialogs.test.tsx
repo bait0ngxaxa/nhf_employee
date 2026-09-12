@@ -55,6 +55,7 @@ describe("AdjustDialog", () => {
         render(
             <AdjustDialog
                 item={item}
+                canManageInventory
                 onClose={() => undefined}
                 onSuccess={() => undefined}
             />,

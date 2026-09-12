@@ -1,7 +1,7 @@
-# Stock Authorization Migration — Phase 6A
+# Stock Authorization Migration — Phase 6A / Phase 6B
 
-สถานะ: เสร็จสิ้นสำหรับ **server enforcement**<br>
-ขอบเขต: Stock เท่านั้น; ไม่รวม Phase 6B presentation, Leave, Employee, Audit หรือ Settings
+สถานะ: Phase 6A **server enforcement** และ Phase 6B **presentation projection** เสร็จสิ้น<br>
+ขอบเขต: Stock เท่านั้น; ไม่รวม Leave, Employee, Audit หรือ Settings
 
 เอกสารนี้บันทึกการย้าย authorization ของ Stock จาก role/boolean checks ไปยัง central authorization resolver โดยคงพฤติกรรมเดิมเป็น compatibility floor ชั่วคราวตาม [authorization-contract.md](authorization-contract.md), [authorization-resolver.md](authorization-resolver.md) และ [stock-migration.md](stock-migration.md)
 
@@ -78,12 +78,91 @@ Catalog reads use `stock.catalog.read` and retain catalog-wide visibility; reque
 
 All Stock domain invariants remain in Stock application/domain/infrastructure code: pending-state transitions, inventory availability, active references, locking, concurrency, idempotency, audit, email, LINE notification and outbox behavior are not encoded in the generic authorization module.
 
-## 5. Presentation boundary and non-goals
+## 5. Presentation boundary — Phase 6B
 
-Phase 6A makes server authorization authoritative first. It intentionally does not migrate Dashboard/LIFF presentation projection, Stock navigation, tabs, buttons, `LiffHomeApp`, `CurrentUserProjection` or the legacy `canRequestStock`/`canProcessStockRequests` values. A granted USER may therefore have server authority before the UI exposes the corresponding action; this is planned Phase 6B work.
+สถานะ: **เสร็จสิ้นสำหรับ Stock presentation projection**
 
-No Prisma authorization schema or migration was added. DENY grants, wildcards, ABAC, Department/Team semantics, a policy DSL and authorization administration UI are out of scope. Routine code and behavior are unchanged.
+Phase 6B adds the immutable `StockPresentationCapabilities` projection in
+`modules/stock/application/authorization.ts`. It uses one centralized
+`authorization.resolveMany()` call and the same
+`buildStockCapabilityAuthorization()` compatibility translation as Phase 6A.
+Expected capability denials become `false`; unknown capabilities, invalid
+configuration and structural resolver failures remain fail-closed or propagate
+according to the shared authorization architecture.
+
+The projection keeps these decisions independent:
+
+| Presentation capability | Source decision |
+|---|---|
+| `canReadCatalog` | `stock.catalog.read / ALL` |
+| `canReadOwnRequests`, `canReadAllRequests` | `stock.request.read / OWN`, `/ ALL` |
+| `canCreateRequests` | `stock.request.create / OWN` |
+| `canCancelOwnRequests`, `canCancelAnyRequests` | `stock.request.cancel / OWN`, `/ ALL` |
+| `canProcessRequests` | `stock.request.process / ALL` |
+| `canManageInventory` | `stock.inventory.manage / ALL` |
+| `canExportReports` | `stock.report.export / ALL` |
+
+### Dashboard flow
+
+```text
+trusted Dashboard account + active Employee projection
+  -> getStockPresentationCapabilities(..., DASHBOARD)
+  -> CurrentUserProjection.stockCapabilities
+  -> Dashboard menu/direct-route guard
+  -> StockProvider tabs, queries and action controls
+```
+
+Stock menu and `/dashboard/stock` access require at least one usable Stock
+surface. Tabs and controls use the granular projection: catalog browsing,
+request creation, own request history/cancellation, organization-wide request
+read, processing, any-request cancellation, inventory management and report
+export are separate gates. `scope=all` is requested only for
+`canReadAllRequests`; processing does not make the organization list visible,
+and read-all does not expose processing or cancellation controls.
+
+### LIFF flow
+
+```text
+verified LIFF workforce session
+  -> getLiffCapabilities(..., LIFF_SELF_SERVICE)
+  -> /api/line/home stockCapabilities
+  -> LiffHomeApp module state
+  -> LiffStockApp capability-aware tabs/data/mutations
+```
+
+LIFF Stock waits for the trusted home projection before requesting catalog,
+own-request or processing data. The module is usable when catalog, own-request
+read or processing is available. The tabs map to those same three capabilities.
+The legacy aliases remain temporarily, but are derived only from the
+projection:
+
+```text
+canRequestStock = canReadCatalog && canCreateRequests
+canProcessStockRequests = canProcessRequests
+```
+
+The LIFF channel preserves Phase 6A compatibility: LIFF USER is a requester,
+LIFF ADMIN remains a processor, and an explicit USER process grant is honored.
+The Routine LIFF ADMIN self-service clamp is intentionally not applied to
+Stock. Dashboard-only inventory and report capabilities remain unavailable in
+LIFF because those registry entries do not support `LIFF_SELF_SERVICE`.
+
+Capability changes during an open UI close or disable stale Stock controls,
+normalize stale tabs/deep links to a usable surface, and refresh the home
+projection after ambiguous mutation session recovery. No automatic retry uses
+an old capability snapshot. All of these are presentation safeguards; Phase
+6A route guards, resource relationships, domain state and transaction-time
+authorization remain authoritative.
+
+No Prisma authorization schema or migration was added. DENY grants, wildcards,
+ABAC, Department/Team semantics, a policy DSL and authorization administration
+UI are out of scope. Leave, Employee, Audit, Settings and Routine behavior are
+not migrated by this phase.
 
 ## 6. Verification record
 
-Focused adapter, query, mutation, Dashboard route, LIFF route, inventory route and report route tests cover compatibility, explicit grants, channel denial, OWN/ALL translation, LIFF 404 hiding, processor separation and transaction revalidation. The repository-wide `npm run check` command is the final verification gate for architecture, lint, typecheck and the full test suite.
+Focused Stock projection, Dashboard, LIFF home, LIFF bootstrap/order,
+capability/tab/action and recovery tests cover compatibility, explicit grants,
+channel denial, batching, OWN/ALL separation and stale presentation state.
+The repository-wide `npm run check` command is the final verification gate for
+architecture, lint, typecheck and the full test suite.

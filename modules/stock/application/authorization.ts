@@ -13,6 +13,7 @@ import type { UserRole } from "@/lib/ssot/permissions";
 
 import { StockCapabilityDeniedError } from "./errors";
 import type { StockCommandActor } from "../domain/types";
+import type { StockPresentationCapabilities } from "./types";
 
 export const STOCK_MIGRATED_CAPABILITIES = [
     "stock.catalog.read",
@@ -207,6 +208,111 @@ function buildStockCapabilityAuthorization(
             false,
         ),
         usedMigrationCompatibility: false,
+    });
+}
+
+function getStockPresentationDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: StockMigratedCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(
+            `Authorization resolver omitted Stock capability: ${capability}`,
+        );
+    }
+    return decision;
+}
+
+function projectStockCapabilityDecision(
+    actor: StockAuthorizationActor,
+    capability: StockMigratedCapability,
+    decision: AuthorizationDecision,
+    options: StockCapabilityOptions = {},
+): readonly AuthorizationScope[] | null {
+    try {
+        return buildStockCapabilityAuthorization(
+            actor,
+            capability,
+            decision,
+            options,
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof StockCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+function hasStockScope(
+    scopes: readonly AuthorizationScope[] | null,
+    scope: AuthorizationScope,
+): boolean {
+    return scopes?.includes(scope) === true || scopes?.includes("ALL") === true;
+}
+
+export async function getStockPresentationCapabilities(
+    context: StockAuthorizationContext,
+): Promise<StockPresentationCapabilities> {
+    const actor = context.authorizationActor;
+    const decisions = await authorization.resolveMany(
+        actor,
+        STOCK_MIGRATED_CAPABILITIES,
+    );
+
+    const project = (
+        capability: StockMigratedCapability,
+        options: StockCapabilityOptions = {},
+    ): readonly AuthorizationScope[] | null =>
+        projectStockCapabilityDecision(
+            actor,
+            capability,
+            getStockPresentationDecision(decisions, capability),
+            options,
+        );
+
+    const readOwnScopes = project("stock.request.read", {
+        requestedScope: "mine",
+    });
+    const readAllScopes = project("stock.request.read", {
+        requestedScope: "all",
+    });
+    const cancelOwnScopes = project("stock.request.cancel", {
+        requestedScope: "mine",
+    });
+    const cancelAllScopes = project("stock.request.cancel", {
+        requestedScope: "all",
+    });
+
+    return Object.freeze({
+        canReadCatalog: hasStockScope(
+            project("stock.catalog.read"),
+            "ALL",
+        ),
+        canReadOwnRequests: hasStockScope(readOwnScopes, "OWN"),
+        canReadAllRequests: hasStockScope(readAllScopes, "ALL"),
+        canCreateRequests: hasStockScope(
+            project("stock.request.create"),
+            "OWN",
+        ),
+        canCancelOwnRequests: hasStockScope(cancelOwnScopes, "OWN"),
+        canCancelAnyRequests: hasStockScope(cancelAllScopes, "ALL"),
+        canProcessRequests: hasStockScope(
+            project("stock.request.process"),
+            "ALL",
+        ),
+        canManageInventory: hasStockScope(
+            project("stock.inventory.manage"),
+            "ALL",
+        ),
+        canExportReports: hasStockScope(
+            project("stock.report.export"),
+            "ALL",
+        ),
     });
 }
 

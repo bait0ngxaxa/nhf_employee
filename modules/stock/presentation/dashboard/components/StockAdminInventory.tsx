@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PackageSearch, PackagePlus, Plus } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,9 @@ export function StockAdminInventory() {
         refreshItems,
         refreshCategories,
         totalItems,
+        stockCapabilities,
     } = useStockDataContext();
+    const canManageInventory = stockCapabilities.canManageInventory;
     const {
         itemsPage,
         setItemsPage,
@@ -39,20 +41,33 @@ export function StockAdminInventory() {
     const [showAddCategory, setShowAddCategory] = useState(false);
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
     const isInitialLoading = isLoading && items.length === 0;
+    useEffect(() => {
+        if (!canManageInventory) {
+            setShowAddItem(false);
+            setEditingItem(null);
+            setShowAddCategory(false);
+        }
+    }, [canManageInventory]);
 
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap gap-3">
                 <Button
                     className="h-11 bg-action-primary-solid px-5 font-semibold text-content-on-brand shadow-sm transition-colors hover:bg-action-primary-solid-hover"
-                    onClick={() => setShowAddItem(true)}
+                    onClick={() => {
+                        if (canManageInventory) setShowAddItem(true);
+                    }}
+                    disabled={!canManageInventory}
                 >
                     <Plus className="mr-1.5 h-4 w-4" /> {STOCK_ADMIN_TEXT.addItem}
                 </Button>
                 <Button
                     variant="outline"
                     className="h-11 border-border-subtle px-5 font-medium text-content-secondary transition-colors hover:border-action-primary-border hover:bg-action-primary-surface hover:text-action-primary-foreground"
-                    onClick={() => setShowAddCategory(true)}
+                    onClick={() => {
+                        if (canManageInventory) setShowAddCategory(true);
+                    }}
+                    disabled={!canManageInventory}
                 >
                     <PackagePlus className="mr-1.5 h-4 w-4" />
                     {STOCK_ADMIN_TEXT.addCategory}
@@ -78,7 +93,10 @@ export function StockAdminInventory() {
                 <>
                     <StockInventoryTable
                         items={items}
-                        onAdjust={setEditingItem}
+                        canManageInventory={canManageInventory}
+                        onAdjust={(item) => {
+                            if (canManageInventory) setEditingItem(item);
+                        }}
                         onDeleted={(message) => {
                             toast.success(message);
                             refreshItems();
@@ -105,6 +123,7 @@ export function StockAdminInventory() {
                 open={showAddItem}
                 onClose={() => setShowAddItem(false)}
                 categories={categories}
+                canManageInventory={canManageInventory}
                 onSuccess={() => {
                     refreshItems();
                     setShowAddItem(false);
@@ -115,6 +134,7 @@ export function StockAdminInventory() {
                 <EditItemDialog
                     item={editingItem}
                     categories={categories}
+                    canManageInventory={canManageInventory}
                     onClose={() => setEditingItem(null)}
                     onSuccess={() => {
                         refreshItems();
@@ -126,6 +146,7 @@ export function StockAdminInventory() {
             <AddCategoryDialog
                 open={showAddCategory}
                 onClose={() => setShowAddCategory(false)}
+                canManageInventory={canManageInventory}
                 onSuccess={() => {
                     refreshCategories();
                     setShowAddCategory(false);

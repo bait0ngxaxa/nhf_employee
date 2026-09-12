@@ -7,10 +7,17 @@ import {
 
 const ROUTINE_READ_ALLOWED = {
     routineCapabilities: { canReadTasks: true },
+    stockCapabilities: { canReadCatalog: true, canReadOwnRequests: true, canProcessRequests: false },
 };
 
 const ROUTINE_READ_DENIED = {
     routineCapabilities: { canReadTasks: false },
+    stockCapabilities: { canReadCatalog: false, canReadOwnRequests: false, canProcessRequests: false },
+};
+
+const STOCK_PROCESSOR_ONLY = {
+    routineCapabilities: { canReadTasks: false },
+    stockCapabilities: { canReadCatalog: false, canReadOwnRequests: false, canProcessRequests: true },
 };
 
 describe("LIFF home module availability", () => {
@@ -37,6 +44,19 @@ describe("LIFF home module availability", () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
 
         expect(getLiffHomeModules(ROUTINE_READ_ALLOWED).routine).toEqual({
+            enabled: false,
+            status: "unavailable",
+        });
+    });
+
+    it("enables Stock for any usable current LIFF surface", () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_STOCK", "true");
+
+        expect(getLiffHomeModules(STOCK_PROCESSOR_ONLY).stock).toEqual({
+            enabled: true,
+            status: "available",
+        });
+        expect(getLiffHomeModules(ROUTINE_READ_DENIED).stock).toEqual({
             enabled: false,
             status: "unavailable",
         });

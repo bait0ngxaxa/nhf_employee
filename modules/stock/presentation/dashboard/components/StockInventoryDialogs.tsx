@@ -28,6 +28,7 @@ import {
 
 type AdjustDialogProps = {
     item: StockItem;
+    canManageInventory: boolean;
     onClose: () => void;
     onSuccess: () => void;
 };
@@ -46,7 +47,7 @@ function getTrimmedFormText(
     return typeof value === "string" ? value.trim() : "";
 }
 
-export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
+export function AdjustDialog({ item, canManageInventory, onClose, onSuccess }: AdjustDialogProps) {
     const activeVariants = item.variants?.filter((variant) => variant.isActive) ?? [];
     const initialVariant = activeVariants.length === 1 ? activeVariants[0] : undefined;
     const [loading, setLoading] = useState(false);
@@ -67,6 +68,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
+        if (!canManageInventory) return;
         const formData = new FormData(event.currentTarget);
         const variantId = Number(formData.get("variantId"));
         if (activeVariants.length > 1 && !selectedVariantId) {
@@ -120,6 +122,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                             variants={activeVariants}
                             value={selectedVariantId}
                             onValueChange={handleVariantChange}
+                            disabled={!canManageInventory}
                         />
                     )}
                     <DialogNumberField
@@ -127,6 +130,7 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                         name="quantity"
                         label={STOCK_ADMIN_TEXT.inboundQuantity}
                         defaultValue={1}
+                        disabled={!canManageInventory}
                     />
                     <DialogNumberField
                         id="adj-min-stock"
@@ -134,11 +138,13 @@ export function AdjustDialog({ item, onClose, onSuccess }: AdjustDialogProps) {
                         label={STOCK_ADMIN_TEXT.minStock}
                         value={minStock}
                         onValueChange={setMinStock}
+                        disabled={!canManageInventory}
                     />
                     <DialogActions
                         loading={loading}
                         submitLabel={STOCK_ADMIN_TEXT.saveAdjust}
                         onClose={onClose}
+                        disabled={!canManageInventory}
                     />
                 </form>
             </DialogContent>
@@ -150,6 +156,7 @@ function AdjustVariantField(props: {
     variants: StockItemVariant[];
     value: string;
     onValueChange: (value: string) => void;
+    disabled: boolean;
 }) {
 
     return (
@@ -162,7 +169,10 @@ function AdjustVariantField(props: {
                 value={props.value}
                 onValueChange={props.onValueChange}
             >
-                <SelectTrigger className="h-11 w-full focus:ring-action-primary-focus">
+                <SelectTrigger
+                    disabled={props.disabled}
+                    className="h-11 w-full focus:ring-action-primary-focus"
+                >
                     <SelectValue placeholder="เลือกรายการย่อย" />
                 </SelectTrigger>
                 <SelectContent>
@@ -179,12 +189,14 @@ function AdjustVariantField(props: {
 
 type AddCategoryDialogProps = {
     open: boolean;
+    canManageInventory: boolean;
     onClose: () => void;
     onSuccess: () => void;
 };
 
 export function AddCategoryDialog({
     open,
+    canManageInventory,
     onClose,
     onSuccess,
 }: AddCategoryDialogProps) {
@@ -192,6 +204,7 @@ export function AddCategoryDialog({
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
+        if (!canManageInventory) return;
         const formData = new FormData(event.currentTarget);
         const categoryName = getTrimmedFormText(formData, "name");
         const categoryDescription = getTrimmedFormText(formData, "description");
@@ -237,16 +250,19 @@ export function AddCategoryDialog({
                         name="name"
                         label={STOCK_ADMIN_TEXT.categoryName}
                         required
+                        disabled={!canManageInventory}
                     />
                     <DialogTextField
                         id="cat-desc"
                         name="description"
                         label={STOCK_ADMIN_TEXT.categoryDescription}
+                        disabled={!canManageInventory}
                     />
                     <DialogActions
                         loading={loading}
                         submitLabel={STOCK_ADMIN_TEXT.save}
                         onClose={onClose}
+                        disabled={!canManageInventory}
                     />
                 </form>
             </DialogContent>
@@ -259,6 +275,7 @@ function DialogTextField(props: {
     name: string;
     label: string;
     required?: boolean;
+    disabled?: boolean;
 }) {
     return (
         <div className="space-y-1.5">
@@ -270,6 +287,7 @@ function DialogTextField(props: {
                 id={props.id}
                 name={props.name}
                 required={props.required}
+                disabled={props.disabled}
                 className="h-11 focus-visible:ring-action-primary-focus"
             />
         </div>
@@ -283,6 +301,7 @@ function DialogNumberField(props: {
     defaultValue?: number;
     value?: string;
     onValueChange?: (value: string) => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="space-y-1.5">
@@ -301,6 +320,7 @@ function DialogNumberField(props: {
                       }
                     : { defaultValue: props.defaultValue })}
                 required
+                disabled={props.disabled}
                 className="h-11 focus-visible:ring-action-primary-focus"
             />
         </div>
@@ -311,6 +331,7 @@ function DialogActions(props: {
     loading: boolean;
     submitLabel: string;
     onClose: () => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end">
@@ -318,14 +339,14 @@ function DialogActions(props: {
                 type="button"
                 variant="ghost"
                 onClick={props.onClose}
-                disabled={props.loading}
+                disabled={props.loading || props.disabled}
                 className="h-11 px-5 font-medium text-content-secondary hover:bg-surface-muted"
             >
                 {STOCK_ADMIN_TEXT.cancel}
             </Button>
             <Button
                 type="submit"
-                disabled={props.loading}
+                disabled={props.loading || props.disabled}
                 className="h-11 bg-action-primary-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-action-primary-solid-hover"
             >
                 {props.loading ? STOCK_ADMIN_TEXT.saving : props.submitLabel}

@@ -30,6 +30,9 @@ interface LiffStockRequestDetailProps {
         action: LiffStockRequestAction,
         request: LiffStockRequestDetailData,
     ) => void;
+    canProcessRequests: boolean;
+    canCancelOwnRequests: boolean;
+    canCancelAnyRequests: boolean;
 }
 
 export function LiffStockRequestDetail({
@@ -40,9 +43,19 @@ export function LiffStockRequestDetail({
     actionIntent,
     onOpenChange,
     onAction,
+    canProcessRequests,
+    canCancelOwnRequests,
+    canCancelAnyRequests,
 }: LiffStockRequestDetailProps): ReactElement {
-    const processorIntent = detail?.viewerRole === "PROCESSOR"
+    const processorIntent = canProcessRequests
         && (actionIntent === "issue" || actionIntent === "review");
+    const visibleActions = detail?.availableActions.filter((action) =>
+        action === "ISSUE"
+            ? canProcessRequests
+            : detail.viewerRole === "PROCESSOR"
+                ? canCancelAnyRequests
+                : canCancelOwnRequests,
+    ) ?? [];
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,9 +168,9 @@ export function LiffStockRequestDetail({
                     ) : null}
                 </DialogScrollArea>
 
-                {detail && detail.availableActions.length > 0 ? (
+                {detail && visibleActions.length > 0 ? (
                     <div className="shrink-0 flex gap-2 border-t border-border-subtle bg-surface-raised px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
-                        {detail.availableActions.map((action) => (
+                        {visibleActions.map((action) => (
                             <Button
                                 key={action}
                                 type="button"
