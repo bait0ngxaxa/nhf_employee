@@ -5,9 +5,10 @@ import { isActiveEmployeeInTransaction } from "@/modules/leave/application/queri
 import {
     assertLeaveCapabilityScope,
     canUseLeaveAdminRecoveryOverride,
+    resolveLeaveActorInTransaction,
     resolveLeaveCapabilityInTransaction,
+    type LeaveAuthorizationActor,
     type LeaveAuthorizationContext,
-    type LeaveCapabilityAuthorization,
 } from "@/modules/leave/application/authorization";
 import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
@@ -523,26 +524,33 @@ async function getCancellationDecisionRequest(
 ): Promise<{
     leaveRequest: LeaveCancellationRequest;
     adminOverride: boolean;
-    authorization: LeaveCapabilityAuthorization;
+    authorization: {
+        actor: LeaveAuthorizationActor;
+        usesDashboardCapability: boolean;
+    };
 }> {
-    if (!await isActiveEmployeeInTransaction(tx, actor.userId, actor.employeeId)) {
-        throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
-    }
-
-    const capabilityAuthorization = assertLeaveCapabilityScope(
-        await resolveLeaveCapabilityInTransaction(
-            tx,
-            actor.authorization,
-            "leave.cancellation.decide",
-        ),
-        "ASSIGNED",
-    );
-    const allowAdminOverride = canUseLeaveAdminRecoveryOverride(
-        capabilityAuthorization,
-    );
-    const actorEmployeeId = capabilityAuthorization.actor.employeeId;
+    // LIFF cancellation decisions remain Leave-domain-authorized until the
+    // registry has a deliberate contract for this existing production path.
+    const usesDashboardCapability =
+        actor.authorization.authorizationActor.channel === "DASHBOARD";
+    const capabilityAuthorization = usesDashboardCapability
+        ? assertLeaveCapabilityScope(
+            await resolveLeaveCapabilityInTransaction(
+                tx,
+                actor.authorization,
+                "leave.cancellation.decide",
+            ),
+            "ASSIGNED",
+        )
+        : null;
+    const activeActor = capabilityAuthorization?.actor
+        ?? await resolveLeaveActorInTransaction(tx, actor.authorization);
+    const allowAdminOverride = capabilityAuthorization !== null
+        && actor.allowAdminOverride !== false
+        && canUseLeaveAdminRecoveryOverride(capabilityAuthorization);
+    const actorEmployeeId = activeActor.employeeId;
     if (
-        capabilityAuthorization.actor.userId !== actor.userId
+        activeActor.userId !== actor.userId
         || actorEmployeeId === null
         || actorEmployeeId !== actor.employeeId
     ) {
@@ -576,14 +584,20 @@ async function getCancellationDecisionRequest(
             return {
                 leaveRequest,
                 adminOverride: false,
-                authorization: capabilityAuthorization,
+                authorization: {
+                    actor: activeActor,
+                    usesDashboardCapability,
+                },
             };
         }
         if (decisionAuthorization === "ADMIN_OVERRIDE") {
             return {
                 leaveRequest,
                 adminOverride: true,
-                authorization: capabilityAuthorization,
+                authorization: {
+                    actor: activeActor,
+                    usesDashboardCapability,
+                },
             };
         }
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
@@ -624,7 +638,10 @@ async function getCancellationDecisionRequest(
     return {
         leaveRequest,
         adminOverride: false,
-        authorization: capabilityAuthorization,
+        authorization: {
+            actor: activeActor,
+            usesDashboardCapability,
+        },
     };
 }
 

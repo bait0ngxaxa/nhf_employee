@@ -38,7 +38,7 @@ Compatibility floor ของ Leave ไม่ได้หมายความ�
 - `request.read`, `request.create`, `request.cancel` แปลเป็น `OWN`
 - `approval.read`, `request.approve`, `cancellation.decide` (Dashboard) แปลเป็น `ASSIGNED`
 - `request.not_taken` แปลได้ทั้ง `OWN` และ `ASSIGNED` เพราะ owner request กับ approver confirmation เป็นคนละ operation
-- `approver.manage` แปลเป็น `ALL` เฉพาะ Admin ใน compatibility path และเฉพาะ Dashboard
+- `approver.manage` แปลเป็น `ALL` เฉพาะ Admin ใน compatibility path และเฉพาะ Dashboard โดย compatibility เดิมของ Dashboard Admin ยังคงอิง active User account และไม่บังคับ Employee profile; explicit normal `USER` grant ยังคงต้องมี active workforce
 
 Explicit resolver `ALLOW` ใช้ scopes จาก resolver โดยตรง ดังนั้น normal `USER` ที่ได้รับ explicit grant เช่น `leave.approver.manage / ALL` สามารถผ่าน capability ได้โดยไม่ถูกเลื่อน role เป็น Admin แต่ยังต้องผ่าน active workforce และ Leave-owned domain constraints
 
@@ -71,8 +71,9 @@ Normal approve/reject, cancellation decision และ not-taken confirmation �
 - Employee cancellation uses `leave.request.cancel / OWN`; owner, status/date, quota, audit, notifications, row locks and concurrency behavior remain Leave-owned.
 - Normal approve/reject uses `leave.request.approve / ASSIGNED`; transaction-time effective-assignment, pending/current-action, quota and atomic claim checks remain authoritative.
 - Normal cancellation decisions use `leave.cancellation.decide / ASSIGNED` on Dashboard; normal effective approver behavior remains unchanged.
+- The existing LIFF effective-approver cancellation decision remains temporarily Leave-domain-authorized because the registry defines `leave.cancellation.decide` as Dashboard-only. Phase 7A intentionally preserves this production workflow without adding `LIFF_SELF_SERVICE`, inventing a capability, or bridging `CHANNEL_NOT_SUPPORTED`; it remains a future authorization-contract/policy decision and is not centrally migrated.
 - Not-taken request and confirmation use `leave.request.not_taken` with `OWN` and `ASSIGNED` separately. The application does not treat the route option or request data as Admin authority.
-- Approver settings use `leave.approver.manage / ALL` on Dashboard. The route no longer makes `requireAdminSession()` the final authorization decision; assignment eligibility, hierarchy, pending-request and concurrency invariants remain in Leave.
+- Approver settings use `leave.approver.manage / ALL` on Dashboard. The legacy Admin compatibility path remains account-based and Employee-optional; an explicit normal `USER` grant requires active workforce. The route no longer makes `requireAdminSession()` the final authorization decision; assignment eligibility, hierarchy, pending-request and concurrency invariants remain in Leave.
 
 All protected mutations revalidate relevant capability and trusted active identity inside their existing transaction boundary. Existing serializable transactions, row locks, action-version checks, atomic claims, quota reconciliation, audit and outbox semantics are retained.
 
@@ -82,7 +83,7 @@ The route constructs the channel server-side. Dashboard Admin recovery behavior 
 
 - cancellation recovery override is available only through the existing Dashboard Leave-specific path when effective approver availability and existing recovery conditions permit it;
 - not-taken Admin recovery follows the same Dashboard-only compatibility path and requires the existing recovery reason/relationship checks;
-- LIFF passes `LIFF_SELF_SERVICE`, so `leave.cancellation.decide` is not supported there and no Admin recovery override is enabled for not-taken confirmation;
+- LIFF passes `LIFF_SELF_SERVICE`; the existing effective-approver cancellation decision is therefore kept in the Leave domain because `leave.cancellation.decide` is not registered for LIFF, and no Admin recovery override is enabled for that path or for not-taken confirmation;
 - normal LIFF approval still requires `leave.request.approve / ASSIGNED` and effective assignment.
 
 ## Intentionally deferred boundaries

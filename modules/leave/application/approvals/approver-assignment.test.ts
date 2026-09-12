@@ -27,6 +27,15 @@ const ACTOR = {
         "DASHBOARD",
     ),
 };
+const ACCOUNT_ONLY_ADMIN_ACTOR = {
+    userId: 1,
+    email: "admin@thainhf.org",
+    authorization: buildLeaveAuthorizationContext(
+        { id: 1, role: "ADMIN" },
+        null,
+        "DASHBOARD",
+    ),
+};
 const ACTIVE_APPROVER = {
     id: 20,
     firstName: "Manager",
@@ -114,6 +123,35 @@ describe("assignLeaveApprovers", () => {
         });
         vi.mocked(prisma.employee.update).mockResolvedValue({ id: 10 } as never);
         vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
+    });
+
+    it("allows an active account-only Dashboard Admin to manage approvers", async () => {
+        vi.mocked(prisma.user.findFirst).mockResolvedValue({
+            id: 1,
+            role: "ADMIN",
+            isActive: true,
+            deletedAt: null,
+            employee: null,
+        } as never);
+        mockAssignmentLookup({ approvers: [ACTIVE_APPROVER] });
+
+        await expect(assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 20 }],
+            ACCOUNT_ONLY_ADMIN_ACTOR,
+        )).resolves.toBeUndefined();
+
+        expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                id: 1,
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+            }),
+        }));
+        expect(prisma.employee.update).toHaveBeenCalledWith({
+            where: { id: 10 },
+            data: { managerId: 20 },
+        });
     });
 
     it("blocks a manager change while the employee has a pending leave request", async () => {

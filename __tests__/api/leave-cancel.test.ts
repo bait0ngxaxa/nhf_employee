@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST, PUT } from "@/app/api/leave/cancel/route";
+import { PUT as liffPUT } from "@/app/api/line/leave/cancel/route";
 import { POST as requestNotTaken } from "@/app/api/leave/not-taken/route";
 import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
@@ -11,6 +12,9 @@ const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
     resolveInTransaction: vi.fn(),
 }));
+const liffAuthMocks = vi.hoisted(() => ({
+    requireLiffWorkforceSession: vi.fn(),
+}));
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -18,6 +22,9 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: vi.fn() }));
+vi.mock("@/modules/line", () => ({
+    requireLiffWorkforceSession: liffAuthMocks.requireLiffWorkforceSession,
+}));
 vi.mock("@/lib/services/outbox/processor", () => ({ processOutbox: vi.fn() }));
 vi.mock("@/modules/authorization", () => ({
     authorization: {
@@ -640,6 +647,16 @@ describe("POST /api/leave/cancel", () => {
             where: expect.objectContaining({ exceptionApproverId: 30 }),
             data: expect.objectContaining({ status: "CANCELLED_AFTER_APPROVAL" }),
         });
+        expect(authorizationMocks.resolveInTransaction).toHaveBeenCalledWith(
+            {
+                userId: 30,
+                employeeId: 30,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            "leave.cancellation.decide",
+            prisma,
+        );
     });
 
     it("rejects confirmation after the leave has started without returning quota", async () => {
@@ -1270,5 +1287,220 @@ describe("POST /api/leave/cancel", () => {
                 details: expect.stringContaining('"adminOverride":true'),
             }),
         });
+    });
+});
+
+describe("PUT /api/line/leave/cancel application authorization", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
+        authorizationMocks.resolve.mockReset();
+        authorizationMocks.resolveInTransaction.mockReset();
+        authorizationMocks.resolveInTransaction.mockRejectedValue(
+            new Error("LIFF must not invoke the Dashboard cancellation resolver"),
+        );
+        liffAuthMocks.requireLiffWorkforceSession.mockResolvedValue({
+            ok: true,
+            user: {
+                id: 20,
+                email: "manager@example.com",
+                name: "Manager",
+                role: "USER",
+            },
+            employeeId: 20,
+        });
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(20));
+        vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+            if (typeof callback === "function") return callback(prisma);
+            return callback;
+        });
+        vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
+        vi.mocked(prisma.employee.findMany).mockResolvedValue([] as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-cancellation",
+            status: "CANCELLED_AFTER_APPROVAL",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-1",
+            employeeId: 10,
+            year: 2099,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
+            usedHalfDays: 4,
+        });
+        vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
+            id: "quota-1",
+            employeeId: 10,
+            year: 2099,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
+            usedHalfDays: 2,
+        });
+        vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([]);
+        vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.notification.create).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({} as never);
+        vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
+    });
+
+    function decisionRequest(
+        action: "CONFIRM" | "REJECT",
+        leaveId = "leave-cancellation",
+    ): NextRequest {
+        return new NextRequest("http://localhost/api/line/leave/cancel", {
+            method: "PUT",
+            body: JSON.stringify({ leaveId, action }),
+        });
+    }
+
+    it("allows an effective LIFF approver to confirm without central cancellation resolution", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest(),
+        );
+
+        const response = await liffPUT(decisionRequest("CONFIRM"));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({ approverId: 20 }),
+            data: expect.objectContaining({ status: "CANCELLED_AFTER_APPROVAL" }),
+        });
+        expect(authorizationMocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("allows an effective LIFF approver to reject without central cancellation resolution", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest(),
+        );
+
+        const response = await liffPUT(decisionRequest("REJECT"));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({ approverId: 20 }),
+            data: { status: "APPROVED" },
+        });
+        expect(authorizationMocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("denies an unrelated employee and excludes the leave owner", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest(),
+        );
+
+        liffAuthMocks.requireLiffWorkforceSession.mockResolvedValueOnce({
+            ok: true,
+            user: { id: 40, email: "other@example.com", name: "Other", role: "USER" },
+            employeeId: 40,
+        });
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(40));
+        await expect(liffPUT(decisionRequest("REJECT"))).resolves.toMatchObject({ status: 403 });
+
+        vi.clearAllMocks();
+        vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+            if (typeof callback === "function") return callback(prisma);
+            return callback;
+        });
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(10));
+        liffAuthMocks.requireLiffWorkforceSession.mockResolvedValueOnce({
+            ok: true,
+            user: { id: 10, email: "employee@example.com", name: "Employee", role: "USER" },
+            employeeId: 10,
+        });
+
+        await expect(liffPUT(decisionRequest("CONFIRM"))).resolves.toMatchObject({ status: 403 });
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(authorizationMocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("denies the superseded original approver and allows the exception approver", async () => {
+        const exceptionApprover = {
+            id: 30,
+            firstName: "Current",
+            lastName: "Manager",
+            email: "current@example.com",
+            status: "ACTIVE",
+            deletedAt: null,
+            user: {
+                id: 30,
+                email: "current@example.com",
+                isActive: true,
+                deletedAt: null,
+            },
+        };
+        const reassignedRequest = buildCancellationRequest({
+            exceptionApproverId: 30,
+            exceptionApproverAssignedAt: new Date("2098-12-21T00:00:00.000Z"),
+            exceptionApprover,
+        });
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(reassignedRequest);
+
+        await expect(liffPUT(decisionRequest("REJECT"))).resolves.toMatchObject({ status: 403 });
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+
+        vi.clearAllMocks();
+        vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+            if (typeof callback === "function") return callback(prisma);
+            return callback;
+        });
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(reassignedRequest);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(30));
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.notification.create).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({} as never);
+        vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
+        liffAuthMocks.requireLiffWorkforceSession.mockResolvedValueOnce({
+            ok: true,
+            user: { id: 30, email: "current@example.com", name: "Current", role: "USER" },
+            employeeId: 30,
+        });
+
+        const response = await liffPUT(decisionRequest("REJECT"));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({ exceptionApproverId: 30 }),
+            data: { status: "APPROVED" },
+        });
+        expect(authorizationMocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("does not grant a LIFF ADMIN recovery override", async () => {
+        liffAuthMocks.requireLiffWorkforceSession.mockResolvedValueOnce({
+            ok: true,
+            user: { id: 99, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+            employeeId: 99,
+        });
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest({
+            approver: {
+                id: 20,
+                firstName: "Former",
+                lastName: "Manager",
+                email: "former@example.com",
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        }));
+        vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
+        vi.mocked(prisma.employee.findMany).mockResolvedValue([] as never);
+
+        const response = await liffPUT(decisionRequest("REJECT"));
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(authorizationMocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 });

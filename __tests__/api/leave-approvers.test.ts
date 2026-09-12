@@ -107,6 +107,18 @@ describe("GET /api/leave/approvers", () => {
             expect.objectContaining({ id: 10, canApproveLeave: true }),
         ]);
     });
+
+    it("allows an active Dashboard Admin account without an Employee profile", async () => {
+        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "1", role: "ADMIN" } },
+            user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+        });
+
+        const response = await GET();
+
+        expect(response.status).toBe(200);
+    });
 });
 
 describe("PUT /api/leave/approvers", () => {

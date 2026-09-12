@@ -313,12 +313,59 @@ describe("Leave authorization migration adapter", () => {
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 
-    it("fails closed when Dashboard Admin approver management has no Employee profile", async () => {
+    it("preserves account-only Dashboard Admin approver management compatibility", async () => {
         const tx = {
             user: {
                 findFirst: vi.fn().mockResolvedValue(activeUser("ADMIN", null)),
             },
         } as unknown as Prisma.TransactionClient;
+        mocks.resolveInTransaction.mockResolvedValue(
+            decision("leave.approver.manage", false, [], "NO_APPLICABLE_GRANT"),
+        );
+
+        const result = await resolveLeaveCapabilityInTransaction(
+            tx,
+            context("ADMIN", "DASHBOARD", null),
+            "leave.approver.manage",
+        );
+
+        expect(result.actor).toEqual({
+            userId: 7,
+            employeeId: null,
+            systemRole: "ADMIN",
+            channel: "DASHBOARD",
+        });
+        expect(result.scopes).toEqual(["ALL"]);
+        expect(result.usedMigrationCompatibility).toBe(true);
+        expect(tx.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                id: 7,
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+            }),
+        }));
+        expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
+        expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
+        expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
+            {
+                userId: 7,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+            "leave.approver.manage",
+            tx,
+        );
+    });
+
+    it("fails closed when the account-only Admin role is revoked before the transaction", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(activeUser("USER", null)),
+            },
+        } as unknown as Prisma.TransactionClient;
+
         await expect(
             resolveLeaveCapabilityInTransaction(
                 tx,
@@ -326,8 +373,96 @@ describe("Leave authorization migration adapter", () => {
                 "leave.approver.manage",
             ),
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
-        expect(tx.user.findFirst).not.toHaveBeenCalled();
         expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
+        expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["an inactive account", { ...activeUser("ADMIN", null), isActive: false }],
+        ["a deleted account", { ...activeUser("ADMIN", null), deletedAt: new Date() }],
+    ] as const)("fails closed for %s in the account-only path", async (_label, user) => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(user),
+            },
+        } as unknown as Prisma.TransactionClient;
+
+        await expect(
+            resolveLeaveCapabilityInTransaction(
+                tx,
+                context("ADMIN", "DASHBOARD", null),
+                "leave.approver.manage",
+            ),
+        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("does not make Employee optional for any other Leave capability or channel", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn(),
+            },
+        } as unknown as Prisma.TransactionClient;
+
+        await expect(
+            resolveLeaveCapabilityInTransaction(
+                tx,
+                context("ADMIN", "DASHBOARD", null),
+                "leave.request.cancel",
+            ),
+        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        await expect(
+            resolveLeaveCapabilityInTransaction(
+                tx,
+                context("ADMIN", "LIFF_SELF_SERVICE", null),
+                "leave.approver.manage",
+            ),
+        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("resolves an explicit USER approver-management grant with active workforce", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(activeUser("USER", 21)),
+            },
+        } as unknown as Prisma.TransactionClient;
+        mocks.resolveInTransaction.mockResolvedValue(
+            decision(
+                "leave.approver.manage",
+                true,
+                ["ALL"],
+                undefined,
+                [userGrant("leave.approver.manage", "ALL")],
+            ),
+        );
+
+        const result = await resolveLeaveCapabilityInTransaction(
+            tx,
+            context("USER", "DASHBOARD", 21),
+            "leave.approver.manage",
+        );
+
+        expect(result.actor.systemRole).toBe("USER");
+        expect(result.actor.employeeId).toBe(21);
+        expect(result.scopes).toEqual(["ALL"]);
+        expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [21]);
+    });
+
+    it("fails closed when an explicit USER approver-management actor loses workforce identity", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(null),
+            },
+        } as unknown as Prisma.TransactionClient;
+
+        await expect(
+            resolveLeaveCapabilityInTransaction(
+                tx,
+                context("USER", "DASHBOARD", 21),
+                "leave.approver.manage",
+            ),
+        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 });
