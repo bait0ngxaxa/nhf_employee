@@ -299,7 +299,7 @@ export function LiffRoutineApp(): ReactElement {
 
     const reloadLatestTask = useCallback(
         async (taskId: number): Promise<LiffRoutineTaskDetail> => {
-            if (!routineReadAvailable || !canReadTasks || !canUpdateTasks) {
+            if (!routineReadAvailable || !canReadTasks) {
                 throw new Error("Routine access is no longer available");
             }
             const requestId = detailRequestIdRef.current + 1;
@@ -325,7 +325,7 @@ export function LiffRoutineApp(): ReactElement {
                 }
             }
         },
-        [canReadTasks, canUpdateTasks, routineReadAvailable],
+        [canReadTasks, routineReadAvailable],
     );
 
     const handleFilterChange = useCallback(
@@ -396,6 +396,54 @@ export function LiffRoutineApp(): ReactElement {
         }
     }, [canReadTasks, isTaskLoading, pagination, routineReadAvailable, selectedFilter, state]);
 
+    const refreshRoutineAccess = useCallback(async (): Promise<LiffHomeResponse | null> => {
+        try {
+            const homeResponse = await fetchLiffHome();
+            setHome(homeResponse);
+            if (!hasRoutineReadAccess(homeResponse)) {
+                routineRequestIdRef.current += 1;
+                taskRequestIdRef.current += 1;
+                detailRequestIdRef.current += 1;
+                referenceRequestIdRef.current += 1;
+                setState("UNAVAILABLE");
+                setViewError(null);
+                setSummary(null);
+                setTasks([]);
+                setFocusedTaskId(null);
+                setFocusNotice(null);
+                setSelectedTaskId(null);
+                setDetail(null);
+                setDetailError(null);
+                setDetailLoading(false);
+                setFormMode(null);
+                setDeleteError(null);
+                setIsTaskLoading(false);
+                setReference(null);
+                setReferenceState("IDLE");
+                setReferenceError(null);
+            }
+            return homeResponse;
+        } catch (error) {
+            routineRequestIdRef.current += 1;
+            taskRequestIdRef.current += 1;
+            detailRequestIdRef.current += 1;
+            referenceRequestIdRef.current += 1;
+            setHome(null);
+            setState("ERROR");
+            setViewError(toRoutineViewError(error));
+            setSummary(null);
+            setTasks([]);
+            setSelectedTaskId(null);
+            setDetail(null);
+            setDetailError(null);
+            setDetailLoading(false);
+            setFormMode(null);
+            setDeleteError(null);
+            setIsTaskLoading(false);
+            return null;
+        }
+    }, []);
+
     const refreshRoutineData = useCallback(async (
         refreshFailureMessage = "บันทึกสำเร็จ แต่โหลดรายการ Routine ล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง",
     ): Promise<boolean> => {
@@ -428,6 +476,24 @@ export function LiffRoutineApp(): ReactElement {
             }
         }
     }, [canReadTasks, routineReadAvailable, selectedFilter]);
+
+    const handleRecoveredFormMutation = useCallback(
+        async (mode: LiffRoutineTaskFormMode): Promise<boolean> => {
+            const homeResponse = await refreshRoutineAccess();
+            if (!homeResponse || !hasRoutineReadAccess(homeResponse)) return false;
+
+            const routineCapabilities = homeResponse.capabilities.routineCapabilities;
+            const actionAllowed = mode === "CREATE"
+                ? routineCapabilities.canCreateTasks
+                : routineCapabilities.canUpdateTasks;
+            if (!actionAllowed) setFormMode(null);
+            await refreshRoutineData(
+                `${LIFF_SESSION_RECOVERED_MUTATION_MESSAGE} แต่ยังโหลดรายการล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง`,
+            );
+            return actionAllowed;
+        },
+        [refreshRoutineAccess, refreshRoutineData],
+    );
 
     const openCreate = useCallback((): void => {
         if (!routineReadAvailable || !canCreateTasks) {
@@ -498,20 +564,23 @@ export function LiffRoutineApp(): ReactElement {
                     if (isRecoveredLiffMutation(error)) {
                         setDeleteError(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                         setOperationNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
-                        await refreshRoutineData(
-                            `${LIFF_SESSION_RECOVERED_MUTATION_MESSAGE} แต่ยังโหลดรายการล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง`,
-                        );
-                        try {
-                            await reloadLatestTask(task.id);
-                        } catch (reloadError) {
-                            if (reloadError instanceof LiffApiError && reloadError.status === 404) {
-                                setOperationNotice("งานนี้ไม่พบในสถานะล่าสุด กำลังปิดรายละเอียด");
-                                setFocusedTaskId((current) => current === task.id ? null : current);
-                                detailRequestIdRef.current += 1;
-                                setSelectedTaskId(null);
-                                setDetail(null);
-                                setDetailError(null);
-                                setDeleteError(null);
+                        const homeResponse = await refreshRoutineAccess();
+                        if (hasRoutineReadAccess(homeResponse)) {
+                            await refreshRoutineData(
+                                `${LIFF_SESSION_RECOVERED_MUTATION_MESSAGE} แต่ยังโหลดรายการล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง`,
+                            );
+                            try {
+                                await reloadLatestTask(task.id);
+                            } catch (reloadError) {
+                                if (reloadError instanceof LiffApiError && reloadError.status === 404) {
+                                    setOperationNotice("งานนี้ไม่พบในสถานะล่าสุด กำลังปิดรายละเอียด");
+                                    setFocusedTaskId((current) => current === task.id ? null : current);
+                                    detailRequestIdRef.current += 1;
+                                    setSelectedTaskId(null);
+                                    setDetail(null);
+                                    setDetailError(null);
+                                    setDeleteError(null);
+                                }
                             }
                         }
                     } else if (error instanceof LiffApiError && error.status === 404) {
@@ -530,7 +599,7 @@ export function LiffRoutineApp(): ReactElement {
                 }
             })();
         },
-        [canDeleteTasks, isDeleting, refreshRoutineData, reloadLatestTask, routineReadAvailable],
+        [canDeleteTasks, isDeleting, refreshRoutineAccess, refreshRoutineData, reloadLatestTask, routineReadAvailable],
     );
 
     const handleDetailOpenChange = useCallback((open: boolean): void => {
@@ -682,11 +751,7 @@ export function LiffRoutineApp(): ReactElement {
                     )}
                     onSaved={handleTaskSaved}
                     onReloadLatest={reloadLatestTask}
-                    onAmbiguousSubmit={async () => {
-                        await refreshRoutineData(
-                            `${LIFF_SESSION_RECOVERED_MUTATION_MESSAGE} แต่ยังโหลดรายการล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง`,
-                        );
-                    }}
+                    onAmbiguousSubmit={handleRecoveredFormMutation}
                 />
             ) : null}
         </>

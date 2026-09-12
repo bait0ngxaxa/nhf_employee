@@ -87,7 +87,7 @@ interface LiffRoutineTaskFormProps {
     onReloadLatest?: (taskId: number) => Promise<LiffRoutineTaskDetail>;
     onAmbiguousSubmit?: (
         mode: LiffRoutineTaskFormMode,
-    ) => void | Promise<void>;
+    ) => boolean | Promise<boolean>;
 }
 
 export interface LiffRoutineTaskFormHandle {
@@ -470,20 +470,31 @@ export const LiffRoutineTaskForm = forwardRef<
             }
 
             if (isRecoveredLiffMutation(submitError)) {
-                if (mode === "EDIT" && task && onReloadLatest) {
+                const canReloadLatest = mode === "EDIT"
+                    && task !== null
+                    && onReloadLatest !== undefined;
+                if (canReloadLatest) {
                     setHasConflict(true);
                     setLatestConflictTask(null);
+                }
+                let actionAllowedAfterRecovery = true;
+                try {
+                    actionAllowedAfterRecovery = onAmbiguousSubmit
+                        ? await onAmbiguousSubmit(mode)
+                        : true;
+                } catch {
+                    actionAllowedAfterRecovery = false;
+                }
+
+                if (!actionAllowedAfterRecovery) {
+                    onCancel();
+                } else if (canReloadLatest) {
                     try {
                         await reloadLatest(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                     } catch {
                         // reloadLatest has already surfaced the recoverable reload error.
                     }
                 } else {
-                    try {
-                        await onAmbiguousSubmit?.(mode);
-                    } catch {
-                        // The form keeps its payload and idempotency key for explicit retry.
-                    }
                     setError(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 }
                 toast.error(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);

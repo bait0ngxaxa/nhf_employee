@@ -820,6 +820,105 @@ describe("LiffRoutineApp", () => {
         expect(secondKey).toBe(firstKey);
     });
 
+    it("rechecks home capabilities after recovered create and closes a revoked form", async () => {
+        const revokedHome = {
+            ...HOME,
+            capabilities: {
+                ...HOME.capabilities,
+                canCreateOwnRoutine: false,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canCreateTasks: false,
+                },
+            },
+        };
+        mocks.fetchLiffHome
+            .mockResolvedValueOnce(HOME)
+            .mockResolvedValueOnce(revokedHome);
+        mocks.createLiffRoutineTask.mockRejectedValueOnce(
+            new mocks.MockLiffApiError(
+                "session recovered",
+                401,
+                { recovered: true, replayed: false },
+            ),
+        );
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        const formDialog = await screen.findByRole("dialog");
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "งานที่ถูกถอนสิทธิ์" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+
+        await waitFor(() => expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(mocks.fetchLiffHome).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(
+            screen.queryByRole("heading", { name: "เพิ่ม Routine ของฉัน" }),
+        ).not.toBeInTheDocument());
+        expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(1);
+    });
+
+    it("enters the unavailable state after recovered mutation loses Routine read access", async () => {
+        const unavailableHome = {
+            ...HOME,
+            modules: {
+                ...HOME.modules,
+                routine: { enabled: false, status: "unavailable" as const },
+            },
+            capabilities: {
+                ...HOME.capabilities,
+                canCreateOwnRoutine: false,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canReadTasks: false,
+                    canCreateTasks: false,
+                    canUpdateTasks: false,
+                    canDeleteTasks: false,
+                },
+            },
+        };
+        mocks.fetchLiffHome
+            .mockResolvedValueOnce(HOME)
+            .mockResolvedValueOnce(unavailableHome);
+        mocks.createLiffRoutineTask.mockRejectedValueOnce(
+            new mocks.MockLiffApiError(
+                "session recovered",
+                401,
+                { recovered: true, replayed: false },
+            ),
+        );
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+        const formDialog = await screen.findByRole("dialog");
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(within(formDialog).getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "งานที่ถูกถอนสิทธิ์อ่าน" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+
+        expect(await screen.findByRole("heading", { name: "งานประจำ ยังไม่พร้อมใช้งาน" })).toBeInTheDocument();
+        expect(mocks.fetchLiffHome).toHaveBeenCalledTimes(2);
+        expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchLiffRoutineReference).toHaveBeenCalledTimes(1);
+        expect(mocks.createLiffRoutineTask).toHaveBeenCalledTimes(1);
+    });
+
     it("prevents duplicate create submissions while the request is in flight", async () => {
         const pendingCreate = deferred<{ task: LiffRoutineTaskDetail; replayed: boolean }>();
         mocks.createLiffRoutineTask.mockImplementationOnce(() => pendingCreate.promise);
@@ -1182,6 +1281,48 @@ describe("LiffRoutineApp", () => {
         expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledTimes(2);
     });
 
+    it("rechecks home capabilities after recovered update and closes a revoked edit form", async () => {
+        const revokedHome = {
+            ...HOME,
+            capabilities: {
+                ...HOME.capabilities,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canUpdateTasks: false,
+                },
+            },
+        };
+        mocks.fetchLiffHome
+            .mockResolvedValueOnce(HOME)
+            .mockResolvedValueOnce(revokedHome);
+        mocks.updateLiffRoutineTask.mockRejectedValueOnce(
+            new mocks.MockLiffApiError(
+                "session recovered",
+                401,
+                { recovered: true, replayed: false },
+            ),
+        );
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }));
+        await screen.findByText("รายละเอียดฉบับเต็ม");
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขงาน" }));
+        const dialogs = await screen.findAllByRole("dialog");
+        const formDialog = dialogs[dialogs.length - 1];
+        fireEvent.change(within(formDialog).getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "งานที่ถูกถอนสิทธิ์" },
+        });
+        fireEvent.click(within(formDialog).getByRole("button", { name: "บันทึกการแก้ไข" }));
+
+        await waitFor(() => expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(mocks.fetchLiffHome).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(
+            screen.queryByRole("heading", { name: "แก้ไขงาน Routine" }),
+        ).not.toBeInTheDocument());
+        expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1);
+    });
+
     it("requires delete confirmation and refreshes after one successful delete", async () => {
         const pendingDelete = deferred<void>();
         mocks.deleteLiffRoutineTask.mockImplementationOnce(() => pendingDelete.promise);
@@ -1234,5 +1375,47 @@ describe("LiffRoutineApp", () => {
         expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(2);
         expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledTimes(2);
         expect(within(confirmation).getByRole("button", { name: "ลบงานนี้" })).toBeInTheDocument();
+    });
+
+    it("reloads recovered delete detail with read and delete access but without update access", async () => {
+        const readDeleteOnlyHome = {
+            ...HOME,
+            capabilities: {
+                ...HOME.capabilities,
+                canCreateOwnRoutine: false,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canCreateTasks: false,
+                    canUpdateTasks: false,
+                    canDeleteTasks: true,
+                },
+            },
+        };
+        mocks.fetchLiffHome
+            .mockResolvedValueOnce(readDeleteOnlyHome)
+            .mockResolvedValueOnce(readDeleteOnlyHome);
+        mocks.deleteLiffRoutineTask.mockRejectedValueOnce(
+            new mocks.MockLiffApiError(
+                "session recovered",
+                401,
+                { recovered: true, replayed: false },
+            ),
+        );
+        mocks.fetchLiffRoutineTask
+            .mockResolvedValueOnce({ task: DETAIL })
+            .mockResolvedValueOnce({ task: DETAIL });
+
+        render(<LiffRoutineApp />);
+        await screen.findByText("ตรวจสอบระบบ");
+        fireEvent.click(screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }));
+        await screen.findByText("รายละเอียดฉบับเต็ม");
+        fireEvent.click(screen.getByRole("button", { name: "ลบงานนี้" }));
+        const confirmation = await screen.findByRole("alertdialog");
+        fireEvent.click(within(confirmation).getByRole("button", { name: "ลบงานนี้" }));
+
+        await waitFor(() => expect(mocks.deleteLiffRoutineTask).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(mocks.fetchLiffHome).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(mocks.fetchLiffRoutineTask).toHaveBeenCalledTimes(2));
+        expect(mocks.deleteLiffRoutineTask).toHaveBeenCalledTimes(1);
     });
 });

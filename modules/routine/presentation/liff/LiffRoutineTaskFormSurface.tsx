@@ -41,7 +41,7 @@ interface LiffRoutineTaskFormSurfaceProps {
     onReloadLatest?: (taskId: number) => Promise<LiffRoutineTaskDetail>;
     onAmbiguousSubmit?: (
         mode: LiffRoutineTaskFormMode,
-    ) => void | Promise<void>;
+    ) => boolean | Promise<boolean>;
 }
 
 export function LiffRoutineTaskFormSurface({
