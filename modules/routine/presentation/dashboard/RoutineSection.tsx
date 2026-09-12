@@ -24,6 +24,7 @@ import { RoutineTaskDialog } from "./RoutineTaskDialog";
 import { RoutineTaskList } from "./RoutineTaskList";
 import { RoutineImportPanel } from "./RoutineImportPanel";
 import { formatRoutineUnitLabel, uniqueRoutineUnits } from "./labels";
+import type { RoutinePresentationCapabilities } from "../../application/types";
 import type {
     PaginatedRoutineTaskWorkItemsResponse,
     PaginatedTasksResponse,
@@ -48,6 +49,7 @@ async function fetchRoutine<T>(url: string): Promise<T> {
 
 function RoutineOccurrencePanel({
     isAdmin,
+    routineCapabilities,
     scope,
     taskId,
     occurrenceId,
@@ -57,6 +59,7 @@ function RoutineOccurrencePanel({
     summaryLoading,
 }: {
     isAdmin: boolean;
+    routineCapabilities?: RoutinePresentationCapabilities;
     scope: "mine" | "all";
     taskId: number | null;
     occurrenceId: number | null;
@@ -126,6 +129,18 @@ function RoutineOccurrencePanel({
     const editingTask = editingTaskData?.task.id === editingTaskId
         ? editingTaskData.task
         : null;
+    const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
+
+    useEffect(() => {
+        if (!canUpdateTasks && editingTaskId !== null) {
+            setEditingTaskId(null);
+        }
+    }, [canUpdateTasks, editingTaskId]);
+
+    function openTaskEdit(taskId: number): void {
+        if (!canUpdateTasks) return;
+        setEditingTaskId(taskId);
+    }
 
     return (
         <div className="space-y-5">
@@ -245,11 +260,12 @@ function RoutineOccurrencePanel({
                 error={error}
                 isLoading={isLoading}
                 isAdmin={isAdmin}
+                routineCapabilities={routineCapabilities}
                 focusTaskId={taskId}
                 focusOccurrenceId={occurrenceId}
                 onRetry={() => void mutate()}
                 onPageChange={setPage}
-                onEditTask={setEditingTaskId}
+                onEditTask={openTaskEdit}
                 mutate={mutate}
                 employees={reference?.employees ?? []}
             />
@@ -257,7 +273,8 @@ function RoutineOccurrencePanel({
                 open={editingTaskId !== null}
                 intent="edit"
                 mode={isAdmin ? "ADMIN" : "SELF_SERVICE"}
-                canChangeStatus={isAdmin || editingTask?.canDelete === true}
+                canSubmit={canUpdateTasks && (editingTask === null || editingTask.canEdit === true)}
+                canChangeStatus={canUpdateTasks && editingTask?.canDelete === true}
                 reference={reference}
                 task={editingTask}
                 error={referenceError ?? editingTaskError}
@@ -280,9 +297,11 @@ function RoutineOccurrencePanel({
 
 function RoutineTaskSettings({
     mode,
+    routineCapabilities,
     onTaskSaved,
 }: {
     mode: "SELF_SERVICE" | "ADMIN";
+    routineCapabilities?: RoutinePresentationCapabilities;
     onTaskSaved: () => void;
 }) {
     const isSelfService = mode === "SELF_SERVICE";
@@ -319,8 +338,31 @@ function RoutineTaskSettings({
         fetchRoutine,
         { keepPreviousData: true },
     );
+    const canCreateTasks = routineCapabilities?.canCreateTasks === true;
+    const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
+    const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
+
+    useEffect(() => {
+        if (!canCreateTasks && isCreating) {
+            setIsCreating(false);
+        }
+        if (!canUpdateTasks && editingTask !== null) {
+            setEditingTask(null);
+        }
+    }, [canCreateTasks, canUpdateTasks, editingTask, isCreating]);
+
+    function openCreate(): void {
+        if (!canCreateTasks) return;
+        setIsCreating(true);
+    }
+
+    function openEdit(task: RoutineTask): void {
+        if (!canUpdateTasks || task.canEdit !== true) return;
+        setEditingTask(task);
+    }
 
     async function updateTaskActive(task: RoutineTask): Promise<void> {
+        if (!canUpdateTasks || task.canDelete !== true) return;
         if (activeMutationLockRef.current.has(task.id)) return;
         activeMutationLockRef.current.add(task.id);
         setPendingTaskId(task.id);
@@ -348,6 +390,7 @@ function RoutineTaskSettings({
     }
 
     async function deleteTask(task: RoutineTask): Promise<void> {
+        if (!canDeleteTasks || task.canDelete !== true) return;
         try {
             const response = await fetch(API_ROUTES.routines.taskById(task.id), {
                 method: "DELETE",
@@ -377,10 +420,11 @@ function RoutineTaskSettings({
                 data={tasks}
                 error={tasksError}
                 isAdmin={!isSelfService}
+                routineCapabilities={routineCapabilities}
                 isLoading={tasksLoading}
                 onRetry={() => void mutateTasks()}
-                onCreate={() => setIsCreating(true)}
-                onEdit={(task) => setEditingTask(task)}
+                onCreate={openCreate}
+                onEdit={openEdit}
                 onToggleActive={updateTaskActive}
                 onDelete={deleteTask}
                 pendingTaskId={pendingTaskId}
@@ -412,7 +456,12 @@ function RoutineTaskSettings({
                 open={isCreating || editingTask !== null}
                 intent={editingTask ? "edit" : "create"}
                 mode={mode}
-                canChangeStatus={editingTask === null || editingTask.canDelete}
+                canSubmit={editingTask
+                    ? canUpdateTasks && editingTask.canEdit === true
+                    : canCreateTasks}
+                canChangeStatus={editingTask === null
+                    ? canCreateTasks
+                    : canUpdateTasks && editingTask.canDelete === true}
                 reference={reference}
                 task={editingTask}
                 error={referenceError}
@@ -436,6 +485,9 @@ function RoutineTaskSettings({
 export function RoutineSection() {
     const { user } = useDashboardDataContext();
     const isAdmin = isAdminRole(user?.role);
+    const routineCapabilities = user?.routineCapabilities;
+    const canReadTasks = routineCapabilities?.canReadTasks === true;
+    const canManageImports = routineCapabilities?.canManageImports === true;
     const searchParams = useSearchParams();
     const taskIdValue = Number(searchParams.get("taskId"));
     const taskId = Number.isInteger(taskIdValue) && taskIdValue > 0
@@ -447,16 +499,20 @@ export function RoutineSection() {
         : null;
     const [activeTab, setActiveTab] = useState("mine");
     const [summaryScope, setSummaryScope] = useState<"mine" | "all">("mine");
-    const safeTab = isAdmin
-        ? activeTab === "mine"
-            || activeTab === "all"
-            || activeTab === "settings"
-            || activeTab === "import"
-            ? activeTab
-            : "mine"
-        : activeTab === "mine" || activeTab === "all" || activeTab === "manage"
-            ? activeTab
-            : "mine";
+    const visibleRoutineTabs = useMemo<ReadonlySet<string>>(
+        () => new Set(
+            canReadTasks
+                ? [
+                      "mine",
+                      "all",
+                      ...(isAdmin ? ["settings"] : ["manage"]),
+                      ...(canManageImports ? ["import"] : []),
+                  ]
+                : [],
+        ),
+        [canManageImports, canReadTasks, isAdmin],
+    );
+    const safeTab = visibleRoutineTabs.has(activeTab) ? activeTab : "mine";
     useEffect(() => {
         setSummaryScope(safeTab === "all" ? "all" : "mine");
     }, [safeTab]);
@@ -466,25 +522,42 @@ export function RoutineSection() {
         error: summaryError,
         isLoading: summaryLoading,
         mutate: mutateSummary,
-    } = useSWR<RoutineSummaryResponse, Error>(summaryKey, fetchRoutine, {
-        keepPreviousData: true,
-    });
+    } = useSWR<RoutineSummaryResponse, Error>(
+        canReadTasks ? summaryKey : null,
+        fetchRoutine,
+        {
+            keepPreviousData: true,
+        },
+    );
 
     useEffect(() => {
-        if (taskId !== null || occurrenceId !== null) setActiveTab("all");
-    }, [occurrenceId, taskId]);
+        if (safeTab !== activeTab) {
+            setActiveTab(safeTab);
+        }
+    }, [activeTab, safeTab]);
+
+    useEffect(() => {
+        if (canReadTasks && (taskId !== null || occurrenceId !== null)) {
+            setActiveTab("all");
+        }
+    }, [canReadTasks, occurrenceId, taskId]);
 
     useEffect(() => {
         const requestedTab = searchParams.get("routineTab");
-        if (
-            requestedTab === "mine"
-            || requestedTab === "all"
-            || (!isAdmin && requestedTab === "manage")
-            || (isAdmin && (requestedTab === "settings" || requestedTab === "import"))
-        ) {
+        if (requestedTab !== null && visibleRoutineTabs.has(requestedTab)) {
             setActiveTab(requestedTab);
         }
-    }, [isAdmin, searchParams]);
+    }, [searchParams, visibleRoutineTabs]);
+
+    if (!canReadTasks) {
+        return null;
+    }
+
+    function handleTabChange(value: string): void {
+        if (visibleRoutineTabs.has(value)) {
+            setActiveTab(value);
+        }
+    }
 
     const tabs: SectionTabItem[] = [
         {
@@ -492,35 +565,37 @@ export function RoutineSection() {
             label: "รายการของฉัน",
             group: "work",
             groupLabel: "รายการงาน",
-            content: <RoutineOccurrencePanel scope="mine" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
+            visible: visibleRoutineTabs.has("mine"),
+            content: <RoutineOccurrencePanel scope="mine" isAdmin={isAdmin} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
         },
         {
             value: "all",
             label: "รายการทั้งหมด",
             group: "work",
-            content: <RoutineOccurrencePanel scope="all" isAdmin={isAdmin} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
+            visible: visibleRoutineTabs.has("all"),
+            content: <RoutineOccurrencePanel scope="all" isAdmin={isAdmin} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
         },
         {
             value: "manage",
             label: "จัดการงานของฉัน",
             group: "manage",
             groupLabel: "จัดการ",
-            visible: !isAdmin,
-            content: <RoutineTaskSettings mode="SELF_SERVICE" onTaskSaved={() => void mutateSummary()} />,
+            visible: visibleRoutineTabs.has("manage"),
+            content: <RoutineTaskSettings mode="SELF_SERVICE" routineCapabilities={routineCapabilities} onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "settings",
             label: "ตั้งค่างานประจำ",
             group: "manage",
-            visible: isAdmin,
-            content: <RoutineTaskSettings mode="ADMIN" onTaskSaved={() => void mutateSummary()} />,
+            visible: visibleRoutineTabs.has("settings"),
+            content: <RoutineTaskSettings mode="ADMIN" routineCapabilities={routineCapabilities} onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "import",
             label: "นำเข้าจาก Excel",
             group: "tools",
             groupLabel: "เครื่องมือ",
-            visible: isAdmin,
+            visible: visibleRoutineTabs.has("import"),
             content: <RoutineImportPanel />,
         },
     ];
@@ -547,7 +622,7 @@ export function RoutineSection() {
             />
             <SectionTabs
                 value={safeTab}
-                onValueChange={setActiveTab}
+                onValueChange={handleTabChange}
                 tabs={tabs}
                 activeColor="var(--module-routine-tab)"
                 ariaLabel="แท็บ NHF Routine"

@@ -3,10 +3,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { KeyedMutator } from "swr";
 
 import { RoutineOccurrenceList } from "./RoutineOccurrenceList";
+import type { RoutinePresentationCapabilities } from "../../application/types";
 import type {
     PaginatedRoutineTaskWorkItemsResponse,
     RoutineEmployee,
 } from "./types";
+
+const allRoutineCapabilities = {
+    canReadTasks: true,
+    canCreateTasks: true,
+    canUpdateTasks: true,
+    canDeleteTasks: true,
+    canReadOccurrences: true,
+    canOverrideOccurrences: true,
+    canReassignOccurrences: true,
+    canChangeOccurrenceDueDate: true,
+    canManageImports: true,
+} satisfies RoutinePresentationCapabilities;
 
 const taskData: PaginatedRoutineTaskWorkItemsResponse = {
     tasks: [{
@@ -110,6 +123,7 @@ interface RenderListOptions {
     isAdmin?: boolean;
     mutate?: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
     onEditTask?: (taskId: number) => void;
+    routineCapabilities?: RoutinePresentationCapabilities;
 }
 
 function renderList({
@@ -118,6 +132,11 @@ function renderList({
     isAdmin = false,
     mutate = vi.fn(async () => undefined),
     onEditTask = vi.fn<(taskId: number) => void>(),
+    routineCapabilities = {
+        ...allRoutineCapabilities,
+        canUpdateTasks: false,
+        canOverrideOccurrences: false,
+    },
 }: RenderListOptions = {}): void {
     render(
         <RoutineOccurrenceList
@@ -131,6 +150,7 @@ function renderList({
             onPageChange={vi.fn()}
             onEditTask={onEditTask}
             mutate={mutate}
+            routineCapabilities={routineCapabilities}
             employees={employees}
         />,
     );
@@ -202,7 +222,12 @@ describe("RoutineOccurrenceList", () => {
             ...taskData,
             tasks: [{ ...taskData.tasks[0], canEdit: true, canDelete: true }],
         };
-        renderList({ data: adminData, isAdmin: true, onEditTask });
+        renderList({
+            data: adminData,
+            isAdmin: true,
+            onEditTask,
+            routineCapabilities: allRoutineCapabilities,
+        });
 
         expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แก้ไข Routine" })).toBeInTheDocument();
@@ -219,7 +244,14 @@ describe("RoutineOccurrenceList", () => {
             tasks: [{ ...taskData.tasks[0], canEdit: true, canDelete: false }],
         };
 
-        renderList({ data: assignedData, onEditTask });
+        renderList({
+            data: assignedData,
+            onEditTask,
+            routineCapabilities: {
+                ...allRoutineCapabilities,
+                canOverrideOccurrences: false,
+            },
+        });
 
         expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แก้ไข Routine" })).toBeInTheDocument();
@@ -231,7 +263,13 @@ describe("RoutineOccurrenceList", () => {
     it("opens occurrence editing in a prefilled dialog and cancel does not mutate", async () => {
         const fetchMock = vi.fn();
         vi.stubGlobal("fetch", fetchMock);
-        renderList({ isAdmin: true });
+        renderList({
+            isAdmin: true,
+            routineCapabilities: {
+                ...allRoutineCapabilities,
+                canUpdateTasks: false,
+            },
+        });
 
         fireEvent.click(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" }));
 
@@ -250,7 +288,14 @@ describe("RoutineOccurrenceList", () => {
         );
         const mutate = vi.fn().mockResolvedValue(undefined);
         vi.stubGlobal("fetch", fetchMock);
-        renderList({ isAdmin: true, mutate });
+        renderList({
+            isAdmin: true,
+            mutate,
+            routineCapabilities: {
+                ...allRoutineCapabilities,
+                canUpdateTasks: false,
+            },
+        });
 
         fireEvent.click(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" }));
         const dialog = screen.getByRole("dialog", { name: "ปรับเฉพาะรอบนี้" });
@@ -317,5 +362,23 @@ describe("RoutineOccurrenceList", () => {
         expect(dialog).toHaveTextContent("ผู้รับผิดชอบแม่แบบ Routine");
         expect(dialog).toHaveTextContent("มานะ ดีใจ");
         expect(dialog).toHaveTextContent("สมชาย ใจดี");
+    });
+
+    it("shows task and occurrence actions to a non-admin actor with explicit grants", () => {
+        const onEditTask = vi.fn();
+        renderList({
+            data: {
+                ...taskData,
+                tasks: [{ ...taskData.tasks[0], canEdit: true, canDelete: true }],
+            },
+            isAdmin: false,
+            onEditTask,
+            routineCapabilities: allRoutineCapabilities,
+        });
+
+        expect(screen.getByRole("button", { name: "แก้ไข Routine" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine" }));
+        expect(onEditTask).toHaveBeenCalledWith(71);
     });
 });

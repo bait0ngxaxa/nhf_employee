@@ -1,5 +1,5 @@
 import { Edit3, Eye, Power, Plus, Trash2, X } from "lucide-react";
-import { useId, useRef, useState, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 
 import {
     AlertDialog,
@@ -25,6 +25,7 @@ import {
 } from "./labels";
 import { RoutineDetailsDialog } from "./RoutineDetailsDialog";
 import { RoutineTaskListSkeleton } from "./RoutineSkeletons";
+import type { RoutinePresentationCapabilities } from "../../application/types";
 import type { PaginatedTasksResponse, RoutineTask } from "./types";
 
 interface RoutineTaskListProps {
@@ -34,6 +35,7 @@ interface RoutineTaskListProps {
     error: Error | undefined;
     isAdmin: boolean;
     isLoading: boolean;
+    routineCapabilities?: RoutinePresentationCapabilities;
     onCategoryChange: (value: string) => void;
     onCreate: () => void;
     onDelete: (task: RoutineTask) => Promise<void>;
@@ -75,6 +77,7 @@ export function RoutineTaskList({
     error,
     isAdmin,
     isLoading,
+    routineCapabilities,
     onCategoryChange,
     onCreate,
     onDelete,
@@ -108,6 +111,18 @@ export function RoutineTaskList({
     const categoryIdField = `${filterId}-category`;
     const statusId = `${filterId}-status`;
     const isInitialLoading = isLoading && !data;
+    const canCreateTasks = routineCapabilities?.canCreateTasks === true;
+    const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
+    const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
+
+    useEffect(() => {
+        if (
+            deleteTask !== null
+            && (!canDeleteTasks || deleteTask.canDelete !== true)
+        ) {
+            setDeleteTask(null);
+        }
+    }, [canDeleteTasks, deleteTask]);
 
     function openDetails(task: RoutineTask): void {
         setDetailsTask(task);
@@ -190,10 +205,12 @@ export function RoutineTaskList({
                         <option value="inactive">ปิดใช้งาน</option>
                     </select>
                 </label>
-                <Button type="button" size="sm" className="xl:justify-self-end" onClick={onCreate}>
-                    <Plus aria-hidden="true" />
-                    สร้างแม่แบบงาน
-                </Button>
+                {canCreateTasks ? (
+                    <Button type="button" size="sm" className="xl:justify-self-end" onClick={() => onCreate()}>
+                        <Plus aria-hidden="true" />
+                        สร้างแม่แบบงาน
+                    </Button>
+                ) : null}
             </div>
 
             {isInitialLoading ? <RoutineTaskListSkeleton /> : null}
@@ -267,23 +284,25 @@ export function RoutineTaskList({
                                                     <Eye aria-hidden="true" />
                                                     ดูรายละเอียด
                                                 </Button>
-                                                {task.canEdit ? (
+                                                {canUpdateTasks && task.canEdit === true ? (
                                                     <Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}>
                                                         <Edit3 aria-hidden="true" />
                                                         แก้ไข
                                                     </Button>
                                                 ) : null}
-                                                {task.canDelete ? (
+                                                {canUpdateTasks && task.canDelete === true ? (
                                                     <>
                                                         <Button type="button" variant="outline" size="sm" disabled={pendingTaskId === task.id} onClick={() => void onToggleActive(task)}>
                                                             <Power aria-hidden="true" />
                                                             {pendingTaskId === task.id ? "กำลังบันทึก..." : task.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}
                                                         </Button>
-                                                        <Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}>
-                                                            <Trash2 aria-hidden="true" />
-                                                            ลบ
-                                                        </Button>
                                                     </>
+                                                ) : null}
+                                                {canDeleteTasks && task.canDelete === true ? (
+                                                    <Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}>
+                                                        <Trash2 aria-hidden="true" />
+                                                        ลบ
+                                                    </Button>
                                                 ) : null}
                                             </div>
                                         </td>

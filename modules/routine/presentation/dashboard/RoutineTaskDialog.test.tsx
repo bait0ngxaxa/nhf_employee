@@ -75,6 +75,7 @@ describe("RoutineTaskDialog", () => {
         const { rerender } = render(
             <RoutineTaskDialog
                 open
+                canSubmit
                 intent="create"
                 mode="SELF_SERVICE"
                 reference={reference}
@@ -92,6 +93,7 @@ describe("RoutineTaskDialog", () => {
         rerender(
             <RoutineTaskDialog
                 open
+                canSubmit
                 intent="edit"
                 mode="ADMIN"
                 reference={reference}
@@ -105,6 +107,29 @@ describe("RoutineTaskDialog", () => {
 
         expect(screen.getByRole("dialog", { name: "แก้ไข Routine" })).toBeInTheDocument();
         expect(screen.getByDisplayValue("ตรวจสอบระบบ")).toBeInTheDocument();
+    });
+
+    it("does not keep a stale task form open after capability loss", async () => {
+        const onClose = vi.fn();
+
+        render(
+            <RoutineTaskDialog
+                open
+                canSubmit={false}
+                intent="create"
+                mode="ADMIN"
+                reference={reference}
+                task={null}
+                isLoading={false}
+                onRetry={vi.fn()}
+                onClose={onClose}
+                onSaved={vi.fn()}
+            />,
+        );
+
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "บันทึกแม่แบบงาน" })).not.toBeInTheDocument();
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     });
 
     it("closes a pristine form from the footer and restores trigger focus", async () => {
@@ -123,6 +148,7 @@ describe("RoutineTaskDialog", () => {
         render(
             <RoutineTaskDialog
                 open
+                canSubmit
                 intent="create"
                 mode="SELF_SERVICE"
                 reference={reference}
@@ -192,6 +218,7 @@ function RoutineTaskDialogHarness({
             </button>
             <RoutineTaskDialog
                 open={open}
+                canSubmit
                 intent="create"
                 mode="SELF_SERVICE"
                 reference={reference}

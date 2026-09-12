@@ -39,6 +39,7 @@ interface RoutineOccurrenceEditorState {
 }
 
 interface RoutineOccurrenceEditDialogProps {
+    canOverrideOccurrences: boolean;
     employees: readonly RoutineEmployee[];
     onOpenChange: (open: boolean) => void;
     onSaved: () => void | Promise<void>;
@@ -84,6 +85,7 @@ async function sendRoutineMutation(url: string, payload: unknown): Promise<void>
 }
 
 export function RoutineOccurrenceEditDialog({
+    canOverrideOccurrences,
     employees,
     onOpenChange,
     onSaved,
@@ -103,6 +105,12 @@ export function RoutineOccurrenceEditDialog({
         setEditor(editorState(occurrence));
         setError(null);
     }, [occurrence, open]);
+
+    useEffect(() => {
+        if (open && !canOverrideOccurrences) {
+            onOpenChange(false);
+        }
+    }, [canOverrideOccurrences, onOpenChange, open]);
 
     function closeWhenIdle(): void {
         if (!isSaving && !saveLockRef.current) onOpenChange(false);
@@ -126,7 +134,13 @@ export function RoutineOccurrenceEditDialog({
     }
 
     async function save(): Promise<void> {
-        if (!task || !occurrence || !editor || saveLockRef.current) return;
+        if (
+            !canOverrideOccurrences
+            || !task
+            || !occurrence
+            || !editor
+            || saveLockRef.current
+        ) return;
         const ownerCount = Object.values(editor.assignees)
             .filter((role) => role === "OWNER")
             .length;
@@ -166,7 +180,7 @@ export function RoutineOccurrenceEditDialog({
         }
     }
 
-    if (!task || !occurrence || !editor) {
+    if (!canOverrideOccurrences || !task || !occurrence || !editor) {
         return <Dialog open={false} onOpenChange={onOpenChange} />;
     }
 

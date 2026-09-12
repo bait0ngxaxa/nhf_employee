@@ -1,5 +1,5 @@
 import { Eye, Pencil } from "lucide-react";
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import type { KeyedMutator } from "swr";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 import { RoutineDetailsDialog } from "./RoutineDetailsDialog";
 import { RoutineOccurrenceEditDialog } from "./RoutineOccurrenceEditDialog";
 import { RoutineOccurrenceListSkeleton } from "./RoutineSkeletons";
+import type { RoutinePresentationCapabilities } from "../../application/types";
 import type {
     PaginatedRoutineTaskWorkItemsResponse,
     RoutineEmployee,
@@ -33,6 +34,7 @@ interface RoutineOccurrenceListProps {
     isAdmin: boolean;
     isLoading: boolean;
     mutate: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
+    routineCapabilities?: RoutinePresentationCapabilities;
     onEditTask: (taskId: number) => void;
     onPageChange: (page: number) => void;
     onRetry: () => void;
@@ -59,11 +61,21 @@ export function RoutineOccurrenceList({
     onEditTask,
     onPageChange,
     onRetry,
+    routineCapabilities,
 }: RoutineOccurrenceListProps): ReactElement {
     const [detailsTask, setDetailsTask] = useState<RoutineTaskWorkItem | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [occurrenceEditTask, setOccurrenceEditTask] = useState<RoutineTaskWorkItem | null>(null);
     const [occurrenceEditOpen, setOccurrenceEditOpen] = useState(false);
+    const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
+    const canOverrideOccurrences = routineCapabilities?.canOverrideOccurrences === true;
+
+    useEffect(() => {
+        if (!canOverrideOccurrences && occurrenceEditTask !== null) {
+            setOccurrenceEditTask(null);
+            setOccurrenceEditOpen(false);
+        }
+    }, [canOverrideOccurrences, occurrenceEditTask]);
 
     function openDetails(task: RoutineTaskWorkItem): void {
         setDetailsTask(task);
@@ -71,6 +83,7 @@ export function RoutineOccurrenceList({
     }
 
     function openOccurrenceEdit(task: RoutineTaskWorkItem): void {
+        if (!canOverrideOccurrences || task.relevantOccurrence === null) return;
         setOccurrenceEditTask(task);
         setOccurrenceEditOpen(true);
     }
@@ -183,13 +196,13 @@ export function RoutineOccurrenceList({
                                 <Eye aria-hidden="true" />
                                 ดูรายละเอียด
                             </Button>
-                            {task.canEdit ? (
+                            {canUpdateTasks && task.canEdit === true ? (
                                 <Button type="button" size="sm" variant="outline" onClick={() => onEditTask(task.id)}>
                                     <Pencil aria-hidden="true" />
                                     แก้ไข Routine
                                 </Button>
                             ) : null}
-                            {isAdmin && occurrence ? (
+                            {canOverrideOccurrences && occurrence ? (
                                 <Button type="button" size="sm" variant="outline" onClick={() => openOccurrenceEdit(task)}>
                                     <Pencil aria-hidden="true" />
                                     ปรับเฉพาะรอบนี้
@@ -219,6 +232,7 @@ export function RoutineOccurrenceList({
             <RoutineOccurrenceEditDialog
                 task={occurrenceEditTask}
                 open={occurrenceEditOpen}
+                canOverrideOccurrences={canOverrideOccurrences}
                 onOpenChange={setOccurrenceEditOpen}
                 employees={employees}
                 onSaved={async () => {

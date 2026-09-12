@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
 import { RoutineSection } from "./RoutineSection";
+import type { RoutinePresentationCapabilities } from "../../application/types";
 
 const mocks = vi.hoisted(() => ({
     useDashboardDataContext: vi.fn(),
@@ -34,6 +35,42 @@ const routineReference = {
         nickname: null,
     }],
 };
+
+const allRoutineCapabilities = {
+    canReadTasks: true,
+    canCreateTasks: true,
+    canUpdateTasks: true,
+    canDeleteTasks: true,
+    canReadOccurrences: true,
+    canOverrideOccurrences: true,
+    canReassignOccurrences: true,
+    canChangeOccurrenceDueDate: true,
+    canManageImports: true,
+} satisfies RoutinePresentationCapabilities;
+
+const userRoutineCapabilities = {
+    ...allRoutineCapabilities,
+    canManageImports: false,
+} satisfies RoutinePresentationCapabilities;
+
+const readOnlyRoutineCapabilities = {
+    ...userRoutineCapabilities,
+    canCreateTasks: false,
+    canUpdateTasks: false,
+    canDeleteTasks: false,
+    canOverrideOccurrences: false,
+} satisfies RoutinePresentationCapabilities;
+
+function mockRoutineUser(
+    role: "USER" | "ADMIN",
+    routineCapabilities: RoutinePresentationCapabilities = role === "ADMIN"
+        ? allRoutineCapabilities
+        : userRoutineCapabilities,
+): void {
+    mocks.useDashboardDataContext.mockReturnValue({
+        user: { role, routineCapabilities },
+    });
+}
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
     useDashboardDataContext: mocks.useDashboardDataContext,
@@ -91,12 +128,12 @@ vi.mock("./RoutineKpiGrid", () => ({
 }));
 
 vi.mock("./RoutineOccurrenceList", () => ({
-            RoutineOccurrenceList: ({
-        _isAdmin,
+    RoutineOccurrenceList: ({
+        routineCapabilities,
         onEditTask,
         onPageChange,
     }: {
-        _isAdmin: boolean;
+        routineCapabilities?: RoutinePresentationCapabilities;
         onEditTask: (taskId: number) => void;
         onPageChange: (page: number) => void;
     }) => (
@@ -104,9 +141,11 @@ vi.mock("./RoutineOccurrenceList", () => ({
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้ารายการ Routine ถัดไป
             </button>
-            <button type="button" onClick={() => onEditTask(71)}>
-                แก้ไข Routine ทดสอบ
-            </button>
+            {routineCapabilities?.canUpdateTasks === true ? (
+                <button type="button" onClick={() => onEditTask(71)}>
+                    แก้ไข Routine ทดสอบ
+                </button>
+            ) : null}
         </div>
     ),
 }));
@@ -117,6 +156,7 @@ vi.mock("./RoutineTaskList", () => ({
         categories,
         categoryId,
         onCreate,
+        routineCapabilities,
         onSearchChange,
         onCategoryChange,
         onPageChange,
@@ -125,6 +165,7 @@ vi.mock("./RoutineTaskList", () => ({
         categories: Array<{ id: number; name: string }>;
         categoryId: string;
         onCreate: () => void;
+        routineCapabilities?: RoutinePresentationCapabilities;
         onSearchChange: (value: string) => void;
         onCategoryChange: (value: string) => void;
         onPageChange: (page: number) => void;
@@ -150,9 +191,11 @@ vi.mock("./RoutineTaskList", () => ({
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้าถัดไป
             </button>
-            <button type="button" onClick={onCreate}>
-                สร้างแม่แบบงานทดสอบ
-            </button>
+            {routineCapabilities?.canCreateTasks === true ? (
+                <button type="button" onClick={onCreate}>
+                    สร้างแม่แบบงานทดสอบ
+                </button>
+            ) : null}
         </div>
     ),
 }));
@@ -178,9 +221,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("does not expose admin tabs to a regular user", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
 
         render(<RoutineSection />);
 
@@ -201,9 +242,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("keeps the operational list available when reference filters fail to load", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
         mocks.useSWR.mockImplementation((key: unknown) => ({
             data: undefined,
             error: key === "/api/routines/reference"
@@ -224,9 +263,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("lets a regular user open the all-task view and summary", async () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
@@ -244,9 +281,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("accepts a direct all-tab URL for a regular user", async () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
         mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=all"));
 
         render(<RoutineSection />);
@@ -264,9 +299,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("offers an all-task Excel export to every workforce user", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" }));
@@ -277,9 +310,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("exposes task settings and all-occurrence tabs to an admin", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "ADMIN" },
-        });
+        mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
 
@@ -289,10 +320,64 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
     });
 
-    it("opens create in a dialog while keeping the management list mounted", async () => {
+    it("keeps work tabs visible while hiding capability-gated actions", () => {
+        mockRoutineUser("USER", readOnlyRoutineCapabilities);
+
+        render(<RoutineSection />);
+
+        expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
+        expect(screen.getByText("จัดการงานของฉัน")).toBeInTheDocument();
+        expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "สร้างแม่แบบงานทดสอบ" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "แก้ไข Routine ทดสอบ" })).not.toBeInTheDocument();
+    });
+
+    it("lets a non-admin actor with explicit capabilities use Routine actions", () => {
+        mockRoutineUser("USER", allRoutineCapabilities);
+
+        render(<RoutineSection />);
+
+        expect(screen.getByText("จัดการงานของฉัน")).toBeInTheDocument();
+        expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงานของฉัน" }));
+        expect(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
+        expect(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" })).toBeInTheDocument();
+    });
+
+    it("falls back from a stale import tab URL when import capability is absent", () => {
+        mockRoutineUser("USER");
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=import"));
+
+        render(<RoutineSection />);
+
+        expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
+        expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
+    });
+
+    it("fails closed without the Routine module-entry capability", () => {
         mocks.useDashboardDataContext.mockReturnValue({
             user: { role: "ADMIN" },
         });
+
+        render(<RoutineSection />);
+
+        expect(screen.queryByText("รายการของฉัน")).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" })).not.toBeInTheDocument();
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            null,
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
+        );
+        expect(mocks.useSWR).not.toHaveBeenCalledWith(
+            "/api/routines/reference",
+            expect.any(Function),
+        );
+    });
+
+    it("opens create in a dialog while keeping the management list mounted", async () => {
+        mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" }));
@@ -305,9 +390,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("closes after create success and refreshes the current list and summary", async () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
         const fetchMock = vi.fn().mockResolvedValue(
             new Response(JSON.stringify({ task: { id: 81 } }), { status: 201 }),
         );
@@ -335,9 +418,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("opens operational edit in a dialog while keeping the operational list mounted", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "ADMIN" },
-        });
+        mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
@@ -348,9 +429,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("loads the master task detail for a regular employee's edit action", async () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" }));
@@ -363,9 +442,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("exposes only current and future timing options in the operational filter", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
 
         render(<RoutineSection />);
 
@@ -378,9 +455,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("requests all tasks for the admin settings list", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "ADMIN" },
-        });
+        mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
 
@@ -392,9 +467,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("requests the KPI summary for the active admin operational scope", async () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "ADMIN" },
-        });
+        mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
 
@@ -418,9 +491,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("opens an admin deep link with the all-scope KPI", async () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "ADMIN" },
-        });
+        mockRoutineUser("ADMIN");
         mocks.useSearchParams.mockReturnValue(new URLSearchParams("taskId=71&occurrenceId=91"));
 
         render(<RoutineSection />);
@@ -439,9 +510,7 @@ describe("RoutineSection tabs", () => {
 
     it("combines operational filters and resets pagination when each filter changes", () => {
         vi.useFakeTimers();
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
 
         const occurrenceKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
             .map(([key]) => typeof key === "string" ? key : "")
@@ -494,9 +563,7 @@ describe("RoutineSection tabs", () => {
     });
 
     it("adds task category filtering and resets task pagination", () => {
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "ADMIN" },
-        });
+        mockRoutineUser("ADMIN");
 
         const taskKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
             .map(([key]) => typeof key === "string" ? key : "")
@@ -518,9 +585,7 @@ describe("RoutineSection tabs", () => {
 
     it("debounces task settings search, resets pagination, and clears the query", () => {
         vi.useFakeTimers();
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "ADMIN" },
-        });
+        mockRoutineUser("ADMIN");
 
         const taskKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
             .map(([key]) => typeof key === "string" ? key : "")
@@ -558,9 +623,7 @@ describe("RoutineSection tabs", () => {
 
     it("debounces the operational routine search before changing the request key", () => {
         vi.useFakeTimers();
-        mocks.useDashboardDataContext.mockReturnValue({
-            user: { role: "USER" },
-        });
+        mockRoutineUser("USER");
 
         const occurrenceKeys = (): string[] => (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
             .map(([key]) => typeof key === "string" ? key : "")

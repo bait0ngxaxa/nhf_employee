@@ -1,11 +1,13 @@
-# Phase 5A — Routine presentation capability projection
+# Phase 5B — Routine presentation capability projection
 
-Status: Phase 5A foundation
+Status: Phase 5B Dashboard integration
 
 This record defines the server-derived presentation contract added for the
-Routine authorization migration. It extends the Phase 4 Routine pilot; it
-does not replace the locked authorization source-of-truth or migrate Routine
-screens and navigation.
+Routine authorization migration. It extends the Phase 4 Routine pilot; it does
+not replace the locked authorization source-of-truth or server-side
+enforcement. Phase 5A established the projection and Phase 5B integrates it
+into the Dashboard navigation, route boundary, Routine tabs, and Routine
+actions.
 
 ## Contract and ownership
 
@@ -58,6 +60,34 @@ adapter. No client-provided role, capability, Team ID, or Employee ID is used.
 Existing account/workforce eligibility and the Leave fields
 `canApproveLeave` and `canViewLeaveReports` remain unchanged.
 
+Phase 5B consumes the projection through this Dashboard path:
+
+```text
+server Routine projection
+    -> AuthenticatedUser.routineCapabilities
+    -> DashboardProvider menu filtering
+    -> /dashboard/routine feature + read-capability route boundary
+    -> Routine tabs and task/occurrence/import presentation controls
+```
+
+Routine navigation requires both the Routine feature flag and
+`canReadTasks`. The direct Dashboard route preserves the normal login redirect,
+redirects authenticated actors without `canReadTasks` to access denied, and
+renders only when the feature and read capability are both available. The
+operational `mine` and `all` tabs use `canReadTasks`; their distinction remains
+server-scoped and is not reimplemented in the browser. Create, update,
+lifecycle, delete, occurrence override, and import visibility use their
+corresponding projection booleans together with existing resource projections
+such as `task.canEdit` and `task.canDelete`.
+
+Remaining role-derived Dashboard presentation is intentionally limited to the
+existing ADMIN versus SELF_SERVICE editor contract and related management-tab
+and detail metadata presentation. It does not authorize any migrated action.
+
+Dashboard client components consume the already-established user projection.
+They do not call the central authorization resolver or send capability
+evaluation inputs from the browser.
+
 ## LIFF path
 
 ```text
@@ -77,7 +107,7 @@ uses the same Phase 4 Routine composition and remains clamped to self-service
 task semantics; Dashboard-only occurrence administration and import access do
 not become available through LIFF.
 
-## Presentation is not enforcement
+## Presentation visibility != authorization enforcement
 
 These booleans are UX hints for future navigation, tabs, buttons, and module
 availability. They are never a security boundary. Route/application
@@ -95,11 +125,11 @@ enforce their own decisions.
 
 `routine.summary.read`, `routine.task.export`, and `routine.reference.read`
 remain outside this projection because their legacy policy is unresolved.
-Their existing role-based presentation behavior is intentionally not rewritten
-in Phase 5A.
+Dashboard Excel export, summary authorization, reference-data authorization,
+and their existing compatibility presentation behavior therefore remain
+unchanged in Phase 5B; no new capability rule is invented for them.
 
 Stock, Leave, Employee, Audit, Email Request, Settings, and other non-Routine
 presentation and authorization paths remain on their existing compatibility
 behavior until their approved migration phases, including Phase 6 where
-applicable. Dashboard presentation migration is deferred to Phase 5B and LIFF
-presentation migration to Phase 5C.
+applicable. LIFF presentation migration remains deferred to Phase 5C.

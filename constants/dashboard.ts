@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
+import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 
 /** Flat lookup used by handleMenuClick for role validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -121,17 +122,27 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
     },
 ];
 
-/** Filter groups by role — removes ADMIN-only items for non-admins, drops empty groups */
-export function getAvailableMenuGroups(isAdmin: boolean): MenuGroup[] {
+/**
+ * Filter groups by role and feature availability. Routine also requires its
+ * server-derived read projection; non-Routine menu behavior remains role-based.
+ */
+export function getAvailableMenuGroups(
+    isAdmin: boolean,
+    routineCapabilities?: RoutinePresentationCapabilities,
+): MenuGroup[] {
     return DASHBOARD_MENU_GROUPS.map((group) => {
         const filteredItems = group.items.filter(
             (item) =>
                 !item.requiredRole ||
                 (item.requiredRole === "ADMIN" && isAdmin),
-            )
+        )
             .filter(
                 (item) => !item.feature || isFeatureEnabled(item.feature),
-        );
+            )
+            .filter(
+                (item) => item.id !== "routine"
+                    || routineCapabilities?.canReadTasks === true,
+            );
         if (filteredItems.length === 0) return null;
         return { ...group, items: filteredItems };
     }).filter((g): g is MenuGroup => g !== null);

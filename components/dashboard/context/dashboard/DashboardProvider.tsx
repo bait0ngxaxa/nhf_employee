@@ -52,8 +52,8 @@ export function DashboardProvider({
         useState(false);
 
     const availableMenuGroups = useMemo(
-        () => getAvailableMenuGroups(isAdmin),
-        [isAdmin],
+        () => getAvailableMenuGroups(isAdmin, user?.routineCapabilities),
+        [isAdmin, user?.routineCapabilities],
     );
 
     const handleMenuClick = useCallback(
@@ -67,6 +67,13 @@ export function DashboardProvider({
                 router.push(APP_ROUTES.dashboard, { scroll: false });
                 return;
             }
+            if (
+                menuId === "routine"
+                && user?.routineCapabilities?.canReadTasks !== true
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
             if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
@@ -77,7 +84,7 @@ export function DashboardProvider({
                 router.push(targetPath, { scroll: false });
             }
         },
-        [isAdmin, pathname, router],
+        [isAdmin, pathname, router, user?.routineCapabilities],
     );
 
     const handleSignOut = useCallback(async (): Promise<void> => {

@@ -1,8 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { type ReactElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardProvider } from "@/components/dashboard/context/dashboard/DashboardProvider";
-import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
+import {
+    useDashboardDataContext,
+    useDashboardUIContext,
+} from "@/components/dashboard/context/dashboard/DashboardContext";
+import type { AuthenticatedUser } from "@/modules/auth/client";
 
 const navigationMocks = vi.hoisted(() => ({
     pathname: "/dashboard",
@@ -10,6 +14,11 @@ const navigationMocks = vi.hoisted(() => ({
         push: vi.fn(),
         replace: vi.fn(),
     },
+    user: {
+        id: "employee-1",
+        name: "สมชาย ใจดี",
+        role: "EMPLOYEE",
+    } as AuthenticatedUser,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -23,15 +32,23 @@ vi.mock("@/modules/stock/client", () => ({
 
 vi.mock("@/modules/auth/client", () => ({
     useAuth: () => ({
-        user: {
-            id: "employee-1",
-            name: "สมชาย ใจดี",
-            role: "EMPLOYEE",
-        },
+        user: navigationMocks.user,
         status: "authenticated",
         signOut: vi.fn(),
     }),
 }));
+
+const routineCapabilities = {
+    canReadTasks: true,
+    canCreateTasks: false,
+    canUpdateTasks: false,
+    canDeleteTasks: false,
+    canReadOccurrences: false,
+    canOverrideOccurrences: false,
+    canReassignOccurrences: false,
+    canChangeOccurrenceDueDate: false,
+    canManageImports: false,
+};
 
 function DashboardNavigationState(): ReactElement {
     const { selectedMenu, mobileNavOpen, desktopSidebarCollapsed } =
@@ -50,11 +67,29 @@ function DashboardNavigationState(): ReactElement {
     );
 }
 
+function DashboardMenuState(): ReactElement {
+    const { availableMenuGroups } = useDashboardDataContext();
+    const menuIds = availableMenuGroups.flatMap((group) =>
+        group.items.map((item) => item.id),
+    );
+
+    return <output data-testid="available-menu-ids">{menuIds.join(",")}</output>;
+}
+
 describe("DashboardProvider navigation state", () => {
     beforeEach(() => {
         navigationMocks.router.push.mockReset();
         navigationMocks.router.replace.mockReset();
         navigationMocks.pathname = "/dashboard";
+        navigationMocks.user = {
+            id: "employee-1",
+            name: "สมชาย ใจดี",
+            role: "EMPLOYEE",
+        };
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it("starts with mobile navigation closed and desktop sidebar expanded", () => {
@@ -109,6 +144,68 @@ describe("DashboardProvider navigation state", () => {
         fireEvent.click(screen.getByRole("button", { name: "Stock" }));
         expect(navigationMocks.router.push).toHaveBeenCalledWith(
             "/dashboard/stock",
+            { scroll: false },
+        );
+    });
+
+    it("requires Routine read capability for visibility and stale menu clicks", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            routineCapabilities: {
+                ...routineCapabilities,
+                canReadTasks: false,
+            },
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button type="button" onClick={() => handleMenuClick("routine")}>
+                    Routine
+                </button>
+            );
+        }
+
+        render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent("routine");
+        fireEvent.click(screen.getByRole("button", { name: "Routine" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+    });
+
+    it("allows Routine navigation when its feature and read capability are available", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            routineCapabilities,
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button type="button" onClick={() => handleMenuClick("routine")}>
+                    Routine
+                </button>
+            );
+        }
+
+        render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("routine");
+        fireEvent.click(screen.getByRole("button", { name: "Routine" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/routine",
             { scroll: false },
         );
     });

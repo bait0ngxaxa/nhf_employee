@@ -2,7 +2,20 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, expect, it, vi } from "vitest";
 
 import { RoutineTaskList } from "./RoutineTaskList";
+import type { RoutinePresentationCapabilities } from "../../application/types";
 import type { RoutineTask } from "./types";
+
+const allRoutineCapabilities = {
+    canReadTasks: true,
+    canCreateTasks: true,
+    canUpdateTasks: true,
+    canDeleteTasks: true,
+    canReadOccurrences: true,
+    canOverrideOccurrences: true,
+    canReassignOccurrences: true,
+    canChangeOccurrenceDueDate: true,
+    canManageImports: true,
+} satisfies RoutinePresentationCapabilities;
 
 const task = {
     canEdit: true,
@@ -45,6 +58,7 @@ function makeProps() {
         error: undefined,
         isAdmin: true,
         isLoading: false,
+        routineCapabilities: allRoutineCapabilities,
         onRetry: vi.fn(),
         onCreate: vi.fn(),
         onEdit: vi.fn(),
@@ -216,5 +230,67 @@ describe("RoutineTaskList", () => {
         expect(screen.getByRole("button", { name: "แก้ไข" })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "ปิดใช้งาน" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "ลบ" })).not.toBeInTheDocument();
+    });
+
+    it("keeps a read-only task surface free of management actions", () => {
+        const props = makeProps();
+        render(
+            <RoutineTaskList
+                {...props}
+                isAdmin={false}
+                routineCapabilities={{
+                    ...allRoutineCapabilities,
+                    canCreateTasks: false,
+                    canUpdateTasks: false,
+                    canDeleteTasks: false,
+                }}
+            />,
+        );
+
+        expect(screen.getByRole("button", { name: "ดูรายละเอียด" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "สร้างแม่แบบงาน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "แก้ไข" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ปิดใช้งาน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลบ" })).not.toBeInTheDocument();
+    });
+
+    it("allows a non-admin actor with explicitly granted task capabilities", () => {
+        const props = makeProps();
+        render(<RoutineTaskList {...props} isAdmin={false} />);
+
+        expect(screen.getByRole("button", { name: "สร้างแม่แบบงาน" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "แก้ไข" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ปิดใช้งาน" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ลบ" })).toBeInTheDocument();
+    });
+
+    it("separates lifecycle update capability from delete capability", () => {
+        const props = makeProps();
+        const { rerender } = render(
+            <RoutineTaskList
+                {...props}
+                routineCapabilities={{
+                    ...allRoutineCapabilities,
+                    canDeleteTasks: false,
+                }}
+            />,
+        );
+
+        expect(screen.getByRole("button", { name: "ปิดใช้งาน" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลบ" })).not.toBeInTheDocument();
+
+        rerender(
+            <RoutineTaskList
+                {...props}
+                routineCapabilities={{
+                    ...allRoutineCapabilities,
+                    canUpdateTasks: false,
+                }}
+            />,
+        );
+
+        expect(screen.queryByRole("button", { name: "แก้ไข" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ปิดใช้งาน" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ลบ" })).toBeInTheDocument();
     });
 });

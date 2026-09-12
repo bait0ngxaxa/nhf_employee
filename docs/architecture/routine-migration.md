@@ -33,9 +33,13 @@ transaction-only helpers, workbook internals, and private recipient helpers
 remain unexported.
 
 Client consumers use `@/modules/routine/client`, which intentionally exposes
-only `RoutineSection`, `RoutineSectionSkeleton`, and `LiffRoutineApp`. Dashboard
-and LIFF internals use relative imports inside the module; the client entry
-does not export server/application implementation.
+only the runtime presentation components `RoutineSection`,
+`RoutineSectionSkeleton`, and `LiffRoutineApp`, plus the type-only
+`RoutinePresentationCapabilities` contract. The type-only export is
+client-safe presentation data; it is not a server authorization implementation
+and does not resolve capabilities. Dashboard and LIFF internals use relative
+imports inside the module; the client entry does not export
+server/application implementation.
 
 ## Actual module shape
 

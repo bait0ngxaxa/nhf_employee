@@ -19,6 +19,7 @@ import {
 import type { RoutineReferenceData, RoutineTask } from "./types";
 
 interface RoutineTaskDialogProps {
+    canSubmit: boolean;
     error?: Error;
     intent: "create" | "edit";
     isLoading: boolean;
@@ -53,6 +54,7 @@ function isAlertDialogTarget(target: EventTarget | null): boolean {
 }
 
 export function RoutineTaskDialog({
+    canSubmit,
     error,
     intent,
     isLoading,
@@ -78,6 +80,12 @@ export function RoutineTaskDialog({
         && (intent === "create" || task !== null);
 
     useEffect(() => {
+        if (open && !canSubmit) {
+            onClose();
+        }
+    }, [canSubmit, onClose, open]);
+
+    useEffect(() => {
         if (open) return;
 
         const rememberFocusTarget = (event: Event): void => {
@@ -98,7 +106,7 @@ export function RoutineTaskDialog({
 
     return (
         <Dialog
-            open={open}
+            open={open && canSubmit}
             onOpenChange={(nextOpen) => {
                 if (!nextOpen) requestClose();
             }}
