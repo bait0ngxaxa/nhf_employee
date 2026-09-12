@@ -75,6 +75,8 @@ export type LiffRoutineTaskFormMode = "CREATE" | "EDIT";
 
 interface LiffRoutineTaskFormProps {
     mode: LiffRoutineTaskFormMode;
+    canCreateTasks: boolean;
+    canUpdateTasks: boolean;
     reference: LiffRoutineReferenceData;
     task: LiffRoutineTaskDetail | null;
     onCancel: () => void;
@@ -238,6 +240,8 @@ export const LiffRoutineTaskForm = forwardRef<
     LiffRoutineTaskFormProps
 >(function LiffRoutineTaskForm({
     mode,
+    canCreateTasks,
+    canUpdateTasks,
     reference,
     task,
     onCancel,
@@ -246,6 +250,9 @@ export const LiffRoutineTaskForm = forwardRef<
     onAmbiguousSubmit,
 }, ref): ReactElement {
     const formTask = mode === "EDIT" ? task : null;
+    const canSubmit = mode === "CREATE"
+        ? canCreateTasks
+        : canUpdateTasks && task?.canEdit === true;
     const units = useMemo(
         () => uniqueRoutineUnits(reference.units),
         [reference.units],
@@ -262,6 +269,12 @@ export const LiffRoutineTaskForm = forwardRef<
     const [extraDetailsOpen, setExtraDetailsOpen] = useState(Boolean(form.extraDetails));
     const initialSnapshotRef = useRef(routineFormSnapshot(taskToForm(formTask)));
     const versionRef = useRef<number | null>(formTask?.version ?? null);
+    const canSubmitRef = useRef(canSubmit);
+
+    useEffect(() => {
+        canSubmitRef.current = canSubmit;
+        if (!canSubmit && !isSubmitting) onCancel();
+    }, [canSubmit, isSubmitting, onCancel]);
 
     useEffect(() => {
         if (form.extraDetails || fieldErrors.extraDetails) setExtraDetailsOpen(true);
@@ -274,7 +287,7 @@ export const LiffRoutineTaskForm = forwardRef<
         [form],
     );
     const isDirty = currentSnapshot !== initialSnapshotRef.current;
-    const controlsDisabled = isSubmitting || isReloadingLatest;
+    const controlsDisabled = !canSubmit || isSubmitting || isReloadingLatest;
 
     const requestClose = useCallback((): void => {
         if (controlsDisabled) return;
@@ -349,7 +362,13 @@ export const LiffRoutineTaskForm = forwardRef<
     const reloadLatest = useCallback(async (
         message: string = STALE_CONFLICT_MESSAGE,
     ): Promise<void> => {
-        if (mode !== "EDIT" || !task || !onReloadLatest || isReloadingLatest) return;
+        if (
+            !canSubmitRef.current
+            || mode !== "EDIT"
+            || !task
+            || !onReloadLatest
+            || isReloadingLatest
+        ) return;
         setIsReloadingLatest(true);
         try {
             const latest = await onReloadLatest(task.id);
@@ -379,6 +398,10 @@ export const LiffRoutineTaskForm = forwardRef<
     }
 
     async function submit(): Promise<void> {
+        if (!canSubmitRef.current) {
+            onCancel();
+            return;
+        }
         if (submitLockRef.current || isSubmitting || hasConflict) return;
         submitLockRef.current = true;
         setError(null);

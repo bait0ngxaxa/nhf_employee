@@ -13,10 +13,8 @@ export async function GET(): Promise<NextResponse> {
         const auth = await requireLiffWorkforceSession();
         if (!auth.ok) return auth.response;
 
-        const [modules, capabilities] = await Promise.all([
-            getLiffHomeModules(),
-            getLiffCapabilities(auth),
-        ]);
+        const capabilities = await getLiffCapabilities(auth);
+        const modules = getLiffHomeModules(capabilities);
 
         const response: LiffHomeResponse = {
             workforce: {

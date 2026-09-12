@@ -77,6 +77,59 @@ describe("LIFF home", () => {
         expect(screen.getByText("บริการของฉัน")).toBeInTheDocument();
     });
 
+    it("keeps the Routine card navigable for a read-only actor", async () => {
+        const readOnlyHome = {
+            ...HOME,
+            capabilities: {
+                ...HOME.capabilities,
+                canCreateOwnRoutine: false,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canCreateTasks: false,
+                    canUpdateTasks: false,
+                    canDeleteTasks: false,
+                },
+            },
+        };
+        mocks.fetchLiffHome.mockResolvedValueOnce(readOnlyHome);
+
+        render(<LiffHomeApp />);
+
+        expect(await screen.findByRole("link", { name: /ดูงานประจำของฉัน/ })).toHaveAttribute(
+            "href",
+            "/liff/routine",
+        );
+    });
+
+    it("renders Routine as a disabled non-link when the server denies task reads", async () => {
+        const unavailableRoutineHome = {
+            ...HOME,
+            modules: {
+                ...HOME.modules,
+                routine: { enabled: false as const, status: "unavailable" as const },
+            },
+            capabilities: {
+                ...HOME.capabilities,
+                canCreateOwnRoutine: false,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canReadTasks: false,
+                    canCreateTasks: false,
+                    canUpdateTasks: false,
+                    canDeleteTasks: false,
+                },
+            },
+        };
+        mocks.fetchLiffHome.mockResolvedValueOnce(unavailableRoutineHome);
+
+        render(<LiffHomeApp />);
+
+        await waitFor(() => {
+            expect(screen.queryByRole("link", { name: /ดูงานประจำของฉัน/ })).not.toBeInTheDocument();
+        });
+        expect(screen.getAllByText("บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณ")).toHaveLength(2);
+    });
+
     it("shows a safe retryable error instead of backend details", async () => {
         mocks.fetchLiffHome.mockRejectedValueOnce(new Error("provider details"));
 

@@ -26,6 +26,8 @@ import {
 interface LiffRoutineTaskFormSurfaceProps {
     open: boolean;
     mode: LiffRoutineTaskFormMode;
+    canCreateTasks: boolean;
+    canUpdateTasks: boolean;
     reference: LiffRoutineReferenceData | null;
     referenceLoading: boolean;
     referenceError: string | null;
@@ -45,6 +47,8 @@ interface LiffRoutineTaskFormSurfaceProps {
 export function LiffRoutineTaskFormSurface({
     open,
     mode,
+    canCreateTasks,
+    canUpdateTasks,
     reference,
     referenceLoading,
     referenceError,
@@ -57,6 +61,9 @@ export function LiffRoutineTaskFormSurface({
 }: LiffRoutineTaskFormSurfaceProps): ReactElement {
     const formRef = useRef<LiffRoutineTaskFormHandle>(null);
     const title = mode === "CREATE" ? "เพิ่ม Routine ของฉัน" : "แก้ไขงาน Routine";
+    const canSubmit = mode === "CREATE"
+        ? canCreateTasks
+        : canUpdateTasks && task?.canEdit === true;
 
     function requestClose(): void {
         if (formRef.current) {
@@ -125,11 +132,13 @@ export function LiffRoutineTaskFormSurface({
                             </Button>
                         </div>
                     </SheetScrollArea>
-                ) : reference && (mode === "CREATE" || task?.canEdit === true) ? (
+                ) : reference && canSubmit ? (
                     <LiffRoutineTaskForm
                         key={`${mode}-${task?.id ?? "new"}`}
                         ref={formRef}
                         mode={mode}
+                        canCreateTasks={canCreateTasks}
+                        canUpdateTasks={canUpdateTasks}
                         reference={reference}
                         task={task}
                         onCancel={() => onOpenChange(false)}

@@ -78,6 +78,12 @@ describe("LIFF home API", () => {
             capabilities: CAPABILITIES,
         });
         expect(getLiffCapabilitiesMock).toHaveBeenCalledWith(AUTH);
+        expect(getLiffCapabilitiesMock).toHaveBeenCalledTimes(1);
+        expect(getLiffHomeModulesMock).toHaveBeenCalledWith(CAPABILITIES);
+        expect(getLiffHomeModulesMock).toHaveBeenCalledTimes(1);
+        expect(getLiffCapabilitiesMock.mock.invocationCallOrder[0]).toBeLessThan(
+            getLiffHomeModulesMock.mock.invocationCallOrder[0],
+        );
     });
 
     it("returns the existing LIFF session failure without querying capabilities", async () => {

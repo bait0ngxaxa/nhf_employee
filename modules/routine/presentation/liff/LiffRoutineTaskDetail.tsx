@@ -36,6 +36,8 @@ interface LiffRoutineTaskDetailProps {
     error: string | null;
     deleting: boolean;
     deleteError: string | null;
+    canUpdateTasks: boolean;
+    canDeleteTasks: boolean;
     focusedOccurrenceId?: number | null;
     onOpenChange: (open: boolean) => void;
     onRetry: () => void;
@@ -114,6 +116,8 @@ export function LiffRoutineTaskDetail({
     error,
     deleting,
     deleteError,
+    canUpdateTasks,
+    canDeleteTasks,
     focusedOccurrenceId = null,
     onOpenChange,
     onRetry,
@@ -121,11 +125,13 @@ export function LiffRoutineTaskDetail({
     onDelete,
 }: LiffRoutineTaskDetailProps): ReactElement {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const canEdit = canUpdateTasks && detail?.canEdit === true;
+    const canDelete = canDeleteTasks && detail?.canDelete === true;
     const timing = detail ? currentOccurrence(detail, focusedOccurrenceId) : null;
 
     useEffect(() => {
         setDeleteConfirmOpen(false);
-    }, [detail?.id]);
+    }, [canDelete, detail?.id]);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -265,7 +271,7 @@ export function LiffRoutineTaskDetail({
                                     </OptionalSection>
                                 ) : null}
 
-                                {detail.canEdit ? (
+                                {canEdit ? (
                                     <OptionalSection id="liff-routine-reminders" title="การแจ้งเตือน">
                                         {detail.reminderRules.length === 0 ? (
                                             <p className="text-sm leading-6 text-content-secondary">
@@ -331,26 +337,30 @@ export function LiffRoutineTaskDetail({
                     </div>
                 </SheetScrollArea>
 
-                {(detail?.canEdit || detail?.canDelete) && !loading && !error ? (
+                {(canEdit || canDelete) && !loading && !error ? (
                     <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
                         <div className="mx-auto grid max-w-2xl gap-2">
-                            {detail?.canEdit ? (
+                            {canEdit ? (
                                 <Button
                                     type="button"
                                     className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
-                                    onClick={() => onEdit(detail)}
+                                    onClick={() => {
+                                        if (canEdit) onEdit(detail);
+                                    }}
                                     disabled={deleting}
                                 >
                                     <Pencil className="size-4" aria-hidden="true" />
                                     แก้ไขงาน
                                 </Button>
                             ) : null}
-                            {detail?.canDelete ? (
+                            {canDelete ? (
                                 <Button
                                     type="button"
                                     variant="outline"
                                     className="min-h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface"
-                                    onClick={() => setDeleteConfirmOpen(true)}
+                                    onClick={() => {
+                                        if (canDelete) setDeleteConfirmOpen(true);
+                                    }}
                                     disabled={deleting}
                                 >
                                     <Trash2 className="size-4" aria-hidden="true" />
@@ -363,12 +373,17 @@ export function LiffRoutineTaskDetail({
 
                 {detail ? (
                     <LiffRoutineDeleteConfirm
-                        open={deleteConfirmOpen}
+                        open={canDelete && deleteConfirmOpen}
                         taskTitle={detail.title}
                         busy={deleting}
                         error={deleteError}
-                        onOpenChange={setDeleteConfirmOpen}
-                        onConfirm={() => onDelete(detail)}
+                        onOpenChange={(nextOpen) => {
+                            if (nextOpen && !canDelete) return;
+                            setDeleteConfirmOpen(nextOpen);
+                        }}
+                        onConfirm={() => {
+                            if (canDelete) onDelete(detail);
+                        }}
                     />
                 ) : null}
             </SheetContent>

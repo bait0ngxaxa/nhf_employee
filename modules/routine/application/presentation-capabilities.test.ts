@@ -129,6 +129,40 @@ describe("Routine presentation capability projection", () => {
         });
     });
 
+    it("honors explicit non-admin task grants in the LIFF projection", async () => {
+        mockResolveMany((capability) => {
+            const allowed = capability === "routine.task.read"
+                || capability === "routine.task.create";
+            return {
+                capability,
+                allowed,
+                scopes: allowed
+                    ? [capability === "routine.task.create" ? "OWN" : "ALL"]
+                    : [],
+                grants: allowed
+                    ? [{
+                          capability: capability as EffectiveAuthorizationGrant["capability"],
+                          scope: capability === "routine.task.create" ? "OWN" : "ALL",
+                          source: { type: "USER", userId: 7 },
+                      }]
+                    : [],
+                ...(allowed ? {} : { reason: "CHANNEL_NOT_SUPPORTED" as const }),
+            };
+        });
+
+        await expect(
+            getRoutinePresentationCapabilities({
+                ...ACTOR,
+                mode: "LIFF_SELF_SERVICE",
+            }, 21),
+        ).resolves.toMatchObject({
+            canReadTasks: true,
+            canCreateTasks: true,
+            canUpdateTasks: false,
+            canDeleteTasks: false,
+        });
+    });
+
     it("projects Dashboard ADMIN authorization without applying the LIFF clamp", async () => {
         mockResolveMany((capability) => ({
             capability,

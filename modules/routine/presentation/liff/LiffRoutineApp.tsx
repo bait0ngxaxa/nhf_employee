@@ -13,10 +13,13 @@ import {
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { Button } from "@/components/ui/button";
 import {
+    fetchLiffHome,
     isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
     LiffApiError,
+    type LiffHomeResponse,
 } from "@/modules/line/client";
+import { LiffModuleLanding } from "@/components/liff/LiffModuleLanding";
 import {
     deleteLiffRoutineTask,
     fetchLiffRoutineReference,
@@ -41,7 +44,7 @@ import {
 import type { LiffRoutineTaskFormMode } from "./LiffRoutineTaskForm";
 import { LiffRoutineTaskList } from "./LiffRoutineTaskList";
 
-type LiffRoutineState = "LOADING" | "READY" | "ERROR";
+type LiffRoutineState = "LOADING" | "READY" | "ERROR" | "UNAVAILABLE";
 type LiffRoutineReferenceState = "IDLE" | "LOADING" | "READY" | "ERROR";
 
 const LIFF_TASK_PAGE_SIZE = 12;
@@ -78,12 +81,18 @@ function toRoutineMutationError(error: unknown): string {
     return "ไม่สามารถดำเนินการกับงาน Routine ได้ กรุณาลองใหม่อีกครั้ง";
 }
 
+function hasRoutineReadAccess(home: LiffHomeResponse | null): boolean {
+    return home?.modules.routine.enabled === true
+        && home.capabilities.routineCapabilities.canReadTasks === true;
+}
+
 export function LiffRoutineApp(): ReactElement {
     const searchParams = useSearchParams();
     const initialRoutineFocus = getRoutineFocus(searchParams);
     const initialFocusTaskId = initialRoutineFocus?.taskId ?? null;
     const initialFocusOccurrenceId = initialRoutineFocus?.occurrenceId ?? null;
     const [state, setState] = useState<LiffRoutineState>("LOADING");
+    const [home, setHome] = useState<LiffHomeResponse | null>(null);
     const [viewError, setViewError] = useState<string | null>(null);
     const [summary, setSummary] = useState<LiffRoutineSummary | null>(null);
     const [tasks, setTasks] = useState<LiffRoutineTaskWorkItem[]>([]);
@@ -115,6 +124,12 @@ export function LiffRoutineApp(): ReactElement {
     const detailRequestIdRef = useRef(0);
     const referenceRequestIdRef = useRef(0);
     const routineRequestIdRef = useRef(0);
+    const routineCapabilities = home?.capabilities.routineCapabilities;
+    const canReadTasks = routineCapabilities?.canReadTasks === true;
+    const canCreateTasks = routineCapabilities?.canCreateTasks === true;
+    const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
+    const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
+    const routineReadAvailable = hasRoutineReadAccess(home);
 
     useEffect(() => () => {
         routineRequestIdRef.current += 1;
@@ -123,6 +138,24 @@ export function LiffRoutineApp(): ReactElement {
         referenceRequestIdRef.current += 1;
     }, []);
 
+    useEffect(() => {
+        if (
+            formMode === "CREATE"
+            && (!routineReadAvailable || !canCreateTasks)
+        ) {
+            setFormMode(null);
+        }
+        if (
+            formMode === "EDIT"
+            && (!routineReadAvailable || !canUpdateTasks || detail?.canEdit !== true)
+        ) {
+            setFormMode(null);
+        }
+        if (!routineReadAvailable || !canDeleteTasks) {
+            setDeleteError(null);
+        }
+    }, [canCreateTasks, canDeleteTasks, canUpdateTasks, detail?.canEdit, formMode, routineReadAvailable]);
+
     const loadRoutine = useCallback(async (): Promise<void> => {
         const requestId = routineRequestIdRef.current + 1;
         routineRequestIdRef.current = requestId;
@@ -130,6 +163,7 @@ export function LiffRoutineApp(): ReactElement {
         detailRequestIdRef.current += 1;
         setState("LOADING");
         setViewError(null);
+        setHome(null);
         setSummary(null);
         setTasks([]);
         setPagination(initialPagination());
@@ -140,8 +174,17 @@ export function LiffRoutineApp(): ReactElement {
         setDetailError(null);
         setDeleteError(null);
         setDetailLoading(false);
+        setFormMode(null);
 
         try {
+            const homeResponse = await fetchLiffHome();
+            if (requestId !== routineRequestIdRef.current) return;
+            setHome(homeResponse);
+            if (!hasRoutineReadAccess(homeResponse)) {
+                setState("UNAVAILABLE");
+                return;
+            }
+
             const focusedTasksPromise = initialFocusTaskId !== null
                 && initialFocusOccurrenceId !== null
                 ? fetchLiffRoutineTasks({
@@ -198,7 +241,14 @@ export function LiffRoutineApp(): ReactElement {
         void loadRoutine();
     }, [loadRoutine]);
 
-    const loadReference = useCallback(async (): Promise<void> => {
+    const loadReference = useCallback(async (
+        mode: LiffRoutineTaskFormMode,
+        task: LiffRoutineTaskDetail | null,
+    ): Promise<void> => {
+        const actionAllowed = mode === "CREATE"
+            ? canCreateTasks
+            : canUpdateTasks && task?.canEdit === true;
+        if (!routineReadAvailable || !actionAllowed) return;
         if (reference || referenceState === "LOADING") return;
         const requestId = referenceRequestIdRef.current + 1;
         referenceRequestIdRef.current = requestId;
@@ -214,9 +264,10 @@ export function LiffRoutineApp(): ReactElement {
             setReferenceError(toRoutineViewError(error));
             setReferenceState("ERROR");
         }
-    }, [reference, referenceState]);
+    }, [canCreateTasks, canUpdateTasks, reference, referenceState, routineReadAvailable]);
 
     const loadTaskDetail = useCallback((taskId: number): void => {
+        if (!routineReadAvailable || !canReadTasks) return;
         const requestId = detailRequestIdRef.current + 1;
         detailRequestIdRef.current = requestId;
         setSelectedTaskId(taskId);
@@ -239,7 +290,7 @@ export function LiffRoutineApp(): ReactElement {
                     setDetailLoading(false);
                 }
             });
-    }, []);
+    }, [canReadTasks, routineReadAvailable]);
 
     const retryTaskDetail = useCallback((): void => {
         if (selectedTaskId === null) return;
@@ -248,6 +299,9 @@ export function LiffRoutineApp(): ReactElement {
 
     const reloadLatestTask = useCallback(
         async (taskId: number): Promise<LiffRoutineTaskDetail> => {
+            if (!routineReadAvailable || !canReadTasks || !canUpdateTasks) {
+                throw new Error("Routine access is no longer available");
+            }
             const requestId = detailRequestIdRef.current + 1;
             detailRequestIdRef.current = requestId;
             setSelectedTaskId(taskId);
@@ -271,12 +325,12 @@ export function LiffRoutineApp(): ReactElement {
                 }
             }
         },
-        [],
+        [canReadTasks, canUpdateTasks, routineReadAvailable],
     );
 
     const handleFilterChange = useCallback(
         async (filter: LiffRoutineTimingFilter): Promise<void> => {
-            if (state !== "READY") return;
+            if (state !== "READY" || !routineReadAvailable || !canReadTasks) return;
             const requestId = taskRequestIdRef.current + 1;
             taskRequestIdRef.current = requestId;
             setSelectedFilter(filter);
@@ -300,11 +354,17 @@ export function LiffRoutineApp(): ReactElement {
                 }
             }
         },
-        [state],
+        [canReadTasks, routineReadAvailable, state],
     );
 
     const handleLoadMore = useCallback(async (): Promise<void> => {
-        if (state !== "READY" || isTaskLoading || pagination.page >= pagination.pages) {
+        if (
+            state !== "READY"
+            || !routineReadAvailable
+            || !canReadTasks
+            || isTaskLoading
+            || pagination.page >= pagination.pages
+        ) {
             return;
         }
         const requestId = taskRequestIdRef.current + 1;
@@ -334,11 +394,12 @@ export function LiffRoutineApp(): ReactElement {
                 setIsTaskLoading(false);
             }
         }
-    }, [isTaskLoading, pagination, selectedFilter, state]);
+    }, [canReadTasks, isTaskLoading, pagination, routineReadAvailable, selectedFilter, state]);
 
     const refreshRoutineData = useCallback(async (
         refreshFailureMessage = "บันทึกสำเร็จ แต่โหลดรายการ Routine ล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง",
     ): Promise<boolean> => {
+        if (!routineReadAvailable || !canReadTasks) return false;
         const requestId = taskRequestIdRef.current + 1;
         taskRequestIdRef.current = requestId;
         setIsTaskLoading(true);
@@ -366,23 +427,35 @@ export function LiffRoutineApp(): ReactElement {
                 setIsTaskLoading(false);
             }
         }
-    }, [selectedFilter]);
+    }, [canReadTasks, routineReadAvailable, selectedFilter]);
 
     const openCreate = useCallback((): void => {
+        if (!routineReadAvailable || !canCreateTasks) {
+            setFormMode(null);
+            return;
+        }
         setOperationError(null);
         setFormMode("CREATE");
-        void loadReference();
-    }, [loadReference]);
+        void loadReference("CREATE", null);
+    }, [canCreateTasks, loadReference, routineReadAvailable]);
 
     const openEdit = useCallback((task: LiffRoutineTaskDetail): void => {
-        if (!task.canEdit) return;
+        if (!routineReadAvailable || !canUpdateTasks || !task.canEdit) {
+            setFormMode(null);
+            return;
+        }
         setDeleteError(null);
         setFormMode("EDIT");
-        void loadReference();
-    }, [loadReference]);
+        void loadReference("EDIT", task);
+    }, [canUpdateTasks, loadReference, routineReadAvailable]);
 
     const handleTaskSaved = useCallback(
         async (savedTask: LiffRoutineTaskDetail, mode: LiffRoutineTaskFormMode): Promise<void> => {
+            const actionAllowed = mode === "CREATE" ? canCreateTasks : canUpdateTasks;
+            if (!routineReadAvailable || !actionAllowed) {
+                setFormMode(null);
+                return;
+            }
             setFormMode(null);
             setOperationError(null);
             setOperationNotice(
@@ -396,12 +469,17 @@ export function LiffRoutineApp(): ReactElement {
             setDetailLoading(false);
             await refreshRoutineData();
         },
-        [refreshRoutineData],
+        [canCreateTasks, canUpdateTasks, refreshRoutineData, routineReadAvailable],
     );
 
     const handleDelete = useCallback(
         (task: LiffRoutineTaskDetail): void => {
-            if (isDeleting || !task.canDelete) return;
+            if (
+                isDeleting
+                || !routineReadAvailable
+                || !canDeleteTasks
+                || !task.canDelete
+            ) return;
             setIsDeleting(true);
             setDeleteError(null);
             void (async () => {
@@ -452,7 +530,7 @@ export function LiffRoutineApp(): ReactElement {
                 }
             })();
         },
-        [isDeleting, refreshRoutineData, reloadLatestTask],
+        [canDeleteTasks, isDeleting, refreshRoutineData, reloadLatestTask, routineReadAvailable],
     );
 
     const handleDetailOpenChange = useCallback((open: boolean): void => {
@@ -465,6 +543,10 @@ export function LiffRoutineApp(): ReactElement {
         setDeleteError(null);
         setDetailLoading(false);
     }, []);
+
+    if (state === "UNAVAILABLE") {
+        return <LiffModuleLanding module="routine" enabled={false} />;
+    }
 
     if (state === "ERROR") {
         return (
@@ -502,14 +584,16 @@ export function LiffRoutineApp(): ReactElement {
                                 ดูงานที่ได้รับมอบหมายและกำหนดส่งของคุณ
                             </p>
                         </div>
-                        <Button
-                            type="button"
-                            onClick={openCreate}
-                            className="min-h-11 w-full bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover min-[420px]:w-auto"
-                        >
-                            <Plus className="size-4" aria-hidden="true" />
-                            เพิ่ม Routine ของฉัน
-                        </Button>
+                        {canCreateTasks ? (
+                            <Button
+                                type="button"
+                                onClick={openCreate}
+                                className="min-h-11 w-full bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover min-[420px]:w-auto"
+                            >
+                                <Plus className="size-4" aria-hidden="true" />
+                                เพิ่ม Routine ของฉัน
+                            </Button>
+                        ) : null}
                     </header>
 
                     {operationNotice ? (
@@ -566,6 +650,8 @@ export function LiffRoutineApp(): ReactElement {
                 error={detailError}
                 deleting={isDeleting}
                 deleteError={deleteError}
+                canUpdateTasks={canUpdateTasks}
+                canDeleteTasks={canDeleteTasks}
                 focusedOccurrenceId={focusedOccurrenceId}
                 onOpenChange={handleDetailOpenChange}
                 onRetry={retryTaskDetail}
@@ -573,10 +659,16 @@ export function LiffRoutineApp(): ReactElement {
                 onDelete={handleDelete}
             />
 
-            {formMode ? (
+            {formMode && (
+                formMode === "CREATE"
+                    ? canCreateTasks
+                    : canUpdateTasks && detail?.canEdit === true
+            ) ? (
                 <LiffRoutineTaskFormSurface
                     open
                     mode={formMode}
+                    canCreateTasks={canCreateTasks}
+                    canUpdateTasks={canUpdateTasks}
                     reference={reference}
                     referenceLoading={referenceState === "LOADING"}
                     referenceError={referenceError}
@@ -584,7 +676,10 @@ export function LiffRoutineApp(): ReactElement {
                     onOpenChange={(open) => {
                         if (!open) setFormMode(null);
                     }}
-                    onRetryReference={() => void loadReference()}
+                    onRetryReference={() => void loadReference(
+                        formMode,
+                        formMode === "EDIT" ? detail : null,
+                    )}
                     onSaved={handleTaskSaved}
                     onReloadLatest={reloadLatestTask}
                     onAmbiguousSubmit={async () => {

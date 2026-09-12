@@ -4,7 +4,10 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
-import { getLiffHomeModules, type LiffHomeModules } from "@/modules/line";
+import {
+    getLiffConfiguredModules,
+    type LiffHomeModules,
+} from "@/modules/line";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 import {
@@ -783,7 +786,7 @@ export async function prepareNhfRichMenu(
         imagePath,
         image,
         imageBytes: await readFile(imagePath),
-        modules: getLiffHomeModules(),
+        modules: getLiffConfiguredModules(),
         channelAccessToken,
     };
 }
@@ -968,7 +971,7 @@ export async function getNhfRichMenuStatus(
         sessionSecretConfigured: legacyStatus.sessionSecretConfigured,
         sessionTtlConfigured: legacyStatus.sessionTtlConfigured,
         sessionConfigValid: legacyStatus.sessionConfigValid,
-        modules: getLiffHomeModules(),
+        modules: getLiffConfiguredModules(),
         liffUrls,
         defaultRichMenuId: legacyStatus.defaultRichMenuId,
         defaultRichMenuStatus: legacyStatus.defaultRichMenuStatus,

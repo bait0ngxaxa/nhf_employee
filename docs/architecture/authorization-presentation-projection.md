@@ -1,13 +1,13 @@
-# Phase 5B — Routine presentation capability projection
+# Phase 5C — Routine presentation capability projection
 
-Status: Phase 5B Dashboard integration
+Status: Phase 5C LIFF integration complete
 
 This record defines the server-derived presentation contract added for the
 Routine authorization migration. It extends the Phase 4 Routine pilot; it does
 not replace the locked authorization source-of-truth or server-side
-enforcement. Phase 5A established the projection and Phase 5B integrates it
-into the Dashboard navigation, route boundary, Routine tabs, and Routine
-actions.
+enforcement. Phase 5A established the projection, Phase 5B integrated it into
+the Dashboard, and Phase 5C integrates the same projection into the LIFF home
+contract and Routine client.
 
 ## Contract and ownership
 
@@ -91,21 +91,70 @@ evaluation inputs from the browser.
 ## LIFF path
 
 ```text
-verified LIFF workforce session
-  -> getRoutinePresentationCapabilities(
-       { id, role, email, mode: "LIFF_SELF_SERVICE" },
-       employeeId,
-     )
-  -> LiffCapabilities.routineCapabilities
+LiffBootstrap
+  -> establishLiffSession()
+  -> verified LIFF workforce session
+  -> GET /api/line/home
+  -> getLiffCapabilities()
+  -> one getRoutinePresentationCapabilities(..., mode: "LIFF_SELF_SERVICE")
+  -> capability-aware LiffHomeResponse
+  -> Routine home-card availability
+  -> LiffRoutineApp
+  -> granular task action visibility
 ```
 
+`GET /api/line/home` resolves `getLiffCapabilities()` once and composes its
+modules from that response. Routine is enabled only when both the Routine
+feature flag and `routineCapabilities.canReadTasks` are true. The composition
+helper does not resolve authorization again and does not introduce a second
+policy table. Stock and Leave module behavior remains unchanged.
+
 The existing `canCreateOwnRoutine` field remains in the LIFF contract for
-compatibility. It is now `routineEnabled && routineCapabilities.canCreateTasks`.
-The Routine feature flag therefore still controls availability, while the
-capability projection answers the separate authorization question. LIFF ADMIN
-uses the same Phase 4 Routine composition and remains clamped to self-service
-task semantics; Dashboard-only occurrence administration and import access do
-not become available through LIFF.
+compatibility and is derived as:
+
+```text
+canCreateOwnRoutine
+  = Routine feature enabled
+  AND routineCapabilities.canCreateTasks
+```
+
+`LiffRoutineApp` independently calls the trusted `fetchLiffHome()` contract
+after `LiffBootstrap` is READY. It does not load Routine summary, task, or
+reference data until the contract confirms both module availability and
+`canReadTasks`. A denied or unavailable contract renders the existing stable
+unavailable module view and makes no Routine data requests. Direct links and
+focus query parameters follow the same gate.
+
+Routine LIFF task presentation uses the granular projection as follows:
+
+| Presentation | Rule |
+|---|---|
+| Read/task list/detail | `canReadTasks` and the existing self-service server/resource result |
+| Create | `canCreateTasks` |
+| Edit | `canUpdateTasks AND task.canEdit` |
+| Delete | `canDeleteTasks AND task.canDelete` |
+| Lifecycle mutation | `canUpdateTasks AND` the existing resource lifecycle eligibility; no broader access is inferred |
+| Occurrence administration/import | Not exposed in LIFF; the LIFF self-service clamp keeps these capabilities unavailable |
+
+The client also guards form opening, confirmation, submission, and stale open
+state. These are presentation controls only; the LIFF routes and Routine
+application remain authoritative for authentication, relationships, business
+rules, and mutations.
+
+The `/liff/routine` RSC page intentionally does not use the Dashboard page
+guard pattern. LIFF session establishment happens in `LiffBootstrap` on the
+client before child applications render, so the session may not exist while
+the RSC page is rendered. The page only selects the existing feature-disabled
+landing view or mounts `LiffRoutineApp`; capability and module authorization
+happens after bootstrap through `/api/line/home`.
+
+Dashboard and LIFF use different actor modes: Dashboard uses its Dashboard
+channel, while LIFF explicitly uses `LIFF_SELF_SERVICE`. A system ADMIN in
+LIFF therefore remains constrained to self-service task relationships and
+does not gain `routine.occurrence.override`,
+`routine.occurrence.reassign`, `routine.occurrence.change_due_date`, or
+`routine.import.manage` presentation access. Dashboard ADMIN behavior remains
+the Phase 5B behavior.
 
 ## Presentation visibility != authorization enforcement
 
@@ -127,9 +176,21 @@ enforce their own decisions.
 remain outside this projection because their legacy policy is unresolved.
 Dashboard Excel export, summary authorization, reference-data authorization,
 and their existing compatibility presentation behavior therefore remain
-unchanged in Phase 5B; no new capability rule is invented for them.
+unchanged; no new capability rule is invented for them. In particular, the
+deferred policies remain deferred:
+
+```text
+routine.summary.read
+routine.task.export
+routine.reference.read
+```
+
+When the Routine module is legitimately available, the existing LIFF summary
+and reference compatibility behavior is preserved; the home gate only keeps
+actors without Routine read availability from reaching those requests through
+the Routine UI.
 
 Stock, Leave, Employee, Audit, Email Request, Settings, and other non-Routine
 presentation and authorization paths remain on their existing compatibility
 behavior until their approved migration phases, including Phase 6 where
-applicable. LIFF presentation migration remains deferred to Phase 5C.
+applicable.

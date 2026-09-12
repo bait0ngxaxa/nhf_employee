@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
 
     return {
         useSearchParams: vi.fn(),
+        fetchLiffHome: vi.fn(),
         fetchLiffRoutineSummary: vi.fn(),
         fetchLiffRoutineTasks: vi.fn(),
         fetchLiffRoutineReference: vi.fn(),
@@ -45,6 +46,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/modules/line/client", () => ({
+    fetchLiffHome: mocks.fetchLiffHome,
     LiffApiError: mocks.MockLiffApiError,
     isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
@@ -73,6 +75,37 @@ const SUMMARY = {
         dueSoon: 2,
         within30Days: 3,
         asOfDate: "2026-08-10",
+    },
+};
+
+const HOME = {
+    workforce: {
+        userId: 10,
+        employeeId: 20,
+        name: "พนักงาน ทดสอบ",
+    },
+    modules: {
+        stock: { enabled: true, status: "available" as const },
+        leave: { enabled: true, status: "available" as const },
+        routine: { enabled: true, status: "available" as const },
+    },
+    capabilities: {
+        canRequestStock: true,
+        canProcessStockRequests: false,
+        canRequestLeave: true,
+        canApproveLeave: false,
+        canCreateOwnRoutine: true,
+        routineCapabilities: {
+            canReadTasks: true,
+            canCreateTasks: true,
+            canUpdateTasks: true,
+            canDeleteTasks: true,
+            canReadOccurrences: false,
+            canOverrideOccurrences: false,
+            canReassignOccurrences: false,
+            canChangeOccurrenceDueDate: false,
+            canManageImports: false,
+        },
     },
 };
 
@@ -206,6 +239,7 @@ describe("LiffRoutineApp", () => {
     beforeEach(() => {
         vi.resetAllMocks();
         mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+        mocks.fetchLiffHome.mockResolvedValue(HOME);
         mocks.fetchLiffRoutineSummary.mockResolvedValue(SUMMARY);
         mocks.fetchLiffRoutineTasks.mockResolvedValue(tasksResponse());
         mocks.fetchLiffRoutineReference.mockResolvedValue(REFERENCE);
@@ -232,6 +266,13 @@ describe("LiffRoutineApp", () => {
             page: 1,
             limit: 12,
         });
+        expect(mocks.fetchLiffHome).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchLiffHome.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.fetchLiffRoutineSummary.mock.invocationCallOrder[0],
+        );
+        expect(mocks.fetchLiffHome.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.fetchLiffRoutineTasks.mock.invocationCallOrder[0],
+        );
         expect(screen.getByText("ตรวจสอบระบบ")).toBeInTheDocument();
         expect(screen.getByText("IT · ฝ่าย IT")).toBeInTheDocument();
         expect(screen.getByText("ระบบคอมพิวเตอร์")).toBeInTheDocument();
@@ -239,6 +280,71 @@ describe("LiffRoutineApp", () => {
         expect(screen.getByLabelText("ใกล้ถึงกำหนด 2 งาน")).toBeInTheDocument();
         expect(screen.getByLabelText("ภายใน 30 วัน 3 งาน")).toBeInTheDocument();
         expect(screen.getByText("ยังไม่มีกำหนดรอบถัดไป")).toBeInTheDocument();
+    });
+
+    it("checks the home contract before loading Routine APIs and blocks an unavailable deep link", async () => {
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=71&occurrenceId=91"),
+        );
+        mocks.fetchLiffHome.mockResolvedValueOnce({
+            ...HOME,
+            capabilities: {
+                ...HOME.capabilities,
+                canCreateOwnRoutine: false,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canReadTasks: false,
+                    canCreateTasks: false,
+                    canUpdateTasks: false,
+                    canDeleteTasks: false,
+                },
+            },
+        });
+
+        render(<LiffRoutineApp />);
+
+        expect(
+            await screen.findByRole("heading", { name: "งานประจำ ยังไม่พร้อมใช้งาน" }),
+        ).toBeInTheDocument();
+        expect(mocks.fetchLiffRoutineTasks).not.toHaveBeenCalled();
+        expect(mocks.fetchLiffRoutineSummary).not.toHaveBeenCalled();
+        expect(mocks.fetchLiffRoutineReference).not.toHaveBeenCalled();
+        expect(mocks.fetchLiffRoutineTask).not.toHaveBeenCalled();
+    });
+
+    it("keeps the read-only Routine experience readable without mutation controls or requests", async () => {
+        mocks.fetchLiffHome.mockResolvedValueOnce({
+            ...HOME,
+            capabilities: {
+                ...HOME.capabilities,
+                canCreateOwnRoutine: false,
+                routineCapabilities: {
+                    ...HOME.capabilities.routineCapabilities,
+                    canCreateTasks: false,
+                    canUpdateTasks: false,
+                    canDeleteTasks: false,
+                },
+            },
+        });
+
+        render(<LiffRoutineApp />);
+
+        await waitFor(() => {
+            expect(screen.getByText("ตรวจสอบระบบ")).toBeInTheDocument();
+        });
+        expect(screen.queryByRole("button", { name: "เพิ่ม Routine ของฉัน" })).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }),
+        );
+        const detailDialog = await screen.findByRole("dialog");
+        expect(within(detailDialog).getByRole("heading", { name: "ตรวจสอบระบบ" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "แก้ไขงาน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลบงานนี้" })).not.toBeInTheDocument();
+        expect(mocks.fetchLiffRoutineReference).not.toHaveBeenCalled();
+        expect(mocks.createLiffRoutineTask).not.toHaveBeenCalled();
+        expect(mocks.updateLiffRoutineTask).not.toHaveBeenCalled();
+        expect(mocks.deleteLiffRoutineTask).not.toHaveBeenCalled();
     });
 
     it("renders timing status and due-date presentation from the Routine service", async () => {

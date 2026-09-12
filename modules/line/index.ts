@@ -4,7 +4,10 @@ export {
     getLiffCapabilities,
     requireLiffWorkforceSession,
 } from "./application/liff";
-export { getLiffHomeModules } from "./application/home";
+export {
+    getLiffConfiguredModules,
+    getLiffHomeModules,
+} from "./application/home";
 export {
     findLineAccountLinkByLineUserId,
     findLineUserIdByUserId,
