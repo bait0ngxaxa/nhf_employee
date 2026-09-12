@@ -2,6 +2,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
     assertStockCapabilityForMigration,
     buildStockAuthorizationContext,
@@ -99,26 +100,23 @@ export async function POST(
 
         const cancelReason =
             parsed.data.cancelReason ?? parsed.data.rejectReason ?? null;
-        const capabilityAuthorization =
-            await assertStockCapabilityForMigration(
-                authorization,
-                "stock.request.cancel",
-                { requestedScope: "all" },
-            );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.request.cancel",
+            { requestedScope: "all" },
+        );
         const updated = await executeCancelStockRequest({
             requestId,
             actor,
             reason: cancelReason,
-            options: {
-                notificationMode: capabilityAuthorization.isAdministrative
-                    ? "PROCESSOR"
-                    : "REQUESTER",
-            },
         });
         return NextResponse.json({ request: updated });
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
         }
         const message = error instanceof Error ? error.message : "";
         if (

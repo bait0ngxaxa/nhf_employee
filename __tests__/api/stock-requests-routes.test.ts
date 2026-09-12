@@ -98,7 +98,6 @@ vi.mock("@/modules/stock", async () => {
                 command.requestId,
                 command.actor,
                 command.reason,
-                command.options,
             ),
     };
 });
@@ -672,6 +671,40 @@ describe("Stock Request Routes", () => {
             expect(processOutbox).toHaveBeenCalledTimes(1);
         });
 
+        it("should map transaction workforce revocation to 403", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+            vi.mocked(prisma.user.findUnique).mockResolvedValue({
+                isActive: true,
+                deletedAt: null,
+                employee: null,
+            } as never);
+            vi.mocked(stockService.issueRequest).mockRejectedValue(
+                new WorkforceAuthorizationError(),
+            );
+
+            const response = await issueRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/77/issue",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({}),
+                    },
+                ),
+                { params: Promise.resolve({ id: "77" }) },
+            );
+
+            expect(response.status).toBe(403);
+        });
+
         it("should return a conflict when a pending request lacks a variant snapshot", async () => {
             vi.mocked(getApiAuthSession).mockResolvedValue({
                 user: { id: "1", email: "admin@test.com", role: "ADMIN" },
@@ -754,6 +787,35 @@ describe("Stock Request Routes", () => {
             expect(processOutbox).toHaveBeenCalledTimes(1);
         });
 
+        it("should map transaction workforce revocation to 403 for review actions", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "1", email: "admin@test.com", role: "ADMIN" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 1,
+                email: "admin@test.com",
+                role: "ADMIN",
+                name: "Admin",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(true);
+            vi.mocked(stockService.issueRequest).mockRejectedValue(
+                new WorkforceAuthorizationError(),
+            );
+
+            const response = await reviewRequestRoute(
+                new NextRequest(
+                    "http://localhost/api/stock/requests/77/review",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({ action: "issue" }),
+                    },
+                ),
+                { params: Promise.resolve({ id: "77" }) },
+            );
+
+            expect(response.status).toBe(403);
+        });
+
         it("should delegate cancel actions with admin authorization", async () => {
             vi.mocked(getApiAuthSession).mockResolvedValue({
                 user: { id: "1", email: "admin@test.com", role: "ADMIN" },
@@ -795,7 +857,6 @@ describe("Stock Request Routes", () => {
                     correlationId: expect.any(String),
                 }),
                 "ไม่อนุมัติ",
-                { notificationMode: "PROCESSOR" },
             );
             expect(processOutbox).not.toHaveBeenCalled();
         });
@@ -939,7 +1000,6 @@ describe("Stock Request Routes", () => {
                     correlationId: expect.any(String),
                 }),
                 "ทดสอบยกเลิก",
-                { notificationMode: "REQUESTER" },
             );
         });
 

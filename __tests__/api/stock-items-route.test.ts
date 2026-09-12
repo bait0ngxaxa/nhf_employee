@@ -13,6 +13,7 @@ import {
     stockService,
     StockCapabilityDeniedError,
 } from "@/modules/stock";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 const stockAuthorizationMock = vi.hoisted(() => ({
     assert: vi.fn(),
@@ -272,5 +273,21 @@ describe("Stock Item Routes", () => {
 
         expect(response.status).toBe(200);
         expect(stockService.updateItem).toHaveBeenCalledTimes(1);
+    });
+
+    it("maps transaction workforce revocation to 403", async () => {
+        vi.mocked(stockService.updateItem).mockRejectedValue(
+            new WorkforceAuthorizationError(),
+        );
+
+        const response = await patchItemRoute(
+            new NextRequest("http://localhost/api/stock/items/42", {
+                method: "PATCH",
+                body: JSON.stringify({ name: "ปากกาใหม่" }),
+            }),
+            { params: Promise.resolve({ id: "42" }) },
+        );
+
+        expect(response.status).toBe(403);
     });
 });

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
     assertStockCapabilityForMigration,
@@ -67,6 +68,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
         }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
+        }
         const message = error instanceof Error ? error.message : "";
         if (message.includes("Unique constraint")) {
             return jsonError("หมวดหมู่นี้มีอยู่แล้ว", 409);
@@ -106,6 +110,9 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
         }
         const message = error instanceof Error ? error.message : "";
         if (message.includes("Foreign key constraint")) {

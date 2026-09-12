@@ -51,12 +51,11 @@ export async function POST(
             "employeeId" in auth ? auth.employeeId : null,
             "DASHBOARD",
         );
-        const capabilityAuthorization =
-            await assertStockCapabilityForMigration(
-                authorization,
-                "stock.request.cancel",
-                { requestedScope: "all" },
-            );
+        await assertStockCapabilityForMigration(
+            authorization,
+            "stock.request.cancel",
+            { requestedScope: "all" },
+        );
 
         const { id } = await params;
         const requestId = Number(id);
@@ -81,11 +80,6 @@ export async function POST(
                 authorization,
             ),
             reason: parsed.data.cancelReason,
-            options: {
-                notificationMode: capabilityAuthorization.isAdministrative
-                    ? "PROCESSOR"
-                    : "REQUESTER",
-            },
         });
 
         return NextResponse.json({ request: updated });

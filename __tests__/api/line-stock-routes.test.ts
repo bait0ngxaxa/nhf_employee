@@ -4,6 +4,7 @@ import type * as NextServerModule from "next/server";
 import type * as StockModule from "@/modules/stock";
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 const mocks = vi.hoisted(() => ({
     requireLiffWorkforceSession: vi.fn(),
@@ -71,7 +72,6 @@ vi.mock("@/modules/stock", async () => {
                 command.requestId,
                 command.actor,
                 command.reason,
-                command.options,
             ),
     };
 });
@@ -709,7 +709,6 @@ describe("LIFF Stock route adapters", () => {
             71,
             expect.objectContaining({ id: 7 }),
             "ไม่ใช้แล้ว",
-            { notificationMode: "REQUESTER" },
         );
 
         const forgedIssueResponse = await issueRequest(request(
@@ -753,8 +752,25 @@ describe("LIFF Stock route adapters", () => {
             71,
             expect.objectContaining({ id: 1 }),
             "ไม่ดำเนินการ",
-            { notificationMode: "PROCESSOR" },
         );
+    });
+
+    it("maps transaction workforce revocation to 403 for LIFF issue", async () => {
+        mocks.requireLiffWorkforceSession.mockResolvedValueOnce(ADMIN_AUTH);
+        mocks.issueRequest.mockRejectedValueOnce(
+            new WorkforceAuthorizationError(),
+        );
+
+        const response = await issueRequest(request(
+            "/api/line/stock/requests/71/issue",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            },
+        ), { params: Promise.resolve({ id: "71" }) });
+
+        expect(response.status).toBe(403);
     });
 
     it("rejects invalid query and request IDs before reaching Stock services", async () => {

@@ -39,7 +39,7 @@ The compatibility floor applies only when the resolver returns `NO_APPLICABLE_GR
 ### Dashboard
 
 - USER: catalog `ALL`; request read/create/cancel `OWN`; inventory, process and report are denied.
-- ADMIN: catalog `ALL`; request read has an `ALL` ceiling, but `scope=mine` remains requester-owned and `scope=all` may query all; create remains `OWN` and requires active workforce; cancel, inventory, process and report are `ALL`.
+- ADMIN: catalog `ALL`; request read has an `ALL` ceiling, but `scope=mine` remains requester-owned and `scope=all` may query all; create remains `OWN` and requires active workforce; cancel, inventory, process and report are `ALL`. Legacy Dashboard ADMIN eligibility for cancel, inventory and process requires an active account but does not require an Employee profile.
 
 ADMIN is not used as the new policy source. A valid explicit grant can authorize a USER, for example `stock.request.process / ALL`.
 
@@ -65,14 +65,14 @@ LIFF request detail is separate from the requester list. Read `ALL` can expose a
 
 ## 4. Mutation enforcement and lifecycle
 
-Routes authenticate and parse their inputs, then use the Stock adapter. Critical Prisma mutations revalidate authorization inside the transaction with `authorization.resolveInTransaction(...)` after locking and re-reading the active User/Employee identity:
+Routes authenticate and parse their inputs, then use the Stock adapter. Critical Prisma mutations revalidate authorization inside the transaction with `authorization.resolveInTransaction(...)` after locking and re-reading the active User identity. Active Employee status remains required for request creation and for USER/LIFF actors. The legacy Dashboard ADMIN path for inventory, process and cancel preserves the existing Admin eligibility boundary and resolves with `employeeId = null`, so an Admin without an Employee profile remains operational for those capabilities.
 
 - request creation resolves `stock.request.create`; `requestedBy` is derived from the trusted actor, and active workforce, availability, variant, idempotency, rate-limit, outbox and audit behavior remain unchanged;
-- cancellation resolves `stock.request.cancel`; `OWN` requires the request owner and `ALL` may cancel an eligible pending request. Notification mode is an explicit side-effect choice and is not used as authorization;
+- cancellation resolves `stock.request.cancel`; `OWN` requires the request owner and `ALL` may cancel an eligible pending request. After loading the request, Stock derives notification mode from legacy ADMIN semantics and the effective scope/resource relationship: ADMIN uses the processor result path, an actor cancelling their own request uses requester notification, and an explicit USER `ALL` actor cancelling another user's request uses the processor result path. Notification mode is not supplied by the route and is never authorization authority;
 - processing/issue resolves `stock.request.process` at the application transaction boundary before the atomic pending claim, inventory locks, active item/variant checks, stock transaction and notifications;
 - inventory item/category/quantity mutations resolve `stock.inventory.manage` in their transaction before existing locks and domain invariants.
 
-The LIFF processor guard verifies the active linked LIFF workforce first, then resolves `stock.request.process` for `LIFF_SELF_SERVICE`. It no longer uses `isAdminRole()` as its authorization source. The Dashboard inventory and processor paths keep the existing eligible-workforce lifecycle requirements, while explicitly granted USER actors must still be active workforce actors.
+The LIFF processor guard verifies the active linked LIFF workforce first, then resolves `stock.request.process` for `LIFF_SELF_SERVICE`. It no longer uses `isAdminRole()` as its authorization source. Dashboard inventory, processor and cancellation transactions preserve the legacy ADMIN account-only eligibility even when no Employee profile exists; request creation and all USER/LIFF operational paths still require an active workforce actor. Every transaction-backed Stock route maps lifecycle revocation to HTTP 403.
 
 Catalog reads use `stock.catalog.read` and retain catalog-wide visibility; request ownership predicates are not applied to catalog data. Image upload remains limited to the existing `scope=item|variant` Stock workflow and is authorized by `stock.inventory.manage`, not a generic upload capability. Report export uses `stock.report.export`, remains Dashboard-only, and preserves filters, row limits, XLSX behavior and error mapping.
 

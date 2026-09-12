@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
     assertStockCapabilityForMigration,
@@ -54,6 +55,9 @@ export async function PATCH(
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
         }
         const message = error instanceof Error ? error.message : "";
         if (
@@ -124,6 +128,9 @@ export async function DELETE(
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
         }
         const message = error instanceof Error ? error.message : "";
         if (message.includes("คำขอรอจ่าย")) {

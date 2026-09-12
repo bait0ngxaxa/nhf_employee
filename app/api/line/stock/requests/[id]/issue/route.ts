@@ -17,6 +17,7 @@ import {
     enforcePreAuthIpRateLimit,
 } from "@/lib/security/mutation-rate-limit";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
     issueRequestSchema,
@@ -87,6 +88,9 @@ export async function POST(
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
         }
         if (error instanceof SyntaxError) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400);

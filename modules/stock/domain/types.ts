@@ -18,10 +18,6 @@ export type ItemVariantSeed = {
 
 export type StockCancellationNotificationMode = "REQUESTER" | "PROCESSOR";
 
-export type CancelRequestOptions = {
-    readonly notificationMode?: StockCancellationNotificationMode;
-};
-
 export type StockCommandActor = {
     id: number;
     email: string;

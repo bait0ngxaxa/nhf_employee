@@ -66,6 +66,12 @@ const STOCK_CAPABILITY_SET = new Set<string>(
     STOCK_MIGRATED_CAPABILITIES,
 );
 
+const DASHBOARD_ADMIN_EMPLOYEE_OPTIONAL_CAPABILITIES = new Set<string>([
+    "stock.inventory.manage",
+    "stock.request.process",
+    "stock.request.cancel",
+]);
+
 function isStockMigratedCapability(
     capability: string,
 ): capability is StockMigratedCapability {
@@ -287,6 +293,16 @@ function isActiveStockEmployee(
     return employee?.status === "ACTIVE" && employee.deletedAt === null;
 }
 
+function canUseLegacyDashboardAdminLifecycle(
+    channel: StockAuthorizationChannel,
+    role: UserRole,
+    capability: string,
+): boolean {
+    return channel === "DASHBOARD"
+        && role === "ADMIN"
+        && DASHBOARD_ADMIN_EMPLOYEE_OPTIONAL_CAPABILITIES.has(capability);
+}
+
 export async function resolveStockCapabilityInTransaction(
     tx: Prisma.TransactionClient,
     actor: StockAuthorizedCommandActor,
@@ -302,14 +318,26 @@ export async function resolveStockCapabilityInTransaction(
     if (!user || !user.isActive || user.deletedAt !== null) {
         throw new WorkforceAuthorizationError();
     }
-    if (!isActiveStockEmployee(user.employee)) {
+
+    const currentRole = parseUserRole(user.role);
+    const employeeIsOptional = canUseLegacyDashboardAdminLifecycle(
+        requestedActor.channel,
+        currentRole,
+        capability,
+    );
+    const activeEmployee = isActiveStockEmployee(user.employee)
+        ? user.employee
+        : null;
+    if (!employeeIsOptional && activeEmployee === null) {
         throw new WorkforceAuthorizationError();
     }
 
-    await lockEmployeeRows(tx, [user.employee.id]);
+    if (!employeeIsOptional && activeEmployee !== null) {
+        await lockEmployeeRows(tx, [activeEmployee.id]);
+    }
     const activeActor = buildStockAuthorizationActor(
-        { id: user.id, role: user.role },
-        user.employee.id,
+        { id: user.id, role: currentRole },
+        employeeIsOptional ? null : activeEmployee?.id ?? null,
         requestedActor.channel,
     );
     const decision = await authorization.resolveInTransaction(

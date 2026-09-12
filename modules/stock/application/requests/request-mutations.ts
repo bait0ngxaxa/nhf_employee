@@ -38,11 +38,14 @@ import {
 } from "../../infrastructure/persistence/shared";
 import { lockStockInventoryRows } from "../../infrastructure/persistence/locks";
 import type {
-    CancelRequestOptions,
     IssueRequestResult,
     LowStockAlertCandidate,
+    StockCancellationNotificationMode,
 } from "../../domain/types";
-import type { StockAuthorizedCommandActor } from "../authorization";
+import type {
+    StockAuthorizedCommandActor,
+    StockCapabilityAuthorization,
+} from "../authorization";
 import { resolveStockCapabilityInTransaction } from "../authorization";
 import { getUserDisplayName } from "@/shared/identity/display";
 
@@ -432,7 +435,6 @@ export async function cancelRequest(
     requestId: number,
     actor: StockAuthorizedCommandActor,
     reason?: string | null,
-    options: CancelRequestOptions = {},
 ): Promise<Prisma.StockRequestGetPayload<Record<string, never>>> {
     return runSerializableTransaction(async (tx) => {
         const authorization = await resolveStockCapabilityInTransaction(
@@ -457,6 +459,11 @@ export async function cancelRequest(
         if (!canCancelAnyRequest && request.requestedBy !== actor.id) {
             throw new Error("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
         }
+        const notificationMode = resolveCancellationNotificationMode(
+            authorization,
+            actor.id,
+            request.requestedBy,
+        );
 
         const cancelledAt = new Date();
         const cancelledRequest = await tx.stockRequest.updateMany({
@@ -514,7 +521,7 @@ export async function cancelRequest(
             reason ?? null,
             cancelledAt,
         );
-        if (options.notificationMode !== "PROCESSOR") {
+        if (notificationMode === "REQUESTER") {
             await notifyAdminsStockRequestCancelledByRequester(
                 requestId,
                 getUserDisplayName(request.requester),
@@ -530,4 +537,19 @@ export async function cancelRequest(
 
         return updated;
     });
+}
+
+function resolveCancellationNotificationMode(
+    authorization: StockCapabilityAuthorization,
+    actorId: number,
+    requestedBy: number,
+): StockCancellationNotificationMode {
+    // Keep the legacy ADMIN notification wording while using resolved scopes
+    // for authorization. Explicit USER ALL grants use the processor result
+    // path only when they cancel someone else's request.
+    if (authorization.actor.systemRole === "ADMIN") return "PROCESSOR";
+    if (requestedBy === actorId) return "REQUESTER";
+    return authorization.scopes.includes("ALL")
+        ? "PROCESSOR"
+        : "REQUESTER";
 }

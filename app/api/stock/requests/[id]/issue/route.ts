@@ -2,6 +2,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
     assertStockCapabilityForMigration,
     buildStockAuthorizationContext,
@@ -89,6 +90,9 @@ export async function POST(
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
+        }
+        if (error instanceof WorkforceAuthorizationError) {
+            return jsonError(error.message, 403);
         }
         const message = error instanceof Error ? error.message : "";
         if (

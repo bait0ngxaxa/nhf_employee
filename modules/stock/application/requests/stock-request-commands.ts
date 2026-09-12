@@ -2,9 +2,6 @@ import {
     cancelRequest,
     issueRequest,
 } from "./request-mutations";
-import type {
-    CancelRequestOptions,
-} from "../../domain/types";
 import type { StockAuthorizedCommandActor } from "../authorization";
 
 type IssueStockRequestCommand = {
@@ -14,7 +11,6 @@ type IssueStockRequestCommand = {
 
 type CancelStockRequestCommand = IssueStockRequestCommand & {
     reason?: string | null;
-    options: CancelRequestOptions;
 };
 
 type IssuedStockRequest = Awaited<
@@ -42,6 +38,5 @@ export async function executeCancelStockRequest(
         command.requestId,
         command.actor,
         command.reason,
-        command.options,
     );
 }

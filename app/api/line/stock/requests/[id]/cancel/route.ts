@@ -78,14 +78,6 @@ export async function POST(
                 authorization,
             ),
             reason: parsedBody.data.cancelReason,
-            options: {
-                // This selects the legacy notification path only. The
-                // transaction authorizes cancellation from resolved scopes.
-                notificationMode:
-                    authorization.authorizationActor.systemRole === "ADMIN"
-                        ? "PROCESSOR"
-                        : "REQUESTER",
-            },
         });
         return NextResponse.json({ success: true });
     } catch (error) {

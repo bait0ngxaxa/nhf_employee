@@ -7,6 +7,7 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 import {
     buildStockAuthorizationContext,
@@ -518,5 +519,101 @@ describe("Stock authorization migration adapter", () => {
             tx,
         );
         expect(result.scopes).toEqual(["OWN"]);
+    });
+
+    it.each([
+        "stock.inventory.manage",
+        "stock.request.process",
+        "stock.request.cancel",
+    ] as const)(
+        "keeps legacy Dashboard ADMIN transaction access without an employee profile for %s",
+        async (capability) => {
+            const tx = {
+                user: {
+                    findUnique: vi.fn().mockResolvedValue({
+                        id: 7,
+                        role: "ADMIN",
+                        isActive: true,
+                        deletedAt: null,
+                        employee: null,
+                    }),
+                },
+            } as never;
+            mocks.resolveInTransaction.mockResolvedValue(
+                decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+            );
+
+            const result = await resolveStockCapabilityInTransaction(
+                tx,
+                commandActor(context("ADMIN")),
+                capability,
+            );
+
+            expect(result.scopes).toEqual(["ALL"]);
+            expect(result.usedMigrationCompatibility).toBe(true);
+            expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
+            expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
+                {
+                    userId: 7,
+                    employeeId: null,
+                    systemRole: "ADMIN",
+                    channel: "DASHBOARD",
+                },
+                capability,
+                tx,
+            );
+        },
+    );
+
+    it.each([
+        ["stock.request.create", "DASHBOARD"],
+        ["stock.request.process", "LIFF_SELF_SERVICE"],
+    ] as const)(
+        "still requires an active employee for ADMIN %s on %s",
+        async (capability, channel) => {
+            const tx = {
+                user: {
+                    findUnique: vi.fn().mockResolvedValue({
+                        id: 7,
+                        role: "ADMIN",
+                        isActive: true,
+                        deletedAt: null,
+                        employee: null,
+                    }),
+                },
+            } as never;
+
+            await expect(
+                resolveStockCapabilityInTransaction(
+                    tx,
+                    commandActor(context("ADMIN", channel)),
+                    capability,
+                ),
+            ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+            expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
+        },
+    );
+
+    it("still requires an active employee for a Dashboard USER transaction actor", async () => {
+        const tx = {
+            user: {
+                findUnique: vi.fn().mockResolvedValue({
+                    id: 7,
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                    employee: null,
+                }),
+            },
+        } as never;
+
+        await expect(
+            resolveStockCapabilityInTransaction(
+                tx,
+                commandActor(context("USER")),
+                "stock.request.cancel",
+            ),
+        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 });
