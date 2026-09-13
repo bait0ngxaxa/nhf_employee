@@ -19,6 +19,19 @@ const notificationMocks = vi.hoisted(() => ({
     listLatestForUser: vi.fn(),
     markAllReadForUser: vi.fn(),
     markReadForUser: vi.fn(),
+    buildNotificationAuthorizationContext: vi.fn(),
+    assertNotificationCapabilityForMigration: vi.fn(),
+    assertNotificationCapabilityScope: vi.fn(),
+    NotificationCapabilityDeniedError: class NotificationCapabilityDeniedError extends Error {
+        readonly statusCode = 403;
+
+        constructor(
+            readonly capability: string,
+            readonly authorizationReason: string,
+        ) {
+            super("Forbidden");
+        }
+    },
 }));
 
 vi.mock("@/lib/auth/server", () => ({
@@ -51,6 +64,43 @@ describe("Notification API Routes", () => {
         });
         mockMarkReadForUser.mockResolvedValue({} as never);
         mockMarkAllReadForUser.mockResolvedValue(0);
+        notificationMocks.buildNotificationAuthorizationContext.mockImplementation(
+            (user: { id: number; role: string }) => ({
+                authorizationActor: {
+                    userId: user.id,
+                    employeeId: null,
+                    systemRole: user.role,
+                    channel: "DASHBOARD",
+                },
+            }),
+        );
+        notificationMocks.assertNotificationCapabilityForMigration.mockImplementation(
+            async (
+                context: {
+                    authorizationActor: {
+                        userId: number;
+                        employeeId: number | null;
+                        systemRole: string;
+                        channel: string;
+                    };
+                },
+                capability: string,
+            ) => ({
+                actor: context.authorizationActor,
+                capability,
+                decision: {
+                    capability,
+                    allowed: true,
+                    scopes: ["OWN"],
+                    grants: [],
+                },
+                scopes: ["OWN"],
+                usedMigrationCompatibility: false,
+            }),
+        );
+        notificationMocks.assertNotificationCapabilityScope.mockImplementation(
+            (authorization) => authorization,
+        );
     });
 
     describe("GET /api/notifications", () => {
@@ -85,7 +135,9 @@ describe("Notification API Routes", () => {
             ];
             mockListLatestForUser.mockResolvedValue({ notifications, unreadCount: 1 } as never);
 
-            const req = new NextRequest("http://localhost/api/notifications");
+            const req = new NextRequest(
+                "http://localhost/api/notifications?userId=2",
+            );
             const res = await getNotifications(req);
 
             expect(res.status).toBe(200);
@@ -93,6 +145,38 @@ describe("Notification API Routes", () => {
             expect(data.notifications).toEqual(notifications);
             expect(data.unreadCount).toBe(1);
             expect(mockListLatestForUser).toHaveBeenCalledWith(1);
+            expect(
+                notificationMocks.assertNotificationCapabilityForMigration,
+            ).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    authorizationActor: expect.objectContaining({
+                        userId: 1,
+                        systemRole: "USER",
+                        channel: "DASHBOARD",
+                    }),
+                }),
+                "notification.inbox.read",
+            );
+            expect(notificationMocks.assertNotificationCapabilityScope).toHaveBeenCalledWith(
+                expect.anything(),
+                "OWN",
+            );
+        });
+
+        it("does not execute a read query when the read capability is denied", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            notificationMocks.assertNotificationCapabilityForMigration.mockRejectedValue(
+                new notificationMocks.NotificationCapabilityDeniedError(
+                    "notification.inbox.read",
+                    "CHANNEL_NOT_SUPPORTED",
+                ),
+            );
+
+            const req = new NextRequest("http://localhost/api/notifications");
+            const res = await getNotifications(req);
+
+            expect(res.status).toBe(403);
+            expect(mockListLatestForUser).not.toHaveBeenCalled();
         });
 
         it("keeps the sanitized error response when the Notification query fails", async () => {
@@ -136,6 +220,9 @@ describe("Notification API Routes", () => {
                 filter: "all",
                 cursor: null,
             });
+            expect(
+                notificationMocks.assertNotificationCapabilityForMigration,
+            ).toHaveBeenCalledWith(expect.anything(), "notification.inbox.read");
         });
 
         it("passes a new opaque composite cursor unchanged for all history", async () => {
@@ -201,6 +288,8 @@ describe("Notification API Routes", () => {
             const params = Promise.resolve({ id: "notif-123" });
             const req = new NextRequest("http://localhost/api/notifications/notif-123/read", {
                 method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ userId: 2 }),
             });
 
             const res = await markAsRead(req, { params });
@@ -208,6 +297,34 @@ describe("Notification API Routes", () => {
             expect(res.status).toBe(200);
             expect(await res.json()).toEqual({ success: true, notification });
             expect(mockMarkReadForUser).toHaveBeenCalledWith("notif-123", 1);
+            expect(
+                notificationMocks.assertNotificationCapabilityForMigration,
+            ).toHaveBeenCalledWith(expect.anything(), "notification.inbox.update");
+        });
+
+        it("does not allow the read capability to authorize a mutation", async () => {
+            mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
+            notificationMocks.assertNotificationCapabilityForMigration.mockImplementation(
+                async (_context: unknown, capability: string) => {
+                    if (capability === "notification.inbox.update") {
+                        throw new notificationMocks.NotificationCapabilityDeniedError(
+                            capability,
+                            "NO_APPLICABLE_GRANT",
+                        );
+                    }
+                    return {};
+                },
+            );
+
+            const res = await markAsRead(
+                new NextRequest("http://localhost/api/notifications/notif-123/read", {
+                    method: "PATCH",
+                }),
+                { params: Promise.resolve({ id: "notif-123" }) },
+            );
+
+            expect(res.status).toBe(403);
+            expect(mockMarkReadForUser).not.toHaveBeenCalled();
         });
 
         it("returns unauthorized for patch without a session", async () => {
@@ -253,6 +370,9 @@ describe("Notification API Routes", () => {
             expect(res.status).toBe(200);
             expect(await res.json()).toEqual({ success: true, updatedCount: 5 });
             expect(mockMarkAllReadForUser).toHaveBeenCalledWith(1);
+            expect(
+                notificationMocks.assertNotificationCapabilityForMigration,
+            ).toHaveBeenCalledWith(expect.anything(), "notification.inbox.update");
         });
 
         it("keeps zero unread rows as a successful result", async () => {

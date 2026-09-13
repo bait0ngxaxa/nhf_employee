@@ -2,7 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { listHistoryForUser } from "@/modules/notification";
+import {
+    assertNotificationCapabilityForMigration,
+    assertNotificationCapabilityScope,
+    buildNotificationAuthorizationContext,
+    listHistoryForUser,
+    NotificationCapabilityDeniedError,
+} from "@/modules/notification";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
     try {
@@ -14,12 +20,31 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserSession }, { status: 400 });
         }
 
+        const authorization = await assertNotificationCapabilityForMigration(
+            buildNotificationAuthorizationContext({
+                id: userId,
+                role: auth.user.role,
+            }),
+            "notification.inbox.read",
+        );
+        assertNotificationCapabilityScope(authorization, "OWN");
+
         const cursor = req.nextUrl.searchParams.get("cursor");
         const filter = req.nextUrl.searchParams.get("filter");
 
-        const result = await listHistoryForUser({ userId, cursor, filter });
+        const result = await listHistoryForUser({
+            userId: authorization.actor.userId,
+            cursor,
+            filter,
+        });
         return NextResponse.json(result);
     } catch (error) {
+        if (error instanceof NotificationCapabilityDeniedError) {
+            return NextResponse.json(
+                { error: COMMON_API_MESSAGES.forbidden },
+                { status: 403 },
+            );
+        }
         console.error("Error fetching all notifications:", error);
         return NextResponse.json(
             { error: COMMON_API_MESSAGES.failedToFetchNotifications },

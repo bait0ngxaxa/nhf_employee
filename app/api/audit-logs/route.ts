@@ -1,7 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireApiSession } from "@/lib/auth/api";
 import { operationFailed } from "@/lib/ssot/http";
-import { getAuditLogs, type AuditLogFilters } from "@/modules/audit";
+import {
+    assertAuditCapabilityForMigration,
+    assertAuditCapabilityScope,
+    buildAuditAuthorizationContext,
+    AuditCapabilityDeniedError,
+    getAuditLogs,
+    type AuditLogFilters,
+} from "@/modules/audit";
 
 /**
  * Parse query parameters into AuditLogFilters
@@ -28,20 +35,29 @@ function parseQueryParams(url: string): AuditLogFilters {
     };
 }
 
-// GET - Retrieve audit logs (Admin only)
+// GET - Retrieve audit logs through the centralized Audit capability.
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession({
+        const auth = await requireApiSession({
             unauthorizedResponse: () => operationFailed(403),
             forbiddenResponse: () => operationFailed(403),
         });
         if (!auth.ok) return auth.response;
+
+        const authorization = await assertAuditCapabilityForMigration(
+            buildAuditAuthorizationContext(auth.user),
+            "audit.read",
+        );
+        assertAuditCapabilityScope(authorization, "ALL");
 
         const filters = parseQueryParams(request.url);
         const result = await getAuditLogs(filters);
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {
+        if (error instanceof AuditCapabilityDeniedError) {
+            return operationFailed(403);
+        }
         console.error("Error fetching audit logs:", error);
         return operationFailed(500);
     }

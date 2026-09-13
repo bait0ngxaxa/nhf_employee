@@ -9,6 +9,21 @@ export {
     calculateAuditLogRetentionCutoff,
     cleanupExpiredAuditLogs,
 } from "./application/retention";
+export {
+    assertAuditCapabilityForMigration,
+    assertAuditCapabilityScope,
+    buildAuditAuthorizationActor,
+    buildAuditAuthorizationContext,
+    AuditCapabilityDeniedError,
+    AUDIT_MIGRATED_CAPABILITIES,
+    resolveAuditCapabilityForMigration,
+} from "./application/authorization";
+export type {
+    AuditAuthorizationActor,
+    AuditAuthorizationContext,
+    AuditCapabilityAuthorization,
+    AuditMigratedCapability,
+} from "./application/authorization";
 export type {
     AuditAppendCommand,
     AuditEntityHistoryQuery,

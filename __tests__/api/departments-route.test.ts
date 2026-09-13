@@ -5,8 +5,25 @@ import { GET } from "@/app/api/departments/route";
 import { requireApiSession } from "@/lib/auth/api";
 import { listDepartments } from "@/modules/department";
 
+const departmentMocks = vi.hoisted(() => ({
+    listDepartments: vi.fn(),
+    buildDepartmentAuthorizationContext: vi.fn(),
+    assertDepartmentCapabilityForMigration: vi.fn(),
+    assertDepartmentCapabilityScope: vi.fn(),
+    DepartmentCapabilityDeniedError: class DepartmentCapabilityDeniedError extends Error {
+        readonly statusCode = 403;
+
+        constructor(
+            readonly capability: string,
+            readonly authorizationReason: string,
+        ) {
+            super("Forbidden");
+        }
+    },
+}));
+
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: vi.fn() }));
-vi.mock("@/modules/department", () => ({ listDepartments: vi.fn() }));
+vi.mock("@/modules/department", () => departmentMocks);
 
 const USER = {
     id: 1,
@@ -42,6 +59,34 @@ describe("GET /api/departments", () => {
             user: USER,
             session: { user: { ...USER, id: String(USER.id) } },
         });
+        departmentMocks.buildDepartmentAuthorizationContext.mockReturnValue({
+            authorizationActor: {
+                userId: USER.id,
+                employeeId: null,
+                systemRole: USER.role,
+                channel: "DASHBOARD",
+            },
+        });
+        departmentMocks.assertDepartmentCapabilityForMigration.mockResolvedValue({
+            actor: {
+                userId: USER.id,
+                employeeId: null,
+                systemRole: USER.role,
+                channel: "DASHBOARD",
+            },
+            capability: "department.read",
+            decision: {
+                capability: "department.read",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [],
+            },
+            scopes: ["ALL"],
+            usedMigrationCompatibility: false,
+        });
+        departmentMocks.assertDepartmentCapabilityScope.mockImplementation(
+            (authorization) => authorization,
+        );
     });
 
     it("returns 403 without executing the Department query when unauthenticated", async () => {
@@ -70,6 +115,39 @@ describe("GET /api/departments", () => {
             })),
         });
         expect(listDepartments).toHaveBeenCalledTimes(1);
+        expect(departmentMocks.buildDepartmentAuthorizationContext).toHaveBeenCalledWith(
+            USER,
+        );
+        expect(
+            departmentMocks.assertDepartmentCapabilityForMigration,
+        ).toHaveBeenCalledWith(
+            expect.objectContaining({
+                authorizationActor: expect.objectContaining({
+                    userId: USER.id,
+                    systemRole: USER.role,
+                    channel: "DASHBOARD",
+                }),
+            }),
+            "department.read",
+        );
+        expect(departmentMocks.assertDepartmentCapabilityScope).toHaveBeenCalledWith(
+            expect.anything(),
+            "ALL",
+        );
+    });
+
+    it("preserves the forbidden response and skips the query when the capability is denied", async () => {
+        departmentMocks.assertDepartmentCapabilityForMigration.mockRejectedValue(
+            new departmentMocks.DepartmentCapabilityDeniedError(
+                "department.read",
+                "NO_APPLICABLE_GRANT",
+            ),
+        );
+
+        const response = await GET();
+
+        expect(response.status).toBe(403);
+        expect(listDepartments).not.toHaveBeenCalled();
     });
 
     it("sanitizes Department query failures as a 500 response", async () => {
