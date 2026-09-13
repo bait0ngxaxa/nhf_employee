@@ -1,4 +1,5 @@
 import type { EmployeeStatusValue } from "../../domain/lifecycle";
+import type { EmployeePresentationCapabilities } from "../../application/types";
 
 export type { EmployeeStatusValue };
 
@@ -47,7 +48,7 @@ export interface EmployeeFormData {
 
 export interface EmployeeListProps {
     refreshTrigger?: number;
-    userRole?: string;
+    employeeCapabilities?: EmployeePresentationCapabilities;
 }
 
 export interface AddEmployeeFormProps {

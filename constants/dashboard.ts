@@ -15,8 +15,9 @@ import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
+import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 
-/** Flat lookup used by handleMenuClick for role validation */
+/** Flat lookup used by handleMenuClick for feature and capability validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
         id: "leave-management",
@@ -56,14 +57,12 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "เพิ่มพนักงาน",
         icon: UserPlus,
         description: "เพิ่มข้อมูลพนักงานใหม่",
-        requiredRole: "ADMIN",
     },
     {
         id: "import-employee",
         label: "นำเข้าจาก CSV",
         icon: Upload,
         description: "นำเข้าข้อมูลพนักงานจากไฟล์ CSV",
-        requiredRole: "ADMIN",
     },
     {
         id: "audit-logs",
@@ -133,6 +132,13 @@ export function canAccessStockDashboard(
         || capabilities?.canExportReports === true;
 }
 
+export function canAccessEmployeeDashboard(
+    capabilities?: EmployeePresentationCapabilities,
+): boolean {
+    return capabilities?.canReadEmployees === true
+        || capabilities?.canReadStats === true;
+}
+
 export const LEAVE_DASHBOARD_TABS = [
     "my-leave",
     "approvals",
@@ -196,27 +202,35 @@ export function normalizeLeaveDashboardTab(
 }
 
 /**
- * Filter groups by role and feature availability. Routine, Stock, and Leave
- * use server-derived presentation projections when supplied.
+ * Filter groups by role, capability, and feature availability. Routine,
+ * Stock, Leave, and Employee use server-derived presentation projections
+ * when supplied.
  */
 export function getAvailableMenuGroups(
     isAdmin: boolean,
     routineCapabilities?: RoutinePresentationCapabilities,
     stockCapabilities?: StockPresentationCapabilities,
     leaveAvailability?: Omit<LeaveDashboardAvailabilityInput, "isAdmin">,
+    employeeCapabilities?: EmployeePresentationCapabilities,
 ): MenuGroup[] {
     const stockAvailable = canAccessStockDashboard(stockCapabilities);
+    const employeeAvailable = canAccessEmployeeDashboard(employeeCapabilities);
     const leaveAvailable = canAccessLeaveDashboard({
         isAdmin,
         ...(leaveAvailability ?? {}),
     });
 
     return DASHBOARD_MENU_GROUPS.map((group) => {
-        const filteredItems = group.items.filter(
-            (item) =>
-                !item.requiredRole ||
-                (item.requiredRole === "ADMIN" && isAdmin),
-        )
+        const filteredItems = group.items.filter((item) => {
+            if (item.id === "employee-management") {
+                return employeeAvailable;
+            }
+            if (item.id === "add-employee") {
+                return employeeCapabilities?.canCreateEmployees === true;
+            }
+            return !item.requiredRole
+                || (item.requiredRole === "ADMIN" && isAdmin);
+        })
             .filter(
                 (item) => !item.feature || isFeatureEnabled(item.feature),
             )

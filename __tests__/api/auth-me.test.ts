@@ -34,6 +34,15 @@ describe("GET /api/auth/me", () => {
             isManager: true,
             canApproveLeave: true,
             canViewLeaveReports: true,
+            employeeCapabilities: {
+                canReadEmployees: true,
+                canReadStats: true,
+                canCreateEmployees: true,
+                canUpdateEmployees: true,
+                canDeleteEmployees: true,
+                canImportEmployees: true,
+                canExportEmployees: true,
+            },
         };
         currentUserProjectionMock.mockResolvedValue(user);
 

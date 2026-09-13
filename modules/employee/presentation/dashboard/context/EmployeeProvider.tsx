@@ -25,6 +25,7 @@ import {
     type EmployeeDataContextValue,
     type EmployeeUIContextValue,
 } from "./types";
+import type { EmployeePresentationCapabilities } from "../../../application/types";
 
 interface Pagination {
     page: number;
@@ -35,6 +36,7 @@ interface Pagination {
 
 interface EmployeeProviderProps {
     children: ReactNode;
+    employeeCapabilities?: EmployeePresentationCapabilities;
 }
 
 const defaultPagination: Pagination = {
@@ -60,7 +62,14 @@ interface EmployeeListResponse {
     pagination: Pagination;
 }
 
-export function EmployeeProvider({ children }: EmployeeProviderProps) {
+export function EmployeeProvider({
+    children,
+    employeeCapabilities,
+}: EmployeeProviderProps) {
+    const canReadEmployees = employeeCapabilities?.canReadEmployees === true;
+    const canReadStats = employeeCapabilities?.canReadStats === true;
+    const canUpdateEmployees = employeeCapabilities?.canUpdateEmployees === true;
+    const canExportEmployees = employeeCapabilities?.canExportEmployees === true;
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [currentPage, setCurrentPage] = useState(1);
@@ -101,6 +110,8 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         params.append("status", statusFilter);
     }
     const swrKey = `${API_ROUTES.employees.list}?${params.toString()}`;
+    const employeeListKey = canReadEmployees ? swrKey : null;
+    const employeeStatsKey = canReadStats ? API_ROUTES.employees.stats : null;
 
     // SWR Hook
     const {
@@ -108,9 +119,9 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         mutate,
         isLoading,
         error: swrError,
-    } = useSWR<EmployeeListResponse>(swrKey, { keepPreviousData: true });
+    } = useSWR<EmployeeListResponse>(employeeListKey, { keepPreviousData: true });
     const { data: statsData, mutate: mutateStats } = useSWR<EmployeeStatsResponse>(
-        API_ROUTES.employees.stats,
+        employeeStatsKey,
     );
 
     // Keep mutate stable using ref to prevent unnecessary re-renders
@@ -123,24 +134,32 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         mutateStatsRef.current = mutateStats;
     }, [mutateStats]);
 
+    const revalidatePermittedData = useCallback(async (): Promise<void> => {
+        const refreshes: Promise<unknown>[] = [];
+        if (canReadEmployees) {
+            refreshes.push(mutateRef.current());
+        }
+        if (canReadStats) {
+            refreshes.push(mutateStatsRef.current());
+        }
+        await Promise.all(refreshes);
+    }, [canReadEmployees, canReadStats]);
+
     // Derived data - wrapped in useMemo to prevent exhaustive-deps warning in dataValue
     const { employees, pagination, error } = useMemo(() => {
         return {
-            employees: data?.employees || [],
-            pagination: data?.pagination || defaultPagination,
-            error: swrError
+            employees: canReadEmployees ? data?.employees || [] : [],
+            pagination: canReadEmployees
+                ? data?.pagination || defaultPagination
+                : defaultPagination,
+            error: canReadEmployees && swrError
                 ? swrError.message || "เกิดข้อผิดพลาดในการโหลดข้อมูล"
                 : "",
         };
-    }, [data, swrError]);
-    const employeeStats = statsData?.stats ?? defaultEmployeeStats;
-
-    // Force refresh when refreshTrigger changes
-    useEffect(() => {
-        if (refreshTrigger > 0) {
-            mutateRef.current();
-        }
-    }, [refreshTrigger]);
+    }, [canReadEmployees, data, swrError]);
+    const employeeStats = canReadStats
+        ? statsData?.stats ?? defaultEmployeeStats
+        : defaultEmployeeStats;
 
     const handlePageChange = useCallback((page: number) => {
         startTransition(() => {
@@ -161,6 +180,10 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     }, [pagination.totalPages]);
 
     const handleExportCSV = useCallback(async (): Promise<void> => {
+        if (!canExportEmployees) {
+            return;
+        }
+
         setIsExporting(true);
         try {
             if (pagination.total === 0) {
@@ -202,12 +225,16 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
         } finally {
             setTimeout(() => setIsExporting(false), 500);
         }
-    }, [debouncedSearchTerm, pagination.total, statusFilter]);
+    }, [canExportEmployees, debouncedSearchTerm, pagination.total, statusFilter]);
 
     const handleEditEmployee = useCallback((employee: Employee) => {
+        if (!canUpdateEmployees) {
+            return;
+        }
+
         setEmployeeToEdit(employee);
         setIsEditFormOpen(true);
-    }, []);
+    }, [canUpdateEmployees]);
 
     const handleCloseEditForm = useCallback(() => {
         setIsEditFormOpen(false);
@@ -215,6 +242,12 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
     }, []);
 
     const handleEmployeeUpdate = useCallback(() => {
+        if (!canUpdateEmployees) {
+            setIsEditFormOpen(false);
+            setEmployeeToEdit(null);
+            return;
+        }
+
         const employeeName = employeeToEdit
             ? getEmployeeDisplayName(employeeToEdit)
             : "พนักงาน";
@@ -227,21 +260,34 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             description: `ข้อมูลของ ${employeeName} ได้รับการอัปเดตเรียบร้อยแล้ว`,
         });
 
-        mutateRef.current(); // Revalidate SWR
-        void mutateStatsRef.current();
-    }, [employeeToEdit]);
+        const refreshes: Promise<unknown>[] = [];
+        if (canReadEmployees) {
+            refreshes.push(mutateRef.current());
+        }
+        if (canReadStats) {
+            refreshes.push(mutateStatsRef.current());
+        }
+        void Promise.all(refreshes);
+    }, [canReadEmployees, canReadStats, canUpdateEmployees, employeeToEdit]);
+
+    useEffect(() => {
+        if (canUpdateEmployees) {
+            return;
+        }
+
+        if (isEditFormOpen || employeeToEdit !== null) {
+            setIsEditFormOpen(false);
+            setEmployeeToEdit(null);
+        }
+    }, [canUpdateEmployees, employeeToEdit, isEditFormOpen]);
 
     // Stable triggerRefresh that doesn't depend on mutate identity
     const triggerRefresh = useCallback(async () => {
-        await Promise.all([
-            mutateRef.current(),
-            mutateStatsRef.current(),
-        ]);
+        await revalidatePermittedData();
         setRefreshTrigger((prev) => prev + 1);
-    }, []);
+    }, [revalidatePermittedData]);
 
-    // Split data into stable references to reduce context updates
-    // triggerRefresh is intentionally excluded - it's kept stable via ref pattern
+    // Split data into stable references to reduce context updates.
     const dataValue = useMemo<EmployeeDataContextValue>(
         () => ({
             employees,
@@ -249,13 +295,12 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             employeeStats,
             totalEmployees: pagination.total,
             totalPages: pagination.totalPages,
-            isLoading,
+            isLoading: canReadEmployees && isLoading,
             error,
             fetchEmployees: triggerRefresh,
             refreshTrigger,
             triggerRefresh,
         }),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         [
             employees,
             employeeStats,
@@ -264,6 +309,8 @@ export function EmployeeProvider({ children }: EmployeeProviderProps) {
             isLoading,
             error,
             refreshTrigger,
+            canReadEmployees,
+            triggerRefresh,
         ],
     );
 

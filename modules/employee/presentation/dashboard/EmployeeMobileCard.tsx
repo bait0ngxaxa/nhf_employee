@@ -23,13 +23,13 @@ import {
 
 interface EmployeeMobileCardProps {
     employee: Employee;
-    canEdit: boolean;
+    canUpdateEmployees: boolean;
     onEditEmployee?: (employee: Employee) => void;
 }
 
 export function EmployeeMobileCard({
     employee,
-    canEdit,
+    canUpdateEmployees,
     onEditEmployee,
 }: EmployeeMobileCardProps) {
     return (
@@ -79,7 +79,7 @@ export function EmployeeMobileCard({
                 />
             </dl>
 
-            {canEdit && onEditEmployee ? (
+            {canUpdateEmployees && onEditEmployee ? (
                 <div className="mt-4 flex justify-end border-t border-border-muted pt-3">
                     <EditEmployeeButton
                         employee={employee}

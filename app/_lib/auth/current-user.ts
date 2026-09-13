@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 
 import { resolveAuthenticatedAccount } from "@/modules/auth";
-import { findCurrentEmployeeProjection } from "@/modules/employee";
+import {
+    buildEmployeeAuthorizationContext,
+    findCurrentEmployeeProjection,
+    getEmployeePresentationCapabilities,
+} from "@/modules/employee";
 import {
     buildLeaveAuthorizationContext,
     getCurrentEmployeeLeaveProjection,
@@ -27,7 +31,15 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
     const employee = await findCurrentEmployeeProjection(account.userId);
     if (!employee) return null;
 
-    const [leave, leaveCapabilities] = await Promise.all([
+    const employeeAuthorizationContext = buildEmployeeAuthorizationContext(
+        {
+            id: account.userId,
+            role: account.role,
+        },
+        employee.id,
+    );
+
+    const [leave, leaveCapabilities, employeeCapabilities] = await Promise.all([
         getCurrentEmployeeLeaveProjection(
             employee.id,
             employee.isManager,
@@ -42,6 +54,7 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
                 "DASHBOARD",
             ),
         ),
+        getEmployeePresentationCapabilities(employeeAuthorizationContext),
     ]);
     const routineCapabilities = await getRoutinePresentationCapabilities(
         {
@@ -84,5 +97,6 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         leaveCapabilities,
         routineCapabilities,
         stockCapabilities,
+        employeeCapabilities,
     };
 }

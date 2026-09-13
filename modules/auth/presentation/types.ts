@@ -1,6 +1,7 @@
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
+import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 
 export interface AuthenticatedUser {
     id: string;
@@ -14,4 +15,5 @@ export interface AuthenticatedUser {
     leaveCapabilities?: LeavePresentationCapabilities;
     routineCapabilities?: RoutinePresentationCapabilities;
     stockCapabilities?: StockPresentationCapabilities;
+    employeeCapabilities?: EmployeePresentationCapabilities;
 }

@@ -5,6 +5,16 @@ import type {
     EmployeeStatusValue,
 } from "../domain/lifecycle";
 
+export interface EmployeePresentationCapabilities {
+    readonly canReadEmployees: boolean;
+    readonly canReadStats: boolean;
+    readonly canCreateEmployees: boolean;
+    readonly canUpdateEmployees: boolean;
+    readonly canDeleteEmployees: boolean;
+    readonly canImportEmployees: boolean;
+    readonly canExportEmployees: boolean;
+}
+
 export interface EmployeeFilters {
     search?: string;
     status?: EmployeeStatusValue | "all";

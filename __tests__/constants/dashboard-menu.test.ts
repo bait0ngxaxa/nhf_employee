@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     canAccessLeaveDashboard,
+    canAccessEmployeeDashboard,
     DASHBOARD_MENU_ITEMS,
     getLeaveDashboardTabVisibility,
     getDashboardPageLabel,
@@ -12,6 +13,7 @@ import { isDashboardTabEnabled } from "@/lib/ssot/features";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
+import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 
 const originalRoutineFlag = process.env.NEXT_PUBLIC_FEATURE_ROUTINE;
 const originalLeaveFlag = process.env.NEXT_PUBLIC_FEATURE_LEAVE;
@@ -57,6 +59,36 @@ const ownLeaveCapabilities = {
     canReadOwnRequests: true,
 } satisfies LeavePresentationCapabilities;
 
+const employeeReadCapabilities = {
+    canReadEmployees: true,
+    canReadStats: true,
+    canCreateEmployees: false,
+    canUpdateEmployees: false,
+    canDeleteEmployees: false,
+    canImportEmployees: false,
+    canExportEmployees: true,
+} satisfies EmployeePresentationCapabilities;
+
+const employeeCreateCapabilities = {
+    ...employeeReadCapabilities,
+    canCreateEmployees: true,
+} satisfies EmployeePresentationCapabilities;
+
+const employeeImportCapabilities = {
+    ...employeeReadCapabilities,
+    canImportEmployees: true,
+} satisfies EmployeePresentationCapabilities;
+
+const employeeAllCapabilities = {
+    canReadEmployees: true,
+    canReadStats: true,
+    canCreateEmployees: true,
+    canUpdateEmployees: true,
+    canDeleteEmployees: true,
+    canImportEmployees: true,
+    canExportEmployees: true,
+} satisfies EmployeePresentationCapabilities;
+
 function getMenuIds(
     isAdmin: boolean,
     leaveAvailability?: Parameters<typeof getAvailableMenuGroups>[3],
@@ -87,6 +119,74 @@ afterEach(() => {
 });
 
 describe("dashboard menu", () => {
+    it("uses Employee read surfaces for management-menu availability", () => {
+        expect(canAccessEmployeeDashboard()).toBe(false);
+        expect(canAccessEmployeeDashboard({
+            ...employeeReadCapabilities,
+            canReadEmployees: false,
+        })).toBe(true);
+        expect(canAccessEmployeeDashboard({
+            ...employeeReadCapabilities,
+            canReadStats: false,
+        })).toBe(true);
+
+        const userMenuIds = getAvailableMenuGroups(
+            false,
+            undefined,
+            undefined,
+            undefined,
+            employeeReadCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+
+        expect(userMenuIds).toContain("employee-management");
+        expect(userMenuIds).not.toContain("add-employee");
+    });
+
+    it("keeps Employee create and import navigation independent", () => {
+        const createMenuIds = getAvailableMenuGroups(
+            false,
+            undefined,
+            undefined,
+            undefined,
+            employeeCreateCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+        const importMenuIds = getAvailableMenuGroups(
+            false,
+            undefined,
+            undefined,
+            undefined,
+            employeeImportCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+
+        expect(createMenuIds).toContain("add-employee");
+        expect(importMenuIds).not.toContain("add-employee");
+        expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === "add-employee")?.requiredRole)
+            .toBeUndefined();
+        expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === "import-employee")?.requiredRole)
+            .toBeUndefined();
+    });
+
+    it("does not expose Employee presentation from system role alone", () => {
+        const adminMenuIds = getAvailableMenuGroups(true)
+            .flatMap((group) => group.items.map((item) => item.id));
+
+        expect(adminMenuIds).not.toContain("employee-management");
+        expect(adminMenuIds).not.toContain("add-employee");
+    });
+
+    it("preserves the existing ADMIN compatibility presentation", () => {
+        const adminMenuIds = getAvailableMenuGroups(
+            true,
+            undefined,
+            undefined,
+            undefined,
+            employeeAllCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+
+        expect(adminMenuIds).toContain("employee-management");
+        expect(adminMenuIds).toContain("add-employee");
+    });
+
     it("keeps CSV import route available but hides it from dashboard menus", () => {
         expect(
             DASHBOARD_MENU_ITEMS.some((item) => item.id === "import-employee"),

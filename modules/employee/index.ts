@@ -20,6 +20,7 @@ export {
     buildEmployeeAuthorizedCommandActor,
     EmployeeCapabilityDeniedError,
     EMPLOYEE_MIGRATED_CAPABILITIES,
+    getEmployeePresentationCapabilities,
     resolveEmployeeCapabilityForMigration,
 } from "./application/authorization";
 export type {
@@ -53,6 +54,7 @@ export type {
     EmployeeAccountLifecycleProvider,
     EmployeeAccountLifecycleRecord,
     CurrentEmployeeProjection,
+    EmployeePresentationCapabilities,
     LiffEmployeeIdentity,
 } from "./application/types";
 

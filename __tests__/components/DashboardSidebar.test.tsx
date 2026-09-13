@@ -14,13 +14,33 @@ vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
 
 const handleMenuClick = vi.fn();
 const setDesktopSidebarCollapsed = vi.fn();
+const adminEmployeeCapabilities = {
+    canReadEmployees: true,
+    canReadStats: true,
+    canCreateEmployees: true,
+    canUpdateEmployees: true,
+    canDeleteEmployees: true,
+    canImportEmployees: true,
+    canExportEmployees: true,
+} as const;
 
 function mockSidebarContext(desktopSidebarCollapsed: boolean): void {
     vi.mocked(useDashboardDataContext).mockReturnValue({
         status: "authenticated",
-        user: { name: "สมชาย ใจดี", role: "ADMIN", department: "IT" },
+        user: {
+            name: "สมชาย ใจดี",
+            role: "ADMIN",
+            department: "IT",
+            employeeCapabilities: adminEmployeeCapabilities,
+        },
         isAdmin: true,
-        availableMenuGroups: getAvailableMenuGroups(true),
+        availableMenuGroups: getAvailableMenuGroups(
+            true,
+            undefined,
+            undefined,
+            undefined,
+            adminEmployeeCapabilities,
+        ),
     });
     vi.mocked(useDashboardUIContext).mockReturnValue({
         selectedMenu: "employee-management",

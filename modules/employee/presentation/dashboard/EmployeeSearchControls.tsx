@@ -18,10 +18,12 @@ import {
 import { EMPLOYEE_STATUS_FILTER_OPTIONS } from "./formatters";
 
 interface EmployeeSearchControlsProps {
+    canExportEmployees: boolean;
     onExportClick: () => void;
 }
 
 export function EmployeeSearchControls({
+    canExportEmployees,
     onExportClick,
 }: EmployeeSearchControlsProps) {
     const { employees, totalEmployees } = useEmployeeDataContext();
@@ -100,7 +102,7 @@ export function EmployeeSearchControls({
                 </div>
             </div>
 
-            {employees.length > 0 && (
+            {canExportEmployees && employees.length > 0 && (
                 <Button
                     variant="outline"
                     className="h-11 w-full justify-center rounded-lg border-border-subtle bg-surface-raised text-content-body hover:bg-surface-subtle hover:text-content-primary xl:w-auto xl:justify-start"

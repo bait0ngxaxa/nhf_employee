@@ -1,9 +1,10 @@
-# Employee Authorization Migration — Phase 8A
+# Employee Authorization Migration — Phase 8A / Phase 8B
 
 สถานะ: Phase 8A **server authorization migration — CLOSED**<br>
-Phase 8B **presentation capability migration — NOT STARTED**<br>
+Phase 8B **presentation capability migration — CLOSED**<br>
 Phase 8C **complete-surface audit and regression hardening — NOT STARTED**<br>
-ขอบเขต: Employee server operations เท่านั้น; ไม่รวม Employee presentation, Department หรือ Team policy
+ขอบเขต: Employee server operations และ Employee Dashboard presentation; ไม่รวม
+Department หรือ Team policy และไม่รวม Phase 8C complete-surface hardening
 
 เอกสารนี้บันทึกการย้าย authoritative Employee server authorization จาก
 `requireAdminSession()`/authenticated-only route decisions ไปยัง Employee-owned
@@ -149,12 +150,114 @@ Employee/audit producers. The adapter does not emit, suppress, duplicate or
 reorder audit events. Authorization configuration remains owned by the
 authorization subsystem.
 
-Phase 8A does not migrate Employee Dashboard presentation capability checks,
-`isAdmin` UI behavior, menu visibility or UI control projections. Those are
-Phase 8B work. Complete production-surface audit and additional regression
-hardening are Phase 8C work
+ในขอบเขตของ Phase 8A เดิมยังไม่ได้ย้าย Employee Dashboard presentation
+capability checks, `isAdmin` UI behavior, menu visibility หรือ UI control
+projections; งานดังกล่าวถูกบันทึกและปิดใน Phase 8B ด้านล่าง ส่วน complete
+production-surface audit และ additional regression hardening ยังเป็น Phase 8C
 
-## 8. Focused regression coverage
+## 8. Phase 8B Employee presentation capability migration
+
+Phase 8B ปิดการย้าย Employee Dashboard presentation ไปยัง projection จาก
+server โดยไม่เปลี่ยน Phase 8A server authorization หรือ broad organization-wide
+policy ใด ๆ
+
+### 8.1 Contract and projection
+
+`modules/employee/application/types.ts` เป็นเจ้าของ immutable,
+serializable `EmployeePresentationCapabilities` contract ซึ่งมีเจ็ด field
+แยกกันตาม registered capability:
+
+```ts
+interface EmployeePresentationCapabilities {
+    readonly canReadEmployees: boolean;
+    readonly canReadStats: boolean;
+    readonly canCreateEmployees: boolean;
+    readonly canUpdateEmployees: boolean;
+    readonly canDeleteEmployees: boolean;
+    readonly canImportEmployees: boolean;
+    readonly canExportEmployees: boolean;
+}
+```
+
+`getEmployeePresentationCapabilities()` เรียก
+`authorization.resolveMany()` เพียงครั้งเดียวด้วย
+`EMPLOYEE_MIGRATED_CAPABILITIES` ทั้งเจ็ดรายการ แล้วแปล decision ผ่าน
+`buildEmployeeCapabilityAuthorization()` ตัวเดียวกับที่ Phase 8A ใช้ใน
+authoritative server authorization ก่อนคืน object ที่ `Object.freeze()` แล้ว
+ห้ามใช้ role เป็น policy ใหม่และห้ามรวม create/update/delete/import เป็น
+`canManageEmployees`
+
+ดังนั้น compatibility จึงยังเป็นแบบเดิม: normal `USER` ที่เป็น
+`NO_APPLICABLE_GRANT` ได้ read/stats/export แต่ไม่ได้ create/update/delete/import;
+`ADMIN` ได้ทั้งเจ็ด และ explicit USER grant เปิดได้เฉพาะ field ที่ตรงกัน
+expected authorization denial เป็น `false` ส่วน unknown capability, decision ที่
+หายไป, invalid configuration, persistence หรือ resolver/system failure ไม่ถูก
+ซ่อนเป็น `false`
+
+### 8.2 Trusted Dashboard current-user path
+
+เส้นทางที่ใช้จริงคือ:
+
+```text
+authenticated account
+  -> active Employee projection
+  -> buildEmployeeAuthorizationContext(account, employee.id)
+     [DASHBOARD]
+  -> getEmployeePresentationCapabilities()
+     [one authorization.resolveMany()]
+  -> CurrentUserProjection / AuthenticatedUser / DashboardUser
+  -> DashboardProvider และ Employee presentation
+```
+
+`getCurrentUserProjection()` ใช้ account และ Employee ที่ resolve จาก server
+เท่านั้น ส่ง current Employee ID เข้า Employee authorization builder และ
+`/api/auth/me` ได้ field ใหม่นี้ผ่าน canonical current-user contract โดยไม่มี
+Employee capability endpoint ใหม่และไม่มี client-side resolver
+
+### 8.3 Employee Dashboard surfaces and data loading
+
+Dashboard menu และ `handleMenuClick()` ใช้ `user.employeeCapabilities`:
+
+| Surface | Presentation gate |
+|---|---|
+| Employee management entry | `canReadEmployees OR canReadStats` |
+| Employee list/search/filter/pagination | `canReadEmployees` |
+| Employee statistics cards | `canReadStats` |
+| เพิ่มพนักงาน และ direct `/dashboard/employees/new` | `canCreateEmployees` |
+| นำเข้า CSV และ direct `/dashboard/employees/import` | `canImportEmployees` |
+| Edit desktop/mobile และ edit handler | `canUpdateEmployees` |
+| CSV export control/export handler | `canExportEmployees` |
+
+The two direct mutation pages use the trusted server projection and preserve
+login redirect, access-denied redirect and render outcomes. Generic
+`requiredRole: ADMIN` behavior remains unchanged for unrelated Email Request
+and Audit navigation. Employee list and stats SWR keys are conditional, so a
+denied presentation surface does not issue or revalidate its request. Update
+refreshes only currently permitted data, and stale edit state closes when
+update capability disappears.
+
+`canDeleteEmployees` is projected, tested, and carried through the trusted
+current-user contract, but repository review found no existing Employee delete
+or offboarding control in this Dashboard flow. Phase 8B therefore adds no
+delete UI or workflow.
+
+Completion search classification: no Employee Dashboard presentation path
+still uses `isAdmin`, `isAdminRole`, `role === "ADMIN"`, `requiredRole`, or
+`userRole` to expose an Employee operation, select Employee data, initiate an
+Employee request, grant direct-route access, or open an Employee mutation
+surface. The remaining role-derived references in the reviewed presentation
+graph are the unrelated Email Request and Audit `requiredRole: ADMIN` rules,
+the existing Leave recovery/generic Dashboard `isAdmin` rules, and
+descriptive `role` fields or accessibility `role="status"` values. None is an
+Employee capability authority.
+
+All of these are presentation/data-minimization hints only. Employee API
+routes, application commands, resource/business rules, transactions, locks and
+audit behavior remain authoritative on the server. Phase 8B does not narrow
+read/stats/export scope, add Team/Department policy, or change any Capability
+Registry entry.
+
+## 9. Focused regression coverage
 
 `modules/employee/application/authorization.test.ts` covers the adapter
 inventory, trusted Dashboard actor, broad read/export and Admin mutation
@@ -176,7 +279,23 @@ auth-before-body, invalid IDs, audit scheduling and import row limits.
 No Employee authorization schema, seed grant, scope, registry entry or new
 transaction architecture was added
 
-## 9. Complete-surface audit and closure state
+Phase 8B focused coverage adds:
+
+- `modules/employee/application/presentation-capabilities.test.ts` for the
+  single batched resolver call, exact inventory, compatibility translation,
+  independent fields, denial/error behavior and immutability
+- `__tests__/auth/current-user-projection.test.ts` for the trusted account,
+  current Employee ID and `DASHBOARD` actor path
+- `__tests__/constants/dashboard-menu.test.ts`,
+  `__tests__/context/DashboardProvider.test.tsx` and
+  `__tests__/dashboard-employee-pages.test.tsx` for menu/navigation and direct
+  route access
+- `modules/employee/presentation/dashboard/EmployeeManagementSection.test.tsx`,
+  `EmployeeSearchControls.test.tsx`, `EmployeeTable.test.tsx` and
+  `context/EmployeeProvider.test.tsx` for granular controls, desktop/mobile
+  edit behavior, conditional SWR, export guards and stale edit closure
+
+## 10. Complete-surface audit and closure state
 
 Repository search accounted for the seven registered Employee server operations
 under `app/api/employees/**`: list, stats, export, create, update, delete and
@@ -186,6 +305,7 @@ Employee server operation was found. The audit export logging endpoint
 data-export authority and remains outside this capability migration.
 
 Phase 8A is **CLOSED** for the registered Employee server capabilities.
-Employee presentation capability migration remains **Phase 8B — NOT STARTED**.
-Employee complete-surface audit and regression hardening remains
-**Phase 8C — NOT STARTED**
+Phase 8B is **CLOSED** for the reviewed Employee Dashboard presentation
+surfaces and trusted current-user projection. Employee complete-surface audit
+and regression hardening remains **Phase 8C — NOT STARTED**. Phase 8B does not
+claim that all future Employee production surfaces have been audited.

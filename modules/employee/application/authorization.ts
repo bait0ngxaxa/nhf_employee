@@ -10,7 +10,10 @@ import {
 } from "@/modules/authorization";
 import type { UserRole } from "@/lib/ssot/permissions";
 
-import type { EmployeeLifecycleActor } from "./types";
+import type {
+    EmployeeLifecycleActor,
+    EmployeePresentationCapabilities,
+} from "./types";
 
 export const EMPLOYEE_MIGRATED_CAPABILITIES = [
     "employee.read",
@@ -168,6 +171,102 @@ function buildEmployeeCapabilityAuthorization(
         decision,
         scopes: decision.scopes,
         usedMigrationCompatibility: false,
+    });
+}
+
+function getEmployeePresentationDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: EmployeeMigratedCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(
+            `Authorization resolver omitted Employee capability: ${capability}`,
+        );
+    }
+    return decision;
+}
+
+function projectEmployeeCapabilityDecision(
+    actor: EmployeeAuthorizationActor,
+    capability: EmployeeMigratedCapability,
+    decision: AuthorizationDecision,
+): readonly AuthorizationScope[] | null {
+    try {
+        return buildEmployeeCapabilityAuthorization(
+            actor,
+            capability,
+            decision,
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof EmployeeCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+function hasEmployeeScope(
+    scopes: readonly AuthorizationScope[] | null,
+    scope: AuthorizationScope,
+): boolean {
+    return scopes?.includes(scope) === true || scopes?.includes("ALL") === true;
+}
+
+/**
+ * Projects Employee capability eligibility for Dashboard presentation only.
+ * Employee routes and application mutations remain authoritative.
+ */
+export async function getEmployeePresentationCapabilities(
+    context: EmployeeAuthorizationContext,
+): Promise<EmployeePresentationCapabilities> {
+    const actor = context.authorizationActor;
+    const decisions = await authorization.resolveMany(
+        actor,
+        EMPLOYEE_MIGRATED_CAPABILITIES,
+    );
+
+    const project = (
+        capability: EmployeeMigratedCapability,
+    ): readonly AuthorizationScope[] | null =>
+        projectEmployeeCapabilityDecision(
+            actor,
+            capability,
+            getEmployeePresentationDecision(decisions, capability),
+        );
+
+    return Object.freeze({
+        canReadEmployees: hasEmployeeScope(
+            project("employee.read"),
+            "ALL",
+        ),
+        canReadStats: hasEmployeeScope(
+            project("employee.stats.read"),
+            "ALL",
+        ),
+        canCreateEmployees: hasEmployeeScope(
+            project("employee.create"),
+            "ALL",
+        ),
+        canUpdateEmployees: hasEmployeeScope(
+            project("employee.update"),
+            "ALL",
+        ),
+        canDeleteEmployees: hasEmployeeScope(
+            project("employee.delete"),
+            "ALL",
+        ),
+        canImportEmployees: hasEmployeeScope(
+            project("employee.import"),
+            "ALL",
+        ),
+        canExportEmployees: hasEmployeeScope(
+            project("employee.export"),
+            "ALL",
+        ),
     });
 }
 

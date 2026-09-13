@@ -3,6 +3,7 @@ import { type MenuGroup } from "@/types/dashboard";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
+import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 
 export interface DashboardUser {
     id?: string;
@@ -16,6 +17,7 @@ export interface DashboardUser {
     leaveCapabilities?: LeavePresentationCapabilities;
     routineCapabilities?: RoutinePresentationCapabilities;
     stockCapabilities?: StockPresentationCapabilities;
+    employeeCapabilities?: EmployeePresentationCapabilities;
 }
 
 export interface DashboardDataContextValue {

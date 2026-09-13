@@ -7,6 +7,7 @@ import {
     useDashboardUIContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import type { AuthenticatedUser } from "@/modules/auth/client";
+import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 
 const navigationMocks = vi.hoisted(() => ({
     pathname: "/dashboard",
@@ -73,6 +74,26 @@ const noLeaveCapabilities = {
     canConfirmAssignedNotTaken: false,
     canManageApprovers: false,
 } as const;
+
+const employeeReadCapabilities = {
+    canReadEmployees: true,
+    canReadStats: true,
+    canCreateEmployees: false,
+    canUpdateEmployees: false,
+    canDeleteEmployees: false,
+    canImportEmployees: false,
+    canExportEmployees: true,
+} satisfies EmployeePresentationCapabilities;
+
+const employeeCreateCapabilities = {
+    ...employeeReadCapabilities,
+    canCreateEmployees: true,
+} satisfies EmployeePresentationCapabilities;
+
+const employeeImportCapabilities = {
+    ...employeeReadCapabilities,
+    canImportEmployees: true,
+} satisfies EmployeePresentationCapabilities;
 
 function DashboardNavigationState(): ReactElement {
     const { selectedMenu, mobileNavOpen, desktopSidebarCollapsed } =
@@ -296,5 +317,173 @@ describe("DashboardProvider navigation state", () => {
             "/dashboard/leave",
             { scroll: false },
         );
+    });
+
+    it("allows a normal USER to open Employee information with read capability", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            employeeCapabilities: employeeReadCapabilities,
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button
+                    type="button"
+                    onClick={() => handleMenuClick("employee-management")}
+                >
+                    Employees
+                </button>
+            );
+        }
+
+        render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent(
+            "employee-management",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Employees" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/employees",
+            { scroll: false },
+        );
+    });
+
+    it("denies Add Employee without create capability and allows an explicit USER grant", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            employeeCapabilities: employeeReadCapabilities,
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button
+                    type="button"
+                    onClick={() => handleMenuClick("add-employee")}
+                >
+                    Add Employee
+                </button>
+            );
+        }
+
+        const { rerender } = render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent(
+            "add-employee",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Add Employee" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+
+        navigationMocks.router.push.mockReset();
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            employeeCapabilities: employeeCreateCapabilities,
+        };
+        rerender(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent(
+            "add-employee",
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Add Employee" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/employees/new",
+            { scroll: false },
+        );
+    });
+
+    it("denies Import Employee without import capability and allows an explicit USER grant", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            employeeCapabilities: employeeReadCapabilities,
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button
+                    type="button"
+                    onClick={() => handleMenuClick("import-employee")}
+                >
+                    Import Employee
+                </button>
+            );
+        }
+
+        const { rerender } = render(
+            <DashboardProvider>
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Import Employee" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+
+        navigationMocks.router.push.mockReset();
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            employeeCapabilities: employeeImportCapabilities,
+        };
+        rerender(
+            <DashboardProvider>
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Import Employee" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/employees/import",
+            { scroll: false },
+        );
+    });
+
+    it("keeps unrelated ADMIN-only navigation role-gated", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            employeeCapabilities: {
+                ...employeeCreateCapabilities,
+                canImportEmployees: true,
+            },
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button
+                    type="button"
+                    onClick={() => handleMenuClick("email-request")}
+                >
+                    Email Request
+                </button>
+            );
+        }
+
+        render(
+            <DashboardProvider>
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Email Request" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
     });
 });

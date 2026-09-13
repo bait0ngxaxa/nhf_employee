@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthenticatedAccount } from "@/modules/auth";
-import type { CurrentEmployeeProjection } from "@/modules/employee";
+import type {
+    CurrentEmployeeProjection,
+    EmployeePresentationCapabilities,
+} from "@/modules/employee";
 import type {
     CurrentEmployeeLeaveProjection,
     LeavePresentationCapabilities,
@@ -11,6 +14,8 @@ const {
     cookiesMock,
     resolveAccountMock,
     employeeProjectionMock,
+    employeeCapabilitiesMock,
+    employeeAuthorizationContextMock,
     leaveProjectionMock,
     leaveCapabilitiesMock,
     leaveAuthorizationContextMock,
@@ -21,6 +26,8 @@ const {
     cookiesMock: vi.fn(),
     resolveAccountMock: vi.fn(),
     employeeProjectionMock: vi.fn(),
+    employeeCapabilitiesMock: vi.fn(),
+    employeeAuthorizationContextMock: vi.fn(),
     leaveProjectionMock: vi.fn(),
     leaveCapabilitiesMock: vi.fn(),
     leaveAuthorizationContextMock: vi.fn(),
@@ -31,7 +38,11 @@ const {
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
 vi.mock("@/modules/auth", () => ({ resolveAuthenticatedAccount: resolveAccountMock }));
-vi.mock("@/modules/employee", () => ({ findCurrentEmployeeProjection: employeeProjectionMock }));
+vi.mock("@/modules/employee", () => ({
+    buildEmployeeAuthorizationContext: employeeAuthorizationContextMock,
+    findCurrentEmployeeProjection: employeeProjectionMock,
+    getEmployeePresentationCapabilities: employeeCapabilitiesMock,
+}));
 vi.mock("@/modules/leave", () => ({
     buildLeaveAuthorizationContext: leaveAuthorizationContextMock,
     getCurrentEmployeeLeaveProjection: leaveProjectionMock,
@@ -106,6 +117,16 @@ const STOCK = {
     canExportReports: false,
 };
 
+const EMPLOYEE_CAPABILITIES: EmployeePresentationCapabilities = {
+    canReadEmployees: true,
+    canReadStats: true,
+    canCreateEmployees: true,
+    canUpdateEmployees: true,
+    canDeleteEmployees: true,
+    canImportEmployees: true,
+    canExportEmployees: true,
+};
+
 describe("current-user application projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -114,6 +135,15 @@ describe("current-user application projection", () => {
         });
         resolveAccountMock.mockResolvedValue(ACCOUNT);
         employeeProjectionMock.mockResolvedValue(EMPLOYEE);
+        employeeAuthorizationContextMock.mockReturnValue({
+            authorizationActor: {
+                userId: 41,
+                employeeId: 101,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+        });
+        employeeCapabilitiesMock.mockResolvedValue(EMPLOYEE_CAPABILITIES);
         leaveProjectionMock.mockResolvedValue(LEAVE);
         leaveCapabilitiesMock.mockResolvedValue(LEAVE_CAPABILITIES);
         leaveAuthorizationContextMock.mockReturnValue({
@@ -142,9 +172,22 @@ describe("current-user application projection", () => {
             leaveCapabilities: LEAVE_CAPABILITIES,
             routineCapabilities: ROUTINE,
             stockCapabilities: STOCK,
+            employeeCapabilities: EMPLOYEE_CAPABILITIES,
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
+        expect(employeeAuthorizationContextMock).toHaveBeenCalledWith(
+            { id: 41, role: "ADMIN" },
+            101,
+        );
+        expect(employeeCapabilitiesMock).toHaveBeenCalledWith({
+            authorizationActor: {
+                userId: 41,
+                employeeId: 101,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+        });
         expect(leaveProjectionMock).toHaveBeenCalledWith(101, false);
         expect(leaveCapabilitiesMock).toHaveBeenCalledWith({
             authorizationActor: {
@@ -174,6 +217,7 @@ describe("current-user application projection", () => {
         await expect(getCurrentUserProjection()).resolves.toBeNull();
         expect(leaveProjectionMock).not.toHaveBeenCalled();
         expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
+        expect(employeeCapabilitiesMock).not.toHaveBeenCalled();
     });
 
     it.each(["inactive", "suspended", "deleted"])(
@@ -238,5 +282,6 @@ describe("current-user application projection", () => {
         expect(employeeProjectionMock).not.toHaveBeenCalled();
         expect(leaveProjectionMock).not.toHaveBeenCalled();
         expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
+        expect(employeeCapabilitiesMock).not.toHaveBeenCalled();
     });
 });

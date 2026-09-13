@@ -1,13 +1,16 @@
 # Authorization presentation capability projections
 
-Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C closed
+Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
+closed; Employee Phase 8A/8B closed; Employee Phase 8C not started
 
 This record defines the server-derived presentation contracts added for the
-Routine, Stock, and Leave authorization migrations. These projections do not
+Routine, Stock, Leave, and Employee authorization migrations. These projections do not
 replace the locked authorization source-of-truth or server-side enforcement.
 The Routine and Stock sections retain their completed migration records; the
 Leave Phase 7B section records the projection and the Phase 7C section records
-the final production-surface closure and regression hardening.
+the final production-surface closure and regression hardening. The Employee
+Phase 8B section records the Dashboard projection; its complete-surface audit
+and regression hardening remains Phase 8C.
 
 ## Contract and ownership
 
@@ -247,10 +250,10 @@ Read ALL never implies process or cancel ALL. Any remaining Stock role check is
 descriptive only (for example, a role badge); it does not select a tab, query
 scope, expose a control or authorize a mutation.
 
-Stock server enforcement remains authoritative. Employee, Audit, Email
-Request, Settings and other non-Routine/non-Stock presentation and
-authorization paths remain on their existing compatibility behavior until
-their approved migration phases. Routine behavior is unchanged by Phase 6B.
+Stock server enforcement remains authoritative. Audit, Email Request, Settings
+and other non-Routine/non-Stock presentation and authorization paths remain on
+their existing compatibility behavior until their approved migration phases.
+Routine and Employee behavior is unchanged by the Stock projection.
 
 ## Leave Phase 7B projection
 
@@ -446,3 +449,77 @@ the production-consumer audit, while
 Reports/export, participant/detail, attachments, and Dashboard Admin recovery
 remain explicitly deferred Leave-owned policy. No generic report, participant,
 attachment, or recovery capability is implied by the presentation projection.
+
+## Employee Phase 8B projection
+
+สถานะ: **Phase 8A Employee server enforcement closed; Phase 8B Employee
+Dashboard presentation projection closed; Phase 8C complete-surface audit not
+started**
+
+Employee owns the immutable, serializable seven-field
+`EmployeePresentationCapabilities` contract:
+
+```ts
+interface EmployeePresentationCapabilities {
+    readonly canReadEmployees: boolean;
+    readonly canReadStats: boolean;
+    readonly canCreateEmployees: boolean;
+    readonly canUpdateEmployees: boolean;
+    readonly canDeleteEmployees: boolean;
+    readonly canImportEmployees: boolean;
+    readonly canExportEmployees: boolean;
+}
+```
+
+`getEmployeePresentationCapabilities()` calls
+`authorization.resolveMany()` exactly once for all seven entries in
+`EMPLOYEE_MIGRATED_CAPABILITIES`. Each decision is translated through the
+same `buildEmployeeCapabilityAuthorization()` compatibility translation used
+by Phase 8A server authorization. `NO_APPLICABLE_GRANT` therefore preserves
+the existing floor: an eligible normal USER gets read/stats/export, but not
+create/update/delete/import; an ADMIN gets all seven; and an explicit USER
+grant enables only its matching field. Expected denials project to `false`;
+unknown capabilities, omitted decisions, invalid configuration and resolver or
+persistence failures propagate rather than becoming a misleading ordinary
+denial. The returned object is frozen.
+
+The trusted Dashboard path is:
+
+```text
+authenticated account
+  -> active Employee projection
+  -> Employee AuthorizationActor / DASHBOARD with current employeeId
+  -> one getEmployeePresentationCapabilities() resolveMany()
+  -> CurrentUserProjection / AuthenticatedUser / DashboardUser
+  -> DashboardProvider and Employee Dashboard presentation
+```
+
+`getCurrentUserProjection()` builds the Employee actor from the server account
+and current Employee projection. It returns `employeeCapabilities` through
+the canonical current-user contract used by `/api/auth/me`; clients do not
+resolve capabilities and no Employee capability endpoint was added.
+
+Employee Dashboard navigation and controls use independent fields: the
+management entry requires `canReadEmployees` or `canReadStats`; list/search/
+pagination uses `canReadEmployees`; stats uses `canReadStats`; add/import/edit/
+export use `canCreateEmployees`, `canImportEmployees`, `canUpdateEmployees`,
+and `canExportEmployees` respectively. `getAvailableMenuGroups()` and
+`DashboardProvider.handleMenuClick()` apply these checks without changing the
+generic `requiredRole: ADMIN` behavior for unrelated Email Request or Audit
+items. The direct Add Employee and Import Employee pages use a small trusted
+server-side capability guard and preserve login, access-denied and render
+outcomes.
+
+EmployeeProvider uses conditional SWR keys and refreshes only permitted list
+and stats resources. Export and edit handlers repeat their capability checks,
+and a revoked update capability closes an open edit surface. The list/stats/
+export query scope, CSV shape, filters, row limits and audit behavior are
+unchanged.
+
+`canDeleteEmployees` is projected and carried through the current-user
+contract, but no existing Employee delete/offboarding presentation control was
+found. Phase 8B intentionally adds no delete UI or workflow. Every projection
+and UI decision above is presentation/data-minimization behavior only;
+Employee routes and application authorization remain authoritative on the
+server. Phase 8C complete-surface audit and regression hardening is still
+pending.

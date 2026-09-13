@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
 import { useSWRConfig } from "swr";
 import {
+    useDashboardDataContext,
     useDashboardUIContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -11,7 +12,9 @@ import { AddEmployeeForm } from "./add-employee";
 
 export function AddEmployeeSection() {
     const { handleMenuClick } = useDashboardUIContext();
+    const { user } = useDashboardDataContext();
     const { mutate } = useSWRConfig();
+    const canReadStats = user?.employeeCapabilities?.canReadStats === true;
 
     return (
         <div className="min-h-[calc(100dvh-6rem)]">
@@ -42,7 +45,9 @@ export function AddEmployeeSection() {
                 <div className="space-y-8">
                     <AddEmployeeForm
                         onSuccess={() => {
-                            void mutate(API_ROUTES.employees.stats);
+                            if (canReadStats) {
+                                void mutate(API_ROUTES.employees.stats);
+                            }
                         }}
                     />
                 </div>

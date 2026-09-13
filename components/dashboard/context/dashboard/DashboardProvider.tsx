@@ -10,6 +10,7 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import {
     DASHBOARD_MENU_ITEMS,
+    canAccessEmployeeDashboard,
     canAccessLeaveDashboard,
     canAccessStockDashboard,
     getAvailableMenuGroups,
@@ -63,6 +64,7 @@ export function DashboardProvider({
                 canApproveLeave: user?.canApproveLeave,
                 canViewLeaveReports: user?.canViewLeaveReports,
             },
+            user?.employeeCapabilities,
         ),
         [
             isAdmin,
@@ -71,6 +73,7 @@ export function DashboardProvider({
             user?.leaveCapabilities,
             user?.canApproveLeave,
             user?.canViewLeaveReports,
+            user?.employeeCapabilities,
         ],
     );
 
@@ -111,6 +114,27 @@ export function DashboardProvider({
                 router.push(APP_ROUTES.accessDenied);
                 return;
             }
+            if (
+                menuId === "employee-management"
+                && !canAccessEmployeeDashboard(user?.employeeCapabilities)
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
+            if (
+                menuId === "add-employee"
+                && user?.employeeCapabilities?.canCreateEmployees !== true
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
+            if (
+                menuId === "import-employee"
+                && user?.employeeCapabilities?.canImportEmployees !== true
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
             if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
@@ -130,6 +154,7 @@ export function DashboardProvider({
             user?.leaveCapabilities,
             user?.canApproveLeave,
             user?.canViewLeaveReports,
+            user?.employeeCapabilities,
         ],
     );
 

@@ -8,7 +8,6 @@ import {
     getEmployeeStatusBadge,
     formatEmployeePhone,
 } from "./formatters";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { EmployeeMobileCard } from "./EmployeeMobileCard";
 import {
     EditEmployeeButton,
@@ -18,20 +17,20 @@ import {
 
 interface EmployeeTableProps {
     employees: Employee[];
-    userRole?: string;
+    canUpdateEmployees: boolean;
     onEditEmployee?: (employee: Employee) => void;
 }
 
 export const EmployeeTable = memo(function EmployeeTable({
     employees,
-    userRole,
+    canUpdateEmployees,
     onEditEmployee,
 }: EmployeeTableProps) {
     if (employees.length === 0) {
         return null;
     }
 
-    const canEdit = isAdminRole(userRole) && Boolean(onEditEmployee);
+    const canEdit = canUpdateEmployees && Boolean(onEditEmployee);
 
     return (
         <div className="space-y-3">
@@ -40,7 +39,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                     <EmployeeMobileCard
                         key={employee.id}
                         employee={employee}
-                        canEdit={canEdit}
+                        canUpdateEmployees={canEdit}
                         onEditEmployee={onEditEmployee}
                     />
                 ))}

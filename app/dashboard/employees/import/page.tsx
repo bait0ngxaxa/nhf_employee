@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 
 import { ImportSectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
-import { requireDashboardAdmin } from "@/app/dashboard/_lib/route-access";
+import { requireDashboardEmployeeCapability } from "@/app/dashboard/_lib/route-access";
 import { ImportEmployeeRouteContent } from "@/modules/employee/client";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ImportEmployeeDashboardPage() {
-    await requireDashboardAdmin();
+    await requireDashboardEmployeeCapability("canImportEmployees");
 
     return (
         <Suspense fallback={<ImportSectionSkeleton />}>

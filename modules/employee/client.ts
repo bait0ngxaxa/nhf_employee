@@ -12,5 +12,7 @@ export {
     ImportEmployeeRouteContent,
 } from "./presentation/import/ImportEmployeeRouteContent";
 
+export type { EmployeePresentationCapabilities } from "./application/types";
+
 // Pure identity formatter used by Employee-adjacent browser presentation.
 export { getEmployeeDisplayName } from "./domain/identity";

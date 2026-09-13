@@ -24,7 +24,7 @@ describe("EmployeeTable", () => {
         render(
             <EmployeeTable
                 employees={[employee]}
-                userRole="ADMIN"
+                canUpdateEmployees={true}
                 onEditEmployee={() => undefined}
             />,
         );
@@ -41,5 +41,21 @@ describe("EmployeeTable", () => {
             expect(value).toHaveClass("whitespace-nowrap");
             expect(value).not.toHaveClass("truncate");
         });
+    });
+
+    it("hides desktop and mobile edit controls without update capability", () => {
+        render(
+            <EmployeeTable
+                employees={[employee]}
+                canUpdateEmployees={false}
+                onEditEmployee={() => undefined}
+            />,
+        );
+
+        const fullName = "นางสาวสมใจ นามสกุลยาวเพื่อทดสอบการแสดงผล (สมใจ)";
+        expect(screen.getByRole("table")).not.toHaveTextContent("การจัดการ");
+        expect(screen.queryByRole("button", {
+            name: `แก้ไขข้อมูล ${fullName}`,
+        })).not.toBeInTheDocument();
     });
 });

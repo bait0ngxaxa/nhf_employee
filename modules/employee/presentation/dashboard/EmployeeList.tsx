@@ -12,7 +12,7 @@ import { getEmployeeStatusLabel } from "./formatters";
 import { useEmployeeDataContext, useEmployeeUIContext } from "./context/EmployeeContext";
 import { EmployeeListSkeleton } from "./EmployeeSkeletons";
 
-export function EmployeeList({ userRole }: EmployeeListProps) {
+export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
     const {
         employees,
         currentEmployees,
@@ -36,6 +36,11 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
         handleExportCSV,
         handleEditEmployee,
     } = useEmployeeUIContext();
+    const canReadEmployees = employeeCapabilities?.canReadEmployees === true;
+
+    if (!canReadEmployees) {
+        return null;
+    }
 
     // Show full skeleton only for the very first unfiltered load.
     // Keep search controls mounted during filtering/searching to avoid input focus loss.
@@ -47,7 +52,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
         && statusFilter === "all";
 
     // Handle export button click - fetch data then trigger CSV download
-    const onExportClick = async () => {
+    const onExportClick = async (): Promise<void> => {
         await handleExportCSV();
     };
 
@@ -78,7 +83,10 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
     return (
         <div className="space-y-6">
             {/* Search, Filter and Export Controls */}
-            <EmployeeSearchControls onExportClick={onExportClick} />
+            <EmployeeSearchControls
+                canExportEmployees={employeeCapabilities?.canExportEmployees === true}
+                onExportClick={onExportClick}
+            />
 
             {/* Results Summary */}
             <div className="flex flex-col gap-3 rounded-xl border border-border-subtle bg-surface-subtle/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -128,7 +136,7 @@ export function EmployeeList({ userRole }: EmployeeListProps) {
             ) : (
                 <EmployeeTable
                     employees={currentEmployees}
-                    userRole={userRole}
+                    canUpdateEmployees={employeeCapabilities?.canUpdateEmployees === true}
                     onEditEmployee={handleEditEmployee}
                 />
             )}
