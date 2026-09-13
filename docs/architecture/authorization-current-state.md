@@ -41,7 +41,10 @@ web access cookie / LIFF session / system secret
 - Leave ไม่ใช่ Admin-vs-User อย่างเดียว: approval ใช้ effective approver จาก exceptionApproverId หรือ approverId; Admin override มีเฉพาะบาง Dashboard/API workflow และถูกปิดสำหรับ LIFF
 - `LeavePresentationCapabilities`, canApproveLeave, canViewLeaveReports และ LiffCapabilities เป็น projections สำหรับ presentation/entry-point behavior ไม่ใช่ authoritative server permission; capability eligibility ยังต้องประกอบกับ Leave resource/work relationship
 - LIFF Routine reference route มี mode omission ที่อาจทำให้ internal query ใช้ Admin branch แต่ serializeLiffRoutineReference() ไม่ส่ง employee list ออกไป; จึงเป็น internal channel-context/least-data-access risk ไม่ใช่ client-visible employee disclosure ที่พิสูจน์แล้ว
-- ยังไม่พบ Team, TeamRole, Capability Registry, generic scope engine หรือ Department-based authorization ใน repository นี้
+- ระบบ authorization ปัจจุบันมี Team, TeamRole, TeamMembership และ persisted capability grants ได้แก่ TeamCapabilityGrant, TeamRoleCapabilityGrant และ UserCapabilityGrant รวมถึง code-owned Capability Registry, Scope Registry, AuthorizationActor และ central resolver แล้ว
+- ชื่อ Team และ TeamRole ไม่มี authority โดยตัวมันเอง; authority มาจาก effective capability grants ที่ central resolver ประเมิน
+- Department / departmentId ยังไม่ถูกใช้เพื่ออนุมาน authorization
+- Routine, Stock และ Leave migrated paths ใช้ central resolver พร้อม domain-owned resource semantics และ compatibility floors ตาม migration records
 
 ## 1. Scope, terms and classification
 
@@ -454,7 +457,7 @@ Query and persistence scopes found include:
 | System execution | Shared secret/HMAC | Cron, cleanup, webhook | Not a User scope | Separate system principal model is out of Phase 0 |
 | LIFF Routine reference query | Route actor without explicit LIFF_SELF_SERVICE mode; serializer omits employees from the response | Internal employee reference query only; LIFF response reference metadata | Not a client-visible employee scope; OPEN — requires Phase 1/4 hardening decision | Internal channel-context and least-data-access risk; do not freeze the broader query as compatibility behavior |
 
-No current behavior authorizes from departmentId, Department name, Team name or magic TeamRole name. No future Team/Capability mapping is binding in this document.
+Current authority is not inferred from departmentId, Department name, Team name or magic TeamRole name. Team and TeamRole participation contributes authority only through persisted capability grants evaluated by the central resolver. No future Team/Capability mapping is binding in this document.
 
 ## 7. Authorization Compatibility Invariants
 

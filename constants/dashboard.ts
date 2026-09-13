@@ -196,8 +196,8 @@ export function normalizeLeaveDashboardTab(
 }
 
 /**
- * Filter groups by role and feature availability. Routine also requires its
- * server-derived read projection; non-Routine menu behavior remains role-based.
+ * Filter groups by role and feature availability. Routine, Stock, and Leave
+ * use server-derived presentation projections when supplied.
  */
 export function getAvailableMenuGroups(
     isAdmin: boolean,
