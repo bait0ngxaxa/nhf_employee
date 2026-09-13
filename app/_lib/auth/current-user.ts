@@ -16,6 +16,18 @@ import {
     buildStockAuthorizationContext,
     getStockPresentationCapabilities,
 } from "@/modules/stock";
+import {
+    buildDepartmentAuthorizationContext,
+    getDepartmentPresentationCapabilities,
+} from "@/modules/department";
+import {
+    buildAuditAuthorizationContext,
+    getAuditPresentationCapabilities,
+} from "@/modules/audit";
+import {
+    buildNotificationAuthorizationContext,
+    getNotificationPresentationCapabilities,
+} from "@/modules/notification";
 import type { AuthenticatedUser } from "@/modules/auth/client";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { getUserDisplayName } from "@/shared/identity/display";
@@ -39,7 +51,16 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         employee.id,
     );
 
-    const [leave, leaveCapabilities, employeeCapabilities] = await Promise.all([
+    const [
+        leave,
+        leaveCapabilities,
+        employeeCapabilities,
+        routineCapabilities,
+        stockCapabilities,
+        departmentCapabilities,
+        auditCapabilities,
+        notificationCapabilities,
+    ] = await Promise.all([
         getCurrentEmployeeLeaveProjection(
             employee.id,
             employee.isManager,
@@ -55,25 +76,52 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
             ),
         ),
         getEmployeePresentationCapabilities(employeeAuthorizationContext),
-    ]);
-    const routineCapabilities = await getRoutinePresentationCapabilities(
-        {
-            id: account.userId,
-            role: account.role,
-            email: account.email,
-        },
-        employee.id,
-    );
-    const stockCapabilities = await getStockPresentationCapabilities(
-        buildStockAuthorizationContext(
+        getRoutinePresentationCapabilities(
             {
                 id: account.userId,
                 role: account.role,
+                email: account.email,
             },
             employee.id,
-            "DASHBOARD",
         ),
-    );
+        getStockPresentationCapabilities(
+            buildStockAuthorizationContext(
+                {
+                    id: account.userId,
+                    role: account.role,
+                },
+                employee.id,
+                "DASHBOARD",
+            ),
+        ),
+        getDepartmentPresentationCapabilities(
+            buildDepartmentAuthorizationContext(
+                {
+                    id: account.userId,
+                    role: account.role,
+                },
+                employee.id,
+            ),
+        ),
+        getAuditPresentationCapabilities(
+            buildAuditAuthorizationContext(
+                {
+                    id: account.userId,
+                    role: account.role,
+                },
+                employee.id,
+            ),
+        ),
+        getNotificationPresentationCapabilities(
+            buildNotificationAuthorizationContext(
+                {
+                    id: account.userId,
+                    role: account.role,
+                },
+                employee.id,
+            ),
+        ),
+    ]);
 
     return {
         id: String(account.userId),
@@ -98,5 +146,8 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         routineCapabilities,
         stockCapabilities,
         employeeCapabilities,
+        departmentCapabilities,
+        auditCapabilities,
+        notificationCapabilities,
     };
 }

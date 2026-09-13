@@ -6,6 +6,7 @@ import {
 } from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
+import type { NotificationPresentationCapabilities } from "./types";
 
 export const NOTIFICATION_MIGRATED_CAPABILITIES = [
     "notification.inbox.read",
@@ -139,6 +140,80 @@ function buildNotificationCapabilityAuthorization(
         decision,
         scopes: decision.scopes,
         usedMigrationCompatibility: false,
+    });
+}
+
+function getNotificationPresentationDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: NotificationMigratedCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(
+            `Authorization resolver omitted Notification capability: ${capability}`,
+        );
+    }
+    return decision;
+}
+
+function projectNotificationCapabilityDecision(
+    actor: NotificationAuthorizationActor,
+    capability: NotificationMigratedCapability,
+    decision: AuthorizationDecision,
+): readonly AuthorizationScope[] | null {
+    try {
+        return assertNotificationCapabilityScope(
+            buildNotificationCapabilityAuthorization(actor, capability, decision),
+            "OWN",
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof NotificationCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+function hasNotificationScope(
+    scopes: readonly AuthorizationScope[] | null,
+    scope: AuthorizationScope,
+): boolean {
+    return scopes?.includes(scope) === true;
+}
+
+/**
+ * Projects independent Dashboard inbox read/update eligibility. Notification
+ * APIs remain authoritative at the server boundary.
+ */
+export async function getNotificationPresentationCapabilities(
+    context: NotificationAuthorizationContext,
+): Promise<NotificationPresentationCapabilities> {
+    const actor = context.authorizationActor;
+    const decisions = await authorization.resolveMany(
+        actor,
+        NOTIFICATION_MIGRATED_CAPABILITIES,
+    );
+    const project = (
+        capability: NotificationMigratedCapability,
+    ): readonly AuthorizationScope[] | null =>
+        projectNotificationCapabilityDecision(
+            actor,
+            capability,
+            getNotificationPresentationDecision(decisions, capability),
+        );
+
+    return Object.freeze({
+        canReadInbox: hasNotificationScope(
+            project("notification.inbox.read"),
+            "OWN",
+        ),
+        canUpdateInbox: hasNotificationScope(
+            project("notification.inbox.update"),
+            "OWN",
+        ),
     });
 }
 

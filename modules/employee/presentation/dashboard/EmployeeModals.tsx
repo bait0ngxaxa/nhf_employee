@@ -2,8 +2,10 @@
 
 import { EditEmployeeForm } from "./edit-employee";
 import { useEmployeeUIContext } from "./context/EmployeeContext";
+import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 
 export function EmployeeModals() {
+    const { user } = useDashboardDataContext();
     const {
         isEditFormOpen,
         employeeToEdit,
@@ -20,6 +22,7 @@ export function EmployeeModals() {
                 isOpen={isEditFormOpen}
                 onClose={handleCloseEditForm}
                 onSuccess={handleEmployeeUpdate}
+                canReadDepartments={user?.departmentCapabilities?.canReadDepartments === true}
             />
         </>
     );

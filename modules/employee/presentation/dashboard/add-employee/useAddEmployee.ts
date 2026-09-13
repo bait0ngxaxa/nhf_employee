@@ -29,11 +29,13 @@ function getAddEmployeeErrorMessage(error: unknown): string {
 
 interface UseAddEmployeeOptions {
     onSuccess?: () => void;
+    canReadDepartments: boolean;
 }
 
 interface UseAddEmployeeReturn {
     formData: EmployeeFormData;
     departments: Department[];
+    canReadDepartments: boolean;
     isLoading: boolean;
     error: string;
     fieldErrors: Record<string, string>;
@@ -46,12 +48,13 @@ interface UseAddEmployeeReturn {
 
 export function useAddEmployee({
     onSuccess,
+    canReadDepartments,
 }: UseAddEmployeeOptions): UseAddEmployeeReturn {
     const [formData, setFormData] =
         useState<EmployeeFormData>(INITIAL_FORM_DATA);
 
     const { data: departmentData } = useSWR<{ departments: Department[] }>(
-        API_ROUTES.employees.departments,
+        canReadDepartments ? API_ROUTES.employees.departments : null,
     );
     const departments = departmentData?.departments || [];
 
@@ -82,6 +85,11 @@ export function useAddEmployee({
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
         if (isLoading) {
+            return;
+        }
+
+        if (!canReadDepartments) {
+            setError("ไม่สามารถเพิ่มพนักงานได้ เนื่องจากไม่สามารถโหลดข้อมูลแผนก");
             return;
         }
 
@@ -144,6 +152,7 @@ export function useAddEmployee({
     return {
         formData,
         departments,
+        canReadDepartments,
         isLoading,
         error,
         fieldErrors,

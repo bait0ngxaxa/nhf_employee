@@ -21,12 +21,14 @@ export function NotificationsHeader({
     totalCount,
     hasUnread,
     isMarkingAll,
+    canUpdateInbox,
     onMarkAll,
 }: {
     filter: NotificationFilter;
     totalCount: number;
     hasUnread: boolean;
     isMarkingAll: boolean;
+    canUpdateInbox: boolean;
     onMarkAll: () => void;
 }): React.ReactElement {
     const countLabel = filter === "unread"
@@ -45,24 +47,26 @@ export function NotificationsHeader({
                 </h1>
                 <p className="mt-0.5 text-sm text-content-secondary">{countLabel}</p>
             </div>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onMarkAll}
-                disabled={!hasUnread || isMarkingAll}
-                className="border-border-subtle bg-surface text-sm font-semibold text-content-body hover:bg-surface-subtle"
-                aria-busy={isMarkingAll}
-            >
-                {isMarkingAll ? (
-                    <NotificationInlineLoading label="กำลังอัปเดต" />
-                ) : (
-                    <>
-                        <Check className="h-4 w-4" aria-hidden="true" />
-                        อ่านทั้งหมด
-                    </>
-                )}
-            </Button>
+            {canUpdateInbox ? (
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onMarkAll}
+                    disabled={!hasUnread || isMarkingAll}
+                    className="border-border-subtle bg-surface text-sm font-semibold text-content-body hover:bg-surface-subtle"
+                    aria-busy={isMarkingAll}
+                >
+                    {isMarkingAll ? (
+                        <NotificationInlineLoading label="กำลังอัปเดต" />
+                    ) : (
+                        <>
+                            <Check className="h-4 w-4" aria-hidden="true" />
+                            อ่านทั้งหมด
+                        </>
+                    )}
+                </Button>
+            ) : null}
         </header>
     );
 }

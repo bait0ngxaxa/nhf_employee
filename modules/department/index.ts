@@ -14,6 +14,7 @@ export {
     buildDepartmentAuthorizationContext,
     DepartmentCapabilityDeniedError,
     DEPARTMENT_MIGRATED_CAPABILITIES,
+    getDepartmentPresentationCapabilities,
     resolveDepartmentCapabilityForMigration,
 } from "./application/authorization";
 export type {
@@ -22,3 +23,4 @@ export type {
     DepartmentCapabilityAuthorization,
     DepartmentMigratedCapability,
 } from "./application/authorization";
+export type { DepartmentPresentationCapabilities } from "./application/types";

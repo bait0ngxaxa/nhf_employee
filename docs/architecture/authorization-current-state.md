@@ -1,6 +1,6 @@
 # NHF Employee — Current Authorization State
 
-สถานะ: Baseline Phase 0 พร้อมบันทึก migration ถึง Phase 9A; Phase 9A remaining server authorization migration — CLOSED; Phase 9B — NOT STARTED; Phase 9C — NOT STARTED; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Email Request / future IT module — DEFERRED<br>
+สถานะ: Baseline Phase 0 พร้อมบันทึก migration ถึง Phase 9B; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C — NOT STARTED; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-13<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -19,6 +19,8 @@
 หมายเหตุ Phase 8C: เพิ่ม trusted server-side RSC boundary ให้ `/dashboard/employees` โดยใช้ `canReadEmployees OR canReadStats` ร่วมกับ `canAccessEmployeeDashboard()` เดียวกับเมนู/`handleMenuClick()`; direct Add/Import routes ยังคงตรวจ capability เฉพาะของตนเอง. Complete-surface search ไม่พบ production Employee bypass, Employee presentation ADMIN authority หรือ delete/offboarding UI; EmployeeProvider และ Employee-specific Add/Import global revalidation ตรวจ capability ก่อนโหลด/refresh. ผล export/read reachability, role classification, route parity, API call-site audit และ regression evidence อยู่ใน [authorization-employee-migration.md](authorization-employee-migration.md)
 
 หมายเหตุ Phase 9A: Department, Audit read และ Notification inbox server routes ย้ายมาใช้ domain-owned authorization adapters และ central resolver ด้วย `DASHBOARD` actor โดยคง `requireApiSession()` เป็น authentication/legacy workforce boundary. `NO_APPLICABLE_GRANT` compatibility floor ใช้เฉพาะ Department และ Notification เพื่อรักษา eligible-user behavior เดิม; Audit คง Admin central semantics และรองรับ explicit `audit.read / ALL` grant ของ normal USER โดยไม่เปิด access ให้ผู้ใช้ที่ไม่มี grant. Notification ยังคง actor-derived `OWN` predicates ใน query/update layer. Audit cleanup และ export-event ไม่ได้ถูกแปลงเป็น `audit.read`, Email Request ยังคง deferred และไม่มี presentation migration ใน Phase 9A. รายละเอียดอยู่ใน [authorization-remaining-server-migration.md](authorization-remaining-server-migration.md)
+
+หมายเหตุ Phase 9B: Department, Audit และ Notification เพิ่ม immutable domain-owned presentation projections จาก resolver เดียวกับ Phase 9A แล้วต่อเข้ากับ trusted `getCurrentUserProjection()` หลัง current active Employee lifecycle check. Audit menu, `handleMenuClick()` และ `/dashboard/audit` ใช้ `auditCapabilities`; Notification Navbar/page ใช้ `canReadInbox` และคง read/update เป็นอิสระ; Employee Add/Edit Department selectors เรียก `/api/departments` เฉพาะเมื่อ `canReadDepartments` เป็น true และแยก unauthorized reference state จาก authorized-empty state. Phase 9A server authority ไม่เปลี่ยน, Email Request/future IT module ยังคง deferred และ Phase 9C ยังไม่เริ่ม. รายละเอียดอยู่ใน [authorization-remaining-presentation-migration.md](authorization-remaining-presentation-migration.md)
 
 เอกสารนี้เป็น baseline ของพฤติกรรมปัจจุบัน ไม่ใช่ policy ใหม่และไม่ใช่การออกแบบ resolver ในอนาคต ทุกข้อความที่ระบุว่า “ปัจจุบัน” หมายถึงสิ่งที่ trace ได้จาก code หรือ test โดยตรง การพบพฤติกรรมที่เสี่ยงหรือดูไม่ตรงกับหลัก least privilege จะถูกบันทึกเป็น risk เพื่อให้ Phase ถัดไปตัดสินใจอย่างชัดเจน โดย Phase 0 ไม่แก้ผลลัพธ์ authorization เดิม
 
@@ -52,7 +54,7 @@ web access cookie / LIFF session / system secret
 - ระบบ authorization ปัจจุบันมี Team, TeamRole, TeamMembership และ persisted capability grants ได้แก่ TeamCapabilityGrant, TeamRoleCapabilityGrant และ UserCapabilityGrant รวมถึง code-owned Capability Registry, Scope Registry, AuthorizationActor และ central resolver แล้ว
 - ชื่อ Team และ TeamRole ไม่มี authority โดยตัวมันเอง; authority มาจาก effective capability grants ที่ central resolver ประเมิน
 - Department / departmentId ยังไม่ถูกใช้เพื่ออนุมาน authorization
-- Routine, Stock, Leave, Employee, Department, Audit read และ Notification inbox server migrated paths ใช้ central resolver พร้อม domain-owned resource semantics และ compatibility floors ตาม migration records; Employee presentation และ complete-surface audit/regression hardening ของ current production surface ปิดแล้วใน Phase 8B/8C ตามลำดับ ขณะที่ Phase 9B presentation migration ยังไม่เริ่ม
+- Routine, Stock, Leave, Employee, Department, Audit read และ Notification inbox server migrated paths ใช้ central resolver พร้อม domain-owned resource semantics และ compatibility floors ตาม migration records; Employee presentation และ complete-surface audit/regression hardening ของ current production surface ปิดแล้วใน Phase 8B/8C ตามลำดับ และ Phase 9B presentation integration ของ Department/Audit/Notification ปิดแล้ว ขณะที่ Phase 9C ยังไม่เริ่ม
 
 ## 1. Scope, terms and classification
 
@@ -510,7 +512,7 @@ Later migration phases must preserve these behaviors until a policy change is ex
 26. **Phase 9A Department server closure** — `GET /api/departments` resolves `department.read / ALL` through the Department adapter and central resolver after the unchanged `requireApiSession()` eligibility boundary. Explicit ALLOW is authoritative; only `NO_APPLICABLE_GRANT` maps to the legacy eligible-user compatibility floor. Department remains reference data and is never mapped to Team or used to infer authority.
 27. **Phase 9A Audit server closure** — `GET /api/audit-logs` resolves `audit.read / ALL` through the Audit adapter and central resolver. ADMIN authority is central, explicit normal USER grants are accepted, and an ungranted USER remains denied. Query filters/pagination and Audit ownership remain unchanged; `/api/audit-logs/cleanup` and `/api/audit-logs/export` are separate system/instrumentation boundaries and are not `audit.read` routes.
 28. **Phase 9A Notification server closure** — all four Notification inbox routes resolve their exact registered read or update capability with `DASHBOARD` and require `OWN`; only `NO_APPLICABLE_GRANT` uses the eligible-user compatibility floor. The authenticated session supplies the actor user ID, and Notification persistence continues to enforce `userId` in read/update predicates. Read and update capabilities remain independent, and no UI migration occurred.
-29. **Phase 9A Email Request deferral** — `email.request.read`, `email.request.create` and `app/api/email-request/**` remain registered but deferred for the future IT module. Phase 9A does not activate, remove, rename or otherwise migrate them; Phase 9B and Phase 9C are not started.
+29. **Phase 9A/9B Email Request deferral** — `email.request.read`, `email.request.create` and `app/api/email-request/**` remain registered but deferred for the future IT module. Phase 9A/9B do not activate, remove, rename or otherwise migrate them; Phase 9C is not started.
 
 ## 8. Characterization tests
 
@@ -763,8 +765,10 @@ npm.cmd run test:run -- modules/authorization/application/resolver.test.ts modul
 ```
 
 ผล: **13 test files และ 122 tests ผ่าน**. รายละเอียด implementation,
-compatibility, excluded boundaries, Email Request deferral และ Phase 9B handoff
-อยู่ใน [authorization-remaining-server-migration.md](authorization-remaining-server-migration.md)
+compatibility, excluded boundaries และ Email Request deferral อยู่ใน
+[authorization-remaining-server-migration.md](authorization-remaining-server-migration.md);
+รายละเอียด Phase 9B presentation closure อยู่ใน
+[authorization-remaining-presentation-migration.md](authorization-remaining-presentation-migration.md)
 
 ## 9. Risks / Ambiguities / Phase 1 Inputs
 

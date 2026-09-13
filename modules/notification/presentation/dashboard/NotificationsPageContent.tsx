@@ -33,7 +33,15 @@ function getApiUrl(filter: NotificationFilter): string {
     return `${API_ROUTES.notifications.all}?filter=${filter}`;
 }
 
-export function NotificationsSection(): React.ReactElement {
+export interface NotificationsSectionProps {
+    readonly canReadInbox?: boolean;
+    readonly canUpdateInbox?: boolean;
+}
+
+export function NotificationsSection({
+    canReadInbox = false,
+    canUpdateInbox = false,
+}: NotificationsSectionProps): React.ReactElement {
     const router = useRouter();
     const [filter, setFilter] = useState<NotificationFilter>("all");
     const [items, setItems] = useState<NotificationItem[]>([]);
@@ -45,7 +53,7 @@ export function NotificationsSection(): React.ReactElement {
 
     const apiUrl = getApiUrl(filter);
     const { data, error, isLoading, mutate } = useSWR<NotificationsResponse>(
-        apiUrl,
+        canReadInbox ? apiUrl : null,
         notificationFetcher,
         {
             revalidateOnFocus: false,
@@ -57,6 +65,7 @@ export function NotificationsSection(): React.ReactElement {
             },
         },
     );
+
     const hasUnread = items.some((item) => !item.isRead);
     const totalCount = data?.totalCount ?? 0;
 
@@ -86,9 +95,24 @@ export function NotificationsSection(): React.ReactElement {
         }
     }, [apiUrl, cursor, isLoadingMore]);
 
+    if (!canReadInbox) {
+        return <></>;
+    }
+
     const handleMarkAsRead = async (
         notification: NotificationItem,
     ): Promise<void> => {
+        const targetUrl = normalizeNotificationActionUrl(
+            notification.actionUrl,
+        );
+
+        if (!canUpdateInbox) {
+            if (targetUrl) {
+                router.push(targetUrl);
+            }
+            return;
+        }
+
         if (pendingId || isMarkingAll) {
             return;
         }
@@ -103,9 +127,6 @@ export function NotificationsSection(): React.ReactElement {
             );
             await mutate();
 
-            const targetUrl = normalizeNotificationActionUrl(
-                notification.actionUrl,
-            );
             if (targetUrl) {
                 router.push(targetUrl);
             }
@@ -119,7 +140,7 @@ export function NotificationsSection(): React.ReactElement {
     };
 
     const handleMarkAllAsRead = async (): Promise<void> => {
-        if (isMarkingAll || !hasUnread) {
+        if (!canUpdateInbox || isMarkingAll || !hasUnread) {
             return;
         }
 
@@ -155,6 +176,7 @@ export function NotificationsSection(): React.ReactElement {
                     totalCount={totalCount}
                     hasUnread={hasUnread}
                     isMarkingAll={isMarkingAll}
+                    canUpdateInbox={canUpdateInbox}
                     onMarkAll={() => void handleMarkAllAsRead()}
                 />
                 <NotificationFilterTabs
@@ -172,7 +194,7 @@ export function NotificationsSection(): React.ReactElement {
                         <NotificationPageList
                             items={items}
                             pendingId={pendingId}
-                            isDisabled={Boolean(pendingId) || isMarkingAll}
+                            isDisabled={canUpdateInbox && (Boolean(pendingId) || isMarkingAll)}
                             onOpen={handleMarkAsRead}
                         />
                     )}

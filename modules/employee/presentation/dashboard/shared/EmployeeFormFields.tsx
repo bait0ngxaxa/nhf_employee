@@ -74,6 +74,7 @@ export function EmployeeFormFields({
     formData,
     fieldErrors,
     departments,
+    canReadDepartments,
     onFieldChange,
 }: EmployeeFormFieldsProps) {
     return (
@@ -179,6 +180,7 @@ export function EmployeeFormFields({
                     onValueChange={(value) =>
                         onFieldChange("departmentId", value)
                     }
+                    disabled={!canReadDepartments}
                 >
                     <SelectTrigger
                         id="departmentId"
@@ -194,10 +196,18 @@ export function EmployeeFormFields({
                                 : ""
                         }
                     >
-                        <SelectValue placeholder="เลือกแผนก" />
+                        <SelectValue
+                            placeholder={canReadDepartments
+                                ? "เลือกแผนก"
+                                : "ไม่สามารถโหลดข้อมูลแผนกได้"}
+                        />
                     </SelectTrigger>
                     <SelectContent>
-                        {departments.length > 0 ? (
+                        {!canReadDepartments ? (
+                            <SelectItem value="__unavailable" disabled>
+                                ไม่มีสิทธิ์เข้าถึงข้อมูลแผนก
+                            </SelectItem>
+                        ) : departments.length > 0 ? (
                             departments.map((dept) => (
                                 <SelectItem
                                     key={dept.id}
@@ -214,6 +224,11 @@ export function EmployeeFormFields({
                         )}
                     </SelectContent>
                 </Select>
+                {!canReadDepartments && (
+                    <p className="text-xs leading-5 text-content-secondary [overflow-wrap:anywhere]" role="status">
+                        ไม่สามารถโหลดรายการแผนกได้ เนื่องจากไม่มีสิทธิ์เข้าถึงข้อมูลอ้างอิง
+                    </p>
+                )}
                 {fieldErrors.departmentId && (
                     <p
                         id="departmentId-error"

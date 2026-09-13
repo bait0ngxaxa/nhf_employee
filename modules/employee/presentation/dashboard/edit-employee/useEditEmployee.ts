@@ -34,11 +34,13 @@ interface UseEditEmployeeOptions {
     isOpen: boolean;
     onClose: () => void;
     onSuccess?: () => void;
+    canReadDepartments: boolean;
 }
 
 interface UseEditEmployeeReturn {
     formData: EmployeeFormData;
     departments: Department[];
+    canReadDepartments: boolean;
     isLoading: boolean;
     error: string;
     fieldErrors: Record<string, string>;
@@ -56,13 +58,14 @@ export function useEditEmployee({
     isOpen,
     onClose,
     onSuccess,
+    canReadDepartments,
 }: UseEditEmployeeOptions): UseEditEmployeeReturn {
     const [formData, setFormData] = useState<EmployeeFormData>(() =>
         buildInitialFormData(employee),
     );
 
     const { data: departmentData } = useSWR<{ departments: Department[] }>(
-        isOpen ? API_ROUTES.employees.departments : null,
+        isOpen && canReadDepartments ? API_ROUTES.employees.departments : null,
     );
     const departments = departmentData?.departments || [];
 
@@ -150,6 +153,7 @@ export function useEditEmployee({
     return {
         formData,
         departments,
+        canReadDepartments,
         isLoading,
         error,
         fieldErrors,

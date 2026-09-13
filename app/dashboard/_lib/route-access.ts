@@ -22,6 +22,18 @@ export async function requireDashboardAdmin(): Promise<void> {
     }
 }
 
+export async function requireDashboardAuditCapability(): Promise<void> {
+    const user = await getCurrentUserProjection();
+
+    if (!user) {
+        redirect(APP_ROUTES.login);
+    }
+
+    if (user.auditCapabilities?.canReadAuditLogs !== true) {
+        redirect(APP_ROUTES.accessDenied);
+    }
+}
+
 export async function requireDashboardEmployeeCapability(
     capability: DashboardEmployeeCapability,
 ): Promise<void> {

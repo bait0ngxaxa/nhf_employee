@@ -8,16 +8,20 @@ import type { AddEmployeeFormProps } from "../types";
 import { EmployeeFormFields } from "../shared";
 import { useAddEmployee } from "./useAddEmployee";
 
-export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
+export function AddEmployeeForm({
+    onSuccess,
+    canReadDepartments,
+}: AddEmployeeFormProps) {
     const {
         formData,
         departments,
+        canReadDepartments: projectedCanReadDepartments,
         isLoading,
         error,
         fieldErrors,
         handleFieldChange,
         handleSubmit,
-    } = useAddEmployee({ onSuccess });
+    } = useAddEmployee({ onSuccess, canReadDepartments });
 
     return (
         <Card className="mx-auto w-full max-w-3xl rounded-xl border-border-subtle bg-surface-raised shadow-none">
@@ -28,6 +32,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                             formData={formData}
                             fieldErrors={fieldErrors}
                             departments={departments}
+                            canReadDepartments={projectedCanReadDepartments}
                             onFieldChange={handleFieldChange}
                         />
 
@@ -46,7 +51,7 @@ export function AddEmployeeForm({ onSuccess }: AddEmployeeFormProps) {
                         <Button
                             type="submit"
                             className="h-11 w-full bg-action-primary-solid text-base font-bold text-content-on-brand transition-colors hover:bg-action-primary-solid-hover"
-                            disabled={isLoading}
+                            disabled={isLoading || !projectedCanReadDepartments}
                         >
                             {isLoading ? (
                                 <>

@@ -6,6 +6,8 @@ import {
     useDashboardUIContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 
+const notificationDropdownMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
     useDashboardDataContext: vi.fn(),
     useDashboardUIContext: vi.fn(),
@@ -14,7 +16,10 @@ vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
 vi.mock(
     "@/modules/notification/client",
     () => ({
-        NotificationDropdown: () => <button type="button">การแจ้งเตือน</button>,
+        NotificationDropdown: (props: { canUpdateInbox: boolean }) => {
+            notificationDropdownMock(props);
+            return <button type="button">การแจ้งเตือน</button>;
+        },
     }),
 );
 
@@ -119,5 +124,40 @@ describe("DashboardNavbar mobile navigation", () => {
 
         expect(matchMedia).toHaveBeenCalledWith("(min-width: 1024px)");
         expect(setMobileNavOpen).not.toHaveBeenCalledWith(false);
+    });
+
+    it("does not mount the Notification dropdown without read capability", () => {
+        mockNavbarContext(false);
+
+        render(<DashboardNavbar />);
+
+        expect(screen.queryByRole("button", { name: "การแจ้งเตือน" })).not.toBeInTheDocument();
+        expect(notificationDropdownMock).not.toHaveBeenCalled();
+    });
+
+    it("passes independent read-only Notification update state to the dropdown", () => {
+        mockNavbarContext(false);
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: {
+                id: "employee-1",
+                name: "สมชาย ใจดี",
+                email: "somchai@example.com",
+                role: "USER",
+                notificationCapabilities: {
+                    canReadInbox: true,
+                    canUpdateInbox: false,
+                },
+            },
+            isAdmin: false,
+            availableMenuGroups: [],
+        });
+
+        render(<DashboardNavbar />);
+
+        expect(screen.getByRole("button", { name: "การแจ้งเตือน" })).toBeInTheDocument();
+        expect(notificationDropdownMock).toHaveBeenCalledWith({
+            canUpdateInbox: false,
+        });
     });
 });

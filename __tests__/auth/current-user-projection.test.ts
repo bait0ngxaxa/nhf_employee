@@ -9,6 +9,9 @@ import type {
     CurrentEmployeeLeaveProjection,
     LeavePresentationCapabilities,
 } from "@/modules/leave";
+import type { DepartmentPresentationCapabilities } from "@/modules/department";
+import type { AuditPresentationCapabilities } from "@/modules/audit";
+import type { NotificationPresentationCapabilities } from "@/modules/notification";
 
 const {
     cookiesMock,
@@ -22,6 +25,12 @@ const {
     routineProjectionMock,
     stockContextMock,
     stockProjectionMock,
+    departmentContextMock,
+    departmentProjectionMock,
+    auditContextMock,
+    auditProjectionMock,
+    notificationContextMock,
+    notificationProjectionMock,
 } = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
     resolveAccountMock: vi.fn(),
@@ -34,6 +43,12 @@ const {
     routineProjectionMock: vi.fn(),
     stockContextMock: vi.fn(),
     stockProjectionMock: vi.fn(),
+    departmentContextMock: vi.fn(),
+    departmentProjectionMock: vi.fn(),
+    auditContextMock: vi.fn(),
+    auditProjectionMock: vi.fn(),
+    notificationContextMock: vi.fn(),
+    notificationProjectionMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
@@ -54,6 +69,18 @@ vi.mock("@/modules/routine", () => ({
 vi.mock("@/modules/stock", () => ({
     buildStockAuthorizationContext: stockContextMock,
     getStockPresentationCapabilities: stockProjectionMock,
+}));
+vi.mock("@/modules/department", () => ({
+    buildDepartmentAuthorizationContext: departmentContextMock,
+    getDepartmentPresentationCapabilities: departmentProjectionMock,
+}));
+vi.mock("@/modules/audit", () => ({
+    buildAuditAuthorizationContext: auditContextMock,
+    getAuditPresentationCapabilities: auditProjectionMock,
+}));
+vi.mock("@/modules/notification", () => ({
+    buildNotificationAuthorizationContext: notificationContextMock,
+    getNotificationPresentationCapabilities: notificationProjectionMock,
 }));
 
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
@@ -127,6 +154,19 @@ const EMPLOYEE_CAPABILITIES: EmployeePresentationCapabilities = {
     canExportEmployees: true,
 };
 
+const DEPARTMENT_CAPABILITIES: DepartmentPresentationCapabilities = {
+    canReadDepartments: true,
+};
+
+const AUDIT_CAPABILITIES: AuditPresentationCapabilities = {
+    canReadAuditLogs: true,
+};
+
+const NOTIFICATION_CAPABILITIES: NotificationPresentationCapabilities = {
+    canReadInbox: true,
+    canUpdateInbox: false,
+};
+
 describe("current-user application projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -157,9 +197,15 @@ describe("current-user application projection", () => {
         routineProjectionMock.mockResolvedValue(ROUTINE);
         stockContextMock.mockReturnValue({ authorizationActor: "stock-actor" });
         stockProjectionMock.mockResolvedValue(STOCK);
+        departmentContextMock.mockReturnValue({ authorizationActor: "department-actor" });
+        departmentProjectionMock.mockResolvedValue(DEPARTMENT_CAPABILITIES);
+        auditContextMock.mockReturnValue({ authorizationActor: "audit-actor" });
+        auditProjectionMock.mockResolvedValue(AUDIT_CAPABILITIES);
+        notificationContextMock.mockReturnValue({ authorizationActor: "notification-actor" });
+        notificationProjectionMock.mockResolvedValue(NOTIFICATION_CAPABILITIES);
     });
 
-    it("returns the server-derived Routine projection with the compatible Employee/Department/Leave projection", async () => {
+    it("returns all server-derived Dashboard projections after the Employee lifecycle check", async () => {
         await expect(getCurrentUserProjection()).resolves.toEqual({
             id: "41",
             role: "ADMIN",
@@ -173,6 +219,9 @@ describe("current-user application projection", () => {
             routineCapabilities: ROUTINE,
             stockCapabilities: STOCK,
             employeeCapabilities: EMPLOYEE_CAPABILITIES,
+            departmentCapabilities: DEPARTMENT_CAPABILITIES,
+            auditCapabilities: AUDIT_CAPABILITIES,
+            notificationCapabilities: NOTIFICATION_CAPABILITIES,
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
@@ -209,6 +258,27 @@ describe("current-user application projection", () => {
         expect(stockProjectionMock).toHaveBeenCalledWith({
             authorizationActor: "stock-actor",
         });
+        expect(departmentContextMock).toHaveBeenCalledWith(
+            { id: 41, role: "ADMIN" },
+            101,
+        );
+        expect(departmentProjectionMock).toHaveBeenCalledWith({
+            authorizationActor: "department-actor",
+        });
+        expect(auditContextMock).toHaveBeenCalledWith(
+            { id: 41, role: "ADMIN" },
+            101,
+        );
+        expect(auditProjectionMock).toHaveBeenCalledWith({
+            authorizationActor: "audit-actor",
+        });
+        expect(notificationContextMock).toHaveBeenCalledWith(
+            { id: 41, role: "ADMIN" },
+            101,
+        );
+        expect(notificationProjectionMock).toHaveBeenCalledWith({
+            authorizationActor: "notification-actor",
+        });
     });
 
     it("keeps the broad projection unauthorized without an eligible Employee", async () => {
@@ -218,6 +288,9 @@ describe("current-user application projection", () => {
         expect(leaveProjectionMock).not.toHaveBeenCalled();
         expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
         expect(employeeCapabilitiesMock).not.toHaveBeenCalled();
+        expect(departmentProjectionMock).not.toHaveBeenCalled();
+        expect(auditProjectionMock).not.toHaveBeenCalled();
+        expect(notificationProjectionMock).not.toHaveBeenCalled();
     });
 
     it.each(["inactive", "suspended", "deleted"])(
@@ -283,5 +356,8 @@ describe("current-user application projection", () => {
         expect(leaveProjectionMock).not.toHaveBeenCalled();
         expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
         expect(employeeCapabilitiesMock).not.toHaveBeenCalled();
+        expect(departmentProjectionMock).not.toHaveBeenCalled();
+        expect(auditProjectionMock).not.toHaveBeenCalled();
+        expect(notificationProjectionMock).not.toHaveBeenCalled();
     });
 });

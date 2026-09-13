@@ -49,3 +49,7 @@ export type NotificationHistoryResult = {
     hasMore: boolean;
     totalCount: number;
 };
+export interface NotificationPresentationCapabilities {
+    readonly canReadInbox: boolean;
+    readonly canUpdateInbox: boolean;
+}

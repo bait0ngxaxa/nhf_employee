@@ -16,6 +16,7 @@ import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
+import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 
 /** Flat lookup used by handleMenuClick for feature and capability validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -69,7 +70,6 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "บันทึกการใช้งาน",
         icon: FileText,
         description: "ดูประวัติการใช้งานระบบ",
-        requiredRole: "ADMIN",
     },
 ];
 
@@ -212,6 +212,7 @@ export function getAvailableMenuGroups(
     stockCapabilities?: StockPresentationCapabilities,
     leaveAvailability?: Omit<LeaveDashboardAvailabilityInput, "isAdmin">,
     employeeCapabilities?: EmployeePresentationCapabilities,
+    auditCapabilities?: AuditPresentationCapabilities,
 ): MenuGroup[] {
     const stockAvailable = canAccessStockDashboard(stockCapabilities);
     const employeeAvailable = canAccessEmployeeDashboard(employeeCapabilities);
@@ -227,6 +228,9 @@ export function getAvailableMenuGroups(
             }
             if (item.id === "add-employee") {
                 return employeeCapabilities?.canCreateEmployees === true;
+            }
+            if (item.id === "audit-logs") {
+                return auditCapabilities?.canReadAuditLogs === true;
             }
             return !item.requiredRole
                 || (item.requiredRole === "ADMIN" && isAdmin);

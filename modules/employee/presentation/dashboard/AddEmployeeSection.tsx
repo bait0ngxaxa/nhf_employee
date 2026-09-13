@@ -44,6 +44,7 @@ export function AddEmployeeSection() {
 
                 <div className="space-y-8">
                     <AddEmployeeForm
+                        canReadDepartments={user?.departmentCapabilities?.canReadDepartments === true}
                         onSuccess={() => {
                             if (canReadStats) {
                                 void mutate(API_ROUTES.employees.stats);

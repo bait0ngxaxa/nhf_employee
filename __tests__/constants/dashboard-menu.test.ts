@@ -14,6 +14,7 @@ import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
+import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 
 const originalRoutineFlag = process.env.NEXT_PUBLIC_FEATURE_ROUTINE;
 const originalLeaveFlag = process.env.NEXT_PUBLIC_FEATURE_LEAVE;
@@ -88,6 +89,10 @@ const employeeAllCapabilities = {
     canImportEmployees: true,
     canExportEmployees: true,
 } satisfies EmployeePresentationCapabilities;
+
+const auditCapabilities = {
+    canReadAuditLogs: true,
+} satisfies AuditPresentationCapabilities;
 
 function getMenuIds(
     isAdmin: boolean,
@@ -253,6 +258,35 @@ describe("dashboard menu", () => {
         expect(userMenuIds).toContain("routine");
         expect(adminMenuIds).toContain("email-request");
         expect(userMenuIds).not.toContain("email-request");
+    });
+
+    it("uses the Audit projection while keeping Email Request role-gated", () => {
+        const grantedUserMenuIds = getAvailableMenuGroups(
+            false,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            auditCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+        const deniedUserMenuIds = getAvailableMenuGroups(false)
+            .flatMap((group) => group.items.map((item) => item.id));
+        const adminMenuIds = getAvailableMenuGroups(
+            true,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            auditCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+
+        expect(grantedUserMenuIds).toContain("audit-logs");
+        expect(deniedUserMenuIds).not.toContain("audit-logs");
+        expect(adminMenuIds).toContain("audit-logs");
+        expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === "audit-logs")?.requiredRole)
+            .toBeUndefined();
+        expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === "email-request")?.requiredRole)
+            .toBe("ADMIN");
     });
 
     it("shows Stock only when a Stock presentation surface is usable", () => {

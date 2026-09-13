@@ -152,9 +152,14 @@ export function DashboardNavbar(): ReactElement {
                 {/* Right: User menu */}
                 <div className="flex shrink-0 items-center gap-2 sm:gap-4">
                     {/* Notifications */}
-                    <NotificationDropdown />
-
-                    <div className="mx-1 hidden h-8 w-px bg-border-muted sm:block" />
+                    {user?.notificationCapabilities?.canReadInbox === true ? (
+                        <>
+                            <NotificationDropdown
+                                canUpdateInbox={user.notificationCapabilities.canUpdateInbox === true}
+                            />
+                            <div className="mx-1 hidden h-8 w-px bg-border-muted sm:block" />
+                        </>
+                    ) : null}
 
                     {/* User Dropdown */}
                     <DropdownMenu>

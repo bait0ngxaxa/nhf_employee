@@ -8,3 +8,4 @@ export {
 
 // Pure display formatter used by existing cross-capability presentation tests.
 export { formatAuditLogDisplay } from "./presentation/dashboard/display";
+export type { AuditPresentationCapabilities } from "./application/types";

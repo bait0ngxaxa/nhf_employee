@@ -6,6 +6,7 @@ import {
 } from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
+import type { DepartmentPresentationCapabilities } from "./types";
 
 export const DEPARTMENT_MIGRATED_CAPABILITIES = [
     "department.read",
@@ -137,6 +138,74 @@ function buildDepartmentCapabilityAuthorization(
         decision,
         scopes: decision.scopes,
         usedMigrationCompatibility: false,
+    });
+}
+
+function getDepartmentPresentationDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: DepartmentMigratedCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(
+            `Authorization resolver omitted Department capability: ${capability}`,
+        );
+    }
+    return decision;
+}
+
+function projectDepartmentCapabilityDecision(
+    actor: DepartmentAuthorizationActor,
+    capability: DepartmentMigratedCapability,
+    decision: AuthorizationDecision,
+): readonly AuthorizationScope[] | null {
+    try {
+        return assertDepartmentCapabilityScope(
+            buildDepartmentCapabilityAuthorization(actor, capability, decision),
+            "ALL",
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof DepartmentCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+function hasDepartmentScope(
+    scopes: readonly AuthorizationScope[] | null,
+    scope: AuthorizationScope,
+): boolean {
+    return scopes?.includes(scope) === true || scopes?.includes("ALL") === true;
+}
+
+/**
+ * Projects Department reference-data eligibility for Dashboard presentation.
+ * The Department API remains the authoritative authorization boundary.
+ */
+export async function getDepartmentPresentationCapabilities(
+    context: DepartmentAuthorizationContext,
+): Promise<DepartmentPresentationCapabilities> {
+    const actor = context.authorizationActor;
+    const decisions = await authorization.resolveMany(
+        actor,
+        DEPARTMENT_MIGRATED_CAPABILITIES,
+    );
+    const decision = getDepartmentPresentationDecision(
+        decisions,
+        "department.read",
+    );
+    const scopes = projectDepartmentCapabilityDecision(
+        actor,
+        "department.read",
+        decision,
+    );
+
+    return Object.freeze({
+        canReadDepartments: hasDepartmentScope(scopes, "ALL"),
     });
 }
 

@@ -28,10 +28,12 @@ export function EditEmployeeForm({
     isOpen,
     onClose,
     onSuccess,
+    canReadDepartments,
 }: EditEmployeeFormProps) {
     const {
         formData,
         departments,
+        canReadDepartments: projectedCanReadDepartments,
         isLoading,
         error,
         fieldErrors,
@@ -39,7 +41,13 @@ export function EditEmployeeForm({
         handleStatusChange,
         handleSubmit,
         handleClose,
-    } = useEditEmployee({ employee, isOpen, onClose, onSuccess });
+    } = useEditEmployee({
+        employee,
+        isOpen,
+        onClose,
+        onSuccess,
+        canReadDepartments,
+    });
 
     if (!employee) return null;
 
@@ -60,6 +68,7 @@ export function EditEmployeeForm({
                         formData={formData}
                         fieldErrors={fieldErrors}
                         departments={departments}
+                        canReadDepartments={projectedCanReadDepartments}
                         onFieldChange={handleFieldChange}
                     />
 

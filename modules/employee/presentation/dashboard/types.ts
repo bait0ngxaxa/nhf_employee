@@ -55,6 +55,7 @@ export interface AddEmployeeFormProps {
     isOpen?: boolean;
     onClose?: () => void;
     onSuccess?: () => void;
+    canReadDepartments: boolean;
 }
 
 export interface EditEmployeeFormProps {
@@ -62,4 +63,5 @@ export interface EditEmployeeFormProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess?: () => void;
+    canReadDepartments: boolean;
 }

@@ -65,6 +65,7 @@ export function DashboardProvider({
                 canViewLeaveReports: user?.canViewLeaveReports,
             },
             user?.employeeCapabilities,
+            user?.auditCapabilities,
         ),
         [
             isAdmin,
@@ -74,6 +75,7 @@ export function DashboardProvider({
             user?.canApproveLeave,
             user?.canViewLeaveReports,
             user?.employeeCapabilities,
+            user?.auditCapabilities,
         ],
     );
 
@@ -135,6 +137,13 @@ export function DashboardProvider({
                 router.push(APP_ROUTES.accessDenied);
                 return;
             }
+            if (
+                menuId === "audit-logs"
+                && user?.auditCapabilities?.canReadAuditLogs !== true
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
             if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
@@ -155,6 +164,7 @@ export function DashboardProvider({
             user?.canApproveLeave,
             user?.canViewLeaveReports,
             user?.employeeCapabilities,
+            user?.auditCapabilities,
         ],
     );
 

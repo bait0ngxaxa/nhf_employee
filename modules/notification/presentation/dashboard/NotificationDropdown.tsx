@@ -48,7 +48,13 @@ function getNotificationButtonLabel(unreadCount: number): string {
     return `เปิดการแจ้งเตือน มี ${unreadCount} รายการที่ยังไม่อ่าน`;
 }
 
-export function NotificationDropdown(): React.ReactElement {
+export interface NotificationDropdownProps {
+    readonly canUpdateInbox: boolean;
+}
+
+export function NotificationDropdown({
+    canUpdateInbox,
+}: NotificationDropdownProps): React.ReactElement {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [pendingId, setPendingId] = useState<string | null>(null);
@@ -70,6 +76,18 @@ export function NotificationDropdown(): React.ReactElement {
     const handleMarkAsRead = async (
         notification: NotificationItem,
     ): Promise<void> => {
+        const normalizedActionUrl = normalizeNotificationActionUrl(
+            notification.actionUrl,
+        );
+
+        if (!canUpdateInbox) {
+            if (normalizedActionUrl) {
+                setOpen(false);
+                router.push(normalizedActionUrl);
+            }
+            return;
+        }
+
         if (pendingId || isMarkingAll) {
             return;
         }
@@ -79,9 +97,6 @@ export function NotificationDropdown(): React.ReactElement {
             await apiPatch(API_ROUTES.notifications.read(notification.id));
             await mutate();
 
-            const normalizedActionUrl = normalizeNotificationActionUrl(
-                notification.actionUrl,
-            );
             if (normalizedActionUrl) {
                 setOpen(false);
                 router.push(normalizedActionUrl);
@@ -96,7 +111,7 @@ export function NotificationDropdown(): React.ReactElement {
     };
 
     const handleMarkAllAsRead = async (): Promise<void> => {
-        if (isMarkingAll || unreadCount <= 0) {
+        if (!canUpdateInbox || isMarkingAll || unreadCount <= 0) {
             return;
         }
 
@@ -151,24 +166,26 @@ export function NotificationDropdown(): React.ReactElement {
                                 : "ไม่มีรายการค้างอ่าน"}
                         </p>
                     </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleMarkAllAsRead()}
-                        disabled={unreadCount <= 0 || isMarkingAll}
-                        className="shrink-0 rounded-lg border-border-subtle bg-surface text-sm font-semibold text-content-body"
-                        aria-busy={isMarkingAll}
-                    >
-                        {isMarkingAll ? (
-                            <NotificationInlineLoading label="กำลังอ่าน" />
-                        ) : (
-                            <>
-                                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                                อ่านทั้งหมด
-                            </>
-                        )}
-                    </Button>
+                    {canUpdateInbox ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleMarkAllAsRead()}
+                            disabled={unreadCount <= 0 || isMarkingAll}
+                            className="shrink-0 rounded-lg border-border-subtle bg-surface text-sm font-semibold text-content-body"
+                            aria-busy={isMarkingAll}
+                        >
+                            {isMarkingAll ? (
+                                <NotificationInlineLoading label="กำลังอ่าน" />
+                            ) : (
+                                <>
+                                    <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                                    อ่านทั้งหมด
+                                </>
+                            )}
+                        </Button>
+                    ) : null}
                 </div>
 
                 <div className="max-h-[min(26rem,calc(100dvh-12rem))] overflow-y-auto">
@@ -188,7 +205,7 @@ export function NotificationDropdown(): React.ReactElement {
                                     key={notification.id}
                                     notification={notification}
                                     isPending={pendingId === notification.id}
-                                    isDisabled={Boolean(pendingId) || isMarkingAll}
+                                    isDisabled={canUpdateInbox && (Boolean(pendingId) || isMarkingAll)}
                                     onOpen={handleMarkAsRead}
                                 />
                             ))}

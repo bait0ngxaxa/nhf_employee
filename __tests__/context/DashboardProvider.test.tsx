@@ -486,4 +486,53 @@ describe("DashboardProvider navigation state", () => {
         fireEvent.click(screen.getByRole("button", { name: "Email Request" }));
         expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
     });
+
+    it("uses projected Audit access for visibility and stale menu clicks", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button
+                    type="button"
+                    onClick={() => handleMenuClick("audit-logs")}
+                >
+                    Audit
+                </button>
+            );
+        }
+
+        const { rerender } = render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent("audit-logs");
+        fireEvent.click(screen.getByRole("button", { name: "Audit" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+
+        navigationMocks.router.push.mockReset();
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            auditCapabilities: { canReadAuditLogs: true },
+        };
+        rerender(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("audit-logs");
+        fireEvent.click(screen.getByRole("button", { name: "Audit" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/audit",
+            { scroll: false },
+        );
+    });
 });

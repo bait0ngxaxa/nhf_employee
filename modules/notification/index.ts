@@ -18,6 +18,7 @@ export {
     buildNotificationAuthorizationContext,
     NotificationCapabilityDeniedError,
     NOTIFICATION_MIGRATED_CAPABILITIES,
+    getNotificationPresentationCapabilities,
     resolveNotificationCapabilityForMigration,
 } from "./application/authorization";
 export type {
@@ -26,6 +27,7 @@ export type {
     NotificationCapabilityAuthorization,
     NotificationMigratedCapability,
 } from "./application/authorization";
+export type { NotificationPresentationCapabilities } from "./application/types";
 export type {
     NotificationCreateInput,
     NotificationHistoryQuery,

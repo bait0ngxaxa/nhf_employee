@@ -4,6 +4,9 @@ import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
+import type { DepartmentPresentationCapabilities } from "@/modules/department";
+import type { AuditPresentationCapabilities } from "@/modules/audit/client";
+import type { NotificationPresentationCapabilities } from "@/modules/notification/client";
 
 export interface DashboardUser {
     id?: string;
@@ -18,6 +21,9 @@ export interface DashboardUser {
     routineCapabilities?: RoutinePresentationCapabilities;
     stockCapabilities?: StockPresentationCapabilities;
     employeeCapabilities?: EmployeePresentationCapabilities;
+    departmentCapabilities?: DepartmentPresentationCapabilities;
+    auditCapabilities?: AuditPresentationCapabilities;
+    notificationCapabilities?: NotificationPresentationCapabilities;
 }
 
 export interface DashboardDataContextValue {

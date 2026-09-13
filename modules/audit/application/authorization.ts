@@ -6,6 +6,7 @@ import {
 } from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
+import type { AuditPresentationCapabilities } from "./types";
 
 export const AUDIT_MIGRATED_CAPABILITIES = [
     "audit.read",
@@ -102,6 +103,71 @@ function buildAuditCapabilityAuthorization(
         decision,
         scopes: decision.scopes,
         usedMigrationCompatibility: false,
+    });
+}
+
+function getAuditPresentationDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: AuditMigratedCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(
+            `Authorization resolver omitted Audit capability: ${capability}`,
+        );
+    }
+    return decision;
+}
+
+function projectAuditCapabilityDecision(
+    actor: AuditAuthorizationActor,
+    capability: AuditMigratedCapability,
+    decision: AuthorizationDecision,
+): readonly AuthorizationScope[] | null {
+    try {
+        return assertAuditCapabilityScope(
+            buildAuditCapabilityAuthorization(actor, capability, decision),
+            "ALL",
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof AuditCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+function hasAuditScope(
+    scopes: readonly AuthorizationScope[] | null,
+    scope: AuthorizationScope,
+): boolean {
+    return scopes?.includes(scope) === true || scopes?.includes("ALL") === true;
+}
+
+/**
+ * Projects Audit log eligibility for Dashboard presentation only. The Audit
+ * route and API remain authoritative and central-resolver driven.
+ */
+export async function getAuditPresentationCapabilities(
+    context: AuditAuthorizationContext,
+): Promise<AuditPresentationCapabilities> {
+    const actor = context.authorizationActor;
+    const decisions = await authorization.resolveMany(
+        actor,
+        AUDIT_MIGRATED_CAPABILITIES,
+    );
+    const decision = getAuditPresentationDecision(decisions, "audit.read");
+    const scopes = projectAuditCapabilityDecision(
+        actor,
+        "audit.read",
+        decision,
+    );
+
+    return Object.freeze({
+        canReadAuditLogs: hasAuditScope(scopes, "ALL"),
     });
 }
 

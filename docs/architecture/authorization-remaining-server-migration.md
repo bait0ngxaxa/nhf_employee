@@ -3,7 +3,7 @@
 สถานะ: **Phase 9A — CLOSED**  
 Baseline: `139022923f8bfd9db059bad2026ebd059e345287`  
 วันที่: 2026-09-13  
-Phase 9B: **NOT STARTED**  
+Phase 9B: **CLOSED — presentation record:** [authorization-remaining-presentation-migration.md](authorization-remaining-presentation-migration.md)
 Phase 9C: **NOT STARTED**
 
 เอกสารนี้บันทึกการย้าย server authorization ของ Department, Audit read และ
@@ -146,9 +146,10 @@ npm.cmd run check
 ผล: ผ่านทั้งหมด — architecture check ตรวจ **1,058 source files**, strict lint
 ผ่าน, typecheck ผ่าน และ full Vitest ผ่าน **294 test files / 2,584 tests**.
 
-## 6. Phase 9B handoff
+## 6. Phase 9B presentation record
 
-งานถัดไปที่ยังไม่เริ่มคือ presentation migration และ capability-derived
-visibility ตาม scope ที่อนุมัติแยกต่างหาก. ยังไม่เปิด Team-based production
-policy, ไม่ retire compatibility floors, ไม่เพิ่ม explicit DENY และไม่ย้าย
-Email Request/future IT module.
+การเชื่อมต่อ presentation และ capability-derived visibility ตาม scope ของ Phase
+9B เสร็จใน [authorization-remaining-presentation-migration.md](authorization-remaining-presentation-migration.md).
+ยังไม่เปิด Team-based production policy, ไม่ retire compatibility floors,
+ไม่เพิ่ม explicit DENY และไม่ย้าย Email Request/future IT module. Phase 9C ยัง
+ไม่เริ่ม

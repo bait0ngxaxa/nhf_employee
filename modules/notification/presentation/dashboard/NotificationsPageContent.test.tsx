@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { apiGet } from "@/lib/client/api-client";
+import { apiGet, apiPatch, apiPost } from "@/lib/client/api-client";
 import type { ApiResponse } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { NotificationsSection } from "./NotificationsPageContent";
@@ -11,6 +11,8 @@ import type {
     NotificationsResponse,
 } from "./NotificationShared";
 
+const routerPush = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/client/api-client", () => ({
     apiGet: vi.fn(),
     apiPatch: vi.fn(),
@@ -18,7 +20,7 @@ vi.mock("@/lib/client/api-client", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push: vi.fn() }),
+    useRouter: () => ({ push: routerPush }),
 }));
 
 vi.mock("sonner", () => ({
@@ -36,14 +38,21 @@ function success<T>(data: T): ApiResponse<T> {
     };
 }
 
-function buildItem(id: string, title: string): NotificationItem {
+function buildItem(
+    id: string,
+    title: string,
+    options: Pick<NotificationItem, "isRead" | "actionUrl"> = {
+        isRead: true,
+        actionUrl: null,
+    },
+): NotificationItem {
     return {
         id,
         type: "SYSTEM_ALERT",
         title,
         message: `${title} message`,
-        isRead: true,
-        actionUrl: null,
+        isRead: options.isRead,
+        actionUrl: options.actionUrl,
         createdAt: "2026-09-09T10:00:00.000Z",
     };
 }
@@ -51,6 +60,18 @@ function buildItem(id: string, title: string): NotificationItem {
 describe("NotificationsSection history pagination", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        routerPush.mockReset();
+    });
+
+    it("does not request notification history without inbox read capability", () => {
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox={false} />
+            </SWRConfig>,
+        );
+
+        expect(apiGet).not.toHaveBeenCalled();
+        expect(screen.queryByRole("heading", { name: "การแจ้งเตือน" })).not.toBeInTheDocument();
     });
 
     it("passes an opaque cursor to Load More and appends the next page", async () => {
@@ -73,7 +94,7 @@ describe("NotificationsSection history pagination", () => {
 
         render(
             <SWRConfig value={{ provider: () => new Map() }}>
-                <NotificationsSection />
+                <NotificationsSection canReadInbox />
             </SWRConfig>,
         );
 
@@ -114,7 +135,7 @@ describe("NotificationsSection history pagination", () => {
 
         render(
             <SWRConfig value={{ provider: () => new Map() }}>
-                <NotificationsSection />
+                <NotificationsSection canReadInbox />
             </SWRConfig>,
         );
 
@@ -134,5 +155,78 @@ describe("NotificationsSection history pagination", () => {
         expect(apiGet).not.toHaveBeenCalledWith(
             `${API_ROUTES.notifications.all}?filter=unread&cursor=${encodeURIComponent(opaqueCursor)}`,
         );
+    });
+
+    it("keeps read and update behavior available together", async () => {
+        const notification = buildItem("notification-1", "อ่านได้", {
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        });
+        vi.mocked(apiGet).mockResolvedValue(success({
+            notifications: [notification],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 1,
+        }));
+        vi.mocked(apiPatch).mockResolvedValue(success({}));
+        vi.mocked(apiPost).mockResolvedValue(success({}));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("อ่านได้")).toBeInTheDocument();
+        });
+        expect(screen.getByRole("button", { name: "อ่านทั้งหมด" })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /อ่านได้/ }));
+        await waitFor(() => {
+            expect(apiPatch).toHaveBeenCalledWith(
+                API_ROUTES.notifications.read("notification-1"),
+            );
+        });
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+
+        fireEvent.click(screen.getByRole("button", { name: "อ่านทั้งหมด" }));
+        await waitFor(() => {
+            expect(apiPost).toHaveBeenCalledWith(API_ROUTES.notifications.markAllRead);
+        });
+    });
+
+    it("lets read-only users navigate without offering or triggering mutations", async () => {
+        const notification = buildItem("notification-1", "ไปยังรายการ", {
+            isRead: false,
+            actionUrl: "/dashboard/notifications?filter=all",
+        });
+        vi.mocked(apiGet).mockResolvedValue(success({
+            notifications: [notification],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 1,
+        }));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox={false} />
+            </SWRConfig>,
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText("ไปยังรายการ")).toBeInTheDocument();
+        });
+        expect(screen.queryByRole("button", { name: "อ่านทั้งหมด" })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /ไปยังรายการ/ }));
+
+        await waitFor(() => {
+            expect(routerPush).toHaveBeenCalledWith(
+                "/dashboard/notifications?filter=all",
+            );
+        });
+        expect(apiPatch).not.toHaveBeenCalled();
+        expect(apiPost).not.toHaveBeenCalled();
     });
 });

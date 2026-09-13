@@ -1,7 +1,8 @@
 # Authorization presentation capability projections
 
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
-closed; Employee Phase 8A/8B/8C closed
+closed; Employee Phase 8A/8B/8C closed; Phase 9A/9B Department, Audit and
+Notification integration closed
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -10,7 +11,9 @@ The Routine and Stock sections retain their completed migration records; the
 Leave Phase 7B section records the projection and the Phase 7C section records
 the final production-surface closure and regression hardening. The Employee
 Phase 8B section records the Dashboard projection and the Phase 8C section
-records the final complete-surface audit and regression hardening.
+records the final complete-surface audit and regression hardening. Phase 9B is
+recorded in
+[authorization-remaining-presentation-migration.md](authorization-remaining-presentation-migration.md).
 
 ## Contract and ownership
 
@@ -250,8 +253,8 @@ Read ALL never implies process or cancel ALL. Any remaining Stock role check is
 descriptive only (for example, a role badge); it does not select a tab, query
 scope, expose a control or authorize a mutation.
 
-Stock server enforcement remains authoritative. Audit, Email Request, Settings
-and other non-Routine/non-Stock presentation and authorization paths remain on
+Stock server enforcement remains authoritative. Email Request, Settings and
+other non-Routine/non-Stock presentation and authorization paths remain on
 their existing compatibility behavior until their approved migration phases.
 Routine and Employee behavior is unchanged by the Stock projection.
 
@@ -505,8 +508,8 @@ pagination uses `canReadEmployees`; stats uses `canReadStats`; add/import/edit/
 export use `canCreateEmployees`, `canImportEmployees`, `canUpdateEmployees`,
 and `canExportEmployees` respectively. `getAvailableMenuGroups()` and
 `DashboardProvider.handleMenuClick()` apply these checks without changing the
-generic `requiredRole: ADMIN` behavior for unrelated Email Request or Audit
-items. The direct Add Employee and Import Employee pages use a small trusted
+generic `requiredRole: ADMIN` behavior for unrelated Email Request items. The
+direct Add Employee and Import Employee pages use a small trusted
 server-side capability guard and preserve login, access-denied and render
 outcomes.
 
@@ -532,4 +535,17 @@ details are recorded in
 
 Employee Phase 8C is closed for the current production surface. This does not
 change the independent `employee.export` authority, broad read/stats/export
-policy, compatibility floor, or any deferred Department/Team policy.
+policy, compatibility floor, or any deferred Team policy.
+
+## Phase 9B remaining-domain presentation closure
+
+Phase 9B adds the Department, Audit and Notification presentation projections
+listed in [authorization-remaining-presentation-migration.md](authorization-remaining-presentation-migration.md).
+Department reference-data loading in Employee Add/Edit is capability-aware;
+Audit menu, stale menu clicks and direct route entry use `auditCapabilities`;
+Notification Navbar/page entry uses `canReadInbox`, while read-state mutation
+controls and side effects require the independent `canUpdateInbox` field.
+The current-user projection resolves these domain capabilities after the active
+Employee lifecycle check and batches independent projection work. Phase 9A
+server authorization remains authoritative, Email Request remains deferred, and
+Phase 9C is not started.

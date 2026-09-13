@@ -16,6 +16,7 @@ export {
     buildAuditAuthorizationContext,
     AuditCapabilityDeniedError,
     AUDIT_MIGRATED_CAPABILITIES,
+    getAuditPresentationCapabilities,
     resolveAuditCapabilityForMigration,
 } from "./application/authorization";
 export type {
@@ -24,6 +25,7 @@ export type {
     AuditCapabilityAuthorization,
     AuditMigratedCapability,
 } from "./application/authorization";
+export type { AuditPresentationCapabilities } from "./application/types";
 export type {
     AuditAppendCommand,
     AuditEntityHistoryQuery,
