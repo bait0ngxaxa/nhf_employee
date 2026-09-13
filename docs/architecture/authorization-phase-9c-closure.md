@@ -5,8 +5,11 @@ surfaces; **Phase 9 — CLOSED** สำหรับขอบเขตดัง�
 module — DEFERRED**
 
 วันที่ตรวจ: 2026-09-13  
-Baseline ที่ตรวจ: `4438f1cf4f1dbbadb012d9ce9164eb6eedf1b7d2`  
-HEAD ที่ตรวจ: `4438f1cf4f1dbbadb012d9ce9164eb6eedf1b7d2`
+Baseline audited: `4438f1cf4f1dbbadb012d9ce9164eb6eedf1b7d2`<br>
+Phase 9C implementation/fix commit: `7d1c459fb4eb3ff426e2d7935a060e0e1c05d7f0`<br>
+Final documentation reconciliation: applied against the implementation/fix
+commit above; the final SHA is the commit that records this documentation-only
+update.
 
 เอกสารนี้เป็น closure record ของ audit ไม่ใช่การเปิด policy ใหม่ และไม่ใช่
 หลักฐานว่า authorization program ทั้งหมดเสร็จสิ้น. Compatibility floors,
@@ -357,6 +360,10 @@ Result: passed
   typecheck: tsc --noEmit; passed
   full Vitest: 301 test files passed, 2,634 tests passed
 ```
+
+ตัวเลข focused และ full suite ข้างต้นเป็นผลที่บันทึกจากการรันโดย developer ใน
+environment ของ Phase 9C implementation/fix; ไม่มีการอ้าง GitHub CI status หรือ
+check จากหลักฐานชุดนี้
 
 A Codex Security standard-scan launcher was also attempted, but it could not
 start because this Windows environment resolves `python` to the Microsoft
