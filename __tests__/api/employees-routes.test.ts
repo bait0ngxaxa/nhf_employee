@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
 
@@ -20,6 +20,7 @@ import {
     buildEmployeeAuthorizationContext,
     createEmployee,
     deleteEmployee,
+    EmployeeCapabilityDeniedError,
     employeeFiltersSchema,
     importEmployeesFromCsvRows,
     getEmployeeStats,
@@ -100,6 +101,12 @@ const USER = {
 
 function employeeParams(id: string): { params: Promise<{ id: string }> } {
     return { params: Promise.resolve({ id }) };
+}
+
+function denyEmployeeCapability(capability: string): void {
+    vi.mocked(assertEmployeeCapabilityForMigration).mockRejectedValue(
+        new EmployeeCapabilityDeniedError(capability, "CHANNEL_NOT_SUPPORTED"),
+    );
 }
 
 describe("Employee mutation routes", () => {
@@ -446,6 +453,79 @@ describe("Employee mutation routes", () => {
             getEmployeeLeaveOffboardingBlockers,
             employeeAccountLifecycle,
         );
+    });
+
+    it("returns 403 before consuming the body or scheduling audit when create is denied", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: USER,
+            session: { user: { ...USER, id: String(USER.id) } },
+        });
+        denyEmployeeCapability("employee.create");
+        const json = vi.fn().mockRejectedValue(new Error("body must not be read"));
+
+        const response = await createEmployeeRoute({ json } as unknown as NextRequest);
+
+        expect(response.status).toBe(403);
+        expect(json).not.toHaveBeenCalled();
+        expect(createEmployee).not.toHaveBeenCalled();
+        expect(appendEmployeeCreateAudit).not.toHaveBeenCalled();
+        expect(after).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 before consuming the body or scheduling audit when import is denied", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: USER,
+            session: { user: { ...USER, id: String(USER.id) } },
+        });
+        denyEmployeeCapability("employee.import");
+        const json = vi.fn().mockRejectedValue(new Error("body must not be read"));
+
+        const response = await importEmployeesRoute({ json } as unknown as NextRequest);
+
+        expect(response.status).toBe(403);
+        expect(json).not.toHaveBeenCalled();
+        expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+        expect(after).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 without calling the update service or scheduling audit when update is denied", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: USER,
+            session: { user: { ...USER, id: String(USER.id) } },
+        });
+        denyEmployeeCapability("employee.update");
+
+        const response = await PATCH(new NextRequest(
+            "http://localhost/api/employees/12",
+            { method: "PATCH", body: JSON.stringify({ firstName: "Denied" }) },
+        ), employeeParams("12"));
+
+        expect(response.status).toBe(403);
+        expect(updateEmployee).not.toHaveBeenCalled();
+        expect(appendEmployeeUpdateAudit).not.toHaveBeenCalled();
+        expect(after).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 without calling the delete service or scheduling audit when delete is denied", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: USER,
+            session: { user: { ...USER, id: String(USER.id) } },
+        });
+        denyEmployeeCapability("employee.delete");
+
+        const response = await DELETE(new NextRequest(
+            "http://localhost/api/employees/12",
+            { method: "DELETE" },
+        ), employeeParams("12"));
+
+        expect(response.status).toBe(403);
+        expect(deleteEmployee).not.toHaveBeenCalled();
+        expect(appendEmployeeDeleteAudit).not.toHaveBeenCalled();
+        expect(after).not.toHaveBeenCalled();
     });
 
     it("accepts 1000 import rows for processing", async () => {

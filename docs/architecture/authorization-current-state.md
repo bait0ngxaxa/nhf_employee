@@ -46,7 +46,7 @@ web access cookie / LIFF session / system secret
 - ระบบ authorization ปัจจุบันมี Team, TeamRole, TeamMembership และ persisted capability grants ได้แก่ TeamCapabilityGrant, TeamRoleCapabilityGrant และ UserCapabilityGrant รวมถึง code-owned Capability Registry, Scope Registry, AuthorizationActor และ central resolver แล้ว
 - ชื่อ Team และ TeamRole ไม่มี authority โดยตัวมันเอง; authority มาจาก effective capability grants ที่ central resolver ประเมิน
 - Department / departmentId ยังไม่ถูกใช้เพื่ออนุมาน authorization
-- Routine, Stock และ Leave migrated paths ใช้ central resolver พร้อม domain-owned resource semantics และ compatibility floors ตาม migration records
+- Routine, Stock, Leave และ Employee server migrated paths ใช้ central resolver พร้อม domain-owned resource semantics และ compatibility floors ตาม migration records; Employee presentation ยังเป็น Phase 8B และ Employee complete-surface audit/regression hardening ยังเป็น Phase 8C
 
 ## 1. Scope, terms and classification
 
@@ -117,6 +117,7 @@ Source entry points หลัก:
 - Dashboard projection/guard: app/_lib/auth/current-user.ts:getCurrentUserProjection, app/dashboard/_lib/route-access.ts:requireDashboardAdmin
 - LIFF: modules/line/application/liff.ts:requireLiffWorkforceSession, modules/line/application/liff.ts:getLiffCapabilities
 - Domain-specific rules: modules/routine/application/authorization.ts, modules/routine/application/queries.ts, modules/routine/application/mutations.ts, modules/stock/application/queries/queries.ts, modules/stock/application/requests/request-mutations.ts, modules/leave/application/approvals/**, modules/leave/application/cancellation/cancellation.ts, modules/leave/application/not-taken.ts
+- Employee server authorization: modules/employee/application/authorization.ts เป็น adapter เดียวเหนือ central resolver; routes ใช้ requireApiSession() เป็น authentication/workforce eligibility แล้วให้ adapter ตัดสิน capability application authorization
 
 ## 3. Global current enforcement model
 
@@ -215,6 +216,12 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 | Employee | API | POST /api/employees (`employee.create`), PATCH /api/employees/:id (`employee.update`), DELETE /api/employees/:id (`employee.delete`), POST /api/employees/import (`employee.import`) | Employee lifecycle/data | requireApiSession() then corresponding Employee capability `/ ALL` | API eligible active Employee; update/delete mutation service rechecks transaction state | Employee adapter resolves centrally first; explicit USER ALLOW is honored; Admin-only behavior is retained only for `NO_APPLICABLE_GRANT` compatibility | `ADMIN` only on compatibility fallback; explicit effective USER grants can authorize | Locks User/Employee; blocks self-offboarding, last active Admin removal, subordinate/Leave dependencies; account lifecycle may deactivate/revoke auth | Admin may target selected Employee; no Team/Department authorization; import remains partial-success | None | Routes under app/api/employees/**, modules/employee/application/authorization.ts, modules/employee/application/mutations.ts, Auth lifecycle port | Admin form/import controls remain presentation behavior and are not server authority | Existing custom/default 401/403; validation/domain conflicts 400/409; missing target 404 | __tests__/api/employees-routes.test.ts, modules/employee/application/authorization.test.ts, modules/employee/application/mutations.test.ts, modules/employee/schemas/employee.test.ts | Only `NO_APPLICABLE_GRANT` bridges to legacy Admin floor; lifecycle/business/audit rules remain Employee-owned |
 | Department | API | GET /api/departments | Department reference data | requireApiSession() | Legacy eligible active Employee | Any eligible API user; no role or relationship scope | None | Organization-wide department reference list | All departments returned | None | app/api/departments/route.ts, modules/department/application/queries.ts | Used by forms/import selectors | Caller intentionally maps missing auth to 403; otherwise 500 | __tests__/api/departments-route.test.ts | Department is HR/reference data, not authorization input |
 | Account lifecycle | API | /api/auth/me, session listing/revoke/logout and account-link routes | User/account/session or linked LINE identity | Auth-specific access/refresh/CSRF/LINE verification | Current-user projection requires active Employee; session management is User-self scoped; account-link requires active workforce | These are authentication/account identity or self-management boundaries, not new domain permissions | Role not used for generic session self-management | Session operations target authenticated User's own records; account-link targets current User | OWN/self account/session | None | app/api/auth/**, app/api/line/account-link/route.ts, modules/auth/**, lib/auth/** | Auth status and session management UI | Mostly 401, validation 400, self-target not found/forbidden per route | __tests__/api/hybrid-auth-routes.test.ts, __tests__/auth/current-user-projection.test.ts, __tests__/integration/auth-session-concurrency.integration.test.ts | Out of Phase 0 authorization migration; preserve identity/session behavior |
+
+Employee Phase 8A inventory detail:
+
+- `modules/employee/application/authorization.ts` เป็น Employee adapter เหนือ central resolver: ตรวจเฉพาะ registered capabilities และ scope `ALL`, ใช้ compatibility ได้เมื่อ decision มี reason ตรงตัวเป็น `NO_APPLICABLE_GRANT` เท่านั้น และ explicit `ALLOW` ของ normal `USER` เป็น authority โดยไม่ promote role
+- `resolveEmployeeCapabilityInTransaction()` ใช้กับ update/delete เพื่อ lock และ re-read lifecycle ของ User/Employee ปัจจุบัน แล้ว re-resolve capability ใน transaction เดิม
+- Employee routes ใช้ `requireApiSession()` สำหรับ authentication/workforce eligibility และใช้ Employee capability adapter สำหรับ application authorization; `requireAdminSession()` ไม่ใช่ mutation authority ปัจจุบันของ Employee
 
 ### 4.3 Routine
 
@@ -453,7 +460,7 @@ Query and persistence scopes found include:
 | Requested by | StockRequest.requestedBy = userId | Stock request list/detail/cancel | OWN | Admin all is a separate role/domain branch |
 | Effective approver | exceptionApproverId ?? approverId | Leave approval, cancellation, not-taken, participant detail | ASSIGNED candidate | Requires Leave-specific effective-approver and workflow translation; OPEN — requires Phase 1/domain review |
 | Original approver history | LeaveRequest.approverId = employeeId | Leave approver-history report | OPEN | Not the same as effective approver after exception reassignment |
-| Direct reports/current team | Employee managerId = currentEmployeeId, active/deleted filters | Leave current-team report | TEAM candidate only if domain defines it | Do not equate HR manager relation with future Team persistence |
+| Direct reports/current team | Employee managerId = currentEmployeeId, active/deleted filters | Leave current-team report | TEAM candidate only if domain defines it | Do not equate HR manager relation with Team membership or Team-derived authority |
 | Participant | Leave owner/original/effective approver query branches | Leave detail and attachments | OPEN | Participant is a domain relation, not a universal scope |
 | Organization-wide | Empty or broad Prisma where after Admin/query path | Audit Admin read, Stock catalog/reports, Employee list/export, Routine all work items/export | ALL only where approved | Current broad USER surfaces require explicit policy decision |
 | Recovery candidate | Effective approver unavailable plus exclusions | Leave Admin recovery | OPEN | Special recovery operation; do not collapse into ordinary ALL |
@@ -614,8 +621,9 @@ server authorization tests.
     `authorization.resolveInTransaction()` ด้วย persisted role ปัจจุบัน
 - `__tests__/api/employees-routes.test.ts`
   - ยืนยัน list/stats/read capability entry points, explicit USER mutation
-    reachability, existing validation/id/auth-before-body ordering, audit
-    scheduling และ 1,000-row/partial import boundary
+    reachability, `EmployeeCapabilityDeniedError` ที่คืน 403 โดยไม่เรียก
+    mutation/import service หรือ schedule audit, existing validation/id/auth-before-body
+    ordering และ 1,000-row/partial import boundary
 - `__tests__/api/authorization-current-state.test.ts`
   - ยืนยัน USER export ยังคงผ่าน adapter และบันทึก audit actor เดิม
 - `modules/employee/application/mutations.test.ts` และ Employee integration
@@ -630,7 +638,7 @@ Focused invocation ที่รันจริงใน Phase 8A:
 npm.cmd run test:run -- modules/employee/application/authorization.test.ts modules/employee/application/mutations.test.ts __tests__/api/employees-routes.test.ts __tests__/api/authorization-current-state.test.ts
 ```
 
-ผลที่ยืนยันแล้ว: 4 test files และ 96 tests ผ่าน; `npm.cmd run typecheck` ผ่าน
+ผลที่ยืนยันแล้ว: 4 test files และ 100 tests ผ่าน; `npm.cmd run typecheck` ผ่าน
 
 ## 9. Risks / Ambiguities / Phase 1 Inputs
 
@@ -655,7 +663,7 @@ npm.cmd run test:run -- modules/employee/application/authorization.test.ts modul
 14. **Public upload vs private attachment** — public upload GET ไม่มี User auth ตาม design path; private Leave attachment route มี participant/Admin relationship. ต้องรักษา namespace boundary
 15. **Audit query ownership** — getAuditEntityHistory เป็น generic reader ที่ feature query เรียกหลัง resource authorization; ไม่พบ generic per-caller guard จึงต้อง audit callers ต่อเมื่อเพิ่ม consumer
 16. **Test coverage gaps** — มี tests แข็งแรงใน Routine/Stock/Leave relationship แต่ก่อน Phase 0 ไม่มี route test เฉพาะ Employee export และ Audit export; เพิ่ม characterization สำหรับสอง boundary แล้ว. ยังไม่มี live production authorization test และยังไม่ได้ตัดสิน policy ของ broad read/export
-17. **Department/Team ambiguity** — Department ถูกใช้ใน HR/reference/reporting; ไม่พบ Team persistence หรือ Team authorization. ห้ามใช้ชื่อแผนก/หน่วยงาน/ทีมในปัจจุบันเป็น future grant โดยอนุมาน
+17. **Department/Team boundary** — Department เป็น HR/reference structure ไม่ใช่ Team และไม่ใช่ authorization grouping. ระบบมี Team, TeamRole, TeamMembership และ persisted Team/TeamRole/direct User capability grants แล้ว แต่ authority จาก Team, TeamRole และ direct User grants ต้องผ่าน central authorization resolver เท่านั้น; ชื่อ Team หรือ TeamRole ไม่ได้ grant authority โดยตัวมันเอง และห้ามใช้ชื่อแผนก/หน่วยงาน/ทีมอนุมาน grant
 18. **Manager projection versus manager authority** — getCurrentEmployeeProjection() ใช้การมี subordinate relation เพื่อคำนวณ isManager แต่ query นี้ไม่ได้ใช้ active/deleted filter แบบเดียวกับ Leave report query; จึงอาจทำให้ tab/capability projection กว้างกว่า actionable server result. API approval/report ยังใช้ query scope ของตนเอง
 
 ### Migration notes

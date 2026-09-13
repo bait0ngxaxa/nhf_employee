@@ -170,6 +170,7 @@ rollback and audit behavior with the authorization revalidation seam present.
 `__tests__/api/employees-routes.test.ts` and
 `__tests__/api/authorization-current-state.test.ts` cover route composition,
 read/stats/export capability entry points, explicit USER mutation reachability,
+capability-denial HTTP 403 behavior, no service/audit scheduling after denial,
 auth-before-body, invalid IDs, audit scheduling and import row limits.
 
 No Employee authorization schema, seed grant, scope, registry entry or new
