@@ -24,6 +24,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
                 email: auth.user.email,
             },
             request.headers,
+            { mode: "LIFF_SELF_SERVICE" },
         );
         const reference = await getRoutineReferenceData({
             actor,

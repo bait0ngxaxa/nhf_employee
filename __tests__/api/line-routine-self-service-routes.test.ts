@@ -198,6 +198,16 @@ describe("LIFF Routine self-service route contracts", () => {
                 ],
             });
             expect(body).not.toHaveProperty("employees");
+            expect(mocks.getRoutineReferenceData).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actor: expect.objectContaining({
+                        id: 7,
+                        role,
+                        mode: "LIFF_SELF_SERVICE",
+                    }),
+                    employeeId: 31,
+                }),
+            );
         },
     );
 

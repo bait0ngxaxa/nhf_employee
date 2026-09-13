@@ -202,7 +202,11 @@ describe("LIFF Routine API authorization", () => {
             expect.objectContaining({
                 employeeId: 31,
                 scope: "mine",
-                actor: expect.objectContaining({ id: 7, role: "ADMIN" }),
+                actor: expect.objectContaining({
+                    id: 7,
+                    role: "ADMIN",
+                    mode: "LIFF_SELF_SERVICE",
+                }),
             }),
         );
     });
