@@ -200,6 +200,57 @@ describe("useManagerApprovalModel", () => {
         expect(submitLeaveDecision).not.toHaveBeenCalled();
     });
 
+    it("keeps normal approval confirmation independent from not-taken capability", async () => {
+        const allLeaveCapabilities: LeavePresentationCapabilities = {
+            ...LEAVE_CAPABILITIES,
+            canManageApprovers: true,
+        };
+        const { result, rerender } = renderHook(
+            ({ capabilities }: { capabilities: LeavePresentationCapabilities }) =>
+                useManagerApprovalModel({
+                    leaveCapabilities: capabilities,
+                    hasApprovalRelationship: true,
+                }),
+            { initialProps: { capabilities: allLeaveCapabilities } },
+        );
+        const warningLeave = {
+            ...pendingLeave,
+            specialReason: "จำเป็นต้องใช้สิทธิ์เพิ่ม",
+        };
+
+        await act(async () => {
+            await result.current.approveLeave(warningLeave);
+        });
+
+        expect(result.current.approvalConfirmLeave).toEqual(warningLeave);
+        expect(submitLeaveDecision).not.toHaveBeenCalled();
+
+        rerender({
+            capabilities: {
+                ...allLeaveCapabilities,
+                canConfirmAssignedNotTaken: false,
+            },
+        });
+
+        expect(result.current.approvalConfirmLeave).toEqual(warningLeave);
+
+        await act(async () => {
+            expect(await result.current.confirmNotTaken("leave-not-taken")).toBe(false);
+        });
+
+        expect(confirmLeaveNotTaken).not.toHaveBeenCalled();
+
+        rerender({
+            capabilities: {
+                ...allLeaveCapabilities,
+                canApproveAssignedRequests: false,
+                canConfirmAssignedNotTaken: false,
+            },
+        });
+
+        expect(result.current.approvalConfirmLeave).toBeNull();
+    });
+
     it("opens reject dialog and clears state when closed", async () => {
         const { result } = renderHook(() => useManagerApprovalModel({
             leaveCapabilities: LEAVE_CAPABILITIES,

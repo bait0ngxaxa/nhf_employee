@@ -137,12 +137,6 @@ export function useManagerApprovalModel({
         }
     }, [canApproveAssignedRequests]);
 
-    useEffect(() => {
-        if (!canConfirmAssignedNotTaken) {
-            setApprovalConfirmLeave(null);
-        }
-    }, [canConfirmAssignedNotTaken]);
-
     const handleHistoryQueryChange = (value: string): void => {
         setHistoryQuery(value);
         setHistoryPage(1);
