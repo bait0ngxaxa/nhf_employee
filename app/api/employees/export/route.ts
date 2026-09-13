@@ -3,11 +3,15 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/auth/api";
 import { logDataExport } from "@/lib/server/audit";
 import {
+    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapabilityScope,
+    buildEmployeeAuthorizationContext,
     createEmployeeExport,
+    EmployeeCapabilityDeniedError,
     employeeFiltersSchema,
     type EmployeeFilters,
 } from "@/modules/employee";
-import { jsonError } from "@/lib/ssot/http";
+import { forbidden, jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 function parseExportFilters(
@@ -50,6 +54,12 @@ export async function GET(request: NextRequest): Promise<Response> {
             return parsedFilters.response;
         }
 
+        const authorization = await assertEmployeeCapabilityForMigration(
+            buildEmployeeAuthorizationContext(auth.user),
+            "employee.export",
+        );
+        assertEmployeeCapabilityScope(authorization, "ALL");
+
         const filters = parsedFilters.data;
         const exportPreparation = await createEmployeeExport(filters);
 
@@ -81,6 +91,9 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         return exportPreparation.response;
     } catch (error) {
+        if (error instanceof EmployeeCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Employee export error:", error);
         return jsonError("ไม่สามารถส่งออกข้อมูลพนักงานได้", 500);
     }

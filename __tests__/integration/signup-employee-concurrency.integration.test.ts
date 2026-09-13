@@ -5,12 +5,16 @@ import { POST as signupRoute } from "@/app/api/auth/signup/route";
 import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
 import { prisma } from "@/lib/db/prisma";
 import { employeeAccountLifecycle } from "@/modules/auth";
-import { updateEmployee } from "@/modules/employee";
+import {
+    buildEmployeeAuthorizedCommandActor,
+    updateEmployee,
+} from "@/modules/employee";
 
 const DEPARTMENT_NAME = "Signup Employee Concurrency Integration";
 const DEPARTMENT_CODE = "SIGNUP-EMPLOYEE-RACE";
 const ORIGINAL_EMAIL = "signup-employee-race@thainhf.org";
 const UPDATED_EMAIL = "signup-employee-race-updated@thainhf.org";
+const ACTOR_EMAIL = "signup-employee-race-actor@thainhf.org";
 
 function assertDedicatedDatabase(): void {
     const rawUrl = process.env.DATABASE_URL;
@@ -49,7 +53,7 @@ function buildSignupRequest(): NextRequest {
 async function cleanFixtures(): Promise<void> {
     resetAuthRateLimit();
     await prisma.auditLog.deleteMany({
-        where: { userEmail: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL] } },
+        where: { userEmail: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL, ACTOR_EMAIL] } },
     });
 
     const department = await prisma.department.findUnique({
@@ -58,7 +62,7 @@ async function cleanFixtures(): Promise<void> {
     });
     if (!department) {
         await prisma.user.deleteMany({
-            where: { email: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL] } },
+            where: { email: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL, ACTOR_EMAIL] } },
         });
         return;
     }
@@ -72,7 +76,7 @@ async function cleanFixtures(): Promise<void> {
     await prisma.user.deleteMany({
         where: {
             OR: [
-                { email: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL] } },
+                { email: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL, ACTOR_EMAIL] } },
                 { employeeId: { in: employeeIds } },
             ],
         },
@@ -112,13 +116,31 @@ describe.sequential("signup and Employee identity concurrency with real MySQL", 
                 departmentId: department.id,
             },
         });
+        const actorEmployee = await prisma.employee.create({
+            data: {
+                firstName: "Signup",
+                lastName: "Actor",
+                email: ACTOR_EMAIL,
+                position: "Integration Test Actor",
+                departmentId: department.id,
+            },
+        });
+        const actorUser = await prisma.user.create({
+            data: {
+                email: ACTOR_EMAIL,
+                name: "Signup Actor",
+                password: "integration-test-password",
+                role: "ADMIN",
+                employeeId: actorEmployee.id,
+            },
+        });
 
         const [signupResponse, employeeUpdate] = await Promise.all([
             signupRoute(buildSignupRequest()),
             updateEmployee(
                 employee.id,
                 { email: UPDATED_EMAIL },
-                undefined,
+                buildEmployeeAuthorizedCommandActor(actorUser),
                 undefined,
                 employeeAccountLifecycle,
             ),

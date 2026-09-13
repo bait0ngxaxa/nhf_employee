@@ -1,12 +1,17 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireApiSession } from "@/lib/auth/api";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
 import { employeeAccountLifecycle } from "@/modules/auth";
 import {
     appendEmployeeDeleteAudit,
     appendEmployeeUpdateAudit,
+    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapabilityScope,
+    buildEmployeeAuthorizedCommandActor,
+    EmployeeCapabilityDeniedError,
     deleteEmployee,
     updateEmployee,
     updateEmployeeSchema,
@@ -57,13 +62,20 @@ export async function PATCH(
             });
         }
 
-        const auth = await requireAdminSession();
+        const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
+
+        const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
+        const authorization = await assertEmployeeCapabilityForMigration(
+            commandActor.authorization,
+            "employee.update",
+        );
+        assertEmployeeCapabilityScope(authorization, "ALL");
 
         const result = await updateEmployee(
             employeeId,
             validationResult.data,
-            { userId: auth.user.id, email: auth.user.email },
+            commandActor,
             getEmployeeLeaveOffboardingBlockers,
             employeeAccountLifecycle,
         );
@@ -102,6 +114,12 @@ export async function PATCH(
             { status: 200 },
         );
     } catch (error) {
+        if (
+            error instanceof EmployeeCapabilityDeniedError
+            || error instanceof WorkforceAuthorizationError
+        ) {
+            return jsonError(COMMON_API_MESSAGES.forbidden, 403);
+        }
         console.error("Error updating employee:", error);
         return jsonError(COMMON_API_MESSAGES.failedToUpdateEmployee, 500);
     }
@@ -112,8 +130,15 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession();
+        const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
+
+        const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
+        const authorization = await assertEmployeeCapabilityForMigration(
+            commandActor.authorization,
+            "employee.delete",
+        );
+        assertEmployeeCapabilityScope(authorization, "ALL");
 
         const { employeeId, error } = await parseEmployeeId(params);
         if (error) return error;
@@ -123,7 +148,7 @@ export async function DELETE(
 
         const result = await deleteEmployee(
             employeeId,
-            { userId: auth.user.id, email: auth.user.email },
+            commandActor,
             getEmployeeLeaveOffboardingBlockers,
             employeeAccountLifecycle,
         );
@@ -153,6 +178,12 @@ export async function DELETE(
             { status: 200 },
         );
     } catch (error) {
+        if (
+            error instanceof EmployeeCapabilityDeniedError
+            || error instanceof WorkforceAuthorizationError
+        ) {
+            return jsonError(COMMON_API_MESSAGES.forbidden, 403);
+        }
         console.error("Error deleting employee:", error);
         return jsonError(COMMON_API_MESSAGES.failedToDeleteEmployee, 500);
     }

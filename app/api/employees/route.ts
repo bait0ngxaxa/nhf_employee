@@ -1,8 +1,12 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
+import { requireApiSession } from "@/lib/auth/api";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import {
     appendEmployeeCreateAudit,
+    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapabilityScope,
+    buildEmployeeAuthorizedCommandActor,
+    EmployeeCapabilityDeniedError,
     createEmployee,
     createEmployeeSchema,
     employeeFiltersSchema,
@@ -51,6 +55,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return parsedFilters.response;
         }
 
+        const authorization = await assertEmployeeCapabilityForMigration(
+            buildEmployeeAuthorizedCommandActor(auth.user).authorization,
+            "employee.read",
+        );
+        assertEmployeeCapabilityScope(authorization, "ALL");
+
         const result = await listEmployees(parsedFilters.data);
 
         return NextResponse.json({
@@ -58,6 +68,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             ...result,
         });
     } catch (error) {
+        if (error instanceof EmployeeCapabilityDeniedError) {
+            return operationFailed(403);
+        }
         console.error("Error fetching employees:", error);
         return operationFailed(500);
     }
@@ -66,11 +79,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // NOTE: normalized to remove mojibake
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession({
+        const auth = await requireApiSession({
             unauthorizedResponse: () => operationFailed(403),
-            forbiddenResponse: () => operationFailed(403),
         });
         if (!auth.ok) return auth.response;
+
+        const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
+        const authorization = await assertEmployeeCapabilityForMigration(
+            commandActor.authorization,
+            "employee.create",
+        );
+        assertEmployeeCapabilityScope(authorization, "ALL");
 
         const body = await request.json();
         const result = createEmployeeSchema.safeParse(body);
@@ -113,6 +132,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 201 },
         );
     } catch (error) {
+        if (error instanceof EmployeeCapabilityDeniedError) {
+            return operationFailed(403);
+        }
         console.error("Error creating employee:", error);
         return operationFailed(500);
     }

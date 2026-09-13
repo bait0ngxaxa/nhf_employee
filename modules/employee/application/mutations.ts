@@ -12,6 +12,11 @@ import {
 } from "../domain/lifecycle";
 import { getEmployeeDisplayName, getEmployeeFullName } from "../domain/identity";
 import { EMPLOYEE_WITH_RELATIONS_INCLUDE, employeeEmailExists } from "../infrastructure/persistence/employee-queries";
+import {
+    assertEmployeeCapabilityScope,
+    resolveEmployeeCapabilityInTransaction,
+    type EmployeeAuthorizedCommandActor,
+} from "./authorization";
 import type {
     CreateEmployeeData,
     EmployeeLifecycleActor,
@@ -279,13 +284,22 @@ async function writeLifecycleAudit(
 async function runEmployeeLifecycle(
     employeeId: number,
     operation: EmployeeLifecycleOperation,
-    actor: EmployeeLifecycleActor,
+    actor: EmployeeAuthorizedCommandActor,
+    capability: "employee.update" | "employee.delete",
     data: UpdateEmployeeData,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider | undefined,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     try {
         return await runSerializableTransaction(async (tx) => {
+            assertEmployeeCapabilityScope(
+                await resolveEmployeeCapabilityInTransaction(
+                    tx,
+                    actor,
+                    capability,
+                ),
+                "ALL",
+            );
             const { employee, account } = await lockEmployeeForMutation(
                 tx,
                 employeeId,
@@ -372,10 +386,19 @@ async function runEmployeeLifecycle(
 async function runEmployeeProfileUpdate(
     employeeId: number,
     data: UpdateEmployeeData,
+    actor: EmployeeAuthorizedCommandActor,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
     try {
         return await runSerializableTransaction(async (tx) => {
+            assertEmployeeCapabilityScope(
+                await resolveEmployeeCapabilityInTransaction(
+                    tx,
+                    actor,
+                    "employee.update",
+                ),
+                "ALL",
+            );
             const { employee, account } = await lockEmployeeForMutation(
                 tx,
                 employeeId,
@@ -434,14 +457,14 @@ export async function createEmployee(data: CreateEmployeeData): Promise<Employee
 export async function updateEmployee(
     employeeId: number,
     data: UpdateEmployeeData,
-    actor: EmployeeLifecycleActor | undefined,
+    actor: EmployeeAuthorizedCommandActor | undefined,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider | undefined,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
-    if (!data.status) return runEmployeeProfileUpdate(employeeId, data, accountLifecycleProvider);
     if (!actor) {
         return { success: false, error: MESSAGES.lifecycleActorRequired, status: 403 };
     }
+    if (!data.status) return runEmployeeProfileUpdate(employeeId, data, actor, accountLifecycleProvider);
     const operation: EmployeeLifecycleOperation = data.status === "INACTIVE"
         ? "OFFBOARD"
         : data.status === "SUSPENDED" ? "SUSPEND" : "REACTIVATE";
@@ -449,6 +472,7 @@ export async function updateEmployee(
         employeeId,
         operation,
         actor,
+        "employee.update",
         data,
         offboardingDependencyProvider,
         accountLifecycleProvider,
@@ -457,7 +481,7 @@ export async function updateEmployee(
 
 export async function deleteEmployee(
     employeeId: number,
-    actor: EmployeeLifecycleActor,
+    actor: EmployeeAuthorizedCommandActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
@@ -465,6 +489,7 @@ export async function deleteEmployee(
         employeeId,
         "OFFBOARD",
         actor,
+        "employee.delete",
         {},
         offboardingDependencyProvider,
         accountLifecycleProvider,
@@ -473,7 +498,7 @@ export async function deleteEmployee(
 
 export async function suspendEmployee(
     employeeId: number,
-    actor: EmployeeLifecycleActor,
+    actor: EmployeeAuthorizedCommandActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
@@ -481,6 +506,7 @@ export async function suspendEmployee(
         employeeId,
         "SUSPEND",
         actor,
+        "employee.update",
         {},
         offboardingDependencyProvider,
         accountLifecycleProvider,
@@ -489,15 +515,23 @@ export async function suspendEmployee(
 
 export async function reactivateEmployee(
     employeeId: number,
-    actor: EmployeeLifecycleActor,
+    actor: EmployeeAuthorizedCommandActor,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
-    return runEmployeeLifecycle(employeeId, "REACTIVATE", actor, {}, undefined, accountLifecycleProvider);
+    return runEmployeeLifecycle(
+        employeeId,
+        "REACTIVATE",
+        actor,
+        "employee.update",
+        {},
+        undefined,
+        accountLifecycleProvider,
+    );
 }
 
 export async function offboardEmployee(
     employeeId: number,
-    actor: EmployeeLifecycleActor,
+    actor: EmployeeAuthorizedCommandActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
@@ -505,6 +539,7 @@ export async function offboardEmployee(
         employeeId,
         "OFFBOARD",
         actor,
+        "employee.update",
         {},
         offboardingDependencyProvider,
         accountLifecycleProvider,

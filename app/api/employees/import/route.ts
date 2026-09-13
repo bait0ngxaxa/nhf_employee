@@ -1,19 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireApiSession } from "@/lib/auth/api";
 import {
+    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapabilityScope,
+    buildEmployeeAuthorizedCommandActor,
     EMPLOYEE_IMPORT_MAX_ROWS,
+    EmployeeCapabilityDeniedError,
     importEmployeesFromCsvRows,
 } from "@/modules/employee";
 import { jsonError, operationFailed } from "@/lib/ssot/http";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession({
+        const auth = await requireApiSession({
             unauthorizedResponse: () => operationFailed(403),
-            forbiddenResponse: () => operationFailed(403),
         });
         if (!auth.ok) return auth.response;
+
+        const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
+        const authorization = await assertEmployeeCapabilityForMigration(
+            commandActor.authorization,
+            "employee.import",
+        );
+        assertEmployeeCapabilityScope(authorization, "ALL");
 
         const { employees } = await request.json();
 
@@ -41,6 +51,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 200 },
         );
     } catch (error) {
+        if (error instanceof EmployeeCapabilityDeniedError) {
+            return operationFailed(403);
+        }
         console.error("Error importing employees:", error);
         return operationFailed(500);
     }

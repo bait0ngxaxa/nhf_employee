@@ -18,7 +18,10 @@ import {
     revokeAuthSessionFamily,
 } from "@/modules/auth";
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
-import { updateEmployee } from "@/modules/employee";
+import {
+    buildEmployeeAuthorizedCommandActor,
+    updateEmployee,
+} from "@/modules/employee";
 
 const DEPARTMENT_NAME = "L1 Auth Session Concurrency Integration";
 const DEPARTMENT_CODE = "L1-AUTH-RACE";
@@ -262,12 +265,28 @@ async function createPasswordResetFixture(scenario: Scenario): Promise<string> {
 }
 
 async function createActor(): Promise<void> {
+    const department = await prisma.department.create({
+        data: {
+            name: `${DEPARTMENT_NAME} Actor`,
+            code: `${DEPARTMENT_CODE}-ACTOR`,
+        },
+    });
+    const employee = await prisma.employee.create({
+        data: {
+            firstName: "L1",
+            lastName: "Actor",
+            email: ACTOR_EMAIL,
+            position: "Integration Test Actor",
+            departmentId: department.id,
+        },
+    });
     await prisma.user.create({
         data: {
             email: ACTOR_EMAIL,
             name: "L1 Actor",
             password: "integration-test-password",
             role: "ADMIN",
+            employeeId: employee.id,
         },
     });
 }
@@ -298,12 +317,12 @@ async function runEmployeeLifecycle(
 ): Promise<unknown> {
     const actor = await prisma.user.findUniqueOrThrow({
         where: { email: ACTOR_EMAIL },
-        select: { id: true, email: true },
+        select: { id: true, email: true, role: true },
     });
     return updateEmployee(
         scenario.employeeId,
         { status },
-        { userId: actor.id, email: actor.email },
+        buildEmployeeAuthorizedCommandActor(actor),
         status === "ACTIVE" ? undefined : getEmployeeLeaveOffboardingBlockers,
         employeeAccountLifecycle,
     );

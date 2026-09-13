@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
     requireApiSession: vi.fn(),
     employeeFiltersSafeParse: vi.fn(),
     createEmployeeExport: vi.fn(),
+    assertEmployeeCapabilityForMigration: vi.fn(),
+    assertEmployeeCapabilityScope: vi.fn(),
+    buildEmployeeAuthorizationContext: vi.fn(),
     logDataExport: vi.fn(),
 }));
 
@@ -24,6 +27,12 @@ vi.mock("@/lib/auth/api", () => ({
 }));
 
 vi.mock("@/modules/employee", () => ({
+    EmployeeCapabilityDeniedError: class EmployeeCapabilityDeniedError extends Error {
+        readonly statusCode = 403;
+    },
+    assertEmployeeCapabilityForMigration: mocks.assertEmployeeCapabilityForMigration,
+    assertEmployeeCapabilityScope: mocks.assertEmployeeCapabilityScope,
+    buildEmployeeAuthorizationContext: mocks.buildEmployeeAuthorizationContext,
     createEmployeeExport: mocks.createEmployeeExport,
     employeeFiltersSchema: {
         safeParse: mocks.employeeFiltersSafeParse,
@@ -59,6 +68,20 @@ describe("Phase 0 authorization current-state characterization", () => {
             success: true,
             data: {},
         });
+        mocks.buildEmployeeAuthorizationContext.mockImplementation((user) => ({
+            authorizationActor: {
+                userId: user.id,
+                employeeId: null,
+                systemRole: user.role,
+                channel: "DASHBOARD",
+            },
+        }));
+        mocks.assertEmployeeCapabilityForMigration.mockResolvedValue({
+            scopes: ["ALL"],
+        });
+        mocks.assertEmployeeCapabilityScope.mockImplementation(
+            (authorization) => authorization,
+        );
         mocks.createEmployeeExport.mockResolvedValue({
             status: "ready",
             recordCount: 0,
@@ -74,6 +97,16 @@ describe("Phase 0 authorization current-state characterization", () => {
         );
 
         expect(response.status).toBe(200);
+        expect(mocks.assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+            expect.objectContaining({
+                authorizationActor: expect.objectContaining({
+                    userId: 5,
+                    systemRole: "USER",
+                    channel: "DASHBOARD",
+                }),
+            }),
+            "employee.export",
+        );
         expect(mocks.createEmployeeExport).toHaveBeenCalledWith({});
         expect(mocks.logDataExport).toHaveBeenCalledWith(
             "Employee",

@@ -3,17 +3,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
 
 import { PATCH, DELETE } from "@/app/api/employees/[id]/route";
-import { POST as createEmployeeRoute } from "@/app/api/employees/route";
+import {
+    GET as listEmployeesRoute,
+    POST as createEmployeeRoute,
+} from "@/app/api/employees/route";
 import { POST as importEmployeesRoute } from "@/app/api/employees/import/route";
+import { GET as getEmployeeStatsRoute } from "@/app/api/employees/stats/route";
 import { employeeAccountLifecycle } from "@/modules/auth";
-import { requireAdminSession } from "@/lib/auth/api";
+import { requireApiSession } from "@/lib/auth/api";
 import {
     appendEmployeeCreateAudit,
     appendEmployeeDeleteAudit,
     appendEmployeeUpdateAudit,
+    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapabilityScope,
+    buildEmployeeAuthorizationContext,
     createEmployee,
     deleteEmployee,
+    employeeFiltersSchema,
     importEmployeesFromCsvRows,
+    getEmployeeStats,
+    listEmployees,
     updateEmployee,
 } from "@/modules/employee";
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
@@ -23,19 +33,45 @@ vi.mock("next/server", async (importOriginal) => {
     return { ...actual, after: vi.fn((callback) => callback()) };
 });
 vi.mock("@/lib/auth/api", () => ({
-    requireAdminSession: vi.fn(),
     requireApiSession: vi.fn(),
 }));
 vi.mock("@/modules/employee", () => ({
+    EmployeeCapabilityDeniedError: class EmployeeCapabilityDeniedError extends Error {
+        readonly statusCode = 403;
+    },
     EMPLOYEE_IMPORT_MAX_ROWS: 1000,
     appendEmployeeCreateAudit: vi.fn(),
     appendEmployeeDeleteAudit: vi.fn(),
     appendEmployeeUpdateAudit: vi.fn(),
+    assertEmployeeCapabilityForMigration: vi.fn(),
+    assertEmployeeCapabilityScope: vi.fn(),
+    buildEmployeeAuthorizationContext: vi.fn((user) => ({
+        authorizationActor: {
+            userId: user.id,
+            employeeId: null,
+            systemRole: user.role as "ADMIN" | "USER",
+            channel: "DASHBOARD",
+        },
+    })),
+    buildEmployeeAuthorizedCommandActor: vi.fn((user) => ({
+        userId: user.id,
+        email: user.email,
+        authorization: {
+            authorizationActor: {
+                userId: user.id,
+                employeeId: null,
+                systemRole: user.role as "ADMIN" | "USER",
+                channel: "DASHBOARD",
+            },
+        },
+    })),
     createEmployee: vi.fn(),
     deleteEmployee: vi.fn(),
     employeeFiltersSchema: { safeParse: vi.fn() },
+    getEmployeeStats: vi.fn(),
     getEmployeeDisplayName: vi.fn(() => "Test Employee"),
     importEmployeesFromCsvRows: vi.fn(),
+    listEmployees: vi.fn(),
     updateEmployee: vi.fn(),
     updateEmployeeSchema: {
         safeParse: vi.fn((value) => ({ success: true, data: value })),
@@ -55,6 +91,13 @@ const ADMIN = {
     role: "ADMIN",
 };
 
+const USER = {
+    id: 100,
+    email: "user@thainhf.org",
+    name: "User",
+    role: "USER",
+};
+
 function employeeParams(id: string): { params: Promise<{ id: string }> } {
     return { params: Promise.resolve({ id }) };
 }
@@ -62,14 +105,75 @@ function employeeParams(id: string): { params: Promise<{ id: string }> } {
 describe("Employee mutation routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(requireAdminSession).mockResolvedValue({
+        vi.mocked(requireApiSession).mockResolvedValue({
             ok: true,
             user: ADMIN,
             session: { user: { ...ADMIN, id: String(ADMIN.id) } },
         });
+        vi.mocked(assertEmployeeCapabilityForMigration).mockResolvedValue({
+            scopes: ["ALL"],
+        } as never);
+        vi.mocked(assertEmployeeCapabilityScope).mockImplementation(
+            (authorization) => authorization,
+        );
+        vi.mocked(buildEmployeeAuthorizationContext).mockImplementation((user) => ({
+            authorizationActor: {
+                userId: user.id,
+                employeeId: null,
+                systemRole: user.role as "ADMIN" | "USER",
+                channel: "DASHBOARD",
+            },
+        }));
+        vi.mocked(employeeFiltersSchema.safeParse).mockReturnValue({
+            success: true,
+            data: { search: "Somchai", status: undefined, page: 1, limit: 10 },
+        } as never);
         vi.mocked(appendEmployeeCreateAudit).mockResolvedValue(undefined);
         vi.mocked(appendEmployeeDeleteAudit).mockResolvedValue(undefined);
         vi.mocked(appendEmployeeUpdateAudit).mockResolvedValue(undefined);
+    });
+
+    it("keeps the organization-wide Employee list behind employee.read", async () => {
+        vi.mocked(listEmployees).mockResolvedValue({
+            employees: [],
+            pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+        });
+
+        const response = await listEmployeesRoute(new NextRequest(
+            "http://localhost/api/employees?search=Somchai",
+        ));
+
+        expect(response.status).toBe(200);
+        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+            expect.any(Object),
+            "employee.read",
+        );
+        expect(listEmployees).toHaveBeenCalledWith({
+            search: "Somchai",
+            status: undefined,
+            page: 1,
+            limit: 10,
+        });
+    });
+
+    it("keeps organization-wide Employee statistics behind employee.stats.read", async () => {
+        vi.mocked(getEmployeeStats).mockResolvedValue({
+            total: 2,
+            active: 1,
+            inactive: 1,
+            suspended: 0,
+            admin: 1,
+            academic: 0,
+        });
+
+        const response = await getEmployeeStatsRoute();
+
+        expect(response.status).toBe(200);
+        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+            expect.any(Object),
+            "employee.stats.read",
+        );
+        expect(getEmployeeStats).toHaveBeenCalledOnce();
     });
 
     it.each([
@@ -147,7 +251,18 @@ describe("Employee mutation routes", () => {
         expect(updateEmployee).toHaveBeenCalledWith(
             12,
             { email: "new@thainhf.org", status: "SUSPENDED" },
-            { userId: ADMIN.id, email: ADMIN.email },
+            expect.objectContaining({
+                userId: ADMIN.id,
+                email: ADMIN.email,
+                authorization: {
+                    authorizationActor: {
+                        userId: ADMIN.id,
+                        employeeId: null,
+                        systemRole: "ADMIN",
+                        channel: "DASHBOARD",
+                    },
+                },
+            }),
             getEmployeeLeaveOffboardingBlockers,
             employeeAccountLifecycle,
         );
@@ -229,7 +344,18 @@ describe("Employee mutation routes", () => {
         expect(response.status).toBe(200);
         expect(deleteEmployee).toHaveBeenCalledWith(
             12,
-            { userId: ADMIN.id, email: ADMIN.email },
+            expect.objectContaining({
+                userId: ADMIN.id,
+                email: ADMIN.email,
+                authorization: {
+                    authorizationActor: {
+                        userId: ADMIN.id,
+                        employeeId: null,
+                        systemRole: "ADMIN",
+                        channel: "DASHBOARD",
+                    },
+                },
+            }),
             getEmployeeLeaveOffboardingBlockers,
             employeeAccountLifecycle,
         );
@@ -272,7 +398,7 @@ describe("Employee mutation routes", () => {
         ["import", importEmployeesRoute],
     ] as const)("authenticates before reading the %s request body", async (_label, route) => {
         const authResponse = NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        vi.mocked(requireAdminSession).mockResolvedValue({
+        vi.mocked(requireApiSession).mockResolvedValue({
             ok: false,
             response: authResponse,
         });
@@ -284,6 +410,42 @@ describe("Employee mutation routes", () => {
         expect(json).not.toHaveBeenCalled();
         expect(createEmployee).not.toHaveBeenCalled();
         expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+    });
+
+    it("allows an explicitly authorized USER to reach the update application boundary", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: USER,
+            session: { user: { ...USER, id: String(USER.id) } },
+        });
+        vi.mocked(updateEmployee).mockResolvedValue({
+            success: true,
+            employee: { id: 12 },
+        } as never);
+
+        const response = await PATCH(new NextRequest(
+            "http://localhost/api/employees/12",
+            { method: "PATCH", body: JSON.stringify({ firstName: "Granted" }) },
+        ), employeeParams("12"));
+
+        expect(response.status).toBe(200);
+        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+            expect.objectContaining({
+                authorizationActor: expect.objectContaining({
+                    userId: USER.id,
+                    systemRole: "USER",
+                    channel: "DASHBOARD",
+                }),
+            }),
+            "employee.update",
+        );
+        expect(updateEmployee).toHaveBeenCalledWith(
+            12,
+            { firstName: "Granted" },
+            expect.objectContaining({ userId: USER.id, email: USER.email }),
+            getEmployeeLeaveOffboardingBlockers,
+            employeeAccountLifecycle,
+        );
     });
 
     it("accepts 1000 import rows for processing", async () => {

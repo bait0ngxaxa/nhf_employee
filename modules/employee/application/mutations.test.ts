@@ -8,14 +8,24 @@ import {
     deleteEmployee as deleteEmployeeUseCase,
 } from "./mutations";
 import type {
-    EmployeeAccountLifecycleProvider,
     EmployeeLifecycleActor,
     EmployeeMutationResult,
     EmployeeOffboardingDependency,
     EmployeeOffboardingDependencyProvider,
     UpdateEmployeeData,
 } from "./types";
+import type { EmployeeAuthorizedCommandActor } from "./authorization";
 import { employeeAccountLifecycle } from "@/modules/auth";
+
+const authorizationMocks = vi.hoisted(() => ({
+    assertEmployeeCapabilityScope: vi.fn(),
+    resolveEmployeeCapabilityInTransaction: vi.fn(),
+}));
+
+vi.mock("./authorization", () => ({
+    assertEmployeeCapabilityScope: authorizationMocks.assertEmployeeCapabilityScope,
+    resolveEmployeeCapabilityInTransaction: authorizationMocks.resolveEmployeeCapabilityInTransaction,
+}));
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -27,25 +37,33 @@ const prismaMock = prisma as unknown as ReturnType<
 const ACTOR = { userId: 999, email: "admin@thainhf.org" };
 const NO_OFFBOARDING_DEPENDENCIES: EmployeeOffboardingDependencyProvider = async () => [];
 
+function authorizedActor(
+    actor: EmployeeLifecycleActor = ACTOR,
+): EmployeeAuthorizedCommandActor {
+    return {
+        ...actor,
+        authorization: {
+            authorizationActor: {
+                userId: actor.userId,
+                employeeId: null,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+        },
+    };
+}
+
 function updateEmployee(
     employeeId: number,
     data: UpdateEmployeeData,
     actor?: EmployeeLifecycleActor,
     offboardingDependencyProvider?: EmployeeOffboardingDependencyProvider,
 ): Promise<EmployeeMutationResult> {
-    if (!actor) {
-        return updateEmployeeUseCase(
-            employeeId,
-            data,
-            undefined,
-            undefined,
-            employeeAccountLifecycle as EmployeeAccountLifecycleProvider,
-        );
-    }
+    const commandActor = authorizedActor(actor);
     return updateEmployeeUseCase(
         employeeId,
         data,
-        actor,
+        commandActor,
         offboardingDependencyProvider ?? NO_OFFBOARDING_DEPENDENCIES,
         employeeAccountLifecycle,
     );
@@ -58,7 +76,7 @@ function deleteEmployee(
 ): Promise<EmployeeMutationResult> {
     return deleteEmployeeUseCase(
         employeeId,
-        actor,
+        authorizedActor(actor),
         offboardingDependencyProvider,
         employeeAccountLifecycle,
     );
@@ -102,6 +120,11 @@ function buildLinkedEmployee(
 describe("Employee Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        authorizationMocks.assertEmployeeCapabilityScope.mockReset();
+        authorizationMocks.resolveEmployeeCapabilityInTransaction.mockReset();
+        authorizationMocks.resolveEmployeeCapabilityInTransaction.mockResolvedValue({
+            scopes: ["ALL"],
+        });
         prismaMock.employee.findFirst.mockResolvedValue(null);
         prismaMock.$queryRaw.mockResolvedValue([] as never);
         prismaMock.$transaction.mockImplementation(async (callback) => {
