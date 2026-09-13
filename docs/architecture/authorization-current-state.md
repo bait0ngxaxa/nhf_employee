@@ -371,7 +371,7 @@ Employee Phase 8A inventory detail:
 - buildWorkOccurrenceWhere: occurrence-level assignee scope; normal USER is mine even when requested all
 - buildTaskAssigneeWhere and buildTaskWhere: operational task path permits unscoped all when scope=all, without role predicate
 - buildLiffRoutineTaskAccessWhere: creator, current task assignee or occurrence-only assignee; active checks for assignment paths
-- getRoutineReferenceData plus serializeLiffRoutineReference: internal Admin query branch on the LIFF reference route is not the client-visible response scope; the serializer omits employees
+- getRoutineReferenceData plus serializeLiffRoutineReference: the LIFF reference route carries explicit `LIFF_SELF_SERVICE` mode, so ADMIN does not select Dashboard/Admin query semantics; the serializer continues to omit employees from the response
 - Mutation transactions enforce active actor, active target Employees, version/reminder locks and creator-vs-assignee field restrictions
 
 ### 5.6 Stock domain authorization
