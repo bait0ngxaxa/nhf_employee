@@ -307,6 +307,45 @@ describe("LIFF Leave route adapters", () => {
         });
     });
 
+    it("ignores authority-shaped client fields when dispatching an approval", async () => {
+        mocks.decideLeaveRequest.mockResolvedValueOnce({ id: "leave_1" });
+
+        const response = await decideLeave(request("/api/line/leave/decision", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                leaveId: "leave_1",
+                action: "APPROVE",
+                employeeId: 999,
+                userId: 999,
+                role: "ADMIN",
+                isAdmin: true,
+                scope: "ALL",
+                capability: "leave.approver.manage",
+                permission: true,
+                canApproveLeave: true,
+                approverId: 999,
+            }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(mocks.decideLeaveRequest).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: AUTH.user.id,
+                employeeId: AUTH.employeeId,
+                authorization: {
+                    authorizationActor: {
+                        userId: AUTH.user.id,
+                        employeeId: AUTH.employeeId,
+                        systemRole: AUTH.user.role,
+                        channel: "LIFF_SELF_SERVICE",
+                    },
+                },
+            }),
+            { leaveId: "leave_1", action: "APPROVE" },
+        );
+    });
+
     it.each([
         ["cancel", () => cancelLeave(request("/api/line/leave/cancel", {
             method: "POST",

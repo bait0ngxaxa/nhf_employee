@@ -10,6 +10,7 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import {
     DASHBOARD_MENU_ITEMS,
+    canAccessLeaveDashboard,
     canAccessStockDashboard,
     getAvailableMenuGroups,
 } from "@/constants/dashboard";
@@ -57,8 +58,20 @@ export function DashboardProvider({
             isAdmin,
             user?.routineCapabilities,
             user?.stockCapabilities,
+            {
+                leaveCapabilities: user?.leaveCapabilities,
+                canApproveLeave: user?.canApproveLeave,
+                canViewLeaveReports: user?.canViewLeaveReports,
+            },
         ),
-        [isAdmin, user?.routineCapabilities, user?.stockCapabilities],
+        [
+            isAdmin,
+            user?.routineCapabilities,
+            user?.stockCapabilities,
+            user?.leaveCapabilities,
+            user?.canApproveLeave,
+            user?.canViewLeaveReports,
+        ],
     );
 
     const handleMenuClick = useCallback(
@@ -86,6 +99,18 @@ export function DashboardProvider({
                 router.push(APP_ROUTES.accessDenied);
                 return;
             }
+            if (
+                menuId === "leave-management"
+                && !canAccessLeaveDashboard({
+                    isAdmin,
+                    leaveCapabilities: user?.leaveCapabilities,
+                    canApproveLeave: user?.canApproveLeave,
+                    canViewLeaveReports: user?.canViewLeaveReports,
+                })
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
             if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
@@ -102,6 +127,9 @@ export function DashboardProvider({
             router,
             user?.routineCapabilities,
             user?.stockCapabilities,
+            user?.leaveCapabilities,
+            user?.canApproveLeave,
+            user?.canViewLeaveReports,
         ],
     );
 

@@ -14,6 +14,7 @@ import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
+import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 
 /** Flat lookup used by handleMenuClick for role validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -132,6 +133,68 @@ export function canAccessStockDashboard(
         || capabilities?.canExportReports === true;
 }
 
+export const LEAVE_DASHBOARD_TABS = [
+    "my-leave",
+    "approvals",
+    "recovery",
+    "reports",
+    "approver-settings",
+] as const;
+
+export type LeaveDashboardTab = (typeof LEAVE_DASHBOARD_TABS)[number];
+
+export interface LeaveDashboardAvailabilityInput {
+    isAdmin: boolean;
+    leaveCapabilities?: LeavePresentationCapabilities;
+    canApproveLeave?: boolean;
+    canViewLeaveReports?: boolean;
+}
+
+export type LeaveDashboardTabVisibility = Record<
+    LeaveDashboardTab,
+    boolean
+>;
+
+/**
+ * Project the Dashboard Leave surfaces from granular capabilities plus the
+ * existing Leave-owned relationship/deferred-policy projections.
+ */
+export function getLeaveDashboardTabVisibility({
+    isAdmin,
+    leaveCapabilities,
+    canApproveLeave,
+    canViewLeaveReports,
+}: LeaveDashboardAvailabilityInput): LeaveDashboardTabVisibility {
+    return {
+        "my-leave": leaveCapabilities?.canReadOwnRequests === true,
+        approvals:
+            leaveCapabilities?.canReadAssignedApprovals === true
+            && canApproveLeave === true,
+        recovery: isAdmin,
+        reports: canViewLeaveReports === true,
+        "approver-settings": leaveCapabilities?.canManageApprovers === true,
+    };
+}
+
+export function canAccessLeaveDashboard(
+    input: LeaveDashboardAvailabilityInput,
+): boolean {
+    const visibility = getLeaveDashboardTabVisibility(input);
+    return LEAVE_DASHBOARD_TABS.some((tab) => visibility[tab]);
+}
+
+export function normalizeLeaveDashboardTab(
+    requestedTab: string | undefined,
+    input: LeaveDashboardAvailabilityInput,
+): LeaveDashboardTab {
+    const visibility = getLeaveDashboardTabVisibility(input);
+    const visibleTabs = LEAVE_DASHBOARD_TABS.filter((tab) => visibility[tab]);
+
+    return visibleTabs.find((tab) => tab === requestedTab)
+        ?? visibleTabs[0]
+        ?? "my-leave";
+}
+
 /**
  * Filter groups by role and feature availability. Routine also requires its
  * server-derived read projection; non-Routine menu behavior remains role-based.
@@ -140,7 +203,14 @@ export function getAvailableMenuGroups(
     isAdmin: boolean,
     routineCapabilities?: RoutinePresentationCapabilities,
     stockCapabilities?: StockPresentationCapabilities,
+    leaveAvailability?: Omit<LeaveDashboardAvailabilityInput, "isAdmin">,
 ): MenuGroup[] {
+    const stockAvailable = canAccessStockDashboard(stockCapabilities);
+    const leaveAvailable = canAccessLeaveDashboard({
+        isAdmin,
+        ...(leaveAvailability ?? {}),
+    });
+
     return DASHBOARD_MENU_GROUPS.map((group) => {
         const filteredItems = group.items.filter(
             (item) =>
@@ -154,12 +224,14 @@ export function getAvailableMenuGroups(
                 (item) => item.id !== "routine"
                     || routineCapabilities?.canReadTasks === true,
             );
-        const stockAvailable = canAccessStockDashboard(stockCapabilities);
         const stockFilteredItems = filteredItems.filter(
             (item) => item.id !== "stock" || stockAvailable,
         );
-        if (stockFilteredItems.length === 0) return null;
-        return { ...group, items: stockFilteredItems };
+        const leaveFilteredItems = stockFilteredItems.filter(
+            (item) => item.id !== "leave-management" || leaveAvailable,
+        );
+        if (leaveFilteredItems.length === 0) return null;
+        return { ...group, items: leaveFilteredItems };
     }).filter((g): g is MenuGroup => g !== null);
 }
 

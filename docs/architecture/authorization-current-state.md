@@ -1,7 +1,7 @@
 # NHF Employee — Current Authorization State
 
-สถานะ: Baseline Phase 0 พร้อมบันทึก migration ถึง Phase 7B<br>
-วันที่สำรวจ: 2026-09-10<br>
+สถานะ: Baseline Phase 0 พร้อมบันทึก migration ถึง Phase 7C; Leave authorization migration — CLOSED<br>
+วันที่สำรวจ: 2026-09-13<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
 หมายเหตุการปรับปรุง: หลัง Phase 6A การบังคับใช้ authorization ฝั่ง server ของ Stock ใช้ central resolver และมี compatibility floor ตามที่บันทึกใน [authorization-stock-migration.md](authorization-stock-migration.md), Phase 6B เพิ่ม Stock presentation projection จาก resolver เดียวกัน และ Phase 6C ปิด migration ด้วย complete-surface audit, query-level request-detail ownership และ regression hardening โดยยังคง compatibility bridge ไว้อย่างตั้งใจ ส่วนโดเมนที่ยังไม่เข้าสู่ migration ยังคงอ้างอิง baseline ของ Phase 0 ตามที่ระบุในแต่ละหัวข้อ
@@ -9,6 +9,8 @@
 หมายเหตุ Phase 7A: Leave ย้าย registered server capabilities ไปยัง central resolver พร้อม Leave compatibility floor และยังคงให้ relationship, workflow, report, participant, attachment และ recovery boundaries ที่ยังไม่อยู่ใน generic scope เป็นความรับผิดชอบของ Leave ตามที่บันทึกใน [authorization-leave-migration.md](authorization-leave-migration.md)
 
 หมายเหตุ Phase 7B: Leave เพิ่ม immutable `LeavePresentationCapabilities` จากการเรียก `authorization.resolveMany()` แบบ batch เดียวผ่าน Leave boundary แล้วต่อเข้ากับ Dashboard current-user projection และ LIFF `/api/line/home` โดยคง legacy aliases, report projection, Admin recovery และ participant/detail/attachment policy เดิมไว้
+
+หมายเหตุ Phase 7C: Leave complete-surface audit และ regression hardening ปิดแล้ว โดย Dashboard menu/direct route/tab ใช้ capability + relationship projection เดียวกัน, migrated server operations ยังคงใช้ Leave adapter/central resolver และ transaction-time lifecycle revalidation, LIFF cancellation decision ยังคงเป็น Leave-domain exception, และ reports/export, participant/detail, attachments กับ Admin recovery ยังคงเป็น deferred Leave policy
 
 เอกสารนี้เป็น baseline ของพฤติกรรมปัจจุบัน ไม่ใช่ policy ใหม่และไม่ใช่การออกแบบ resolver ในอนาคต ทุกข้อความที่ระบุว่า “ปัจจุบัน” หมายถึงสิ่งที่ trace ได้จาก code หรือ test โดยตรง การพบพฤติกรรมที่เสี่ยงหรือดูไม่ตรงกับหลัก least privilege จะถูกบันทึกเป็น risk เพื่อให้ Phase ถัดไปตัดสินใจอย่างชัดเจน โดย Phase 0 ไม่แก้ผลลัพธ์ authorization เดิม
 
@@ -334,7 +336,7 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 - Stock processor capability guard: requireLiffStockProcessorSession verifies LIFF workforce first, then resolves `stock.request.process`
 - Routine channel mode: createLiffRoutineActor(..., { mode: LIFF_SELF_SERVICE })
 - LIFF Routine reference exception: app/api/line/routine/reference/route.ts ไม่ส่ง mode ให้ createRoutineCommandActor(); getRoutineReferenceData() จึงอาจ query employee set แบบ Admin แต่ serializeLiffRoutineReference() ส่งออกเฉพาะ units, categories, scheduleTypes และ businessDayPolicies โดยไม่ส่ง employees
-- Leave capability: getLiffLeaveCapabilities checks actionable assigned effective approver work, not role; migrated LIFF Leave server paths resolve registered capabilities after the LIFF workforce check
+- Leave capability: `getLiffCapabilities()` projects registered Leave capabilities through the canonical Leave adapter after the LIFF workforce check; `getLiffLeaveRelationshipProjection()` supplies the actionable assigned effective-approver relationship, not role, and the deprecated `getLiffLeaveCapabilities()` helper/type has been removed
 - Leave/Routine LIFF routes independently enforce relationship/status after projection; Leave keeps Dashboard-only cancellation-decision and Admin-recovery boundaries, while migrated Stock LIFF routes resolve Stock capabilities after the LIFF workforce check and retain Stock-owned relationship/status rules
 
 ### 5.5 Routine domain authorization
@@ -479,6 +481,7 @@ Later migration phases must preserve these behaviors until a policy change is ex
 19. **Self-scoped notifications and Email Request reads** — notification commands/queries always use authenticated User ID; non-admin Email Request query is requester-owned.
 20. **System endpoint separation** — cron/cleanup/webhook operations remain secret/HMAC-protected system boundaries, not User role checks.
 21. **Leave Phase 7B presentation projection** — `LeavePresentationCapabilities` is server-derived through one batched resolver call and reuses Phase 7A compatibility translation; each capability remains separate from effective-approver/resource/workflow relationships, all presentation booleans remain non-authoritative, report visibility and Admin recovery remain deferred, and LIFF cancellation decisions remain Leave-domain-authorized because the registered capability is Dashboard-only.
+22. **Leave Phase 7C closure** — the complete Leave production surface now uses the canonical adapter/resolver path for all registered operations; Dashboard availability and deep links use `canAccessLeaveDashboard()` plus tab normalization; transaction mutations revalidate current User/Employee lifecycle and capability; the only fallback remains `NO_APPLICABLE_GRANT`; LIFF cancellation decision, reports/export, participant/detail, attachments and Admin recovery remain explicit deferred/domain-owned boundaries.
 
 ## 8. Characterization tests
 
@@ -524,6 +527,72 @@ Dashboard/LIFF:
 
 These tests verify presentation behavior only; existing Leave route/application
 authorization tests remain the authority for server enforcement.
+
+### 8.4 Phase 7C Leave closure and regression-hardening tests
+
+เพิ่มหรือ consolidate focused tests สำหรับ closure โดยไม่เปลี่ยน policy:
+
+- `modules/leave/application/presentation-capabilities.test.ts`
+  - ยืนยันว่าแต่ละ registered capability แสดงผลเฉพาะ granular field ของตัวเอง
+    รวมทั้ง `not_taken / OWN` และ `not_taken / ASSIGNED` ที่เป็นอิสระกัน
+- `__tests__/constants/dashboard-menu.test.ts`,
+  `__tests__/context/DashboardProvider.test.tsx` และ
+  `__tests__/dashboard-leave-page.test.tsx`
+  - ยืนยัน Leave availability แบบ own-read, assigned-read + relationship,
+    reports, Admin recovery, explicit USER approver management, feature flag,
+    menu/direct-route denial และ inaccessible-tab normalization
+- Leave application/route/domain suites ที่มีอยู่
+  - ยืนยัน trusted identity, direct-input spoof resistance, effective approver
+    exception precedence, owner exclusion, lifecycle/transaction revalidation,
+    LIFF channel isolation, participant/detail/attachment/report/recovery
+    deferred policy และ session-recovery no-retry behavior
+
+Focused invocation ที่รันจริง (32 files, 308 tests ผ่าน):
+
+```text
+modules/leave/application/authorization.test.ts
+modules/leave/application/presentation-capabilities.test.ts
+modules/leave/application/approvals/approval-queries.test.ts
+modules/leave/application/approvals/exception-approver.test.ts
+modules/leave/application/approvals/approver-assignment.test.ts
+modules/leave/application/approvals/offboarding-responsibilities.test.ts
+modules/leave/application/queries/active-employee-session.test.ts
+modules/leave/server/request-api.test.ts
+modules/leave/presentation/dashboard/LeaveManagementSection.test.tsx
+modules/leave/presentation/dashboard/ManagerApprovalDashboard.test.tsx
+modules/leave/presentation/dashboard/hooks/useManagerApprovalModel.test.ts
+modules/leave/presentation/dashboard/hooks/useEmployeeLeaveDashboardModel.test.ts
+modules/leave/presentation/liff/LiffLeaveApp.test.tsx
+modules/leave/presentation/liff/LiffLeaveComponents.test.tsx
+__tests__/auth/current-user-projection.test.ts
+__tests__/auth/liff-capabilities.test.ts
+__tests__/api/line-home-route.test.ts
+__tests__/lib/liff-home.test.ts
+__tests__/api/leave-request.test.ts
+__tests__/api/leave-me.test.ts
+__tests__/api/leave-approvals.test.ts
+__tests__/api/leave-decision.test.ts
+__tests__/api/leave-cancel.test.ts
+__tests__/api/leave-not-taken.test.ts
+__tests__/api/leave-approvers.test.ts
+__tests__/api/leave-admin-recovery.test.ts
+__tests__/api/leave-attachment.test.ts
+__tests__/api/leave-export.test.ts
+__tests__/api/line-leave-routes.test.ts
+__tests__/constants/dashboard-menu.test.ts
+__tests__/context/DashboardProvider.test.tsx
+__tests__/dashboard-leave-page.test.tsx
+```
+
+คำสั่ง focused ที่ใช้จริงคือ:
+
+```text
+npm.cmd run test:run -- modules/leave/application/authorization.test.ts modules/leave/application/presentation-capabilities.test.ts modules/leave/application/approvals/approval-queries.test.ts modules/leave/application/approvals/exception-approver.test.ts modules/leave/application/approvals/approver-assignment.test.ts modules/leave/application/approvals/offboarding-responsibilities.test.ts modules/leave/application/queries/active-employee-session.test.ts modules/leave/server/request-api.test.ts modules/leave/presentation/dashboard/LeaveManagementSection.test.tsx modules/leave/presentation/dashboard/ManagerApprovalDashboard.test.tsx modules/leave/presentation/dashboard/hooks/useManagerApprovalModel.test.ts modules/leave/presentation/dashboard/hooks/useEmployeeLeaveDashboardModel.test.ts modules/leave/presentation/liff/LiffLeaveApp.test.tsx modules/leave/presentation/liff/LiffLeaveComponents.test.tsx __tests__/auth/current-user-projection.test.ts __tests__/auth/liff-capabilities.test.ts __tests__/api/line-home-route.test.ts __tests__/lib/liff-home.test.ts __tests__/api/leave-request.test.ts __tests__/api/leave-me.test.ts __tests__/api/leave-approvals.test.ts __tests__/api/leave-decision.test.ts __tests__/api/leave-cancel.test.ts __tests__/api/leave-not-taken.test.ts __tests__/api/leave-approvers.test.ts __tests__/api/leave-admin-recovery.test.ts __tests__/api/leave-attachment.test.ts __tests__/api/leave-export.test.ts __tests__/api/line-leave-routes.test.ts __tests__/constants/dashboard-menu.test.ts __tests__/context/DashboardProvider.test.tsx __tests__/dashboard-leave-page.test.tsx
+```
+
+ผล closure ต้องอ่านคู่กับ exact commands/results ใน Phase 7C section ของ
+`authorization-leave-migration.md`; tests ที่เป็น presentation ไม่ถูกใช้แทน
+server authorization tests.
 
 ## 9. Risks / Ambiguities / Phase 1 Inputs
 

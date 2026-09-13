@@ -20,13 +20,11 @@ export {
     getApproverHistoryReportWhere,
     getCurrentEmployeeLeaveProjection,
     getAssignedLeaveApproverWhere,
-    getLiffLeaveCapabilities,
     getLiffLeaveRelationshipProjection,
     parseLeaveApprovalPage,
 } from "./application/approvals/approval-queries";
 export type {
     CurrentEmployeeLeaveProjection,
-    LiffLeaveCapabilities,
     LiffLeaveRelationshipProjection,
 } from "./application/approvals/approval-queries";
 export { getLeaveApprovalList } from "./application/approvals/approval-list";

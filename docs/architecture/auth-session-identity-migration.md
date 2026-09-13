@@ -1822,10 +1822,13 @@ canonical display name. LINE composes Auth and Employee to preserve the
 existing `user.id`, `user.role`, `user.email`, `user.name`, and `employeeId`
 result.
 
-Leave exposes `getLiffLeaveCapabilities()` through `@/modules/leave`. Leave
-keeps the exact LIFF actionable assigned-approver query, including its status
-predicates and approver precedence. Auth no longer owns the LIFF Leave
-capability query, and LINE does not duplicate Leave policy. Stock role hints
+Leave exposes `getLiffLeaveRelationshipProjection()` through `@/modules/leave`.
+Leave keeps the exact LIFF actionable assigned-approver query, including its
+status predicates and approver precedence. The deprecated
+`getLiffLeaveCapabilities()` / `LiffLeaveCapabilities` helper and type were
+removed after a repository-wide production-consumer audit; the canonical
+relationship projection remains. Auth no longer owns the LIFF Leave capability
+query, and LINE does not duplicate Leave policy. Stock role hints
 and feature flags remain presentation hints; feature routes remain
 authoritative.
 

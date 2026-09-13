@@ -9,6 +9,10 @@ import { ApproverManagement } from "./ApproverManagement";
 import { LeaveReportsDashboard } from "./LeaveReportsDashboard";
 import { LEAVE_THEME_COLOR } from "./leaveTheme";
 import { isAdminRole } from "@/lib/ssot/permissions";
+import {
+    getLeaveDashboardTabVisibility,
+    type LeaveDashboardTabVisibility,
+} from "@/constants/dashboard";
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
@@ -21,13 +25,13 @@ interface LeaveManagementSectionProps {
 export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagementSectionProps) {
     const { user } = useDashboardDataContext();
     const leaveCapabilities = user?.leaveCapabilities;
-    const canReadOwnRequests = leaveCapabilities?.canReadOwnRequests === true;
-    const canReadAssignedApprovals = leaveCapabilities?.canReadAssignedApprovals === true;
     const hasApprovalRelationship = user?.canApproveLeave === true;
-    const canViewLeaveReports = user?.canViewLeaveReports === true;
-    const isAdmin = isAdminRole(user?.role);
-    const canRecoverLeave = isAdmin;
-    const canManageApprovers = leaveCapabilities?.canManageApprovers === true;
+    const tabVisibility = getLeaveDashboardTabVisibility({
+        isAdmin: isAdminRole(user?.role),
+        leaveCapabilities,
+        canApproveLeave: user?.canApproveLeave,
+        canViewLeaveReports: user?.canViewLeaveReports,
+    });
 
     const [activeTab, setActiveTab] = useState(defaultTab);
     const [isMounted, setIsMounted] = useState(false);
@@ -45,12 +49,8 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
 
     const tabs = getLeaveTabs({
         leaveCapabilities,
-        canReadOwnRequests,
-        canReadAssignedApprovals,
+        tabVisibility,
         hasApprovalRelationship,
-        canViewLeaveReports,
-        canRecoverLeave,
-        canManageApprovers,
     });
     const hasTabs = tabs.some((tab) => tab.visible !== false);
     const activeTabIsVisible = tabs.some((tab) => tab.value === activeTab && tab.visible !== false);
@@ -81,22 +81,14 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
 
 interface LeaveTabOptions {
     leaveCapabilities?: LeavePresentationCapabilities;
-    canReadOwnRequests: boolean;
-    canReadAssignedApprovals: boolean;
+    tabVisibility: LeaveDashboardTabVisibility;
     hasApprovalRelationship: boolean;
-    canViewLeaveReports: boolean;
-    canRecoverLeave: boolean;
-    canManageApprovers: boolean;
 }
 
 function getLeaveTabs({
     leaveCapabilities,
-    canReadOwnRequests,
-    canReadAssignedApprovals,
+    tabVisibility,
     hasApprovalRelationship,
-    canViewLeaveReports,
-    canRecoverLeave,
-    canManageApprovers,
 }: LeaveTabOptions): SectionTabItem[] {
     return [
         {
@@ -109,7 +101,7 @@ function getLeaveTabs({
                     leaveCapabilities={leaveCapabilities}
                 />
             ),
-            visible: canReadOwnRequests,
+            visible: tabVisibility["my-leave"],
         },
         {
             value: "approvals",
@@ -121,7 +113,7 @@ function getLeaveTabs({
                     hasApprovalRelationship={hasApprovalRelationship}
                 />
             ),
-            visible: canReadAssignedApprovals && hasApprovalRelationship,
+            visible: tabVisibility.approvals,
         },
         {
             value: "recovery",
@@ -129,21 +121,21 @@ function getLeaveTabs({
             group: "tools",
             groupLabel: "เครื่องมือ",
             content: <AdminLeaveRecoveryDashboard />,
-            visible: canRecoverLeave,
+            visible: tabVisibility.recovery,
         },
         {
             value: "reports",
             label: "รีพอร์ต",
             group: "tools",
             content: <LeaveReportsDashboard />,
-            visible: canViewLeaveReports,
+            visible: tabVisibility.reports,
         },
         {
             value: "approver-settings",
             label: "จัดการผู้อนุมัติ",
             group: "tools",
             content: <ApproverManagement />,
-            visible: canManageApprovers,
+            visible: tabVisibility["approver-settings"],
         },
     ];
 }

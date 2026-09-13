@@ -62,6 +62,18 @@ const stockCapabilities = {
     canExportReports: true,
 };
 
+const noLeaveCapabilities = {
+    canReadOwnRequests: false,
+    canReadAssignedApprovals: false,
+    canCreateOwnRequests: false,
+    canCancelOwnRequests: false,
+    canApproveAssignedRequests: false,
+    canDecideAssignedCancellations: false,
+    canRequestOwnNotTaken: false,
+    canConfirmAssignedNotTaken: false,
+    canManageApprovers: false,
+} as const;
+
 function DashboardNavigationState(): ReactElement {
     const { selectedMenu, mobileNavOpen, desktopSidebarCollapsed } =
         useDashboardUIContext();
@@ -219,6 +231,69 @@ describe("DashboardProvider navigation state", () => {
         fireEvent.click(screen.getByRole("button", { name: "Routine" }));
         expect(navigationMocks.router.push).toHaveBeenCalledWith(
             "/dashboard/routine",
+            { scroll: false },
+        );
+    });
+
+    it("hides and denies Leave navigation when no Leave surface is usable", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            leaveCapabilities: noLeaveCapabilities,
+            canApproveLeave: false,
+            canViewLeaveReports: false,
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button type="button" onClick={() => handleMenuClick("leave-management")}>
+                    Leave
+                </button>
+            );
+        }
+
+        render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent("leave-management");
+        fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+    });
+
+    it("allows an explicit USER approver-management grant to open Leave", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            leaveCapabilities: {
+                ...noLeaveCapabilities,
+                canManageApprovers: true,
+            },
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button type="button" onClick={() => handleMenuClick("leave-management")}>
+                    Leave
+                </button>
+            );
+        }
+
+        render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("leave-management");
+        fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/leave",
             { scroll: false },
         );
     });

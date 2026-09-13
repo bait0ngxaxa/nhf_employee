@@ -1,9 +1,9 @@
-# Leave Authorization Migration — Phase 7A / Phase 7B
+# Leave Authorization Migration — Phase 7A / Phase 7B / Phase 7C
 
-สถานะ: Phase 7A server authorization closed; Phase 7B presentation projection complete
-วันที่: 2026-09-12
+สถานะ: Phase 7A — CLOSED; Phase 7B — CLOSED; Phase 7C — CLOSED; Leave authorization migration — CLOSED
+วันที่: 2026-09-13
 
-เอกสารนี้บันทึกการย้าย authorization ฝั่ง server ของ Leave ไปยัง central authorization resolver และการย้าย presentation projection ใน Phase 7B โดยคง relationship, workflow, business rule, transaction และ channel behavior ของ Leave เดิมไว้ ไม่ใช่ policy ใหม่และไม่ใช่การเริ่ม Phase 7C
+เอกสารนี้บันทึกการย้าย authorization ฝั่ง server ของ Leave ไปยัง central authorization resolver, การย้าย presentation projection ใน Phase 7B และการ complete-surface audit/regression hardening ใน Phase 7C โดยคง relationship, workflow, business rule, transaction และ channel behavior ของ Leave เดิมไว้ ไม่ใช่ policy ใหม่และไม่ใช่การเริ่ม Employee authorization migration
 
 ## Scope
 
@@ -97,7 +97,7 @@ Phase 7A does not add generic policy for these surfaces:
 - `GET /api/leave/admin/recovery`: remains Dashboard-only, active-workforce, Admin-only and filtered by unavailable effective approver plus current-Admin workload exclusion. There is no generic recovery capability.
 - manager/direct-report, original-approver history, exception approver precedence, quota, dates, workflow state, concurrency, attachments, notifications and audit semantics remain Leave-domain responsibilities.
 
-Existing presentation projections such as `canApproveLeave`, `canViewLeaveReports` and the relationship-only `LiffLeaveCapabilities` remain behavior-compatible and are not authoritative server permissions. Phase 7B adds the granular `LeavePresentationCapabilities` projection while retaining these legacy fields as compatibility aliases/deferred relationship projections.
+Existing presentation projections such as `canApproveLeave` and `canViewLeaveReports` remain behavior-compatible and are not authoritative server permissions. Phase 7B adds the granular `LeavePresentationCapabilities` projection while retaining these legacy fields as compatibility aliases/deferred relationship projections. The canonical LIFF relationship contract is `getLiffLeaveRelationshipProjection()`; the deprecated `getLiffLeaveCapabilities()` helper and `LiffLeaveCapabilities` type were removed after a repository-wide production-consumer audit.
 
 ## Phase 7B — Leave capability-driven presentation projection
 
@@ -218,3 +218,190 @@ attachments, Admin recovery, manager/direct-report scope, Team policy หรื�
 server authorization. Presentation booleans ทั้งหมดไม่ใช่ security boundary;
 authentication, authorization, relationship, workflow, business rule,
 transaction และ concurrency checks ฝั่ง server ยังคง authoritative.
+
+## Phase 7C — Leave authorization migration closure and regression hardening
+
+สถานะ: **Phase 7A — CLOSED; Phase 7B — CLOSED; Phase 7C — CLOSED; Leave
+authorization migration — CLOSED**
+
+Phase 7C ตรวจ production surface แบบ end-to-end และยืนยันเส้นทาง authoritative
+ดังนี้:
+
+```text
+registered Leave capability
+    -> central resolver
+    -> Leave authorization adapter
+    -> Leave-owned resource relationship
+    -> Leave workflow/business invariant
+    -> transaction/lifecycle validation
+    -> Dashboard/LIFF presentation projection
+```
+
+### Complete production-surface audit
+
+ตรวจครบ `app/api/leave/**`, `app/api/line/leave/**`,
+`app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**`, Leave
+composition ใต้ `modules/line/**`, `app/_lib/auth/current-user.ts`, Dashboard
+menu/route composition, `/api/auth/me` และ `/api/line/home` รวมทั้ง callers และ
+tests ที่เกี่ยวข้องกับ request, approval, cancellation, not-taken, approver
+management, participant/detail, attachment, report/export และ Admin recovery.
+
+การตรวจ role/boolean จัดประเภทได้ดังนี้:
+
+- **A — migrated authorization:** request read/create/cancel, approval read,
+  approve/reject, Dashboard cancellation decision, not-taken owner/confirmation
+  และ approver management ใช้ Leave capability adapter ที่เรียก central resolver
+  ตาม registered inventory
+- **B — intentionally deferred Leave policy:** reports/export,
+  participant/detail, attachments, Admin recovery และ LIFF cancellation decision
+  ยังคงใช้ Leave-owned relationship/domain boundary ตามที่ระบุด้านล่าง
+- **C — compatibility floor:** `NO_APPLICABLE_GRANT` และ account-only Dashboard
+  Admin approver-management exception อยู่ภายใน Leave adapter เท่านั้น
+- **D — descriptive/presentation identity:** `role`, `isAdmin`,
+  `canApproveLeave`, `canViewLeaveReports` และ LIFF aliases ใช้เป็น identity หรือ
+  projection ที่ไม่ใช่ server authority
+- **E — obsolete bypass:** ไม่พบ migrated operation ที่ใช้ role หรือ client input
+  เป็น authority หลัง audit; Dashboard Leave menu/direct-route gap และ deprecated
+  LIFF helper residue ถูกแก้ใน Phase 7C
+
+Role checks ที่คงไว้จำกัดอยู่ที่ Dashboard Admin recovery, participant/detail/
+attachment Admin relationship, approver-management compatibility exception และ
+descriptive presentation identity เท่านั้น. `canApproveLeave` ยังคงเป็น
+relationship-sensitive hint; `canViewLeaveReports` ยังคงเป็น deferred report
+projection. ไม่พบการใช้ `requireAdminSession`, client-provided role,
+`employeeId`, owner, scope หรือ permission boolean เพื่อสร้าง authority ของ
+migrated Leave operation.
+
+### Dashboard menu, direct route และ tab closure
+
+`constants/dashboard.ts` เป็นเจ้าของ helper กลาง
+`canAccessLeaveDashboard()` และ tab visibility/normalization contract. Leave
+Dashboard มี usable surface เมื่ออย่างน้อยหนึ่งข้อต่อไปนี้เป็นจริง:
+
+```text
+canReadOwnRequests
+OR (canReadAssignedApprovals AND existing canApproveLeave relationship hint)
+OR canViewLeaveReports
+OR existing Admin recovery surface
+OR canManageApprovers
+```
+
+Menu และ `DashboardProvider` ใช้ helper เดียวกัน จึงไม่ใช้ broad Admin shortcut;
+normal USER ที่มี `leave.approver.manage / ALL` เห็น Leave entry และ
+approver-settings ได้ แต่ไม่เห็น recovery. Direct `/dashboard/leave` ตรวจตามลำดับ
+feature flag -> trusted current-user projection -> login redirect -> Leave
+availability -> access-denied redirect -> safe tab normalization -> render.
+Query `leaveTab` ไม่ใช่ authorization input: tabs ที่ไม่ visible จะ normalize
+ไปยัง visible surface แรก และ route จะ deny หากไม่มี surface ใดเลย. ฝั่ง
+`LeaveManagementSection` คง normalization เป็น defense-in-depth.
+
+Visibility สุดท้ายยังเป็น:
+
+```text
+my-leave          -> canReadOwnRequests
+approvals         -> canReadAssignedApprovals AND canApproveLeave relationship
+recovery          -> existing Dashboard Admin-only recovery policy
+reports           -> canViewLeaveReports
+approver-settings -> canManageApprovers
+```
+
+### Server capability, resource/query และ transaction closure
+
+ทุก migrated server operation derive identity จาก trusted session และใช้ Leave
+adapter; active Employee/workforce เป็นเงื่อนไขตาม operation ยกเว้น exact
+account-only Dashboard Admin `leave.approver.manage` compatibility path. OWN
+แปลเป็น owner predicate ของ current Employee และ ASSIGNED ใช้
+canonical effective-approver predicate ที่ exception approver supersedes original
+approver และ owner ถูกกันออก. Approval list/detail ที่อยู่ใน scope นี้ยังคงใช้
+query-level effective assignment เมื่อปลอดภัย. Participant/detail และ attachment
+ยังคงใช้ Leave-owned participant/Admin relationship; reports ยังคงใช้
+manager/direct-report และ original-approver history; recovery candidates ไม่ถูก
+แทนที่ด้วย ASSIGNED.
+
+Create, own cancel, approve/reject, cancellation decision, not-taken และ
+approver-management mutations แยก route preflight ออกจาก transaction
+authorization. Transaction boundary re-reads and locks current User และ
+Employee เมื่อ operation บังคับ workforce (หรือใช้ account-only exception ตาม
+ขอบเขตข้างต้น), ตรวจ active/not-deleted/linkage และ resolve capability ใหม่ก่อน
+protected write;
+resource relationship, current action/status, owner exclusion, exception
+precedence, quota, row locks, serializable/retry, atomic claim/update, audit,
+outbox และ notification behavior เดิมยังคงอยู่. การ deactivation/deletion,
+Employee suspension/deletion, role/grant revocation หรือ assignment/exception
+change ระหว่าง preflight กับ transaction จึง fail closed.
+
+### Presentation and channel isolation
+
+Dashboard และ LIFF ใช้ granular capability eligibility ร่วมกับ Leave resource
+และ state/action relationship. LIFF own profile/history ต้องมี own-read;
+approval list ต้องมี assigned-read และ actionable effective relationship; action
+controls intersect capability ที่ตรงกับ operation กับ server `availableActions`.
+`CONFIRM_CANCELLATION` และ `REJECT_CANCELLATION` ใน LIFF ยังคงเป็น explicit
+Leave-domain exception เพราะ `leave.cancellation.decide / ASSIGNED` รองรับเฉพาะ
+Dashboard. ไม่เพิ่ม LIFF channel, ไม่จับ `CHANNEL_NOT_SUPPORTED` แล้ว bypass และ
+ไม่เปิด Admin recovery ใน LIFF. Effective/exception approver ใช้งานได้ตามเดิม;
+owner, superseded original approver, unrelated Employee และ unrelated Admin ยัง
+ถูกปฏิเสธ.
+
+Compatibility bridge ยังคงมีเพียง:
+
+```text
+resolver ALLOW        -> ใช้ scopes จาก resolver
+NO_APPLICABLE_GRANT   -> Leave compatibility floor
+ทุก denial/configuration/system อื่น -> fail closed หรือ propagate
+```
+
+`CHANNEL_NOT_SUPPORTED`, `UNKNOWN_CAPABILITY`, invalid persisted authorization,
+resolver structural failure และ database/configuration failure ไม่ fallback ไปยัง
+role behavior.
+
+### Compatibility aliases and removed helper
+
+Dashboard `canApproveLeave` และ `canViewLeaveReports` ถูกเก็บไว้เพราะยังเป็น
+active relationship/deferred-policy contracts; ไม่ใช่ registered capability.
+LIFF `/api/line/home` ยังคง `canRequestLeave` และ `canApproveLeave` เพื่อ response
+compatibility. ทั้งหมด derive จาก trusted projection/relationship และไม่ถูกใช้
+เป็น server authority. Audit ไม่พบ production consumer ของ
+`getLiffLeaveCapabilities()` หรือ `LiffLeaveCapabilities` นอก definition/export/
+docs จึงลบ deprecated helper/type/export และเก็บ canonical
+`getLiffLeaveRelationshipProjection()` ไว้.
+
+### Explicitly deferred boundaries
+
+Phase 7C **ไม่ได้** migrate และไม่ควรอ่านว่า migrated แล้ว:
+
+- reports/export และ audit/report relationship policy; ยังไม่มี
+  `leave.report.export`
+- participant/detail และ original/effective approver/Admin participant rules
+- attachment participant/Admin access
+- Dashboard Admin recovery และ recovery candidate policy; ไม่มี generic
+  `leave.recovery.*` หรือ `RECOVERY` scope
+- LIFF `leave.cancellation.decide`; ยังคง Leave-domain exception และ registry
+  ยังคง Dashboard-only
+
+### Regression evidence
+
+Focused regression coverage ครอบคลุม adapter/projection independence, transaction
+identity/lifecycle revalidation, request read/create/cancel, approval read/decision,
+cancellation, not-taken, approver management, participant/detail/attachments,
+reports/export, Dashboard current-user/menu/direct route/tabs/actions, LIFF home,
+Leave route/presentation/session recovery และ cross-user/effective-approver,
+channel-isolation, direct-input spoofing cases.
+
+ผลคำสั่งตรวจสอบที่รันจริง:
+
+- `npm.cmd run architecture:check` — passed; ตรวจ 1,045 source files
+- `npm.cmd run lint:strict` — passed; zero warnings
+- `npm.cmd run typecheck` — passed
+- focused Leave/Dashboard/LIFF Vitest invocation — passed; 32 files, 308 tests
+- `npm.cmd run check` — passed; architecture, lint, typecheck และ full Vitest
+  285 files, 2,472 tests
+- `git diff --check` — passed; ไม่มี whitespace error หรือ encoding/mojibake finding
+
+Focused command ที่ใช้คือ `npm.cmd run test:run --` ตามรายการ test files ใน
+`authorization-current-state.md` section 8.4 และครอบคลุมทุก surface ที่ระบุใน
+ย่อหน้าข้างต้น.
+
+Phase 7C จึงปิด Leave authorization migration โดยไม่เปลี่ยน capability
+inventory, scope vocabulary, deferred Leave policy, workflow หรือเริ่ม Employee
+authorization migration.

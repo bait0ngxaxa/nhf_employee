@@ -1,13 +1,13 @@
 # Authorization presentation capability projections
 
-Status: Routine Phase 5C and Stock Phase 6B complete; Leave Phase 7B complete
+Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C closed
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, and Leave authorization migrations. These projections do not
 replace the locked authorization source-of-truth or server-side enforcement.
 The Routine and Stock sections retain their completed migration records; the
-Leave Phase 7B section records the new Leave projection and presentation
-integration.
+Leave Phase 7B section records the projection and the Phase 7C section records
+the final production-surface closure and regression hardening.
 
 ## Contract and ownership
 
@@ -400,3 +400,49 @@ manager/direct-report scope, or Admin recovery policy. All presentation
 booleans are UX hints only. Every Leave route and application mutation remains
 responsible for authentication, server-side authorization, resource
 relationships, workflow/business rules, and transaction-time revalidation.
+
+### Leave Phase 7C presentation closure
+
+Phase 7C closes the Dashboard entry-point and deep-link presentation boundary
+without adding a capability or changing Leave policy. The shared helper in
+`constants/dashboard.ts` computes the five Leave tab visibilities from the
+granular projection plus the existing Leave-owned projections:
+
+```text
+my-leave          -> canReadOwnRequests
+approvals         -> canReadAssignedApprovals AND canApproveLeave relationship hint
+recovery          -> existing Dashboard Admin recovery rule
+reports           -> canViewLeaveReports
+approver-settings -> canManageApprovers
+```
+
+`canAccessLeaveDashboard()` returns true only when at least one tab is usable:
+own-read, assigned-read plus an existing approval relationship, the deferred
+report relationship, the existing Admin recovery surface, or approver
+management. `getAvailableMenuGroups()` and `DashboardProvider` use this same
+decision. A direct `/dashboard/leave` request performs feature check, trusted
+current-user projection, authentication redirect, availability denial, and
+server-side tab normalization before rendering. An unavailable `leaveTab`
+deep link therefore cannot select a hidden surface; a valid route with another
+unavailable tab falls back to the first visible tab.
+
+Explicit normal USER approver-management grants can expose the Dashboard and
+approver-settings without exposing Admin recovery. Role checks remain only for
+the existing recovery relationship/presentation boundary and descriptive
+identity; they are not replacements for migrated capabilities.
+
+LIFF continues to load granular `leaveCapabilities` from `/api/line/home` and
+combines them with server `availableActions` and effective resource/state
+relationships. The Dashboard-only `leave.cancellation.decide` capability is
+not projected as a LIFF permission: LIFF cancellation confirmation/rejection
+continues through the documented Leave-domain exception. Session recovery
+refreshes the trusted home projection and authorized data, and never retries
+an ambiguous protected mutation. `canRequestLeave` and `canApproveLeave` remain
+response-compatibility aliases only; the deprecated internal
+`getLiffLeaveCapabilities()`/`LiffLeaveCapabilities` contract was removed after
+the production-consumer audit, while
+`getLiffLeaveRelationshipProjection()` remains canonical.
+
+Reports/export, participant/detail, attachments, and Dashboard Admin recovery
+remain explicitly deferred Leave-owned policy. No generic report, participant,
+attachment, or recovery capability is implied by the presentation projection.

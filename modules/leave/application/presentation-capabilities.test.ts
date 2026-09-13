@@ -21,6 +21,7 @@ import {
     getLeavePresentationCapabilities,
     LEAVE_MIGRATED_CAPABILITIES,
 } from "./authorization";
+import type { LeavePresentationCapabilities } from "./types";
 
 const DASHBOARD_USER = buildLeaveAuthorizationContext(
     { id: 7, role: "USER" },
@@ -186,6 +187,89 @@ describe("Leave presentation capability projection", () => {
             canConfirmAssignedNotTaken: false,
             canManageApprovers: true,
         });
+    });
+
+    it("does not borrow eligibility between any registered Leave capabilities", async () => {
+        const emptyProjection: LeavePresentationCapabilities = {
+            canReadOwnRequests: false,
+            canReadAssignedApprovals: false,
+            canCreateOwnRequests: false,
+            canCancelOwnRequests: false,
+            canApproveAssignedRequests: false,
+            canDecideAssignedCancellations: false,
+            canRequestOwnNotTaken: false,
+            canConfirmAssignedNotTaken: false,
+            canManageApprovers: false,
+        };
+
+        const expectOnlyCapability = async (
+            capability: (typeof LEAVE_MIGRATED_CAPABILITIES)[number],
+            scope: AuthorizationScope,
+            field: keyof LeavePresentationCapabilities,
+        ): Promise<void> => {
+            mockDecisions((candidate) => candidate === capability
+                ? decision(
+                    candidate,
+                    true,
+                    [scope],
+                    undefined,
+                    [userGrant(candidate, scope)],
+                )
+                : deniedDecision(candidate));
+
+            await expect(
+                getLeavePresentationCapabilities(DASHBOARD_USER),
+            ).resolves.toEqual({
+                ...emptyProjection,
+                [field]: true,
+            });
+        };
+
+        await expectOnlyCapability(
+            "leave.request.read",
+            "OWN",
+            "canReadOwnRequests",
+        );
+        await expectOnlyCapability(
+            "leave.approval.read",
+            "ASSIGNED",
+            "canReadAssignedApprovals",
+        );
+        await expectOnlyCapability(
+            "leave.request.create",
+            "OWN",
+            "canCreateOwnRequests",
+        );
+        await expectOnlyCapability(
+            "leave.request.cancel",
+            "OWN",
+            "canCancelOwnRequests",
+        );
+        await expectOnlyCapability(
+            "leave.request.approve",
+            "ASSIGNED",
+            "canApproveAssignedRequests",
+        );
+        await expectOnlyCapability(
+            "leave.cancellation.decide",
+            "ASSIGNED",
+            "canDecideAssignedCancellations",
+        );
+        await expectOnlyCapability(
+            "leave.request.not_taken",
+            "OWN",
+            "canRequestOwnNotTaken",
+        );
+        await expectOnlyCapability(
+            "leave.request.not_taken",
+            "ASSIGNED",
+            "canConfirmAssignedNotTaken",
+        );
+        await expectOnlyCapability(
+            "leave.approver.manage",
+            "ALL",
+            "canManageApprovers",
+        );
     });
 
     it("projects the expected LIFF channel denial as false while keeping supported capabilities", async () => {
