@@ -1,7 +1,7 @@
 # Authorization presentation capability projections
 
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
-closed; Employee Phase 8A/8B closed; Employee Phase 8C not started
+closed; Employee Phase 8A/8B/8C closed
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -9,8 +9,8 @@ replace the locked authorization source-of-truth or server-side enforcement.
 The Routine and Stock sections retain their completed migration records; the
 Leave Phase 7B section records the projection and the Phase 7C section records
 the final production-surface closure and regression hardening. The Employee
-Phase 8B section records the Dashboard projection; its complete-surface audit
-and regression hardening remains Phase 8C.
+Phase 8B section records the Dashboard projection and the Phase 8C section
+records the final complete-surface audit and regression hardening.
 
 ## Contract and ownership
 
@@ -453,8 +453,8 @@ attachment, or recovery capability is implied by the presentation projection.
 ## Employee Phase 8B projection
 
 สถานะ: **Phase 8A Employee server enforcement closed; Phase 8B Employee
-Dashboard presentation projection closed; Phase 8C complete-surface audit not
-started**
+Dashboard presentation projection closed; Phase 8C complete-surface audit and
+regression hardening closed**
 
 Employee owns the immutable, serializable seven-field
 `EmployeePresentationCapabilities` contract:
@@ -521,5 +521,15 @@ contract, but no existing Employee delete/offboarding presentation control was
 found. Phase 8B intentionally adds no delete UI or workflow. Every projection
 and UI decision above is presentation/data-minimization behavior only;
 Employee routes and application authorization remain authoritative on the
-server. Phase 8C complete-surface audit and regression hardening is still
-pending.
+server. Phase 8C confirmed the main `/dashboard/employees` RSC boundary,
+direct-route parity, complete Employee production call-site coverage,
+capability-aware loading/revalidation, role-check classification, the
+unreachable export-without-read state under the locked registry, and the
+absence of an existing Employee delete/offboarding UI. The focused Employee
+regression suites, typecheck, strict lint, and architecture check passed;
+details are recorded in
+[authorization-employee-migration.md](authorization-employee-migration.md).
+
+Employee Phase 8C is closed for the current production surface. This does not
+change the independent `employee.export` authority, broad read/stats/export
+policy, compatibility floor, or any deferred Department/Team policy.

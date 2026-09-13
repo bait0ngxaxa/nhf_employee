@@ -1,6 +1,6 @@
 # NHF Employee — Current Authorization State
 
-สถานะ: Baseline Phase 0 พร้อมบันทึก migration ถึง Phase 8B; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Leave authorization migration — CLOSED; Employee complete-surface audit Phase 8C — NOT STARTED<br>
+สถานะ: Baseline Phase 0 พร้อมบันทึก migration ถึง Phase 8C; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED<br>
 วันที่สำรวจ: 2026-09-13<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -14,7 +14,9 @@
 
 หมายเหตุ Phase 8A: Employee server authorization migration ปิดแล้วสำหรับ registered capabilities ทั้งเจ็ด โดย routes ใต้ `/api/employees/**` ใช้ `requireApiSession()` เป็น authentication/workforce boundary แล้วผ่าน Employee adapter และ central resolver ด้วย execution channel `DASHBOARD`; explicit `ALLOW` ของ normal `USER` มีผลได้, compatibility floor ใช้เฉพาะ `NO_APPLICABLE_GRANT`, และ update/delete re-resolve current User/Employee lifecycle ใน existing serializable transaction ขณะที่ list/stats/export query scope, import partial-success และ Employee lifecycle/audit invariants ยังคงเดิม
 
-หมายเหตุ Phase 8B: Employee Dashboard ใช้ immutable `EmployeePresentationCapabilities` เจ็ด field จาก `getEmployeePresentationCapabilities()` ซึ่งเรียก `authorization.resolveMany()` เพียงครั้งเดียวและใช้ Phase 8A compatibility translation เดิม. `getCurrentUserProjection()` สร้าง trusted Employee actor จาก authenticated account กับ current active Employee และส่ง `employeeCapabilities` ผ่าน `AuthenticatedUser`/`DashboardUser`; menu, direct Add/Import route, list/stats SWR, create/import/update/export controls ใช้ field ที่ตรงกันแบบ granular. `canDeleteEmployees` ถูก project และส่งต่อแต่ยังไม่มี delete/offboarding UI ที่มีอยู่ให้ migrate. Phase 8B ปิดแล้ว; Phase 8C complete-surface audit และ regression hardening ยังไม่เริ่ม
+หมายเหตุ Phase 8B: Employee Dashboard ใช้ immutable `EmployeePresentationCapabilities` เจ็ด field จาก `getEmployeePresentationCapabilities()` ซึ่งเรียก `authorization.resolveMany()` เพียงครั้งเดียวและใช้ Phase 8A compatibility translation เดิม. `getCurrentUserProjection()` สร้าง trusted Employee actor จาก authenticated account กับ current active Employee และส่ง `employeeCapabilities` ผ่าน `AuthenticatedUser`/`DashboardUser`; menu, direct Add/Import route, list/stats SWR, create/import/update/export controls ใช้ field ที่ตรงกันแบบ granular. `canDeleteEmployees` ถูก project และส่งต่อแต่ยังไม่มี delete/offboarding UI ที่มีอยู่ให้ migrate. Phase 8B ปิดแล้ว
+
+หมายเหตุ Phase 8C: เพิ่ม trusted server-side RSC boundary ให้ `/dashboard/employees` โดยใช้ `canReadEmployees OR canReadStats` ร่วมกับ `canAccessEmployeeDashboard()` เดียวกับเมนู/`handleMenuClick()`; direct Add/Import routes ยังคงตรวจ capability เฉพาะของตนเอง. Complete-surface search ไม่พบ production Employee bypass, Employee presentation ADMIN authority หรือ delete/offboarding UI; EmployeeProvider และ Employee-specific Add/Import global revalidation ตรวจ capability ก่อนโหลด/refresh. ผล export/read reachability, role classification, route parity, API call-site audit และ regression evidence อยู่ใน [authorization-employee-migration.md](authorization-employee-migration.md)
 
 เอกสารนี้เป็น baseline ของพฤติกรรมปัจจุบัน ไม่ใช่ policy ใหม่และไม่ใช่การออกแบบ resolver ในอนาคต ทุกข้อความที่ระบุว่า “ปัจจุบัน” หมายถึงสิ่งที่ trace ได้จาก code หรือ test โดยตรง การพบพฤติกรรมที่เสี่ยงหรือดูไม่ตรงกับหลัก least privilege จะถูกบันทึกเป็น risk เพื่อให้ Phase ถัดไปตัดสินใจอย่างชัดเจน โดย Phase 0 ไม่แก้ผลลัพธ์ authorization เดิม
 
@@ -48,7 +50,7 @@ web access cookie / LIFF session / system secret
 - ระบบ authorization ปัจจุบันมี Team, TeamRole, TeamMembership และ persisted capability grants ได้แก่ TeamCapabilityGrant, TeamRoleCapabilityGrant และ UserCapabilityGrant รวมถึง code-owned Capability Registry, Scope Registry, AuthorizationActor และ central resolver แล้ว
 - ชื่อ Team และ TeamRole ไม่มี authority โดยตัวมันเอง; authority มาจาก effective capability grants ที่ central resolver ประเมิน
 - Department / departmentId ยังไม่ถูกใช้เพื่ออนุมาน authorization
-- Routine, Stock, Leave และ Employee server migrated paths ใช้ central resolver พร้อม domain-owned resource semantics และ compatibility floors ตาม migration records; Employee presentation ยังเป็น Phase 8B และ Employee complete-surface audit/regression hardening ยังเป็น Phase 8C
+- Routine, Stock, Leave และ Employee server migrated paths ใช้ central resolver พร้อม domain-owned resource semantics และ compatibility floors ตาม migration records; Employee presentation และ complete-surface audit/regression hardening ของ current production surface ปิดแล้วใน Phase 8B/8C ตามลำดับ
 
 ## 1. Scope, terms and classification
 
@@ -204,7 +206,7 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 | Cross-cutting workforce | API | requireActiveWorkforceSession() | Current Employee identity | API session | User active/not deleted; Employee exists, ACTIVE, not deleted | Active workforce gate; no broad resource grant | None | Current User-to-Employee link | Current Employee only | None | lib/auth/workforce.ts | Current-user name projection | Missing profile 404 by default; inactive/deleted 403; unauthenticated normally 401 | __tests__/auth/workforce.test.ts, __tests__/auth/workforce-transaction.test.ts | Transaction variants must remain fail-closed |
 | Dashboard | DASHBOARD | Shared /dashboard layout | Dashboard session | Hybrid access cookie resolved by getCurrentUserProjection() | Account active/not deleted and current Employee lifecycle eligible | Authenticated current workforce can enter shared shell; no Admin requirement in layout | None at layout | Current Employee projection | Current Employee only | None | app/dashboard/layout.tsx, app/_lib/auth/current-user.ts | DashboardProvider receives role plus Leave/Stock/Routine/Employee projections | Missing projection redirects to /login | __tests__/auth/current-user-projection.test.ts, __tests__/lib/dashboard-routes.test.ts | Shared layout protection is not equivalent to per-page Admin authorization |
 | Dashboard | DASHBOARD | Audit and Email Request pages | Admin-only page | Shared Dashboard session | Current active Employee projection | requireDashboardAdmin() requires Admin role | ADMIN | None beyond current workforce | Page access all Admin dashboard scope | Audit/Leave/Routine feature behavior is separate | app/dashboard/_lib/route-access.ts and Admin-only page files under app/dashboard/** | Menu hides links for USER | USER redirects /access-denied; absent user /login | __tests__/lib/dashboard-routes.test.ts, route tests | Employee New/Import use the Employee capability guard; direct API guards remain mandatory |
-| Dashboard | DASHBOARD | Employee Management page | Employee list/stats UI | Shared Dashboard session | Current active Employee projection | Trusted current-user Employee projection gates each presentation surface; no page role gate | No Employee presentation role gate | API list/stats remain server-authorized and organization-wide | List requires `canReadEmployees`; stats requires `canReadStats`; either can make the entry available | None | app/dashboard/employees/page.tsx, modules/employee/presentation/dashboard/EmployeeManagementSection.tsx, EmployeeProvider | `employeeCapabilities` independently gates list/stats/create/import/update/export; delete is projected but unused | UI access is not proof of API mutation/read authorization | Employee presentation tests, __tests__/api/employees-routes.test.ts | Phase 8B closes reviewed Dashboard presentation; Phase 8C audit remains pending |
+| Dashboard | DASHBOARD | Employee Management page | Employee list/stats UI | Shared Dashboard session | Current active Employee projection | Trusted current-user Employee projection gates each presentation surface; no page role gate | No Employee presentation role gate | API list/stats remain server-authorized and organization-wide | List requires `canReadEmployees`; stats requires `canReadStats`; either can make the entry available | None | app/dashboard/employees/page.tsx, modules/employee/presentation/dashboard/EmployeeManagementSection.tsx, EmployeeProvider | `employeeCapabilities` independently gates list/stats/create/import/update/export; delete is projected but unused | UI access is not proof of API mutation/read authorization | Employee presentation tests, __tests__/api/employees-routes.test.ts, __tests__/dashboard-employee-pages.test.tsx | Phase 8C closes the main RSC boundary and complete current production-surface audit; broad data policy remains unchanged |
 | Dashboard | DASHBOARD | Leave, Routine, Stock pages and tabs | Domain UI | Shared Dashboard session | Current active Employee projection | Page-level role gates are not the authoritative domain decision; feature and API routes decide | Domain-specific | Domain-specific | UI chooses default/self/admin tabs from projection | Leave/Routine flags | app/dashboard/leave/page.tsx, app/dashboard/routine/page.tsx, app/dashboard/stock/page.tsx and domain presentations | Leave uses `leaveCapabilities` plus existing Leave relationship/report projections; Stock uses stockCapabilities; Routine retains its existing projection; feature hides | UI hidden/redirect can differ from direct API result | Domain route/presentation tests | Never document hidden UI as server enforcement |
 | Dashboard | DASHBOARD | Sidebar/menu click | Menu item | Already in authenticated shell | Current projection | requiredRole = ADMIN and feature checks are client-side navigation checks | ADMIN for configured items | None | No resource scope; menu visibility only | getAvailableMenuGroups() applies flags | constants/dashboard.ts, components/dashboard/context/dashboard/DashboardProvider.tsx | Hidden menu or client /access-denied push | Hidden or client redirect only | __tests__/constants/dashboard-menu.test.ts, __tests__/context/DashboardProvider.test.tsx | Presentation-only; direct navigation/API must still be tested |
 
@@ -498,7 +500,8 @@ Later migration phases must preserve these behaviors until a policy change is ex
 21. **Leave Phase 7B presentation projection** — `LeavePresentationCapabilities` is server-derived through one batched resolver call and reuses Phase 7A compatibility translation; each capability remains separate from effective-approver/resource/workflow relationships, all presentation booleans remain non-authoritative, report visibility and Admin recovery remain deferred, and LIFF cancellation decisions remain Leave-domain-authorized because the registered capability is Dashboard-only.
 22. **Leave Phase 7C closure** — the complete Leave production surface now uses the canonical adapter/resolver path for all registered operations; Dashboard availability and deep links use `canAccessLeaveDashboard()` plus tab normalization; transaction mutations revalidate current User/Employee lifecycle and capability; the only fallback remains `NO_APPLICABLE_GRANT`; LIFF cancellation decision, reports/export, participant/detail, attachments and Admin recovery remain explicit deferred/domain-owned boundaries.
 23. **Employee Phase 8A server closure** — the seven registered Employee capabilities use the Employee adapter and central resolver on the seven Employee server operations with `DASHBOARD` execution context; explicit ALLOW is authoritative for normal USER actors, only `NO_APPLICABLE_GRANT` invokes the recorded compatibility floor, and all existing Employee query, import, audit, lifecycle, lock and concurrency invariants remain unchanged.
-24. **Employee Phase 8B presentation closure** — `EmployeePresentationCapabilities` is server-derived through one `authorization.resolveMany()` call over the seven registered capabilities and reuses the Phase 8A compatibility translation. Dashboard current-user projection uses the authenticated account, active Employee ID and `DASHBOARD` actor; list/stats loading, navigation, add/import/edit/export controls use independent fields, while delete is projected but unused because no existing delete UI was found. Presentation remains non-authoritative, broad list/stats/export policy is unchanged, and Phase 8C complete-surface audit/regression hardening is still not started.
+24. **Employee Phase 8B presentation closure** — `EmployeePresentationCapabilities` is server-derived through one `authorization.resolveMany()` call over the seven registered capabilities and reuses the Phase 8A compatibility translation. Dashboard current-user projection uses the authenticated account, active Employee ID and `DASHBOARD` actor; list/stats loading, navigation, add/import/edit/export controls use independent fields, while delete is projected but unused because no existing delete UI was found. Presentation remains non-authoritative and broad list/stats/export policy is unchanged.
+25. **Employee Phase 8C complete-surface closure** — `/dashboard/employees` now has the trusted server-side `getCurrentUserProjection()` boundary using the same `canAccessEmployeeDashboard()` predicate as menu availability and `handleMenuClick()`. Direct Add/Import routes retain independent capability guards; explicit normal USER grants remain reachable without role promotion; all seven Employee API/application production paths, transaction revalidation, route ordering, conditional loading/revalidation, role-derived presentation checks, export/read reachability and delete-surface evidence were audited. No bypass or existing delete/offboarding UI was found, and focused regression hardening passed. Employee authorization migration is closed for the current production surface; broad data policy and Department/Team decisions remain unchanged/deferred.
 
 ## 8. Characterization tests
 
@@ -679,6 +682,47 @@ npm.cmd run test:run -- __tests__/constants/dashboard-menu.test.ts __tests__/con
 และยังคงใช้ server Employee route/application tests จาก Phase 8A เป็น
 authority tests แยกจาก presentation tests
 
+### 8.7 Phase 8C Employee complete-surface audit and regression hardening
+
+Phase 8C เพิ่ม trusted RSC entry boundary ให้
+`app/dashboard/employees/page.tsx`: ไม่มี current-user projection จะ redirect
+ไป `/login`; projection ที่ไม่มีทั้ง `canReadEmployees` และ `canReadStats` จะ
+redirect ไป `/access-denied`; list-only, stats-only และ normal USER compatibility
+ยัง render ได้. Predicate นี้เป็น `canAccessEmployeeDashboard()` เดียวกับ menu
+และ `DashboardProvider.handleMenuClick()`. Direct Add/Import pages ยังคงใช้
+capability เฉพาะของตนเอง ดังนั้น explicit normal USER create/import grant ใช้
+เข้าหน้าได้โดยไม่ promote role และ mutation-only actor ไม่ได้สิทธิ์หน้า
+ข้อมูล Employee โดยอัตโนมัติ.
+
+Final production search ครอบคลุม role-derived checks, Employee capability
+inventory, API routes, application commands, helper call sites และ hard-coded
+Employee paths. พบว่า Employee API ทั้งเจ็ด operation ผ่าน adapter/resolver;
+update/delete มี transaction revalidation; ไม่พบ production bypass หรือ
+Employee presentation authority ที่อิง ADMIN. Role matches ที่เหลือเป็น
+Admin-only Audit/Email Request, Leave/generic Dashboard behavior หรือ
+descriptive audit/display fields. ไม่พบ production Employee delete/offboarding
+UI จึงคง `canDeleteEmployees` ไว้ใน projection/tests และไม่สร้าง control ใหม่.
+
+EmployeeProvider ไม่สร้าง SWR request เมื่อ list/stats capability ไม่มี และ
+revalidate เฉพาะ resource ที่ projection อนุญาต. Global `mutate()` นอก provider
+มีเฉพาะ Add/Import success handlers ซึ่ง revalidate stats เมื่อ
+`canReadStats` เป็นจริงเท่านั้น. Export ยังคงเป็น capability อิสระ; ภายใต้
+registry/compatibility ปัจจุบัน state export=true/read=false ไปไม่ถึง เพราะ
+eligible USER ที่ไม่มี read grant ได้ `NO_APPLICABLE_GRANT` read floor และ
+ไม่มี DENY ที่จะลบ read ออก. จึงคง export control ใน list surface โดยไม่สร้าง
+หน้าใหม่หรือผูก policy read/export เข้าด้วยกัน.
+
+Focused Phase 8C invocation ที่รันจริง (รวม suites ของ Phase 8A/8B):
+
+```text
+npm.cmd run test:run -- modules/employee/application/authorization.test.ts modules/employee/application/presentation-capabilities.test.ts modules/employee/application/mutations.test.ts __tests__/api/employees-routes.test.ts __tests__/api/authorization-current-state.test.ts __tests__/auth/current-user-projection.test.ts __tests__/constants/dashboard-menu.test.ts __tests__/context/DashboardProvider.test.tsx __tests__/dashboard-employee-pages.test.tsx modules/employee/presentation/dashboard/EmployeeManagementSection.test.tsx modules/employee/presentation/dashboard/EmployeeSearchControls.test.tsx modules/employee/presentation/dashboard/EmployeeTable.test.tsx modules/employee/presentation/dashboard/context/EmployeeProvider.test.tsx
+```
+
+ผล: **13 test files และ 177 tests ผ่าน**; focused route test
+`__tests__/dashboard-employee-pages.test.tsx` รันแยกได้ **1 test file และ
+13 tests ผ่าน**. `npm.cmd run typecheck`, `npm.cmd run lint:strict` และ
+`npm.cmd run architecture:check` ผ่านทั้งหมด.
+
 ## 9. Risks / Ambiguities / Phase 1 Inputs
 
 ### High risk
@@ -697,11 +741,11 @@ authority tests แยกจาก presentation tests
 9. **Leave report role semantics ยังไม่ชัด** — route ให้ active workforce ทุกคนเรียกได้ ถ้ามี manager/original-approver relationship; canViewLeaveReports เป็นเพียง projection. ต้องตัดสิน whether report is relationship capability or Admin/Team capability
 10. **Leave original vs effective approver history** — operational approval ใช้ effective approver แต่ report history ใช้ original approver. ไม่ควร map ทั้งสองเป็น ASSIGNED โดยไม่คุยกับ Leave owner
 11. **Leave manager terminology** — getLeaveApprovalList รับ managerId แต่ query ใช้ effective approver relation รวม exception approver; อย่าใช้ชื่อนี้เป็นหลักฐานว่า manager เป็น authorization role
-12. **Dashboard page/API divergence** — Employee management page ใช้ projection แยก list/stats และ direct Add/Import pages ใช้ capability guard; Admin-only pages อื่นยัง guard ที่ page, ส่วน domain pages อาศัย APIs. direct URL และ direct API จึงยังต้องวิเคราะห์ตาม surface
+12. **Dashboard page/API divergence** — Employee Phase 8C ปิด divergence ของ current production surface แล้ว: management page มี trusted RSC guard, Add/Import มี direct capability guards, และ menu/handleMenuClick ใช้ predicate เดียวกัน. Admin-only pages อื่นยัง guard ที่ page ส่วน domain pages อาศัย APIs; direct URL และ direct API ยังต้องคงการตรวจของแต่ละ domain
 13. **Feature flag behavior varies by channel** — Leave/Routine disabled คืน not-found ใน APIs/LIFF และ redirect/hide ใน Dashboard; defaults เปิดนอก production. ไม่ใช่ permission state
 14. **Public upload vs private attachment** — public upload GET ไม่มี User auth ตาม design path; private Leave attachment route มี participant/Admin relationship. ต้องรักษา namespace boundary
 15. **Audit query ownership** — getAuditEntityHistory เป็น generic reader ที่ feature query เรียกหลัง resource authorization; ไม่พบ generic per-caller guard จึงต้อง audit callers ต่อเมื่อเพิ่ม consumer
-16. **Test coverage gaps** — Phase 8B เพิ่ม focused tests สำหรับ Employee projection, current-user path, Dashboard navigation/routes, granular controls และ conditional data loading; ยังไม่มี live production authorization test และยังไม่ได้ตัดสิน policy ของ broad read/export หรือทำ Phase 8C complete-surface audit
+16. **Test coverage gaps** — Employee Phase 8C complete-surface audit และ focused regression hardening ปิดแล้วสำหรับ current production graph พร้อม 13 test files/177 tests, typecheck, strict lint และ architecture check. ยังไม่ได้ตัดสิน policy ของ broad read/export และไม่มีการเปลี่ยน policy ดังกล่าวใน migration นี้
 17. **Department/Team boundary** — Department เป็น HR/reference structure ไม่ใช่ Team และไม่ใช่ authorization grouping. ระบบมี Team, TeamRole, TeamMembership และ persisted Team/TeamRole/direct User capability grants แล้ว แต่ authority จาก Team, TeamRole และ direct User grants ต้องผ่าน central authorization resolver เท่านั้น; ชื่อ Team หรือ TeamRole ไม่ได้ grant authority โดยตัวมันเอง และห้ามใช้ชื่อแผนก/หน่วยงาน/ทีมอนุมาน grant
 18. **Manager projection versus manager authority** — getCurrentEmployeeProjection() ใช้การมี subordinate relation เพื่อคำนวณ isManager แต่ query นี้ไม่ได้ใช้ active/deleted filter แบบเดียวกับ Leave report query; จึงอาจทำให้ tab/capability projection กว้างกว่า actionable server result. API approval/report ยังใช้ query scope ของตนเอง
 
@@ -714,7 +758,7 @@ authority tests แยกจาก presentation tests
 - มี regression tests สำหรับ Employee adapter และ broad export/read compatibility แล้ว; ก่อนแก้ Routine all-scope, Employee export/read หรือ audit export semantics ต้องมี intended policy แยกต่างหาก
 - Phase 6A ย้าย Stock server enforcement แล้ว และ Phase 6B ย้าย Dashboard/LIFF presentation ไปยัง `stockCapabilities` โดยยังคง role-based compatibility floor ฝั่ง server; รายละเอียดอยู่ใน [authorization-stock-migration.md](authorization-stock-migration.md) และ [authorization-presentation-projection.md](authorization-presentation-projection.md)
 - Phase 7A ย้าย Leave server enforcement แล้ว และ Phase 7B ย้าย Dashboard/LIFF presentation ไปยัง `leaveCapabilities` โดยใช้ `resolveMany()` batch เดียวและ compatibility translation ร่วมกับ server; report, recovery, participant/detail และ attachment policy ยัง deferred ตาม [authorization-leave-migration.md](authorization-leave-migration.md) และ [authorization-presentation-projection.md](authorization-presentation-projection.md)
-- Phase 8A ย้าย Employee server enforcement แล้ว และ Phase 8B ย้าย Employee Dashboard presentation ไปยัง `employeeCapabilities` โดยใช้ `resolveMany()` batch เดียวและ compatibility translation ร่วมกับ server; broad list/stats/export policy ไม่เปลี่ยน, delete capability ยัง projected-but-unused และ complete-surface audit/regression hardening ยังเป็น Phase 8C ตาม [authorization-employee-migration.md](authorization-employee-migration.md) และ [authorization-presentation-projection.md](authorization-presentation-projection.md)
+- Phase 8A ย้าย Employee server enforcement แล้ว, Phase 8B ย้าย Employee Dashboard presentation ไปยัง `employeeCapabilities` โดยใช้ `resolveMany()` batch เดียว และ Phase 8C ปิด complete-surface audit/regression hardening แล้ว; broad list/stats/export policy ไม่เปลี่ยน, delete capability ยัง projected-but-unused ตาม [authorization-employee-migration.md](authorization-employee-migration.md) และ [authorization-presentation-projection.md](authorization-presentation-projection.md)
 
 ## 10. Explicit non-goals for Phase 0
 

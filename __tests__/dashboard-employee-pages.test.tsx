@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+    employeeManagementSection: vi.fn(() => null),
     getCurrentUserProjection: vi.fn(),
     redirect: vi.fn((target: string): never => {
         throw new Error(`NEXT_REDIRECT:${target}`);
@@ -14,9 +15,12 @@ vi.mock("@/app/_lib/auth/current-user", () => ({
 }));
 vi.mock("@/modules/employee/client", () => ({
     AddEmployeeSection: () => null,
+    EmployeeManagementSection: mocks.employeeManagementSection,
+    EmployeeManagementSectionSkeleton: () => null,
     ImportEmployeeRouteContent: () => null,
 }));
 
+import EmployeesDashboardPage from "@/app/dashboard/employees/page";
 import ImportEmployeeDashboardPage from "@/app/dashboard/employees/import/page";
 import AddEmployeeDashboardPage from "@/app/dashboard/employees/new/page";
 
@@ -40,6 +44,28 @@ const importEmployeeCapabilities = {
     canImportEmployees: true,
 } as const;
 
+const mutationOnlyEmployeeCapabilities = {
+    ...noEmployeeCapabilities,
+    canReadEmployees: false,
+    canReadStats: false,
+    canExportEmployees: false,
+    canCreateEmployees: true,
+} as const;
+
+const listOnlyEmployeeCapabilities = {
+    ...noEmployeeCapabilities,
+    canReadEmployees: true,
+    canReadStats: false,
+    canExportEmployees: false,
+} as const;
+
+const statsOnlyEmployeeCapabilities = {
+    ...noEmployeeCapabilities,
+    canReadEmployees: false,
+    canReadStats: true,
+    canExportEmployees: false,
+} as const;
+
 const adminEmployeeCapabilities = {
     canReadEmployees: true,
     canReadStats: true,
@@ -55,6 +81,59 @@ const user = {
     role: "USER",
     email: "account@test.com",
 };
+
+describe("Employee Dashboard information route access", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            ...user,
+            employeeCapabilities: noEmployeeCapabilities,
+        });
+    });
+
+    it("redirects unauthenticated access to login before rendering the section", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue(null);
+
+        await expect(EmployeesDashboardPage()).rejects.toThrow(
+            "NEXT_REDIRECT:/login",
+        );
+        expect(mocks.employeeManagementSection).not.toHaveBeenCalled();
+    });
+
+    it("denies a mutation-only actor without an Employee read surface", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            ...user,
+            employeeCapabilities: mutationOnlyEmployeeCapabilities,
+        });
+
+        await expect(EmployeesDashboardPage()).rejects.toThrow(
+            "NEXT_REDIRECT:/access-denied",
+        );
+        expect(mocks.employeeManagementSection).not.toHaveBeenCalled();
+    });
+
+    it("allows a list-only actor to render the Employee page", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            ...user,
+            employeeCapabilities: listOnlyEmployeeCapabilities,
+        });
+
+        await expect(EmployeesDashboardPage()).resolves.toBeTruthy();
+    });
+
+    it("allows a stats-only actor to render the Employee page", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            ...user,
+            employeeCapabilities: statsOnlyEmployeeCapabilities,
+        });
+
+        await expect(EmployeesDashboardPage()).resolves.toBeTruthy();
+    });
+
+    it("preserves normal USER compatibility access to the Employee page", async () => {
+        await expect(EmployeesDashboardPage()).resolves.toBeTruthy();
+    });
+});
 
 describe("Employee Dashboard mutation route access", () => {
     beforeEach(() => {

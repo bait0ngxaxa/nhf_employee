@@ -1,10 +1,11 @@
-# Employee Authorization Migration — Phase 8A / Phase 8B
+# Employee Authorization Migration — Phase 8A / Phase 8B / Phase 8C
 
 สถานะ: Phase 8A **server authorization migration — CLOSED**<br>
 Phase 8B **presentation capability migration — CLOSED**<br>
-Phase 8C **complete-surface audit and regression hardening — NOT STARTED**<br>
-ขอบเขต: Employee server operations และ Employee Dashboard presentation; ไม่รวม
-Department หรือ Team policy และไม่รวม Phase 8C complete-surface hardening
+Phase 8C **complete-surface audit and regression hardening — CLOSED**<br>
+Employee authorization migration **CLOSED**<br>
+ขอบเขต: Employee server operations และ Employee Dashboard presentation รวม
+complete-surface audit; ไม่รวม Department หรือ Team policy
 
 เอกสารนี้บันทึกการย้าย authoritative Employee server authorization จาก
 `requireAdminSession()`/authenticated-only route decisions ไปยัง Employee-owned
@@ -153,7 +154,8 @@ authorization subsystem.
 ในขอบเขตของ Phase 8A เดิมยังไม่ได้ย้าย Employee Dashboard presentation
 capability checks, `isAdmin` UI behavior, menu visibility หรือ UI control
 projections; งานดังกล่าวถูกบันทึกและปิดใน Phase 8B ด้านล่าง ส่วน complete
-production-surface audit และ additional regression hardening ยังเป็น Phase 8C
+production-surface audit และ additional regression hardening ถูกตรวจและปิดใน
+Phase 8C ด้านล่าง
 
 ## 8. Phase 8B Employee presentation capability migration
 
@@ -306,6 +308,122 @@ data-export authority and remains outside this capability migration.
 
 Phase 8A is **CLOSED** for the registered Employee server capabilities.
 Phase 8B is **CLOSED** for the reviewed Employee Dashboard presentation
-surfaces and trusted current-user projection. Employee complete-surface audit
-and regression hardening remains **Phase 8C — NOT STARTED**. Phase 8B does not
-claim that all future Employee production surfaces have been audited.
+surfaces and trusted current-user projection. Phase 8C is **CLOSED** after the
+complete production-surface audit and focused regression hardening recorded
+below. This closure applies to the current Employee production surface and
+does not create a future policy for Department, Team, or broad-data narrowing.
+
+## 11. Phase 8C complete-surface audit and closure
+
+Phase 8C closed the remaining Employee Dashboard entry-point gap without
+changing the Phase 8A/8B capability registry, compatibility table, scopes,
+channels, grants, or server policy.
+
+### 11.1 Trusted main-page boundary and route parity
+
+`app/dashboard/employees/page.tsx` now resolves
+`getCurrentUserProjection()` on the server before returning
+`EmployeeManagementSection`. It redirects an absent projection to
+`/login`, redirects a projection for which
+`canAccessEmployeeDashboard()` is false to `/access-denied`, and renders when
+either `canReadEmployees` or `canReadStats` is true. The page does not require
+ADMIN or any mutation capability.
+
+The same pure `canAccessEmployeeDashboard()` predicate is used by the
+Employee management menu availability and `DashboardProvider.handleMenuClick()`.
+The direct `/dashboard/employees/new` and `/dashboard/employees/import` pages
+continue to use `requireDashboardEmployeeCapability()` for their independent
+create/import fields. Add and Import back navigation returns through
+`handleMenuClick("employee-management")`; it therefore does not imply read
+access for a create/import-only actor. Explicit normal USER create/import
+grants are covered through both navigation and direct-page tests, while an
+ungranted USER remains denied. Browser refresh and direct URL entry re-enter
+the server boundary, while client navigation uses the same predicate before
+the guarded RSC destination renders.
+
+### 11.2 Production call-site and role-derived presentation audit
+
+The seven registered Employee server operations were traced to their
+production routes: list uses `employee.read`, stats uses
+`employee.stats.read`, create uses `employee.create`, update uses
+`employee.update`, delete uses `employee.delete`, import uses
+`employee.import`, and export uses `employee.export`, all with `scope: ALL`.
+Update and delete also retain transaction-time current User/Employee
+revalidation through `resolveEmployeeCapabilityInTransaction()`. No
+production Employee mutation or data path bypassing the Employee adapter and
+central resolver was found. API body/validation order, import's 1,000-row
+limit and partial-success behavior, export/list/stats filters and response
+contracts, lifecycle rules, locks, and audit scheduling were not changed.
+
+The complete production search found no Employee presentation use of
+`isAdmin`, `isAdminRole`, literal ADMIN comparisons, `requiredRole`, or
+`userRole` as authorization-shaped authority. Remaining matches are
+unrelated: generic Admin guards for Audit and Email Request,
+Leave/generic-Dashboard availability, descriptive dashboard role display,
+and the Employee mutation audit snapshot's descriptive `userRole`.
+`canDeleteEmployees` remains projected and tested. No existing production
+Employee delete/offboarding presentation surface was found, so no delete UI
+was added.
+
+### 11.3 Data loading, revalidation, and trusted projection
+
+`EmployeeProvider` uses null SWR keys for denied list/stats surfaces, checks
+export and update handlers independently, closes stale edit state when update
+capability is absent, and revalidates only permitted list/stats resources.
+The only Employee-specific global SWR mutations outside that provider are the
+Add Employee and Import Employee success handlers; each revalidates Employee
+stats only when `canReadStats` is true. No denied Employee request is
+initiated merely to discover a 403.
+
+The trusted path remains:
+
+```text
+access cookie
+  -> resolveAuthenticatedAccount()
+  -> findCurrentEmployeeProjection()
+  -> current trusted Employee ID
+  -> buildEmployeeAuthorizationContext()
+  -> getEmployeePresentationCapabilities()
+  -> CurrentUserProjection / /api/auth/me / DashboardProvider
+```
+
+Invalid or inactive/deleted accounts and ineligible Employees continue to
+return no normal Dashboard projection. Presentation projection continues to
+translate only ordinary expected authorization denial to `false`; omitted
+decisions, unknown capabilities, malformed configuration, persistence errors,
+and resolver/system exceptions remain failures.
+
+### 11.4 Export/read and create/import-only conclusions
+
+Under the locked current registry and compatibility behavior,
+`canExportEmployees === true` with `canReadEmployees === false` is not a
+valid reachable projection: an eligible USER without a read grant receives
+the existing `NO_APPLICABLE_GRANT` read compatibility floor, explicit grants
+are additive without DENY, and ADMIN compatibility grants all seven fields.
+The export capability remains independent in the model and server authority,
+while the existing list-surface export control is retained; no new export page
+was invented and no read capability was weakened.
+
+Explicit normal USER create/import grants remain independently usable on
+their direct pages. The locked compatibility floor is characterized rather
+than supplemented with presentation-side capability implications.
+
+### 11.5 Phase 8C verification
+
+The focused Employee authorization/presentation regression command ran with
+the Phase 8A/8B suites and the Phase 8C main-page tests:
+
+```text
+npm.cmd run test:run -- modules/employee/application/authorization.test.ts modules/employee/application/presentation-capabilities.test.ts modules/employee/application/mutations.test.ts __tests__/api/employees-routes.test.ts __tests__/api/authorization-current-state.test.ts __tests__/auth/current-user-projection.test.ts __tests__/constants/dashboard-menu.test.ts __tests__/context/DashboardProvider.test.tsx __tests__/dashboard-employee-pages.test.tsx modules/employee/presentation/dashboard/EmployeeManagementSection.test.tsx modules/employee/presentation/dashboard/EmployeeSearchControls.test.tsx modules/employee/presentation/dashboard/EmployeeTable.test.tsx modules/employee/presentation/dashboard/context/EmployeeProvider.test.tsx
+```
+
+Result: **13 test files passed, 177 tests passed**. The focused new route
+file was also run independently with **1 test file passed, 13 tests passed**.
+`npm.cmd run typecheck`, `npm.cmd run lint:strict`, and
+`npm.cmd run architecture:check` all passed. The final working-tree diff was
+checked for whitespace and encoding regressions.
+
+Phase 8A — **CLOSED**
+Phase 8B — **CLOSED**
+Phase 8C — **CLOSED**
+Employee authorization migration — **CLOSED**
