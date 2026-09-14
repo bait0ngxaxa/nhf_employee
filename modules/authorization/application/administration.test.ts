@@ -11,6 +11,7 @@ import {
     getAuthorizationAdministrationOverview,
     getAuthorizationAdministrationTeam,
     getAuthorizationAdministrationUser,
+    searchAuthorizationAdministrationUsers,
 } from "@/modules/authorization";
 import type {
     AuthorizationResolutionData,
@@ -252,6 +253,7 @@ function emptyRepository(
 ): AuthorizationAdministrationRepository {
     return {
         listTeams: vi.fn(async () => []),
+        searchUsers: vi.fn(async () => []),
         findTeamById: vi.fn(async () => null),
         findUserById: vi.fn(async () => null),
         ...overrides,
@@ -345,6 +347,48 @@ describe("Authorization Administration capability catalog", () => {
             (administrativeStatus === "GRANTABLE") === administrativelyGrantable,
         )).toBe(true);
         expect(first.some(({ key }) => String(key) === "routine.task.archive")).toBe(false);
+    });
+});
+
+describe("Authorization Administration User directory", () => {
+    it("projects lifecycle-aware safe identities and trims the search query", async () => {
+        const searchUsers = vi.fn(async () => [
+            rawUser(7, {
+                isActive: false,
+                deletedAt: new Date("2026-03-01T00:00:00.000Z"),
+            }),
+        ]);
+        const repository = emptyRepository({ searchUsers });
+
+        await expect(
+            searchAuthorizationAdministrationUsers(
+                ADMIN_PRINCIPAL,
+                "  สมชาย  ",
+                { repository },
+            ),
+        ).resolves.toMatchObject([{
+            id: 7,
+            name: "User 7",
+            role: "USER",
+            isActive: false,
+            deletedAt: new Date("2026-03-01T00:00:00.000Z"),
+            employee: { displayName: "สมชาย ใจดี (ชาย)" },
+        }]);
+        expect(searchUsers).toHaveBeenCalledWith("สมชาย");
+    });
+
+    it("rejects unsafe query sizes before reaching persistence", async () => {
+        const searchUsers = vi.fn(async () => []);
+        const repository = emptyRepository({ searchUsers });
+
+        await expect(
+            searchAuthorizationAdministrationUsers(
+                ADMIN_PRINCIPAL,
+                "x".repeat(101),
+                { repository },
+            ),
+        ).rejects.toMatchObject({ code: "INVALID_IDENTIFIER" });
+        expect(searchUsers).not.toHaveBeenCalled();
     });
 });
 

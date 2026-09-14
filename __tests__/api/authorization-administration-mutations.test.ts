@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
     updateTeamRole: vi.fn(),
     addTeamRoleGrant: vi.fn(),
     removeTeamRoleGrant: vi.fn(),
+    addUserGrant: vi.fn(),
+    removeUserGrant: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({
@@ -34,6 +36,8 @@ vi.mock("@/modules/authorization", async (importOriginal) => {
         updateAuthorizationAdministrationTeamRole: mocks.updateTeamRole,
         addAuthorizationAdministrationTeamRoleGrant: mocks.addTeamRoleGrant,
         removeAuthorizationAdministrationTeamRoleGrant: mocks.removeTeamRoleGrant,
+        addAuthorizationAdministrationUserGrant: mocks.addUserGrant,
+        removeAuthorizationAdministrationUserGrant: mocks.removeUserGrant,
     };
 });
 
@@ -59,6 +63,10 @@ import {
     DELETE as removeTeamRoleGrant,
     POST as addTeamRoleGrant,
 } from "@/app/api/authorization/administration/teams/[id]/roles/[roleId]/grants/route";
+import {
+    DELETE as removeUserGrant,
+    POST as addUserGrant,
+} from "@/app/api/authorization/administration/users/[id]/grants/route";
 
 const ADMIN_USER = {
     id: 41,
@@ -142,6 +150,16 @@ describe("Authorization Administration mutation API boundary", () => {
         mocks.removeTeamRoleGrant.mockResolvedValue({
             teamId: 10,
             teamRoleId: 20,
+            capabilityKey: "audit.read",
+            scope: "ALL",
+        });
+        mocks.addUserGrant.mockResolvedValue({
+            userId: 7,
+            capabilityKey: "audit.read",
+            scope: "ALL",
+        });
+        mocks.removeUserGrant.mockResolvedValue({
+            userId: 7,
             capabilityKey: "audit.read",
             scope: "ALL",
         });
@@ -361,6 +379,41 @@ describe("Authorization Administration mutation API boundary", () => {
             10,
             20,
             grantInput,
+        );
+    });
+
+    it("uses the [id] segment and exact body for direct User grant handlers", async () => {
+        const input = { capabilityKey: "audit.read", scope: "ALL" };
+        const addResponse = await invokeRoute(
+            addUserGrant,
+            jsonRequest(
+                "/api/authorization/administration/users/7/grants",
+                "POST",
+                input,
+            ),
+            { id: "7" },
+        );
+        const removeResponse = await invokeRoute(
+            removeUserGrant,
+            jsonRequest(
+                "/api/authorization/administration/users/7/grants",
+                "DELETE",
+                input,
+            ),
+            { id: "7" },
+        );
+
+        expect(addResponse.status).toBe(201);
+        expect(removeResponse.status).toBe(200);
+        expect(mocks.addUserGrant).toHaveBeenCalledWith(
+            expect.any(Object),
+            7,
+            input,
+        );
+        expect(mocks.removeUserGrant).toHaveBeenCalledWith(
+            expect.any(Object),
+            7,
+            input,
         );
     });
 });

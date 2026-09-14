@@ -103,17 +103,17 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## Authorization Administration boundary (Phase 10B)
+## Authorization Administration boundary (Phase 10C)
 
 `modules/authorization/` owns the Authorization Administration application
 contract. Its capability administration catalog is a projection of the
 code-owned `CAPABILITY_REGISTRY`; operational grantability is explicit
 administration metadata and is not a second capability registry. The
 administration application exposes safe Team, TeamRole, membership, grant,
-User, and effective-permission read models plus narrow command use cases for
-the Phase 10B lifecycle and additive grant operations. Mutation persistence
-uses a separate command-specific repository and does not expose generic
-Prisma CRUD.
+User directory/detail, and effective-permission read models plus narrow command
+use cases for the Phase 10B lifecycle and additive grant operations. Mutation
+persistence uses a separate command-specific repository and does not expose
+generic Prisma CRUD.
 
 The app API and Dashboard route boundaries authenticate through the existing
 server session/workforce checks, then require the explicit Phase 10A
@@ -126,7 +126,25 @@ guards before a serializable transaction writes configuration and appends
 strict audit through the public `@/modules/audit` contract. Phase 10B permits
 only explicit ADMIN mutations for `GRANTABLE` capabilities; it does not seed
 policy, infer Teams from Department, retire compatibility floors, or add hard
-delete semantics. The Dashboard remains read-only until Phase 10C.
+delete semantics.
+
+Phase 10C adds the operator-facing Dashboard workspace at
+`/dashboard/authorization`. The server page remains the composition and
+`requireDashboardAuthorizationAdministration()` boundary, while the browser
+loads read models and sends commands only through the client-safe
+`@/modules/authorization/client` entry and the bounded
+`/api/authorization/administration/users` directory route. The browser must
+not import Prisma, authorization persistence, server session helpers, audit
+infrastructure, or mutation implementations. The menu item is an ADMIN-only
+presentation filter; direct route and API checks remain authoritative.
+
+The workspace preserves exact Team, TeamRole, membership, and direct User grant
+operations, exposes registry readiness and invalid persisted configuration,
+and labels resolver-effective permissions as central-resolver output rather
+than universal final runtime access. `CENTRAL_WITH_COMPATIBILITY` receives an
+explicit warning. Phase 10C does not activate Team policy, retire compatibility
+floors, add delegated authorization capabilities, or infer Team membership from
+Department, manager, position, or employee state.
 
 ## Notification boundary (H0/H1/H2/H3)
 

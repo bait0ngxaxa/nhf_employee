@@ -48,6 +48,7 @@ export const APP_DASHBOARD_TABS = {
     notifications: "notifications",
     sessions: "sessions",
     itEquipment: "it-equipment",
+    authorizationAdministration: "authorization-administration",
 } as const;
 
 export type DashboardMenuId =
@@ -68,6 +69,7 @@ export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     "audit-logs": APP_ROUTES.dashboardAudit,
     notifications: APP_ROUTES.dashboardNotifications,
     sessions: APP_ROUTES.dashboardSessions,
+    "authorization-administration": APP_ROUTES.dashboardAuthorizationAdministration,
 };
 
 const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
@@ -83,6 +85,10 @@ const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     [APP_ROUTES.dashboardAudit, APP_DASHBOARD_TABS.auditLogs],
     [APP_ROUTES.dashboardNotifications, APP_DASHBOARD_TABS.notifications],
     [APP_ROUTES.dashboardSessions, APP_DASHBOARD_TABS.sessions],
+    [
+        APP_ROUTES.dashboardAuthorizationAdministration,
+        APP_DASHBOARD_TABS.authorizationAdministration,
+    ],
     [APP_ROUTES.dashboard, APP_DASHBOARD_TABS.dashboard],
 ];
 
@@ -170,6 +176,9 @@ const LEGACY_DASHBOARD_TAB_TARGETS: Readonly<
     "audit-logs": { menuId: APP_DASHBOARD_TABS.auditLogs },
     notifications: { menuId: APP_DASHBOARD_TABS.notifications },
     sessions: { menuId: APP_DASHBOARD_TABS.sessions },
+    "authorization-administration": {
+        menuId: APP_DASHBOARD_TABS.authorizationAdministration,
+    },
 };
 
 const DASHBOARD_QUERY_KEYS_BY_MENU: Readonly<
@@ -345,10 +354,36 @@ export const API_ROUTES = {
     },
     authorizationAdministration: {
         overview: "/api/authorization/administration",
+        users: "/api/authorization/administration/users",
+        userSearch: (query: string): string =>
+            `/api/authorization/administration/users?query=${encodeURIComponent(query)}`,
         teamById: (id: number | string): string =>
             `/api/authorization/administration/teams/${id}`,
+        teamRoles: (teamId: number | string): string =>
+            `/api/authorization/administration/teams/${teamId}/roles`,
+        teamRoleById: (
+            teamId: number | string,
+            roleId: number | string,
+        ): string =>
+            `/api/authorization/administration/teams/${teamId}/roles/${roleId}`,
+        teamMembers: (teamId: number | string): string =>
+            `/api/authorization/administration/teams/${teamId}/members`,
+        teamMemberById: (
+            teamId: number | string,
+            userId: number | string,
+        ): string =>
+            `/api/authorization/administration/teams/${teamId}/members/${userId}`,
+        teamGrants: (teamId: number | string): string =>
+            `/api/authorization/administration/teams/${teamId}/grants`,
+        teamRoleGrants: (
+            teamId: number | string,
+            roleId: number | string,
+        ): string =>
+            `/api/authorization/administration/teams/${teamId}/roles/${roleId}/grants`,
         userById: (id: number | string): string =>
             `/api/authorization/administration/users/${id}`,
+        userGrants: (userId: number | string): string =>
+            `/api/authorization/administration/users/${userId}/grants`,
     },
     uploads: {
         image: "/api/uploads/image",

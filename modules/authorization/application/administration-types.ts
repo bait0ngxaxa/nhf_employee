@@ -127,6 +127,16 @@ export interface AuthorizationAdministrationAccountIdentity {
     } | null;
 }
 
+/**
+ * Safe identity projection used by the bounded Authorization Administration
+ * user directory. It intentionally contains no credential or session fields.
+ */
+export type AuthorizationAdministrationUserSummary =
+    AuthorizationAdministrationAccountIdentity;
+
+export const AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH = 100;
+export const AUTHORIZATION_ADMINISTRATION_USER_SEARCH_LIMIT = 25;
+
 export interface AuthorizationAdministrationRawUserIdentity {
     readonly id: number;
     readonly name: string;
@@ -324,6 +334,9 @@ export interface AuthorizationAdministrationUserRecord {
 
 export interface AuthorizationAdministrationRepository {
     listTeams(): Promise<readonly AuthorizationAdministrationTeamRecord[]>;
+    searchUsers(
+        query: string,
+    ): Promise<readonly AuthorizationAdministrationRawUserIdentity[]>;
     findTeamById(
         teamId: number,
     ): Promise<AuthorizationAdministrationTeamDetailRecord | null>;

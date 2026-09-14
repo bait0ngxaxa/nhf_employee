@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     getOverview: vi.fn(),
     getTeam: vi.fn(),
     getUser: vi.fn(),
+    searchUsers: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({
@@ -20,6 +21,7 @@ vi.mock("@/modules/authorization", async (importOriginal) => {
         getAuthorizationAdministrationOverview: mocks.getOverview,
         getAuthorizationAdministrationTeam: mocks.getTeam,
         getAuthorizationAdministrationUser: mocks.getUser,
+        searchAuthorizationAdministrationUsers: mocks.searchUsers,
     };
 });
 
@@ -60,6 +62,7 @@ describe("Authorization Administration API boundary", () => {
         });
         mocks.getTeam.mockResolvedValue({ id: 10 });
         mocks.getUser.mockResolvedValue({ user: { id: 7 } });
+        mocks.searchUsers.mockResolvedValue([{ id: 7, name: "User 7" }]);
     });
 
     it("returns 401 and does not execute a query when authentication fails", async () => {
@@ -148,6 +151,59 @@ describe("Authorization Administration API boundary", () => {
             { userId: 41, systemRole: "ADMIN" },
             7,
         );
+    });
+
+    it("protects the bounded User directory and passes the search query", async () => {
+        const { GET } = await import(
+            "@/app/api/authorization/administration/users/route"
+        );
+        const response = await GET(
+            new Request(
+                "http://localhost/api/authorization/administration/users?query=สมชาย",
+            ),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            users: [{ id: 7, name: "User 7" }],
+        });
+        expect(mocks.searchUsers).toHaveBeenCalledWith(
+            { userId: 41, systemRole: "ADMIN" },
+            "สมชาย",
+        );
+    });
+
+    it("rejects a non-ADMIN User directory request before searching", async () => {
+        mocks.requireAdminSession.mockResolvedValue({
+            ok: false,
+            response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+        });
+        const { GET } = await import(
+            "@/app/api/authorization/administration/users/route"
+        );
+
+        const response = await GET(
+            new Request(
+                "http://localhost/api/authorization/administration/users?query=สมชาย",
+            ),
+        );
+
+        expect(response.status).toBe(403);
+        expect(mocks.searchUsers).not.toHaveBeenCalled();
+    });
+
+    it("rejects an overlong User directory query before the application read", async () => {
+        const { GET } = await import(
+            "@/app/api/authorization/administration/users/route"
+        );
+        const response = await GET(
+            new Request(
+                `http://localhost/api/authorization/administration/users?query=${"x".repeat(101)}`,
+            ),
+        );
+
+        expect(response.status).toBe(400);
+        expect(mocks.searchUsers).not.toHaveBeenCalled();
     });
 
     it("rejects malformed resource identifiers before querying", async () => {

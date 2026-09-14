@@ -9,6 +9,7 @@ import {
     AppWindow,
     ShieldCheck,
     ClipboardCheck,
+    KeyRound,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -71,6 +72,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         icon: FileText,
         description: "ดูประวัติการใช้งานระบบ",
     },
+    {
+        id: "authorization-administration",
+        label: "จัดการสิทธิ์การใช้งาน",
+        icon: KeyRound,
+        description: "จัดการ Team, TeamRole และสิทธิ์การเข้าถึง",
+        requiredRole: "ADMIN",
+    },
 ];
 
 function getDashboardMenuItem(menuId: string): MenuItem {
@@ -89,6 +97,7 @@ const DASHBOARD_PAGE_LABELS: Readonly<Record<string, string>> = {
     notifications: "การแจ้งเตือน",
     sessions: "จัดการเซสชัน",
     routine: "NHF Routine",
+    "authorization-administration": "จัดการสิทธิ์การใช้งาน",
 };
 
 export function getDashboardPageLabel(menuId: string): string {
@@ -119,6 +128,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
             getDashboardMenuItem("employee-management"),
             getDashboardMenuItem("add-employee"),
             getDashboardMenuItem("audit-logs"),
+            getDashboardMenuItem("authorization-administration"),
         ],
     },
 ];
@@ -354,6 +364,16 @@ export const getMenuTheme = (menuId: string) => {
                 hover: "hover:bg-cyan-50",
                 activeBg: "bg-cyan-50/80",
                 glow: "from-cyan-400 via-teal-400 to-emerald-400",
+            };
+        case "authorization-administration":
+            return {
+                gradient: "from-indigo-600 to-blue-700",
+                lightBg: "bg-indigo-50",
+                text: "text-indigo-700",
+                border: "border-indigo-700",
+                hover: "hover:bg-indigo-50",
+                activeBg: "bg-indigo-50/80",
+                glow: "from-indigo-400 via-blue-400 to-cyan-400",
             };
         default:
             return {

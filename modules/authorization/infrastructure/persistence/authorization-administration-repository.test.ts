@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
+import type { EmployeeStatus } from "@prisma/client";
 
 import type {
+    AuthorizationAdministrationRawUserIdentity,
     AuthorizationAdministrationPersistenceContext,
 } from "../../application/administration-types";
+import { AUTHORIZATION_ADMINISTRATION_USER_SEARCH_LIMIT } from "../../application/administration-types";
 import { createAuthorizationAdministrationRepository } from "./authorization-administration-repository";
 
 const CREATED_AT = new Date("2026-01-01T00:00:00.000Z");
 const UPDATED_AT = new Date("2026-01-02T00:00:00.000Z");
 
-function userIdentity(id: number) {
+function userIdentity(id: number): AuthorizationAdministrationRawUserIdentity {
     return {
         id,
         name: `User ${id}`,
@@ -21,7 +24,7 @@ function userIdentity(id: number) {
             firstName: "สมชาย",
             lastName: "ใจดี",
             nickname: "ชาย",
-            status: "ACTIVE",
+            status: "ACTIVE" as EmployeeStatus,
             deletedAt: null,
         },
     };
@@ -190,5 +193,36 @@ describe("Authorization Administration persistence read adapter", () => {
                 userCapabilityGrants: expect.any(Object),
             }),
         }));
+    });
+
+    it("searches a bounded, deterministic User identity projection", async () => {
+        const findMany = vi.fn(async (_args: unknown): Promise<readonly AuthorizationAdministrationRawUserIdentity[]> => [
+            userIdentity(7),
+            userIdentity(8),
+        ]);
+        const context = {
+            team: { findMany: vi.fn(), findUnique: vi.fn() },
+            user: { findMany, findUnique: vi.fn() },
+        } as unknown as AuthorizationAdministrationPersistenceContext;
+        const repository = createAuthorizationAdministrationRepository(context);
+
+        await expect(repository.searchUsers("สมชาย")).resolves.toHaveLength(2);
+
+        expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            take: AUTHORIZATION_ADMINISTRATION_USER_SEARCH_LIMIT,
+            where: {
+                OR: expect.arrayContaining([
+                    { name: { contains: "สมชาย" } },
+                    { email: { contains: "สมชาย" } },
+                ]),
+            },
+        }));
+        const firstCall = findMany.mock.calls[0]?.[0];
+        const select = typeof firstCall === "object" && firstCall !== null
+            ? (firstCall as { readonly select?: Record<string, unknown> }).select
+            : undefined;
+        expect(select).not.toHaveProperty("password");
+        expect(select).toMatchObject({ id: true, name: true, email: true });
     });
 });

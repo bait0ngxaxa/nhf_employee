@@ -6,7 +6,11 @@ import type {
     AuthorizationAdministrationRepository,
     AuthorizationAdministrationTeamDetailRecord,
     AuthorizationAdministrationTeamRecord,
+    AuthorizationAdministrationRawUserIdentity,
     AuthorizationAdministrationUserRecord,
+} from "../../application/administration-types";
+import {
+    AUTHORIZATION_ADMINISTRATION_USER_SEARCH_LIMIT,
 } from "../../application/administration-types";
 
 const TEAM_SUMMARY_SELECT = {
@@ -181,6 +185,35 @@ function projectUserDetail(row: UserDetailRow): AuthorizationAdministrationUserR
     };
 }
 
+function buildUserSearchWhere(query: string): Prisma.UserWhereInput | undefined {
+    if (query.length === 0) return undefined;
+
+    const searchClauses: Prisma.UserWhereInput[] = [
+        { name: { contains: query } },
+        { email: { contains: query } },
+        {
+            employee: {
+                is: {
+                    OR: [
+                        { firstName: { contains: query } },
+                        { lastName: { contains: query } },
+                        { nickname: { contains: query } },
+                    ],
+                },
+            },
+        },
+    ];
+
+    if (/^\d+$/.test(query)) {
+        const numericId = Number(query);
+        if (Number.isSafeInteger(numericId) && numericId > 0) {
+            searchClauses.unshift({ id: numericId });
+        }
+    }
+
+    return { OR: searchClauses };
+}
+
 export function createAuthorizationAdministrationRepository(
     context: AuthorizationAdministrationPersistenceContext = prisma,
 ): AuthorizationAdministrationRepository {
@@ -201,6 +234,18 @@ export function createAuthorizationAdministrationRepository(
                 select: TEAM_DETAIL_SELECT,
             });
             return row === null ? null : projectTeamDetail(row);
+        },
+
+        async searchUsers(
+            query: string,
+        ): Promise<readonly AuthorizationAdministrationRawUserIdentity[]> {
+            const rows = await context.user.findMany({
+                where: buildUserSearchWhere(query),
+                orderBy: [{ name: "asc" }, { id: "asc" }],
+                take: AUTHORIZATION_ADMINISTRATION_USER_SEARCH_LIMIT,
+                select: USER_IDENTITY_SELECT,
+            });
+            return rows;
         },
 
         async findUserById(

@@ -76,6 +76,7 @@ export {
     getAuthorizationAdministrationTeam,
     getAuthorizationAdministrationUser,
     listAuthorizationAdministrationTeams,
+    searchAuthorizationAdministrationUsers,
 } from "./application/administration";
 export { buildCapabilityAdministrationCatalog } from "./application/administration-catalog";
 export type {
@@ -101,11 +102,16 @@ export type {
     AuthorizationAdministrationTeamRoleGrant,
     AuthorizationAdministrationTeamRoleReference,
     AuthorizationAdministrationTeamSummary,
+    AuthorizationAdministrationUserSummary,
     AuthorizationAdministrationUserDetail,
     AuthorizationAdministrationUserTeamMembership,
     CapabilityAdministrationProjection,
     CapabilityAdministrationStatus,
     RuntimeAuthorizationMode,
+} from "./application/administration-types";
+export {
+    AUTHORIZATION_ADMINISTRATION_USER_SEARCH_LIMIT,
+    AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH,
 } from "./application/administration-types";
 export {
     addAuthorizationAdministrationTeamGrant,

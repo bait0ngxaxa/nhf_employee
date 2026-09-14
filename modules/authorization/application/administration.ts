@@ -17,36 +17,38 @@ import {
     authorization,
     type AuthorizationResolver,
 } from "./resolver";
-import type {
-    AuthorizationAdministrationAccountIdentity,
-    AuthorizationAdministrationConfigurationIssue,
-    AuthorizationAdministrationResolverEffectiveGrant,
-    AuthorizationAdministrationResolverEffectivePermission,
-    AuthorizationAdministrationGrantProjection,
-    AuthorizationAdministrationGrantValidationCode,
-    AuthorizationAdministrationPrincipal,
-    AuthorizationAdministrationQueryDependencies,
-    AuthorizationAdministrationRawGrant,
-    AuthorizationAdministrationRawUserIdentity,
-    AuthorizationAdministrationResolutionError,
-    AuthorizationAdministrationResolverEffectivePermissionStatus,
-    AuthorizationAdministrationRepository,
-    AuthorizationAdministrationSourceExplanation,
-    AuthorizationAdministrationTeamDetail,
-    AuthorizationAdministrationTeamDetailRecord,
-    AuthorizationAdministrationTeamGrant,
-    AuthorizationAdministrationTeamMembership,
-    AuthorizationAdministrationTeamMembershipRecord,
-    AuthorizationAdministrationTeamReference,
-    AuthorizationAdministrationTeamRole,
-    AuthorizationAdministrationTeamRoleGrant,
-    AuthorizationAdministrationTeamRoleReference,
-    AuthorizationAdministrationTeamSummary,
-    AuthorizationAdministrationOverview,
-    AuthorizationAdministrationUserDetail,
-    AuthorizationAdministrationUserRecord,
-    AuthorizationAdministrationUserTeamMembership,
-    CapabilityAdministrationProjection,
+import {
+    AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH,
+    type AuthorizationAdministrationAccountIdentity,
+    type AuthorizationAdministrationConfigurationIssue,
+    type AuthorizationAdministrationResolverEffectiveGrant,
+    type AuthorizationAdministrationResolverEffectivePermission,
+    type AuthorizationAdministrationGrantProjection,
+    type AuthorizationAdministrationGrantValidationCode,
+    type AuthorizationAdministrationPrincipal,
+    type AuthorizationAdministrationQueryDependencies,
+    type AuthorizationAdministrationRawGrant,
+    type AuthorizationAdministrationRawUserIdentity,
+    type AuthorizationAdministrationResolutionError,
+    type AuthorizationAdministrationResolverEffectivePermissionStatus,
+    type AuthorizationAdministrationRepository,
+    type AuthorizationAdministrationSourceExplanation,
+    type AuthorizationAdministrationTeamDetail,
+    type AuthorizationAdministrationTeamDetailRecord,
+    type AuthorizationAdministrationTeamGrant,
+    type AuthorizationAdministrationTeamMembership,
+    type AuthorizationAdministrationTeamMembershipRecord,
+    type AuthorizationAdministrationTeamReference,
+    type AuthorizationAdministrationTeamRole,
+    type AuthorizationAdministrationTeamRoleGrant,
+    type AuthorizationAdministrationTeamRoleReference,
+    type AuthorizationAdministrationTeamSummary,
+    type AuthorizationAdministrationOverview,
+    type AuthorizationAdministrationUserSummary,
+    type AuthorizationAdministrationUserDetail,
+    type AuthorizationAdministrationUserRecord,
+    type AuthorizationAdministrationUserTeamMembership,
+    type CapabilityAdministrationProjection,
 } from "./administration-types";
 import type {
     AuthorizationActor,
@@ -583,11 +585,37 @@ function getRepository(
     return dependencies.repository ?? authorizationAdministrationRepository;
 }
 
+function parseUserDirectoryQuery(query: unknown): string {
+    if (
+        typeof query !== "string"
+        || query.length > AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH
+    ) {
+        throw new AuthorizationAdministrationInputError();
+    }
+
+    return query.trim();
+}
+
 export function getAuthorizationAdministrationCapabilityCatalog(
     principal: AuthorizationAdministrationPrincipal,
 ): readonly CapabilityAdministrationProjection[] {
     assertAuthorizationAdministrationAccess(principal);
     return buildCapabilityAdministrationCatalog();
+}
+
+/**
+ * Return a bounded, lifecycle-aware identity directory for administration
+ * selection. This is deliberately not a general User query API.
+ */
+export async function searchAuthorizationAdministrationUsers(
+    principal: AuthorizationAdministrationPrincipal,
+    query: unknown,
+    dependencies: AuthorizationAdministrationQueryDependencies = {},
+): Promise<readonly AuthorizationAdministrationUserSummary[]> {
+    assertAuthorizationAdministrationAccess(principal);
+    const normalizedQuery = parseUserDirectoryQuery(query);
+    const users = await getRepository(dependencies).searchUsers(normalizedQuery);
+    return freezeArray(users.map(projectAccountIdentity));
 }
 
 export async function listAuthorizationAdministrationTeams(
