@@ -33,6 +33,7 @@ vi.mock("@/lib/db/prisma", () => ({ prisma: prismaMock }));
 
 vi.mock("@/modules/audit", () => ({
     appendAuditBestEffort: appendAuditBestEffortMock,
+    appendAuditInTransaction: vi.fn(),
 }));
 
 function buildRequest(password = "StrongPass1"): NextRequest {

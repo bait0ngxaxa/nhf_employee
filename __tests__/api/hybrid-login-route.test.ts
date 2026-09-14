@@ -30,6 +30,7 @@ vi.mock("@/lib/db/prisma", () => ({ prisma: prismaMock }));
 
 vi.mock("@/modules/audit", () => ({
     appendAuditBestEffort: appendAuditBestEffortMock,
+    appendAuditInTransaction: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/hybrid/tokens", () => ({

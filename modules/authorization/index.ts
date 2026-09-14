@@ -37,10 +37,13 @@ export {
     AuthorizationDeniedError,
     AuthorizationAdministrationAccessError,
     AuthorizationAdministrationInputError,
+    AuthorizationAdministrationMutationError,
 } from "./application/errors";
 export type {
     AuthorizationConfigurationErrorCode,
     AuthorizationConfigurationErrorDetails,
+    AuthorizationAdministrationMutationErrorCode,
+    AuthorizationAdministrationMutationErrorDetails,
 } from "./application/errors";
 export {
     authorization,
@@ -104,3 +107,51 @@ export type {
     CapabilityAdministrationStatus,
     RuntimeAuthorizationMode,
 } from "./application/administration-types";
+export {
+    addAuthorizationAdministrationTeamGrant,
+    addAuthorizationAdministrationTeamMember,
+    addAuthorizationAdministrationTeamRoleGrant,
+    addAuthorizationAdministrationUserGrant,
+    changeAuthorizationAdministrationTeamMemberRole,
+    createAuthorizationAdministrationTeam,
+    createAuthorizationAdministrationTeamRole,
+    removeAuthorizationAdministrationTeamGrant,
+    removeAuthorizationAdministrationTeamMember,
+    removeAuthorizationAdministrationTeamRoleGrant,
+    removeAuthorizationAdministrationUserGrant,
+    updateAuthorizationAdministrationTeam,
+    updateAuthorizationAdministrationTeamRole,
+} from "./application/administration-mutations";
+export type {
+    AuthorizationAdministrationMutationDependencies,
+} from "./application/administration-mutations";
+export {
+    addAuthorizationTeamMemberSchema,
+    authorizationCapabilityGrantSchema,
+    changeAuthorizationTeamMemberRoleSchema,
+    createAuthorizationTeamRoleSchema,
+    createAuthorizationTeamSchema,
+    updateAuthorizationTeamRoleSchema,
+    updateAuthorizationTeamSchema,
+} from "./application/administration-mutation-schemas";
+export type {
+    AddAuthorizationTeamMemberInput,
+    AuthorizationCapabilityGrantInput,
+    ChangeAuthorizationTeamMemberRoleInput,
+    CreateAuthorizationTeamInput,
+    CreateAuthorizationTeamRoleInput,
+    UpdateAuthorizationTeamInput,
+    UpdateAuthorizationTeamRoleInput,
+} from "./application/administration-mutation-schemas";
+export type {
+    AuthorizationAdministrationMutationActor,
+    AuthorizationAdministrationMutationContext,
+    AuthorizationAdministrationMutationMembership,
+    AuthorizationAdministrationMutationRepository,
+    AuthorizationAdministrationMutationTeam,
+    AuthorizationAdministrationMutationTeamGrant,
+    AuthorizationAdministrationMutationTeamRole,
+    AuthorizationAdministrationMutationTeamRoleGrant,
+    AuthorizationAdministrationMutationUser,
+    AuthorizationAdministrationMutationUserGrant,
+} from "./application/administration-mutation-types";

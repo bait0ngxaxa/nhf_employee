@@ -103,24 +103,30 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## Authorization Administration boundary (Phase 10A)
+## Authorization Administration boundary (Phase 10B)
 
-`modules/authorization/` owns the read-only Authorization Administration
-application contract. Its capability administration catalog is a projection
-of the code-owned `CAPABILITY_REGISTRY`; operational grantability is explicit
+`modules/authorization/` owns the Authorization Administration application
+contract. Its capability administration catalog is a projection of the
+code-owned `CAPABILITY_REGISTRY`; operational grantability is explicit
 administration metadata and is not a second capability registry. The
-administration application use cases expose safe Team, TeamRole, membership,
-grant, User, and effective-permission read models. The persistence adapter
-uses bounded nested Prisma `select`/`_count` reads and does not expose generic
+administration application exposes safe Team, TeamRole, membership, grant,
+User, and effective-permission read models plus narrow command use cases for
+the Phase 10B lifecycle and additive grant operations. Mutation persistence
+uses a separate command-specific repository and does not expose generic
 Prisma CRUD.
 
 The app API and Dashboard route boundaries authenticate through the existing
 server session/workforce checks, then require the explicit Phase 10A
 Authorization Administration `ADMIN` system boundary. They import only the
 public `@/modules/authorization` contract; they must not query authorization
-delegates directly or accept role/ownership data from the client. Phase 10A
-does not expose mutation use cases, activate Team policy, infer Teams from
-Department, or add a client-safe authorization administration entry point.
+delegates directly or accept role/ownership data from the client. Phase 10B
+routes call the same ADMIN boundary, parse request input, and delegate to
+application commands. Commands perform readiness and indirect applicability
+guards before a serializable transaction writes configuration and appends
+strict audit through the public `@/modules/audit` contract. Phase 10B permits
+only explicit ADMIN mutations for `GRANTABLE` capabilities; it does not seed
+policy, infer Teams from Department, retire compatibility floors, or add hard
+delete semantics. The Dashboard remains read-only until Phase 10C.
 
 ## Notification boundary (H0/H1/H2/H3)
 

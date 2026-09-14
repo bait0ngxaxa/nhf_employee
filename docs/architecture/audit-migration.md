@@ -99,8 +99,10 @@ Indexes currently cover userId, action, entityType/entityId, and createdAt.
 There is no foreign key from entityType/entityId to the affected business
 record.
 
-The AuditAction enum contains 50 values. The exhaustive classification is in
-section 9. Prisma enum values STOCK_REQUEST_ISSUE and STOCK_REQUEST_CANCEL use
+The I0 AuditAction enum contained 50 values. Phase 10B extends the current
+enum to 63 values with dedicated Authorization Administration events; the
+current extension is classified in section 9 and does not alter historical
+values. Prisma enum values STOCK_REQUEST_ISSUE and STOCK_REQUEST_CANCEL use
 database mappings STOCK_REQUEST_APPROVE and STOCK_REQUEST_REJECT respectively;
 these storage mappings are compatibility contracts.
 
@@ -528,6 +530,19 @@ contain the value.
 | USER_UPDATE | Admin/User capability | User | No current producer found |
 | USER_DELETE | Admin/User capability | User | No current producer found |
 | USER_ROLE_CHANGE | Admin/User capability | User | No current producer found |
+| TEAM_CREATE | Authorization Administration | Team | Active Phase 10B; strict transaction-bound append |
+| TEAM_UPDATE | Authorization Administration | Team | Active Phase 10B; strict transaction-bound append |
+| TEAM_DISABLE | Authorization Administration | Team | Active Phase 10B; strict transaction-bound append |
+| TEAM_MEMBER_ADD | Authorization Administration | Team | Active Phase 10B; composite membership target in metadata |
+| TEAM_MEMBER_REMOVE | Authorization Administration | Team | Active Phase 10B; composite membership target in metadata |
+| TEAM_MEMBER_ROLE_CHANGE | Authorization Administration | Team | Active Phase 10B; old/new TeamRole snapshot |
+| TEAM_ROLE_CREATE | Authorization Administration | TeamRole | Active Phase 10B; strict transaction-bound append |
+| TEAM_ROLE_UPDATE | Authorization Administration | TeamRole | Active Phase 10B; strict transaction-bound append |
+| TEAM_ROLE_DISABLE | Authorization Administration | TeamRole | Active Phase 10B; strict transaction-bound append |
+| TEAM_CAPABILITY_GRANT_UPDATE | Authorization Administration | Team | Active Phase 10B; add/remove snapshots |
+| TEAM_ROLE_CAPABILITY_GRANT_UPDATE | Authorization Administration | TeamRole | Active Phase 10B; add/remove snapshots |
+| USER_CAPABILITY_GRANT_ADD | Authorization Administration | User | Active Phase 10B; exceptional direct grant |
+| USER_CAPABILITY_GRANT_REMOVE | Authorization Administration | User | Active Phase 10B; exceptional direct grant |
 | STOCK_ITEM_CREATE | Stock item creation | StockItem and StockVariant | Active; strict |
 | STOCK_ITEM_UPDATE | Stock item update | StockItem and StockVariant | Active; strict |
 | STOCK_ITEM_DELETE | Stock item deletion path | StockItem and StockVariant | Active; strict |
@@ -551,10 +566,14 @@ contain the value.
 | ROUTINE_IMPORT_APPLY | Routine import apply | RoutineImportBatch | Active; strict |
 | ROUTINE_IMPORT_CANCEL | Routine import cancel | RoutineImportBatch | Active; strict |
 
-There are 38 distinct enum values emitted by current production paths. The
-remaining 12 are six historical TICKET values and six currently unused values:
+At the I0 baseline there were 38 distinct enum values emitted by current
+production paths. Phase 10B adds 13 active Authorization Administration
+values; the historical and previously unused values remain retained and
+query-compatible. The six historical TICKET values remain retained; the six
+previously unused values are:
 PASSWORD_CHANGE, EMPLOYEE_IMPORT, USER_UPDATE, USER_DELETE,
-USER_ROLE_CHANGE, and SETTINGS_UPDATE. None may be renamed or removed in I0.
+USER_ROLE_CHANGE, and SETTINGS_UPDATE. Historical values may not be renamed or
+removed by Phase 10B.
 constants/audit.ts supplies labels and badge metadata for active values and
 intentionally omits the six legacy TICKET values; its registry test allows
 that historical exception.

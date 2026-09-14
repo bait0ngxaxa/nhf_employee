@@ -30,6 +30,7 @@ export interface AuditLogDisplay {
 const FIELD_LABELS: Record<string, string> = {
     assignedToId: "ผู้รับผิดชอบ",
     attributes: "คุณลักษณะ",
+    capabilityKey: "ความสามารถ",
     businessDayPolicy: "การเลื่อนวันทำการ",
     category: "หมวดหมู่",
     categoryId: "หมวดหมู่",
@@ -46,6 +47,7 @@ const FIELD_LABELS: Record<string, string> = {
     firstName: "ชื่อ",
     imageUrl: "รูปภาพ",
     isActive: "สถานะใช้งาน",
+    key: "รหัสเทคนิค",
     lastName: "นามสกุล",
     managerId: "ผู้อนุมัติการลา",
     minStock: "จำนวนขั้นต่ำ",
@@ -65,6 +67,10 @@ const FIELD_LABELS: Record<string, string> = {
     scheduleText: "กำหนดการ",
     sku: "รหัสวัสดุ",
     status: "สถานะ",
+    scope: "ขอบเขตสิทธิ์",
+    teamId: "Team",
+    teamRoleId: "TeamRole",
+    userId: "ผู้ใช้",
     title: "หัวข้อ",
     type: "ประเภท",
     unit: "หน่วย",
@@ -176,6 +182,15 @@ const GENERIC_DIFF_ACTIONS = new Set([
     "USER_UPDATE",
     "USER_ROLE_CHANGE",
     "SETTINGS_UPDATE",
+    "TEAM_UPDATE",
+    "TEAM_DISABLE",
+    "TEAM_MEMBER_ROLE_CHANGE",
+    "TEAM_ROLE_UPDATE",
+    "TEAM_ROLE_DISABLE",
+    "TEAM_CAPABILITY_GRANT_UPDATE",
+    "TEAM_ROLE_CAPABILITY_GRANT_UPDATE",
+    "USER_CAPABILITY_GRANT_ADD",
+    "USER_CAPABILITY_GRANT_REMOVE",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {

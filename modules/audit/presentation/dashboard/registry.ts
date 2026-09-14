@@ -86,6 +86,58 @@ export const AUDIT_ACTION_META = {
         label: "เปลี่ยนสิทธิ์ผู้ใช้",
         badgeClassName: AUDIT_BADGE_TONES.security,
     },
+    TEAM_CREATE: {
+        label: "สร้าง Team",
+        badgeClassName: AUDIT_BADGE_TONES.create,
+    },
+    TEAM_UPDATE: {
+        label: "แก้ไข Team",
+        badgeClassName: AUDIT_BADGE_TONES.update,
+    },
+    TEAM_DISABLE: {
+        label: "ปิดใช้งาน Team",
+        badgeClassName: AUDIT_BADGE_TONES.warning,
+    },
+    TEAM_MEMBER_ADD: {
+        label: "เพิ่มสมาชิก Team",
+        badgeClassName: AUDIT_BADGE_TONES.create,
+    },
+    TEAM_MEMBER_REMOVE: {
+        label: "นำสมาชิกออกจาก Team",
+        badgeClassName: AUDIT_BADGE_TONES.remove,
+    },
+    TEAM_MEMBER_ROLE_CHANGE: {
+        label: "เปลี่ยน TeamRole ของสมาชิก",
+        badgeClassName: AUDIT_BADGE_TONES.security,
+    },
+    TEAM_ROLE_CREATE: {
+        label: "สร้าง TeamRole",
+        badgeClassName: AUDIT_BADGE_TONES.create,
+    },
+    TEAM_ROLE_UPDATE: {
+        label: "แก้ไข TeamRole",
+        badgeClassName: AUDIT_BADGE_TONES.update,
+    },
+    TEAM_ROLE_DISABLE: {
+        label: "ปิดใช้งาน TeamRole",
+        badgeClassName: AUDIT_BADGE_TONES.warning,
+    },
+    TEAM_CAPABILITY_GRANT_UPDATE: {
+        label: "แก้ไขสิทธิ์ของ Team",
+        badgeClassName: AUDIT_BADGE_TONES.security,
+    },
+    TEAM_ROLE_CAPABILITY_GRANT_UPDATE: {
+        label: "แก้ไขสิทธิ์ของ TeamRole",
+        badgeClassName: AUDIT_BADGE_TONES.security,
+    },
+    USER_CAPABILITY_GRANT_ADD: {
+        label: "เพิ่มสิทธิ์เฉพาะผู้ใช้",
+        badgeClassName: AUDIT_BADGE_TONES.security,
+    },
+    USER_CAPABILITY_GRANT_REMOVE: {
+        label: "ลบสิทธิ์เฉพาะผู้ใช้",
+        badgeClassName: AUDIT_BADGE_TONES.remove,
+    },
     SETTINGS_UPDATE: {
         label: "อัปเดตการตั้งค่า",
         badgeClassName: AUDIT_BADGE_TONES.stateChange,
@@ -225,6 +277,8 @@ export const AUDIT_ACTION_FILTER_OPTIONS = [
 
 export const AUDIT_ENTITY_LABELS = {
     User: "ผู้ใช้ระบบ",
+    Team: "Team",
+    TeamRole: "TeamRole",
     Employee: "พนักงาน",
     EmployeeApprover: "ผู้อนุมัติการลา",
     EmailRequest: "คำร้องพนักงานใหม่",

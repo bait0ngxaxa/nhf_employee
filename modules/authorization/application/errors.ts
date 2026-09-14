@@ -66,3 +66,42 @@ export class AuthorizationAdministrationInputError extends Error {
         this.name = "AuthorizationAdministrationInputError";
     }
 }
+
+export type AuthorizationAdministrationMutationErrorCode =
+    | "INVALID_INPUT"
+    | "NOT_FOUND"
+    | "CONFLICT"
+    | "DUPLICATE_MEMBERSHIP"
+    | "DUPLICATE_GRANT"
+    | "TEAM_ROLE_TEAM_MISMATCH"
+    | "UNKNOWN_CAPABILITY"
+    | "UNSUPPORTED_SCOPE"
+    | "DIRECT_TEAM_SCOPE_REQUIRES_ORIGIN"
+    | "CAPABILITY_POLICY_ACTIVATION_REQUIRED"
+    | "CAPABILITY_DEFERRED"
+    | "INVALID_AUTHORIZATION_CONFIGURATION"
+    | "NO_STATE_CHANGE";
+
+export interface AuthorizationAdministrationMutationErrorDetails {
+    readonly capabilityKey?: string;
+    readonly scope?: string;
+    readonly teamId?: number;
+    readonly teamRoleId?: number;
+    readonly userId?: number;
+}
+
+export class AuthorizationAdministrationMutationError extends Error {
+    readonly code: AuthorizationAdministrationMutationErrorCode;
+    readonly details: AuthorizationAdministrationMutationErrorDetails;
+
+    constructor(
+        code: AuthorizationAdministrationMutationErrorCode,
+        message: string,
+        details: AuthorizationAdministrationMutationErrorDetails = {},
+    ) {
+        super(message);
+        this.name = "AuthorizationAdministrationMutationError";
+        this.code = code;
+        this.details = details;
+    }
+}
