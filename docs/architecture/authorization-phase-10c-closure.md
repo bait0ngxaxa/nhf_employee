@@ -1,6 +1,6 @@
 # Authorization Phase 10C — Authorization Administration Operator UI
 
-สถานะ: **Implementation complete; pending Phase 10D security/behavior re-audit**  
+สถานะ: **CLOSED** หลัง Phase 10D security/behavior re-audit วันที่ 2026-09-14
 วันที่: 2026-09-14
 
 Phase 10C adds the operator-facing Authorization Administration workspace over
@@ -104,12 +104,14 @@ UI never turns a rejected command into local success.
 ## User directory and User Exceptions
 
 `GET /api/authorization/administration/users?query=...` is an ADMIN-only,
-bounded read contract owned by the Authorization Administration application
-and repository boundary. It searches safe identity fields (User ID, name,
-email, and available employee name fields), orders deterministically, and
-returns at most 25 results. The projection includes lifecycle information but
-never credentials, password-reset values, refresh/session tokens, or other
-secrets.
+search-only, bounded read contract owned by the Authorization Administration
+application and repository boundary. A non-empty trimmed query is required;
+empty or whitespace-only queries return `INVALID_INPUT`, so the endpoint does
+not accidentally become an unfiltered directory browse. It searches safe
+identity fields (User ID, name, email, and available employee name fields),
+orders deterministically, and returns at most 25 results. The projection
+includes lifecycle information but never credentials, password-reset values,
+refresh/session tokens, or other secrets.
 
 Selecting a directory result loads the existing Phase 10A User detail model.
 The User panel shows identity, system role, account and employee lifecycle,
@@ -206,7 +208,8 @@ Phase 10C does **not**:
   nested Teams, hard delete, or UI-specific schema columns;
 - create a second Authorization audit persistence/query system;
 - make the browser UI an authorization boundary;
-- begin Phase 10D.
+- rely on the browser UI as an authorization boundary; Phase 10D re-audited
+  the server boundary and UI behavior after this implementation.
 
 ## Tests and handoff
 
@@ -220,21 +223,15 @@ warning, and invalid resolver state. Existing Phase 10A/10B route,
 application, mutation, audit, and direct API security tests remain part of the
 verification set.
 
-Verification on 2026-09-14: the focused Phase 10A/10B/10C run passed 13 test
-files and 104 tests. The full repository unit run passed 313 test files and
-2,708 tests. `npm.cmd run check` passed architecture, strict lint, typecheck,
-and the same full unit suite. The targeted MySQL Authorization Administration,
-authorization persistence, and resolver integration run passed 3 files and 16
-tests. The complete MySQL integration runner applied migrations successfully
-and passed 15 of 16 files (100 of 101 tests); its one failure is the unrelated
-Leave quota concurrency test at
-`__tests__/integration/leave-quota-concurrency.integration.test.ts`, where
-Leave authorization rejects the fixture before quota creation. No Phase 10C
-file or Leave behavior was changed for that failure.
-
-Phase 10D must perform the final security/behavior re-audit across the Phase
-10A read model, Phase 10B audited mutation boundary, and this Phase 10C
-operator flow. Phase 10C should not be marked CLOSED until that re-audit and
-the repository verification commands establish that the UI cannot bypass
-server authority, lose exact DELETE payloads, or misrepresent resolver output
-as final runtime authorization.
+Initial Phase 10C verification on 2026-09-14 recorded 13 test files and 104
+tests; the final Phase 10D evidence is recorded in
+[authorization-phase-10d-closure.md](authorization-phase-10d-closure.md).
+That re-audit reran the complete Phase 10A/10B/10C/D focused surface, including
+the UI/API boundary and architecture graph checks, with 17 test files and 341
+tests passing. It also reran the repository suite at 313 test files and 2,715
+tests passing, plus the targeted MySQL Authorization Administration,
+authorization persistence, and resolver integration at 3 files and 16 tests
+passing. The complete MySQL runner applied migrations successfully and passed
+15 of 16 files (100 of 101 tests); its only failure remains the documented,
+pre-existing Leave quota concurrency failure. No Phase 10C or Leave behavior
+was changed for that failure.

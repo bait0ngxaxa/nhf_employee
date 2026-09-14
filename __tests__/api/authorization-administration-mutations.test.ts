@@ -5,6 +5,7 @@ import type * as AuthorizationModule from "@/modules/authorization";
 const mocks = vi.hoisted(() => ({
     requireAdminSession: vi.fn(),
     createTeam: vi.fn(),
+    updateTeam: vi.fn(),
     addTeamGrant: vi.fn(),
     removeTeamGrant: vi.fn(),
     addTeamMember: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("@/modules/authorization", async (importOriginal) => {
     return {
         ...actual,
         createAuthorizationAdministrationTeam: mocks.createTeam,
+        updateAuthorizationAdministrationTeam: mocks.updateTeam,
         addAuthorizationAdministrationTeamGrant: mocks.addTeamGrant,
         removeAuthorizationAdministrationTeamGrant: mocks.removeTeamGrant,
         addAuthorizationAdministrationTeamMember: mocks.addTeamMember,
@@ -42,6 +44,7 @@ vi.mock("@/modules/authorization", async (importOriginal) => {
 });
 
 import { POST as createTeam } from "@/app/api/authorization/administration/route";
+import { PATCH as updateTeam } from "@/app/api/authorization/administration/teams/[id]/route";
 import {
     DELETE as removeTeamGrant,
     POST as addTeamGrant,
@@ -114,6 +117,7 @@ describe("Authorization Administration mutation API boundary", () => {
             session: { user: { ...ADMIN_USER, id: String(ADMIN_USER.id) } },
         });
         mocks.createTeam.mockResolvedValue({ id: 10, key: "people" });
+        mocks.updateTeam.mockResolvedValue({ id: 10, key: "people", isActive: false });
         mocks.addTeamGrant.mockResolvedValue({
             teamId: 10,
             capabilityKey: "audit.read",
@@ -259,6 +263,26 @@ describe("Authorization Administration mutation API boundary", () => {
             input,
         );
         expect(mocks.removeTeamGrant).toHaveBeenCalledWith(
+            expect.any(Object),
+            10,
+            input,
+        );
+    });
+
+    it("uses the [id] segment for Team lifecycle updates", async () => {
+        const input = { name: "People Operations", isActive: false };
+        const response = await invokeRoute(
+            updateTeam,
+            jsonRequest(
+                "/api/authorization/administration/teams/10",
+                "PATCH",
+                input,
+            ),
+            { id: "10" },
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.updateTeam).toHaveBeenCalledWith(
             expect.any(Object),
             10,
             input,

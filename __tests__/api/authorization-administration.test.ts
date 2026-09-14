@@ -206,6 +206,21 @@ describe("Authorization Administration API boundary", () => {
         expect(mocks.searchUsers).not.toHaveBeenCalled();
     });
 
+    it("rejects an empty User directory query instead of browsing users", async () => {
+        const { GET } = await import(
+            "@/app/api/authorization/administration/users/route"
+        );
+        const response = await GET(
+            new Request(
+                "http://localhost/api/authorization/administration/users?query=",
+            ),
+        );
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ code: "INVALID_INPUT" });
+        expect(mocks.searchUsers).not.toHaveBeenCalled();
+    });
+
     it("rejects malformed resource identifiers before querying", async () => {
         const response = await getTeam(
             new Request("http://localhost/api/authorization/administration/teams/not-an-id"),

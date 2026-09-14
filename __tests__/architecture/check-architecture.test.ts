@@ -33,6 +33,10 @@ const fixtureFiles: FixtureFiles = {
     "modules/notification/client.ts": '"use client"; export const x = 1;\n',
     "modules/notification/application/example.ts": "export const x = 1;\n",
     "modules/notification/infrastructure/persistence/repository.ts": "export const x = 1;\n",
+    "modules/authorization/index.ts": "export const x = 1;\n",
+    "modules/authorization/client.ts": '"use client"; export const x = 1;\n',
+    "modules/authorization/application/example.ts": "export const x = 1;\n",
+    "modules/authorization/infrastructure/persistence/repository.ts": "export const x = 1;\n",
     "modules/auth/index.ts": "export const x = 1;\n",
     "modules/auth/client.ts": '"use client"; export const x = 1;\n',
     "modules/auth/presentation/example.ts": '"use client"; export const x = 1;\n',
@@ -1486,6 +1490,78 @@ describe("architecture checker module boundaries", () => {
         expect(result.violations[0]).toContain("@prisma/client");
         expect(result.violations[0]).toContain(
             "Server-only runtime dependency is reachable from @/modules/audit/client",
+        );
+    });
+
+    it("rejects a direct Prisma runtime dependency from the Authorization client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/authorization/client.ts": [
+                '"use client";',
+                'import { prisma } from "@/lib/db/prisma";',
+                "export { prisma };",
+            ].join("\n"),
+            "lib/db/prisma.ts": "export const prisma = {};\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/authorization/client",
+        );
+    });
+
+    it("rejects server authentication helpers from the Authorization client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/authorization/client.ts": [
+                '"use client";',
+                'export { x } from "./presentation/example";',
+            ].join("\n"),
+            "modules/authorization/presentation/example.ts": [
+                'import { x } from "@/lib/auth/workforce";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/authorization/client",
+        );
+    });
+
+    it("rejects transitive Authorization application dependencies from the client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/authorization/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/authorization/presentation/example.ts": [
+                'import { x } from "@/modules/authorization/application/example";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/authorization/client",
+        );
+    });
+
+    it("rejects the Authorization server entry from the client graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/authorization/client.ts": '"use client"; export { x } from "./presentation/example";\n',
+            "modules/authorization/presentation/example.ts": [
+                'import { x } from "@/modules/authorization";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "The Authorization browser graph must not reach the @/modules/authorization server entry",
         );
     });
 

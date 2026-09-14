@@ -2075,6 +2075,87 @@ function getNotificationClientGraphViolations(rootPath, getRuntimeImports) {
     return violations;
 }
 
+function getAuthorizationClientGraphViolations(rootPath, getRuntimeImports) {
+    const entryPath = resolve(rootPath, "modules/authorization/client.ts");
+    if (!existsSync(entryPath)) return [];
+
+    const authorizationServerEntry = resolve(rootPath, "modules/authorization");
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/auth/api",
+        "lib/auth/context",
+        "lib/auth/hybrid",
+        "lib/auth/server",
+        "lib/auth/workforce",
+        "lib/auth/workforce-transaction",
+        "lib/auth/csrf",
+        "lib/auth/rate-limit",
+        "modules/authorization/application",
+        "modules/authorization/infrastructure",
+        "modules/audit/application",
+        "modules/audit/infrastructure",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getRuntimeImports(filePath)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            const reachesAuthorizationServerEntry = importTarget === authorizationServerEntry
+                || sourcePath === resolve(authorizationServerEntry, "index.ts");
+            const reachesServerDirectory = [importTarget, sourcePath].some((target) =>
+                target !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(target, resolve(rootPath, directory)),
+                ),
+            );
+
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || reachesServerDirectory) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/authorization/client.",
+                ));
+                continue;
+            }
+
+            if (reachesAuthorizationServerEntry) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "The Authorization browser graph must not reach the @/modules/authorization server entry.",
+                ));
+                continue;
+            }
+
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function getAuditClientGraphViolations(rootPath, getRuntimeImports) {
     const entryPath = resolve(rootPath, "modules/audit/client.ts");
     if (!existsSync(entryPath)) return [];
@@ -2973,6 +3054,7 @@ function checkArchitecture(options = {}) {
     violations.push(...getLeaveClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getEmployeeClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getNotificationClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getAuthorizationClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getAuditClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getAuthClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getLineClientGraphViolations(rootPath, getRuntimeImports));

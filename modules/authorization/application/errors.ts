@@ -58,12 +58,17 @@ export class AuthorizationAdministrationAccessError extends Error {
     }
 }
 
-export class AuthorizationAdministrationInputError extends Error {
-    readonly code = "INVALID_IDENTIFIER" as const;
+export type AuthorizationAdministrationInputErrorCode =
+    | "INVALID_IDENTIFIER"
+    | "INVALID_INPUT";
 
-    constructor() {
+export class AuthorizationAdministrationInputError extends Error {
+    readonly code: AuthorizationAdministrationInputErrorCode;
+
+    constructor(code: AuthorizationAdministrationInputErrorCode = "INVALID_IDENTIFIER") {
         super("Invalid Authorization Administration identifier");
         this.name = "AuthorizationAdministrationInputError";
+        this.code = code;
     }
 }
 

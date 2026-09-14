@@ -14,7 +14,10 @@ export async function GET(request: Request): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const query = new URL(request.url).searchParams.get("query") ?? "";
-        if (query.length > AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH) {
+        if (
+            query.length > AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH
+            || query.trim().length === 0
+        ) {
             return badRequest({ code: "INVALID_INPUT" });
         }
         const users = await searchAuthorizationAdministrationUsers(

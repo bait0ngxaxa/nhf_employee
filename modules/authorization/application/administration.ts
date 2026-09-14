@@ -590,10 +590,15 @@ function parseUserDirectoryQuery(query: unknown): string {
         typeof query !== "string"
         || query.length > AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH
     ) {
-        throw new AuthorizationAdministrationInputError();
+        throw new AuthorizationAdministrationInputError("INVALID_INPUT");
     }
 
-    return query.trim();
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length === 0) {
+        throw new AuthorizationAdministrationInputError("INVALID_INPUT");
+    }
+
+    return normalizedQuery;
 }
 
 export function getAuthorizationAdministrationCapabilityCatalog(

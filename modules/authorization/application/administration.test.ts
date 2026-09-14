@@ -387,7 +387,21 @@ describe("Authorization Administration User directory", () => {
                 "x".repeat(101),
                 { repository },
             ),
-        ).rejects.toMatchObject({ code: "INVALID_IDENTIFIER" });
+        ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+        expect(searchUsers).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty or whitespace-only query before reaching persistence", async () => {
+        const searchUsers = vi.fn(async () => []);
+        const repository = emptyRepository({ searchUsers });
+
+        await expect(
+            searchAuthorizationAdministrationUsers(
+                ADMIN_PRINCIPAL,
+                "   ",
+                { repository },
+            ),
+        ).rejects.toMatchObject({ code: "INVALID_INPUT" });
         expect(searchUsers).not.toHaveBeenCalled();
     });
 });
