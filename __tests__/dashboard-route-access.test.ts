@@ -13,7 +13,10 @@ vi.mock("@/app/_lib/auth/current-user", () => ({
     getCurrentUserProjection: mocks.getCurrentUserProjection,
 }));
 
-import { requireDashboardAuditCapability } from "@/app/dashboard/_lib/route-access";
+import {
+    requireDashboardAuditCapability,
+    requireDashboardAuthorizationAdministration,
+} from "@/app/dashboard/_lib/route-access";
 
 describe("Dashboard Audit route authorization", () => {
     beforeEach(() => {
@@ -48,6 +51,38 @@ describe("Dashboard Audit route authorization", () => {
         });
 
         await expect(requireDashboardAuditCapability()).resolves.toBeUndefined();
+        expect(mocks.redirect).not.toHaveBeenCalled();
+    });
+
+    it("redirects unauthenticated Authorization Administration access to login", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue(null);
+
+        await expect(requireDashboardAuthorizationAdministration()).rejects.toThrow(
+            "NEXT_REDIRECT:/login",
+        );
+    });
+
+    it("redirects a normal USER from the Authorization Administration route", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "USER",
+        });
+
+        await expect(requireDashboardAuthorizationAdministration()).rejects.toThrow(
+            "NEXT_REDIRECT:/access-denied",
+        );
+    });
+
+    it("allows only the server-projected ADMIN into Authorization Administration", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "ADMIN",
+        });
+
+        await expect(requireDashboardAuthorizationAdministration()).resolves.toEqual({
+            userId: 41,
+            systemRole: "ADMIN",
+        });
         expect(mocks.redirect).not.toHaveBeenCalled();
     });
 });

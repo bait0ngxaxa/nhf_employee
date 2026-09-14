@@ -103,6 +103,25 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
+## Authorization Administration boundary (Phase 10A)
+
+`modules/authorization/` owns the read-only Authorization Administration
+application contract. Its capability administration catalog is a projection
+of the code-owned `CAPABILITY_REGISTRY`; operational grantability is explicit
+administration metadata and is not a second capability registry. The
+administration application use cases expose safe Team, TeamRole, membership,
+grant, User, and effective-permission read models. The persistence adapter
+uses bounded nested Prisma `select`/`_count` reads and does not expose generic
+Prisma CRUD.
+
+The app API and Dashboard route boundaries authenticate through the existing
+server session/workforce checks, then require the explicit Phase 10A
+Authorization Administration `ADMIN` system boundary. They import only the
+public `@/modules/authorization` contract; they must not query authorization
+delegates directly or accept role/ownership data from the client. Phase 10A
+does not expose mutation use cases, activate Team policy, infer Teams from
+Department, or add a client-safe authorization administration entry point.
+
 ## Notification boundary (H0/H1/H2/H3)
 
 The `modules/notification/` module now owns the user-facing in-app

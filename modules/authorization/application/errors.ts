@@ -48,3 +48,21 @@ export class AuthorizationDeniedError extends Error {
         this.reason = decision.reason ?? "NO_APPLICABLE_GRANT";
     }
 }
+
+export class AuthorizationAdministrationAccessError extends Error {
+    readonly code = "ADMIN_REQUIRED" as const;
+
+    constructor() {
+        super("Authorization Administration requires the ADMIN system role");
+        this.name = "AuthorizationAdministrationAccessError";
+    }
+}
+
+export class AuthorizationAdministrationInputError extends Error {
+    readonly code = "INVALID_IDENTIFIER" as const;
+
+    constructor() {
+        super("Invalid Authorization Administration identifier");
+        this.name = "AuthorizationAdministrationInputError";
+    }
+}

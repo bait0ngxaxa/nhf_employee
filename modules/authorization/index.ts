@@ -35,6 +35,8 @@ export { seedAuthorizationConfiguration } from "./application/seed";
 export {
     AuthorizationConfigurationError,
     AuthorizationDeniedError,
+    AuthorizationAdministrationAccessError,
+    AuthorizationAdministrationInputError,
 } from "./application/errors";
 export type {
     AuthorizationConfigurationErrorCode,
@@ -64,3 +66,39 @@ export type {
     AuthorizationPersistenceContext,
     EffectiveAuthorizationGrant,
 } from "./application/types";
+export {
+    assertAuthorizationAdministrationAccess,
+    getAuthorizationAdministrationCapabilityCatalog,
+    getAuthorizationAdministrationOverview,
+    getAuthorizationAdministrationTeam,
+    getAuthorizationAdministrationUser,
+    listAuthorizationAdministrationTeams,
+} from "./application/administration";
+export { buildCapabilityAdministrationCatalog } from "./application/administration-catalog";
+export type {
+    AuthorizationAdministrationAccountIdentity,
+    AuthorizationAdministrationConfigurationIssue,
+    AuthorizationAdministrationEffectiveGrant,
+    AuthorizationAdministrationEffectivePermission,
+    AuthorizationAdministrationGrantProjection,
+    AuthorizationAdministrationGrantValidation,
+    AuthorizationAdministrationGrantValidationCode,
+    AuthorizationAdministrationOverview,
+    AuthorizationAdministrationPrincipal,
+    AuthorizationAdministrationQueryDependencies,
+    AuthorizationAdministrationRepository,
+    AuthorizationAdministrationResolutionError,
+    AuthorizationAdministrationResolutionStatus,
+    AuthorizationAdministrationSourceExplanation,
+    AuthorizationAdministrationTeamDetail,
+    AuthorizationAdministrationTeamGrant,
+    AuthorizationAdministrationTeamMembership,
+    AuthorizationAdministrationTeamReference,
+    AuthorizationAdministrationTeamRole,
+    AuthorizationAdministrationTeamRoleGrant,
+    AuthorizationAdministrationTeamRoleReference,
+    AuthorizationAdministrationTeamSummary,
+    AuthorizationAdministrationUserDetail,
+    AuthorizationAdministrationUserTeamMembership,
+    CapabilityAdministrationProjection,
+} from "./application/administration-types";

@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import {
+    assertAuthorizationAdministrationAccess,
+    AuthorizationAdministrationAccessError,
+    type AuthorizationAdministrationPrincipal,
+} from "@/modules/authorization";
 import type { EmployeePresentationCapabilities } from "@/modules/employee";
 
 export type DashboardEmployeeCapability = keyof Pick<
@@ -19,6 +24,28 @@ export async function requireDashboardAdmin(): Promise<void> {
 
     if (!isAdminRole(user.role)) {
         redirect(APP_ROUTES.accessDenied);
+    }
+}
+
+export async function requireDashboardAuthorizationAdministration(): Promise<
+    AuthorizationAdministrationPrincipal
+> {
+    const user = await getCurrentUserProjection();
+
+    if (!user) {
+        redirect(APP_ROUTES.login);
+    }
+
+    try {
+        return assertAuthorizationAdministrationAccess({
+            userId: Number(user.id),
+            systemRole: user.role,
+        });
+    } catch (error) {
+        if (error instanceof AuthorizationAdministrationAccessError) {
+            redirect(APP_ROUTES.accessDenied);
+        }
+        throw error;
     }
 }
 

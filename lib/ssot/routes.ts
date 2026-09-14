@@ -16,6 +16,7 @@ export const APP_ROUTES = {
     dashboardAudit: "/dashboard/audit",
     dashboardNotifications: "/dashboard/notifications",
     dashboardSessions: "/dashboard/sessions",
+    dashboardAuthorizationAdministration: "/dashboard/authorization",
     accessDenied: "/access-denied",
     forgotPassword: "/forgot-password",
     resetPassword: "/reset-password",
@@ -341,6 +342,13 @@ export const API_ROUTES = {
     auditLogs: {
         cleanup: "/api/audit-logs/cleanup",
         export: "/api/audit-logs/export",
+    },
+    authorizationAdministration: {
+        overview: "/api/authorization/administration",
+        teamById: (id: number | string): string =>
+            `/api/authorization/administration/teams/${id}`,
+        userById: (id: number | string): string =>
+            `/api/authorization/administration/users/${id}`,
     },
     uploads: {
         image: "/api/uploads/image",
