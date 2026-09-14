@@ -78,8 +78,8 @@ export { buildCapabilityAdministrationCatalog } from "./application/administrati
 export type {
     AuthorizationAdministrationAccountIdentity,
     AuthorizationAdministrationConfigurationIssue,
-    AuthorizationAdministrationEffectiveGrant,
-    AuthorizationAdministrationEffectivePermission,
+    AuthorizationAdministrationResolverEffectiveGrant,
+    AuthorizationAdministrationResolverEffectivePermission,
     AuthorizationAdministrationGrantProjection,
     AuthorizationAdministrationGrantValidation,
     AuthorizationAdministrationGrantValidationCode,
@@ -88,7 +88,7 @@ export type {
     AuthorizationAdministrationQueryDependencies,
     AuthorizationAdministrationRepository,
     AuthorizationAdministrationResolutionError,
-    AuthorizationAdministrationResolutionStatus,
+    AuthorizationAdministrationResolverEffectivePermissionStatus,
     AuthorizationAdministrationSourceExplanation,
     AuthorizationAdministrationTeamDetail,
     AuthorizationAdministrationTeamGrant,
@@ -101,4 +101,6 @@ export type {
     AuthorizationAdministrationUserDetail,
     AuthorizationAdministrationUserTeamMembership,
     CapabilityAdministrationProjection,
+    CapabilityAdministrationStatus,
+    RuntimeAuthorizationMode,
 } from "./application/administration-types";

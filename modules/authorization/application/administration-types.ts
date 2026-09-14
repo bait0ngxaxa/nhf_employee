@@ -24,7 +24,15 @@ export interface AuthorizationAdministrationPrincipal {
     readonly systemRole: UserRole;
 }
 
-export type CapabilityAdministrationStatus = "GRANTABLE" | "DEFERRED";
+export type RuntimeAuthorizationMode =
+    | "CENTRAL_ONLY"
+    | "CENTRAL_WITH_COMPATIBILITY"
+    | "DEFERRED";
+
+export type CapabilityAdministrationStatus =
+    | "GRANTABLE"
+    | "POLICY_ACTIVATION_REQUIRED"
+    | "DEFERRED";
 
 export interface CapabilityAdministrationProjection {
     readonly key: RegisteredCapabilityKey;
@@ -33,7 +41,13 @@ export interface CapabilityAdministrationProjection {
     readonly description: string;
     readonly supportedScopes: readonly AuthorizationScope[];
     readonly supportedChannels: readonly AuthorizationChannel[];
+    /**
+     * Describes whether a domain adapter may still translate a central
+     * resolver denial through a documented compatibility floor.
+     */
+    readonly runtimeAuthorizationMode: RuntimeAuthorizationMode;
     readonly administrativeStatus: CapabilityAdministrationStatus;
+    /** True only when an ordinary additive Phase 10B grant is safe to expose. */
     readonly administrativelyGrantable: boolean;
     readonly nonGrantableReason?: string;
 }
@@ -206,7 +220,7 @@ export type AuthorizationAdministrationSourceExplanation =
         readonly userId: number;
     };
 
-export interface AuthorizationAdministrationEffectiveGrant {
+export interface AuthorizationAdministrationResolverEffectiveGrant {
     readonly capability: RegisteredCapabilityKey;
     readonly scope: AuthorizationScope;
     readonly source: AuthorizationGrantSource;
@@ -214,11 +228,11 @@ export interface AuthorizationAdministrationEffectiveGrant {
     readonly origin: AuthorizationAdministrationSourceExplanation;
 }
 
-export interface AuthorizationAdministrationEffectivePermission {
+export interface AuthorizationAdministrationResolverEffectivePermission {
     readonly capability: CapabilityAdministrationProjection;
     readonly allowed: boolean;
     readonly scopes: readonly AuthorizationScope[];
-    readonly grants: readonly AuthorizationAdministrationEffectiveGrant[];
+    readonly grants: readonly AuthorizationAdministrationResolverEffectiveGrant[];
     readonly reason?: AuthorizationDecisionReason;
 }
 
@@ -230,7 +244,7 @@ export interface AuthorizationAdministrationResolutionError {
     readonly teamRoleId?: number;
 }
 
-export type AuthorizationAdministrationResolutionStatus =
+export type AuthorizationAdministrationResolverEffectivePermissionStatus =
     | { readonly status: "RESOLVED" }
     | {
         readonly status: "INVALID_CONFIGURATION";
@@ -242,8 +256,10 @@ export interface AuthorizationAdministrationUserDetail {
     readonly systemRole: UserRole;
     readonly teamMemberships: readonly AuthorizationAdministrationUserTeamMembership[];
     readonly directGrants: readonly AuthorizationAdministrationGrantProjection[];
-    readonly effectivePermissionStatus: AuthorizationAdministrationResolutionStatus;
-    readonly effectivePermissions: readonly AuthorizationAdministrationEffectivePermission[];
+    /** Central resolver results; not a final domain/runtime access decision. */
+    readonly resolverEffectivePermissionStatus: AuthorizationAdministrationResolverEffectivePermissionStatus;
+    /** Central resolver results; domain compatibility adapters may still apply. */
+    readonly resolverEffectivePermissions: readonly AuthorizationAdministrationResolverEffectivePermission[];
     readonly configurationIssues: readonly AuthorizationAdministrationConfigurationIssue[];
 }
 
@@ -253,6 +269,7 @@ export interface AuthorizationAdministrationOverview {
     readonly summary: {
         readonly registeredCapabilityCount: number;
         readonly administrativelyGrantableCapabilityCount: number;
+        readonly policyActivationRequiredCapabilityCount: number;
         readonly deferredCapabilityCount: number;
         readonly teamCount: number;
         readonly activeTeamCount: number;

@@ -20,8 +20,8 @@ import {
 import type {
     AuthorizationAdministrationAccountIdentity,
     AuthorizationAdministrationConfigurationIssue,
-    AuthorizationAdministrationEffectiveGrant,
-    AuthorizationAdministrationEffectivePermission,
+    AuthorizationAdministrationResolverEffectiveGrant,
+    AuthorizationAdministrationResolverEffectivePermission,
     AuthorizationAdministrationGrantProjection,
     AuthorizationAdministrationGrantValidationCode,
     AuthorizationAdministrationPrincipal,
@@ -29,7 +29,7 @@ import type {
     AuthorizationAdministrationRawGrant,
     AuthorizationAdministrationRawUserIdentity,
     AuthorizationAdministrationResolutionError,
-    AuthorizationAdministrationResolutionStatus,
+    AuthorizationAdministrationResolverEffectivePermissionStatus,
     AuthorizationAdministrationRepository,
     AuthorizationAdministrationSourceExplanation,
     AuthorizationAdministrationTeamDetail,
@@ -487,10 +487,10 @@ function cloneGrantSource(source: AuthorizationGrantSource): AuthorizationGrantS
     }
 }
 
-function projectEffectiveGrant(
+function projectResolverEffectiveGrant(
     grant: EffectiveAuthorizationGrant,
     memberships: readonly AuthorizationAdministrationUserTeamMembership[],
-): AuthorizationAdministrationEffectiveGrant {
+): AuthorizationAdministrationResolverEffectiveGrant {
     if (!CAPABILITY_REGISTRY.has(grant.capability)) {
         throw new Error(
             `Resolver returned an unregistered capability: ${grant.capability}`,
@@ -512,12 +512,12 @@ function projectEffectiveGrant(
     });
 }
 
-function projectEffectivePermissions(
+function projectResolverEffectivePermissions(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
     catalogByKey: ReadonlyMap<string, CapabilityAdministrationProjection>,
     memberships: readonly AuthorizationAdministrationUserTeamMembership[],
-): readonly AuthorizationAdministrationEffectivePermission[] {
-    const permissions: AuthorizationAdministrationEffectivePermission[] = [];
+): readonly AuthorizationAdministrationResolverEffectivePermission[] {
+    const permissions: AuthorizationAdministrationResolverEffectivePermission[] = [];
 
     for (const definition of CAPABILITY_REGISTRY.definitions) {
         const decision = decisions.get(definition.key);
@@ -529,7 +529,7 @@ function projectEffectivePermissions(
         }
 
         const grants = decision.grants.map((grant) =>
-            projectEffectiveGrant(grant, memberships),
+            projectResolverEffectiveGrant(grant, memberships),
         );
         permissions.push(Object.freeze({
             capability,
@@ -566,9 +566,9 @@ function issueFromResolutionError(
     });
 }
 
-function projectResolutionStatus(
+function projectResolverEffectivePermissionStatus(
     error: AuthorizationConfigurationError | null,
-): AuthorizationAdministrationResolutionStatus {
+): AuthorizationAdministrationResolverEffectivePermissionStatus {
     return error === null
         ? Object.freeze({ status: "RESOLVED" as const })
         : Object.freeze({
@@ -613,6 +613,13 @@ export async function getAuthorizationAdministrationOverview(
     const administrativelyGrantableCapabilityCount = capabilities.filter(
         (capability) => capability.administrativelyGrantable,
     ).length;
+    const policyActivationRequiredCapabilityCount = capabilities.filter(
+        (capability) => capability.administrativeStatus
+            === "POLICY_ACTIVATION_REQUIRED",
+    ).length;
+    const deferredCapabilityCount = capabilities.filter(
+        (capability) => capability.administrativeStatus === "DEFERRED",
+    ).length;
 
     return Object.freeze({
         capabilities,
@@ -620,8 +627,8 @@ export async function getAuthorizationAdministrationOverview(
         summary: Object.freeze({
             registeredCapabilityCount: capabilities.length,
             administrativelyGrantableCapabilityCount,
-            deferredCapabilityCount:
-                capabilities.length - administrativelyGrantableCapabilityCount,
+            policyActivationRequiredCapabilityCount,
+            deferredCapabilityCount,
             teamCount: teams.length,
             activeTeamCount: teams.filter((team) => team.isActive).length,
         }),
@@ -699,21 +706,23 @@ export async function getAuthorizationAdministrationUser(
     const resolver: Pick<AuthorizationResolver, "resolveMany"> =
         dependencies.resolver ?? authorization;
 
-    let effectivePermissionStatus: AuthorizationAdministrationResolutionStatus;
-    let effectivePermissions: readonly AuthorizationAdministrationEffectivePermission[];
+    let resolverEffectivePermissionStatus: AuthorizationAdministrationResolverEffectivePermissionStatus;
+    let resolverEffectivePermissions: readonly AuthorizationAdministrationResolverEffectivePermission[];
     try {
         const decisions = await resolver.resolveMany(targetActor, capabilityKeys);
-        effectivePermissions = projectEffectivePermissions(
+        resolverEffectivePermissions = projectResolverEffectivePermissions(
             decisions,
             catalogByKey,
             teamMemberships,
         );
-        effectivePermissionStatus = projectResolutionStatus(null);
+        resolverEffectivePermissionStatus =
+            projectResolverEffectivePermissionStatus(null);
     } catch (error) {
         if (!(error instanceof AuthorizationConfigurationError)) throw error;
         configurationIssues.push(issueFromResolutionError(error, user.id));
-        effectivePermissions = [];
-        effectivePermissionStatus = projectResolutionStatus(error);
+        resolverEffectivePermissions = [];
+        resolverEffectivePermissionStatus =
+            projectResolverEffectivePermissionStatus(error);
     }
 
     return Object.freeze({
@@ -721,8 +730,8 @@ export async function getAuthorizationAdministrationUser(
         systemRole: userIdentity.role,
         teamMemberships,
         directGrants: freezeArray(directGrants),
-        effectivePermissionStatus,
-        effectivePermissions,
+        resolverEffectivePermissionStatus,
+        resolverEffectivePermissions,
         configurationIssues: freezeArray(configurationIssues),
     });
 }

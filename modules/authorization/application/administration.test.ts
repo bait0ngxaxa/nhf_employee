@@ -6,6 +6,7 @@ import {
     AuthorizationAdministrationAccessError,
     buildCapabilityAdministrationCatalog,
     CAPABILITY_REGISTRY,
+    createCapabilityRegistry,
     createAuthorizationResolver,
     getAuthorizationAdministrationOverview,
     getAuthorizationAdministrationTeam,
@@ -258,7 +259,7 @@ function emptyRepository(
 }
 
 describe("Authorization Administration capability catalog", () => {
-    it("projects the registry deterministically and marks deferred entries non-grantable", () => {
+    it("projects the registry deterministically with explicit runtime/readiness metadata", () => {
         const first = buildCapabilityAdministrationCatalog();
         const second = buildCapabilityAdministrationCatalog();
 
@@ -271,14 +272,78 @@ describe("Authorization Administration capability catalog", () => {
             supportedChannels: CAPABILITY_REGISTRY.get("routine.task.read")?.channels,
         });
         expect(first.every(({ registered }) => registered)).toBe(true);
+        expect(first.find(({ key }) => key === "audit.read")).toMatchObject({
+            runtimeAuthorizationMode: "CENTRAL_ONLY",
+            administrativeStatus: "GRANTABLE",
+            administrativelyGrantable: true,
+        });
+        expect(first.find(({ key }) => key === "routine.task.update")).toMatchObject({
+            runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
+            administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
+            administrativelyGrantable: false,
+            nonGrantableReason: expect.stringContaining("Routine"),
+        });
+        expect(first.find(({ key }) => key === "department.read")).toMatchObject({
+            runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
+            administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
+            administrativelyGrantable: false,
+        });
         expect(first.find(({ key }) => key === "routine.task.export")).toMatchObject({
+            runtimeAuthorizationMode: "DEFERRED",
             administrativeStatus: "DEFERRED",
             administrativelyGrantable: false,
         });
         expect(first.find(({ key }) => key === "email.request.create")).toMatchObject({
+            runtimeAuthorizationMode: "DEFERRED",
             administrativeStatus: "DEFERRED",
             administrativelyGrantable: false,
         });
+        expect(first.filter(({ runtimeAuthorizationMode }) =>
+            runtimeAuthorizationMode === "CENTRAL_ONLY",
+        ).map(({ key }) => key)).toEqual([
+            "employee.create",
+            "employee.update",
+            "employee.delete",
+            "employee.import",
+            "routine.occurrence.override",
+            "routine.occurrence.reassign",
+            "routine.occurrence.change_due_date",
+            "routine.import.manage",
+            "stock.inventory.manage",
+            "stock.request.process",
+            "stock.report.export",
+            "leave.approver.manage",
+            "audit.read",
+        ]);
+        expect(first.filter(({ runtimeAuthorizationMode }) =>
+            runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
+        ).map(({ key }) => key)).toEqual([
+            "employee.read",
+            "employee.stats.read",
+            "employee.export",
+            "department.read",
+            "routine.task.read",
+            "routine.task.create",
+            "routine.task.update",
+            "routine.task.delete",
+            "routine.occurrence.read",
+            "stock.catalog.read",
+            "stock.request.read",
+            "stock.request.create",
+            "stock.request.cancel",
+            "leave.request.read",
+            "leave.approval.read",
+            "leave.request.create",
+            "leave.request.cancel",
+            "leave.request.approve",
+            "leave.cancellation.decide",
+            "leave.request.not_taken",
+            "notification.inbox.read",
+            "notification.inbox.update",
+        ]);
+        expect(first.every(({ administrativeStatus, administrativelyGrantable }) =>
+            (administrativeStatus === "GRANTABLE") === administrativelyGrantable,
+        )).toBe(true);
         expect(first.some(({ key }) => String(key) === "routine.task.archive")).toBe(false);
     });
 });
@@ -303,6 +368,17 @@ describe("Authorization Administration read models", () => {
             teamCount: 2,
             activeTeamCount: 1,
         });
+        expect(overview.summary.policyActivationRequiredCapabilityCount).toBe(
+            overview.capabilities.filter(
+                ({ administrativeStatus }) =>
+                    administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
+            ).length,
+        );
+        expect(overview.summary.deferredCapabilityCount).toBe(
+            overview.capabilities.filter(
+                ({ administrativeStatus }) => administrativeStatus === "DEFERRED",
+            ).length,
+        );
     });
 
     it("preserves TeamRole ownership, lifecycle state, memberships, and invalid grants", async () => {
@@ -371,12 +447,17 @@ describe("Authorization Administration effective permission inspector", () => {
             { repository, resolver },
         );
 
-        const routineRead = detail?.effectivePermissions.find(
+        const routineRead = detail?.resolverEffectivePermissions.find(
             ({ capability }) => capability.key === "routine.task.read",
         );
         expect(routineRead).toMatchObject({
             allowed: true,
             scopes: ["ALL"],
+            capability: {
+                runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
+                administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
+                administrativelyGrantable: false,
+            },
         });
         expect(routineRead?.grants.map(({ source, origin }) => ({ source, origin }))).toEqual([
             {
@@ -410,8 +491,7 @@ describe("Authorization Administration effective permission inspector", () => {
                 origin: { type: "USER", userId: 7 },
             },
         ]);
-
-        const noGrant = detail?.effectivePermissions.find(
+        const noGrant = detail?.resolverEffectivePermissions.find(
             ({ capability }) => capability.key === "audit.read",
         );
         expect(noGrant).toMatchObject({
@@ -419,6 +499,10 @@ describe("Authorization Administration effective permission inspector", () => {
             scopes: [],
             grants: [],
             reason: "NO_APPLICABLE_GRANT",
+            capability: {
+                runtimeAuthorizationMode: "CENTRAL_ONLY",
+                administrativeStatus: "GRANTABLE",
+            },
         });
         expect(detail?.teamMemberships).toHaveLength(2);
         expect(detail?.user).toMatchObject({
@@ -442,6 +526,122 @@ describe("Authorization Administration effective permission inspector", () => {
         expect(load).not.toHaveBeenCalled();
     });
 
+    it("does not present a compatibility-backed resolver denial as final runtime denial", async () => {
+        const emptyResolution: AuthorizationResolutionData = {
+            userGrants: [],
+            memberships: [],
+            teamRoleGrants: [],
+        };
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => emptyResolution,
+        );
+        const resolver = createAuthorizationResolver({
+            repository: {
+                load: vi.fn(async () => emptyResolution),
+                loadMany,
+            },
+        });
+        const repository = emptyRepository({
+            findUserById: vi.fn(async () => ({
+                ...rawUser(7),
+                teamMemberships: [],
+                userCapabilityGrants: [],
+            })),
+        });
+
+        const detail = await getAuthorizationAdministrationUser(
+            ADMIN_PRINCIPAL,
+            7,
+            { repository, resolver },
+        );
+        const routineUpdate = detail?.resolverEffectivePermissions.find(
+            ({ capability }) => capability.key === "routine.task.update",
+        );
+
+        expect(routineUpdate).toMatchObject({
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+            capability: {
+                runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
+                administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
+                administrativelyGrantable: false,
+            },
+        });
+        expect(routineUpdate?.capability.runtimeAuthorizationMode).toBe(
+            "CENTRAL_WITH_COMPATIBILITY",
+        );
+        expect(loadMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("preserves the originating Team constraint for a TEAM-scoped resolver grant", async () => {
+        const teamScopedRegistry = createCapabilityRegistry([
+            {
+                key: "routine.task.read",
+                domain: "routine",
+                description: "Read Routine tasks within an authorized resource scope.",
+                scopes: ["TEAM"] as const,
+                channels: ["DASHBOARD"] as const,
+            },
+        ]);
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => ({
+                userGrants: [],
+                memberships: [{
+                    userId: 7,
+                    teamId: 10,
+                    isTeamActive: true,
+                    teamRoleId: null,
+                    teamRole: null,
+                    teamGrants: [{
+                        teamId: 10,
+                        capabilityKey: "routine.task.read",
+                        scope: "TEAM",
+                    }],
+                }],
+                teamRoleGrants: [],
+            }),
+        );
+        const resolver = createAuthorizationResolver({
+            registry: teamScopedRegistry,
+            repository: {
+                load: vi.fn(async () => ({
+                    userGrants: [],
+                    memberships: [],
+                    teamRoleGrants: [],
+                })),
+                loadMany,
+            },
+        });
+        const repository = emptyRepository({
+            findUserById: vi.fn(async () => userRecord()),
+        });
+
+        const detail = await getAuthorizationAdministrationUser(
+            ADMIN_PRINCIPAL,
+            7,
+            { repository, resolver },
+        );
+        const routineRead = detail?.resolverEffectivePermissions.find(
+            ({ capability }) => capability.key === "routine.task.read",
+        );
+        const teamGrant = routineRead?.grants[0];
+
+        expect(teamGrant).toMatchObject({
+            scope: "TEAM",
+            constraint: { teamId: 10 },
+            source: { type: "TEAM", teamId: 10 },
+            origin: { type: "TEAM", teamId: 10 },
+        });
+        expect(teamGrant?.constraint?.teamId).toBe(10);
+        expect(teamGrant?.origin).toMatchObject({
+            type: "TEAM",
+            teamId: 10,
+        });
+        expect(loadMany).toHaveBeenCalledTimes(1);
+    });
+
     it("uses the central ADMIN resolver source without consulting persisted grants", async () => {
         const repository = emptyRepository({
             findUserById: vi.fn(async () => ({
@@ -456,7 +656,7 @@ describe("Authorization Administration effective permission inspector", () => {
             7,
             { repository, resolver: createAuthorizationResolver() },
         );
-        const employeeRead = detail?.effectivePermissions.find(
+        const employeeRead = detail?.resolverEffectivePermissions.find(
             ({ capability }) => capability.key === "employee.read",
         );
 
@@ -498,8 +698,8 @@ describe("Authorization Administration effective permission inspector", () => {
             { repository, resolver },
         );
 
-        expect(detail?.effectivePermissions).toEqual([]);
-        expect(detail?.effectivePermissionStatus).toMatchObject({
+        expect(detail?.resolverEffectivePermissions).toEqual([]);
+        expect(detail?.resolverEffectivePermissionStatus).toMatchObject({
             status: "INVALID_CONFIGURATION",
             error: { code: "UNSUPPORTED_PERSISTED_SCOPE" },
         });

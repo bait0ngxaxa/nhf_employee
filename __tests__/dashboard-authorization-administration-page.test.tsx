@@ -21,6 +21,7 @@ const OVERVIEW = {
     summary: {
         registeredCapabilityCount: 0,
         administrativelyGrantableCapabilityCount: 0,
+        policyActivationRequiredCapabilityCount: 0,
         deferredCapabilityCount: 0,
         teamCount: 0,
         activeTeamCount: 0,

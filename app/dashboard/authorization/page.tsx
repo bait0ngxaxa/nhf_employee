@@ -28,21 +28,26 @@ export default async function AuthorizationAdministrationPage(): Promise<React.R
                 </h1>
                 <p className="max-w-3xl text-sm text-slate-600">
                     พื้นที่ตรวจสอบแบบอ่านอย่างเดียวสำหรับ Team และ capability
-                    ข้อมูลในหน้านี้ยังไม่เปิดให้แก้ไขการกำหนดสิทธิ์
+                    ข้อมูลในหน้านี้ยังไม่เปิดให้แก้ไขการกำหนดสิทธิ์ และผล
+                    resolver ในรายละเอียด User ไม่ใช่คำตัดสิน runtime ของทุก domain
                 </p>
             </header>
 
             <section
                 aria-label="Authorization Administration summary"
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
             >
                 <SummaryCard
                     label="Registered capabilities"
                     value={overview.summary.registeredCapabilityCount}
                 />
                 <SummaryCard
-                    label="Administratively grantable"
+                    label="Safe ordinary grants"
                     value={overview.summary.administrativelyGrantableCapabilityCount}
+                />
+                <SummaryCard
+                    label="Policy activation required"
+                    value={overview.summary.policyActivationRequiredCapabilityCount}
                 />
                 <SummaryCard
                     label="Deferred capabilities"
@@ -109,7 +114,8 @@ export default async function AuthorizationAdministrationPage(): Promise<React.R
                 <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
                     <h2 className="font-semibold text-slate-900">Capability registry</h2>
                     <p className="mt-1 text-sm text-slate-500">
-                        รายการมาจาก code-owned registry; Deferred ไม่ใช่ capability ที่พร้อมให้ grant
+                        รายการมาจาก code-owned registry; Policy activation required
+                        และ Deferred ไม่ใช่ capability ที่พร้อมให้ grant แบบ ordinary
                     </p>
                 </div>
                 <div className="overflow-x-auto">
@@ -120,7 +126,7 @@ export default async function AuthorizationAdministrationPage(): Promise<React.R
                                 <th className="px-4 py-3 font-medium">Domain</th>
                                 <th className="px-4 py-3 font-medium">Scopes</th>
                                 <th className="px-4 py-3 font-medium">Channels</th>
-                                <th className="px-4 py-3 font-medium">Administration status</th>
+                                <th className="px-4 py-3 font-medium">Runtime / administration status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -139,6 +145,9 @@ export default async function AuthorizationAdministrationPage(): Promise<React.R
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-slate-800">
                                             {capability.administrativeStatus}
+                                        </div>
+                                        <div className="mt-1 text-xs text-slate-500">
+                                            Runtime: {capability.runtimeAuthorizationMode}
                                         </div>
                                         {capability.nonGrantableReason && (
                                             <div className="mt-1 max-w-sm text-xs text-slate-500">
