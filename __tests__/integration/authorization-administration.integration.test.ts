@@ -12,6 +12,7 @@ import {
     createAuthorizationAdministrationTeamRole,
     removeAuthorizationAdministrationTeamMember,
     removeAuthorizationAdministrationUserGrant,
+    updateAuthorizationAdministrationTeam,
     updateAuthorizationAdministrationTeamRole,
 } from "@/modules/authorization";
 import type { AuthorizationAdministrationMutationContext } from "@/modules/authorization";
@@ -222,6 +223,69 @@ describe.sequential("Phase 10B authorization administration with real MySQL", ()
             allowed: false,
             reason: "NO_APPLICABLE_GRANT",
         });
+    });
+
+    it("permits lifecycle changes when historical grants cannot change effective access", async () => {
+        const admin = await createUser("admin-unaffected", Role.ADMIN);
+        const target = await createUser("target-unaffected");
+        const context = mutationContext(admin);
+
+        const emptyTeam = await createAuthorizationAdministrationTeam(
+            context,
+            { key: `${TEST_PREFIX}-empty-team`, name: "Empty team" },
+        );
+        await prisma.teamCapabilityGrant.create({
+            data: {
+                teamId: emptyTeam.id,
+                capabilityKey: "routine.task.read",
+                scope: "ALL",
+            },
+        });
+        await expect(
+            updateAuthorizationAdministrationTeam(
+                context,
+                emptyTeam.id,
+                { isActive: false },
+            ),
+        ).resolves.toMatchObject({ isActive: false });
+
+        const roleTeam = await createAuthorizationAdministrationTeam(
+            context,
+            { key: `${TEST_PREFIX}-inactive-role-team`, name: "Inactive role team" },
+        );
+        const inactiveRole = await createAuthorizationAdministrationTeamRole(
+            context,
+            roleTeam.id,
+            { key: "historical", name: "Historical role" },
+        );
+        await prisma.teamRoleCapabilityGrant.create({
+            data: {
+                teamRoleId: inactiveRole.id,
+                capabilityKey: "routine.task.read",
+                scope: "ALL",
+            },
+        });
+        await expect(
+            updateAuthorizationAdministrationTeamRole(
+                context,
+                roleTeam.id,
+                inactiveRole.id,
+                { isActive: false },
+            ),
+        ).resolves.toMatchObject({ isActive: false });
+
+        await addAuthorizationAdministrationTeamMember(
+            context,
+            roleTeam.id,
+            { userId: target.id, teamRoleId: inactiveRole.id },
+        );
+        await expect(
+            updateAuthorizationAdministrationTeam(
+                context,
+                roleTeam.id,
+                { isActive: false },
+            ),
+        ).resolves.toMatchObject({ isActive: false });
     });
 
     it("rolls back a Team mutation when strict audit append fails", async () => {

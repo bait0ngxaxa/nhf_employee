@@ -17,12 +17,12 @@ import {
 
 export async function POST(
     request: Request,
-    { params }: { readonly params: Promise<{ readonly teamId: string }> },
+    { params }: { readonly params: Promise<{ readonly id: string }> },
 ): Promise<NextResponse> {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
-        const { teamId: rawTeamId } = await params;
+        const { id: rawTeamId } = await params;
         const parsedTeamId = parseAdministrationId(rawTeamId);
         if (!parsedTeamId.ok) return parsedTeamId.response;
         const body = await readAuthorizationAdministrationJsonBody(request);
@@ -43,4 +43,3 @@ export async function POST(
         return operationFailed(500);
     }
 }
-

@@ -17,7 +17,7 @@ import {
 } from "../../../../../_lib/route-auth";
 
 type TeamRoleGrantRouteParams = Promise<{
-    readonly teamId: string;
+    readonly id: string;
     readonly roleId: string;
 }>;
 
@@ -33,7 +33,7 @@ async function parseGrantRoute(
     }
     | { readonly ok: false; readonly response: NextResponse }
 > {
-    const { teamId: rawTeamId, roleId: rawRoleId } = await params;
+    const { id: rawTeamId, roleId: rawRoleId } = await params;
     const parsedTeamId = parseAdministrationId(rawTeamId);
     if (!parsedTeamId.ok) return parsedTeamId;
     const parsedRoleId = parseAdministrationId(rawRoleId);
@@ -99,4 +99,3 @@ export async function DELETE(
         return operationFailed(500);
     }
 }
-

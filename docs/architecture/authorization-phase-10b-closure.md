@@ -65,6 +65,12 @@ POST   /api/authorization/administration/users/:userId/grants
 DELETE /api/authorization/administration/users/:userId/grants
 ```
 
+Route folders use the stable `[id]` Team/User segment and `[roleId]` for a
+TeamRole. Next.js route handlers therefore read `params.id`, `params.userId`,
+and `params.roleId` from the awaited params object; route-level regression
+tests exercise the real folder-shaped parameter keys for every nested mutation
+handler.
+
 GET read models จาก Phase 10A ยังใช้ boundary เดิม และ Dashboard ยังคง
 read-only.
 
@@ -93,9 +99,13 @@ Read state ที่ใช้ตรวจ policy impact, snapshot และ writ
 ก่อน mutation ที่เปลี่ยน applicability จะ validate persisted grants แบบ
 fail-closed:
 
-- Team active-state: Team grants และ TeamRole grants ที่ reachable ผ่าน
-  membership ของ Team
-- TeamRole active-state: grants ของ role เมื่อ Team ยัง active
+- Team active-state: ถ้า Team ไม่มี membership จะไม่มี grant ที่เปลี่ยน
+  applicability จึงไม่ตรวจ readiness ของ historical grants ที่ยังไม่ effective.
+  เมื่อมี membership จะตรวจ Team grants และเฉพาะ TeamRole grants ของ role ที่
+  active และมีสมาชิกใน Team นั้น
+- TeamRole active-state: ตรวจ grants ของ role เฉพาะเมื่อ Team ยัง active และ
+  role นั้นมี membership ที่จะได้รับผล; role ว่างหรือ Team inactive ไม่ทำให้
+  historical grant กลายเป็น impact โดยอัตโนมัติ
 - membership add: Team grants และ grants ของ role ใหม่ที่ active/applicable
 - membership remove: Team grants และ grants ของ role ปัจจุบันที่ active/applicable
 - membership role change: grants ของ old/new role ที่ active/applicable; Team
@@ -169,7 +179,9 @@ Phase 10B does not:
 Focused application/API tests cover trusted ADMIN enforcement, forged principal
 rejection, Team/TeamRole lifecycle, duplicate/no-op behavior, membership role
 integrity, grant validation/readiness, direct User constraints, indirect policy
-guarding, audit snapshots/actions, and audit failure rollback behavior.
+guarding, actual nested route parameter names, audit snapshots/actions, and
+audit failure rollback behavior. Persistence tests also assert that Team
+lifecycle impact queries select only active TeamRoles with memberships.
 
 MySQL integration tests cover:
 
@@ -180,11 +192,14 @@ MySQL integration tests cover:
 - direct User `audit.read / ALL` add/remove and `USER` source explanations;
 - generic Audit query reading the new membership event;
 - real transaction rollback when strict audit append fails;
+- lifecycle mutations with historical non-grantable grants that cannot affect
+  effective access because the Team/TeamRole is empty or inactive;
 - migration deployment and existing authorization/audit integration suites.
 
-The repository check and focused Phase 10B checks pass. The full MySQL runner
-applies all 67 migrations and reports 15/16 files and 99/100 tests passing; the
-single failure is the known pre-existing
+The focused route/application/persistence Phase 10B checks pass (3 test files,
+24 tests), and the full unit suite reports 308/308 files and 2,685/2,685 tests
+passing. The MySQL runner applies all 67 migrations and reports 15/16 files and
+100/101 tests passing; the single failure is the known pre-existing
 `__tests__/integration/leave-quota-concurrency.integration.test.ts`
 `WorkforceAuthorizationError` failure documented by the Phase 10A baseline.
 No additional Phase 10B integration failure is present.
@@ -196,4 +211,3 @@ Exceptions, and Effective Access UI over the Phase 10A read contracts and the
 Phase 10B mutation contracts. The UI must remain a presentation surface; the
 trusted ADMIN boundary, readiness classification, policy-impact guard, and
 strict transactional audit contract remain authoritative on the server.
-

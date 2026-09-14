@@ -396,23 +396,49 @@ async function assertTeamApplicabilitySafe(
     repository: AuthorizationAdministrationMutationRepository,
     teamId: number,
 ): Promise<void> {
-    const [teamGrants, roleGrants, memberships] = await Promise.all([
-        repository.listTeamGrants(tx, teamId),
-        repository.listTeamRoleGrantsForTeam(tx, teamId),
-        repository.listMembershipsForTeam(tx, teamId),
-    ]);
+    const memberships = await repository.listMembershipsForTeam(tx, teamId);
     for (const membership of memberships) {
         assertMembershipIntegrity(membership, teamId);
     }
+    if (memberships.length === 0) return;
+
+    const [teamGrants, roleGrants] = await Promise.all([
+        repository.listTeamGrants(tx, teamId),
+        repository.listTeamRoleGrantsForTeam(tx, teamId),
+    ]);
     for (const grant of teamGrants) {
         assertTeamGrantOrigin(grant, teamId);
         validatePersistedGrantForImpact(grant, "TEAM", { teamId });
     }
+
+    const activeRoleIds = new Set<number>();
+    for (const membership of memberships) {
+        if (membership.role?.isActive === true) {
+            activeRoleIds.add(membership.role.id);
+        }
+    }
     for (const grant of roleGrants) {
+        if (!activeRoleIds.has(grant.teamRoleId)) continue;
         assertTeamRoleGrantOrigin(grant, teamId);
         validatePersistedGrantForImpact(grant, "TEAM_ROLE", {
             teamId,
             teamRoleId: grant.teamRoleId,
+        });
+    }
+}
+
+async function assertTeamRoleGrantsSafe(
+    tx: Prisma.TransactionClient,
+    repository: AuthorizationAdministrationMutationRepository,
+    teamId: number,
+    teamRoleId: number,
+): Promise<void> {
+    const grants = await repository.listTeamRoleGrants(tx, teamRoleId);
+    for (const grant of grants) {
+        assertTeamRoleGrantOrigin(grant, teamId, teamRoleId);
+        validatePersistedGrantForImpact(grant, "TEAM_ROLE", {
+            teamId,
+            teamRoleId,
         });
     }
 }
@@ -423,25 +449,20 @@ async function assertTeamRoleApplicabilitySafe(
     teamId: number,
     teamRoleId: number,
 ): Promise<void> {
-    const [grants, memberships] = await Promise.all([
-        repository.listTeamRoleGrants(tx, teamRoleId),
-        repository.listMembershipsForTeam(tx, teamId),
-    ]);
+    const memberships = await repository.listMembershipsForTeam(tx, teamId);
+    let hasAffectedMembership = false;
     for (const membership of memberships) {
         if (
             membership.teamRoleId === teamRoleId
             || membership.role?.id === teamRoleId
         ) {
             assertMembershipIntegrity(membership, teamId);
+            hasAffectedMembership = true;
         }
     }
-    for (const grant of grants) {
-        assertTeamRoleGrantOrigin(grant, teamId, teamRoleId);
-        validatePersistedGrantForImpact(grant, "TEAM_ROLE", {
-            teamId,
-            teamRoleId,
-        });
-    }
+    if (!hasAffectedMembership) return;
+
+    await assertTeamRoleGrantsSafe(tx, repository, teamId, teamRoleId);
 }
 
 async function assertMembershipApplicabilitySafe(
@@ -465,7 +486,7 @@ async function assertMembershipApplicabilitySafe(
     for (const role of roles) {
         if (role === null || !role.isActive || uniqueRoleIds.has(role.id)) continue;
         uniqueRoleIds.add(role.id);
-        await assertTeamRoleApplicabilitySafe(tx, repository, team.id, role.id);
+        await assertTeamRoleGrantsSafe(tx, repository, team.id, role.id);
     }
 }
 

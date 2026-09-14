@@ -16,7 +16,7 @@ import {
     requireAuthorizationAdministrationApiSession,
 } from "../../../_lib/route-auth";
 
-type TeamGrantRouteParams = Promise<{ readonly teamId: string }>;
+type TeamGrantRouteParams = Promise<{ readonly id: string }>;
 
 export async function POST(
     request: Request,
@@ -25,7 +25,7 @@ export async function POST(
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
-        const { teamId: rawTeamId } = await params;
+        const { id: rawTeamId } = await params;
         const parsedTeamId = parseAdministrationId(rawTeamId);
         if (!parsedTeamId.ok) return parsedTeamId.response;
         const body = await readAuthorizationAdministrationJsonBody(request);
@@ -54,7 +54,7 @@ export async function DELETE(
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
-        const { teamId: rawTeamId } = await params;
+        const { id: rawTeamId } = await params;
         const parsedTeamId = parseAdministrationId(rawTeamId);
         if (!parsedTeamId.ok) return parsedTeamId.response;
         const body = await readAuthorizationAdministrationJsonBody(request);
@@ -75,4 +75,3 @@ export async function DELETE(
         return operationFailed(500);
     }
 }
-

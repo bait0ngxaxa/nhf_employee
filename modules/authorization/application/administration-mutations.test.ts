@@ -354,6 +354,12 @@ describe("Phase 10B Authorization Administration commands", () => {
         const updateTeam = vi.fn();
         const repo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
+            listMembershipsForTeam: vi.fn().mockResolvedValue([{
+                teamId: 10,
+                userId: 7,
+                teamRoleId: null,
+                role: null,
+            }]),
             listTeamGrants: vi.fn().mockResolvedValue([
                 teamGrant({ capabilityKey: "routine.task.read" }),
             ]),
@@ -370,6 +376,86 @@ describe("Phase 10B Authorization Administration commands", () => {
             ),
         ).rejects.toMatchObject({ code: "CAPABILITY_POLICY_ACTIVATION_REQUIRED" });
         expect(updateTeam).not.toHaveBeenCalled();
+    });
+
+    it("does not block Team lifecycle changes when no membership can receive Team grants", async () => {
+        const disabled = team({ isActive: false });
+        const updateTeam = vi.fn().mockResolvedValue(disabled);
+        const listTeamGrants = vi.fn().mockResolvedValue([
+            teamGrant({ capabilityKey: "routine.task.read" }),
+        ]);
+        const repo = repository({
+            findTeamById: vi.fn().mockResolvedValue(team()),
+            listMembershipsForTeam: vi.fn().mockResolvedValue([]),
+            listTeamGrants,
+            updateTeam,
+        });
+
+        await expect(
+            updateAuthorizationAdministrationTeam(
+                ADMIN_CONTEXT,
+                10,
+                { isActive: false },
+                dependencies(repo),
+            ),
+        ).resolves.toEqual(disabled);
+        expect(listTeamGrants).not.toHaveBeenCalled();
+        expect(updateTeam).toHaveBeenCalledOnce();
+    });
+
+    it("ignores inactive TeamRole grants during Team lifecycle impact checks", async () => {
+        const disabled = team({ isActive: false });
+        const updateTeam = vi.fn().mockResolvedValue(disabled);
+        const repo = repository({
+            findTeamById: vi.fn().mockResolvedValue(team()),
+            listMembershipsForTeam: vi.fn().mockResolvedValue([{
+                teamId: 10,
+                userId: 7,
+                teamRoleId: 20,
+                role: role({ isActive: false }),
+            }]),
+            listTeamRoleGrantsForTeam: vi.fn().mockResolvedValue([
+                roleGrant({ capabilityKey: "routine.task.read" }),
+            ]),
+            updateTeam,
+        });
+
+        await expect(
+            updateAuthorizationAdministrationTeam(
+                ADMIN_CONTEXT,
+                10,
+                { isActive: false },
+                dependencies(repo),
+            ),
+        ).resolves.toEqual(disabled);
+        expect(updateTeam).toHaveBeenCalledOnce();
+    });
+
+    it("does not block an empty TeamRole lifecycle change", async () => {
+        const disabledRole = role({ isActive: false });
+        const updateTeamRole = vi.fn().mockResolvedValue(disabledRole);
+        const listTeamRoleGrants = vi.fn().mockResolvedValue([
+            roleGrant({ capabilityKey: "routine.task.read" }),
+        ]);
+        const repo = repository({
+            findTeamById: vi.fn().mockResolvedValue(team()),
+            findTeamRoleById: vi.fn().mockResolvedValue(role()),
+            listMembershipsForTeam: vi.fn().mockResolvedValue([]),
+            listTeamRoleGrants,
+            updateTeamRole,
+        });
+
+        await expect(
+            updateAuthorizationAdministrationTeamRole(
+                ADMIN_CONTEXT,
+                10,
+                20,
+                { isActive: false },
+                dependencies(repo),
+            ),
+        ).resolves.toEqual(disabledRole);
+        expect(listTeamRoleGrants).not.toHaveBeenCalled();
+        expect(updateTeamRole).toHaveBeenCalledOnce();
     });
 
     it("guards membership add and TeamRole lifecycle changes against affected grants", async () => {
@@ -397,6 +483,12 @@ describe("Phase 10B Authorization Administration commands", () => {
         const roleRepo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
             findTeamRoleById: vi.fn().mockResolvedValue(role()),
+            listMembershipsForTeam: vi.fn().mockResolvedValue([{
+                teamId: 10,
+                userId: 7,
+                teamRoleId: 20,
+                role: role(),
+            }]),
             listTeamRoleGrants: vi.fn().mockResolvedValue([
                 roleGrant({ capabilityKey: "routine.task.read" }),
             ]),

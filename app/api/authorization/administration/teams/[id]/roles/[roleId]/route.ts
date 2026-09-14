@@ -21,7 +21,7 @@ export async function PATCH(
         params,
     }: {
         readonly params: Promise<{
-            readonly teamId: string;
+            readonly id: string;
             readonly roleId: string;
         }>;
     },
@@ -29,7 +29,7 @@ export async function PATCH(
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
-        const { teamId: rawTeamId, roleId: rawRoleId } = await params;
+        const { id: rawTeamId, roleId: rawRoleId } = await params;
         const parsedTeamId = parseAdministrationId(rawTeamId);
         if (!parsedTeamId.ok) return parsedTeamId.response;
         const parsedRoleId = parseAdministrationId(rawRoleId);
@@ -53,4 +53,3 @@ export async function PATCH(
         return operationFailed(500);
     }
 }
-

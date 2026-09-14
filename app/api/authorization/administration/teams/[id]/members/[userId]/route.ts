@@ -17,7 +17,7 @@ import {
 } from "../../../../_lib/route-auth";
 
 type MemberRouteParams = Promise<{
-    readonly teamId: string;
+    readonly id: string;
     readonly userId: string;
 }>;
 
@@ -28,7 +28,7 @@ export async function PATCH(
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
-        const { teamId: rawTeamId, userId: rawUserId } = await params;
+        const { id: rawTeamId, userId: rawUserId } = await params;
         const parsedTeamId = parseAdministrationId(rawTeamId);
         if (!parsedTeamId.ok) return parsedTeamId.response;
         const parsedUserId = parseAdministrationId(rawUserId);
@@ -60,7 +60,7 @@ export async function DELETE(
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
-        const { teamId: rawTeamId, userId: rawUserId } = await params;
+        const { id: rawTeamId, userId: rawUserId } = await params;
         const parsedTeamId = parseAdministrationId(rawTeamId);
         if (!parsedTeamId.ok) return parsedTeamId.response;
         const parsedUserId = parseAdministrationId(rawUserId);
@@ -79,4 +79,3 @@ export async function DELETE(
         return operationFailed(500);
     }
 }
-

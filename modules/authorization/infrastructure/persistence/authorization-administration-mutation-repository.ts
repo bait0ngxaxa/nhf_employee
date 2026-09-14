@@ -236,6 +236,7 @@ export function createAuthorizationAdministrationMutationRepository():
                     teamRole: {
                         is: {
                             teamId,
+                            isActive: true,
                             memberships: { some: { teamId } },
                         },
                     },
