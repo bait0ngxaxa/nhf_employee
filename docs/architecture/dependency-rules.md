@@ -221,6 +221,39 @@ because the legacy repository does not yet encode one uniform server-only
 marker across all existing locations; it must be applied to new modules and
 enforced more strongly as each feature migrates.
 
+### Routine browser boundary (Phase 11B.1)
+
+`modules/routine/client.ts` is the only supported Routine browser entry.
+Dashboard and LIFF presentation routes must compose through
+`@/modules/routine/client`; server/application consumers continue to use
+`@/modules/routine`. The checker walks runtime imports transitively from the
+Routine client entry, using the same transpilation step that removes type-only
+imports before traversal.
+
+The accepted current Routine browser graph consists of the Dashboard and LIFF
+presentation modules, their browser transport and UI dependencies, Routine
+schemas, the pure Routine domain helpers used by that presentation, and the
+proven pure helper `modules/routine/application/imports/sheet-config.ts`.
+Browser-safe cross-module entries such as `@/modules/employee/client`,
+`@/modules/line/client`, and shared client/HTTP contracts remain allowed. The
+type-only `modules/routine/application/types.ts` contract is also allowed and
+does not become a runtime edge.
+
+The Routine graph rejects the Routine server root/index, all current Routine
+application code except the explicit `sheet-config.ts` helper, Routine
+infrastructure, Routine server adapters, and the following platform boundaries:
+database/server/email/LINE/outbox infrastructure, server HTTP/network
+helpers, and `lib/auth` API/context/CSRF/hybrid/rate-limit/server/workforce
+helpers. It also rejects runtime Prisma, bcrypt, mail/provider SDKs,
+`server-only`, `next/server`, `next/headers`, `next/cache`, and Node built-ins.
+The rule uses these exact ownership and runtime boundaries rather than a
+repository-wide directory blacklist; packages used by a server-owned Routine
+workbook/parser path are protected by that path's ownership boundary.
+
+Routine module internals must use local contracts and must not re-enter either
+Routine public entry. These checks protect module composition and browser
+reachability only; they do not add or change authorization policy.
+
 ## Prisma access policy
 
 The migration target for business API routes is:
@@ -336,7 +369,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | `npm run architecture:check` | Repository source files, excluding dependency, build, coverage, and generated directories | Uses the installed TypeScript parser to inspect imports, re-exports, type imports, dynamic imports, and `require()` calls; allows `@/modules/<feature>` and, when present, `@/modules/<feature>/client` as module public entries; rejects `shared -> modules`, external consumers deep-importing module internals, cross-module deep imports, including relative paths, and any business module importing the global Outbox Processor |
 | Leave route ownership | `app/api/leave/**`, `app/api/line/leave/**` | Requires the server entry `@/modules/leave` and rejects legacy paths, the client entry, and deep implementation imports |
 | Leave presentation ownership | `app/dashboard/leave/**`, `app/liff/leave/**`, `modules/leave/**` | Requires route composition through `@/modules/leave/client`, rejects deleted legacy presentation paths, and rejects Leave internals importing either public barrel |
-| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave, Employee, Department, and Notification server entries, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`, `@/modules/employee/client`, `@/modules/notification/client`, and `@/modules/audit/client`; type-only imports are erased before graph traversal |
+| Client/server policy | Production `"use client"` dependency graphs and migrated module client entries | Walks runtime imports transitively, rejects client-reachable use of the Leave, Employee, Department, Notification, and Routine server entries, and separately rejects server-only runtime dependencies reachable from `@/modules/leave/client`, `@/modules/employee/client`, `@/modules/notification/client`, `@/modules/audit/client`, and `@/modules/routine/client`; type-only imports are erased before graph traversal |
 | Route-level Prisma policy | Legacy and new code | Documentation-led for unrelated legacy routes; G1 enforces Department ownership in `modules/department/infrastructure/**` |
 | Employee F3 ownership | `app/api/employees/**`, `app/dashboard/employees/**`, `modules/employee/**`, production Client Component graphs | Requires `@/modules/employee` for API routes and `@/modules/employee/client` for the four Employee Dashboard routes; rejects deleted legacy compatibility paths and deep presentation paths, including relative forms, deep/self-barrel imports, Employee → Leave imports, client-to-server reachability, and server-only dependencies from the Employee client graph |
 | Employee/Leave offboarding seam | `modules/employee/**` plus Employee route composition | Employee exposes only a structural blocker-provider port; the outer composition binds Leave's implementation and must preserve the same Employee lifecycle transaction client |
@@ -346,15 +379,15 @@ the module boundary from a legacy directory, while imports unrelated to
 | Audit I1-I2 ownership | `app/api/audit-logs/**`, `app/dashboard/audit/**`, `modules/audit/**`, production client graphs, production source | Requires Audit API routes to consume `@/modules/audit` and Audit Dashboard routes to consume `@/modules/audit/client`; rejects deleted Audit presentation paths, deep/self-barrel imports, server-only dependencies and other module server entries in the Audit client graph, while preserving the I1 direct-access allowlist |
 | Auth J1/J2 ownership | `app/api/auth/**`, `modules/auth/**`, Employee lifecycle composition, production source/client graphs | Restricts production `AuthRefreshToken` and `PasswordResetToken` delegate access to Auth persistence infrastructure; requires server consumers to use `@/modules/auth` and browser consumers to use `@/modules/auth/client`; rejects Auth presentation deep imports, deleted legacy browser seams, Auth internals importing their own barrel, client reachability of the server entry, and server-only runtime dependencies from the Auth client graph; preserves tests, fixtures, schema/migrations, seed/support, and generated-code exceptions |
 | LINE J3 ownership | `app/api/line/**`, `modules/line/**`, production source/client graphs, production `LineAccountLink` access | Requires server consumers to use `@/modules/line` and browser consumers to use `@/modules/line/client`; rejects LINE deep imports, LINE internal self-barrel imports, deleted LIFF compatibility paths, client reachability of the server entry, server/secret/Node dependencies from the LINE client graph, and direct/aliased/destructured `LineAccountLink` delegates outside `modules/line/infrastructure/**`; preserves tests, fixtures, Prisma support, and provider infrastructure exceptions |
+| Routine 11B.1 browser boundary | `app/dashboard/routine/**`, `app/liff/routine/**`, `modules/routine/**`, and the Routine client graph | Requires Routine presentation routes to consume `@/modules/routine/client`; rejects Routine server/deep imports from those routes, Routine internals re-entering either public barrel, Routine server-entry reachability, and proven server-only runtime dependencies from `@/modules/routine/client`; preserves runtime-safe presentation/domain contracts and the explicit `sheet-config.ts` pure helper |
 | Auth J3 Audit producer ownership | `app/api/auth/**` | Requires Auth producers to use `@/modules/audit` directly; rejects Auth API imports of `@/lib/server/audit` without banning legitimate non-Auth compatibility consumers |
 
 K0 checker coverage note: the current client/server graph guard explicitly
-walks Leave, Employee, Department, Notification, Audit, Auth, and LINE
-boundaries. Stock and Routine client graphs are not yet explicit checker
-scopes, and exact ownership of compatibility adapters and provider-specific
+walks Leave, Employee, Department, Notification, Audit, Auth, LINE, and Stock
+boundaries, and Phase 11B.1 now adds the Routine client graph and route
+boundary. Exact ownership of compatibility adapters and provider-specific
 payload composition is not mechanically allowlisted. The K0 audit records
-these as narrow future guard candidates tied to concrete correction slices;
-K0 does not add speculative rules.
+these as correction slices; K0 does not add speculative rules.
 
 ## Auth J2 browser and projection boundary
 

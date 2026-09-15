@@ -162,6 +162,16 @@ const leavePresentationRouteDirectories = [
     "app/liff/leave",
 ];
 
+const routinePresentationRouteDirectories = [
+    "app/dashboard/routine",
+    "app/liff/routine",
+];
+const routinePresentationRouteFiles = [
+    "app/dashboard/routine/page.tsx",
+    "app/dashboard/routine/loading.tsx",
+    "app/liff/routine/page.tsx",
+];
+
 const employeeApiRouteDirectory = "app/api/employees";
 const employeeDashboardRouteDirectory = "app/dashboard/employees";
 const departmentApiRouteDirectory = "app/api/departments";
@@ -332,6 +342,53 @@ function getLeaveRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
     return null;
 }
 
+function getRoutineRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const isRoutinePresentationRoute = routinePresentationRouteDirectories.some((directory) =>
+        pathIsWithin(filePath, resolve(rootPath, directory)),
+    );
+    if (!isRoutinePresentationRoute) return null;
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if (hasImportPrefix(normalizedSpecifier, "@/modules/routine")
+        && normalizedSpecifier !== "@/modules/routine/client") {
+        return "Routine presentation routes must use @/modules/routine/client instead of the Routine server entry or deep Routine imports.";
+    }
+
+    return null;
+}
+
+function getRoutineDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    const routineModuleRoot = resolve(rootPath, "modules/routine");
+    if (!pathIsWithin(filePath, routineModuleRoot)
+        || filePath === resolve(routineModuleRoot, "index.ts")
+        || filePath === resolve(routineModuleRoot, "client.ts")) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+
+    if ([
+        "@/modules/routine",
+        "@/modules/routine/index",
+        "@/modules/routine/client",
+    ].includes(normalizedSpecifier)) {
+        return "Routine module internals must use local contracts instead of their own public barrel.";
+    }
+
+    return null;
+}
+
 function getStockRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
     const resolvedImport = moduleSpecifier.startsWith("@/")
         ? resolve(rootPath, moduleSpecifier.slice(2))
@@ -387,6 +444,36 @@ function getStockLiffRouteCompositionViolations(rootPath, sourceFiles) {
     }
 
     return [`app/liff/stock/page.tsx must consume Stock LIFF presentation through "@/modules/stock/client".`];
+}
+
+function getRoutinePresentationRouteCompositionViolations(rootPath, sourceFiles) {
+    const clientEntry = "@/modules/routine/client";
+    const violations = [];
+
+    for (const routePath of routinePresentationRouteFiles) {
+        const filePath = resolve(rootPath, routePath);
+        if (!sourceFiles.includes(filePath)) continue;
+
+        const normalizedSpecifiers = getImports(filePath).map((record) => {
+            const resolvedImport = record.moduleSpecifier.startsWith("@/")
+                ? resolve(rootPath, record.moduleSpecifier.slice(2))
+                : getImportSourcePath(record.moduleSpecifier, filePath, rootPath);
+            return resolvedImport === null
+                ? record.moduleSpecifier
+                : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+        });
+
+        if (normalizedSpecifiers.includes(clientEntry)) continue;
+        if (normalizedSpecifiers.some((specifier) =>
+            hasImportPrefix(specifier, "@/modules/routine"),
+        )) continue;
+
+        violations.push(
+            `${relativeFilePath(filePath, rootPath)} must consume Routine presentation through "${clientEntry}".`,
+        );
+    }
+
+    return violations;
 }
 
 function getDeletedStockCompatibilityViolation(filePath, rootPath, moduleSpecifier) {
@@ -2461,6 +2548,106 @@ function getStockClientGraphViolations(rootPath, getRuntimeImports) {
     return violations;
 }
 
+function getRoutineClientGraphViolations(rootPath, getRuntimeImports) {
+    const entryPath = resolve(rootPath, "modules/routine/client.ts");
+    if (!existsSync(entryPath)) return [];
+
+    const routineServerRoot = resolve(rootPath, "modules/routine");
+    // This is the one currently reachable application helper proven to be
+    // browser-safe; other Routine application paths own server behavior.
+    const routineClientSafePaths = new Set([
+        resolve(rootPath, "modules/routine/application/imports/sheet-config.ts"),
+    ]);
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "bcrypt",
+        "bcryptjs",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/email",
+        "lib/line",
+        "lib/services/outbox",
+        "lib/network/public-url",
+        "lib/network/trusted-client-ip",
+        "lib/ssot/http",
+        "lib/auth/api",
+        "lib/auth/context",
+        "lib/auth/csrf",
+        "lib/auth/hybrid",
+        "lib/auth/rate-limit",
+        "lib/auth/server",
+        "lib/auth/workforce",
+        "lib/auth/workforce-transaction",
+        "modules/routine/application",
+        "modules/routine/infrastructure",
+        "modules/routine/server",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getRuntimeImports(filePath)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            const isRoutineClientSafePath = sourcePath !== null
+                && routineClientSafePaths.has(sourcePath);
+            const reachesRoutineServerDirectory = !isRoutineClientSafePath
+                && [importTarget, sourcePath].some((target) =>
+                    target !== null && serverDirectories.some((directory) =>
+                        pathIsWithin(target, resolve(rootPath, directory)),
+                    ),
+                );
+            const reachesRoutineServerEntry = importTarget === routineServerRoot
+                || (sourcePath !== null
+                    && pathIsWithin(sourcePath, routineServerRoot)
+                    && /^index\.[cm]?[jt]sx?$/.test(relative(routineServerRoot, sourcePath)));
+
+            if (reachesRoutineServerEntry) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "The Routine browser graph must not reach the @/modules/routine server entry.",
+                ));
+                continue;
+            }
+
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || reachesRoutineServerDirectory) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/routine/client.",
+                ));
+                continue;
+            }
+
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function relativeFilePath(filePath, rootPath) {
     return relative(rootPath, filePath).split(sep).join("/");
 }
@@ -2818,6 +3005,36 @@ function checkArchitecture(options = {}) {
                 continue;
             }
 
+            const routineRouteDependencyViolation = getRoutineRouteDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (routineRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    routineRouteDependencyViolation,
+                ));
+                continue;
+            }
+
+            const routineDependencyViolation = getRoutineDependencyViolation(
+                filePath,
+                rootPath,
+                importRecord.moduleSpecifier,
+            );
+            if (routineDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    routineDependencyViolation,
+                ));
+                continue;
+            }
+
             const stockRouteDependencyViolation = getStockRouteDependencyViolation(
                 filePath,
                 rootPath,
@@ -3047,6 +3264,7 @@ function checkArchitecture(options = {}) {
     violations.push(...getNotificationNavbarCompositionViolations(rootPath, sourceFiles));
     violations.push(...getNotificationRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getStockLiffRouteCompositionViolations(rootPath, sourceFiles));
+    violations.push(...getRoutinePresentationRouteCompositionViolations(rootPath, sourceFiles));
     const sharedStatusPresentationViolation = getSharedStatusPresentationViolation(rootPath);
     if (sharedStatusPresentationViolation !== null) {
         violations.push(sharedStatusPresentationViolation);
@@ -3059,6 +3277,7 @@ function checkArchitecture(options = {}) {
     violations.push(...getAuthClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getLineClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getStockClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getRoutineClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave", getRuntimeImports));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee", getRuntimeImports));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", getRuntimeImports, null));

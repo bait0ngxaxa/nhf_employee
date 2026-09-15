@@ -447,6 +447,260 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
+    it("allows the current Routine browser graph", () => {
+        const result = checkArchitecture({ repositoryRoot: process.cwd() });
+
+        expect(result.violations).toEqual([]);
+    }, 30_000);
+
+    it("allows Routine presentation contracts and pure client-safe helpers", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/routine/client.ts": [
+                '"use client";',
+                'export { x } from "./presentation/example";',
+            ].join("\n"),
+            "modules/routine/presentation/example.ts": [
+                'import { buildRoutineImportSourceKey } from "@/modules/routine/application/imports/sheet-config";',
+                'import { formatRoutineTimingStatus } from "@/modules/routine/domain/labels";',
+                'import type { RoutinePresentationCapabilities } from "@/modules/routine/application/types";',
+                "export const x = buildRoutineImportSourceKey(formatRoutineTimingStatus(), 1);",
+            ].join("\n"),
+            "modules/routine/application/imports/sheet-config.ts": [
+                "export function buildRoutineImportSourceKey(sheetName: string, sourceRow: number): string {",
+                "    return `${sheetName}:${sourceRow}`;",
+                "}",
+            ].join("\n"),
+            "modules/routine/domain/labels.ts": [
+                "export function formatRoutineTimingStatus(): string {",
+                '    return "ready";',
+                "}",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("rejects direct Routine server-entry reachability from the browser graph", async () => {
+        const result = await checkFixture(
+            "modules/routine/client.ts",
+            '"use client"; export { x } from "@/modules/routine";\n',
+        );
+
+        expect(result.violations.some((message) =>
+            message.includes("The Routine browser graph must not reach the @/modules/routine server entry"),
+        )).toBe(true);
+    });
+
+    it("rejects transitive Routine server-entry reachability from the browser graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/routine/client.ts": [
+                '"use client";',
+                'export { x } from "./presentation/example";',
+            ].join("\n"),
+            "modules/routine/presentation/example.ts": [
+                'import { x } from "@/lib/routine-display";',
+                "export { x };",
+            ].join("\n"),
+            "lib/routine-display.ts": [
+                'import { x } from "@/modules/routine";',
+                "export { x };",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations.some((message) =>
+            message.includes("The Routine browser graph must not reach the @/modules/routine server entry"),
+        )).toBe(true);
+    });
+
+    it("rejects direct Prisma runtime access from the Routine browser graph", async () => {
+        const result = await checkFixture(
+            "modules/routine/client.ts",
+            [
+                '"use client";',
+                'import { PrismaClient } from "@prisma/client";',
+                "export const x = PrismaClient;",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/routine/client",
+        );
+        expect(result.violations[0]).toContain('"@prisma/client"');
+    });
+
+    it("rejects transitive Routine persistence infrastructure from the browser graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/routine/client.ts": [
+                '"use client";',
+                'export { x } from "./presentation/example";',
+            ].join("\n"),
+            "modules/routine/presentation/example.ts": [
+                'export { x } from "@/modules/routine/infrastructure/repository";',
+            ].join("\n"),
+            "modules/routine/infrastructure/repository.ts": "export const x = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/routine/client",
+        );
+        expect(result.violations[0]).toContain(
+            "@/modules/routine/infrastructure/repository",
+        );
+    });
+
+    it("rejects transitive Prisma runtime access from the Routine browser graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/routine/client.ts": [
+                '"use client";',
+                'export { x } from "./presentation/example";',
+            ].join("\n"),
+            "modules/routine/presentation/example.ts": [
+                'import { x } from "@/lib/routine-persistence";',
+                "export { x };",
+            ].join("\n"),
+            "lib/routine-persistence.ts": [
+                'import { PrismaClient } from "@prisma/client";',
+                "export const x = PrismaClient;",
+            ].join("\n"),
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/routine/client",
+        );
+        expect(result.violations[0]).toContain('"@prisma/client"');
+    });
+
+    it("rejects transitive server authentication/workforce helpers from the Routine browser graph", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/routine/client.ts": [
+                '"use client";',
+                'export { x } from "./presentation/example";',
+            ].join("\n"),
+            "modules/routine/presentation/example.ts": [
+                'import { x } from "@/lib/auth/workforce";',
+                "export { x };",
+            ].join("\n"),
+            "lib/auth/workforce.ts": "export const x = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/routine/client",
+        );
+        expect(result.violations[0]).toContain('"@/lib/auth/workforce"');
+    });
+
+    it.each([
+        "node:crypto",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ])("rejects %s from the Routine browser graph", async (specifier) => {
+        const result = await checkFixture(
+            "modules/routine/client.ts",
+            [
+                '"use client";',
+                `import dependency from "${specifier}";`,
+                "export const x = dependency;",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Server-only runtime dependency is reachable from @/modules/routine/client",
+        );
+        expect(result.violations[0]).toContain(`"${specifier}"`);
+    });
+
+    it.each([
+        "app/dashboard/routine/page.tsx",
+        "app/dashboard/routine/loading.tsx",
+        "app/liff/routine/page.tsx",
+    ])("rejects %s importing a Routine server/deep entry", async (routePath) => {
+        const result = await checkFixture(
+            routePath,
+            `import { x } from "${routePath.includes("liff") ? "@/modules/routine" : "@/modules/routine/application/queries"}";`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Routine presentation routes must use @/modules/routine/client",
+        );
+    });
+
+    it.each([
+        "app/dashboard/routine/page.tsx",
+        "app/dashboard/routine/loading.tsx",
+        "app/liff/routine/page.tsx",
+    ])("allows %s to consume Routine presentation through the client entry", async (routePath) => {
+        const result = await checkFixture(
+            routePath,
+            'import { x } from "@/modules/routine/client";\n',
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "app/dashboard/routine/page.tsx",
+        "app/dashboard/routine/loading.tsx",
+        "app/liff/routine/page.tsx",
+    ])("requires %s to compose Routine presentation through the client entry", async (routePath) => {
+        const result = await checkFixture(
+            routePath,
+            'import { x } from "@/components/ui/button";\n',
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            'must consume Routine presentation through "@/modules/routine/client"',
+        );
+    });
+
+    it("does not treat type-only Routine/Prisma contracts as browser runtime dependencies", async () => {
+        const result = await checkFixture(
+            "modules/routine/client.ts",
+            [
+                '"use client";',
+                'import type { Prisma } from "@prisma/client";',
+                'import type { RoutineQueryActor } from "./application/queries";',
+                "export type Select = Prisma.UserSelect;",
+                "export type Actor = RoutineQueryActor;",
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it.each([
+        "@/modules/routine",
+        "@/modules/routine/client",
+    ])("rejects Routine internals importing their own public entry %s", async (specifier) => {
+        const result = await checkFixture(
+            "modules/routine/presentation/example.ts",
+            `import { x } from "${specifier}";\n`,
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "Routine module internals must use local contracts instead of their own public barrel",
+        );
+    });
+
     it("rejects server-only runtime dependencies from the Leave client graph", async () => {
         const rootPath = await createFixture({
             ...fixtureFiles,

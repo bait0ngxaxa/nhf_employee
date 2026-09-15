@@ -69,6 +69,14 @@ Routine follows the same split: server/application consumers use
 `@/modules/routine`, while Dashboard and LIFF consumers use
 `@/modules/routine/client`.
 
+The Routine browser entry is enforced as a runtime boundary: its current graph
+may use presentation, browser transport, schemas, pure domain helpers, and the
+explicit pure `modules/routine/application/imports/sheet-config.ts` helper,
+but may not reach the Routine server entry, Routine server/application/
+infrastructure code outside that helper, or proven platform/auth server-only
+dependencies. Routine Dashboard and LIFF route composition and Routine
+internal self-barrel imports are checked by `npm run architecture:check`.
+
 Leave server/application consumers use `@/modules/leave`. Leave Dashboard and
 LIFF route composition use the explicit client-safe entry point
 `@/modules/leave/client`; migrated module presentation internals use local
