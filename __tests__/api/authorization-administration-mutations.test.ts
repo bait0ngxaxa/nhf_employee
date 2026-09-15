@@ -430,12 +430,18 @@ describe("Authorization Administration mutation API boundary", () => {
         expect(addResponse.status).toBe(201);
         expect(removeResponse.status).toBe(200);
         expect(mocks.addUserGrant).toHaveBeenCalledWith(
-            expect.any(Object),
+            expect.objectContaining({
+                principal: { userId: ADMIN_USER.id, systemRole: "ADMIN" },
+                userEmail: ADMIN_USER.email,
+            }),
             7,
             input,
         );
         expect(mocks.removeUserGrant).toHaveBeenCalledWith(
-            expect.any(Object),
+            expect.objectContaining({
+                principal: { userId: ADMIN_USER.id, systemRole: "ADMIN" },
+                userEmail: ADMIN_USER.email,
+            }),
             7,
             input,
         );

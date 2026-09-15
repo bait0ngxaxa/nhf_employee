@@ -141,6 +141,71 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         expect(body.occurrence.task).not.toHaveProperty("isActive");
     });
 
+    it("keeps the Dashboard actor and capability server-selected despite authority-shaped input", async () => {
+        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+            ok: true,
+            user: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/routines/occurrences/91", {
+                method: "PATCH",
+                headers: {
+                    "content-type": "application/json",
+                    "x-user-id": "999",
+                    "x-employee-id": "999",
+                    "x-system-role": "ADMIN",
+                    "x-authorization-channel": "LIFF_SELF_SERVICE",
+                    "x-capability": "routine.import.manage",
+                    "x-scope": "ALL",
+                    "x-request-id": "routine-provenance-test",
+                },
+                body: JSON.stringify({
+                    expectedReminderVersion: 4,
+                    dueDate: "2026-08-10",
+                    assignees: [{ employeeId: 42, role: "OWNER" }],
+                    userId: 999,
+                    employeeId: 999,
+                    role: "ADMIN",
+                    systemRole: "ADMIN",
+                    isAdmin: true,
+                    channel: "LIFF_SELF_SERVICE",
+                    capability: "routine.import.manage",
+                    scopes: ["ALL"],
+                }),
+            }),
+            { params: Promise.resolve({ id: "91" }) },
+        );
+
+        expect(response.status).toBe(200);
+        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 5,
+                role: "USER",
+                email: "user@example.com",
+            }),
+            21,
+            "routine.occurrence.override",
+        );
+        expect(mocks.updateOverride).toHaveBeenCalledWith(
+            91,
+            {
+                expectedReminderVersion: 4,
+                dueDate: "2026-08-10",
+                assignees: [{ employeeId: 42, role: "OWNER" }],
+            },
+            expect.objectContaining({
+                id: 5,
+                role: "USER",
+                email: "user@example.com",
+            }),
+        );
+        expect(mocks.updateOverride.mock.calls[0]?.[2]).not.toHaveProperty(
+            "mode",
+        );
+    });
+
     it("does not mutate when the caller is not an admin", async () => {
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
             ok: false,

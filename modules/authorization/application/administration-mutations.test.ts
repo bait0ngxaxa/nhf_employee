@@ -633,7 +633,7 @@ describe("Phase 10B Authorization Administration commands", () => {
         ]);
     });
 
-    it("supports TeamRole and direct User grant add/remove with strict audit actions", async () => {
+    it("keeps the authenticated principal separate from direct User grant targets in audit", async () => {
         const roleGrantValue = roleGrant();
         const directGrant = userGrant();
         const repo = repository({
@@ -685,6 +685,25 @@ describe("Phase 10B Authorization Administration commands", () => {
             "USER_CAPABILITY_GRANT_ADD",
             "USER_CAPABILITY_GRANT_REMOVE",
         ]);
+        expect(auditAppendMock).toHaveBeenCalledWith(
+            TX,
+            expect.objectContaining({
+                action: "USER_CAPABILITY_GRANT_ADD",
+                entityType: "User",
+                entityId: 7,
+                userId: ADMIN_CONTEXT.principal.userId,
+                userEmail: ADMIN_CONTEXT.userEmail,
+                ipAddress: ADMIN_CONTEXT.ipAddress,
+                userAgent: ADMIN_CONTEXT.userAgent,
+                details: expect.objectContaining({
+                    metadata: expect.objectContaining({
+                        userId: 7,
+                        capabilityKey: "audit.read",
+                        scope: "ALL",
+                    }),
+                }),
+            }),
+        );
     });
 
     it("rejects duplicate or missing exact Team grants and direct User TEAM scope", async () => {

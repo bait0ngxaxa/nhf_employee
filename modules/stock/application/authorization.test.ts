@@ -363,6 +363,37 @@ describe("Stock authorization migration adapter", () => {
         expect(result.isAdministrative).toBe(false);
     });
 
+    it("does not turn a requested all view into a broader effective scope", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "stock.request.read",
+                true,
+                ["OWN"],
+                undefined,
+                [userGrant("stock.request.read", "OWN")],
+            ),
+        );
+
+        const result = await resolveStockCapabilityForMigration(
+            context(),
+            "stock.request.read",
+            { requestedScope: "all" },
+        );
+
+        expect(result.actor).toEqual({
+            userId: 7,
+            employeeId: 21,
+            systemRole: "USER",
+            channel: "DASHBOARD",
+        });
+        expect(result.scopes).toEqual(["OWN"]);
+        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(mocks.resolve).toHaveBeenCalledWith(
+            result.actor,
+            "stock.request.read",
+        );
+    });
+
     it("honors an explicit LIFF USER processor grant", async () => {
         mocks.resolve.mockResolvedValue(
             decision(

@@ -762,8 +762,26 @@ describe("POST /api/leave/request", () => {
 
             const req = createLeaveRequestRequest({
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(validPayload),
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-user-id": "999",
+                    "x-employee-id": "999",
+                    "x-system-role": "ADMIN",
+                    "x-authorization-channel": "LIFF_SELF_SERVICE",
+                    "x-capability": "leave.approver.manage",
+                    "x-scope": "ALL",
+                },
+                body: JSON.stringify({
+                    ...validPayload,
+                    userId: 999,
+                    employeeId: 999,
+                    role: "ADMIN",
+                    systemRole: "ADMIN",
+                    isAdmin: true,
+                    channel: "LIFF_SELF_SERVICE",
+                    capability: "leave.approver.manage",
+                    scopes: ["ALL"],
+                }),
             });
 
             const res = await submitLeaveRequest(req);
@@ -776,6 +794,22 @@ describe("POST /api/leave/request", () => {
                 overQuotaDays: 0,
                 attachments: [],
             });
+
+            const trustedActor = {
+                userId: 1,
+                employeeId: mockEmployeeId,
+                systemRole: "USER" as const,
+                channel: "DASHBOARD" as const,
+            };
+            expect(authorizationMocks.resolve).toHaveBeenCalledWith(
+                trustedActor,
+                "leave.request.create",
+            );
+            expect(authorizationMocks.resolveInTransaction).toHaveBeenCalledWith(
+                trustedActor,
+                "leave.request.create",
+                prisma,
+            );
 
             expect(prisma.leaveQuota.upsert).toHaveBeenCalledWith({
                 where: {

@@ -347,6 +347,48 @@ describe("Stock Request Routes", () => {
                 "all",
             );
         });
+
+        it("keeps requested scope separate from the trusted actor and effective scopes", async () => {
+            vi.mocked(getApiAuthSession).mockResolvedValue({
+                user: { id: "3", email: "user@test.com", role: "USER" },
+            } as never);
+            vi.mocked(buildUserContext).mockReturnValue({
+                id: 3,
+                email: "user@test.com",
+                role: "USER",
+                name: "User",
+            });
+            vi.mocked(isAdminRole).mockReturnValue(false);
+            vi.mocked(stockService.getRequests).mockResolvedValue({
+                requests: [],
+                total: 0,
+                page: 1,
+                limit: 20,
+            } as never);
+
+            const response = await getRequestsRoute(new NextRequest(
+                "http://localhost/api/stock/requests?scope=all&userId=999&employeeId=999&role=ADMIN&systemRole=ADMIN&isAdmin=true&capability=stock.inventory.manage&scopes=ALL&channel=LIFF_SELF_SERVICE",
+            ));
+
+            expect(response.status).toBe(200);
+            expect(stockAuthorizationMock.assert).toHaveBeenCalledWith(
+                {
+                    authorizationActor: {
+                        userId: 3,
+                        employeeId: 10,
+                        systemRole: "USER",
+                        channel: "DASHBOARD",
+                    },
+                },
+                "stock.request.read",
+                { requestedScope: "all" },
+            );
+            expect(stockService.getRequests).toHaveBeenCalledWith(
+                expect.any(Object),
+                { userId: 3, scopes: ["OWN"] },
+                "all",
+            );
+        });
     });
 
     describe("Stock employee workforce access", () => {
@@ -496,15 +538,41 @@ describe("Stock Request Routes", () => {
                     "Idempotency-Key": "stock-request-7001",
                     "X-Request-Id": "req-stock-7001",
                     "X-Correlation-Id": "corr-stock-7001",
+                    "X-User-Id": "999",
+                    "X-Employee-Id": "999",
+                    "X-System-Role": "ADMIN",
+                    "X-Authorization-Channel": "LIFF_SELF_SERVICE",
+                    "X-Capability": "stock.request.process",
                 },
                 body: JSON.stringify({
                     projectCode: "prj-2569/01",
                     items: [{ itemId: 10, quantity: 1 }],
+                    requestedBy: 999,
+                    userId: 999,
+                    employeeId: 999,
+                    role: "ADMIN",
+                    systemRole: "ADMIN",
+                    isAdmin: true,
+                    channel: "LIFF_SELF_SERVICE",
+                    capability: "stock.request.process",
+                    scopes: ["ALL"],
                 }),
             });
             const response = await postRequestsRoute(request);
 
             expect(response.status).toBe(201);
+            expect(stockAuthorizationMock.assert).toHaveBeenCalledWith(
+                {
+                    authorizationActor: {
+                        userId: 3,
+                        employeeId: 10,
+                        systemRole: "USER",
+                        channel: "DASHBOARD",
+                    },
+                },
+                "stock.request.create",
+                { requestedScope: "mine" },
+            );
             expect(stockService.createRequest).toHaveBeenCalledWith(
                 expect.objectContaining({
                     projectCode: "PRJ-2569/01",
@@ -515,6 +583,14 @@ describe("Stock Request Routes", () => {
                     name: "User",
                     requestId: "req-stock-7001",
                     correlationId: "corr-stock-7001",
+                    authorization: {
+                        authorizationActor: {
+                            userId: 3,
+                            employeeId: 10,
+                            systemRole: "USER",
+                            channel: "DASHBOARD",
+                        },
+                    },
                 }),
                 { idempotencyKey: "stock-request-7001" },
             );
@@ -764,19 +840,55 @@ describe("Stock Request Routes", () => {
             const response = await issueRequestRoute(
                 new NextRequest(
                     "http://localhost/api/stock/requests/77/issue",
-                    { method: "POST", body: JSON.stringify({}) },
+                    {
+                        method: "POST",
+                        headers: {
+                            "content-type": "application/json",
+                            "x-user-id": "999",
+                            "x-employee-id": "999",
+                            "x-system-role": "ADMIN",
+                            "x-authorization-channel": "LIFF_SELF_SERVICE",
+                            "x-capability": "stock.inventory.manage",
+                            "x-scope": "ALL",
+                        },
+                        body: JSON.stringify({
+                            userId: 999,
+                            employeeId: 999,
+                            role: "ADMIN",
+                            systemRole: "ADMIN",
+                            isAdmin: true,
+                            channel: "LIFF_SELF_SERVICE",
+                            capability: "stock.inventory.manage",
+                            scopes: ["ALL"],
+                        }),
+                    },
                 ),
                 { params: Promise.resolve({ id: "77" }) },
             );
 
             expect(response.status).toBe(200);
+            expect(stockAuthorizationMock.assert).toHaveBeenCalledWith(
+                {
+                    authorizationActor: {
+                        userId: 4,
+                        employeeId: 10,
+                        systemRole: "USER",
+                        channel: "DASHBOARD",
+                    },
+                },
+                "stock.request.process",
+                { requestedScope: "all" },
+            );
             expect(stockService.issueRequest).toHaveBeenCalledWith(
                 77,
                 expect.objectContaining({
                     id: 4,
                     authorization: {
                         authorizationActor: expect.objectContaining({
+                            userId: 4,
+                            employeeId: 10,
                             systemRole: "USER",
+                            channel: "DASHBOARD",
                         }),
                     },
                 }),

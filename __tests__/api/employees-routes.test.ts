@@ -163,6 +163,41 @@ describe("Employee mutation routes", () => {
         });
     });
 
+    it("keeps a Dashboard USER actor when query input carries authority-shaped values", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: USER,
+            session: { user: { ...USER, id: String(USER.id) } },
+        });
+        vi.mocked(listEmployees).mockResolvedValue({
+            employees: [],
+            pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+        });
+
+        const response = await listEmployeesRoute(new NextRequest(
+            "http://localhost/api/employees?search=Somchai&userId=999&employeeId=999&role=ADMIN&systemRole=ADMIN&isAdmin=true&capability=employee.delete&scope=ALL&channel=LIFF_SELF_SERVICE",
+        ));
+
+        expect(response.status).toBe(200);
+        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+            {
+                authorizationActor: {
+                    userId: USER.id,
+                    employeeId: null,
+                    systemRole: "USER",
+                    channel: "DASHBOARD",
+                },
+            },
+            "employee.read",
+        );
+        expect(listEmployees).toHaveBeenCalledWith({
+            search: "Somchai",
+            status: undefined,
+            page: 1,
+            limit: 10,
+        });
+    });
+
     it("keeps organization-wide Employee statistics behind employee.stats.read", async () => {
         vi.mocked(getEmployeeStats).mockResolvedValue({
             total: 2,

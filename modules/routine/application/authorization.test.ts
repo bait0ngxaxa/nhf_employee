@@ -156,6 +156,38 @@ describe("Routine authorization migration adapter", () => {
         ]);
     });
 
+    it("does not turn a requested task view scope into a resolver grant", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "routine.task.read",
+                true,
+                ["ASSIGNED"],
+                undefined,
+                [userGrant("routine.task.read", "ASSIGNED")],
+            ),
+        );
+
+        const result = await resolveRoutineCapabilityForMigration(
+            actor(),
+            21,
+            "routine.task.read",
+            { taskReadView: "work-item", requestedScope: "all" },
+        );
+
+        expect(result.actor).toEqual({
+            userId: 7,
+            employeeId: 21,
+            systemRole: "USER",
+            channel: "DASHBOARD",
+        });
+        expect(result.scopes).toEqual(["ASSIGNED"]);
+        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(mocks.resolve).toHaveBeenCalledWith(
+            result.actor,
+            "routine.task.read",
+        );
+    });
+
     it("never converts a structural channel denial into migration access", async () => {
         mocks.resolve.mockResolvedValue(
             decision(

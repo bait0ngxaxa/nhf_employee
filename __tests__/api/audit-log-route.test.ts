@@ -86,10 +86,21 @@ describe("Audit log API compatibility", () => {
 
     it("returns historical and new session metadata without reshaping either", async () => {
         const response = await GET(
-            new NextRequest("http://localhost/api/audit-logs?page=1&limit=20"),
+            new NextRequest("http://localhost/api/audit-logs?page=1&limit=20&userId=999&role=ADMIN&systemRole=ADMIN&isAdmin=true&capability=employee.delete&scope=ALL&channel=LIFF_SELF_SERVICE"),
         );
 
         expect(response.status).toBe(200);
+        expect(auditMocks.assertAuditCapabilityForMigration).toHaveBeenCalledWith(
+            {
+                authorizationActor: {
+                    userId: 1,
+                    employeeId: null,
+                    systemRole: "ADMIN",
+                    channel: "DASHBOARD",
+                },
+            },
+            "audit.read",
+        );
         await expect(response.json()).resolves.toMatchObject({
             auditLogs: [
                 { details: { metadata: { familyId: "historical-family-id" } } },
@@ -100,7 +111,7 @@ describe("Audit log API compatibility", () => {
             action: undefined,
             entityType: undefined,
             search: undefined,
-            userId: undefined,
+            userId: 999,
             startDate: undefined,
             endDate: undefined,
             page: 1,
