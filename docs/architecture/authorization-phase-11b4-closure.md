@@ -527,27 +527,30 @@ Phase 11C.
 npm run architecture:check  -> PASS (1,119 source files checked)
 npm run lint:strict         -> PASS
 npm run typecheck           -> PASS
-npm run test:run            -> PASS (stable result confirmed by the user)
+npm run test:run            -> FAILED (exit code 1; 1 timeout)
+  Test Files: 313 passed, 1 failed (314 total)
+  Tests: 2,758 passed, 1 failed (2,759 total)
 git diff --check            -> PASS
 ```
 
-บน Windows ใช้ `npm.cmd` เป็น executable เทียบเท่า `npm`. Full suite failure
-ที่สังเกตได้จาก local default invocation เป็น transient timeout/temporary-directory
-cleanup และ flaky UI state ไม่ใช่ deterministic authorization assertion failure.
-เนื่องจาก Phase 11B.4 เปลี่ยนเฉพาะเอกสาร จึงไม่มี production/test implementation
-path ที่เปลี่ยนแล้วจะอธิบาย failure เหล่านี้ได้. Stable full-suite result ถูก
-ยืนยันโดยผู้ใช้และจึงนับเป็น PASS สำหรับ handoff; local invocation เดิมยังคง
-บันทึกไว้เป็น flaky runner observation ไม่ใช่ enforcement regression และไม่แก้
-ด้วยการผ่อน test timeout หรือแก้ test เพื่อให้เขียว.
-Focused authorization/Routine run ผ่าน 13 non-architecture files รวม 446 tests
-และ architecture suite ผ่าน 251 tests เมื่อ rerun ด้วย
-`--testTimeout=30000 --hookTimeout=30000`; ผลนี้สอดคล้องกับ stable full-suite
-result ที่ผู้ใช้ยืนยัน.
+บน Windows รันคำสั่งเทียบเท่าด้วย `npm.cmd run test:run`. Full suite
+จบด้วย exit code `1` เพราะ test
+`reads changed runtime imports again on a later scan of the same root` ใน
+`__tests__/architecture/check-architecture.test.ts` timeout ที่ default
+`5000ms` (สังเกตการทำงาน `5277ms`). จึงต้องบันทึก required command เป็น
+**FAILED** แม้ผลที่ล้มเหลวจะเป็น timeout ของ test runner และไม่ใช่หลักฐานของ
+authorization assertion failure. ห้ามตีความผลนี้ใหม่เป็น PASS และไม่มีการเพิ่ม
+global timeout หรือแก้ test เพื่อสร้างผลเขียว.
+
+Focused verification เป็น supplemental evidence เท่านั้น: 13 non-architecture
+authorization/Routine files ผ่านรวม 446 tests และ architecture suite ผ่าน 251
+tests เมื่อ rerun ด้วย `--testTimeout=30000 --hookTimeout=30000`; ผลดังกล่าวไม่ใช่
+สิ่งทดแทนการรัน full suite ตามคำสั่งที่กำหนด.
 
 ไม่มีการรัน production build หรือ development server เพราะไม่จำเป็นต่อ audit
 และไม่มี GitHub CI evidence จึงไม่อ้างว่าเป็นผล CI.
 
-## 12. Phase decision และ Phase 11C recommendation
+## 12. Phase decision และ established roadmap
 
 Phase 11B สามารถถือว่า **CLOSED ในมิติ enforcement architecture และ final
 audit** ได้ เพราะ:
@@ -561,14 +564,53 @@ audit** ได้ เพราะ:
 การ CLOSED นี้ไม่หมายความว่า target broad Routine policy ถูก activate หรือว่า
 compatibility ถูก retire แล้ว.
 
-ขอบเขตที่แนะนำสำหรับ **Phase 11C เท่านั้น (ยังไม่เริ่ม)** คือ:
+roadmap ที่ตกลงไว้ยังคงเป็น:
 
-> Routine All-View Authorization Migration & Compatibility Retirement:
-> อนุมัติ intended population/grant strategy, inventory และเตรียม persisted
-> grants, migrate work-item list + summary + export + focus/direct APIs ให้ใช้
-> trusted central `routine.task.read / ALL`, เพิ่ม server-derived presentation
-> contract, ยืนยัน LIFF isolation, ทำ atomic rollout/rollback และลบ current
-> `NO_APPLICABLE_GRANT -> ALL` bridge เฉพาะเมื่อ gates ทั้งหมดผ่าน.
+```text
+Phase 11B
+Architecture Enforcement & Legacy Bypass Prevention
 
-Phase 11C ไม่ควรขยายไป Team activation โดยปริยายหรือเปลี่ยน domain policy อื่น
-จนกว่าจะมี decision และ scope แยกต่างหาก.
+Phase 11C
+Security Regression Matrix
+
+Phase 11D
+Residue Cleanup & Final Authorization Closure
+```
+
+### Next established phase
+
+**Phase 11C — Security Regression Matrix** เป็น phase ถัดไปที่แนะนำ
+(ยังไม่เริ่ม). ขอบเขตควรสร้าง cross-domain authorization regression matrix
+โดย consolidate และ reuse หลักฐานจาก Phase 11A–11B เป็นหลัก ครอบคลุมอย่างน้อย:
+
+- unauthenticated access;
+- inactive/deleted User และ inactive/deleted Employee เมื่อ workforce เป็น
+  prerequisite;
+- stale route-time role เทียบกับ current persisted role;
+- capability/grant revocation;
+- unsupported channel, unknown capability และ invalid persisted authorization
+  configuration;
+- request actor/role/channel/capability spoof attempts;
+- OWN, CREATED และ ASSIGNED relationship failure;
+- TEAM missing/invalid origin ที่ต้อง fail closed;
+- `ALL` ต้องไม่ bypass business, lifecycle หรือ workflow invariants;
+- Dashboard กับ LIFF channel isolation;
+- transaction-time revalidation และ resource-relationship race ในจุดที่รองรับ;
+- Admin ต้องไม่ bypass lifecycle/business invariants;
+- direct API behavior ที่ต้องถูกบังคับใช้โดยไม่ขึ้นกับ UI presentation.
+
+Phase 11C ไม่รวม Team policy activation, Routine compatibility retirement หรือ
+Routine all-view migration ในเอกสารแก้ไขนี้ และไม่ควรเริ่มจนกว่าจะมีการอนุมัติ
+ขอบเขตของ phase แยกต่างหาก.
+
+### Deferred policy migration
+
+**Routine All-View Authorization Migration & Compatibility Retirement** เป็น
+future explicitly approved authorization policy migration track แยกจาก roadmap
+Phase 11B–11D และไม่ถูกกำหนดเป็น Phase 11C. การเริ่ม migration นี้ต้องผ่าน
+10 migration gates ที่บันทึกไว้ในเอกสารนี้ ได้แก่การอนุมัติ intended broad-view
+population และ grant strategy, ความพร้อมของ persisted grants, การ migrate
+work-item list, summary, export, UI และ focus/direct APIs อย่างสอดคล้องกัน,
+server-derived presentation contract, direct-API regression, LIFF isolation
+และ rollout/rollback ที่เป็น atomic policy cutover. Compatibility bridge จะ
+เกษียณได้ต่อเมื่อ gates ทั้งหมดผ่านและมี approval แยกต่างหากเท่านั้น.
