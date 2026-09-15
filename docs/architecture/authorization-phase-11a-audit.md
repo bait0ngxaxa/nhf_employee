@@ -69,7 +69,15 @@ authenticated trusted actor
 - UI visibility, `isAdmin` prop และ capability projection ไม่ใช่ server security boundary
 - คำว่า `DENY` ที่แสดงใน Authorization Administration UI เป็น label ของผล `allowed = false`; ไม่ใช่ persisted explicit-deny grant หรือ policy feature
 
-จุดที่ต้องอ่านร่วมกันคือ `requireApiSession()` → `getApiAuthSession()` → `resolveAuthenticatedAccount()` ตรวจ account และ current eligible Employee ก่อน ส่วน `requireActiveWorkforceOrAdminSession()` และ lower application adapters ยังมี compatibility branch บาง operation ที่รองรับ `employeeId = null` สำหรับ Dashboard ADMIN. ความแตกต่างนี้ถูกจำแนกเป็น `COMPATIBILITY_POLICY`/`AUTHENTICATION_OR_ACCOUNT_LIFECYCLE` seam ไม่ใช่หลักฐานว่า ADMIN มี authority ใหม่ และถูกบันทึกเป็นความเสี่ยงสำหรับ Phase 11B
+จุดที่ต้องอ่านร่วมกันคือ `resolveAuthenticatedAccount()` เป็น generic account identity layer ซึ่งตั้งใจรองรับ valid active User ที่ยังไม่มี Employee. จากนั้น `getApiAuthSession()` เป็น legacy API-session compatibility adapter ที่เรียก `hasEligibleCurrentEmployeeForUser()` เพิ่ม และ `requireApiSession()`/`requireAdminSession()` จึงคง legacy eligible-current-Employee contract ไว้. ดังนั้น:
+
+```text
+generic account identity
+!=
+legacy API-session workforce eligibility
+```
+
+ส่วน `requireActiveWorkforceOrAdminSession()` และ lower application adapters ยังมี compatibility branch บาง operation ที่รองรับ `employeeId = null` สำหรับ Dashboard ADMIN. ความแตกต่างนี้ถูกจำแนกเป็น `COMPATIBILITY_POLICY`/`AUTHENTICATION_OR_ACCOUNT_LIFECYCLE` seam ไม่ใช่หลักฐานว่า ADMIN มี authority ใหม่ และถูกบันทึกเป็นความเสี่ยงสำหรับ Phase 11B
 
 ## Complete categorized surface inventory
 
@@ -96,7 +104,7 @@ Capability registry baseline มี 40 registered capabilities; migrated product
 
 | ID | Surface และ evidence | Decision ที่ทำจริง | Classification boundary |
 |---|---|---|---|
-| A-01 | Access token/cookie/account identity: `modules/auth/application/sessions.ts`, `lib/auth/server.ts` | ตรวจ token/account active/deleted และ `hasEligibleEmployeeLifecycle`; สร้าง trusted account context | ไม่ใช่ capability decision; ป้องกัน unauthenticated/ineligible principal |
+| A-01 | Access token/cookie/generic account identity: `modules/auth/application/sessions.ts`, `lib/auth/server.ts` | `resolveAuthenticatedAccount()` ตรวจ token/account active/deleted และตั้งใจสร้าง generic account identity ได้แม้ User ยังไม่มี Employee | `getApiAuthSession()` เติม `hasEligibleCurrentEmployeeForUser()` เป็น legacy API-session workforce gate; ไม่ใช่ capability decision |
 | A-02 | `requireApiSession()` และ `requireAdminSession()` ใน `lib/auth/api.ts` | API session ต้องผ่าน account/eligible workforce; Admin session ตรวจ trusted system role เป็น structural gate | `requireAdminSession` เป็น bootstrap/deferred boundary ไม่ใช่ generic authorization contract สำหรับ migrated capability |
 | A-03 | `requireActiveWorkforceSession()` และ `requireActiveWorkforceOrAdminSession()` ใน `lib/auth/workforce.ts` | re-read User/Employee, ตรวจ active/deleted state และ map 401/403/404 | lower Admin-optional branch เป็น documented compatibility/lifecycle seam; upstream API session ปกติยังต้องมี eligible Employee |
 | A-04 | Dashboard layout/page access และ `app/_lib/auth/current-user.ts` | server session/projection ต้องเป็น trusted current account/Employee ก่อน page หรือ client projection | capability page guards จัดอยู่ใน C/V; menu หรือ hidden UI ไม่ใช่ enforcement |
@@ -206,17 +214,22 @@ The following role-derived usages were found and are intentional under the curre
 |---|---|---|
 | `lib/ssot/permissions.ts:8-13` | canonical `isAdminRole()` และ role label | A/V primitive |
 | `lib/auth/api.ts:59-70` | `requireAdminSession()` | A-02 / B bootstrap/deferred boundary |
+| `app/api/authorization/administration/_lib/route-auth.ts:30-37` | shared `requireAdminSession()` call before Administration application assertion | B-02 bootstrap |
+| `app/api/email-request/route.ts:19-25` | `requireAdminSession()` call for Email Request POST | E-01 deferred Email boundary |
 | `lib/auth/workforce.ts:140` | Admin branch ของ workforce helper | A-03 / P lifecycle compatibility |
 | `app/dashboard/_lib/route-access.ts:18-29` | Dashboard Admin page guard | B-01 / E-01 Email surface |
+| `app/dashboard/leave/page.tsx:17,37-45` | `isAdminRole(user.role)` feeds `leaveAvailability`, access redirect และ default-tab selection | V-02/V-03 `PRESENTATION_ONLY`; Leave APIs enforce independently |
 | `modules/authorization/application/evaluator.ts:60,93-111` | ADMIN system-role evaluation | C-01 central resolver |
+| `modules/authorization/application/resolver.ts:99,142` | trusted `context.isAdmin` branches while resolving central capability decisions | C-01 central resolver |
 | `modules/authorization/application/administration.ts:67,87-95` | trusted Admin assertion and role parser | B-01/B-02 bootstrap |
 | `modules/auth/application/employee-account-lifecycle.ts:42-45` | last-active-Admin lifecycle invariant | A-06 |
+| `modules/auth/application/signup.ts:64-71` | server-derived bootstrap `Role.ADMIN`/`Role.USER` assignment inside signup transaction | A-06 authentication/account lifecycle |
 | `modules/employee/application/authorization.ts:78,132` | actor parser and exact legacy Admin mutation floor | C-02 / P-01 |
 | `modules/department/application/authorization.ts:61` | trusted actor parser | C-03 / P-02 |
 | `modules/audit/application/authorization.ts:61` | trusted actor parser | C-04 |
 | `modules/notification/application/authorization.ts:62` | trusted actor parser | C-05 / P-03 |
 | `modules/stock/application/authorization.ts:83,125,164,408-409` | parser, legacy scopes, channel/lifecycle branch | C-06/C-07 / P-04 |
-| `modules/routine/application/authorization.ts:84,113-117,170,199,410` | parser, deferred predicate, compatibility and transaction lifecycle | C-10/C-11 / P-05 / E-02–E-04 |
+| `modules/routine/application/authorization.ts:84,113-117,131,170,199,410` | parser, deferred predicate, compatibility and transaction lifecycle | C-10/C-11 / P-05 / E-02–E-04 |
 | `modules/leave/application/authorization.ts:78,128,319,344,360,400` | parser, compatibility, recovery and transaction lifecycle | C-08/C-09 / P-06 / D-04/E-07 |
 | `lib/services/email-request/queries.ts:32-33` | Admin-all vs requester-owned Email query | E-01 |
 | `app/api/leave/attachments/[attachmentId]/route.ts:63` | Admin relationship flag passed to attachment policy | D-05/E-06 |
@@ -225,6 +238,9 @@ The following role-derived usages were found and are intentional under the curre
 | `modules/leave/application/cancellation/cancellation.ts:399,593` | decision actor label and Admin override state | D-04/E-07 |
 | `modules/stock/application/requests/request-mutations.ts:550` | notification mode after request load | D-03 |
 | `modules/routine/application/queries.ts:489,1120-1125,1437` | per-resource flags and deferred summary/reference query | V-05 / E-02/E-03 |
+| `modules/routine/domain/capabilities.ts:30-62` | optional legacy `actor.isAdmin` fallback when central edit/delete scopes are absent | V-05 `PRESENTATION_ONLY`; serialized action flags only, not mutation authority |
+| `modules/leave/application/queries/participant-access.ts:116,142` | server-derived `viewer.isAdmin` relationship bypass for Dashboard attachment access | D-05/E-06 `DOMAIN_RESOURCE_POLICY`; non-Admin participant predicate remains enforced |
+| `modules/routine/application/recipients.ts:122`, `modules/routine/application/scheduler.ts:269`, `modules/routine/application/reminders.ts:461-475`, `modules/stock/infrastructure/notifications/notifications.ts:92-104,332-345` | `Role.ADMIN` recipient selection and stale notification-delivery guard | `DOMAIN_RESOURCE_POLICY` notification recipient/lifecycle behavior, not caller authority |
 | `components/dashboard/context/dashboard/DashboardProvider.tsx:46,147`, `modules/stock/presentation/dashboard/context/StockProvider.tsx:68`, `modules/routine/presentation/dashboard/RoutineSection.tsx:487`, `modules/leave/presentation/dashboard/LeaveManagementSection.tsx:30` | Dashboard role/isAdmin props and menu/page visibility | V-02/V-03 |
 | `modules/authorization/presentation/dashboard/components/UserAccessPanel.tsx:176,185` | Admin status display | V-05 |
 
@@ -238,7 +254,7 @@ The audit separated capability scope from resource/query scope. A central `ALL` 
 
 | Surface | Query behavior found | Classification / risk |
 |---|---|---|
-| Employee list/stats/export | Organization-wide counts/list/export, with bootstrap-admin/deleted filtering where implemented | C-02 + P-01. Broad visibility is frozen policy; PII/HR narrowing requires explicit Phase 11B decision |
+| Employee list/stats/export | Organization-wide counts/list/export, with bootstrap-admin/deleted filtering where implemented | C-02 + P-01. Broad visibility is frozen policy; PII/HR narrowing is a post-11B policy decision |
 | Department reference | Organization-wide active department reference after `department.read / ALL` | C-03 + P-02. No Department-derived authorization |
 | Audit logs | Broad filtered/paginated audit query after central `audit.read / ALL`; request `userId` is a filter only and does not replace the actor | C-04 + D-08. Export event is separate instrumentation |
 | Notifications | All/history pagination still predicates by server actor `userId`; read-state updates use same ownership | C-05 + D-07. No cross-user query found |
@@ -334,9 +350,12 @@ central migrated capability
 
 ข้อความใหม่แยก upstream `requireApiSession()` requirement ออกจาก lower compatibility branch และระบุ test seam/lifecycle race โดยไม่เปลี่ยน production policy
 
-### Remains historical or requires later correction
+### Verified architectural distinction (ไม่ใช่ stale-document finding)
 
-- `lib/auth/server.ts` มี source comment ที่อธิบาย generic account resolution ราวกับ User ที่ไม่มี Employee อาจผ่านได้ แต่ implementation ของ `resolveAuthenticatedAccount()` และ `getApiAuthSession()` ต้องมี eligible current Employee. เป็น comment drift ที่ควรแก้ในงานเอกสาร/cleanup ที่เหมาะสม ไม่ได้แก้ source ใน Phase 11A
+- `lib/auth/server.ts:18-25` อธิบาย architecture ตรงกับ source: `resolveAuthenticatedAccount()` รองรับ generic valid active User ที่ไม่มี Employee ได้ ขณะที่ `getApiAuthSession()` เรียก `hasEligibleCurrentEmployeeForUser()` เพิ่มเป็น legacy API-session contract. `requireApiSession()` และ `requireAdminSession()` จึงต้องมี eligible current Employee แม้ generic account resolution จะไม่บังคับ. ไม่ต้องแก้ comment และไม่ควรใส่การ rewrite นี้ไว้ใน Phase 11B
+
+### Historical or contradictory records that remain
+
 - `docs/architecture/authorization-stock-migration.md` ระบุ lower Stock Admin-without-Employee behavior ว่า operational. ข้อความนั้นยังตรงกับ lower compatibility adapter แต่ overstates stable HTTP reachability เมื่ออ่านโดยไม่ประกอบ `requireApiSession()`; เก็บเป็น historical closure evidence และห้ามใช้เป็นหลักฐานเปิด policy ใหม่
 - `docs/architecture/final-repository-audit.md` มี K0 historical wording ว่า Stock LIFF/client ownership ยังเป็น finding. ส่วนต้นเอกสารระบุว่าเป็น snapshot ประวัติ และ current source/checker มี Stock client boundary แล้ว; ไม่ควรอ่าน section นั้นเป็น current authorization state
 - `docs/architecture/dependency-rules.md`/historical audit wording ที่บอกว่า Stock และ Routine client graph ยังไม่มี explicit guard ต้องแยกกัน: current checker มี Stock client-graph check แล้ว แต่ยังไม่พบ dedicated Routine client-graph checker. นี่เป็น architecture-enforcement gap ที่ควรพิจารณาแยกจาก authorization policy
@@ -346,15 +365,33 @@ central migrated capability
 
 ## Proposed exact Phase 11B enforcement scope
 
-ข้อเสนอด้านล่างอิงเฉพาะหลักฐานจาก audit นี้ และยังไม่ใช่งานที่ทำใน Phase 11A:
+Phase 11B ต้องคงชื่อและขอบเขตเป็น **Architecture Enforcement & Legacy Bypass Prevention**. เนื่องจาก Phase 11A ยืนยัน `LEGACY_AUTHORIZATION_BYPASS` เป็นศูนย์ ขอบเขต implementation จึงเป็นการ harden architecture ที่พิสูจน์แล้วเท่านั้น ไม่ใช่การเปิด policy ใหม่หรือการ migrate deferred surface:
 
-1. **ปิดความกำกวม Admin/workforce contract:** ตัดสินเป็นลายลักษณ์อักษรว่าจะคงหรือ retire lower account-only Admin branches ของ Stock/Routine/Leave; เพิ่ม end-to-end tests ที่เริ่มจาก `requireApiSession()` และ transaction-time lifecycle race โดยไม่เปิดทางใหม่
-2. **ตัดสิน broad query policy ก่อนแก้ code:** ระบุ intended scope/ข้อมูล PII สำหรับ Employee list/stats/export, Routine summary/work-item/export และ Leave report. ห้ามแก้ด้วยการเปลี่ยน role check แบบ mechanical หรือเพิ่ม `ALL` โดยไม่มี policy record
-3. **แยก deferred migration เป็น slices:** Routine summary/reference/export, Leave report/participant/attachment/recovery/LIFF cancellation decision และ Email/IT ต้องมี capability/scope/channel contract, query predicate และ tests ก่อน activate ทีละ surface. ไม่ seed/grant โดยอัตโนมัติ
-4. **คง central-before-query/mutation invariant:** สำหรับ surface ที่จะ migrate ให้ route/application resolve capability ก่อน broad read และ transaction re-resolve actor/capability ก่อน write; ตรวจ exported raw query helpers ให้มี callers ที่จำกัดและมี regression test
-5. **เพิ่ม regression evidence:** test trusted actor provenance, request/client role/ID rejection, Team origin preservation across multiple memberships, invalid persisted configuration fail-closed/inspectable, Admin non-bypass of workforce/domain/transaction rules และ OWN/ASSIGNED/ALL query predicates
-6. **ปิด documentation/enforcement drift:** แก้ source comment account eligibility และบันทึก Routine client-graph enforcement decision แยกจาก policy migration; อย่าแก้ historical closure snapshot ให้กลายเป็น current-state rewrite
-7. **คงข้อห้าม Phase 11A:** ห้ามเพิ่ม DENY/wildcard/ABAC/DSL/nested Team/inheritance/expiry/delegated admin/tenant policy/external engine และห้าม infer authorization จาก Department/manager/Employee hierarchy
+1. เพิ่ม/เสริม architecture checks เพื่อป้องกัน migrated business authorization จากการข้าม centralized authorization contract และทำ explicit allowlist/documentation แบบแคบสำหรับ role checks ที่ตั้งใจคงไว้
+2. เพิ่ม regression coverage สำหรับ trusted actor provenance และบังคับให้ request/client ที่ส่ง role, user ID, employee ID, Team ID, capability หรือ authority data ไม่สามารถกำหนด authorization identity/authority ได้
+3. รักษา invariant ว่า central authorization ต้องเกิดก่อน protected query/list/read และ mutation; ปกป้อง caller/boundary ของ raw query helper ที่ตั้งใจไม่ authorize ตัวเองให้ถูกเรียกจากขอบเขตที่ตรวจแล้วเท่านั้น
+4. เพิ่ม transaction-time authorization/lifecycle re-check ในจุดที่ current contract กำหนด และทดสอบ lifecycle race โดยเฉพาะ lower Stock/Routine/Leave Admin/workforce compatibility seams
+5. ทดสอบการคง grant origin ของ `TEAM` เมื่อ actor อยู่หลาย Team และทำให้ unknown capability, unsupported scope, invalid Team origin, ownership mismatch และ persisted configuration ที่ไม่ถูกต้องยัง fail closed และ inspectable
+6. ยืนยันด้วย tests และ invariants ว่า ADMIN ไม่ bypass account/workforce lifecycle, input/resource/business invariants, workflow state, transaction หรือ concurrency guarantees
+7. แยกและทดสอบ domain predicates `OWN` / `CREATED` / `ASSIGNED` / `TEAM` / `ALL` ตาม resource ที่เกี่ยวข้อง ไม่ให้ capability scope ถูกตีความแทน resource relationship/query policy
+8. เพิ่ม regression tests สำหรับ lower Stock/Routine/Leave compatibility seams และ lifecycle races โดยไม่ตัดสิน policy ใหม่หรือเปิด reachability ใหม่
+9. พิจารณา browser/server dependency-graph enforcement สำหรับ Routine ได้เฉพาะเมื่อ current architecture evidence แสดงว่ามี graph bypass ที่ควรบังคับด้วย checker เพิ่ม; ต้องแยกการบังคับ graph ออกจาก policy migration
+
+## Post-11B policy and migration decisions
+
+รายการต่อไปนี้ไม่ใช่ Phase 11B enforcement implementation และต้องรอ business/architecture decision ที่ระบุ scope, data sensitivity, channel, predicate และ rollout อย่างชัดเจน:
+
+- การตัดสิน Employee broad-data/PII visibility
+- การ narrow หรือ expand Routine broad-query policy
+- การตัดสิน Leave reporting visibility
+- การ migrate Routine summary/reference/export
+- การ migrate Leave report/participant/attachment/recovery/cancellation-decision surfaces
+- การ migrate Email Request หรือ future IT authorization
+- การ activate compatibility-backed production Team policy
+- การ retire compatibility floors
+- การ seed หรือ grant policy ใหม่
+
+Phase 11A ยังคงข้อห้ามเดิม: ห้ามเพิ่ม DENY/wildcard/ABAC/DSL/nested Team/inheritance/expiry/delegated admin/tenant policy/external engine และห้าม infer authorization จาก Department/manager/Employee hierarchy
 
 ## Verification record
 
@@ -367,3 +404,5 @@ central migrated capability
 - `npm.cmd run test:run` — **ผ่าน**; 313 test files, 2,715 tests
 
 ไม่ได้รัน dev server หรือ production build เพราะไม่จำเป็นต่อ documentation-only audit และไม่ได้รัน MySQL integration suite เพราะ Phase 11A ไม่ได้เปลี่ยน schema/persistence production behavior. ไม่มี GitHub workflow/check หรือ security scanner result ถูกอ้างในรายงานนี้
+
+การ correction review หลัง commit `41ccff8c8d6033e6435fda5e6b6712ca1708b5d2` รันเพิ่ม: final production role/`isAdmin` search โดยตัด test/docs/vendor noise — **ผ่านการ reconcile กับ register**; `git diff --check` — **ผ่าน**; `npm.cmd run architecture:check` — **ผ่าน**. Diff ของ correction นี้มีเฉพาะเอกสาร audit และไม่ได้ rerun lint/typecheck/full test suite เพราะไม่มี production source หรือ behavior เปลี่ยน
