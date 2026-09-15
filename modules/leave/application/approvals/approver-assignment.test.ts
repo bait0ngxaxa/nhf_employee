@@ -7,6 +7,14 @@ import { assignLeaveApprovers } from "./approver-assignment";
 import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "../../domain/approver-eligibility";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
 
+const persistenceMocks = vi.hoisted(() => ({
+    lockEmployeeRows: vi.fn(),
+}));
+
+vi.mock("@/modules/leave/infrastructure/persistence/transaction", () => ({
+    lockEmployeeRows: persistenceMocks.lockEmployeeRows,
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
@@ -109,6 +117,7 @@ function mockAssignmentLookup(options: {
 describe("assignLeaveApprovers", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        persistenceMocks.lockEmployeeRows.mockResolvedValue(undefined);
         vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
         vi.mocked(prisma.user.findFirst).mockResolvedValue({
             id: 1,
@@ -184,6 +193,20 @@ describe("assignLeaveApprovers", () => {
                 ...ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE,
             },
         }));
+    });
+
+    it("locks both the affected employee and proposed approver before reading eligibility", async () => {
+        mockAssignmentLookup({ approvers: [ACTIVE_APPROVER] });
+
+        await expect(assignLeaveApprovers(
+            [{ employeeId: 10, managerId: 20 }],
+            ACTOR,
+        )).resolves.toBeUndefined();
+
+        expect(persistenceMocks.lockEmployeeRows).toHaveBeenCalledWith(
+            prisma,
+            [10, 20],
+        );
     });
 
     it("does not write an audit entry for a no-op assignment", async () => {

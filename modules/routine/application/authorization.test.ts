@@ -12,6 +12,7 @@ import {
     buildRoutineAuthorizationActor,
     buildRoutineOccurrenceScope,
     buildRoutineTaskScope,
+    assertActiveEmployeesInTransaction,
     resolveRoutineCapabilityForMigration,
     resolveRoutineCapabilityInTransaction,
     type RoutineMigratedCapability,
@@ -21,6 +22,8 @@ import type { RoutineCommandActor } from "./types";
 const mocks = vi.hoisted(() => ({
     resolve: vi.fn(),
     resolveInTransaction: vi.fn(),
+    lockEmployeeRows: vi.fn(),
+    lockUserRows: vi.fn(),
 }));
 
 vi.mock("@/modules/authorization", () => ({
@@ -28,6 +31,11 @@ vi.mock("@/modules/authorization", () => ({
         resolve: mocks.resolve,
         resolveInTransaction: mocks.resolveInTransaction,
     },
+}));
+
+vi.mock("@/lib/db/row-locks", () => ({
+    lockEmployeeRows: mocks.lockEmployeeRows,
+    lockUserRows: mocks.lockUserRows,
 }));
 
 function actor(
@@ -82,6 +90,8 @@ describe("Routine authorization migration adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
         mocks.resolveInTransaction.mockReset();
+        mocks.lockEmployeeRows.mockReset();
+        mocks.lockUserRows.mockReset();
     });
 
     it("maps Dashboard and LIFF actors without changing the server-derived identity", () => {
@@ -186,6 +196,73 @@ describe("Routine authorization migration adapter", () => {
             result.actor,
             "routine.task.read",
         );
+    });
+
+    it("keeps the task-read compatibility bridge bounded to its approved views", async () => {
+        const cases = [
+            {
+                label: "management view",
+                options: { taskReadView: "management" } as const,
+                scopes: ["CREATED", "ASSIGNED"] as const,
+            },
+            {
+                label: "work-item mine view",
+                options: {
+                    taskReadView: "work-item",
+                    requestedScope: "mine",
+                } as const,
+                scopes: ["ASSIGNED"] as const,
+            },
+            {
+                label: "work-item all view",
+                options: {
+                    taskReadView: "work-item",
+                    requestedScope: "all",
+                } as const,
+                scopes: ["ALL"] as const,
+            },
+        ];
+
+        for (const testCase of cases) {
+            mocks.resolve.mockResolvedValueOnce(
+                decision(
+                    "routine.task.read",
+                    false,
+                    [],
+                    "NO_APPLICABLE_GRANT",
+                ),
+            );
+
+            const result = await resolveRoutineCapabilityForMigration(
+                actor(),
+                21,
+                "routine.task.read",
+                testCase.options,
+            );
+
+            expect(result.scopes, testCase.label).toEqual(testCase.scopes);
+            expect(result.usedMigrationCompatibility).toBe(true);
+        }
+    });
+
+    it("does not bridge a structural task-read denial into work-item ALL", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "routine.task.read",
+                false,
+                [],
+                "CHANNEL_NOT_SUPPORTED",
+            ),
+        );
+
+        await expect(
+            resolveRoutineCapabilityForMigration(
+                actor(),
+                21,
+                "routine.task.read",
+                { taskReadView: "work-item", requestedScope: "all" },
+            ),
+        ).rejects.toMatchObject({ statusCode: 403 });
     });
 
     it("never converts a structural channel denial into migration access", async () => {
@@ -360,5 +437,34 @@ describe("Routine authorization scope translation", () => {
         expect(buildRoutineOccurrenceScope(21, ["CREATED"])).toEqual({
             id: { in: [] },
         });
+    });
+
+    it("fails closed for a TEAM scope without a Routine-owned Team predicate", () => {
+        expect(buildRoutineTaskScope(7, 21, ["TEAM"])).toEqual({
+            id: { in: [] },
+        });
+        expect(buildRoutineOccurrenceScope(21, ["TEAM"])).toEqual({
+            id: { in: [] },
+        });
+    });
+
+    it("locks target Employees before accepting a new active-assignee set", async () => {
+        const steps: string[] = [];
+        const tx = {
+            employee: {
+                findMany: vi.fn().mockImplementation(async () => {
+                    steps.push("re-read");
+                    return [{ id: 21 }, { id: 42 }];
+                }),
+            },
+        } as never;
+        mocks.lockEmployeeRows.mockImplementation(async () => {
+            steps.push("lock");
+        });
+
+        await assertActiveEmployeesInTransaction(tx, [42, 21, 42]);
+
+        expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [42, 21]);
+        expect(steps).toEqual(["lock", "re-read"]);
     });
 });

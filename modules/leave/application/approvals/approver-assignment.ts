@@ -164,10 +164,14 @@ export async function assignLeaveApprovers(
                 403,
             );
         }
-        await lockEmployeeRows(tx, [...employeeIds].sort((left, right) => left - right));
-
         const managerIds = assignments.flatMap(({ managerId }) =>
             managerId === null ? [] : [managerId]
+        );
+        await lockEmployeeRows(
+            tx,
+            [...new Set([...employeeIds, ...managerIds])].sort(
+                (left, right) => left - right,
+            ),
         );
         const [employees, approvers, pendingRequests] = await Promise.all([
             tx.employee.findMany({

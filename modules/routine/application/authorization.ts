@@ -541,6 +541,7 @@ export async function assertActiveEmployeesInTransaction(
         throw new RoutineValidationError("กรุณาระบุผู้รับผิดชอบ");
     }
 
+    await lockEmployeeRows(tx, uniqueEmployeeIds);
     const employees = await tx.employee.findMany({
         where: {
             id: { in: uniqueEmployeeIds },

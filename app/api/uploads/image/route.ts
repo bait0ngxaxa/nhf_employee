@@ -8,7 +8,7 @@ import {
     StockCapabilityDeniedError,
 } from "@/modules/stock";
 
-export async function POST(request: Request): Promise<NextResponse> {
+async function authorizeImageUpload(): Promise<NextResponse | null> {
     const auth = await requireActiveWorkforceOrAdminSession();
     if (!auth.ok) return auth.response;
 
@@ -28,6 +28,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         throw error;
     }
 
+    return null;
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+    const authorizationResponse = await authorizeImageUpload();
+    if (authorizationResponse) return authorizationResponse;
+
     const formData = await request.formData();
     const scope = formData.get("scope");
     const file = formData.get("file");
@@ -39,6 +46,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!(file instanceof File)) {
         return jsonError("กรุณาเลือกไฟล์รูปภาพ", 400);
     }
+
+    const currentAuthorizationResponse = await authorizeImageUpload();
+    if (currentAuthorizationResponse) return currentAuthorizationResponse;
 
     try {
         const upload = await saveLocalImageUpload({ scope, file });

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { lockEmployeeRows } from "@/lib/db/row-locks";
 import {
     ACTIVE_LEAVE_APPROVER_USER_SELECT,
     isActiveLeaveApprover,
@@ -119,6 +120,7 @@ export async function resolveLeaveExceptionApprover(
         };
     }
 
+    await lockEmployeeRows(tx, [input.employeeId]);
     const employee = await tx.employee.findUnique({
         where: { id: input.employeeId },
         select: {
@@ -142,23 +144,32 @@ export async function resolveLeaveExceptionApprover(
         };
     }
 
-    const admins = await tx.employee.findMany({
-        where: {
-            id: { not: input.employeeId },
-            status: "ACTIVE",
-            deletedAt: null,
-            user: {
-                is: {
-                    role: "ADMIN",
-                    isActive: true,
-                    deletedAt: null,
+    const findAdminCandidates = async (): Promise<ExceptionApprover[]> =>
+        tx.employee.findMany({
+            where: {
+                id: { not: input.employeeId },
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    is: {
+                        role: "ADMIN",
+                        isActive: true,
+                        deletedAt: null,
+                    },
                 },
             },
-        },
-        orderBy: { id: "asc" },
-        select: EXCEPTION_APPROVER_SELECT,
-    });
-    const admin = admins.find(isActiveLeaveApprover);
+            orderBy: { id: "asc" },
+            select: EXCEPTION_APPROVER_SELECT,
+        });
+
+    const candidateAdmins = await findAdminCandidates();
+    if (candidateAdmins.length > 0) {
+        await lockEmployeeRows(tx, candidateAdmins.map(({ id }) => id));
+    }
+    const admin = (candidateAdmins.length > 0
+        ? await findAdminCandidates()
+        : candidateAdmins
+    ).find(isActiveLeaveApprover);
     if (!admin) {
         return null;
     }
