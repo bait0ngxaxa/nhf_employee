@@ -811,6 +811,23 @@ changed.
 | `npm.cmd run test:integration:mysql` | FAIL, exit 1. MySQL migrations completed with 67 migrations and no pending work; 15 of 16 integration files passed and 103 of 104 tests passed. The sole failure was the reproduced unrelated malformed-fixture case `__tests__/integration/leave-quota-concurrency.integration.test.ts` / `creates one quota for concurrent non-overlapping requests with different keys`, raising `WorkforceAuthorizationError` at `modules/leave/application/authorization.ts:parseUserRole` from the route mock role shape. |
 | `git diff --check` | PASS, exit 0. No whitespace errors reported. |
 
+#### Verification refresh at corrected HEAD `7fa7e7c5324fbf48d61a25faec616838eed6ca4b`
+
+This verification-only refresh was run after the accepted LEV-17 relational
+fixture correction. No production code or test logic changed during the
+refresh; the matrix classifications and closure status remain unchanged.
+
+| Command | Observed result |
+| --- | --- |
+| `npm.cmd run test:run -- __tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` | PASS, exit 0. 1 test file and 9 tests passed. |
+| `npm.cmd run test:run -- __tests__/api/line-leave-routes.test.ts __tests__/api/leave-not-taken.test.ts modules/leave/application/authorization.test.ts` | PASS, exit 0. 3 test files and 48 tests passed. |
+| `npm.cmd run architecture:check` | PASS, exit 0. `Architecture check passed: checked 1121 repository source file(s) for module boundaries.` |
+| `npm.cmd run lint:strict` | PASS, exit 0. ESLint completed with `--max-warnings=0`. |
+| `npm.cmd run typecheck` | PASS, exit 0. `tsc --noEmit` completed successfully. |
+| `npm.cmd run test:run` | PASS, exit 0. First run: 316 test files and 2,786 tests passed; no rerun was required. |
+| `npm.cmd run test:integration:mysql` | FAIL, exit 1. MySQL migrations completed with 67 migrations and no pending work; 15 of 16 integration files passed and 103 of 104 tests passed. The reproduced unrelated failure was `__tests__/integration/leave-quota-concurrency.integration.test.ts` / `creates one quota for concurrent non-overlapping requests with different keys`, raising `WorkforceAuthorizationError` at `modules/leave/application/authorization.ts:parseUserRole` from the malformed route mock role shape. |
+| `git diff --check` | PASS, exit 0. No whitespace errors reported. |
+
 ## Production policy change statement
 
 Production authorization policy was **not changed** in Phase 11C.2A, Phase
