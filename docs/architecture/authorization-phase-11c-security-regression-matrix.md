@@ -1,7 +1,7 @@
 # Authorization Phase 11C.1 — Security Regression Matrix
 
-Status: Phase 11C.1 final documentation correction pass complete; Phase 11C.2
-not started.
+Status: Phase 11C.2A complete; Phase 11C.2 remains open for
+`11C2-ACTOR-01`, `11C2-TX-01`, `11C2-TX-02`, and `11C2-API-01`.
 
 Historical baselines:
 
@@ -12,13 +12,14 @@ Historical baselines:
 - `779d738c781eaff4ed21f31a0f328cca3f724bac` — current corrective matrix
   commit before this final correction.
 
-Audit point: the current production source and tests at `779d738`.
+Audit point: the current production source and tests after the Phase 11C.2A
+regression additions.
 
 This document is the authoritative cross-domain regression baseline for the
 authorization implementation. It records what the current code enforces, what
-the tests intentionally prove, and which gaps should be implemented only after
-the Phase 11C.2 work is approved. A row is not considered covered merely
-because a related source file or an adjacent test exists.
+the tests intentionally prove, and which gaps are in the approved Phase 11C.2
+backlog. A row is not considered covered merely because a related source file
+or an adjacent test exists.
 
 ## Executive verdict
 
@@ -29,14 +30,14 @@ Employee lifecycle revalidation for Routine, approver/assignee revalidation for
 Leave, and the pre-write authorization recheck for Stock uploads.
 
 The baseline is not fully regression-complete. It contains explicit
-compatibility policies and deferred surfaces, and it has five missing matrix
-proofs for current-state grant revocation, cross-domain stale-role
-revalidation, transaction-time authorization state, and route-by-route
-breadth. The operation ledger separately has 20 route/capability rows without
-an exact direct route assertion. The deferred rows are evaluated against their
-current deferred invariants; choosing their future target policy is outside
-the active test-gap count. These are test and policy-scope findings, not
-silently upgraded target behavior.
+compatibility policies and deferred surfaces, and it has four missing matrix
+proofs for cross-domain stale-role revalidation, transaction-time
+authorization state, and route-by-route breadth. The operation ledger
+separately has 20 route/capability rows without an exact direct route
+assertion. The deferred rows are evaluated against their current deferred
+invariants; choosing their future target policy is outside the active
+test-gap count. These are test and policy-scope findings, not silently
+upgraded target behavior.
 
 The operation-level inventory is finite: the migrated route ledger contains 81
 route/capability/channel rows and the separate Authorization Administration
@@ -55,14 +56,14 @@ Quantified matrix result:
 | Metric | Count |
 | --- | ---: |
 | Total matrix cases | 89 |
-| `DIRECT` | 65 |
-| `INDIRECT` | 16 |
-| `MISSING` | 5 |
+| `DIRECT` | 68 |
+| `INDIRECT` | 14 |
+| `MISSING` | 4 |
 | `N/A` | 3 |
 | Compatibility-policy rows | 14 |
 | Deferred-authorization-surface rows | 3 |
 | Blocking security defects discovered in this audit | 0 |
-| Genuine Phase 11C.2 regression work items | 6 |
+| Remaining genuine Phase 11C.2 regression work items | 4 |
 | Future policy/migration decision families outside Phase 11C | 4 |
 
 Quantified operation-ledger result:
@@ -75,10 +76,9 @@ Quantified operation-ledger result:
 | Authorization Administration command rows | 17 | 17 | 0 | 0 |
 | **Combined explicit ledger rows** | **98** | **78** | **0** | **20** |
 
-Production authorization policy was not changed. No Team policy was activated
-by this corrective pass; no seed/grant records were added by this corrective
-pass; no compatibility bridge was retired; and no deferred capability was
-migrated.
+Production authorization policy was not changed by Phase 11C.2A. No Team
+policy was activated; no production seed/grant records were added; no
+compatibility bridge was retired; and no deferred capability was migrated.
 
 ## Audit methodology
 
@@ -422,9 +422,9 @@ indirect.
 | CAP-02 | Central resolver | Registered capability on unsupported channel | Any | Unsupported channel must fail closed | Deny with `CHANNEL_NOT_SUPPORTED` | `modules/authorization/application/evaluator.ts:getAuthorizationEvaluationContext` | `modules/authorization/application/resolver.test.ts`; `modules/authorization/registry.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None | No compatibility fallback is allowed for a channel error. |
 | CAP-03 | Central resolver and domain adapters | Registered capability with no applicable grant | `DASHBOARD` / `LIFF_SELF_SERVICE` | Default authorization is additive ALLOW plus default DENY | Deny with `NO_APPLICABLE_GRANT`, except for the exact documented compatibility bridge | `modules/authorization/application/evaluator.ts`; each migrated domain authorization adapter | `modules/authorization/application/resolver.test.ts`; domain `application/authorization.test.ts` suites | DIRECT | MIGRATED_AUTHORIZATION | None for the central default-deny decision | Compatibility translation is recorded in separate rows and cannot mask structural errors. |
 | CAP-04 | Central resolver grant union | Team, TeamRole, and direct User grants | `DASHBOARD` / `LIFF_SELF_SERVICE` | Currently applicable grants from valid Team, TeamRole, and direct User sources are additive; direct User grant does not require membership | Union the current applicable grants and normalize scopes; deny when the union is empty | `modules/authorization/application/evaluator.ts`; `modules/authorization/infrastructure/persistence/authorization-resolution-repository.ts` | `modules/authorization/application/resolver.test.ts` (`unions active Team, TeamRole, and direct User grants`; direct User grant without membership) | DIRECT | MIGRATED_AUTHORIZATION | None | “Applicable” includes current Team/membership/TeamRole lifecycle checks; grant rows themselves have present/removed semantics. There is no general explicit DENY policy. |
-| CAP-05 | Central resolver current grant state | Direct User grants | Any supported channel | Removing a persisted direct User grant must affect a fresh subsequent authorization resolution | A removed grant must not authorize the subsequent request; the model has no User-grant `isActive` state | `authorization-resolution-repository.ts` reads present UserCapabilityGrant rows; evaluator resolves the fresh current set | No test directly removes a direct User grant and then resolves the same capability | MISSING | MIGRATED_AUTHORIZATION | `11C2-CAP-01`: add repository-backed remove-then-resolve coverage | “Removed” is the supported persistence transition; do not invent an inactive-grant flag. |
-| CAP-06 | Central resolver membership state | Team-origin grants | Any supported channel | Removing a User's TeamMembership must exclude the Team-origin grant on a fresh subsequent resolution; Team lifecycle is a separate `Team.isActive` condition | A removed membership must not authorize through that Team; an inactive Team is also excluded | `authorization-resolution-repository.ts` queries current membership and `Team.isActive`; evaluator preserves the Team origin | `modules/authorization/application/resolver.test.ts` (`does not use grants from an inactive Team`); repository query tests | INDIRECT | MIGRATED_AUTHORIZATION | `11C2-CAP-02`: add a membership-removal/re-resolve integration case | Team source and `TEAM` resource scope are independent. TeamMembership has no generic `isActive` flag; “removed” is the applicable state. |
-| CAP-07 | Central resolver TeamRole state | TeamRole-origin grants | Any supported channel | Removing a TeamRoleCapabilityGrant must exclude that source; applicability also depends on current membership, `Team.isActive`, and `TeamRole.isActive` | A removed grant or no-longer-applicable membership/Team/TeamRole state must not authorize through that source | `authorization-resolution-repository.ts`; evaluator checks current membership and active Team/TeamRole | `modules/authorization/application/resolver.test.ts` (`does not use TeamRole grants from an inactive role`); `modules/authorization/application/administration-mutations.test.ts` | INDIRECT | MIGRATED_AUTHORIZATION | `11C2-CAP-02`: add a TeamRole grant remove-then-resolve case and retain lifecycle cases | TeamRoleCapabilityGrant has no `isActive` flag; “removed” is the applicable grant state, while `TeamRole.isActive` is a real lifecycle field. |
+| CAP-05 | Central resolver current grant state | Direct User grants | Any supported channel | Removing a persisted direct User grant must affect a fresh subsequent authorization resolution | A removed grant must not authorize the subsequent request; the model has no User-grant `isActive` state | `authorization-resolution-repository.ts` reads present UserCapabilityGrant rows; evaluator resolves the fresh current set | `__tests__/integration/authorization-resolver.integration.test.ts` (`resolves a direct User grant without a membership`; `stops using a removed direct User grant on a fresh resolution`) | DIRECT | MIGRATED_AUTHORIZATION | — | “Removed” is the supported persistence transition; do not invent an inactive-grant flag. |
+| CAP-06 | Central resolver membership state | Team-origin grants | Any supported channel | Removing a User's TeamMembership must exclude the Team-origin grant on a fresh subsequent resolution; Team lifecycle is a separate `Team.isActive` condition | A removed membership must not authorize through that Team; an inactive Team is also excluded | `authorization-resolution-repository.ts` queries current membership and `Team.isActive`; evaluator preserves the Team origin | `__tests__/integration/authorization-resolver.integration.test.ts` (`resolves a Team grant through an active membership`; `stops using a Team grant after its membership is removed`; `excludes an inactive Team`); `modules/authorization/application/resolver.test.ts`; repository query tests | DIRECT | MIGRATED_AUTHORIZATION | — | Team source and `TEAM` resource scope are independent. TeamMembership has no generic `isActive` flag; “removed” is the applicable state. |
+| CAP-07 | Central resolver TeamRole state | TeamRole-origin grants | Any supported channel | Removing a TeamRoleCapabilityGrant must exclude that source; applicability also depends on current membership, `Team.isActive`, and `TeamRole.isActive` | A removed grant or no-longer-applicable membership/Team/TeamRole state must not authorize through that source | `authorization-resolution-repository.ts`; evaluator checks current membership and active Team/TeamRole | `__tests__/integration/authorization-resolver.integration.test.ts` (`resolves an active TeamRole grant through its membership`; `stops using a removed TeamRole grant on a fresh resolution`; `excludes an inactive TeamRole but retains Team grants`); `modules/authorization/application/resolver.test.ts`; `modules/authorization/application/administration-mutations.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | — | TeamRoleCapabilityGrant has no `isActive` flag; “removed” is the applicable grant state, while `TeamRole.isActive` is a real lifecycle field. |
 | CAP-08 | Persisted grant/configuration validation | Any persisted capability and scope | Any | Unknown persisted key or unsupported scope must fail closed rather than normalize or broaden | Return typed invalid-configuration failure; never allow the row | `modules/authorization/application/evaluator.ts:validatePersistedGrant`; grant validation and administration | `modules/authorization/application/grant-validation.test.ts`; `modules/authorization/application/resolver.test.ts`; `modules/authorization/application/administration.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None | No trim, wildcard, fallback, or second capability list is accepted. |
 | CAP-09 | Grant origin validation | Team, TeamRole, and User grants | Any | Invalid Team/TeamRole origin and direct User `TEAM` scope must fail closed | Reject missing/mismatched origin with typed structural/configuration error | `modules/authorization/application/evaluator.ts:toEffectiveGrant`; origin checks in persistence and administration | `modules/authorization/application/resolver.test.ts`; `modules/authorization/application/grant-validation.test.ts`; `modules/authorization/application/administration.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None | Domain modules do not invent Team origin. |
 | CAP-10 | Role semantics | TeamRole and system role | Any | A TeamRole name has no intrinsic authority; only registered currently applicable grants and system role semantics matter | A role without a matching grant is denied | `modules/authorization/application/evaluator.ts`; `lib/ssot/permissions.ts:isAdminRole` | `modules/authorization/application/resolver.test.ts` (`role with no grant is denied`); `modules/authorization/registry.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None | TeamRole is an origin/source, not a hierarchy or inherited authority. `TeamRole.isActive` is a role lifecycle field; a capability-grant row is present or removed. |
@@ -502,14 +502,14 @@ does not claim that invariant for those paths.
 | `AUTHN-*` Authentication boundary | 4 | 3 | 1 | 0 | 0 |
 | `LIFE-*` Identity lifecycle | 6 | 6 | 0 | 0 | 0 |
 | `ACTOR-*` Trusted actor provenance | 7 | 4 | 2 | 1 | 0 |
-| `CAP-*` Capability resolution | 12 | 8 | 3 | 1 | 0 |
+| `CAP-*` Capability resolution | 12 | 11 | 1 | 0 | 0 |
 | `SCOPE-*` Resource scopes | 9 | 7 | 1 | 0 | 1 |
 | `CHANNEL-*` Channel isolation and projections | 7 | 6 | 1 | 0 | 0 |
 | `API-*` Direct API enforcement | 10 | 4 | 5 | 1 | 0 |
 | `TX-*` Transaction-time revalidation | 11 | 7 | 0 | 2 | 2 |
 | `ADMIN-*` ADMIN invariants | 8 | 7 | 1 | 0 | 0 |
 | `COMPAT-*` Compatibility and deferred surfaces | 15 | 13 | 2 | 0 | 0 |
-| **Total** | **89** | **65** | **16** | **5** | **3** |
+| **Total** | **89** | **68** | **14** | **4** | **3** |
 
 Required dimensions A through J are represented as follows: authentication and
 lifecycle in `AUTHN-*` and `LIFE-*`; actor provenance in `ACTOR-*`; resolver
@@ -528,7 +528,7 @@ are assigned to the shared boundary bucket, so the table totals exactly 89.
 | Primary domain/surface bucket | Matrix rows | Total | DIRECT | INDIRECT | MISSING | N/A |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | Auth/session and lifecycle | `AUTHN-*`, `LIFE-*` | 10 | 9 | 1 | 0 | 0 |
-| Central actor/resolver/registry | `ACTOR-*`, `CAP-*` | 19 | 12 | 5 | 2 | 0 |
+| Central actor/resolver/registry | `ACTOR-*`, `CAP-*` | 19 | 15 | 3 | 1 | 0 |
 | Cross-domain scope semantics | `SCOPE-*` | 9 | 7 | 1 | 0 | 1 |
 | Dashboard, LIFF, and presentation boundary | `CHANNEL-*` | 7 | 6 | 1 | 0 | 0 |
 | Employee API and migrated policy | `API-01` | 1 | 0 | 1 | 0 | 0 |
@@ -551,7 +551,7 @@ are assigned to the shared boundary bucket, so the table totals exactly 89.
 | Email deferred surface | `COMPAT-13` | 1 | 1 | 0 | 0 | 0 |
 | Presentation-only surface | `COMPAT-14` | 1 | 1 | 0 | 0 | 0 |
 | Team/Department architecture boundary | `COMPAT-15` | 1 | 0 | 1 | 0 | 0 |
-| **Total** |  | **89** | **65** | **16** | **5** | **3** |
+| **Total** |  | **89** | **68** | **14** | **4** | **3** |
 
 All currently migrated domain surfaces are represented: central Authorization,
 Authorization Administration, Employee, Department, Routine, Stock, Leave,
@@ -577,7 +577,7 @@ should be extended rather than replaced by a giant synthetic test:
 
 ## Missing DIRECT regression coverage
 
-These are the five `MISSING` matrix rows. They are not production defects by
+These are the four `MISSING` matrix rows. They are not production defects by
 themselves; each is a finite regression proof that was not found in the
 current source/test baseline. The operation ledger has a separate, more
 granular set of 20 missing protected route proofs; those rows are not added to
@@ -585,22 +585,15 @@ the matrix-case total.
 
 | Work item | Matrix row | Exact missing proof | Recommended Phase 11C.2 action |
 | --- | --- | --- | --- |
-| `11C2-CAP-01` | `CAP-05` | Remove a persisted direct User grant, then perform a fresh resolver decision for the same capability | Add a repository-backed remove-then-resolve test; assert denial and do not introduce an inactive-grant abstraction. |
 | `11C2-ACTOR-01` | `ACTOR-06` | Across the claimed Routine, Stock, and Leave mutation adapters, prove a current persisted role replaces a stale route-time role | Add one deterministic current-role replacement case for each named adapter. |
 | `11C2-API-01` | `API-10` | Direct operation-specific route proof is absent for the finite ledger rows `LEDGER-EMP-04`, `LEDGER-ROU-01`, `LEDGER-ROU-02`, `LEDGER-ROU-06`, `LEDGER-ROU-07`, `LEDGER-ROU-08`, `LEDGER-ROU-14`, `LEDGER-ROU-15`, `LEDGER-ROU-16`, `LEDGER-ROU-17`, `LEDGER-ROU-18`, `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17` | Add only the 20 named route/capability/channel boundary tests; do not create an unbounded “remaining routes” task. |
 | `11C2-TX-01` | `TX-01` | A supported transaction-time revalidation case in which current state visible to that transaction changes after preflight and stale state would otherwise authorize | Add narrowly scoped transaction-context/lock-re-read tests and document isolation/visibility assumptions. Do not require atomic coordination with an unrelated external grant commit. |
 | `11C2-TX-02` | `TX-06` | Paired cross-domain current-role replacement proof for the exact Stock, Routine, and Leave adapters | Add current-role tests for those adapters; add current grant/membership re-resolution only where the specific path claims it. |
 
-`CAP-06` and `CAP-07` remain `INDIRECT`, not `MISSING`: inactive Team/role
-unit behavior and administration mutation behavior exist, but fresh
-remove-then-resolve assertions do not. Their direct strengthening is a finite
-part of `11C2-CAP-02` below. These are central resolver aggregate rows, not
-operation-ledger rows; the Outcome A direct-route contract applies to the
-operation ledger. The other `INDIRECT` matrix rows are likewise explicitly
-scoped aggregate, architecture, or deferred-classification evidence. They do
-not represent complete direct proof for every operation in their stated
-domain, and any required operation proof is listed by exact ledger ID in the
-finite backlog rather than being hidden behind the word `INDIRECT`.
+The CAP revocation rows are no longer in this missing-coverage table:
+`CAP-05`, `CAP-06`, and `CAP-07` are directly covered by the Phase 11C.2A
+integration resolver tests, while the inactive Team and TeamRole lifecycle
+cases remain covered separately.
 
 ## Real security defects discovered
 
@@ -662,19 +655,19 @@ This is the finite security-regression backlog produced by this audit. It does
 not include future policy selection, and it does not authorize production
 behavior changes.
 
-| Priority | Work item | Exact invariant and affected surface | Missing regression proof | Expected outcome |
+| Priority | Work item | Exact invariant and affected surface | Regression proof / status | Expected outcome |
 | ---: | --- | --- | --- | --- |
-| 1 | `11C2-CAP-01` | Direct User grant removal at the central resolver | Present UserCapabilityGrant is removed, then a fresh resolution for the same capability must deny | The next resolution has no removed direct grant and returns default denial. |
-| 2 | `11C2-CAP-02` | TeamMembership removal and TeamRoleCapabilityGrant removal at the resolver | Current membership/grant state is changed, then a fresh resolution must exclude the relevant Team or TeamRole source | Team-origin authorization disappears without introducing grant-row `isActive` state; inactive `Team.isActive` and `TeamRole.isActive` cases remain covered. |
-| 3 | `11C2-ACTOR-01` | Current persisted system role in Routine, Stock, and Leave transaction actor construction | A stale route-time role is supplied while the persisted role is changed before the adapter's documented re-read | The final actor uses current trusted role; client/request role remains irrelevant. |
-| 4 | `11C2-TX-01` | Transaction-time current-state visibility for supported mutation adapters | A state change visible to the same supported transaction after preflight must not be authorized from the stale snapshot | The test proves only the claimed lock/re-read/isolation boundary; it does not require coordination with an unrelated external grant commit. |
-| 5 | `11C2-TX-02` | Final stale actor/authorization state in the exact Stock, Routine, and Leave transaction paths | Existing lifecycle tests do not pair the current-role/final-decision assertion across all three adapters | Each named adapter either rejects stale actor state at its claimed boundary or is explicitly narrowed as unsupported. |
-| 6 | `11C2-API-01` | Twenty exact missing protected route rows: `LEDGER-EMP-04`, `LEDGER-ROU-01`, `LEDGER-ROU-02`, `LEDGER-ROU-06`, `LEDGER-ROU-07`, `LEDGER-ROU-08`, `LEDGER-ROU-14`, `LEDGER-ROU-15`, `LEDGER-ROU-16`, `LEDGER-ROU-17`, `LEDGER-ROU-18`, `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17` | No adequate operation-specific direct route assertion exists for those capability/channel pairs | Add 20 finite behavior-oriented route tests covering authentication, trusted actor, capability/resource boundary, and applicable lifecycle/workflow behavior. The three Stock LIFF projection rows are not part of this work item. |
+| 1 | `11C2-CAP-01` | Direct User grant removal at the central resolver | **COMPLETE — Phase 11C.2A:** `__tests__/integration/authorization-resolver.integration.test.ts` removes the persisted grant and performs a fresh same-capability resolution. | The next resolution has no removed direct grant and returns default denial. |
+| 2 | `11C2-CAP-02` | TeamMembership removal and TeamRoleCapabilityGrant removal at the resolver | **COMPLETE — Phase 11C.2A:** `__tests__/integration/authorization-resolver.integration.test.ts` covers both persisted removals followed by fresh same-capability resolutions. | Team-origin authorization disappears without introducing grant-row `isActive` state; inactive `Team.isActive` and `TeamRole.isActive` cases remain covered. |
+| 3 | `11C2-ACTOR-01` | Current persisted system role in Routine, Stock, and Leave transaction actor construction | **OPEN:** A stale route-time role is supplied while the persisted role is changed before the adapter's documented re-read. | The final actor uses current trusted role; client/request role remains irrelevant. |
+| 4 | `11C2-TX-01` | Transaction-time current-state visibility for supported mutation adapters | **OPEN:** A state change visible to the same supported transaction after preflight must not be authorized from the stale snapshot. | The test proves only the claimed lock/re-read/isolation boundary; it does not require coordination with an unrelated external grant commit. |
+| 5 | `11C2-TX-02` | Final stale actor/authorization state in the exact Stock, Routine, and Leave transaction paths | **OPEN:** Existing lifecycle tests do not pair the current-role/final-decision assertion across all three adapters. | Each named adapter either rejects stale actor state at its claimed boundary or is explicitly narrowed as unsupported. |
+| 6 | `11C2-API-01` | Twenty exact missing protected route rows: `LEDGER-EMP-04`, `LEDGER-ROU-01`, `LEDGER-ROU-02`, `LEDGER-ROU-06`, `LEDGER-ROU-07`, `LEDGER-ROU-08`, `LEDGER-ROU-14`, `LEDGER-ROU-15`, `LEDGER-ROU-16`, `LEDGER-ROU-17`, `LEDGER-ROU-18`, `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17` | **OPEN:** No adequate operation-specific direct route assertion exists for those capability/channel pairs. | Add 20 finite behavior-oriented route tests covering authentication, trusted actor, capability/resource boundary, and applicable lifecycle/workflow behavior. The three Stock LIFF projection rows are not part of this work item. |
 
 ## Strengthening / optional coverage
 
-These items are useful hardening but are not counted as the six genuine
-missing-regression work items:
+These items are useful hardening but are not counted as the four remaining
+genuine missing-regression work items:
 
 - `11C2-CHANNEL-01`: pair Dashboard and LIFF assertions for each capability
   intentionally available in both channels (`CHANNEL-07` remains aggregate
@@ -730,29 +723,35 @@ wildcards, ABAC, nested Teams, role inheritance, or a persistence redesign.
 
 ## Verification record
 
-This section records the exact commands and observed results after the final
-documentation correction. The focused authorization run is optional for this
-documentation-only pass and was not rerun; the required checks below were run
-without changing timeout or test configuration.
+This section records the exact commands and observed results for Phase 11C.2A.
+The focused resolver and persistence tests were run against both the real
+MySQL integration database and the default unit-test configuration. No timeout
+or test configuration was changed.
+
+The focused integration command used this process-only environment setup:
+
+```powershell
+$integrationValues = Get-Content -Raw -Encoding UTF8 integration.env | ConvertFrom-StringData
+$env:DATABASE_URL = $integrationValues.TEST_DATABASE_URL
+$env:TEST_DATABASE_URL = $integrationValues.TEST_DATABASE_URL
+$env:NODE_ENV = "test"
+node node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts __tests__/integration/authorization-resolver.integration.test.ts
+```
 
 | Command | Observed result |
 | --- | --- |
+| `node node_modules/vitest/vitest.mjs run --config vitest.integration.config.ts __tests__/integration/authorization-resolver.integration.test.ts` with `DATABASE_URL` mapped from `integration.env:TEST_DATABASE_URL` | PASS, exit 0. 1 integration file and 10 tests passed. |
+| `npm.cmd run test:run -- modules/authorization/application/resolver.test.ts modules/authorization/infrastructure/persistence/authorization-resolution-repository.test.ts` | PASS, exit 0. 2 files and 32 tests passed. |
 | `npm.cmd run architecture:check` | PASS, exit 0. `Architecture check passed: checked 1119 repository source file(s) for module boundaries.` |
-| `npm.cmd run lint:strict` | PASS, exit 0. Exit 0; ESLint completed with `--max-warnings=0`. |
-| `npm.cmd run typecheck` | PASS, exit 0. Exit 0; `tsc --noEmit` completed successfully. |
-| `npm.cmd run test:run -- modules/authorization __tests__/auth modules/employee/application/authorization.test.ts modules/routine/application/authorization.test.ts modules/stock/application/authorization.test.ts modules/leave/application/authorization.test.ts` | NOT RUN in the final documentation correction; it was optional because no production or test source changed. |
-| `npm.cmd run test:run` | PASS, exit 0. Vitest reported 314 test files passed and 2,759 tests passed. Start `16:28:26`; duration `175.92s`. |
+| `npm.cmd run lint:strict` | PASS, exit 0. ESLint completed with `--max-warnings=0`. |
+| `npm.cmd run typecheck` | PASS, exit 0. `tsc --noEmit` completed successfully. |
+| `npm.cmd run test:run` | FAIL, exit 1. 313 test files passed and 1 failed; 2,758 tests passed and 1 failed. `__tests__/architecture/check-architecture.test.ts` test `allows the current Routine browser graph` timed out at 30,000 ms. |
+| `npm.cmd run test:integration:mysql` | FAIL, exit 1. Prisma migrations succeeded; 15 integration files passed and 1 failed, with 103 tests passed and 1 failed. The unrelated failure was `__tests__/integration/leave-quota-concurrency.integration.test.ts` / `creates one quota for concurrent non-overlapping requests with different keys`, which raised `WorkforceAuthorizationError` in `modules/leave/application/authorization.ts:parseUserRole`. |
 | `git diff --check` | PASS, exit 0. No whitespace errors reported; Git emitted only its LF-to-CRLF working-copy warning. |
-
-The previous Phase 11B.4 record documented a non-zero default full-suite result
-caused by the architecture test named `reads changed runtime imports again on a
-later scan of the same root` exceeding the default 5000 ms timeout. That timeout
-did not reproduce in this run. The test, timeout, and configuration were not
-changed. No production, test, or configuration file changed in this final
-correction.
 
 ## Production policy change statement
 
-Production authorization policy was **not changed** in Phase 11C.1. This phase
-adds only this audit matrix document. No production source, schema, seed grant,
-compatibility policy, deferred surface, or test configuration was changed.
+Production authorization policy was **not changed** in Phase 11C.2A. This slice
+adds only regression tests and matrix updates. No production source, schema,
+seed grant, compatibility policy, deferred surface, or test configuration was
+changed.

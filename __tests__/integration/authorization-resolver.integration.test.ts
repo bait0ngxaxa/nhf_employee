@@ -122,6 +122,145 @@ describe.sequential("authorization resolver with real MySQL", () => {
         });
     });
 
+    it("stops using a removed direct User grant on a fresh resolution", async () => {
+        const user = await createUser("direct-revocation");
+        const capabilityKey = "stock.request.create";
+        const scope = "OWN";
+        await prisma.userCapabilityGrant.create({
+            data: {
+                userId: user.id,
+                capabilityKey,
+                scope,
+            },
+        });
+
+        const initialDecision = await authorization.resolve(
+            userActor(user.id),
+            capabilityKey,
+        );
+
+        expect(initialDecision).toMatchObject({
+            allowed: true,
+            scopes: [scope],
+            grants: [{
+                capability: capabilityKey,
+                scope,
+                source: { type: "USER", userId: user.id },
+            }],
+        });
+
+        await prisma.userCapabilityGrant.delete({
+            where: {
+                userId_capabilityKey_scope: {
+                    userId: user.id,
+                    capabilityKey,
+                    scope,
+                },
+            },
+        });
+
+        await expect(
+            prisma.userCapabilityGrant.findUnique({
+                where: {
+                    userId_capabilityKey_scope: {
+                        userId: user.id,
+                        capabilityKey,
+                        scope,
+                    },
+                },
+            }),
+        ).resolves.toBeNull();
+
+        const subsequentDecision = await authorization.resolve(
+            userActor(user.id),
+            capabilityKey,
+        );
+
+        expect(subsequentDecision).toEqual({
+            capability: capabilityKey,
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+    });
+
+    it("stops using a Team grant after its membership is removed", async () => {
+        const user = await createUser("membership-revocation");
+        const team = await createTeam("membership-revocation");
+        const capabilityKey = "routine.task.read";
+        const scope = "ALL";
+        await prisma.teamMembership.create({
+            data: { teamId: team.id, userId: user.id },
+        });
+        await prisma.teamCapabilityGrant.create({
+            data: {
+                teamId: team.id,
+                capabilityKey,
+                scope,
+            },
+        });
+
+        const initialDecision = await authorization.resolve(
+            userActor(user.id),
+            capabilityKey,
+        );
+
+        expect(initialDecision).toMatchObject({
+            allowed: true,
+            scopes: [scope],
+            grants: [{
+                capability: capabilityKey,
+                scope,
+                source: { type: "TEAM", teamId: team.id },
+            }],
+        });
+
+        await prisma.teamMembership.delete({
+            where: {
+                teamId_userId: {
+                    teamId: team.id,
+                    userId: user.id,
+                },
+            },
+        });
+
+        await expect(
+            prisma.teamMembership.findUnique({
+                where: {
+                    teamId_userId: {
+                        teamId: team.id,
+                        userId: user.id,
+                    },
+                },
+            }),
+        ).resolves.toBeNull();
+        await expect(
+            prisma.teamCapabilityGrant.findUnique({
+                where: {
+                    teamId_capabilityKey_scope: {
+                        teamId: team.id,
+                        capabilityKey,
+                        scope,
+                    },
+                },
+            }),
+        ).resolves.not.toBeNull();
+
+        const subsequentDecision = await authorization.resolve(
+            userActor(user.id),
+            capabilityKey,
+        );
+
+        expect(subsequentDecision).toEqual({
+            capability: capabilityKey,
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+    });
+
     it("resolves an active TeamRole grant through its membership", async () => {
         const user = await createUser("role");
         const team = await createTeam("role");
@@ -186,6 +325,98 @@ describe.sequential("authorization resolver with real MySQL", () => {
             grants: [{
                 source: { type: "USER", userId: user.id },
             }],
+        });
+    });
+
+    it("stops using a removed TeamRole grant on a fresh resolution", async () => {
+        const user = await createUser("role-revocation");
+        const team = await createTeam("role-revocation");
+        const role = await prisma.teamRole.create({
+            data: {
+                teamId: team.id,
+                key: "REVOCATION_OPERATOR",
+                name: "ผู้ปฏิบัติงานทดสอบการเพิกถอน",
+            },
+        });
+        const capabilityKey = "routine.task.read";
+        const scope = "ALL";
+        await prisma.teamMembership.create({
+            data: {
+                teamId: team.id,
+                userId: user.id,
+                teamRoleId: role.id,
+            },
+        });
+        await prisma.teamRoleCapabilityGrant.create({
+            data: {
+                teamRoleId: role.id,
+                capabilityKey,
+                scope,
+            },
+        });
+
+        const initialDecision = await authorization.resolve(
+            userActor(user.id),
+            capabilityKey,
+        );
+
+        expect(initialDecision).toMatchObject({
+            allowed: true,
+            scopes: [scope],
+            grants: [{
+                capability: capabilityKey,
+                scope,
+                source: {
+                    type: "TEAM_ROLE",
+                    teamId: team.id,
+                    teamRoleId: role.id,
+                },
+            }],
+        });
+
+        await prisma.teamRoleCapabilityGrant.delete({
+            where: {
+                teamRoleId_capabilityKey_scope: {
+                    teamRoleId: role.id,
+                    capabilityKey,
+                    scope,
+                },
+            },
+        });
+
+        await expect(
+            prisma.teamRoleCapabilityGrant.findUnique({
+                where: {
+                    teamRoleId_capabilityKey_scope: {
+                        teamRoleId: role.id,
+                        capabilityKey,
+                        scope,
+                    },
+                },
+            }),
+        ).resolves.toBeNull();
+        await expect(
+            prisma.teamMembership.findUnique({
+                where: {
+                    teamId_userId: {
+                        teamId: team.id,
+                        userId: user.id,
+                    },
+                },
+            }),
+        ).resolves.not.toBeNull();
+
+        const subsequentDecision = await authorization.resolve(
+            userActor(user.id),
+            capabilityKey,
+        );
+
+        expect(subsequentDecision).toEqual({
+            capability: capabilityKey,
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
         });
     });
 
