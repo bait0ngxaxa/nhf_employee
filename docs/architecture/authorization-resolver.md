@@ -8,6 +8,13 @@ capability contract in [authorization-contract.md](./authorization-contract.md),
 the persistence boundary in [authorization-persistence.md](./authorization-persistence.md),
 or the repository module rules in [module-boundaries.md](./module-boundaries.md).
 
+Phase 12A permanently locks the existing no-grant USER domain behavior as
+Default Domain Policy and defines future configured grants as additive
+authority. The detailed inventory and Phase 12B composition contract are in
+[authorization-phase-12a-additive-policy-contract.md](./authorization-phase-12a-additive-policy-contract.md).
+This addendum does not change the resolver implementation or its current
+resolver-level decision semantics.
+
 Phase 3 made authorization resolution operational and independently testable.
 The Phase 4 Routine pilot now composes this boundary for its migrated
 server-side capabilities; this document continues to describe the generic
@@ -128,6 +135,21 @@ mean a grant can revive an invalid actor. Domain modules must still enforce
 resource relationships, workflow state, business rules, transactions, and
 concurrency protection after this decision.
 
+The no-valid-grant result above is a resolver-level result. For a normal USER
+in the locked Phase 12 target, a valid resolver result is configured
+authority, not a replacement for the domain's Default Domain Policy. Phase
+12B must compose:
+
+~~~text
+domainDefaultPolicy + centralResolverConfiguredAuthority
+~~~
+
+as an additive union after trusted identity, registered capability, supported
+channel, and valid-configuration checks. A narrower configured grant must not
+narrow the default behavior. Phase 12A intentionally leaves the existing
+adapter fallback mechanics and current RuntimeAuthorizationMode names in
+place.
+
 ## USER semantics and lifecycle filtering
 
 For a normal `USER`, effective grants are the union of:
@@ -182,6 +204,11 @@ The persisted direct User model has no Team-origin column. A direct User
 `DIRECT_TEAM_SCOPE_REQUIRES_ORIGIN`; it never infers a Team from membership,
 Department, hierarchy, or employee data.
 
+The existing scope-array projection is not sufficient for the future composed
+result when a domain resource predicate needs the originating Team. Phase 12B
+must retain the effective grant source and Team origin/constraint metadata
+alongside normalized scope semantics.
+
 ## Invalid configuration
 
 The persistence adapter stores only the requested capability's rows, but the
@@ -216,6 +243,14 @@ role IDs from the membership result, so inactive roles are excluded at query
 time without excluding the membership's Team-level grants. No per-Team or
 per-grant query, cache, business-resource query, Department lookup, or raw
 Prisma delegate is exposed.
+
+## Phase 12A and later boundary
+
+Phase 12A adds no resolver or domain runtime behavior. It records the
+permanent Default Domain Policy and the current inventory. Phase 12B owns
+additive composition; Phase 12C owns the compatibility-backed domain
+migrations; Phase 12D owns remaining non-IT deferred surfaces. Email Request
+and the future IT module remain outside that roadmap.
 
 ## Phase boundary
 

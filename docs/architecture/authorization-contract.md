@@ -1,6 +1,8 @@
 # NHF Employee — Authorization Contract (Phase 1)
 
-Status: Phase 1 — Capability Contract & Registry
+Status: Phase 1 — Capability Contract & Registry (historical contract);
+Phase 12A additive policy lock: see
+[authorization-phase-12a-additive-policy-contract.md](./authorization-phase-12a-additive-policy-contract.md)
 
 This document defines the code-level authorization vocabulary for the next
 authorization phases. It does not replace or rewrite the current behavior
@@ -17,12 +19,16 @@ Phase 1 establishes:
 - the code-owned capability inventory and registry; and
 - the public module seam future phases will consume.
 
-Future authorization remains intended to be additive `ALLOW` grants with
-default deny. Phase 1 does not implement grant persistence, effective-grant
-resolution, a resolver, or an authorization evaluator. `ADMIN` remains the
-highest system role, but the actor role is not a bypass for authentication,
-workforce lifecycle, resource relationships, workflow state, validation,
-transactions, or concurrency rules.
+Configured authorization remains additive `ALLOW` grants. Phase 1 did not
+implement grant persistence, effective-grant resolution, a resolver, or an
+authorization evaluator. Phase 12A now locks existing NHF USER behavior as a
+permanent Default Domain Policy: a normal USER's effective authority is the
+union of that default policy and applicable configured Team, TeamRole, and
+exceptional direct User grants. The resolver-level no-grant result remains
+distinct from the final domain decision until Phase 12B composes these layers.
+`ADMIN` remains the highest system role, but the actor role is not a bypass for
+authentication, workforce lifecycle, resource relationships, workflow state,
+validation, transactions, channel restrictions, or concurrency rules.
 
 The existing role source of truth remains
 [`lib/ssot/permissions.ts`](../../lib/ssot/permissions.ts). The authorization
@@ -328,6 +334,27 @@ policies:
    bypass.
 
 No runtime branch is based on these labels in Phase 1.
+
+### 8.1 Phase 12A disposition
+
+The open-policy list above is preserved as a historical Phase 1 record. The
+permanent target is now locked by
+[Authorization Phase 12A](./authorization-phase-12a-additive-policy-contract.md):
+
+- existing no-grant USER behavior is the permanent Default Domain Policy;
+- configured Team, TeamRole, and direct User grants are additive and may not
+  narrow that default;
+- TEAM scope retains its originating Team constraint;
+- Department remains independent from Team;
+- current domain relationships and workflow rules remain domain-owned;
+- Routine summary/reference/export and deferred Leave report/export surfaces
+  remain deferred until a later non-IT policy phase; and
+- Email Request and the future IT module remain deferred and outside the Phase
+  12 roadmap.
+
+Phase 12A does not implement composition, activate compatibility-backed
+grants, change catalog readiness, or modify runtime behavior. The later
+Phase 12B contract is defined in the linked record.
 
 ## 9. Explicit Phase 1 non-goals
 
