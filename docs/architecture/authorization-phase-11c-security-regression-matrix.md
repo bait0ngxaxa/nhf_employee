@@ -778,13 +778,13 @@ No timeout configuration was changed.
 
 | Command | Observed result |
 | --- | --- |
-| `npm.cmd run test:run -- __tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` | PASS, exit 0. 1 test file and 13 tests passed. |
-| `npm.cmd run test:run -- __tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts __tests__/api/employees-routes.test.ts __tests__/api/routines-tasks.test.ts __tests__/api/routines-occurrences.test.ts __tests__/api/routines-occurrence-by-id.test.ts __tests__/api/routine-import-preview.test.ts` | PASS, exit 0. 6 test files and 72 tests passed. |
+| `npm.cmd run test:run -- __tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` | PASS, exit 0. 1 test file and 12 tests passed. |
+| `npm.cmd run test:run -- __tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts __tests__/api/employees-routes.test.ts __tests__/api/routines-tasks.test.ts __tests__/api/routines-occurrences.test.ts __tests__/api/routines-occurrence-by-id.test.ts __tests__/api/routine-import-preview.test.ts` | PASS, exit 0. 6 test files and 71 tests passed. |
 | `npm.cmd run test:run -- modules/employee/application/authorization.test.ts modules/employee/infrastructure/export/employee-export.test.ts modules/routine/application/authorization.test.ts modules/routine/application/queries.test.ts modules/routine/application/mutations.test.ts modules/routine/application/imports/staging.test.ts modules/routine/application/imports/apply.test.ts` | PASS, exit 0. 7 test files and 137 tests passed. |
 | `npm.cmd run architecture:check` | PASS, exit 0. `Architecture check passed: checked 1120 repository source file(s) for module boundaries.` |
-| `npm.cmd run lint:strict` | PASS, exit 0. ESLint completed with `--max-warnings=0` after the test-only type-import correction. |
+| `npm.cmd run lint:strict` | PASS, exit 0. ESLint completed with `--max-warnings=0`. |
 | `npm.cmd run typecheck` | PASS, exit 0. `tsc --noEmit` completed successfully. |
-| `npm.cmd run test:run` | FAIL, exit 1. 314 test files passed and 1 failed; 2,777 tests passed and 1 failed. The known intermittent failure was `__tests__/architecture/check-architecture.test.ts` / `reads changed runtime imports again on a later scan of the same root`, which timed out at its existing 5,000 ms test timeout. |
+| `npm.cmd run test:run` | PASS, exit 0. 315 test files passed and 2,777 tests passed. Duration: 326.03 seconds. |
 | `git diff --check` | PASS, exit 0. No whitespace errors reported; Git emitted only its LF-to-CRLF working-copy warning. |
 
 ## Production policy change statement
