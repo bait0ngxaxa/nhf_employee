@@ -39,6 +39,7 @@ const NO_OFFBOARDING_DEPENDENCIES: EmployeeOffboardingDependencyProvider = async
 
 function authorizedActor(
     actor: EmployeeLifecycleActor = ACTOR,
+    systemRole: "ADMIN" | "USER" = "ADMIN",
 ): EmployeeAuthorizedCommandActor {
     return {
         ...actor,
@@ -46,7 +47,7 @@ function authorizedActor(
             authorizationActor: {
                 userId: actor.userId,
                 employeeId: null,
-                systemRole: "ADMIN",
+                systemRole,
                 channel: "DASHBOARD",
             },
         },
@@ -73,10 +74,11 @@ function deleteEmployee(
     employeeId: number,
     actor: EmployeeLifecycleActor,
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider,
+    systemRole: "ADMIN" | "USER" = "ADMIN",
 ): Promise<EmployeeMutationResult> {
     return deleteEmployeeUseCase(
         employeeId,
-        authorizedActor(actor),
+        authorizedActor(actor, systemRole),
         offboardingDependencyProvider,
         employeeAccountLifecycle,
     );
@@ -141,6 +143,28 @@ describe("Employee Mutations", () => {
         prismaMock.employee.findUnique.mockResolvedValue(
             buildEmployee() as never,
         );
+    });
+
+    it("does not write after transaction-time authorization loses the management grant", async () => {
+        const authorizationDenied = new Error("employee.update authorization revoked");
+        authorizationMocks.resolveEmployeeCapabilityInTransaction.mockResolvedValue({
+            defaultScopes: [],
+            scopes: [],
+        });
+        authorizationMocks.assertEmployeeCapabilityScope.mockImplementation(() => {
+            throw authorizationDenied;
+        });
+
+        await expect(
+            updateEmployee(1, { firstName: "Should not write" }, ACTOR),
+        ).rejects.toBe(authorizationDenied);
+        expect(authorizationMocks.resolveEmployeeCapabilityInTransaction)
+            .toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ userId: ACTOR.userId }),
+                "employee.update",
+            );
+        expect(prismaMock.employee.update).not.toHaveBeenCalled();
     });
 
     describe("createEmployee", () => {
@@ -725,6 +749,33 @@ describe("Employee Mutations", () => {
             prismaMock.employee.findUnique.mockResolvedValue(employee as never);
 
             const result = await deleteEmployee(1, ACTOR, NO_OFFBOARDING_DEPENDENCIES);
+
+            expect(result).toMatchObject({
+                success: false,
+                status: 403,
+                error: expect.stringContaining("ตนเอง"),
+            });
+            expect(prismaMock.employee.update).not.toHaveBeenCalled();
+        });
+
+        it("keeps self-offboarding protection for a USER with an explicit delete grant", async () => {
+            const employee = buildEmployee({
+                user: {
+                    id: ACTOR.userId,
+                    email: ACTOR.email,
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            });
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+
+            const result = await deleteEmployee(
+                1,
+                ACTOR,
+                NO_OFFBOARDING_DEPENDENCIES,
+                "USER",
+            );
 
             expect(result).toMatchObject({
                 success: false,

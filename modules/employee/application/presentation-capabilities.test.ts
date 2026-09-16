@@ -5,20 +5,26 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const mocks = vi.hoisted(() => ({
     resolveMany: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolveMany: mocks.resolveMany,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolveMany: mocks.resolveMany,
+        },
+    };
+});
 
 import {
     buildEmployeeAuthorizationContext,
-    EMPLOYEE_MIGRATED_CAPABILITIES,
+    EMPLOYEE_CAPABILITIES,
     getEmployeePresentationCapabilities,
 } from "./authorization";
 import type { EmployeePresentationCapabilities } from "./types";
@@ -45,7 +51,7 @@ function decision(
 }
 
 function userGrant(
-    capability: (typeof EMPLOYEE_MIGRATED_CAPABILITIES)[number],
+    capability: (typeof EMPLOYEE_CAPABILITIES)[number],
 ): EffectiveAuthorizationGrant {
     return {
         capability,
@@ -55,20 +61,20 @@ function userGrant(
 }
 
 function noGrantDecision(
-    capability: (typeof EMPLOYEE_MIGRATED_CAPABILITIES)[number],
+    capability: (typeof EMPLOYEE_CAPABILITIES)[number],
 ): AuthorizationDecision {
     return decision(capability, false, [], "NO_APPLICABLE_GRANT");
 }
 
 function deniedDecision(
-    capability: (typeof EMPLOYEE_MIGRATED_CAPABILITIES)[number],
+    capability: (typeof EMPLOYEE_CAPABILITIES)[number],
 ): AuthorizationDecision {
     return decision(capability, false, [], "CHANNEL_NOT_SUPPORTED");
 }
 
 function mockDecisions(
     getDecision: (
-        capability: (typeof EMPLOYEE_MIGRATED_CAPABILITIES)[number],
+        capability: (typeof EMPLOYEE_CAPABILITIES)[number],
     ) => AuthorizationDecision,
 ): void {
     mocks.resolveMany.mockImplementation(
@@ -76,7 +82,7 @@ function mockDecisions(
             capabilities.map((capability) => [
                 capability,
                 getDecision(
-                    capability as (typeof EMPLOYEE_MIGRATED_CAPABILITIES)[number],
+                    capability as (typeof EMPLOYEE_CAPABILITIES)[number],
                 ),
             ]),
         ),
@@ -105,11 +111,29 @@ describe("Employee presentation capability projection", () => {
         expect(mocks.resolveMany).toHaveBeenCalledTimes(1);
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             DASHBOARD_USER.authorizationActor,
-            EMPLOYEE_MIGRATED_CAPABILITIES,
+            EMPLOYEE_CAPABILITIES,
         );
     });
 
-    it("projects the ADMIN compatibility floor for all seven capabilities", async () => {
+    it("projects centrally resolved ADMIN authority for all seven capabilities", async () => {
+        mocks.resolveMany.mockImplementation(
+            async (_actor: unknown, capabilities: readonly string[]) => new Map(
+                capabilities.map((capability) => [
+                    capability,
+                    decision(
+                        capability,
+                        true,
+                        ["ALL"],
+                        undefined,
+                        [{
+                            capability: capability as EffectiveAuthorizationGrant["capability"],
+                            scope: "ALL",
+                            source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                        }],
+                    ),
+                ]),
+            ),
+        );
         await expect(
             getEmployeePresentationCapabilities(
                 buildEmployeeAuthorizationContext({ id: 7, role: "ADMIN" }, 21),

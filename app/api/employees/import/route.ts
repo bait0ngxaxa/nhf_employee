@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import {
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizedCommandActor,
     EMPLOYEE_IMPORT_MAX_ROWS,
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
-        const authorization = await assertEmployeeCapabilityForMigration(
+        const authorization = await assertEmployeeCapability(
             commandActor.authorization,
             "employee.import",
         );

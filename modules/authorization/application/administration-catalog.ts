@@ -50,12 +50,6 @@ const LEAVE_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
         "The current Leave adapter may translate NO_APPLICABLE_GRANT into a compatibility scope; ordinary grants require explicit policy activation.",
 });
 
-const EMPLOYEE_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
-    nonGrantableReason:
-        "The current Employee adapter may translate NO_APPLICABLE_GRANT into a compatibility scope; ordinary grants require explicit policy activation.",
-});
-
 const DEFERRED_ROUTINE: CapabilityAdministrationMetadata = Object.freeze({
     runtimeAuthorizationMode: "DEFERRED" as const,
     nonGrantableReason:
@@ -85,13 +79,13 @@ const DEFERRED_EMAIL: CapabilityAdministrationMetadata = Object.freeze({
 const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     Record<RegisteredCapabilityKey, CapabilityAdministrationMetadata>
 > = Object.freeze({
-    "employee.read": EMPLOYEE_COMPATIBILITY,
-    "employee.stats.read": EMPLOYEE_COMPATIBILITY,
+    "employee.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "employee.stats.read": CENTRAL_WITH_DEFAULT_POLICY,
     "employee.create": CENTRAL_ONLY,
     "employee.update": CENTRAL_ONLY,
     "employee.delete": CENTRAL_ONLY,
     "employee.import": CENTRAL_ONLY,
-    "employee.export": EMPLOYEE_COMPATIBILITY,
+    "employee.export": CENTRAL_WITH_DEFAULT_POLICY,
     "department.read": CENTRAL_WITH_DEFAULT_POLICY,
 
     "routine.task.read": ROUTINE_COMPATIBILITY,

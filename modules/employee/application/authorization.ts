@@ -4,9 +4,11 @@ import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 import {
     authorization,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationDecision,
     type AuthorizationScope,
+    type ComposedAuthorizationAuthority,
 } from "@/modules/authorization";
 import type { UserRole } from "@/lib/ssot/permissions";
 
@@ -15,7 +17,7 @@ import type {
     EmployeePresentationCapabilities,
 } from "./types";
 
-export const EMPLOYEE_MIGRATED_CAPABILITIES = [
+export const EMPLOYEE_CAPABILITIES = [
     "employee.read",
     "employee.stats.read",
     "employee.create",
@@ -25,8 +27,7 @@ export const EMPLOYEE_MIGRATED_CAPABILITIES = [
     "employee.export",
 ] as const;
 
-export type EmployeeMigratedCapability =
-    (typeof EMPLOYEE_MIGRATED_CAPABILITIES)[number];
+export type EmployeeCapability = (typeof EMPLOYEE_CAPABILITIES)[number];
 
 export type EmployeeAuthorizationActor = AuthorizationActor & {
     readonly channel: "DASHBOARD";
@@ -42,10 +43,10 @@ export type EmployeeAuthorizedCommandActor = EmployeeLifecycleActor & {
 
 export interface EmployeeCapabilityAuthorization {
     readonly actor: EmployeeAuthorizationActor;
-    readonly capability: EmployeeMigratedCapability;
+    readonly capability: EmployeeCapability;
     readonly decision: AuthorizationDecision;
+    readonly defaultScopes: readonly AuthorizationScope[];
     readonly scopes: readonly AuthorizationScope[];
-    readonly usedMigrationCompatibility: boolean;
 }
 
 export class EmployeeCapabilityDeniedError extends Error {
@@ -65,12 +66,12 @@ export class EmployeeCapabilityDeniedError extends Error {
 }
 
 const EMPLOYEE_CAPABILITY_SET = new Set<string>(
-    EMPLOYEE_MIGRATED_CAPABILITIES,
+    EMPLOYEE_CAPABILITIES,
 );
 
-function isEmployeeMigratedCapability(
+function isEmployeeCapability(
     capability: string,
-): capability is EmployeeMigratedCapability {
+): capability is EmployeeCapability {
     return EMPLOYEE_CAPABILITY_SET.has(capability);
 }
 
@@ -110,16 +111,9 @@ export function buildEmployeeAuthorizedCommandActor(
     });
 }
 
-function freezeScopes(
-    scopes: readonly AuthorizationScope[],
+function defaultEmployeeScopes(
+    capability: EmployeeCapability,
 ): readonly AuthorizationScope[] {
-    return Object.freeze([...scopes]);
-}
-
-function legacyEmployeeScopes(
-    actor: EmployeeAuthorizationActor,
-    capability: EmployeeMigratedCapability,
-): readonly AuthorizationScope[] | null {
     switch (capability) {
         case "employee.read":
         case "employee.stats.read":
@@ -129,54 +123,62 @@ function legacyEmployeeScopes(
         case "employee.update":
         case "employee.delete":
         case "employee.import":
-            return actor.systemRole === "ADMIN" ? ["ALL"] : null;
+            return [];
     }
 }
 
 function buildEmployeeCapabilityAuthorization(
     actor: EmployeeAuthorizationActor,
     capability: string,
+    authority: ComposedAuthorizationAuthority,
+): EmployeeCapabilityAuthorization {
+    if (!isEmployeeCapability(capability)) {
+        throw new EmployeeCapabilityDeniedError(
+            capability,
+            authority.configuredDecision.reason ?? "UNKNOWN_CAPABILITY",
+        );
+    }
+
+    if (!authority.allowed) {
+        throw new EmployeeCapabilityDeniedError(
+            capability,
+            authority.configuredDecision.reason,
+        );
+    }
+
+    return Object.freeze({
+        actor,
+        capability,
+        decision: authority.configuredDecision,
+        defaultScopes: authority.defaultScopes,
+        scopes: authority.scopes,
+    });
+}
+
+function composeEmployeeCapabilityAuthorization(
+    actor: EmployeeAuthorizationActor,
+    capability: string,
     decision: AuthorizationDecision,
 ): EmployeeCapabilityAuthorization {
-    if (!isEmployeeMigratedCapability(capability)) {
+    if (!isEmployeeCapability(capability)) {
         throw new EmployeeCapabilityDeniedError(
             capability,
             decision.reason ?? "UNKNOWN_CAPABILITY",
         );
     }
 
-    if (!decision.allowed) {
-        const compatibilityScopes = decision.reason === "NO_APPLICABLE_GRANT"
-            ? legacyEmployeeScopes(actor, capability)
-            : null;
-        if (compatibilityScopes === null) {
-            throw new EmployeeCapabilityDeniedError(
-                capability,
-                decision.reason,
-            );
-        }
-
-        return Object.freeze({
-            actor,
-            capability,
-            decision,
-            scopes: freezeScopes(compatibilityScopes),
-            usedMigrationCompatibility: true,
-        });
-    }
-
-    return Object.freeze({
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
+        defaultEmployeeScopes(capability),
         decision,
-        scopes: decision.scopes,
-        usedMigrationCompatibility: false,
-    });
+    );
+    return buildEmployeeCapabilityAuthorization(actor, capability, authority);
 }
 
 function getEmployeePresentationDecision(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
-    capability: EmployeeMigratedCapability,
+    capability: EmployeeCapability,
 ): AuthorizationDecision {
     const decision = decisions.get(capability);
     if (decision === undefined) {
@@ -189,11 +191,11 @@ function getEmployeePresentationDecision(
 
 function projectEmployeeCapabilityDecision(
     actor: EmployeeAuthorizationActor,
-    capability: EmployeeMigratedCapability,
+    capability: EmployeeCapability,
     decision: AuthorizationDecision,
 ): readonly AuthorizationScope[] | null {
     try {
-        return buildEmployeeCapabilityAuthorization(
+        return composeEmployeeCapabilityAuthorization(
             actor,
             capability,
             decision,
@@ -226,11 +228,11 @@ export async function getEmployeePresentationCapabilities(
     const actor = context.authorizationActor;
     const decisions = await authorization.resolveMany(
         actor,
-        EMPLOYEE_MIGRATED_CAPABILITIES,
+        EMPLOYEE_CAPABILITIES,
     );
 
     const project = (
-        capability: EmployeeMigratedCapability,
+        capability: EmployeeCapability,
     ): readonly AuthorizationScope[] | null =>
         projectEmployeeCapabilityDecision(
             actor,
@@ -270,20 +272,20 @@ export async function getEmployeePresentationCapabilities(
     });
 }
 
-export async function resolveEmployeeCapabilityForMigration(
+export async function resolveEmployeeCapability(
     context: EmployeeAuthorizationContext,
     capability: string,
 ): Promise<EmployeeCapabilityAuthorization> {
     const actor = context.authorizationActor;
     const decision = await authorization.resolve(actor, capability);
-    return buildEmployeeCapabilityAuthorization(actor, capability, decision);
+    return composeEmployeeCapabilityAuthorization(actor, capability, decision);
 }
 
-export async function assertEmployeeCapabilityForMigration(
+export async function assertEmployeeCapability(
     context: EmployeeAuthorizationContext,
     capability: string,
 ): Promise<EmployeeCapabilityAuthorization> {
-    return resolveEmployeeCapabilityForMigration(context, capability);
+    return resolveEmployeeCapability(context, capability);
 }
 
 export function assertEmployeeCapabilityScope(
@@ -401,5 +403,5 @@ export async function resolveEmployeeCapabilityInTransaction(
         tx,
     );
 
-    return buildEmployeeCapabilityAuthorization(activeActor, capability, decision);
+    return composeEmployeeCapabilityAuthorization(activeActor, capability, decision);
 }

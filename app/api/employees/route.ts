@@ -3,7 +3,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import {
     appendEmployeeCreateAudit,
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizedCommandActor,
     EmployeeCapabilityDeniedError,
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return parsedFilters.response;
         }
 
-        const authorization = await assertEmployeeCapabilityForMigration(
+        const authorization = await assertEmployeeCapability(
             buildEmployeeAuthorizedCommandActor(auth.user).authorization,
             "employee.read",
         );
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
-        const authorization = await assertEmployeeCapabilityForMigration(
+        const authorization = await assertEmployeeCapability(
             commandActor.authorization,
             "employee.create",
         );

@@ -17,8 +17,8 @@ that contract in
 [authorization-phase-12b-additive-composition-core.md](./authorization-phase-12b-additive-composition-core.md).
 This does not change the resolver implementation or its current resolver-level
 decision semantics.
-Phase 12C.1 uses that seam for Department and Notification; the remaining
-Employee, Routine, Stock, and Leave adapters retain their documented
+Phase 12C.1 uses that seam for Department and Notification, and Phase 12C.2
+uses it for Employee. Routine, Stock, and Leave retain their documented
 compatibility mechanics until their own migrations.
 
 Phase 3 made authorization resolution operational and independently testable.
@@ -46,8 +46,8 @@ const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
 
-Department and Notification adapters compose the resolver result with their
-trusted default scopes through the Phase 12B seam:
+Department, Notification, and Employee adapters compose the resolver result
+with their trusted default scopes through the Phase 12B seam:
 
 ```ts
 const configuredDecision = await authorization.resolve(actor, capability);
@@ -63,9 +63,9 @@ const authority = composeAuthorizationAuthority(
 Department, request, resource, or workflow dependencies. It validates default
 scopes against the supplied code-owned registry, returns normalized effective
 scopes, and preserves configured grants separately from Default Domain Policy.
-It is the runtime seam for migrated domains; Department and Notification now
-use it, while the remaining compatibility-backed adapters still use their
-Phase 12A mechanics until later Phase 12C work.
+It is the runtime seam for migrated domains; Department, Notification, and
+Employee now use it, while the remaining compatibility-backed adapters still
+use their Phase 12A mechanics until later Phase 12C work.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -180,8 +180,17 @@ domainDefaultPolicy + centralResolverConfiguredAuthority
 as an additive union after trusted identity, registered capability, supported
 channel, and valid-configuration checks. A narrower configured grant must not
 narrow the default behavior. Phase 12C.1 applies this composition to Department
-and Notification; the remaining compatibility-backed adapters retain their
-documented fallback mechanics until later migrations.
+and Notification, and Phase 12C.2 applies it to Employee; the remaining
+compatibility-backed adapters retain their documented fallback mechanics until
+later migrations.
+
+For Employee, the permanent default is `ALL` for `employee.read`,
+`employee.stats.read`, and `employee.export`, and empty for
+`employee.create`, `employee.update`, `employee.delete`, and `employee.import`.
+The Employee adapter uses this same composition after both the regular
+resolver and `resolveInTransaction()`; ADMIN remains the resolver's
+`SYSTEM_ROLE / ADMIN` authority. The next runtime handoff is Phase 12C.3 —
+Routine Additive Default Policy Migration.
 
 ## USER semantics and lifecycle filtering
 
@@ -288,9 +297,9 @@ Prisma delegate is exposed.
 
 Phase 12A adds no resolver or domain runtime behavior. It records the
 permanent Default Domain Policy and the current inventory. Phase 12B provides
-additive composition. Phase 12C.1 has migrated Department + Notification to
-that composition, and Phase 12C.2 owns the Employee migration. Routine, Stock,
-and Leave remain compatibility-backed until their later migrations. Phase 12D
+additive composition. Phase 12C.1 has migrated Department + Notification and
+Phase 12C.2 has migrated Employee to that composition. Routine, Stock, and
+Leave remain compatibility-backed until their later migrations. Phase 12D
 owns remaining non-IT deferred surfaces. Email Request and the future IT
 module remain outside that roadmap.
 

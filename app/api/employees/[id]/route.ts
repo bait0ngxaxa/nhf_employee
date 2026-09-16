@@ -8,7 +8,7 @@ import { employeeAccountLifecycle } from "@/modules/auth";
 import {
     appendEmployeeDeleteAudit,
     appendEmployeeUpdateAudit,
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizedCommandActor,
     EmployeeCapabilityDeniedError,
@@ -66,7 +66,7 @@ export async function PATCH(
         if (!auth.ok) return auth.response;
 
         const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
-        const authorization = await assertEmployeeCapabilityForMigration(
+        const authorization = await assertEmployeeCapability(
             commandActor.authorization,
             "employee.update",
         );
@@ -134,7 +134,7 @@ export async function DELETE(
         if (!auth.ok) return auth.response;
 
         const commandActor = buildEmployeeAuthorizedCommandActor(auth.user);
-        const authorization = await assertEmployeeCapabilityForMigration(
+        const authorization = await assertEmployeeCapability(
             commandActor.authorization,
             "employee.delete",
         );

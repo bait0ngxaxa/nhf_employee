@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import {
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizationContext,
     EmployeeCapabilityDeniedError,
@@ -15,7 +15,7 @@ export async function GET(): Promise<NextResponse> {
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
 
-        const authorization = await assertEmployeeCapabilityForMigration(
+        const authorization = await assertEmployeeCapability(
             buildEmployeeAuthorizationContext(auth.user),
             "employee.stats.read",
         );

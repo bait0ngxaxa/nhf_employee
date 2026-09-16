@@ -287,7 +287,7 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
     });
 
     describe("LEDGER-EMP-04 GET /api/employees/export", () => {
-        it("LEDGER-EMP-04 executes GET /api/employees/export with production employee.export Dashboard compatibility and ignores authority-shaped query input", async () => {
+        it("LEDGER-EMP-04 executes GET /api/employees/export with the permanent employee.export Dashboard default and ignores authority-shaped query input", async () => {
             const response = await getEmployeeExport(request(
                 "/api/employees/export?search=%E0%B8%AA%E0%B8%A1%E0%B8%8A%E0%B8%B2%E0%B8%A2&status=ACTIVE&userId=999&employeeId=999&systemRole=ADMIN&channel=LIFF_SELF_SERVICE&capability=employee.delete&scope=ALL",
             ));

@@ -7,16 +7,18 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
+import { AuthorizationConfigurationError } from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 import {
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizationContext,
     buildEmployeeAuthorizedCommandActor,
     EmployeeCapabilityDeniedError,
-    EMPLOYEE_MIGRATED_CAPABILITIES,
-    resolveEmployeeCapabilityForMigration,
+    EMPLOYEE_CAPABILITIES,
+    resolveEmployeeCapability,
     resolveEmployeeCapabilityInTransaction,
 } from "./authorization";
 
@@ -27,12 +29,17 @@ const mocks = vi.hoisted(() => ({
     lockUserRows: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: mocks.resolve,
-        resolveInTransaction: mocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: mocks.resolve,
+            resolveInTransaction: mocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/row-locks", () => ({
     lockEmployeeRows: mocks.lockEmployeeRows,
@@ -108,7 +115,7 @@ function activeUser(
     };
 }
 
-describe("Employee authorization migration adapter", () => {
+describe("Employee authorization adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
         mocks.resolveInTransaction.mockReset();
@@ -117,7 +124,7 @@ describe("Employee authorization migration adapter", () => {
     });
 
     it("keeps the registered inventory and fixed Dashboard actor mapping explicit", () => {
-        expect(EMPLOYEE_MIGRATED_CAPABILITIES).toEqual([
+        expect(EMPLOYEE_CAPABILITIES).toEqual([
             "employee.read",
             "employee.stats.read",
             "employee.create",
@@ -138,18 +145,19 @@ describe("Employee authorization migration adapter", () => {
         "employee.read",
         "employee.stats.read",
         "employee.export",
-    ] as const)("keeps broad USER compatibility for %s", async (capability) => {
+    ] as const)("uses the permanent ALL default for an ungranted USER %s", async (capability) => {
         mocks.resolve.mockResolvedValue(
             decision(capability, false, [], "NO_APPLICABLE_GRANT"),
         );
 
-        const result = await resolveEmployeeCapabilityForMigration(
+        const result = await resolveEmployeeCapability(
             context(),
             capability,
         );
 
+        expect(result.decision.reason).toBe("NO_APPLICABLE_GRANT");
+        expect(result.defaultScopes).toEqual(["ALL"]);
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(true);
     });
 
     it.each([
@@ -157,18 +165,32 @@ describe("Employee authorization migration adapter", () => {
         "employee.update",
         "employee.delete",
         "employee.import",
-    ] as const)("keeps Admin compatibility for %s", async (capability) => {
+    ] as const)("does not put ADMIN authority in the default policy for %s", async (capability) => {
         mocks.resolve.mockResolvedValue(
-            decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+            decision(
+                capability,
+                true,
+                ["ALL"],
+                undefined,
+                [{
+                    capability: capability as EffectiveAuthorizationGrant["capability"],
+                    scope: "ALL",
+                    source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                }],
+            ),
         );
 
-        const result = await resolveEmployeeCapabilityForMigration(
+        const result = await resolveEmployeeCapability(
             context("ADMIN"),
             capability,
         );
 
+        expect(result.defaultScopes).toEqual([]);
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(true);
+        expect(result.decision.grants[0]?.source).toEqual({
+            type: "SYSTEM_ROLE",
+            role: "ADMIN",
+        });
     });
 
     it.each([
@@ -182,7 +204,7 @@ describe("Employee authorization migration adapter", () => {
         );
 
         await expect(
-            resolveEmployeeCapabilityForMigration(context(), capability),
+            resolveEmployeeCapability(context(), capability),
         ).rejects.toMatchObject({
             capability,
             authorizationReason: "NO_APPLICABLE_GRANT",
@@ -190,7 +212,7 @@ describe("Employee authorization migration adapter", () => {
         });
     });
 
-    it.each(EMPLOYEE_MIGRATED_CAPABILITIES)(
+    it.each(EMPLOYEE_CAPABILITIES)(
         "honors an explicit USER grant for %s without role promotion",
         async (capability) => {
             mocks.resolve.mockResolvedValue(
@@ -203,26 +225,80 @@ describe("Employee authorization migration adapter", () => {
                 ),
             );
 
-            const result = await resolveEmployeeCapabilityForMigration(
+            const result = await resolveEmployeeCapability(
                 context(),
                 capability,
             );
 
             expect(result.actor.systemRole).toBe("USER");
             expect(result.scopes).toEqual(["ALL"]);
-            expect(result.usedMigrationCompatibility).toBe(false);
+            expect(result.defaultScopes).toEqual(
+                capability === "employee.read"
+                || capability === "employee.stats.read"
+                || capability === "employee.export"
+                    ? ["ALL"]
+                    : [],
+            );
             expect(assertEmployeeCapabilityScope(result, "ALL")).toBe(result);
         },
     );
 
-    it("does not invoke compatibility for denial reasons other than NO_APPLICABLE_GRANT", async () => {
+    it("keeps the read baseline when a configured grant is added and removed", async () => {
+        mocks.resolve
+            .mockResolvedValueOnce(
+                decision("employee.read", false, [], "NO_APPLICABLE_GRANT"),
+            )
+            .mockResolvedValueOnce(
+                decision(
+                    "employee.read",
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [userGrant("employee.read", "ALL")],
+                ),
+            )
+            .mockResolvedValueOnce(
+                decision("employee.read", false, [], "NO_APPLICABLE_GRANT"),
+            );
+
+        const beforeGrant = await resolveEmployeeCapability(
+            context(),
+            "employee.read",
+        );
+        const withGrant = await resolveEmployeeCapability(
+            context(),
+            "employee.read",
+        );
+        const afterGrantRemoval = await resolveEmployeeCapability(
+            context(),
+            "employee.read",
+        );
+
+        expect(beforeGrant).toMatchObject({
+            defaultScopes: ["ALL"],
+            scopes: ["ALL"],
+            decision: { grants: [] },
+        });
+        expect(withGrant).toMatchObject({
+            defaultScopes: ["ALL"],
+            scopes: ["ALL"],
+            decision: { grants: [userGrant("employee.read", "ALL")] },
+        });
+        expect(afterGrantRemoval).toMatchObject({
+            defaultScopes: ["ALL"],
+            scopes: ["ALL"],
+            decision: { grants: [] },
+        });
+    });
+
+    it("fails closed for structural denials and propagates resolver failures", async () => {
         for (const reason of ["UNKNOWN_CAPABILITY", "CHANNEL_NOT_SUPPORTED"] as const) {
             mocks.resolve.mockResolvedValue(
                 decision("employee.read", false, [], reason),
             );
 
             await expect(
-                resolveEmployeeCapabilityForMigration(
+                resolveEmployeeCapability(
                     context("ADMIN"),
                     "employee.read",
                 ),
@@ -235,18 +311,48 @@ describe("Employee authorization migration adapter", () => {
         const resolverFailure = new Error("resolver persistence failure");
         mocks.resolve.mockRejectedValue(resolverFailure);
         await expect(
-            resolveEmployeeCapabilityForMigration(context(), "employee.read"),
+            resolveEmployeeCapability(context(), "employee.read"),
         ).rejects.toBe(resolverFailure);
+
+        const configurationError = new AuthorizationConfigurationError(
+            "UNSUPPORTED_PERSISTED_SCOPE",
+            "unsupported configured scope",
+        );
+        mocks.resolve.mockRejectedValue(configurationError);
+        await expect(
+            resolveEmployeeCapability(context(), "employee.read"),
+        ).rejects.toBe(configurationError);
+
+        mocks.resolve.mockResolvedValue(
+            decision("employee.stats.read", true, ["ALL"]),
+        );
+        await expect(
+            resolveEmployeeCapability(context(), "employee.read"),
+        ).rejects.toMatchObject({
+            name: "AuthorizationConfigurationError",
+            code: "CAPABILITY_MISMATCH",
+        });
+
+        mocks.resolve.mockResolvedValue(
+            decision("employee.unknown", false, [], "UNKNOWN_CAPABILITY"),
+        );
+        await expect(
+            resolveEmployeeCapability(context(), "employee.unknown"),
+        ).rejects.toMatchObject({
+            capability: "employee.unknown",
+            authorizationReason: "UNKNOWN_CAPABILITY",
+            statusCode: 403,
+        });
     });
 
     it("requires ALL scope after the resolver decision", async () => {
         mocks.resolve.mockResolvedValue(
-            decision("employee.read", true, ["OWN"]),
+            decision("employee.update", true, ["OWN"]),
         );
 
-        const result = await assertEmployeeCapabilityForMigration(
+        const result = await assertEmployeeCapability(
             context(),
-            "employee.read",
+            "employee.update",
         );
 
         expect(() => assertEmployeeCapabilityScope(result, "ALL")).toThrow(
@@ -290,6 +396,7 @@ describe("Employee authorization migration adapter", () => {
             tx,
         );
         expect(result.actor.employeeId).toBe(21);
+        expect(result.defaultScopes).toEqual([]);
         expect(result.scopes).toEqual(["ALL"]);
     });
 
@@ -300,7 +407,17 @@ describe("Employee authorization migration adapter", () => {
             },
         } as unknown as Prisma.TransactionClient;
         mocks.resolveInTransaction.mockResolvedValue(
-            decision("employee.delete", false, [], "NO_APPLICABLE_GRANT"),
+            decision(
+                "employee.delete",
+                true,
+                ["ALL"],
+                undefined,
+                [{
+                    capability: "employee.delete",
+                    scope: "ALL",
+                    source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                }],
+            ),
         );
 
         const result = await resolveEmployeeCapabilityInTransaction(
@@ -310,9 +427,45 @@ describe("Employee authorization migration adapter", () => {
         );
 
         expect(result.actor.systemRole).toBe("ADMIN");
+        expect(result.defaultScopes).toEqual([]);
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(true);
     });
+
+    it.each(["employee.update", "employee.delete"] as const)(
+        "denies a transaction-time %s when the configured grant was revoked",
+        async (capability) => {
+            const tx = {
+                user: {
+                    findUnique: vi.fn().mockResolvedValue(activeUser()),
+                },
+            } as unknown as Prisma.TransactionClient;
+            mocks.resolveInTransaction.mockResolvedValue(
+                decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+            );
+
+            await expect(
+                resolveEmployeeCapabilityInTransaction(
+                    tx,
+                    commandActor("USER"),
+                    capability,
+                ),
+            ).rejects.toMatchObject({
+                capability,
+                authorizationReason: "NO_APPLICABLE_GRANT",
+                statusCode: 403,
+            });
+            expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 7,
+                    employeeId: 21,
+                    systemRole: "USER",
+                    channel: "DASHBOARD",
+                }),
+                capability,
+                tx,
+            );
+        },
+    );
 
     it.each([
         ["an inactive account", { ...activeUser(), isActive: false }],

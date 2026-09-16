@@ -15,7 +15,7 @@ import {
     appendEmployeeCreateAudit,
     appendEmployeeDeleteAudit,
     appendEmployeeUpdateAudit,
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizationContext,
     createEmployee,
@@ -44,7 +44,7 @@ vi.mock("@/modules/employee", () => ({
     appendEmployeeCreateAudit: vi.fn(),
     appendEmployeeDeleteAudit: vi.fn(),
     appendEmployeeUpdateAudit: vi.fn(),
-    assertEmployeeCapabilityForMigration: vi.fn(),
+    assertEmployeeCapability: vi.fn(),
     assertEmployeeCapabilityScope: vi.fn(),
     buildEmployeeAuthorizationContext: vi.fn((user) => ({
         authorizationActor: {
@@ -104,7 +104,7 @@ function employeeParams(id: string): { params: Promise<{ id: string }> } {
 }
 
 function denyEmployeeCapability(capability: string): void {
-    vi.mocked(assertEmployeeCapabilityForMigration).mockRejectedValue(
+    vi.mocked(assertEmployeeCapability).mockRejectedValue(
         new EmployeeCapabilityDeniedError(capability, "CHANNEL_NOT_SUPPORTED"),
     );
 }
@@ -117,7 +117,7 @@ describe("Employee mutation routes", () => {
             user: ADMIN,
             session: { user: { ...ADMIN, id: String(ADMIN.id) } },
         });
-        vi.mocked(assertEmployeeCapabilityForMigration).mockResolvedValue({
+        vi.mocked(assertEmployeeCapability).mockResolvedValue({
             scopes: ["ALL"],
         } as never);
         vi.mocked(assertEmployeeCapabilityScope).mockImplementation(
@@ -151,7 +151,7 @@ describe("Employee mutation routes", () => {
         ));
 
         expect(response.status).toBe(200);
-        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+        expect(assertEmployeeCapability).toHaveBeenCalledWith(
             expect.any(Object),
             "employee.read",
         );
@@ -179,7 +179,7 @@ describe("Employee mutation routes", () => {
         ));
 
         expect(response.status).toBe(200);
-        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+        expect(assertEmployeeCapability).toHaveBeenCalledWith(
             {
                 authorizationActor: {
                     userId: USER.id,
@@ -211,7 +211,7 @@ describe("Employee mutation routes", () => {
         const response = await getEmployeeStatsRoute();
 
         expect(response.status).toBe(200);
-        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+        expect(assertEmployeeCapability).toHaveBeenCalledWith(
             expect.any(Object),
             "employee.stats.read",
         );
@@ -471,7 +471,7 @@ describe("Employee mutation routes", () => {
         ), employeeParams("12"));
 
         expect(response.status).toBe(200);
-        expect(assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+        expect(assertEmployeeCapability).toHaveBeenCalledWith(
             expect.objectContaining({
                 authorizationActor: expect.objectContaining({
                     userId: USER.id,

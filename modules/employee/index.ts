@@ -13,22 +13,22 @@ export {
 } from "./infrastructure/persistence/employee-queries";
 export { createEmployee, deleteEmployee, updateEmployee } from "./application/mutations";
 export {
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizationActor,
     buildEmployeeAuthorizationContext,
     buildEmployeeAuthorizedCommandActor,
     EmployeeCapabilityDeniedError,
-    EMPLOYEE_MIGRATED_CAPABILITIES,
+    EMPLOYEE_CAPABILITIES,
     getEmployeePresentationCapabilities,
-    resolveEmployeeCapabilityForMigration,
+    resolveEmployeeCapability,
 } from "./application/authorization";
 export type {
     EmployeeAuthorizedCommandActor,
     EmployeeAuthorizationActor,
     EmployeeAuthorizationContext,
     EmployeeCapabilityAuthorization,
-    EmployeeMigratedCapability,
+    EmployeeCapability,
 } from "./application/authorization";
 export { resolveEmployeeCapabilityInTransaction } from "./application/authorization";
 export {

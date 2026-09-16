@@ -287,7 +287,6 @@ describe("Phase 10B Authorization Administration commands", () => {
 
     it.each([
         ["routine.task.read", "ALL"],
-        ["employee.read", "ALL"],
         ["stock.request.read", "OWN"],
         ["leave.request.read", "OWN"],
     ] as const)("rejects %s before opening a transaction when readiness is not GRANTABLE", async (capabilityKey, scope) => {
@@ -401,6 +400,100 @@ describe("Phase 10B Authorization Administration commands", () => {
         expect(repo.createTeamGrant).toHaveBeenCalledWith(TX, departmentGrant);
         expect(repo.createTeamRoleGrant).toHaveBeenCalledWith(TX, notificationReadGrant);
         expect(repo.createUserGrant).toHaveBeenCalledWith(TX, notificationUpdateGrant);
+        expect(auditAppendMock).toHaveBeenCalledTimes(6);
+    });
+
+    it("accepts newly activated Employee grants through Team, TeamRole, and User commands", async () => {
+        const employeeTeamGrant = teamGrant({
+            capabilityKey: "employee.read",
+            scope: "ALL",
+        });
+        const employeeTeamRoleGrant = roleGrant({
+            capabilityKey: "employee.stats.read",
+            scope: "ALL",
+        });
+        const employeeUserGrant = userGrant({
+            capabilityKey: "employee.export",
+            scope: "ALL",
+        });
+        const repo = repository({
+            findTeamById: vi.fn().mockResolvedValue(team()),
+            findTeamGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(employeeTeamGrant),
+            createTeamGrant: vi.fn().mockResolvedValue(employeeTeamGrant),
+            deleteTeamGrant: vi.fn().mockResolvedValue(employeeTeamGrant),
+            findTeamRoleById: vi.fn().mockResolvedValue(role()),
+            findTeamRoleGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(employeeTeamRoleGrant),
+            createTeamRoleGrant: vi.fn().mockResolvedValue(employeeTeamRoleGrant),
+            deleteTeamRoleGrant: vi.fn().mockResolvedValue(employeeTeamRoleGrant),
+            findUserById: vi.fn().mockResolvedValue({ id: 7 }),
+            findUserGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(employeeUserGrant),
+            createUserGrant: vi.fn().mockResolvedValue(employeeUserGrant),
+            deleteUserGrant: vi.fn().mockResolvedValue(employeeUserGrant),
+        });
+        const deps = dependencies(repo);
+
+        await expect(
+            addAuthorizationAdministrationTeamGrant(
+                ADMIN_CONTEXT,
+                10,
+                { capabilityKey: "employee.read", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(employeeTeamGrant);
+        await expect(
+            removeAuthorizationAdministrationTeamGrant(
+                ADMIN_CONTEXT,
+                10,
+                { capabilityKey: "employee.read", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(employeeTeamGrant);
+
+        await expect(
+            addAuthorizationAdministrationTeamRoleGrant(
+                ADMIN_CONTEXT,
+                10,
+                20,
+                { capabilityKey: "employee.stats.read", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(employeeTeamRoleGrant);
+        await expect(
+            removeAuthorizationAdministrationTeamRoleGrant(
+                ADMIN_CONTEXT,
+                10,
+                20,
+                { capabilityKey: "employee.stats.read", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(employeeTeamRoleGrant);
+
+        await expect(
+            addAuthorizationAdministrationUserGrant(
+                ADMIN_CONTEXT,
+                7,
+                { capabilityKey: "employee.export", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(employeeUserGrant);
+        await expect(
+            removeAuthorizationAdministrationUserGrant(
+                ADMIN_CONTEXT,
+                7,
+                { capabilityKey: "employee.export", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(employeeUserGrant);
+
+        expect(repo.createTeamGrant).toHaveBeenCalledWith(TX, employeeTeamGrant);
+        expect(repo.createTeamRoleGrant).toHaveBeenCalledWith(TX, employeeTeamRoleGrant);
+        expect(repo.createUserGrant).toHaveBeenCalledWith(TX, employeeUserGrant);
         expect(auditAppendMock).toHaveBeenCalledTimes(6);
     });
 

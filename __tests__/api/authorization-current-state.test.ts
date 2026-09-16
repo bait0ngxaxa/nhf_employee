@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
     requireApiSession: vi.fn(),
     employeeFiltersSafeParse: vi.fn(),
     createEmployeeExport: vi.fn(),
-    assertEmployeeCapabilityForMigration: vi.fn(),
+    assertEmployeeCapability: vi.fn(),
     assertEmployeeCapabilityScope: vi.fn(),
     buildEmployeeAuthorizationContext: vi.fn(),
     logDataExport: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock("@/modules/employee", () => ({
     EmployeeCapabilityDeniedError: class EmployeeCapabilityDeniedError extends Error {
         readonly statusCode = 403;
     },
-    assertEmployeeCapabilityForMigration: mocks.assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability: mocks.assertEmployeeCapability,
     assertEmployeeCapabilityScope: mocks.assertEmployeeCapabilityScope,
     buildEmployeeAuthorizationContext: mocks.buildEmployeeAuthorizationContext,
     createEmployeeExport: mocks.createEmployeeExport,
@@ -76,7 +76,7 @@ describe("Phase 0 authorization current-state characterization", () => {
                 channel: "DASHBOARD",
             },
         }));
-        mocks.assertEmployeeCapabilityForMigration.mockResolvedValue({
+        mocks.assertEmployeeCapability.mockResolvedValue({
             scopes: ["ALL"],
         });
         mocks.assertEmployeeCapabilityScope.mockImplementation(
@@ -97,7 +97,7 @@ describe("Phase 0 authorization current-state characterization", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(mocks.assertEmployeeCapabilityForMigration).toHaveBeenCalledWith(
+        expect(mocks.assertEmployeeCapability).toHaveBeenCalledWith(
             expect.objectContaining({
                 authorizationActor: expect.objectContaining({
                     userId: 5,

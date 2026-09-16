@@ -1,8 +1,8 @@
 # Authorization presentation capability projections
 
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
-closed; Employee Phase 8A/8B/8C closed; Phase 9A/9B Department, Audit and
-Notification integration closed
+closed; Employee Phase 8A/8B/8C and Phase 12C.2 additive policy migration
+closed; Phase 9A/9B Department, Audit and Notification integration closed
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -476,13 +476,14 @@ interface EmployeePresentationCapabilities {
 
 `getEmployeePresentationCapabilities()` calls
 `authorization.resolveMany()` exactly once for all seven entries in
-`EMPLOYEE_MIGRATED_CAPABILITIES`. Each decision is translated through the
-same `buildEmployeeCapabilityAuthorization()` compatibility translation used
-by Phase 8A server authorization. `NO_APPLICABLE_GRANT` therefore preserves
-the existing floor: an eligible normal USER gets read/stats/export, but not
-create/update/delete/import; an ADMIN gets all seven; and an explicit USER
-grant enables only its matching field. Expected denials project to `false`;
-unknown capabilities, omitted decisions, invalid configuration and resolver or
+`EMPLOYEE_CAPABILITIES`. Each decision is composed through the same
+`composeAuthorizationAuthority()` path used by Phase 12C.2 server
+authorization. The permanent default gives an eligible normal USER
+read/stats/export and gives no default authority to create/update/delete/import;
+an ADMIN gets all seven from the central `SYSTEM_ROLE / ADMIN` decision; and
+an explicit USER grant enables only its matching mutation field while never
+narrowing the read baseline. Expected denials project to `false`; unknown
+capabilities, omitted decisions, invalid configuration and resolver or
 persistence failures propagate rather than becoming a misleading ordinary
 denial. The returned object is frozen.
 
@@ -533,9 +534,12 @@ regression suites, typecheck, strict lint, and architecture check passed;
 details are recorded in
 [authorization-employee-migration.md](authorization-employee-migration.md).
 
-Employee Phase 8C is closed for the current production surface. This does not
+Employee Phase 8C is closed for the historical production surface, and Phase
+12C.2 is closed for its permanent additive authorization policy. This does not
 change the independent `employee.export` authority, broad read/stats/export
-policy, compatibility floor, or any deferred Team policy.
+policy, or any deferred Team policy. The resolver-level inspector still does
+not display the final composed Employee effective scopes; that operator view
+remains Phase 12E.
 
 ## Phase 9B remaining-domain presentation closure
 

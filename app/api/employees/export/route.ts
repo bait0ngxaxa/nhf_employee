@@ -3,7 +3,7 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/auth/api";
 import { logDataExport } from "@/lib/server/audit";
 import {
-    assertEmployeeCapabilityForMigration,
+    assertEmployeeCapability,
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizationContext,
     createEmployeeExport,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<Response> {
             return parsedFilters.response;
         }
 
-        const authorization = await assertEmployeeCapabilityForMigration(
+        const authorization = await assertEmployeeCapability(
             buildEmployeeAuthorizationContext(auth.user),
             "employee.export",
         );
