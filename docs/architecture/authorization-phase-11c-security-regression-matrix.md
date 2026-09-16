@@ -1,6 +1,6 @@
 # Authorization Phase 11C.1 — Security Regression Matrix
 
-Status: Phase 11C.2C.1 complete; Phase 11C.2 remains open for `11C2-API-01`.
+Status: Phase 11C.2C.2 complete; Phase 11C.2D final matrix closure remains.
 
 Historical baselines:
 
@@ -12,8 +12,10 @@ Historical baselines:
   from the Phase 11C.1 corrective pass.
 - `bb64b59b9a4a0c8cf9ba8bd39fb76b2dd077e617` — Phase 11C.2B closed baseline
   used for this Phase 11C.2C.1 route-coverage slice.
+- `d03778316c94d7aaeeac4582424f1020c57cf46b` — Phase 11C.2C.1 verification
+  baseline used for this Phase 11C.2C.2 route-coverage slice.
 
-Audit point: the current production source and tests after the Phase 11C.2C.1
+Audit point: the current production source and tests after the Phase 11C.2C.2
 regression additions.
 
 This document is the authoritative cross-domain regression baseline for the
@@ -30,26 +32,25 @@ hardening was rechecked against current source and tests, including target
 Employee lifecycle revalidation for Routine, approver/assignee revalidation for
 Leave, and the pre-write authorization recheck for Stock uploads.
 
-The baseline is not fully regression-complete. It contains explicit
-compatibility policies and deferred surfaces, and it has one remaining missing
-matrix proof for route-by-route breadth. The cross-domain stale-role and
-supported transaction-time state proofs are now direct. The Employee and
-Routine subsets of the operation ledger now have exact direct route
-assertions; nine Stock and Leave route/capability rows remain without one.
-The deferred rows are evaluated against their current deferred
-invariants; choosing their future target policy is outside the active
-test-gap count. These are test and policy-scope findings, not silently
-upgraded target behavior.
+The finite protected-route regression scope is now complete. The repository
+still contains explicit compatibility policies and deferred surfaces, and the
+matrix retains only partial aggregate evidence where its invariant is broader
+than the named direct route assertions. The cross-domain stale-role and
+supported transaction-time state proofs remain direct. All 78 protected
+route/capability rows now have their own exact direct route assertion; the
+three Stock LIFF projection rows remain presentation-only inventory. The
+deferred rows are evaluated against their current deferred invariants; choosing
+their future target policy is outside the active test-gap count. These are
+policy-scope findings, not silently upgraded target behavior.
 
 The operation-level inventory is finite: the migrated route ledger contains 81
 route/capability/channel rows and the separate Authorization Administration
 command ledger contains 17 rows. The 81 route rows contain 78 protected
 route/capability rows and three LIFF action-availability projection rows; the
 projection rows are not independent mutation operations. The route ledger has
-72 `DIRECT`, zero `INDIRECT`, and 9 `MISSING` rows. The Administration command
-ledger has 17 `DIRECT` rows, so the combined explicit ledger inventory has 98
-rows: 89 `DIRECT`, zero `INDIRECT`, and 9 `MISSING`. The remaining nine missing
-route rows are named in `API-10` and the Phase 11C.2 backlog.
+81 `DIRECT`, zero `INDIRECT`, and zero `MISSING` rows. The Administration
+command ledger has 17 `DIRECT` rows, so the combined explicit ledger inventory
+has 98 rows: 98 `DIRECT`, zero `INDIRECT`, and zero `MISSING`.
 This is a coverage finding, not evidence that the production database or a
 persisted grant inventory is empty.
 
@@ -58,30 +59,30 @@ Quantified matrix result:
 | Metric | Count |
 | --- | ---: |
 | Total matrix cases | 89 |
-| `DIRECT` | 73 |
-| `INDIRECT` | 12 |
-| `MISSING` | 1 |
+| `DIRECT` | 80 |
+| `INDIRECT` | 6 |
+| `MISSING` | 0 |
 | `N/A` | 3 |
 | Compatibility-policy rows | 14 |
 | Deferred-authorization-surface rows | 3 |
 | Blocking security defects discovered in this audit | 0 |
-| Remaining genuine Phase 11C.2 regression work items | 1 |
+| Remaining genuine Phase 11C.2 regression work items | 0 |
 | Future policy/migration decision families outside Phase 11C | 4 |
 
 Quantified operation-ledger result:
 
 | Ledger inventory | Total | DIRECT | INDIRECT | MISSING |
 | --- | ---: | ---: | ---: | ---: |
-| Migrated route/capability/channel rows | 81 | 72 | 0 | 9 |
-| Protected route/capability rows | 78 | 69 | 0 | 9 |
+| Migrated route/capability/channel rows | 81 | 81 | 0 | 0 |
+| Protected route/capability rows | 78 | 78 | 0 | 0 |
 | LIFF action-availability projection rows | 3 | 3 | 0 | 0 |
 | Authorization Administration command rows | 17 | 17 | 0 | 0 |
-| **Combined explicit ledger rows** | **98** | **89** | **0** | **9** |
+| **Combined explicit ledger rows** | **98** | **98** | **0** | **0** |
 
 Production authorization policy was not changed by Phase 11C.2A, Phase
-11C.2B, or Phase 11C.2C.1. No Team policy was activated; no production seed/grant records were
-added; no compatibility bridge was retired; and no deferred capability was
-migrated.
+11C.2B, Phase 11C.2C.1, or Phase 11C.2C.2. No Team policy was activated; no
+production seed/grant records were added; no compatibility bridge was retired;
+and no deferred capability was migrated.
 
 ## Audit methodology
 
@@ -137,10 +138,11 @@ route/capability/channel row requires an exact direct route assertion. A route
 test that mocks the application authorization boundary, or an application test
 that does not execute the route composition, is useful evidence but does not
 close that ledger row. Consequently, no protected operation is closed as
-`INDIRECT`; the 12 former `INDIRECT` operation rows are counted as `MISSING`
-below and are owned by the finite `11C2-API-01` backlog item. The three
-projection rows remain inventory-only presentation checks and are not included
-in that mutation/route backlog.
+`INDIRECT`; a protected operation without an exact direct route assertion is
+`MISSING` and would belong to the finite `11C2-API-01` backlog. The nine Stock
+and Leave rows that were previously missing are now directly proved below, so
+that backlog item is complete. The three projection rows remain inventory-only
+presentation checks and are not included in that mutation/route backlog.
 
 Accordingly, a protected operation-ledger row without an exact direct route
 assertion is `MISSING`, not `INDIRECT`. Matrix-level `INDIRECT` rows are
@@ -232,13 +234,12 @@ means no adequate operation-specific regression proof was found. `N/A` in the
 transaction column means the operation is read-only or the architecture makes
 no transaction-time claim; it does not mean unauthenticated.
 
-### Phase 11C.2C.1 operation rows — Outcome A decision
+### Phase 11C.2C.2 operation rows — Outcome A decision
 
-The Employee and Routine operation rows in the Phase 11C.2C.1 scope were
-re-audited against their real route, application boundary, adapter, and tests.
-The four Routine rows that were previously `INDIRECT` are shown below with
-their new exact direct route evidence. The remaining Stock and Leave rows stay
-`MISSING` until their own phase is started:
+The Employee, Routine, Stock, and Leave operation rows in the Phase 11C.2
+scope were re-audited against their real route, application boundary, adapter,
+and tests. The nine rows that were previously `MISSING` now have exact direct
+route evidence:
 
 | Ledger ID | Traced production boundary | Why the existing evidence is not an exact route proof | Final treatment |
 | --- | --- | --- | --- |
@@ -246,24 +247,25 @@ their new exact direct route evidence. The remaining Stock and Leave rows stay
 | `LEDGER-ROU-02` | The route authenticates, validates idempotency/body, builds the actor, and delegates to `createRoutineTask()`, whose transaction resolves `routine.task.create`. | The new exact route test executes the POST route and real transaction authorization before rejecting an unavailable reference; the task create side effect is absent. | `DIRECT` — `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` (`LEDGER-ROU-02 reaches the real task.create authorization path before rejecting an unavailable resource`). |
 | `LEDGER-ROU-06` | The route dispatches to `getRoutineOccurrences()`, which resolves `routine.occurrence.read` and builds the query scope. | The new exact route test executes the route and real query authorization, then proves the server-derived assignee scope excludes the requested unrelated assignee. | `DIRECT` — `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` (`LEDGER-ROU-06 denies unrelated occurrence workload through GET /api/routines/occurrences`). |
 | `LEDGER-ROU-07` | The same route dispatches `view=tasks` to `getRoutineTaskWorkItems()`, including the bounded work-item compatibility bridge. | The new exact route test executes `view=tasks` through the real work-item query path, asserts `routine.task.read` rather than `routine.occurrence.read`, and separately freezes the no-grant `scope=all` bridge. | `DIRECT` — `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` (`LEDGER-ROU-07 selects routine.task.read for GET /api/routines/occurrences?view=tasks`; `preserves the frozen NO_APPLICABLE_GRANT to ALL bridge only for the task work-item view`). |
-| `LEDGER-STK-01` | The category GET route itself calls `assertStockCapabilityForMigration(..., "stock.catalog.read")` before the service query. | The route suite proves the workforce gate but does not assert this capability allow/deny boundary; Stock adapter/query tests are separate. | `MISSING` — `LEDGER-GAP-STK-01` in `11C2-API-01`. |
-| `LEDGER-STK-02` | The category POST route parses input, then calls the fixed `stock.inventory.manage` assertion before creating the category. | Mutation tests cover the Stock application service/adapter, but no category route test asserts the capability boundary. | `MISSING` — `LEDGER-GAP-STK-02` in `11C2-API-01`. |
-| `LEDGER-STK-03` | The category DELETE route parses the target query value, then calls the fixed `stock.inventory.manage` assertion before deletion. | No operation-specific category delete capability assertion was found; service tests do not cover route composition. | `MISSING` — `LEDGER-GAP-STK-03` in `11C2-API-01`. |
-| `LEDGER-STK-04` | The item GET route calls the fixed `stock.catalog.read` assertion before the catalog query. | The route suite covers workforce rejection and query tests cover data semantics, but neither directly asserts this route capability boundary. | `MISSING` — `LEDGER-GAP-STK-04` in `11C2-API-01`. |
-| `LEDGER-STK-05` | The item POST route calls the fixed `stock.inventory.manage` assertion before creating an item. | Stock mutation tests and the item route suite cover other operations, not this create-route capability boundary. | `MISSING` — `LEDGER-GAP-STK-05` in `11C2-API-01`. |
-| `LEDGER-STK-08` | The item-adjust route calls the fixed `stock.inventory.manage` assertion before `adjustStock()`. | Inventory mutation tests begin at the application service; no adjust-route capability assertion was found. | `MISSING` — `LEDGER-GAP-STK-08` in `11C2-API-01`. |
-| `LEDGER-LEV-14` | The LIFF cancellation POST route verifies the LIFF session, constructs `LIFF_SELF_SERVICE` context, and delegates to `cancelLeaveRequest()`. | `__tests__/api/line-leave-routes.test.ts` mocks the handler and asserts response/actor plumbing; Leave application tests cover the lower path, not the complete route/capability pairing. | `MISSING` — `LEDGER-GAP-LEV-14` in `11C2-API-01`. |
-| `LEDGER-LEV-16` | The LIFF not-taken POST route verifies the LIFF session, constructs the fixed LIFF context, and delegates to `handleLeaveNotTakenRequest()`. | The route suite covers the confirmation `PUT`, not this request `POST`; the lower domain path is not an exact route proof. | `MISSING` — `LEDGER-GAP-LEV-16` in `11C2-API-01`. |
+| `LEDGER-STK-01` | The category GET route itself calls `assertStockCapabilityForMigration(..., "stock.catalog.read")` before the service query. | The focused exact route test keeps the Stock assertion, central resolver, production registry, and no-grant catalog compatibility real; the service is below the authorization boundary. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-STK-01 executes category GET through stock.catalog.read`). |
+| `LEDGER-STK-02` | The category POST route parses input, then calls the fixed `stock.inventory.manage` assertion before creating the category. | The focused exact route test uses a valid create body, real Stock authorization, and a normal no-grant USER denial before the create service. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-STK-02 denies category POST without stock.inventory.manage`). |
+| `LEDGER-STK-03` | The category DELETE route parses the target query value, then calls the fixed `stock.inventory.manage` assertion before deletion. | The focused exact route test uses a valid numeric target, real Stock authorization, and proves the delete service is not reached; query authority fields are ignored. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-STK-03 denies category DELETE without stock.inventory.manage`). |
+| `LEDGER-STK-04` | The item GET route calls the fixed `stock.catalog.read` assertion before the catalog query. | The focused exact route test keeps the production catalog compatibility real, asserts the fixed capability/channel, and passes only ordinary filters to the service. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-STK-04 executes item GET through stock.catalog.read`). |
+| `LEDGER-STK-05` | The item POST route calls the fixed `stock.inventory.manage` assertion before creating an item. | The focused exact route test uses a valid create-item body, real Stock authorization, and proves the create service is not reached after the current USER denial. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-STK-05 denies item POST without stock.inventory.manage`). |
+| `LEDGER-STK-08` | The item-adjust route calls the fixed `stock.inventory.manage` assertion before `adjustStock()`. | The focused exact dynamic route test uses a valid numeric item ID and adjustment payload, controls only rate limits, and proves neither the adjustment service nor outbox runs after the real denial. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-STK-08 denies item adjustment without stock.inventory.manage`). |
+| `LEDGER-LEV-14` | The LIFF cancellation POST route verifies the LIFF session, constructs `LIFF_SELF_SERVICE` context, and delegates to `cancelLeaveRequest()`. | The focused exact route test keeps `requireLiffWorkforceSession`, the real cancellation handler/application authorization path, fixed capability/channel, and owner check real; unrelated data cannot reach mutation. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-LEV-14 denies unrelated LIFF employee cancellation through the real leave.request.cancel path`). |
+| `LEDGER-LEV-16` | The LIFF not-taken POST route verifies the LIFF session, constructs the fixed LIFF context, and delegates to `handleLeaveNotTakenRequest()`. | The focused exact POST route test keeps the real not-taken handler/application authorization path and fixed capability/channel, then proves an unrelated Employee cannot mutate the request. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-LEV-16 denies unrelated LIFF employee not-taken request through the real application path`). |
+| `LEDGER-LEV-17` | The LIFF not-taken PUT route verifies the LIFF session, constructs the fixed LIFF context, and delegates to `handleLeaveNotTakenConfirmation()` with `allowAdminOverride: false`. | The focused exact PUT route test uses a LIFF ADMIN whose current Employee is neither owner nor effective approver; the real handler/application path denies recovery and performs no confirmation mutation. | `DIRECT` — `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` (`LEDGER-LEV-17 denies unrelated LIFF ADMIN confirmation without recovery override`). |
 
-This is a deliberate Outcome A decision, not a mechanical relabeling. The new
-Employee/Routine suite executes the exact HTTP compositions and keeps the
-authorization boundaries under test real; only lower persistence/domain seams
-are controlled. The remaining Stock rows have only adjacent
-workforce/service evidence, and the LIFF Leave rows mock or cover a different
-command boundary. Application and adapter tests remain strong evidence for
-their own boundaries, but they do not close an exact route/capability/channel
-row. Therefore `INDIRECT` is not used for an operation that `API-10` requires
-to be directly asserted.
+This remains a deliberate Outcome A decision, not a mechanical relabeling. The
+focused Stock suite keeps the production Stock adapter, central resolver,
+registry, and fixed Dashboard actor/channel real while controlling only the
+service below the boundary. The focused Leave suite executes the exact LIFF
+routes and real cancellation/not-taken handlers, central resolver, verified
+actor context, and relationship/workflow checks while controlling only
+transaction-bound persistence and notification seams. Therefore each of the
+nine operation rows is now `DIRECT`; no protected operation is classified as
+`INDIRECT`.
 
 | Ledger ID | Domain | Entry point / method or command | Capability | Channel | Authentication boundary | Trusted actor provenance | Resource relationship / scope | Transaction revalidation applicability | Existing regression evidence / direct test(s) | Coverage | Gap |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -298,14 +300,14 @@ to be directly asserted.
 | LEDGER-ROU-21 | Routine | `GET /api/line/routine/tasks/:id` | `routine.task.read` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Linked Employee self-service/deep-link relationship | `N/A` read path | `__tests__/api/line-routine-routes.test.ts` — deep-link mine | DIRECT | — |
 | LEDGER-ROU-22 | Routine | `PATCH /api/line/routine/tasks/:id` | `routine.task.update` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Linked Employee ownership/creator relationship | Serializable mutation with current actor re-resolution | `__tests__/api/line-routine-self-service-routes.test.ts` — detail edit/version | DIRECT | — |
 | LEDGER-ROU-23 | Routine | `DELETE /api/line/routine/tasks/:id` | `routine.task.delete` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Linked Employee ownership/creator relationship | Serializable mutation with current actor re-resolution | `__tests__/api/line-routine-self-service-routes.test.ts` — delete delegates auth | DIRECT | — |
-| LEDGER-STK-01 | Stock | `GET /api/stock/categories` | `stock.catalog.read` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Catalog `ALL` | `N/A` read path | `__tests__/api/stock-requests-routes.test.ts` — workforce gate only; Stock authorization/query tests | MISSING | `LEDGER-GAP-STK-01` |
-| LEDGER-STK-02 | Stock | `POST /api/stock/categories` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Inventory `ALL` | Serializable inventory mutation path | Stock authorization/mutation tests; no category route capability assertion | MISSING | `LEDGER-GAP-STK-02` |
-| LEDGER-STK-03 | Stock | `DELETE /api/stock/categories` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Inventory `ALL` | Serializable inventory mutation path | Stock authorization/mutation tests; no category route capability assertion | MISSING | `LEDGER-GAP-STK-03` |
-| LEDGER-STK-04 | Stock | `GET /api/stock/items` | `stock.catalog.read` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Catalog `ALL` | `N/A` read path | `__tests__/api/stock-requests-routes.test.ts` — workforce gate only; `modules/stock/__tests__/queries.test.ts` — query behavior | MISSING | `LEDGER-GAP-STK-04` |
-| LEDGER-STK-05 | Stock | `POST /api/stock/items` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Inventory `ALL` | Serializable inventory mutation path | Stock authorization/mutation tests; item route suite covers update/delete, not create | MISSING | `LEDGER-GAP-STK-05` |
+| LEDGER-STK-01 | Stock | `GET /api/stock/categories` | `stock.catalog.read` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Catalog `ALL` | `N/A` read path | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact route, real Stock resolver/registry, and catalog compatibility | DIRECT | — |
+| LEDGER-STK-02 | Stock | `POST /api/stock/categories` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Inventory `ALL` | Serializable inventory mutation path | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact route, valid body, real denial, and no create side effect | DIRECT | — |
+| LEDGER-STK-03 | Stock | `DELETE /api/stock/categories` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Inventory `ALL` | Serializable inventory mutation path | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact route, numeric target, real denial, and no delete side effect | DIRECT | — |
+| LEDGER-STK-04 | Stock | `GET /api/stock/items` | `stock.catalog.read` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Catalog `ALL` | `N/A` read path | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact route, real Stock resolver/registry, fixed capability, and ordinary filters | DIRECT | — |
+| LEDGER-STK-05 | Stock | `POST /api/stock/items` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Inventory `ALL` | Serializable inventory mutation path | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact route, valid body, real denial, and no create side effect | DIRECT | — |
 | LEDGER-STK-06 | Stock | `PATCH /api/stock/items/:id` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Target inventory item `ALL` plus domain invariants | Serializable transaction with current workforce re-read | `__tests__/api/stock-items-route.test.ts` | DIRECT | — |
 | LEDGER-STK-07 | Stock | `DELETE /api/stock/items/:id` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Target inventory item `ALL` plus soft-delete rules | Serializable transaction with current workforce re-read | `__tests__/api/stock-items-route.test.ts` | DIRECT | — |
-| LEDGER-STK-08 | Stock | `POST /api/stock/items/:id/adjust` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Target inventory item `ALL` plus quantity invariants | Serializable inventory mutation path | `modules/stock/__tests__/mutations.test.ts` — application mutation only; no dedicated adjust route assertion | MISSING | `LEDGER-GAP-STK-08` |
+| LEDGER-STK-08 | Stock | `POST /api/stock/items/:id/adjust` | `stock.inventory.manage` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Target inventory item `ALL` plus quantity invariants | Serializable inventory mutation path | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact dynamic route, valid target/body, real denial, no adjustment side effect, and no outbox | DIRECT | — |
 | LEDGER-STK-09 | Stock | `GET /api/stock/requests` | `stock.request.read` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | `OWN`/`ALL`; requested scope cannot broaden effective grant | `N/A` read path | `__tests__/api/stock-requests-routes.test.ts` | DIRECT | — |
 | LEDGER-STK-10 | Stock | `POST /api/stock/requests` | `stock.request.create` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Owner is current Employee; `OWN` | Serializable transaction, idempotency, workforce re-read | `__tests__/api/stock-requests-routes.test.ts` | DIRECT | — |
 | LEDGER-STK-11 | Stock | `POST /api/stock/requests/:id/review` with `ISSUE` | `stock.request.process` | `DASHBOARD` | Dashboard workforce/Admin session | Server-derived actor/current role | Processing `ALL` plus workflow state | Serializable transaction and workforce re-read | `__tests__/api/stock-requests-routes.test.ts` | DIRECT | — |
@@ -339,24 +341,21 @@ to be directly asserted.
 | LEDGER-LEV-11 | Leave | `GET /api/line/leave/me` | `leave.request.read` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Owner `OWN` | `N/A` read path | `__tests__/api/line-leave-routes.test.ts` | DIRECT | — |
 | LEDGER-LEV-12 | Leave | `GET /api/line/leave/approvals` | `leave.approval.read` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Assigned effective approver workload | `N/A` read path | `__tests__/api/line-leave-routes.test.ts` | DIRECT | — |
 | LEDGER-LEV-13 | Leave | `POST /api/line/leave/request` | `leave.request.create` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Owner `OWN`; client actor fields ignored | Serializable transaction and idempotency | `__tests__/api/line-leave-routes.test.ts` | DIRECT | — |
-| LEDGER-LEV-14 | Leave | `POST /api/line/leave/cancel` | `leave.request.cancel` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Owner/request relationship and state | Serializable transaction and workflow re-read | `__tests__/api/line-leave-routes.test.ts` — route/response and actor plumbing with handler mock; `__tests__/api/leave-cancel.test.ts` — application path | MISSING | `LEDGER-GAP-LEV-14` |
+| LEDGER-LEV-14 | Leave | `POST /api/line/leave/cancel` | `leave.request.cancel` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Owner/request relationship and state | Serializable transaction and workflow re-read | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact route, real cancellation handler/authorization, verified actor, and unrelated-owner denial | DIRECT | — |
 | LEDGER-LEV-15 | Leave | `POST /api/line/leave/decision` | `leave.request.approve` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Assigned effective approver relationship | Serializable transaction and approver/current-state re-read | `__tests__/api/line-leave-routes.test.ts`; `__tests__/api/leave-decision.test.ts` | DIRECT | — |
-| LEDGER-LEV-16 | Leave | `POST /api/line/leave/not-taken` | `leave.request.not_taken` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Owner `OWN`; no recovery override | Domain transaction path; explicit stronger central guarantee not claimed | `__tests__/api/line-leave-routes.test.ts` covers the confirmation `PUT`, not this request command | MISSING | `LEDGER-GAP-LEV-16` |
-| LEDGER-LEV-17 | Leave | `PUT /api/line/leave/not-taken` | `leave.request.not_taken` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Assigned effective approver; no recovery override | Domain transaction path; explicit stronger central guarantee not claimed | No operation-specific LIFF not-taken PUT assertion found | MISSING | `LEDGER-GAP-LEV-17` |
+| LEDGER-LEV-16 | Leave | `POST /api/line/leave/not-taken` | `leave.request.not_taken` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Owner `OWN`; no recovery override | Domain transaction path; explicit stronger central guarantee not claimed | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact POST route, real not-taken handler/authorization, verified actor, and unrelated-owner denial | DIRECT | — |
+| LEDGER-LEV-17 | Leave | `PUT /api/line/leave/not-taken` | `leave.request.not_taken` | `LIFF_SELF_SERVICE` | Verified LIFF workforce session | Verified LIFF `sub` plus linked Employee | Assigned effective approver; no recovery override | Domain transaction path; explicit stronger central guarantee not claimed | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` — exact PUT route, real confirmation handler/authorization, effective-approver denial, and `allowAdminOverride: false` | DIRECT | — |
 | LEDGER-AUD-01 | Audit | `GET /api/audit-logs` | `audit.read` | `DASHBOARD` | API session plus Audit adapter | Authenticated server User/current role | Audit read `ALL` under central capability | `N/A` read path | `__tests__/api/audit-log-route.test.ts` | DIRECT | — |
 | LEDGER-NOT-01 | Notification | `GET /api/notifications` | `notification.inbox.read` | `DASHBOARD` | API session plus Notification adapter | Server-derived User ID | Actor-owned `OWN` query | `N/A` read path | `__tests__/api/notifications.test.ts` | DIRECT | — |
 | LEDGER-NOT-02 | Notification | `GET /api/notifications/all` | `notification.inbox.read` | `DASHBOARD` | API session plus Notification adapter | Server-derived User ID | Actor-owned `OWN` query; route name does not broaden scope | `N/A` read path | `__tests__/api/notifications.test.ts` | DIRECT | — |
 | LEDGER-NOT-03 | Notification | `PATCH /api/notifications/:id/read` | `notification.inbox.update` | `DASHBOARD` | API session plus Notification adapter | Server-derived User ID; route ID is target only | Target notification belongs to actor `OWN` | Mutation command; no separate central transaction-time claim | `__tests__/api/notifications.test.ts` | DIRECT | — |
 | LEDGER-NOT-04 | Notification | `POST /api/notifications/mark-all-read` | `notification.inbox.update` | `DASHBOARD` | API session plus Notification adapter | Server-derived User ID | Actor-owned `OWN` bulk update | Mutation command; no separate central transaction-time claim | `__tests__/api/notifications.test.ts` | DIRECT | — |
 
-The ledger therefore has 81 migrated capability entry-point rows: 72
-`DIRECT`, zero `INDIRECT`, and 9 `MISSING`. The remaining missing rows are
-`LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`,
-`LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and
-`LEDGER-LEV-17`. They are the remaining finite route-level scope of `API-10`.
-Ledger counts are operation evidence and are not added to the 89 matrix-case
-total. Excluding the three action-availability projection rows, the 78
-protected route/capability rows contain 69 `DIRECT` and 9 `MISSING` rows.
+The ledger therefore has 81 migrated capability entry-point rows: 81
+`DIRECT`, zero `INDIRECT`, and zero `MISSING`. Ledger counts are operation
+evidence and are not added to the 89 matrix-case total. Excluding the three
+action-availability projection rows, the 78 protected route/capability rows
+contain 78 `DIRECT` and zero `MISSING` rows.
 
 The three optional Stock LIFF rows attached to `GET` detail/processing
 responses (`LEDGER-STK-23`, `LEDGER-STK-24`, and `LEDGER-STK-26`) describe
@@ -405,7 +404,7 @@ indirect.
 
 | Matrix ID | Domain / surface | Capability or protected operation | Channel | Threat / invariant | Expected result | Production enforcement location | Existing regression test(s) | Coverage | Classification | Gap / required action | Notes / compatibility constraints |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUTHN-01 | Auth and selected migrated Dashboard/API entry points | Employee list/stats/mutation, Department, Audit, Notification, and Authorization Administration boundaries represented by the named suites | `DASHBOARD` | Missing, invalid, or unauthenticated session must not reach the covered protected work | Return safe `401` and do not perform the covered protected query or mutation | `lib/auth/api.ts:requireApiSession`; route guards before services | `__tests__/api/employees-routes.test.ts`; `__tests__/api/departments-route.test.ts`; `__tests__/api/audit-log-route.test.ts`; `__tests__/api/notifications.test.ts`; `__tests__/api/authorization-administration-mutations.test.ts` | INDIRECT | MIGRATED_AUTHORIZATION | The remaining exact protected operation rows without direct route proof are `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17`. They are owned by `11C2-API-01`. | This aggregate row does not claim every migrated route is directly tested. UI visibility is not part of this proof. |
+| AUTHN-01 | Auth and selected migrated Dashboard/API entry points | Employee list/stats/mutation, Department, Audit, Notification, and Authorization Administration boundaries represented by the named suites | `DASHBOARD` | Missing, invalid, or unauthenticated session must not reach the covered protected work | Return safe `401` and do not perform the covered protected query or mutation | `lib/auth/api.ts:requireApiSession`; route guards before services | `__tests__/api/employees-routes.test.ts`; `__tests__/api/departments-route.test.ts`; `__tests__/api/audit-log-route.test.ts`; `__tests__/api/notifications.test.ts`; `__tests__/api/authorization-administration-mutations.test.ts` | INDIRECT | MIGRATED_AUTHORIZATION | No remaining mandatory Phase 11C.2 gap for the authenticated operation ledger; this aggregate remains partial because it covers selected authentication failures rather than every route. | This aggregate row does not claim every migrated route is directly tested. UI visibility is not part of this proof. |
 | AUTHN-02 | LIFF entry points | LIFF-protected operations | `LIFF_SELF_SERVICE` | Missing, malformed, expired, tampered, or wrong-purpose LIFF session must not establish identity | Return `401` for invalid session material before workforce access | `modules/line/application/liff.ts:requireLiffWorkforceSession`; `modules/line/infrastructure/session/liff-session.ts` | `__tests__/auth/liff.test.ts`; `__tests__/lib/line-liff-session.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for the covered LIFF boundary | Current User, Employee, and account-link state is checked after token verification. |
 | AUTHN-03 | Generic account versus workforce routes | Legacy API and workforce-required operations | `DASHBOARD` | An authenticated account without an eligible Employee must not be treated as a workforce actor | Generic account resolution may succeed only where designed; workforce-required API returns the documented failure | `modules/auth/application/sessions.ts`; `lib/auth/api.ts`; `lib/auth/workforce.ts` | `__tests__/lib/server-auth-token-version.test.ts`; `__tests__/auth/workforce.test.ts` | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for the documented boundary | Account-only ADMIN seams are listed separately and do not make a normal USER a workforce actor. |
 | AUTHN-04 | Session lifecycle | Dashboard/API session | `DASHBOARD` | Revoked session family, token-version mismatch, or invalid current account state must not authenticate | Reject before authorization and persistence access | `modules/auth/application/sessions.ts:resolveAuthenticatedAccount`; `lib/auth/server.ts` | `__tests__/lib/server-auth-token-version.test.ts`; `__tests__/auth/auth-principal.test.ts` | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for covered token/session conditions | Current persisted role is returned; route-time role is not trusted. |
@@ -416,8 +415,8 @@ indirect.
 | LIFE-05 | Explicit account-only ADMIN seams | Stock lower operations, Leave approver management, Routine Dashboard lower helper | `DASHBOARD` | Account-only ADMIN exceptions must be narrow and explicit, not a general lifecycle bypass | Allow only the documented capability/path; require active User and preserve domain rules | `lib/auth/workforce.ts:requireActiveWorkforceOrAdminSession`; Stock, Leave, and Routine transaction authorization adapters | `__tests__/auth/workforce.test.ts`; `modules/stock/application/authorization.test.ts`; `modules/leave/application/authorization.test.ts`; `modules/routine/application/authorization.test.ts` | DIRECT | COMPATIBILITY_POLICY | No mandatory Phase 11C.2 gap; optional strengthening is limited to an explicit negative test for an unlisted capability if the allowlist expands | Current tests directly establish the narrow allowlisted seams. This is a compatibility seam, not a new ADMIN bypass. |
 | LIFE-06 | Dashboard current-user projection | Dashboard navigation and capability projection | `DASHBOARD` | Presentation must not turn an account with no eligible Employee into a workforce authority | Projection is absent or restricted; server route still performs its own checks | `app/_lib/auth/current-user.ts` | `__tests__/auth/current-user-projection.test.ts` | DIRECT | PRESENTATION_ONLY | None for projection behavior | Projection flags are not authorization evidence. |
 | ACTOR-01 | Dashboard actor construction | Migrated domain adapters | `DASHBOARD` | Actor `userId`, `employeeId`, and current role must come from authenticated server state | Build the actor from trusted session/current account; ignore client actor fields | `app/_lib/auth/current-user.ts`; domain `application/authorization.ts` adapters | `__tests__/api/employees-routes.test.ts`; `__tests__/api/authorization-administration-mutations.test.ts`; `__tests__/auth/current-user-projection.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for the covered actor builders | Request data may select a target/filter but cannot establish the actor. |
-| ACTOR-02 | API body, query, and headers | The Employee, Routine, Authorization Administration, Routine LIFF, Stock LIFF, and Leave LIFF cases named in the test column | `DASHBOARD` or `LIFF_SELF_SERVICE` | Request fields cannot supply actor user ID, role, capability, scope, Team origin, or channel in the covered cases | Authorization result remains based on the server-derived actor and operation contract | Route handlers pass authenticated identity to adapters; central resolver accepts `AuthorizationActor`, not `Request` | `__tests__/api/employees-routes.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `__tests__/api/authorization-administration-mutations.test.ts`; `__tests__/api/line-routine-routes.test.ts`; `__tests__/api/line-routine-self-service-routes.test.ts`; `__tests__/api/line-stock-routes.test.ts`; `__tests__/api/line-leave-routes.test.ts` | INDIRECT | MIGRATED_AUTHORIZATION | Outcome A leaves a finite route-proof gap for the remaining `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17`; implement these only through `11C2-API-01` | Headers are transport metadata only where the route explicitly derives a fixed channel. This aggregate row records adjacent spoofing evidence and does not claim that the listed operation rows are complete. |
-| ACTOR-03 | Dynamic route parameters | The Admin, Routine occurrence/task, and Stock request target cases named in the test column | `DASHBOARD` | Route IDs identify a target only and cannot supply an authorization role or capability in the covered cases | Use the authenticated actor with the route ID as resource input; reject unauthorized target access | Route handlers and service command contexts; Admin route auth | `__tests__/api/authorization-administration-mutations.test.ts`; `__tests__/api/routines-occurrence-by-id.test.ts`; `__tests__/api/routines-task-by-id.test.ts`; `__tests__/api/stock-requests-routes.test.ts` | INDIRECT | MIGRATED_AUTHORIZATION | Exact dynamic-route proof remains missing only for `LEDGER-STK-08`; it remains in the finite `11C2-API-01` list | A target ID is not actor provenance; this aggregate row does not claim every dynamic route is directly tested. |
+| ACTOR-02 | API body, query, and headers | The Employee, Routine, Authorization Administration, Routine LIFF, Stock LIFF, and Leave LIFF cases named in the test column | `DASHBOARD` or `LIFF_SELF_SERVICE` | Request fields cannot supply actor user ID, role, capability, scope, Team origin, or channel in the covered cases | Authorization result remains based on the server-derived actor and operation contract | Route handlers pass authenticated identity to adapters; central resolver accepts `AuthorizationActor`, not `Request` | `__tests__/api/employees-routes.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts`; `__tests__/api/authorization-administration-mutations.test.ts`; `__tests__/api/line-routine-routes.test.ts`; `__tests__/api/line-routine-self-service-routes.test.ts`; `__tests__/api/line-stock-routes.test.ts`; `__tests__/api/line-leave-routes.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | — | Exact Stock and Leave route cases now assert that authority-shaped body/query fields cannot replace the trusted actor, fixed capability, or fixed channel. Headers are transport metadata only where the route explicitly derives a fixed channel. |
+| ACTOR-03 | Dynamic route parameters | The Admin, Routine occurrence/task, Stock request, and Stock item-adjust target cases named in the test column | `DASHBOARD` | Route IDs identify a target only and cannot supply an authorization role or capability in the covered cases | Use the authenticated actor with the route ID as resource input; reject unauthorized target access | Route handlers and service command contexts; Admin route auth | `__tests__/api/authorization-administration-mutations.test.ts`; `__tests__/api/routines-occurrence-by-id.test.ts`; `__tests__/api/routines-task-by-id.test.ts`; `__tests__/api/stock-requests-routes.test.ts`; `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | — | The exact dynamic Stock route proof uses a valid numeric item ID as resource identity and proves it cannot supply actor or inventory authority. |
 | ACTOR-04 | LIFF identity boundary | LIFF self-service capabilities | `LIFF_SELF_SERVICE` | LIFF identity must come from a verified LIFF/session boundary and current link, not request data | Use the verified `sub`, current User/Employee, and current account link; reject mismatch | `modules/line/application/liff.ts:requireLiffWorkforceSession`; LIFF route handlers | `__tests__/auth/liff.test.ts`; `__tests__/api/line-routine-routes.test.ts`; `__tests__/api/line-stock-routes.test.ts`; `__tests__/api/line-leave-routes.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for covered LIFF identity paths | LIFF Admin remains a LIFF actor and does not inherit Dashboard Admin semantics. |
 | ACTOR-05 | Employee transaction authorization | Employee update/delete and related mutation commands | `DASHBOARD` | A stale route-time role must not override the current persisted role when revalidation is required | Lock and re-read current User/Employee, rebuild actor from current state, then resolve | `modules/employee/application/authorization.ts:resolveEmployeeCapabilityInTransaction` | `modules/employee/application/authorization.test.ts`; `__tests__/auth/workforce-transaction.test.ts` | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for the Employee path | This evidence is specific to Employee and must not be generalized to every mutation path. |
 | ACTOR-06 | Cross-domain transaction actor state | Routine, Stock, and Leave mutation transactions | `DASHBOARD` | Current persisted role must replace stale route-time role across every path that claims transaction-time revalidation | Re-read the current account actor before the final authorization decision | Domain transaction adapters do this path-by-path; each named adapter now has a direct stale-role regression case | `modules/routine/application/authorization.test.ts` (`rebuilds a stale Dashboard ADMIN route actor from the current persisted USER role`); `modules/stock/application/authorization.test.ts` (`denies Dashboard ADMIN compatibility after the persisted role is downgraded to USER`); `modules/leave/application/authorization.test.ts` (`rebuilds a stale Dashboard ADMIN route actor from the current persisted USER role`; `uses the current USER actor for final authorization after a stale ADMIN preflight`) | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for the covered Routine, Stock, and Leave adapters | Each stale-role case keeps User/Employee active and proves that the persisted USER role replaces route-time ADMIN authority. |
@@ -442,7 +441,7 @@ indirect.
 | SCOPE-06 | Structural Team origin | `TEAM` and direct User grants | Any | Missing Team origin must fail closed | Reject direct User `TEAM` and malformed Team/TeamRole origins | `modules/authorization/application/evaluator.ts`; persistence validation | `modules/authorization/application/resolver.test.ts` (`direct User TEAM scope requires origin` and origin preservation) | DIRECT | MIGRATED_AUTHORIZATION | None | A domain must never fabricate a Team origin from Department, manager, position, or Employee metadata. |
 | SCOPE-07 | ALL-scoped domain operations | `ALL` | `DASHBOARD` / `LIFF_SELF_SERVICE` | `ALL` removes only the relationship restriction represented by the scope | It does not bypass authentication, lifecycle, workflow, validation, locks, or concurrency | Domain query/mutation policies; transaction authorization adapters | `modules/stock/application/authorization.test.ts`; `modules/routine/application/authorization.test.ts`; `modules/leave/application/authorization.test.ts`; `modules/employee/application/mutations.test.ts` | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for covered domain paths | This invariant is repeated in the Admin rows because ADMIN receives authority through the same boundaries. |
 | SCOPE-08 | Requested scope handling | Request `scope=all` and narrower grants | `DASHBOARD` / `LIFF_SELF_SERVICE` | A request cannot widen a narrower effective grant | Requested scope is a filter/selector only; effective scopes decide | Stock and Routine authorization/query builders | `__tests__/api/stock-requests-routes.test.ts`; `__tests__/api/line-stock-routes.test.ts`; `modules/routine/application/authorization.test.ts` | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for covered requested-scope cases | The Routine work-item bridge is an exact compatibility exception documented in COMPAT-06. |
-| SCOPE-09 | Query-level relationship enforcement | Employee, Routine, Stock, Leave, Notification | `DASHBOARD` / `LIFF_SELF_SERVICE` | Unauthorized resources must not be returned before a later UI check in the covered reader cases | Apply actor/resource predicates before the query or return a safe denial | Domain query builders and route authorization gates | `__tests__/api/departments-route.test.ts`; `__tests__/api/notifications.test.ts`; `__tests__/api/stock-requests-routes.test.ts`; `__tests__/api/line-stock-routes.test.ts`; `__tests__/api/leave-me.test.ts`; `__tests__/api/routines-task-by-id.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` | INDIRECT | DOMAIN_OR_LIFECYCLE_POLICY | No second unbounded route gap is implied. The exact Employee/Routine route assertions are now direct in the operation ledger; the remaining exact route assertions are the nine Stock/Leave rows in `11C2-API-01`. The named domain query tests remain direct evidence for their own predicate semantics. | UI filtering is not a substitute for query scoping. This aggregate row does not claim every migrated reader is directly tested. |
+| SCOPE-09 | Query-level relationship enforcement | Employee, Routine, Stock, Leave, Notification | `DASHBOARD` / `LIFF_SELF_SERVICE` | Unauthorized resources must not be returned before a later UI check in the covered reader cases | Apply actor/resource predicates before the query or return a safe denial | Domain query builders and route authorization gates | `__tests__/api/departments-route.test.ts`; `__tests__/api/notifications.test.ts`; `__tests__/api/stock-requests-routes.test.ts`; `__tests__/api/line-stock-routes.test.ts`; `__tests__/api/leave-me.test.ts`; `__tests__/api/routines-task-by-id.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | — | The exact Stock/Leave route cases use valid target data and real owner/resource authorization paths; UI filtering is not a substitute for query scoping. |
 | CHANNEL-01 | Dashboard migrated domains | Employee, Department, Routine, Stock, Leave, Audit, Notification | `DASHBOARD` | Dashboard operations use the Dashboard channel and current server actor | Resolve the registered capability for `DASHBOARD`, then apply domain policy | Domain authorization adapters and Dashboard route handlers | Employee, Department, Audit, Notification, Stock, Routine, and Leave authorization test suites; corresponding API suites | DIRECT | MIGRATED_AUTHORIZATION | None for covered Dashboard adapters | Broad compatibility floors are separate from central target policy. |
 | CHANNEL-02 | LIFF migrated/self-service domains | Routine, Stock, Leave | `LIFF_SELF_SERVICE` | LIFF must use the same authoritative model while retaining self-service restrictions | Resolve with verified LIFF actor and LIFF channel; clamp operation/resource to self-service contract | `modules/line/application/liff.ts`; LIFF route handlers; domain adapters | `__tests__/api/line-routine-routes.test.ts`; `__tests__/api/line-stock-routes.test.ts`; `__tests__/api/line-leave-routes.test.ts`; LIFF session tests | DIRECT | MIGRATED_AUTHORIZATION | None for covered LIFF routes | LIFF is not a client-supplied role or unrestricted Dashboard channel. |
 | CHANNEL-03 | Routine LIFF Admin | Routine task and summary self-service entry points | `LIFF_SELF_SERVICE` | ADMIN through LIFF must not inherit unrestricted Dashboard administrative semantics | Force mine/self-service scope and current LIFF Employee context | `app/api/line/routine/tasks/route.ts`; Routine LIFF actor/mode adapter; LIFF summary route | `__tests__/api/line-routine-routes.test.ts`; `modules/routine/application/authorization.test.ts` | DIRECT | COMPATIBILITY_POLICY | None for the explicit LIFF Admin clamp | Summary remains a deferred central capability surface even though the route is self-service scoped. |
@@ -450,16 +449,16 @@ indirect.
 | CHANNEL-05 | Leave recovery and cancellation | `leave.cancellation.decide` and related recovery paths | `DASHBOARD` / `LIFF_SELF_SERVICE` | Explicit Dashboard recovery authority must not leak into LIFF | Enforce the documented Dashboard-only recovery exception; LIFF uses ordinary self-service/domain path | `modules/leave/application/authorization.ts:canUseLeaveAdminRecoveryOverride`; Leave route composition | `__tests__/api/leave-cancel.test.ts`; `__tests__/api/line-leave-routes.test.ts`; `modules/leave/application/authorization.test.ts` | DIRECT | COMPATIBILITY_POLICY | None for current channel restriction | No generic `ALL` bypass is created by the recovery exception. |
 | CHANNEL-06 | Dashboard and LIFF projections | Capability and navigation projections | `DASHBOARD` / `LIFF_SELF_SERVICE` | Presentation projections must not change server authority | Projection may hide/show affordances, but direct route calls are independently authorized | `app/_lib/auth/current-user.ts`; `modules/line/application/liff.ts:getLiffCapabilities` | `__tests__/auth/current-user-projection.test.ts`; `__tests__/api/line-routine-routes.test.ts`; direct API denial tests | DIRECT | PRESENTATION_ONLY | None for the projection boundary | A hidden button is not evidence of protection. |
 | CHANNEL-07 | Cross-channel model parity | Same capability model with explicit channel constraints | `DASHBOARD` / `LIFF_SELF_SERVICE` | Dashboard and LIFF must share registry/resolver semantics without sharing unrestricted channel authority | Same central decision model; channel-specific adapters constrain operation/resource | Domain adapters use the same resolver API with fixed channels | Cross-domain authorization adapter tests and LIFF route suites | INDIRECT | MIGRATED_AUTHORIZATION | `11C2-CHANNEL-01`: add a paired Dashboard/LIFF assertion for each capability that is intentionally available in both channels | Existing tests establish the two paths separately, not one exhaustive parity table. |
-| API-01 | Employee API | Employee route/capability cases with named direct tests | `DASHBOARD` | Direct HTTP invocation must enforce authentication, capability, target relationship, lifecycle, and business rules in the covered cases | Unauthorized calls fail before service mutation/query; authorized calls still pass domain invariants | `app/api/employees/route.ts`; `app/api/employees/[id]/route.ts`; Employee authorization/service/transaction layer | `__tests__/api/employees-routes.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `modules/employee/application/authorization.test.ts`; `modules/employee/application/mutations.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for the current Employee route ledger; `LEDGER-EMP-04` now has an exact export-route assertion in `11C2-API-01` | Broad Employee read/stat/export behavior is compatibility policy, not evidence of narrower target policy. |
+| API-01 | Employee API | Employee route/capability cases with named direct tests | `DASHBOARD` | Direct HTTP invocation must enforce authentication, capability, target relationship, lifecycle, and business rules in the covered cases | Unauthorized calls fail before service mutation/query; authorized calls still pass domain invariants | `app/api/employees/route.ts`; `app/api/employees/[id]/route.ts`; Employee authorization/service/transaction layer | `__tests__/api/employees-routes.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `modules/employee/application/authorization.test.ts`; `modules/employee/application/mutations.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for the current Employee route ledger; `LEDGER-EMP-04` has an exact export-route assertion in the Phase 11C.2C.1 route suite | Broad Employee read/stat/export behavior is compatibility policy, not evidence of narrower target policy. |
 | API-02 | Department API | `department.read` | `DASHBOARD` | Direct API access cannot bypass authentication or the central read capability | Deny before query unless the current actor is authorized; return scoped/full data only per current policy | `app/api/departments/route.ts`; Department authorization adapter | `__tests__/api/departments-route.test.ts`; `modules/department/application/authorization.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for the current route | Department is reference data and is not a Team source. |
 | API-03 | Routine migrated API | Routine route/capability cases with named direct tests | `DASHBOARD` / `LIFF_SELF_SERVICE` | Direct task, occurrence, and import calls must enforce auth, central capability, resource scope, lifecycle, workflow, and transaction rules in the covered cases | Deny before unauthorized disclosure/write; authorized mutation revalidates claimed invariants | `app/api/routines/tasks/**`; `app/api/routines/occurrences/**`; import routes; Routine authorization/mutations | `__tests__/api/routines-tasks.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `__tests__/api/routines-task-by-id.test.ts`; `__tests__/api/routines-occurrences.test.ts`; `__tests__/api/routines-occurrence-by-id.test.ts`; `__tests__/api/routine-import-preview.test.ts`; Routine application tests | DIRECT | MIGRATED_AUTHORIZATION | None for the current Routine route ledger; all ten Phase 11C.2C.1 Routine rows now have exact route assertions. Deferred summary/reference/export remain outside the ledger. | Summary/reference/export are explicitly excluded and listed as deferred. |
-| API-04 | Stock migrated API | Stock route/capability cases with named direct tests | `DASHBOARD` / `LIFF_SELF_SERVICE` | Direct catalog, inventory, request, and report calls must enforce auth, capability, relationship, lifecycle, workflow, and idempotency/concurrency rules in the covered cases | Unauthorized resources are not returned and unauthorized writes do not occur | `app/api/stock/**`; `app/api/uploads/image/route.ts`; Stock authorization/mutations/queries | `__tests__/api/stock-requests-routes.test.ts`; `__tests__/api/stock-items-route.test.ts`; `__tests__/api/stock-reports-export-route.test.ts`; `__tests__/api/uploads-image-route.test.ts`; `__tests__/api/line-stock-routes.test.ts`; Stock application tests | INDIRECT | MIGRATED_AUTHORIZATION | The exact Stock ledger gaps are `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, and `LEDGER-STK-08`; all are owned by `11C2-API-01`. `LEDGER-STK-23`, `LEDGER-STK-24`, and `LEDGER-STK-26` are presentation projections, not mutation gaps. | File-system writes retain the documented non-atomic residual race; see TX-08. |
-| API-05 | Leave migrated API | Leave route/capability cases with named direct tests | `DASHBOARD` / `LIFF_SELF_SERVICE` | Direct Leave calls must enforce auth, capability, relationship, lifecycle, workflow, quota, and transaction rules in the covered cases | Unauthorized request/approval/cancellation actions fail without disclosure or mutation | `app/api/leave/**`; Leave authorization and workflow services | `__tests__/api/leave-request.test.ts`; `__tests__/api/leave-decision.test.ts`; `__tests__/api/leave-cancel.test.ts`; `__tests__/api/leave-not-taken.test.ts`; `__tests__/api/leave-approvers.test.ts`; `__tests__/api/line-leave-routes.test.ts`; Leave application tests | INDIRECT | MIGRATED_AUTHORIZATION | The exact Leave ledger gaps are `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17`; all are owned by `11C2-API-01`. Deferred report/export and participant surfaces remain separate. | Explicit domain recovery is not a generic capability bypass. |
+| API-04 | Stock migrated API | Stock route/capability cases with named direct tests | `DASHBOARD` / `LIFF_SELF_SERVICE` | Direct catalog, inventory, request, and report calls must enforce auth, capability, relationship, lifecycle, workflow, and idempotency/concurrency rules in the covered cases | Unauthorized resources are not returned and unauthorized writes do not occur | `app/api/stock/**`; `app/api/uploads/image/route.ts`; Stock authorization/mutations/queries | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts`; `__tests__/api/stock-requests-routes.test.ts`; `__tests__/api/stock-items-route.test.ts`; `__tests__/api/stock-reports-export-route.test.ts`; `__tests__/api/uploads-image-route.test.ts`; `__tests__/api/line-stock-routes.test.ts`; Stock application tests | DIRECT | MIGRATED_AUTHORIZATION | — | The six previously missing Stock rows now have exact route assertions. File-system writes retain the documented non-atomic residual race; see TX-08. |
+| API-05 | Leave migrated API | Leave route/capability cases with named direct tests | `DASHBOARD` / `LIFF_SELF_SERVICE` | Direct Leave calls must enforce auth, capability, relationship, lifecycle, workflow, quota, and transaction rules in the covered cases | Unauthorized request/approval/cancellation actions fail without disclosure or mutation | `app/api/leave/**`; Leave authorization and workflow services | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts`; `__tests__/api/leave-request.test.ts`; `__tests__/api/leave-decision.test.ts`; `__tests__/api/leave-cancel.test.ts`; `__tests__/api/leave-not-taken.test.ts`; `__tests__/api/leave-approvers.test.ts`; `__tests__/api/line-leave-routes.test.ts`; Leave application tests | DIRECT | MIGRATED_AUTHORIZATION | — | The three previously missing Leave rows now execute their exact LIFF routes through the real application authorization paths. Explicit domain recovery is not a generic capability bypass. |
 | API-06 | Audit API | `audit.read` | `DASHBOARD` | Direct audit log access must use the server actor and central capability before query | Deny ungranted access before query; preserve safe audit response | `app/api/audit-logs/route.ts`; Audit authorization adapter | `__tests__/api/audit-log-route.test.ts`; `modules/audit/application/authorization.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | Audit export-event metadata policy remains a separate review item | The actual route is `audit-logs`, not `app/api/audit/route.ts`. |
 | API-07 | Notification API | `notification.inbox.read`, `notification.inbox.update` | `DASHBOARD` | Direct inbox read/update must use actor-derived User ownership and separate mutation capability | Read and update are independently authorized; no client user ID broadens access | `app/api/notifications/**`; Notification authorization adapter | `__tests__/api/notifications.test.ts`; `modules/notification/application/authorization.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for covered inbox operations | The adapter intentionally rejects broad non-`OWN` notification scopes. |
 | API-08 | Authorization Administration API | Team, TeamRole, membership, and User grant administration | `DASHBOARD` | Admin management must authenticate and authorize the trusted server principal; body role/user fields cannot elevate | Unauthenticated/non-ADMIN callers fail before persistence; valid Admin commands retain validation and audit rules | `app/api/authorization/administration/_lib/route-auth.ts`; `modules/authorization/application/administration.ts` | `__tests__/api/authorization-administration.test.ts`; `__tests__/api/authorization-administration-mutations.test.ts`; `modules/authorization/application/administration-mutations.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | None for covered Admin administration boundaries | Administration can persist configuration independently of the code-owned seed; this audit did not inspect production runtime records. |
-| API-09 | Direct API versus presentation | Migrated protected actions represented by the named route denial suites | `DASHBOARD` / `LIFF_SELF_SERVICE` | A hidden UI control or absent navigation must not be the only protection in the covered cases | Direct HTTP call still hits server auth, authorization, relationship, lifecycle, and domain/workflow checks | Route handlers, service command boundaries, and transaction adapters | Employee, Routine, Stock, Leave, Notification, Admin, and LIFF route denial tests; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` | INDIRECT | MIGRATED_AUTHORIZATION | The Employee and Routine operation rows are now directly asserted. The remaining exact route proof is the nine Stock/Leave rows `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17`. | Presentation rows cannot be counted as API enforcement. This aggregate row does not claim every migrated action is directly tested. |
-| API-10 | Migrated route breadth | Every migrated protected route/capability/channel row in the finite ledger; the three Stock LIFF projection rows are inventory-only | `DASHBOARD` / `LIFF_SELF_SERVICE` | Under Outcome A, every migrated protected route/capability/channel pair requires a direct regression assertion for its own boundary | The target contract is an exact route-level assertion for each of the 78 protected rows; projection flags do not substitute for mutation authority | Source inventory is broad; the operation-level ledger is explicit and separates protected operations from presentation projections | The ledger names the remaining nine protected rows without adequate direct route proof | MISSING | MIGRATED_AUTHORIZATION | `11C2-API-01` remains open for exactly `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17`. Employee and Routine subsets are complete; do not create an unbounded route-breadth task. | This is a finite coverage gap, not evidence of a production bypass. The three projection rows remain presentation evidence and are not independent mutation operations. |
+| API-09 | Direct API versus presentation | Migrated protected actions represented by the named route denial suites | `DASHBOARD` / `LIFF_SELF_SERVICE` | A hidden UI control or absent navigation must not be the only protection in the covered cases | Direct HTTP call still hits server auth, authorization, relationship, lifecycle, and domain/workflow checks | Route handlers, service command boundaries, and transaction adapters | Employee, Routine, Stock, Leave, Notification, Admin, and LIFF route denial tests; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` | DIRECT | MIGRATED_AUTHORIZATION | — | Presentation rows cannot be counted as API enforcement. |
+| API-10 | Migrated route breadth | Every migrated protected route/capability/channel row in the finite ledger; the three Stock LIFF projection rows are inventory-only | `DASHBOARD` / `LIFF_SELF_SERVICE` | Under Outcome A, every migrated protected route/capability/channel pair requires a direct regression assertion for its own boundary | The target contract is an exact route-level assertion for each of the 78 protected rows; projection flags do not substitute for mutation authority | Source inventory is broad; the operation-level ledger is explicit and separates protected operations from presentation projections | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` plus the complete operation ledger | DIRECT | MIGRATED_AUTHORIZATION | — | The finite protected route scope is complete: 78 protected rows are direct and the three projection rows remain presentation-only inventory. `11C2-API-01` closes this route-breadth item without changing policy. |
 | TX-01 | Mutation-sensitive migrated operations | Authorization state visible to a supported transaction-time re-read | `DASHBOARD` / `LIFF_SELF_SERVICE` | A supported revalidation path must not make its final decision from a stale preflight actor/resource state when a revocation or lifecycle change is visible to that transaction | Final authorization uses the state observed by the path's own lock/re-read boundary; no atomic guarantee is claimed for a grant, membership, or role row committed concurrently in an unrelated transaction after the resolver read | `resolveInTransaction`; `runSerializableTransaction`; domain adapters lock/re-read User, Employee, target Employee, or relationship rows where documented. Grant/membership rows are not generally locked by the resolver | `modules/leave/application/authorization.test.ts` (`rejects a stale Employee 21 preflight when persisted User now belongs to Employee 22`) — query for `employeeId: 21` returns no row because the current persisted relationship is 22; the adapter denies before the central resolver | DIRECT | MIGRATED_AUTHORIZATION | None for the supported Leave relationship re-read boundary covered here | This direct test uses a query-aware mock that applies the production `employeeId` predicate; it models only state visible after the adapter's own User/Employee locks and does not require an unrelated external grant or membership commit to become visible. |
 | TX-02 | Current actor lifecycle in mutation transactions | User and Employee lifecycle | `DASHBOARD` / `LIFF_SELF_SERVICE` | User/Employee deactivation, deletion, or suspension while a mutation waits must fail closed | Lock/re-read current actor lifecycle before final authorization and write | `lib/auth/workforce-transaction.ts`; Employee, Stock, Routine, and Leave transaction adapters | `__tests__/auth/workforce-transaction.test.ts`; `modules/employee/application/authorization.test.ts`; `modules/stock/application/authorization.test.ts`; `modules/leave/application/authorization.test.ts`; Routine mutation tests | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for covered lifecycle races | The exact supported transaction paths are domain-specific. |
 | TX-03 | Routine assignee and Employee target state | Routine task/occurrence mutation | `DASHBOARD` / `LIFF_SELF_SERVICE` | Target Employee lifecycle changes or an invalid assignee must not be committed | Lock and re-read target Employees; reject inactive/deleted targets before write | `modules/routine/application/authorization.ts:assertActiveEmployeesInTransaction`; Routine mutation services | `modules/routine/application/mutations.test.ts`; `modules/routine/application/authorization.test.ts`; `__tests__/api/routines-task-by-id.test.ts` | DIRECT | DOMAIN_OR_LIFECYCLE_POLICY | None for the verified Routine target path | This is one of the Phase 11B.3 hardening fixes. |
@@ -505,15 +504,15 @@ does not claim that invariant for those paths.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `AUTHN-*` Authentication boundary | 4 | 3 | 1 | 0 | 0 |
 | `LIFE-*` Identity lifecycle | 6 | 6 | 0 | 0 | 0 |
-| `ACTOR-*` Trusted actor provenance | 7 | 5 | 2 | 0 | 0 |
+| `ACTOR-*` Trusted actor provenance | 7 | 7 | 0 | 0 | 0 |
 | `CAP-*` Capability resolution | 12 | 11 | 1 | 0 | 0 |
-| `SCOPE-*` Resource scopes | 9 | 7 | 1 | 0 | 1 |
+| `SCOPE-*` Resource scopes | 9 | 8 | 0 | 0 | 1 |
 | `CHANNEL-*` Channel isolation and projections | 7 | 6 | 1 | 0 | 0 |
-| `API-*` Direct API enforcement | 10 | 4 | 5 | 1 | 0 |
+| `API-*` Direct API enforcement | 10 | 10 | 0 | 0 | 0 |
 | `TX-*` Transaction-time revalidation | 11 | 9 | 0 | 0 | 2 |
 | `ADMIN-*` ADMIN invariants | 8 | 7 | 1 | 0 | 0 |
 | `COMPAT-*` Compatibility and deferred surfaces | 15 | 13 | 2 | 0 | 0 |
-| **Total** | **89** | **71** | **14** | **1** | **3** |
+| **Total** | **89** | **80** | **6** | **0** | **3** |
 
 Required dimensions A through J are represented as follows: authentication and
 lifecycle in `AUTHN-*` and `LIFE-*`; actor provenance in `ACTOR-*`; resolver
@@ -532,18 +531,18 @@ are assigned to the shared boundary bucket, so the table totals exactly 89.
 | Primary domain/surface bucket | Matrix rows | Total | DIRECT | INDIRECT | MISSING | N/A |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | Auth/session and lifecycle | `AUTHN-*`, `LIFE-*` | 10 | 9 | 1 | 0 | 0 |
-| Central actor/resolver/registry | `ACTOR-*`, `CAP-*` | 19 | 16 | 3 | 0 | 0 |
-| Cross-domain scope semantics | `SCOPE-*` | 9 | 7 | 1 | 0 | 1 |
+| Central actor/resolver/registry | `ACTOR-*`, `CAP-*` | 19 | 18 | 1 | 0 | 0 |
+| Cross-domain scope semantics | `SCOPE-*` | 9 | 8 | 0 | 0 | 1 |
 | Dashboard, LIFF, and presentation boundary | `CHANNEL-*` | 7 | 6 | 1 | 0 | 0 |
 | Employee API and migrated policy | `API-01` | 1 | 1 | 0 | 0 | 0 |
 | Department API and migrated policy | `API-02` | 1 | 1 | 0 | 0 | 0 |
 | Routine migrated API | `API-03` | 1 | 1 | 0 | 0 | 0 |
-| Stock migrated API | `API-04` | 1 | 0 | 1 | 0 | 0 |
-| Leave migrated API | `API-05` | 1 | 0 | 1 | 0 | 0 |
+| Stock migrated API | `API-04` | 1 | 1 | 0 | 0 | 0 |
+| Leave migrated API | `API-05` | 1 | 1 | 0 | 0 | 0 |
 | Audit API | `API-06` | 1 | 1 | 0 | 0 | 0 |
 | Notification API | `API-07` | 1 | 1 | 0 | 0 | 0 |
 | Authorization Administration API | `API-08` | 1 | 1 | 0 | 0 | 0 |
-| Cross-domain direct API breadth | `API-09`, `API-10` | 2 | 0 | 1 | 1 | 0 |
+| Cross-domain direct API breadth | `API-09`, `API-10` | 2 | 2 | 0 | 0 | 0 |
 | Transaction and concurrency enforcement | `TX-*` | 11 | 9 | 0 | 0 | 2 |
 | ADMIN cross-domain invariants | `ADMIN-*` | 8 | 7 | 1 | 0 | 0 |
 | Employee compatibility | `COMPAT-01`, `COMPAT-02` | 2 | 2 | 0 | 0 | 0 |
@@ -555,7 +554,7 @@ are assigned to the shared boundary bucket, so the table totals exactly 89.
 | Email deferred surface | `COMPAT-13` | 1 | 1 | 0 | 0 | 0 |
 | Presentation-only surface | `COMPAT-14` | 1 | 1 | 0 | 0 | 0 |
 | Team/Department architecture boundary | `COMPAT-15` | 1 | 0 | 1 | 0 | 0 |
-| **Total** |  | **89** | **73** | **12** | **1** | **3** |
+| **Total** |  | **89** | **80** | **6** | **0** | **3** |
 
 All currently migrated domain surfaces are represented: central Authorization,
 Authorization Administration, Employee, Department, Routine, Stock, Leave,
@@ -579,17 +578,15 @@ should be extended rather than replaced by a giant synthetic test:
 | Direct API and Admin boundaries | `__tests__/api/employees-routes.test.ts`; `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts`; `__tests__/api/departments-route.test.ts`; `__tests__/api/audit-log-route.test.ts`; `__tests__/api/notifications.test.ts`; `__tests__/api/authorization-administration-mutations.test.ts` | Proves server-side gates, real query/mutation authorization boundaries, query-before-return behavior, ignored authority-shaped input, and safe denial before persistence. |
 | Architecture boundary | `scripts/check-architecture.mjs`; `__tests__/architecture/check-architecture.test.ts`; Routine browser graph tests | Proves browser/server and module-boundary rules relevant to trusted actor and authorization ownership. |
 
-## Missing DIRECT regression coverage
+## DIRECT regression coverage closure
 
-The only remaining `MISSING` matrix row is listed below. It is not a production
-defect by itself; it is a finite regression proof that is not yet present in the
-current source/test baseline. The operation ledger has a separate, more
-granular set of nine remaining missing protected route proofs; those rows are not added to
-the matrix-case total.
+There are no remaining `MISSING` matrix rows or mandatory protected-route gaps.
+The final finite route proof was added for the nine Stock and Leave rows below;
+these operation-ledger rows are not added to the 89-case matrix total.
 
-| Work item | Matrix row | Exact missing proof | Recommended Phase 11C.2 action |
+| Work item | Matrix row | Closed proof | Final Phase 11C.2 status |
 | --- | --- | --- | --- |
-| `11C2-API-01` | `API-10` | Direct operation-specific route proof remains absent only for `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17` | Add only those nine named route/capability/channel boundary tests in the Stock and Leave slices; do not create an unbounded “remaining routes” task. |
+| `11C2-API-01` | `API-10` | `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` directly executes the exact nine Stock/Leave routes through their real authorization boundaries and proves unauthorized mutations stop before protected side effects. | **COMPLETE — Phase 11C.2C.2.** No mandatory Phase 11C.2 regression work item remains. |
 
 The CAP revocation rows are no longer in this missing-coverage table:
 `CAP-05`, `CAP-06`, and `CAP-07` are directly covered by the Phase 11C.2A
@@ -598,9 +595,9 @@ cases remain covered separately.
 
 ## Real security defects discovered
 
-No new real security defect was identified in the current source. The audit did
-not silently convert missing tests into a claim that production behavior is
-correct; it classified those cases as `MISSING` above.
+No new real security defect was identified in the current source. The completed
+route-gap slice adds regression evidence; it does not change production policy
+or claim that test coverage is a substitute for the runtime enforcement path.
 
 The following previously identified Phase 11B defects were confirmed as fixed
 in current source and regression tests:
@@ -663,7 +660,7 @@ behavior changes.
 | 3 | `11C2-ACTOR-01` | Current persisted system role in Routine, Stock, and Leave transaction actor construction | **COMPLETE — Phase 11C.2B:** `modules/routine/application/authorization.test.ts`, `modules/stock/application/authorization.test.ts`, and `modules/leave/application/authorization.test.ts` directly cover stale Dashboard ADMIN to persisted USER actor replacement. | The final actor uses current trusted role; client/request role remains irrelevant. |
 | 4 | `11C2-TX-01` | Transaction-time current-state visibility for supported mutation adapters | **COMPLETE — Phase 11C.2B:** `modules/leave/application/authorization.test.ts` uses a query-aware mock where persisted User 7 belongs to Employee 22, so the production query for preflight Employee 21 returns no row after the adapter's own locks. | The test proves only the claimed lock/re-read/isolation boundary; it does not require coordination with an unrelated external grant commit. |
 | 5 | `11C2-TX-02` | Final stale actor/authorization state in the exact Stock, Routine, and Leave transaction paths | **COMPLETE — Phase 11C.2B:** Routine, Stock, and Leave authorization tests assert the current USER actor reaches `authorization.resolveInTransaction` and that stale Dashboard ADMIN compatibility is not retained. | Each named adapter rejects or narrows stale actor state at its claimed boundary; no unsupported grant/membership race guarantee is added. |
-| 6 | `11C2-API-01` | Remaining exact missing protected route rows: `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17` | **OPEN:** Employee subset complete (`LEDGER-EMP-04`); Routine subset complete (`LEDGER-ROU-01`, `LEDGER-ROU-02`, `LEDGER-ROU-06`, `LEDGER-ROU-07`, `LEDGER-ROU-08`, `LEDGER-ROU-14`, `LEDGER-ROU-15`, `LEDGER-ROU-16`, `LEDGER-ROU-17`, and `LEDGER-ROU-18`); Stock subset open; Leave subset open. | Add only the nine remaining finite behavior-oriented route tests covering authentication, trusted actor, capability/resource boundary, and applicable lifecycle/workflow behavior. The three Stock LIFF projection rows are not part of this work item. |
+| 6 | `11C2-API-01` | Exact direct route proof for `LEDGER-STK-01`, `LEDGER-STK-02`, `LEDGER-STK-03`, `LEDGER-STK-04`, `LEDGER-STK-05`, `LEDGER-STK-08`, `LEDGER-LEV-14`, `LEDGER-LEV-16`, and `LEDGER-LEV-17` | **COMPLETE — Phase 11C.2C.2:** `__tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` keeps the Stock resolver/registry and Leave application authorization paths real, with only lower service/persistence seams controlled. | The finite route ledger is 81/81 `DIRECT`; protected routes are 78/78 `DIRECT`; zero mandatory Phase 11C.2 regression work items remain. The three Stock LIFF projection rows remain presentation-only. |
 
 ## Strengthening / optional coverage
 
@@ -787,10 +784,37 @@ No timeout configuration was changed.
 | `npm.cmd run test:run` | PASS, exit 0. 315 test files passed and 2,777 tests passed. Duration: 326.03 seconds. |
 | `git diff --check` | PASS, exit 0. No whitespace errors reported; Git emitted only its LF-to-CRLF working-copy warning. |
 
+### Phase 11C.2C.2 verification record
+
+The Phase 11C.2C.2 focused suite executes all nine exact Stock and Leave HTTP
+routes. Stock tests keep the production Stock adapter, central resolver, and
+capability registry real while controlling only the service below the route
+authorization boundary. Leave tests keep the verified LIFF route composition,
+real Leave handlers, central transaction authorization, and relationship/
+workflow checks real while controlling only transaction-bound persistence and
+notification/outbox seams. No production authorization source, schema, seed,
+compatibility policy, deferred surface, timeout, or test configuration was
+changed.
+
+| Command | Observed result |
+| --- | --- |
+| `npm.cmd run test:run -- __tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts` | PASS, exit 0. 1 test file and 9 tests passed. |
+| `npm.cmd run test:run -- __tests__/api/stock-requests-routes.test.ts __tests__/api/stock-items-route.test.ts __tests__/api/stock-reports-export-route.test.ts __tests__/api/uploads-image-route.test.ts __tests__/api/line-stock-routes.test.ts __tests__/api/line-leave-routes.test.ts __tests__/api/leave-cancel.test.ts __tests__/api/leave-not-taken.test.ts __tests__/api/leave-decision.test.ts` | PASS, exit 0. 9 test files and 137 tests passed. |
+| `npm.cmd run test:run -- modules/stock/application/authorization.test.ts modules/stock/__tests__/queries.test.ts modules/stock/__tests__/mutations.test.ts modules/leave/application/authorization.test.ts modules/leave/application/approvals/approval-queries.test.ts modules/leave/application/approvals/approver-assignment.test.ts modules/leave/application/approvals/current-action-recipient.test.ts modules/leave/application/approvals/exception-approver.test.ts modules/leave/application/approvals/offboarding-responsibilities.test.ts` | PASS, exit 0. 9 test files and 142 tests passed. |
+| `npm.cmd exec eslint -- __tests__/api/phase-11c2c2-stock-leave-route-authorization.test.ts --max-warnings=0` | PASS, exit 0. |
+| `npm.cmd run architecture:check` | PASS, exit 0. `Architecture check passed: checked 1121 repository source file(s) for module boundaries.` |
+| `npm.cmd run lint:strict` | PASS, exit 0. ESLint completed with `--max-warnings=0`. |
+| `npm.cmd run typecheck` | PASS, exit 0. `tsc --noEmit` completed successfully. |
+| `npm.cmd run test:run` | FAIL, exit 1. 315 test files passed and 1 failed; 2,782 tests passed and 4 failed out of 2,786. All four failures were 5,000 ms timeouts in `__tests__/architecture/check-architecture.test.ts`: `reads changed runtime imports again on a later scan of the same root`, `allows the supported Stock LIFF route entry`, `rejects Stock LIFF presentation importing its own public barrel`, and `allows type-only Prisma contracts in the Stock client graph`. |
+| `npm.cmd run test:run` (immediate rerun) | PASS, exit 0. 316 test files passed and 2,786 tests passed. The rerun completed without the four architecture-checker timeouts; the first-run failure is retained above as an intermittent full-suite result. |
+| `npm.cmd run test:run -- __tests__/architecture/check-architecture.test.ts -t "reads changed runtime imports again on a later scan of the same root|allows the supported Stock LIFF route entry|rejects Stock LIFF presentation importing its own public barrel|allows type-only Prisma contracts in the Stock client graph"` | PASS, exit 0. The four timeout cases passed when isolated; 247 sibling tests were skipped. The first full-suite result remains recorded as FAIL, and no timeout configuration was changed. |
+| `npm.cmd run test:integration:mysql` | FAIL, exit 1. MySQL migrations completed with 67 migrations and no pending work; 15 of 16 integration files passed and 103 of 104 tests passed. The sole failure was the reproduced unrelated malformed-fixture case `__tests__/integration/leave-quota-concurrency.integration.test.ts` / `creates one quota for concurrent non-overlapping requests with different keys`, raising `WorkforceAuthorizationError` at `modules/leave/application/authorization.ts:parseUserRole` from the route mock role shape. |
+| `git diff --check` | PASS, exit 0. No whitespace errors reported. |
+
 ## Production policy change statement
 
 Production authorization policy was **not changed** in Phase 11C.2A, Phase
-11C.2B, or Phase 11C.2C.1. The Phase 11C.2C.1 slice adds only regression tests
-and matrix updates.
+11C.2B, Phase 11C.2C.1, or Phase 11C.2C.2. The Phase 11C.2C.2 slice adds only
+regression tests and matrix updates.
 No production source, schema, seed grant, compatibility policy, deferred
 surface, or test configuration was changed.
