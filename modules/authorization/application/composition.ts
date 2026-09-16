@@ -60,14 +60,6 @@ export function composeAuthorizationAuthority(
         return createDeniedAuthority(capability, configuredDecision);
     }
 
-    const validatedDefaultScopes = validateDefaultScopes(
-        defaultScopes,
-        capability,
-        definition,
-    );
-    const normalizedDefaultScopes = normalizeAuthorizationScopes(
-        validatedDefaultScopes,
-    );
     const configuredGrants = freezeConfiguredGrants(
         configuredDecision.grants,
     );
@@ -87,6 +79,14 @@ export function composeAuthorizationAuthority(
         });
     }
 
+    const validatedDefaultScopes = validateDefaultScopes(
+        defaultScopes,
+        capability,
+        definition,
+    );
+    const normalizedDefaultScopes = normalizeAuthorizationScopes(
+        validatedDefaultScopes,
+    );
     const configuredScopes = configuredDecision.allowed
         ? normalizeAuthorizationScopes(configuredDecision.scopes)
         : Object.freeze([] as AuthorizationScope[]);

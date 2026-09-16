@@ -602,6 +602,48 @@ describe("composeAuthorizationAuthority", () => {
         ]);
     });
 
+    it("ignores USER default TEAM validation for ADMIN", () => {
+        const adminActor = actor({ systemRole: "ADMIN" });
+        const registry = teamRegistry();
+        const configuredDecision = resolveConfigured(
+            adminActor,
+            CAPABILITY,
+            resolution(),
+            registry,
+        );
+
+        const composed = composeAuthorizationAuthority(
+            adminActor,
+            CAPABILITY,
+            ["TEAM"],
+            configuredDecision,
+            registry,
+        );
+
+        expect(composed.allowed).toBe(true);
+        expect(composed.scopes).toEqual(["ALL"]);
+        expect(composed.defaultScopes).toEqual([]);
+        expect(composed.configuredDecision).toBe(configuredDecision);
+    });
+
+    it("ignores an unsupported USER default scope for ADMIN", () => {
+        const adminActor = actor({ systemRole: "ADMIN" });
+        const capability = "stock.request.create";
+        const configuredDecision = resolveConfigured(adminActor, capability);
+
+        const composed = composeAuthorizationAuthority(
+            adminActor,
+            capability,
+            ["ALL"],
+            configuredDecision,
+        );
+
+        expect(composed.allowed).toBe(true);
+        expect(composed.scopes).toEqual(["OWN"]);
+        expect(composed.defaultScopes).toEqual([]);
+        expect(composed.configuredDecision).toBe(configuredDecision);
+    });
+
     it("keeps ADMIN structural channel denial denied", () => {
         const adminActor = actor({
             systemRole: "ADMIN",

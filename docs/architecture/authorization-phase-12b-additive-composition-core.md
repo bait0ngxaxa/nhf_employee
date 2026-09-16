@@ -204,8 +204,9 @@ No structural failure is recovered as an allow.
 ## 7. ADMIN behavior
 
 ADMIN is not composed as USER default policy plus configured grants. After the
-existing resolver has validated capability and channel, the composer preserves
-the resolver's system-role authority and ignores USER default policy. A valid
+existing resolver has validated capability and channel, the composer branches
+to ADMIN before any USER-only default-scope validation, preserves the
+resolver's system-role authority, and ignores USER default policy. A valid
 ADMIN result remains sourced from `SYSTEM_ROLE / ADMIN`; Team membership and
 persisted TeamRole/User grants are neither required nor used. Structural
 channel/capability denial remains denied, and existing lifecycle, resource,
@@ -271,14 +272,14 @@ unknown capabilities, and unsupported channels.
 Executed verification:
 
 - `npx.cmd vitest run modules/authorization/application/composition.test.ts` —
-  passed, 1 file and 21 tests.
+  passed, 1 file and 23 tests.
 - `npx.cmd vitest run modules/authorization/application/resolver.test.ts` —
   passed, 1 file and 30 tests.
 - `npm.cmd run architecture:check` — passed, 1,123 repository source files
   checked.
 - `npm.cmd run lint:strict` — passed with zero warnings.
 - `npm.cmd run typecheck` — passed.
-- `npm.cmd run test:run` — passed, 317 files and 2,807 tests.
+- `npm.cmd run test:run` — passed, 317 files and 2,809 tests.
 - `git diff --check` — passed.
 
 No development server or production build was run. PowerShell execution policy
