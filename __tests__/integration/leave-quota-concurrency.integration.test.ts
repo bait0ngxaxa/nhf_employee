@@ -175,6 +175,7 @@ function configureSession(fixture: Fixture): void {
         },
         user: {
             id: fixture.employeeUserId,
+            role: "USER",
             email: fixture.employeeUserEmail,
             name: "Quota Requester",
         },

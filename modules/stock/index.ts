@@ -99,7 +99,6 @@ export {
     assertStockCapabilityForMigration,
     buildStockAuthorizationActor,
     buildStockAuthorizationContext,
-    canResolveStockCapabilityForMigration,
     getStockPresentationCapabilities,
     resolveStockCapabilityForMigration,
     resolveStockCapabilityInTransaction,

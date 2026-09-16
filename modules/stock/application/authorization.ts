@@ -348,20 +348,6 @@ export async function assertStockCapabilityForMigration(
     return resolveStockCapabilityForMigration(context, capability, options);
 }
 
-export async function canResolveStockCapabilityForMigration(
-    context: StockAuthorizationContext,
-    capability: string,
-    options: StockCapabilityOptions = {},
-): Promise<boolean> {
-    try {
-        await resolveStockCapabilityForMigration(context, capability, options);
-        return true;
-    } catch (error) {
-        if (error instanceof StockCapabilityDeniedError) return false;
-        throw error;
-    }
-}
-
 interface ActiveStockUserRecord {
     readonly id: number;
     readonly role: string;
