@@ -8,8 +8,8 @@ Historical baselines:
   production/test baseline audited by the first matrix.
 - `f78b7b35afdae1cd0158d8d9ae5600070c6acb1f` — first Phase 11C.1 matrix
   implementation and corrective-pass baseline.
-- `779d738c781eaff4ed21f31a0f328cca3f724bac` — current corrective matrix
--  commit from the Phase 11C.1 corrective pass.
+- `779d738c781eaff4ed21f31a0f328cca3f724bac` — current corrective matrix commit
+  from the Phase 11C.1 corrective pass.
 - `bb64b59b9a4a0c8cf9ba8bd39fb76b2dd077e617` — Phase 11C.2B closed baseline
   used for this Phase 11C.2C.1 route-coverage slice.
 
@@ -270,7 +270,7 @@ to be directly asserted.
 | LEDGER-EMP-01 | Employee | `GET /api/employees` | `employee.read` | `DASHBOARD` | API session plus Employee adapter | Authenticated server User/current role | Organization-wide `ALL` compatibility query | `N/A` read path | `__tests__/api/employees-routes.test.ts` — list capability boundary | DIRECT | — |
 | LEDGER-EMP-02 | Employee | `POST /api/employees` | `employee.create` | `DASHBOARD` | API session plus Employee adapter | Authenticated server User/current role | Create command; no client actor/target authority | Preflight and domain mutation; no transaction-wide re-read claim | `__tests__/api/employees-routes.test.ts` — denied before body/service | DIRECT | — |
 | LEDGER-EMP-03 | Employee | `GET /api/employees/stats` | `employee.stats.read` | `DASHBOARD` | API session plus Employee adapter | Authenticated server User/current role | Organization-wide `ALL` compatibility query | `N/A` read path | `__tests__/api/employees-routes.test.ts` — statistics capability boundary | DIRECT | — |
-| LEDGER-EMP-04 | Employee | `GET /api/employees/export` | `employee.export` | `DASHBOARD` | API session plus Employee adapter | Authenticated server User/current role | Organization-wide `ALL` compatibility export | `N/A` report path | `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` — exact route denial and post-boundary exporter path | DIRECT | — |
+| LEDGER-EMP-04 | Employee | `GET /api/employees/export` | `employee.export` | `DASHBOARD` | API session plus Employee adapter | Authenticated server User/current role | Organization-wide `ALL` compatibility export | `N/A` report path | `__tests__/api/phase-11c2c1-employee-routine-route-authorization.test.ts` — exact route with production registry/resolver, fixed Dashboard `employee.export`, ignored authority-shaped query input, and exporter execution only after the real `NO_APPLICABLE_GRANT -> ALL` compatibility boundary | DIRECT | — |
 | LEDGER-EMP-05 | Employee | `POST /api/employees/import` | `employee.import` | `DASHBOARD` | API session plus Employee adapter | Authenticated server User/current role | Import command; no client actor/target authority | Preflight/partial-success path; no transaction-wide re-read claim | `__tests__/api/employees-routes.test.ts` — denied before body/service | DIRECT | — |
 | LEDGER-EMP-06 | Employee | `PATCH /api/employees/:id` | `employee.update` | `DASHBOARD` | Workforce/Admin session plus Employee transaction adapter | Server session; current User/Employee role is rebuilt | Target Employee lifecycle and command invariants | Serializable transaction with User/Employee lock and re-read | `__tests__/api/employees-routes.test.ts`; `modules/employee/application/authorization.test.ts` | DIRECT | — |
 | LEDGER-EMP-07 | Employee | `DELETE /api/employees/:id` | `employee.delete` | `DASHBOARD` | Workforce/Admin session plus Employee transaction adapter | Server session; current User/Employee role is rebuilt | Target Employee lifecycle and delete blockers | Serializable transaction with User/Employee lock and re-read | `__tests__/api/employees-routes.test.ts`; `modules/employee/application/mutations.test.ts` | DIRECT | — |

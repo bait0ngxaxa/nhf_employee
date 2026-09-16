@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
     const authState = {
-        restrictEmployeeExport: false,
         userGrants: [] as Array<{
             userId: number;
             capabilityKey: string;
@@ -142,26 +141,8 @@ vi.mock("@/lib/server/audit", () => ({
 
 vi.mock("@/modules/authorization", async (importOriginal) => {
     const actual = await importOriginal<typeof AuthorizationModule>();
-    const productionRegistry = actual.CAPABILITY_REGISTRY;
-    const testRegistry = {
-        ...productionRegistry,
-        get(key: string) {
-            const definition = productionRegistry.get(key);
-            if (
-                key !== "employee.export"
-                || definition === undefined
-                || !mocks.authState.restrictEmployeeExport
-            ) {
-                return definition;
-            }
-            return {
-                ...definition,
-                channels: ["LIFF_SELF_SERVICE"] as const,
-            };
-        },
-    };
     const resolver = actual.createAuthorizationResolver({
-        registry: testRegistry,
+        registry: actual.CAPABILITY_REGISTRY,
         repository: mocks.authorizationRepository,
     });
     mocks.authorizationResolve.mockImplementation(resolver.resolve);
@@ -273,7 +254,6 @@ function expectDashboardTransactionAuthorization(capability: string): void {
 describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.authState.restrictEmployeeExport = false;
         mocks.authState.userGrants = [];
 
         mocks.requireApiSession.mockResolvedValue({
@@ -307,26 +287,35 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
     });
 
     describe("LEDGER-EMP-04 GET /api/employees/export", () => {
-        it("denies before export when the real resolver reports a Dashboard channel mismatch", async () => {
-            mocks.authState.restrictEmployeeExport = true;
-
+        it("LEDGER-EMP-04 executes GET /api/employees/export with production employee.export Dashboard compatibility and ignores authority-shaped query input", async () => {
             const response = await getEmployeeExport(request(
-                "/api/employees/export?userId=999&employeeId=999&systemRole=ADMIN&channel=LIFF_SELF_SERVICE&capability=employee.read&scope=ALL",
-            ));
-
-            expect(response.status).toBe(403);
-            expectDashboardAuthorization("employee.export", null);
-            expect(mocks.createEmployeeExport).not.toHaveBeenCalled();
-            expect(mocks.logDataExport).not.toHaveBeenCalled();
-        });
-
-        it("executes the exporter only after the real employee.export Dashboard boundary", async () => {
-            const response = await getEmployeeExport(request(
-                "/api/employees/export?search=%E0%B8%AA%E0%B8%A1%E0%B8%8A%E0%B8%B2%E0%B8%A2&status=ACTIVE&capability=employee.delete&scope=ALL",
+                "/api/employees/export?search=%E0%B8%AA%E0%B8%A1%E0%B8%8A%E0%B8%B2%E0%B8%A2&status=ACTIVE&userId=999&employeeId=999&systemRole=ADMIN&channel=LIFF_SELF_SERVICE&capability=employee.delete&scope=ALL",
             ));
 
             expect(response.status).toBe(200);
+            expect(mocks.requireApiSession).toHaveBeenCalledTimes(1);
             expectDashboardAuthorization("employee.export", null);
+            expect(mocks.authorizationResolve).toHaveBeenCalledTimes(1);
+            expect(mocks.authorizationRepository.load).toHaveBeenCalledWith({
+                userId: USER.id,
+                capabilityKey: "employee.export",
+            });
+            const resolverDecision = await mocks.authorizationResolve.mock.results[0]?.value;
+            expect(resolverDecision).toMatchObject({
+                capability: "employee.export",
+                allowed: false,
+                scopes: [],
+                grants: [],
+                reason: "NO_APPLICABLE_GRANT",
+            });
+            expect(mocks.requireApiSession.mock.invocationCallOrder[0])
+                .toBeLessThan(
+                    mocks.authorizationResolve.mock.invocationCallOrder[0],
+                );
+            expect(mocks.authorizationResolve.mock.invocationCallOrder[0])
+                .toBeLessThan(
+                    mocks.createEmployeeExport.mock.invocationCallOrder[0],
+                );
             expect(mocks.createEmployeeExport).toHaveBeenCalledWith({
                 search: "สมชาย",
                 status: "ACTIVE",
