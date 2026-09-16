@@ -394,10 +394,21 @@ describe("Leave authorization migration adapter", () => {
         );
     });
 
-    it("revalidates the current Employee relationship after a valid preflight actor changes", async () => {
+    it("rejects a stale Employee 21 preflight when persisted User now belongs to Employee 22", async () => {
+        // The persisted relationship moved from preflight Employee 21 to Employee 22.
+        const currentUser = activeUser("USER", 22);
+        const findFirst = vi.fn().mockImplementation(
+            async (query: Prisma.UserFindFirstArgs) => {
+                const where = query.where;
+                return where?.id === currentUser.id
+                    && where.employeeId === currentUser.employee?.id
+                    ? currentUser
+                    : null;
+            },
+        );
         const tx = {
             user: {
-                findFirst: vi.fn().mockResolvedValue(activeUser("USER", 22)),
+                findFirst,
             },
         } as unknown as Prisma.TransactionClient;
         const preflightContext = context("USER", "DASHBOARD", 21);
@@ -411,6 +422,17 @@ describe("Leave authorization migration adapter", () => {
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
         expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
         expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [21]);
+        expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                id: 7,
+                employeeId: 21,
+                isActive: true,
+                deletedAt: null,
+                employee: {
+                    is: { status: "ACTIVE", deletedAt: null },
+                },
+            }),
+        }));
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 
@@ -460,20 +482,37 @@ describe("Leave authorization migration adapter", () => {
         );
     });
 
-    it("fails closed when the account-only Admin role is revoked before the transaction", async () => {
+    it("fails closed when a stale account-only ADMIN preflight meets persisted USER state", async () => {
+        const currentUser = activeUser("USER", null);
+        const findFirst = vi.fn().mockImplementation(
+            async (query: Prisma.UserFindFirstArgs) => query.where?.role === currentUser.role
+                ? currentUser
+                : null,
+        );
         const tx = {
             user: {
-                findFirst: vi.fn().mockResolvedValue(activeUser("USER", null)),
+                findFirst,
             },
         } as unknown as Prisma.TransactionClient;
+        const staleContext = context("ADMIN", "DASHBOARD", null);
 
         await expect(
             resolveLeaveCapabilityInTransaction(
                 tx,
-                context("ADMIN", "DASHBOARD", null),
+                staleContext,
                 "leave.approver.manage",
             ),
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        expect(staleContext.authorizationActor.systemRole).toBe("ADMIN");
+        expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                id: 7,
+                role: "ADMIN",
+                isActive: true,
+                deletedAt: null,
+            }),
+        }));
+        expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
         expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
