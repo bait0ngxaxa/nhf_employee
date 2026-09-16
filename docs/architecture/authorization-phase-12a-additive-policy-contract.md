@@ -162,9 +162,16 @@ other domain policy.
 A configured grant is a validated ALLOW authority source for a registered
 capability and supported scope. Applicable configured sources are:
 
-- a Team grant, constrained to the originating Team;
-- a TeamRole grant, constrained to its originating Team and role; and
+- a Team-sourced grant, retaining source/origin metadata for the originating
+  Team;
+- a TeamRole-sourced grant, retaining source/origin metadata for its
+  originating Team and TeamRole; and
 - an exceptional direct User grant.
+
+Only a grant whose scope is TEAM carries a Team resource constraint. For that
+scope, the constraint identifies the originating Team. A non-TEAM grant
+retains its Team or TeamRole source/origin metadata but does not gain an
+implicit Team resource constraint.
 
 The central resolver remains responsible for loading and validating these
 sources, applying active Team/TeamRole/membership rules, and retaining
@@ -253,9 +260,12 @@ additional authority.
 
 ### 8.1 TEAM origin is mandatory
 
-TEAM scope is origin-bound. A TEAM grant must retain the originating Team
-constraint. A direct User grant must not provide TEAM scope without a Team
-origin. A TeamRole grant must retain both its Team and TeamRole origin.
+TEAM scope is origin-bound. A TEAM-scoped grant must retain the originating
+Team resource constraint. A Team-sourced or TeamRole-sourced grant with a
+non-TEAM scope retains source/origin metadata but does not gain a Team
+resource constraint. A direct User grant must not provide TEAM scope without a
+Team origin. A TeamRole-sourced grant must retain both its Team and TeamRole
+origin metadata.
 
 The existing evaluator/resolver already rejects direct TEAM grants and rejects
 origin mismatches as structural authorization configuration failures. Phase
@@ -608,10 +618,10 @@ registration, supported channel, and valid authorization configuration. It
 must not convert a structural failure into a default allow.
 
 If ALL is present, effective scope normalization must retain ALL semantics.
-The implementation must also retain the source/origin/constraint metadata of
-configured grants, especially Team origin for TEAM scope. A flattened
-AuthorizationScope array is insufficient wherever domain resource policy
-needs to evaluate Team origin.
+The implementation must retain source/origin metadata for every configured
+Team/TeamRole grant, and must carry a Team resource constraint only for a
+grant whose scope is TEAM. A flattened AuthorizationScope array is
+insufficient wherever domain resource policy needs to evaluate Team origin.
 
 The domain adapter must then apply resource/relationship predicates and
 business/workflow invariants. A capability grant is never a workflow or
@@ -722,7 +732,8 @@ Phase 12A is complete when:
 The exact implementation target handed to Phase 12B is the contract in
 Section 15: preserve each domain's recorded default behavior, resolve
 configured grants centrally, union them without narrowing, retain source and
-TEAM origin constraints, and leave resource, relationship, workflow,
+origin metadata for Team/TeamRole grants, apply Team resource constraints only
+to TEAM-scoped grants, and leave resource, relationship, workflow,
 authentication, lifecycle, channel, validation, transaction, and concurrency
 rules in their owning boundaries.
 

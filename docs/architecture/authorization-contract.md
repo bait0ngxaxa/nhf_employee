@@ -136,7 +136,7 @@ system boundaries remain authentication boundaries rather than User grants.
 | `OWN` | The actor's self-owned resource, as defined by the owning domain. | Not every resource with a User foreign key is automatically ownable. |
 | `CREATED` | A resource created by the actor. | Not the same as current assignment. |
 | `ASSIGNED` | A resource assigned to the actor, with assignment semantics owned by the domain. | Not a universal Prisma predicate. |
-| `TEAM` | A resource constrained by the Team associated with the originating grant. | Not Department, department name, manager reports, or organizational unit. |
+| `TEAM` | A resource constrained by the Team associated with the originating grant. This constraint applies only when the grant scope is `TEAM`; Team-sourced origin alone does not impose it. | Not Department, department name, manager reports, or organizational unit. |
 | `ALL` | No resource constraint within the capability's authorized resource set. | Not `ADMIN`; role and business rules remain separate. |
 
 The initial vocabulary deliberately does not contain `PARTICIPANT`, `APPROVER`,

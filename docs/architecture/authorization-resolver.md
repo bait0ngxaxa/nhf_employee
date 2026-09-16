@@ -106,9 +106,12 @@ type AuthorizationGrantSource =
     | { type: "USER"; userId: number };
 ```
 
-`TEAM` grants always carry both `source.teamId` and
-`constraint.teamId`. A TeamRole grant carries its owning Team and role IDs.
-No Routine, Stock, Leave, Employee, workflow, or resource object is included.
+A grant whose scope is `TEAM` carries both `source.teamId` and
+`constraint.teamId`. Team- and TeamRole-sourced grants retain their
+source/origin metadata for every scope, but a non-TEAM scope does not receive
+an implicit `constraint.teamId`. A TeamRole grant carries its owning Team and
+role IDs. No Routine, Stock, Leave, Employee, workflow, or resource object is
+included.
 
 ## Resolution algorithm
 
@@ -206,7 +209,8 @@ Department, hierarchy, or employee data.
 
 The existing scope-array projection is not sufficient for the future composed
 result when a domain resource predicate needs the originating Team. Phase 12B
-must retain the effective grant source and Team origin/constraint metadata
+must retain source/origin metadata for every Team/TeamRole-sourced grant and
+must retain a Team resource constraint only when the grant scope is TEAM,
 alongside normalized scope semantics.
 
 ## Invalid configuration
