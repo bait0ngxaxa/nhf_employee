@@ -69,6 +69,10 @@ export type {
     AuthorizationPersistenceContext,
     EffectiveAuthorizationGrant,
 } from "./application/types";
+export { composeAuthorizationAuthority } from "./application/composition";
+export type {
+    ComposedAuthorizationAuthority,
+} from "./application/composition";
 export {
     assertAuthorizationAdministrationAccess,
     getAuthorizationAdministrationCapabilityCatalog,

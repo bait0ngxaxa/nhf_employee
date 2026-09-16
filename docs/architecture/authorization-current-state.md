@@ -4,6 +4,9 @@ Phase 12A status: CLOSED — additive policy contract and current capability
 inventory only. See
 [authorization-phase-12a-additive-policy-contract.md](authorization-phase-12a-additive-policy-contract.md).
 
+Phase 12B status: CLOSED — reusable additive composition core only. Domain
+adapter migration remains deferred to Phase 12C.1 and later.
+
 สถานะ: Current state after Phase 11D final closure; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-16<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
@@ -13,6 +16,8 @@ inventory only. See
 หมายเหตุ Phase 11D (final closure): audit baseline คือ `a287459d71e4e92da95692b783beba01bafd2123`. พบและลบเฉพาะ `canResolveStockCapabilityForMigration` ซึ่งไม่มี caller/test/documentation reference เหลืออยู่ และเพิ่มเฉพาะ top-level `user.role` ที่ขาดหายจาก `__tests__/integration/leave-quota-concurrency.integration.test.ts` ให้ fixture ตรงกับ production session shape. ไม่มี production authorization policy, compatibility floor, deferred surface หรือ Team policy ถูกเปลี่ยน. Residue inventory, intentional retention, deferred decisions และ verification record อยู่ใน [authorization-phase-11d-closure.md](authorization-phase-11d-closure.md)
 
 หมายเหตุ Phase 12A (locked target): พฤติกรรม NHF เดิมของ USER ที่ไม่มี configured grant เป็น **Default Domain Policy ถาวร** ไม่ใช่ compatibility behavior ชั่วคราวที่มีแผน retire. Grant จาก Team, TeamRole และ direct User เป็น authority แบบ additive ที่วางทับ baseline และห้ามทำให้ default authority แคบลง. Runtime ปัจจุบันยังใช้ compatibility fallback mechanics เดิม และ Phase 12A ไม่ได้เปลี่ยน runtime authorization semantics. รายละเอียด inventory และ contract อยู่ใน [authorization-phase-12a-additive-policy-contract.md](authorization-phase-12a-additive-policy-contract.md). ก่อนหน้านี้ยังไม่มีการ deploy capability architecture สู่ production จึงไม่มี production grant inventory, migration, seed, backfill หรือ historical-grant reconciliation ที่ต้องทำใน phase นี้
+
+หมายเหตุ Phase 12B (additive composition core): เพิ่ม pure `composeAuthorizationAuthority()` เป็น application-layer seam สำหรับรวม domain-provided Default Domain Policy กับ configured authority จาก central resolver. Resolver ยังคงคืน configured/system-role authority เท่านั้น; structural denial และ `AuthorizationConfigurationError` ไม่ถูกแปลงเป็น default allow. Composition รักษา `source`, Team/TeamRole origin และ `TEAM` constraint ของ configured grants แยกจาก normalized scope semantics. ยังไม่มี production domain adapter ใด migrate มาใช้ seam นี้ และ catalog readiness ยังคง `22 POLICY_ACTIVATION_REQUIRED`, `13 GRANTABLE`, `5 DEFERRED`. รายละเอียดอยู่ใน [authorization-phase-12b-additive-composition-core.md](authorization-phase-12b-additive-composition-core.md)
 
 หมายเหตุการปรับปรุง: หลัง Phase 6A การบังคับใช้ authorization ฝั่ง server ของ Stock ใช้ central resolver และมี compatibility floor ตามที่บันทึกใน [authorization-stock-migration.md](authorization-stock-migration.md), Phase 6B เพิ่ม Stock presentation projection จาก resolver เดียวกัน และ Phase 6C ปิด migration ด้วย complete-surface audit, query-level request-detail ownership และ regression hardening โดยยังคง compatibility bridge ไว้อย่างตั้งใจ ส่วนโดเมนที่ยังไม่เข้าสู่ migration ยังคงอ้างอิง baseline ของ Phase 0 ตามที่ระบุในแต่ละหัวข้อ
 
@@ -844,6 +849,30 @@ compatibility, excluded boundaries และ Email Request deferral อยู่
 - Phase 6A ย้าย Stock server enforcement แล้ว และ Phase 6B ย้าย Dashboard/LIFF presentation ไปยัง `stockCapabilities` โดยยังคง role-based compatibility floor ฝั่ง server; รายละเอียดอยู่ใน [authorization-stock-migration.md](authorization-stock-migration.md) และ [authorization-presentation-projection.md](authorization-presentation-projection.md)
 - Phase 7A ย้าย Leave server enforcement แล้ว และ Phase 7B ย้าย Dashboard/LIFF presentation ไปยัง `leaveCapabilities` โดยใช้ `resolveMany()` batch เดียวและ compatibility translation ร่วมกับ server; report, recovery, participant/detail และ attachment policy ยัง deferred ตาม [authorization-leave-migration.md](authorization-leave-migration.md) และ [authorization-presentation-projection.md](authorization-presentation-projection.md)
 - Phase 8A ย้าย Employee server enforcement แล้ว, Phase 8B ย้าย Employee Dashboard presentation ไปยัง `employeeCapabilities` โดยใช้ `resolveMany()` batch เดียว และ Phase 8C ปิด complete-surface audit/regression hardening แล้ว; broad list/stats/export policy ไม่เปลี่ยน, delete capability ยัง projected-but-unused ตาม [authorization-employee-migration.md](authorization-employee-migration.md) และ [authorization-presentation-projection.md](authorization-presentation-projection.md)
+
+## 9.1 Phase 12B additive composition core
+
+Phase 12B เพิ่มเฉพาะ reusable application-layer composition primitive
+`composeAuthorizationAuthority(actor, capability, defaultScopes,
+configuredDecision, registry?)`. Domain code supplies trusted default scopes;
+the central resolver supplies the configured/system-role decision. The result
+keeps normalized effective scopes, normalized default scopes, the exact
+resolver decision, and configured grants as separate read-only values.
+
+For a normal USER, only a valid `NO_APPLICABLE_GRANT` decision may fall through
+to the default policy. A configured ALLOW is unioned with the default and cannot
+narrow it. `UNKNOWN_CAPABILITY`, `CHANNEL_NOT_SUPPORTED`, an unqualified
+denial, and configuration failures remain fail-closed. Default scopes are
+validated against the code-owned registry, and originless default `TEAM` is a
+configuration error. ADMIN uses the resolver's `SYSTEM_ROLE` decision without
+applying USER default policy.
+
+The composition result carries configured Team and TeamRole grant provenance
+unchanged. Only a configured grant whose scope is `TEAM` carries its trusted
+origin constraint; a non-TEAM Team or TeamRole grant does not gain one through
+composition. No Employee, Department, Routine, Stock, Leave, or Notification
+adapter has migrated to this seam yet. The next runtime handoff is
+Phase 12C.1 — Department + Notification additive migration.
 
 ## 10. Explicit non-goals for Phase 0
 

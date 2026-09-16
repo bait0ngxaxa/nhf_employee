@@ -10,10 +10,14 @@ export type AuthorizationConfigurationErrorCode =
     | "TEAM_GRANT_ORIGIN_MISMATCH"
     | "TEAM_ROLE_GRANT_ORIGIN_MISMATCH"
     | "TEAM_ROLE_MEMBERSHIP_MISMATCH"
-    | "UNSUPPORTED_ADMIN_TEAM_SCOPE";
+    | "UNSUPPORTED_ADMIN_TEAM_SCOPE"
+    | "CAPABILITY_MISMATCH"
+    | "UNSUPPORTED_DEFAULT_SCOPE"
+    | "DEFAULT_TEAM_SCOPE_REQUIRES_ORIGIN";
 
 export interface AuthorizationConfigurationErrorDetails {
     readonly capabilityKey?: string;
+    readonly configuredCapabilityKey?: string;
     readonly scope?: string;
     readonly teamId?: number;
     readonly teamRoleId?: number;

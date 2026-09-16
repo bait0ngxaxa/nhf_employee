@@ -12,8 +12,11 @@ Phase 12A permanently locks the existing no-grant USER domain behavior as
 Default Domain Policy and defines future configured grants as additive
 authority. The detailed inventory and Phase 12B composition contract are in
 [authorization-phase-12a-additive-policy-contract.md](./authorization-phase-12a-additive-policy-contract.md).
-This addendum does not change the resolver implementation or its current
-resolver-level decision semantics.
+Phase 12B implements the pure application-layer composition seam described by
+that contract in
+[authorization-phase-12b-additive-composition-core.md](./authorization-phase-12b-additive-composition-core.md).
+This does not change the resolver implementation or its current resolver-level
+decision semantics.
 
 Phase 3 made authorization resolution operational and independently testable.
 The Phase 4 Routine pilot now composes this boundary for its migrated
@@ -25,7 +28,10 @@ resolver contract rather than Routine policy.
 The server/application entry point is `@/modules/authorization`:
 
 ```ts
-import { authorization } from "@/modules/authorization";
+import {
+    authorization,
+    composeAuthorizationAuthority,
+} from "@/modules/authorization";
 
 const decision = await authorization.resolve(actor, "routine.task.read");
 const decisions = await authorization.resolveMany(actor, [
@@ -36,6 +42,26 @@ const allowed = await authorization.can(actor, "routine.task.read");
 const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
+
+Domain adapters that have migrated to the Phase 12B seam can compose the
+resolver result with their trusted default scopes:
+
+```ts
+const configuredDecision = await authorization.resolve(actor, capability);
+const authority = composeAuthorizationAuthority(
+    actor,
+    capability,
+    defaultScopes,
+    configuredDecision,
+);
+```
+
+`composeAuthorizationAuthority()` is pure and has no persistence, Team,
+Department, request, resource, or workflow dependencies. It validates default
+scopes against the supplied code-owned registry, returns normalized effective
+scopes, and preserves configured grants separately from Default Domain Policy.
+It is a future domain-adapter seam; the current production adapters still use
+their Phase 12A compatibility mechanics until Phase 12C.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -209,9 +235,15 @@ Department, hierarchy, or employee data.
 
 The existing scope-array projection is not sufficient for the future composed
 result when a domain resource predicate needs the originating Team. Phase 12B
-must retain source/origin metadata for every Team/TeamRole-sourced grant and
-must retain a Team resource constraint only when the grant scope is TEAM,
-alongside normalized scope semantics.
+retains source/origin metadata for every Team/TeamRole-sourced grant and
+retains a Team resource constraint only when the grant scope is TEAM, alongside
+normalized scope semantics.
+
+The Phase 12B composition result therefore exposes the exact resolver decision
+and a read-only configured-grant collection alongside `defaultScopes` and the
+final normalized `scopes`. Scope normalization may collapse several configured
+grants to one `ALL` or `TEAM` scope, but it never removes their source, origin,
+or trusted Team constraint metadata.
 
 ## Invalid configuration
 
@@ -251,10 +283,11 @@ Prisma delegate is exposed.
 ## Phase 12A and later boundary
 
 Phase 12A adds no resolver or domain runtime behavior. It records the
-permanent Default Domain Policy and the current inventory. Phase 12B owns
-additive composition; Phase 12C owns the compatibility-backed domain
-migrations; Phase 12D owns remaining non-IT deferred surfaces. Email Request
-and the future IT module remain outside that roadmap.
+permanent Default Domain Policy and the current inventory. Phase 12B now
+provides additive composition only; Phase 12C owns the compatibility-backed
+domain migrations, beginning with 12C.1 Department + Notification. Phase 12D
+owns remaining non-IT deferred surfaces. Email Request and the future IT
+module remain outside that roadmap.
 
 ## Phase boundary
 
