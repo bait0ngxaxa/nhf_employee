@@ -368,6 +368,13 @@ function adminRecoveryNotTakenRequest(): Record<string, unknown> {
     return {
         ...unrelatedLeaveRequest("leave-admin-recovery"),
         employeeId: 21,
+        employee: {
+            id: 21,
+            firstName: "พนักงานเจ้าของคำขอ",
+            lastName: "ทดสอบ",
+            email: "employee@example.com",
+            user: { id: 7 },
+        },
         status: "APPROVED",
         approvedAt: new Date("2098-12-20T00:00:00.000Z"),
         notTakenRequestedAt: new Date("2099-01-12T00:00:00.000Z"),
