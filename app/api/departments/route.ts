@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/auth/api";
 import { operationFailed } from "@/lib/ssot/http";
 import {
-    assertDepartmentCapabilityForMigration,
+    assertDepartmentCapability,
     assertDepartmentCapabilityScope,
     buildDepartmentAuthorizationContext,
     DepartmentCapabilityDeniedError,
@@ -17,7 +17,7 @@ export async function GET(): Promise<NextResponse> {
         });
         if (!auth.ok) return auth.response;
 
-        const authorization = await assertDepartmentCapabilityForMigration(
+        const authorization = await assertDepartmentCapability(
             buildDepartmentAuthorizationContext(auth.user),
             "department.read",
         );

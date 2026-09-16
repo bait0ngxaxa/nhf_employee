@@ -285,7 +285,12 @@ describe("Phase 10B Authorization Administration commands", () => {
         expect(persisted).toBe(false);
     });
 
-    it("rejects ordinary grants before opening a transaction when readiness is not GRANTABLE", async () => {
+    it.each([
+        ["routine.task.read", "ALL"],
+        ["employee.read", "ALL"],
+        ["stock.request.read", "OWN"],
+        ["leave.request.read", "OWN"],
+    ] as const)("rejects %s before opening a transaction when readiness is not GRANTABLE", async (capabilityKey, scope) => {
         const transactionRunner = vi.fn(
             async <T>(callback: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> =>
                 callback(TX),
@@ -298,11 +303,105 @@ describe("Phase 10B Authorization Administration commands", () => {
             addAuthorizationAdministrationTeamGrant(
                 ADMIN_CONTEXT,
                 10,
-                { capabilityKey: "routine.task.read", scope: "ALL" },
+                { capabilityKey, scope },
                 dependencies(repo, transactionRunner),
             ),
         ).rejects.toMatchObject({ code: "CAPABILITY_POLICY_ACTIVATION_REQUIRED" });
         expect(transactionRunner).not.toHaveBeenCalled();
+    });
+
+    it("accepts add/remove through generic Team, TeamRole, and User commands for default-policy capabilities", async () => {
+        const departmentGrant = teamGrant({
+            capabilityKey: "department.read",
+            scope: "ALL",
+        });
+        const notificationReadGrant = roleGrant({
+            capabilityKey: "notification.inbox.read",
+            scope: "OWN",
+        });
+        const notificationUpdateGrant = userGrant({
+            capabilityKey: "notification.inbox.update",
+            scope: "OWN",
+        });
+        const repo = repository({
+            findTeamById: vi.fn().mockResolvedValue(team()),
+            findTeamGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(departmentGrant),
+            createTeamGrant: vi.fn().mockResolvedValue(departmentGrant),
+            deleteTeamGrant: vi.fn().mockResolvedValue(departmentGrant),
+            findTeamRoleById: vi.fn().mockResolvedValue(role()),
+            findTeamRoleGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(notificationReadGrant),
+            createTeamRoleGrant: vi.fn().mockResolvedValue(notificationReadGrant),
+            deleteTeamRoleGrant: vi.fn().mockResolvedValue(notificationReadGrant),
+            findUserById: vi.fn().mockResolvedValue({ id: 7 }),
+            findUserGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(notificationUpdateGrant),
+            createUserGrant: vi.fn().mockResolvedValue(notificationUpdateGrant),
+            deleteUserGrant: vi.fn().mockResolvedValue(notificationUpdateGrant),
+        });
+        const deps = dependencies(repo);
+
+        await expect(
+            addAuthorizationAdministrationTeamGrant(
+                ADMIN_CONTEXT,
+                10,
+                { capabilityKey: "department.read", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(departmentGrant);
+        await expect(
+            removeAuthorizationAdministrationTeamGrant(
+                ADMIN_CONTEXT,
+                10,
+                { capabilityKey: "department.read", scope: "ALL" },
+                deps,
+            ),
+        ).resolves.toEqual(departmentGrant);
+
+        await expect(
+            addAuthorizationAdministrationTeamRoleGrant(
+                ADMIN_CONTEXT,
+                10,
+                20,
+                { capabilityKey: "notification.inbox.read", scope: "OWN" },
+                deps,
+            ),
+        ).resolves.toEqual(notificationReadGrant);
+        await expect(
+            removeAuthorizationAdministrationTeamRoleGrant(
+                ADMIN_CONTEXT,
+                10,
+                20,
+                { capabilityKey: "notification.inbox.read", scope: "OWN" },
+                deps,
+            ),
+        ).resolves.toEqual(notificationReadGrant);
+
+        await expect(
+            addAuthorizationAdministrationUserGrant(
+                ADMIN_CONTEXT,
+                7,
+                { capabilityKey: "notification.inbox.update", scope: "OWN" },
+                deps,
+            ),
+        ).resolves.toEqual(notificationUpdateGrant);
+        await expect(
+            removeAuthorizationAdministrationUserGrant(
+                ADMIN_CONTEXT,
+                7,
+                { capabilityKey: "notification.inbox.update", scope: "OWN" },
+                deps,
+            ),
+        ).resolves.toEqual(notificationUpdateGrant);
+
+        expect(repo.createTeamGrant).toHaveBeenCalledWith(TX, departmentGrant);
+        expect(repo.createTeamRoleGrant).toHaveBeenCalledWith(TX, notificationReadGrant);
+        expect(repo.createUserGrant).toHaveBeenCalledWith(TX, notificationUpdateGrant);
+        expect(auditAppendMock).toHaveBeenCalledTimes(6);
     });
 
     it("rejects unknown and unsupported grant values without normalizing them", async () => {

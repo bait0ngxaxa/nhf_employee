@@ -5,20 +5,28 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const mocks = vi.hoisted(() => ({
     resolveMany: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolveMany: mocks.resolveMany,
-    },
-}));
+vi.mock("@/modules/authorization", async () => {
+    const actual = await vi.importActual<typeof AuthorizationModule>(
+        "@/modules/authorization",
+    );
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolveMany: mocks.resolveMany,
+        },
+    };
+});
 
 import {
     buildDepartmentAuthorizationContext,
-    DEPARTMENT_MIGRATED_CAPABILITIES,
+    DEPARTMENT_CAPABILITIES,
     getDepartmentPresentationCapabilities,
 } from "./authorization";
 import type { DepartmentPresentationCapabilities } from "./types";
@@ -73,7 +81,7 @@ describe("Department presentation capability projection", () => {
         ));
     });
 
-    it("keeps the eligible-workforce Department compatibility bridge", async () => {
+    it("keeps the eligible-workforce Department default policy", async () => {
         const projection = await getDepartmentPresentationCapabilities(DASHBOARD_USER);
 
         expect(projection).toEqual({ canReadDepartments: true });
@@ -81,7 +89,7 @@ describe("Department presentation capability projection", () => {
         expect(mocks.resolveMany).toHaveBeenCalledTimes(1);
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             DASHBOARD_USER.authorizationActor,
-            DEPARTMENT_MIGRATED_CAPABILITIES,
+            DEPARTMENT_CAPABILITIES,
         );
     });
 
@@ -89,7 +97,6 @@ describe("Department presentation capability projection", () => {
         ["USER", { type: "USER", userId: 7 }],
         ["TEAM", { type: "TEAM", teamId: 3 }],
         ["TEAM_ROLE", { type: "TEAM_ROLE", teamId: 3, teamRoleId: 4 }],
-        ["ADMIN central authority", { type: "SYSTEM_ROLE", role: "ADMIN" }],
     ] as const)("projects an explicit %s grant", async (_label, source) => {
         mockDecision((capability) => decision(
             capability,
@@ -102,6 +109,28 @@ describe("Department presentation capability projection", () => {
         await expect(
             getDepartmentPresentationCapabilities(DASHBOARD_USER),
         ).resolves.toEqual({ canReadDepartments: true });
+    });
+
+    it("projects ADMIN through central SYSTEM_ROLE authority", async () => {
+        const admin = buildDepartmentAuthorizationContext(
+            { id: 7, role: "ADMIN" },
+            21,
+        );
+        mockDecision((capability) => decision(
+            capability,
+            true,
+            ["ALL"],
+            undefined,
+            [grant({ type: "SYSTEM_ROLE", role: "ADMIN" })],
+        ));
+
+        await expect(
+            getDepartmentPresentationCapabilities(admin),
+        ).resolves.toEqual({ canReadDepartments: true });
+        expect(mocks.resolveMany).toHaveBeenCalledWith(
+            admin.authorizationActor,
+            DEPARTMENT_CAPABILITIES,
+        );
     });
 
     it("fails closed for structural denial and does not mask failures", async () => {

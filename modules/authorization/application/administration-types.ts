@@ -26,6 +26,7 @@ export interface AuthorizationAdministrationPrincipal {
 
 export type RuntimeAuthorizationMode =
     | "CENTRAL_ONLY"
+    | "CENTRAL_WITH_DEFAULT_POLICY"
     | "CENTRAL_WITH_COMPATIBILITY"
     | "DEFERRED";
 
@@ -41,10 +42,7 @@ export interface CapabilityAdministrationProjection {
     readonly description: string;
     readonly supportedScopes: readonly AuthorizationScope[];
     readonly supportedChannels: readonly AuthorizationChannel[];
-    /**
-     * Describes whether a domain adapter may still translate a central
-     * resolver denial through a documented compatibility floor.
-     */
+    /** Describes how central authority combines with the domain runtime policy. */
     readonly runtimeAuthorizationMode: RuntimeAuthorizationMode;
     readonly administrativeStatus: CapabilityAdministrationStatus;
     /** True only when an ordinary additive Phase 10B grant is safe to expose. */
@@ -268,7 +266,7 @@ export interface AuthorizationAdministrationUserDetail {
     readonly directGrants: readonly AuthorizationAdministrationGrantProjection[];
     /** Central resolver results; not a final domain/runtime access decision. */
     readonly resolverEffectivePermissionStatus: AuthorizationAdministrationResolverEffectivePermissionStatus;
-    /** Central resolver results; domain compatibility adapters may still apply. */
+    /** Central resolver results; domain defaults or compatibility policies may still apply. */
     readonly resolverEffectivePermissions: readonly AuthorizationAdministrationResolverEffectivePermission[];
     readonly configurationIssues: readonly AuthorizationAdministrationConfigurationIssue[];
 }

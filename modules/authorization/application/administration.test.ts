@@ -286,10 +286,22 @@ describe("Authorization Administration capability catalog", () => {
             nonGrantableReason: expect.stringContaining("Routine"),
         });
         expect(first.find(({ key }) => key === "department.read")).toMatchObject({
-            runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
-            administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
-            administrativelyGrantable: false,
+            runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+            administrativeStatus: "GRANTABLE",
+            administrativelyGrantable: true,
         });
+        expect(first.find(({ key }) => key === "department.read")?.nonGrantableReason).toBeUndefined();
+        for (const key of [
+            "notification.inbox.read",
+            "notification.inbox.update",
+        ]) {
+            expect(first.find((capability) => capability.key === key)).toMatchObject({
+                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
+            });
+            expect(first.find((capability) => capability.key === key)?.nonGrantableReason).toBeUndefined();
+        }
         expect(first.find(({ key }) => key === "routine.task.export")).toMatchObject({
             runtimeAuthorizationMode: "DEFERRED",
             administrativeStatus: "DEFERRED",
@@ -323,7 +335,6 @@ describe("Authorization Administration capability catalog", () => {
             "employee.read",
             "employee.stats.read",
             "employee.export",
-            "department.read",
             "routine.task.read",
             "routine.task.create",
             "routine.task.update",
@@ -340,9 +351,36 @@ describe("Authorization Administration capability catalog", () => {
             "leave.request.approve",
             "leave.cancellation.decide",
             "leave.request.not_taken",
+        ]);
+        expect(first.filter(({ runtimeAuthorizationMode }) =>
+            runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
+        ).map(({ key }) => key)).toEqual([
+            "department.read",
             "notification.inbox.read",
             "notification.inbox.update",
         ]);
+        expect(first).toHaveLength(40);
+        expect(first.filter(({ runtimeAuthorizationMode }) =>
+            runtimeAuthorizationMode === "CENTRAL_ONLY",
+        )).toHaveLength(13);
+        expect(first.filter(({ runtimeAuthorizationMode }) =>
+            runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
+        )).toHaveLength(3);
+        expect(first.filter(({ runtimeAuthorizationMode }) =>
+            runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
+        )).toHaveLength(19);
+        expect(first.filter(({ runtimeAuthorizationMode }) =>
+            runtimeAuthorizationMode === "DEFERRED",
+        )).toHaveLength(5);
+        expect(first.filter(({ administrativeStatus }) =>
+            administrativeStatus === "GRANTABLE",
+        )).toHaveLength(16);
+        expect(first.filter(({ administrativeStatus }) =>
+            administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
+        )).toHaveLength(19);
+        expect(first.filter(({ administrativeStatus }) =>
+            administrativeStatus === "DEFERRED",
+        )).toHaveLength(5);
         expect(first.every(({ administrativeStatus, administrativelyGrantable }) =>
             (administrativeStatus === "GRANTABLE") === administrativelyGrantable,
         )).toBe(true);

@@ -12,20 +12,20 @@ export {
     createForUsers,
 } from "./application/commands";
 export {
-    assertNotificationCapabilityForMigration,
+    assertNotificationCapability,
     assertNotificationCapabilityScope,
     buildNotificationAuthorizationActor,
     buildNotificationAuthorizationContext,
     NotificationCapabilityDeniedError,
-    NOTIFICATION_MIGRATED_CAPABILITIES,
+    NOTIFICATION_CAPABILITIES,
     getNotificationPresentationCapabilities,
-    resolveNotificationCapabilityForMigration,
+    resolveNotificationCapability,
 } from "./application/authorization";
 export type {
     NotificationAuthorizationActor,
     NotificationAuthorizationContext,
     NotificationCapabilityAuthorization,
-    NotificationMigratedCapability,
+    NotificationCapability,
 } from "./application/authorization";
 export type { NotificationPresentationCapabilities } from "./application/types";
 export type {

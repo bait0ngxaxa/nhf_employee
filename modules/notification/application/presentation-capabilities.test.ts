@@ -5,21 +5,29 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const mocks = vi.hoisted(() => ({
     resolveMany: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolveMany: mocks.resolveMany,
-    },
-}));
+vi.mock("@/modules/authorization", async () => {
+    const actual = await vi.importActual<typeof AuthorizationModule>(
+        "@/modules/authorization",
+    );
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolveMany: mocks.resolveMany,
+        },
+    };
+});
 
 import {
     buildNotificationAuthorizationContext,
     getNotificationPresentationCapabilities,
-    NOTIFICATION_MIGRATED_CAPABILITIES,
+    NOTIFICATION_CAPABILITIES,
 } from "./authorization";
 import type { NotificationPresentationCapabilities } from "./types";
 
@@ -45,7 +53,7 @@ function decision(
 }
 
 function grant(
-    capability: (typeof NOTIFICATION_MIGRATED_CAPABILITIES)[number],
+    capability: (typeof NOTIFICATION_CAPABILITIES)[number],
     source: EffectiveAuthorizationGrant["source"],
 ): EffectiveAuthorizationGrant {
     return {
@@ -57,7 +65,7 @@ function grant(
 
 function mockDecisions(
     getDecision: (
-        capability: (typeof NOTIFICATION_MIGRATED_CAPABILITIES)[number],
+        capability: (typeof NOTIFICATION_CAPABILITIES)[number],
     ) => AuthorizationDecision,
 ): void {
     mocks.resolveMany.mockImplementation(
@@ -65,7 +73,7 @@ function mockDecisions(
             capabilities.map((capability) => [
                 capability,
                 getDecision(
-                    capability as (typeof NOTIFICATION_MIGRATED_CAPABILITIES)[number],
+                    capability as (typeof NOTIFICATION_CAPABILITIES)[number],
                 ),
             ]),
         ),
@@ -99,11 +107,11 @@ describe("Notification presentation capability projection", () => {
         expect(mocks.resolveMany).toHaveBeenCalledTimes(1);
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             DASHBOARD_USER.authorizationActor,
-            NOTIFICATION_MIGRATED_CAPABILITIES,
+            NOTIFICATION_CAPABILITIES,
         );
     });
 
-    it("keeps the NO_APPLICABLE_GRANT compatibility bridge as OWN for both fields", async () => {
+    it("keeps the own-inbox default policy as OWN for both fields", async () => {
         await expect(
             getNotificationPresentationCapabilities(DASHBOARD_USER),
         ).resolves.toEqual({ canReadInbox: true, canUpdateInbox: true });
@@ -153,16 +161,14 @@ describe("Notification presentation capability projection", () => {
         ).resolves.toEqual({ canReadInbox: true, canUpdateInbox: true });
     });
 
-    it("projects the ADMIN central decision and compatibility bridge for each capability", async () => {
-        mockDecisions((capability) => capability === "notification.inbox.read"
-            ? decision(
-                capability,
-                true,
-                ["OWN"],
-                undefined,
-                [grant(capability, { type: "SYSTEM_ROLE", role: "ADMIN" })],
-            )
-            : decision(capability, false, [], "NO_APPLICABLE_GRANT"));
+    it("projects the ADMIN central decision and default policy for each capability", async () => {
+        mockDecisions((capability) => decision(
+            capability,
+            true,
+            ["OWN"],
+            undefined,
+            [grant(capability, { type: "SYSTEM_ROLE", role: "ADMIN" })],
+        ));
 
         await expect(
             getNotificationPresentationCapabilities(

@@ -20,7 +20,7 @@ const notificationMocks = vi.hoisted(() => ({
     markAllReadForUser: vi.fn(),
     markReadForUser: vi.fn(),
     buildNotificationAuthorizationContext: vi.fn(),
-    assertNotificationCapabilityForMigration: vi.fn(),
+    assertNotificationCapability: vi.fn(),
     assertNotificationCapabilityScope: vi.fn(),
     NotificationCapabilityDeniedError: class NotificationCapabilityDeniedError extends Error {
         readonly statusCode = 403;
@@ -74,7 +74,7 @@ describe("Notification API Routes", () => {
                 },
             }),
         );
-        notificationMocks.assertNotificationCapabilityForMigration.mockImplementation(
+        notificationMocks.assertNotificationCapability.mockImplementation(
             async (
                 context: {
                     authorizationActor: {
@@ -95,7 +95,7 @@ describe("Notification API Routes", () => {
                     grants: [],
                 },
                 scopes: ["OWN"],
-                usedMigrationCompatibility: false,
+                defaultScopes: ["OWN"],
             }),
         );
         notificationMocks.assertNotificationCapabilityScope.mockImplementation(
@@ -146,7 +146,7 @@ describe("Notification API Routes", () => {
             expect(data.unreadCount).toBe(1);
             expect(mockListLatestForUser).toHaveBeenCalledWith(1);
             expect(
-                notificationMocks.assertNotificationCapabilityForMigration,
+                notificationMocks.assertNotificationCapability,
             ).toHaveBeenCalledWith(
                 expect.objectContaining({
                     authorizationActor: expect.objectContaining({
@@ -165,7 +165,7 @@ describe("Notification API Routes", () => {
 
         it("does not execute a read query when the read capability is denied", async () => {
             mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
-            notificationMocks.assertNotificationCapabilityForMigration.mockRejectedValue(
+            notificationMocks.assertNotificationCapability.mockRejectedValue(
                 new notificationMocks.NotificationCapabilityDeniedError(
                     "notification.inbox.read",
                     "CHANNEL_NOT_SUPPORTED",
@@ -221,7 +221,7 @@ describe("Notification API Routes", () => {
                 cursor: null,
             });
             expect(
-                notificationMocks.assertNotificationCapabilityForMigration,
+                notificationMocks.assertNotificationCapability,
             ).toHaveBeenCalledWith(expect.anything(), "notification.inbox.read");
         });
 
@@ -298,13 +298,13 @@ describe("Notification API Routes", () => {
             expect(await res.json()).toEqual({ success: true, notification });
             expect(mockMarkReadForUser).toHaveBeenCalledWith("notif-123", 1);
             expect(
-                notificationMocks.assertNotificationCapabilityForMigration,
+                notificationMocks.assertNotificationCapability,
             ).toHaveBeenCalledWith(expect.anything(), "notification.inbox.update");
         });
 
         it("does not allow the read capability to authorize a mutation", async () => {
             mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
-            notificationMocks.assertNotificationCapabilityForMigration.mockImplementation(
+            notificationMocks.assertNotificationCapability.mockImplementation(
                 async (_context: unknown, capability: string) => {
                     if (capability === "notification.inbox.update") {
                         throw new notificationMocks.NotificationCapabilityDeniedError(
@@ -371,7 +371,7 @@ describe("Notification API Routes", () => {
             expect(await res.json()).toEqual({ success: true, updatedCount: 5 });
             expect(mockMarkAllReadForUser).toHaveBeenCalledWith(1);
             expect(
-                notificationMocks.assertNotificationCapabilityForMigration,
+                notificationMocks.assertNotificationCapability,
             ).toHaveBeenCalledWith(expect.anything(), "notification.inbox.update");
         });
 

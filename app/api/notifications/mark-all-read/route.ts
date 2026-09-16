@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireApiSession } from "@/lib/auth/api";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import {
-    assertNotificationCapabilityForMigration,
+    assertNotificationCapability,
     assertNotificationCapabilityScope,
     buildNotificationAuthorizationContext,
     markAllReadForUser,
@@ -20,7 +20,7 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: COMMON_API_MESSAGES.invalidUserSession }, { status: 400 });
         }
 
-        const authorization = await assertNotificationCapabilityForMigration(
+        const authorization = await assertNotificationCapability(
             buildNotificationAuthorizationContext({
                 id: userId,
                 role: auth.user.role,

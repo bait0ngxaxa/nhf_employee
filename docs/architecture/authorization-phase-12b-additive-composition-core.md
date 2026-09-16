@@ -298,3 +298,6 @@ configured additive authority.
 
 Phase 12B stops at the reusable, fail-closed composition core. No 12C runtime
 migration is included in this change.
+
+The completed follow-on is recorded in
+[authorization-phase-12c1-department-notification-additive-migration.md](authorization-phase-12c1-department-notification-additive-migration.md).

@@ -4,7 +4,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import {
-    assertNotificationCapabilityForMigration,
+    assertNotificationCapability,
     assertNotificationCapabilityScope,
     buildNotificationAuthorizationContext,
     markReadForUser,
@@ -27,7 +27,7 @@ export async function PATCH(
         const resolvedParams = await params;
         const notificationId = resolvedParams.id;
 
-        const authorization = await assertNotificationCapabilityForMigration(
+        const authorization = await assertNotificationCapability(
             buildNotificationAuthorizationContext({
                 id: userId,
                 role: auth.user.role,

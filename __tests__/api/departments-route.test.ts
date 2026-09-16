@@ -8,7 +8,7 @@ import { listDepartments } from "@/modules/department";
 const departmentMocks = vi.hoisted(() => ({
     listDepartments: vi.fn(),
     buildDepartmentAuthorizationContext: vi.fn(),
-    assertDepartmentCapabilityForMigration: vi.fn(),
+    assertDepartmentCapability: vi.fn(),
     assertDepartmentCapabilityScope: vi.fn(),
     DepartmentCapabilityDeniedError: class DepartmentCapabilityDeniedError extends Error {
         readonly statusCode = 403;
@@ -67,7 +67,7 @@ describe("GET /api/departments", () => {
                 channel: "DASHBOARD",
             },
         });
-        departmentMocks.assertDepartmentCapabilityForMigration.mockResolvedValue({
+        departmentMocks.assertDepartmentCapability.mockResolvedValue({
             actor: {
                 userId: USER.id,
                 employeeId: null,
@@ -82,7 +82,7 @@ describe("GET /api/departments", () => {
                 grants: [],
             },
             scopes: ["ALL"],
-            usedMigrationCompatibility: false,
+            defaultScopes: ["ALL"],
         });
         departmentMocks.assertDepartmentCapabilityScope.mockImplementation(
             (authorization) => authorization,
@@ -101,7 +101,7 @@ describe("GET /api/departments", () => {
         expect(listDepartments).not.toHaveBeenCalled();
     });
 
-    it("returns the compatible full Department response for an authenticated caller", async () => {
+    it("returns the full Department response for an authenticated caller", async () => {
         vi.mocked(listDepartments).mockResolvedValue(DEPARTMENTS);
 
         const response = await GET();
@@ -119,7 +119,7 @@ describe("GET /api/departments", () => {
             USER,
         );
         expect(
-            departmentMocks.assertDepartmentCapabilityForMigration,
+            departmentMocks.assertDepartmentCapability,
         ).toHaveBeenCalledWith(
             expect.objectContaining({
                 authorizationActor: expect.objectContaining({
@@ -137,7 +137,7 @@ describe("GET /api/departments", () => {
     });
 
     it("preserves the forbidden response and skips the query when the capability is denied", async () => {
-        departmentMocks.assertDepartmentCapabilityForMigration.mockRejectedValue(
+        departmentMocks.assertDepartmentCapability.mockRejectedValue(
             new departmentMocks.DepartmentCapabilityDeniedError(
                 "department.read",
                 "NO_APPLICABLE_GRANT",

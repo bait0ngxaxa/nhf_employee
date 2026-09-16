@@ -44,6 +44,8 @@ export function getRuntimeModeLabel(
     switch (mode) {
         case "CENTRAL_ONLY":
             return "Central only";
+        case "CENTRAL_WITH_DEFAULT_POLICY":
+            return "Central + default policy";
         case "CENTRAL_WITH_COMPATIBILITY":
             return "Central + compatibility";
         case "DEFERRED":

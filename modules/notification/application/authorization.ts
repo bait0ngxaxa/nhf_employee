@@ -1,20 +1,21 @@
 import {
     authorization,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationDecision,
     type AuthorizationScope,
+    type ComposedAuthorizationAuthority,
 } from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
 import type { NotificationPresentationCapabilities } from "./types";
 
-export const NOTIFICATION_MIGRATED_CAPABILITIES = [
+export const NOTIFICATION_CAPABILITIES = [
     "notification.inbox.read",
     "notification.inbox.update",
 ] as const;
 
-export type NotificationMigratedCapability =
-    (typeof NOTIFICATION_MIGRATED_CAPABILITIES)[number];
+export type NotificationCapability = (typeof NOTIFICATION_CAPABILITIES)[number];
 
 export type NotificationAuthorizationActor = AuthorizationActor & {
     readonly channel: "DASHBOARD";
@@ -26,10 +27,10 @@ export interface NotificationAuthorizationContext {
 
 export interface NotificationCapabilityAuthorization {
     readonly actor: NotificationAuthorizationActor;
-    readonly capability: NotificationMigratedCapability;
+    readonly capability: NotificationCapability;
     readonly decision: AuthorizationDecision;
+    readonly defaultScopes: readonly AuthorizationScope[];
     readonly scopes: readonly AuthorizationScope[];
-    readonly usedMigrationCompatibility: boolean;
 }
 
 export class NotificationCapabilityDeniedError extends Error {
@@ -49,12 +50,12 @@ export class NotificationCapabilityDeniedError extends Error {
 }
 
 const NOTIFICATION_CAPABILITY_SET = new Set<string>(
-    NOTIFICATION_MIGRATED_CAPABILITIES,
+    NOTIFICATION_CAPABILITIES,
 );
 
-function isNotificationMigratedCapability(
+function isNotificationCapability(
     capability: string,
-): capability is NotificationMigratedCapability {
+): capability is NotificationCapability {
     return NOTIFICATION_CAPABILITY_SET.has(capability);
 }
 
@@ -84,68 +85,68 @@ export function buildNotificationAuthorizationContext(
     });
 }
 
-function legacyNotificationScopes(
-    capability: NotificationMigratedCapability,
+function defaultNotificationScopes(
+    capability: NotificationCapability,
 ): readonly AuthorizationScope[] {
     switch (capability) {
         case "notification.inbox.read":
         case "notification.inbox.update":
-            // requireApiSession() has already enforced the legacy eligible
-            // workforce contract before this compatibility floor is reached.
             return ["OWN"];
     }
-}
-
-function freezeScopes(
-    scopes: readonly AuthorizationScope[],
-): readonly AuthorizationScope[] {
-    return Object.freeze([...scopes]);
 }
 
 function buildNotificationCapabilityAuthorization(
     actor: NotificationAuthorizationActor,
     capability: string,
+    authority: ComposedAuthorizationAuthority,
+): NotificationCapabilityAuthorization {
+    if (!isNotificationCapability(capability)) {
+        throw new NotificationCapabilityDeniedError(
+            capability,
+            authority.configuredDecision.reason ?? "UNKNOWN_CAPABILITY",
+        );
+    }
+
+    if (!authority.allowed) {
+        throw new NotificationCapabilityDeniedError(
+            capability,
+            authority.configuredDecision.reason,
+        );
+    }
+
+    return Object.freeze({
+        actor,
+        capability,
+        decision: authority.configuredDecision,
+        defaultScopes: authority.defaultScopes,
+        scopes: authority.scopes,
+    });
+}
+
+function composeNotificationCapabilityAuthorization(
+    actor: NotificationAuthorizationActor,
+    capability: string,
     decision: AuthorizationDecision,
 ): NotificationCapabilityAuthorization {
-    if (!isNotificationMigratedCapability(capability)) {
+    if (!isNotificationCapability(capability)) {
         throw new NotificationCapabilityDeniedError(
             capability,
             decision.reason ?? "UNKNOWN_CAPABILITY",
         );
     }
 
-    if (!decision.allowed) {
-        const compatibilityScopes = decision.reason === "NO_APPLICABLE_GRANT"
-            ? legacyNotificationScopes(capability)
-            : null;
-        if (compatibilityScopes === null) {
-            throw new NotificationCapabilityDeniedError(
-                capability,
-                decision.reason,
-            );
-        }
-
-        return Object.freeze({
-            actor,
-            capability,
-            decision,
-            scopes: freezeScopes(compatibilityScopes),
-            usedMigrationCompatibility: true,
-        });
-    }
-
-    return Object.freeze({
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
+        defaultNotificationScopes(capability),
         decision,
-        scopes: decision.scopes,
-        usedMigrationCompatibility: false,
-    });
+    );
+    return buildNotificationCapabilityAuthorization(actor, capability, authority);
 }
 
 function getNotificationPresentationDecision(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
-    capability: NotificationMigratedCapability,
+    capability: NotificationCapability,
 ): AuthorizationDecision {
     const decision = decisions.get(capability);
     if (decision === undefined) {
@@ -158,12 +159,12 @@ function getNotificationPresentationDecision(
 
 function projectNotificationCapabilityDecision(
     actor: NotificationAuthorizationActor,
-    capability: NotificationMigratedCapability,
+    capability: NotificationCapability,
     decision: AuthorizationDecision,
 ): readonly AuthorizationScope[] | null {
     try {
         return assertNotificationCapabilityScope(
-            buildNotificationCapabilityAuthorization(actor, capability, decision),
+            composeNotificationCapabilityAuthorization(actor, capability, decision),
             "OWN",
         ).scopes;
     } catch (error) {
@@ -194,10 +195,10 @@ export async function getNotificationPresentationCapabilities(
     const actor = context.authorizationActor;
     const decisions = await authorization.resolveMany(
         actor,
-        NOTIFICATION_MIGRATED_CAPABILITIES,
+        NOTIFICATION_CAPABILITIES,
     );
     const project = (
-        capability: NotificationMigratedCapability,
+        capability: NotificationCapability,
     ): readonly AuthorizationScope[] | null =>
         projectNotificationCapabilityDecision(
             actor,
@@ -217,20 +218,20 @@ export async function getNotificationPresentationCapabilities(
     });
 }
 
-export async function resolveNotificationCapabilityForMigration(
+export async function resolveNotificationCapability(
     context: NotificationAuthorizationContext,
     capability: string,
 ): Promise<NotificationCapabilityAuthorization> {
     const actor = context.authorizationActor;
     const decision = await authorization.resolve(actor, capability);
-    return buildNotificationCapabilityAuthorization(actor, capability, decision);
+    return composeNotificationCapabilityAuthorization(actor, capability, decision);
 }
 
-export async function assertNotificationCapabilityForMigration(
+export async function assertNotificationCapability(
     context: NotificationAuthorizationContext,
     capability: string,
 ): Promise<NotificationCapabilityAuthorization> {
-    return resolveNotificationCapabilityForMigration(context, capability);
+    return resolveNotificationCapability(context, capability);
 }
 
 export function assertNotificationCapabilityScope(

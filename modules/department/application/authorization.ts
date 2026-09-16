@@ -1,19 +1,20 @@
 import {
     authorization,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationDecision,
     type AuthorizationScope,
+    type ComposedAuthorizationAuthority,
 } from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
 import type { DepartmentPresentationCapabilities } from "./types";
 
-export const DEPARTMENT_MIGRATED_CAPABILITIES = [
+export const DEPARTMENT_CAPABILITIES = [
     "department.read",
 ] as const;
 
-export type DepartmentMigratedCapability =
-    (typeof DEPARTMENT_MIGRATED_CAPABILITIES)[number];
+export type DepartmentCapability = (typeof DEPARTMENT_CAPABILITIES)[number];
 
 export type DepartmentAuthorizationActor = AuthorizationActor & {
     readonly channel: "DASHBOARD";
@@ -25,10 +26,10 @@ export interface DepartmentAuthorizationContext {
 
 export interface DepartmentCapabilityAuthorization {
     readonly actor: DepartmentAuthorizationActor;
-    readonly capability: DepartmentMigratedCapability;
+    readonly capability: DepartmentCapability;
     readonly decision: AuthorizationDecision;
+    readonly defaultScopes: readonly AuthorizationScope[];
     readonly scopes: readonly AuthorizationScope[];
-    readonly usedMigrationCompatibility: boolean;
 }
 
 export class DepartmentCapabilityDeniedError extends Error {
@@ -48,12 +49,12 @@ export class DepartmentCapabilityDeniedError extends Error {
 }
 
 const DEPARTMENT_CAPABILITY_SET = new Set<string>(
-    DEPARTMENT_MIGRATED_CAPABILITIES,
+    DEPARTMENT_CAPABILITIES,
 );
 
-function isDepartmentMigratedCapability(
+function isDepartmentCapability(
     capability: string,
-): capability is DepartmentMigratedCapability {
+): capability is DepartmentCapability {
     return DEPARTMENT_CAPABILITY_SET.has(capability);
 }
 
@@ -83,19 +84,11 @@ export function buildDepartmentAuthorizationContext(
     });
 }
 
-function freezeScopes(
-    scopes: readonly AuthorizationScope[],
-): readonly AuthorizationScope[] {
-    return Object.freeze([...scopes]);
-}
-
-function legacyDepartmentScopes(
-    capability: DepartmentMigratedCapability,
+function defaultDepartmentScopes(
+    capability: DepartmentCapability,
 ): readonly AuthorizationScope[] {
     switch (capability) {
         case "department.read":
-            // requireApiSession() has already enforced the legacy eligible
-            // workforce contract before this compatibility floor is reached.
             return ["ALL"];
     }
 }
@@ -103,47 +96,55 @@ function legacyDepartmentScopes(
 function buildDepartmentCapabilityAuthorization(
     actor: DepartmentAuthorizationActor,
     capability: string,
+    authority: ComposedAuthorizationAuthority,
+): DepartmentCapabilityAuthorization {
+    if (!isDepartmentCapability(capability)) {
+        throw new DepartmentCapabilityDeniedError(
+            capability,
+            authority.configuredDecision.reason ?? "UNKNOWN_CAPABILITY",
+        );
+    }
+
+    if (!authority.allowed) {
+        throw new DepartmentCapabilityDeniedError(
+            capability,
+            authority.configuredDecision.reason,
+        );
+    }
+
+    return Object.freeze({
+        actor,
+        capability,
+        decision: authority.configuredDecision,
+        defaultScopes: authority.defaultScopes,
+        scopes: authority.scopes,
+    });
+}
+
+function composeDepartmentCapabilityAuthorization(
+    actor: DepartmentAuthorizationActor,
+    capability: string,
     decision: AuthorizationDecision,
 ): DepartmentCapabilityAuthorization {
-    if (!isDepartmentMigratedCapability(capability)) {
+    if (!isDepartmentCapability(capability)) {
         throw new DepartmentCapabilityDeniedError(
             capability,
             decision.reason ?? "UNKNOWN_CAPABILITY",
         );
     }
 
-    if (!decision.allowed) {
-        const compatibilityScopes = decision.reason === "NO_APPLICABLE_GRANT"
-            ? legacyDepartmentScopes(capability)
-            : null;
-        if (compatibilityScopes === null) {
-            throw new DepartmentCapabilityDeniedError(
-                capability,
-                decision.reason,
-            );
-        }
-
-        return Object.freeze({
-            actor,
-            capability,
-            decision,
-            scopes: freezeScopes(compatibilityScopes),
-            usedMigrationCompatibility: true,
-        });
-    }
-
-    return Object.freeze({
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
+        defaultDepartmentScopes(capability),
         decision,
-        scopes: decision.scopes,
-        usedMigrationCompatibility: false,
-    });
+    );
+    return buildDepartmentCapabilityAuthorization(actor, capability, authority);
 }
 
 function getDepartmentPresentationDecision(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
-    capability: DepartmentMigratedCapability,
+    capability: DepartmentCapability,
 ): AuthorizationDecision {
     const decision = decisions.get(capability);
     if (decision === undefined) {
@@ -156,12 +157,12 @@ function getDepartmentPresentationDecision(
 
 function projectDepartmentCapabilityDecision(
     actor: DepartmentAuthorizationActor,
-    capability: DepartmentMigratedCapability,
+    capability: DepartmentCapability,
     decision: AuthorizationDecision,
 ): readonly AuthorizationScope[] | null {
     try {
         return assertDepartmentCapabilityScope(
-            buildDepartmentCapabilityAuthorization(actor, capability, decision),
+            composeDepartmentCapabilityAuthorization(actor, capability, decision),
             "ALL",
         ).scopes;
     } catch (error) {
@@ -192,7 +193,7 @@ export async function getDepartmentPresentationCapabilities(
     const actor = context.authorizationActor;
     const decisions = await authorization.resolveMany(
         actor,
-        DEPARTMENT_MIGRATED_CAPABILITIES,
+        DEPARTMENT_CAPABILITIES,
     );
     const decision = getDepartmentPresentationDecision(
         decisions,
@@ -209,20 +210,20 @@ export async function getDepartmentPresentationCapabilities(
     });
 }
 
-export async function resolveDepartmentCapabilityForMigration(
+export async function resolveDepartmentCapability(
     context: DepartmentAuthorizationContext,
     capability: string,
 ): Promise<DepartmentCapabilityAuthorization> {
     const actor = context.authorizationActor;
     const decision = await authorization.resolve(actor, capability);
-    return buildDepartmentCapabilityAuthorization(actor, capability, decision);
+    return composeDepartmentCapabilityAuthorization(actor, capability, decision);
 }
 
-export async function assertDepartmentCapabilityForMigration(
+export async function assertDepartmentCapability(
     context: DepartmentAuthorizationContext,
     capability: string,
 ): Promise<DepartmentCapabilityAuthorization> {
-    return resolveDepartmentCapabilityForMigration(context, capability);
+    return resolveDepartmentCapability(context, capability);
 }
 
 export function assertDepartmentCapabilityScope(

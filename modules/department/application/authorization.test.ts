@@ -6,24 +6,32 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import { AuthorizationConfigurationError } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 import {
     assertDepartmentCapabilityScope,
     buildDepartmentAuthorizationContext,
-    DepartmentCapabilityDeniedError,
-    DEPARTMENT_MIGRATED_CAPABILITIES,
-    resolveDepartmentCapabilityForMigration,
+    DEPARTMENT_CAPABILITIES,
+    resolveDepartmentCapability,
 } from "./authorization";
 
 const mocks = vi.hoisted(() => ({
     resolve: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: mocks.resolve,
-    },
-}));
+vi.mock("@/modules/authorization", async () => {
+    const actual = await vi.importActual<typeof AuthorizationModule>(
+        "@/modules/authorization",
+    );
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: mocks.resolve,
+        },
+    };
+});
 
 function context(
     role: "ADMIN" | "USER" = "USER",
@@ -58,13 +66,13 @@ function grant(
     };
 }
 
-describe("Department authorization migration adapter", () => {
+describe("Department authorization default-policy adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
     });
 
     it("keeps the registered inventory and trusted Dashboard actor mapping", () => {
-        expect(DEPARTMENT_MIGRATED_CAPABILITIES).toEqual(["department.read"]);
+        expect(DEPARTMENT_CAPABILITIES).toEqual(["department.read"]);
         expect(context().authorizationActor).toEqual({
             userId: 7,
             employeeId: null,
@@ -73,19 +81,55 @@ describe("Department authorization migration adapter", () => {
         } satisfies AuthorizationActor);
     });
 
-    it("preserves eligible-user compatibility only for NO_APPLICABLE_GRANT", async () => {
+    it("composes the USER default policy when no configured grant applies", async () => {
         mocks.resolve.mockResolvedValue(
             decision("department.read", false, [], "NO_APPLICABLE_GRANT"),
         );
 
-        const result = await resolveDepartmentCapabilityForMigration(
+        const result = await resolveDepartmentCapability(
             context(),
             "department.read",
         );
 
+        expect(result.defaultScopes).toEqual(["ALL"]);
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(true);
         expect(assertDepartmentCapabilityScope(result, "ALL")).toBe(result);
+    });
+
+    it("retains the default policy after a configured grant is removed", async () => {
+        mocks.resolve
+            .mockResolvedValueOnce(
+                decision("department.read", false, [], "NO_APPLICABLE_GRANT"),
+            )
+            .mockResolvedValueOnce(
+                decision(
+                    "department.read",
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [grant("department.read", { type: "USER", userId: 7 })],
+                ),
+            )
+            .mockResolvedValueOnce(
+                decision("department.read", false, [], "NO_APPLICABLE_GRANT"),
+            );
+
+        const withoutGrant = await resolveDepartmentCapability(
+            context(),
+            "department.read",
+        );
+        const withGrant = await resolveDepartmentCapability(
+            context(),
+            "department.read",
+        );
+        const afterRemoval = await resolveDepartmentCapability(
+            context(),
+            "department.read",
+        );
+
+        expect(withoutGrant.scopes).toEqual(["ALL"]);
+        expect(withGrant.scopes).toEqual(["ALL"]);
+        expect(afterRemoval.scopes).toEqual(["ALL"]);
     });
 
     it.each([
@@ -103,14 +147,14 @@ describe("Department authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveDepartmentCapabilityForMigration(
+        const result = await resolveDepartmentCapability(
             context(),
             "department.read",
         );
 
         expect(result.actor.systemRole).toBe("USER");
+        expect(result.defaultScopes).toEqual(["ALL"]);
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(false);
     });
 
     it("accepts ADMIN through the central resolver rather than a feature-local role check", async () => {
@@ -124,7 +168,7 @@ describe("Department authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveDepartmentCapabilityForMigration(
+        const result = await resolveDepartmentCapability(
             context("ADMIN"),
             "department.read",
         );
@@ -133,7 +177,8 @@ describe("Department authorization migration adapter", () => {
             context("ADMIN").authorizationActor,
             "department.read",
         );
-        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(result.defaultScopes).toEqual([]);
+        expect(result.scopes).toEqual(["ALL"]);
     });
 
     it("does not bridge structural denials or resolver failures", async () => {
@@ -143,32 +188,44 @@ describe("Department authorization migration adapter", () => {
             );
 
             await expect(
-                resolveDepartmentCapabilityForMigration(context(), "department.read"),
+                resolveDepartmentCapability(context(), "department.read"),
             ).rejects.toMatchObject({
                 authorizationReason: reason,
                 statusCode: 403,
             });
         }
 
-        const resolverFailure = new Error("authorization persistence failure");
+        mocks.resolve.mockResolvedValue(
+            decision("department.unknown", false, [], "UNKNOWN_CAPABILITY"),
+        );
+        await expect(
+            resolveDepartmentCapability(context(), "department.unknown"),
+        ).rejects.toMatchObject({
+            authorizationReason: "UNKNOWN_CAPABILITY",
+            capability: "department.unknown",
+        });
+
+        const resolverFailure = new AuthorizationConfigurationError(
+            "UNSUPPORTED_PERSISTED_SCOPE",
+            "invalid persisted grant configuration",
+        );
         mocks.resolve.mockRejectedValue(resolverFailure);
         await expect(
-            resolveDepartmentCapabilityForMigration(context(), "department.read"),
+            resolveDepartmentCapability(context(), "department.read"),
         ).rejects.toBe(resolverFailure);
     });
 
-    it("requires the registered ALL scope", async () => {
+    it("cannot be narrowed by a configured scope", async () => {
         mocks.resolve.mockResolvedValue(
             decision("department.read", true, ["OWN"]),
         );
 
-        const result = await resolveDepartmentCapabilityForMigration(
+        const result = await resolveDepartmentCapability(
             context(),
             "department.read",
         );
 
-        expect(() => assertDepartmentCapabilityScope(result, "ALL")).toThrow(
-            DepartmentCapabilityDeniedError,
-        );
+        expect(result.scopes).toEqual(["ALL"]);
+        expect(assertDepartmentCapabilityScope(result, "ALL")).toBe(result);
     });
 });

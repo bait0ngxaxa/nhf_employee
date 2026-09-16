@@ -13,6 +13,9 @@ type CapabilityAdministrationMetadata =
         readonly runtimeAuthorizationMode: "CENTRAL_ONLY";
     }
     | {
+        readonly runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY";
+    }
+    | {
         readonly runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY";
         readonly nonGrantableReason: string;
     }
@@ -23,6 +26,10 @@ type CapabilityAdministrationMetadata =
 
 const CENTRAL_ONLY: CapabilityAdministrationMetadata = Object.freeze({
     runtimeAuthorizationMode: "CENTRAL_ONLY" as const,
+});
+
+const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.freeze({
+    runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY" as const,
 });
 
 const ROUTINE_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
@@ -49,18 +56,6 @@ const EMPLOYEE_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
         "The current Employee adapter may translate NO_APPLICABLE_GRANT into a compatibility scope; ordinary grants require explicit policy activation.",
 });
 
-const DEPARTMENT_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
-    nonGrantableReason:
-        "The current Department adapter may translate NO_APPLICABLE_GRANT into the legacy reference-data scope; ordinary grants require explicit policy activation.",
-});
-
-const NOTIFICATION_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
-    nonGrantableReason:
-        "The current Notification adapter may translate NO_APPLICABLE_GRANT into the legacy OWN scope; ordinary grants require explicit policy activation.",
-});
-
 const DEFERRED_ROUTINE: CapabilityAdministrationMetadata = Object.freeze({
     runtimeAuthorizationMode: "DEFERRED" as const,
     nonGrantableReason:
@@ -77,10 +72,12 @@ const DEFERRED_EMAIL: CapabilityAdministrationMetadata = Object.freeze({
  * Administration-only operational metadata. Capability identity, description,
  * scopes, and channels remain exclusively owned by CAPABILITY_REGISTRY.
  *
- * CENTRAL_WITH_COMPATIBILITY is assigned only where the audited domain
- * adapter still translates NO_APPLICABLE_GRANT for a normal production user.
- * An ADMIN-only legacy branch does not qualify: ADMIN is already resolved by
- * the central system-role rule.
+ * CENTRAL_WITH_DEFAULT_POLICY is assigned where the audited domain adapter
+ * composes a permanent normal-user default with central configured authority.
+ * CENTRAL_WITH_COMPATIBILITY remains for adapters that still translate
+ * NO_APPLICABLE_GRANT through temporary migration mechanics. An ADMIN-only
+ * legacy branch does not qualify: ADMIN is already resolved by the central
+ * system-role rule.
  *
  * Keep this map exhaustive: a newly registered capability must receive an
  * explicit administration decision before it can be presented as grantable.
@@ -95,7 +92,7 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "employee.delete": CENTRAL_ONLY,
     "employee.import": CENTRAL_ONLY,
     "employee.export": EMPLOYEE_COMPATIBILITY,
-    "department.read": DEPARTMENT_COMPATIBILITY,
+    "department.read": CENTRAL_WITH_DEFAULT_POLICY,
 
     "routine.task.read": ROUTINE_COMPATIBILITY,
     "routine.task.create": ROUTINE_COMPATIBILITY,
@@ -132,8 +129,8 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "email.request.read": DEFERRED_EMAIL,
     "email.request.create": DEFERRED_EMAIL,
 
-    "notification.inbox.read": NOTIFICATION_COMPATIBILITY,
-    "notification.inbox.update": NOTIFICATION_COMPATIBILITY,
+    "notification.inbox.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "notification.inbox.update": CENTRAL_WITH_DEFAULT_POLICY,
 });
 
 function getAdministrativeStatus(
@@ -141,6 +138,8 @@ function getAdministrativeStatus(
 ): CapabilityAdministrationProjection["administrativeStatus"] {
     switch (runtimeAuthorizationMode) {
         case "CENTRAL_ONLY":
+            return "GRANTABLE";
+        case "CENTRAL_WITH_DEFAULT_POLICY":
             return "GRANTABLE";
         case "CENTRAL_WITH_COMPATIBILITY":
             return "POLICY_ACTIVATION_REQUIRED";

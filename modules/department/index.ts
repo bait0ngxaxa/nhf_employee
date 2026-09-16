@@ -8,19 +8,19 @@ export type {
     DepartmentReference,
 } from "./application/queries";
 export {
-    assertDepartmentCapabilityForMigration,
+    assertDepartmentCapability,
     assertDepartmentCapabilityScope,
     buildDepartmentAuthorizationActor,
     buildDepartmentAuthorizationContext,
     DepartmentCapabilityDeniedError,
-    DEPARTMENT_MIGRATED_CAPABILITIES,
+    DEPARTMENT_CAPABILITIES,
     getDepartmentPresentationCapabilities,
-    resolveDepartmentCapabilityForMigration,
+    resolveDepartmentCapability,
 } from "./application/authorization";
 export type {
     DepartmentAuthorizationActor,
     DepartmentAuthorizationContext,
     DepartmentCapabilityAuthorization,
-    DepartmentMigratedCapability,
+    DepartmentCapability,
 } from "./application/authorization";
 export type { DepartmentPresentationCapabilities } from "./application/types";

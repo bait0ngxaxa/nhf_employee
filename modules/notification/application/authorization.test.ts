@@ -6,24 +6,33 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import { AuthorizationConfigurationError } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 import {
     assertNotificationCapabilityScope,
     buildNotificationAuthorizationContext,
     NotificationCapabilityDeniedError,
-    NOTIFICATION_MIGRATED_CAPABILITIES,
-    resolveNotificationCapabilityForMigration,
+    NOTIFICATION_CAPABILITIES,
+    resolveNotificationCapability,
 } from "./authorization";
 
 const mocks = vi.hoisted(() => ({
     resolve: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: mocks.resolve,
-    },
-}));
+vi.mock("@/modules/authorization", async () => {
+    const actual = await vi.importActual<typeof AuthorizationModule>(
+        "@/modules/authorization",
+    );
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: mocks.resolve,
+        },
+    };
+});
 
 function context(
     role: "ADMIN" | "USER" = "USER",
@@ -58,13 +67,13 @@ function grant(
     };
 }
 
-describe("Notification authorization migration adapter", () => {
+describe("Notification authorization default-policy adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
     });
 
     it("keeps both registered capabilities and the trusted Dashboard actor mapping", () => {
-        expect(NOTIFICATION_MIGRATED_CAPABILITIES).toEqual([
+        expect(NOTIFICATION_CAPABILITIES).toEqual([
             "notification.inbox.read",
             "notification.inbox.update",
         ]);
@@ -76,29 +85,66 @@ describe("Notification authorization migration adapter", () => {
         } satisfies AuthorizationActor);
     });
 
-    it.each(NOTIFICATION_MIGRATED_CAPABILITIES)(
-        "preserves own-inbox compatibility for %s only when no grant applies",
+    it.each(NOTIFICATION_CAPABILITIES)(
+        "composes the own-inbox default policy for %s when no grant applies",
         async (capability) => {
             mocks.resolve.mockResolvedValue(
                 decision(capability, false, [], "NO_APPLICABLE_GRANT"),
             );
 
-            const result = await resolveNotificationCapabilityForMigration(
+            const result = await resolveNotificationCapability(
                 context(),
                 capability,
             );
 
+            expect(result.defaultScopes).toEqual(["OWN"]);
             expect(result.scopes).toEqual(["OWN"]);
-            expect(result.usedMigrationCompatibility).toBe(true);
         },
     );
+
+    it("retains the own-inbox default policy after a configured grant is removed", async () => {
+        const capability = "notification.inbox.read" as const;
+        mocks.resolve
+            .mockResolvedValueOnce(
+                decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+            )
+            .mockResolvedValueOnce(
+                decision(
+                    capability,
+                    true,
+                    ["OWN"],
+                    undefined,
+                    [grant(capability, { type: "USER", userId: 7 })],
+                ),
+            )
+            .mockResolvedValueOnce(
+                decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+            );
+
+        const withoutGrant = await resolveNotificationCapability(
+            context(),
+            capability,
+        );
+        const withGrant = await resolveNotificationCapability(
+            context(),
+            capability,
+        );
+        const afterRemoval = await resolveNotificationCapability(
+            context(),
+            capability,
+        );
+
+        expect(withoutGrant.scopes).toEqual(["OWN"]);
+        expect(withGrant.scopes).toEqual(["OWN"]);
+        expect(afterRemoval.scopes).toEqual(["OWN"]);
+    });
 
     it.each([
         ["USER", { type: "USER", userId: 7 }],
         ["TEAM", { type: "TEAM", teamId: 3 }],
         ["TEAM_ROLE", { type: "TEAM_ROLE", teamId: 3, teamRoleId: 4 }],
     ] as const)("honors an explicit central %s grant without broadening OWN", async (_source, source) => {
-        for (const capability of NOTIFICATION_MIGRATED_CAPABILITIES) {
+        for (const capability of NOTIFICATION_CAPABILITIES) {
             mocks.resolve.mockResolvedValue(
                 decision(
                     capability,
@@ -109,14 +155,14 @@ describe("Notification authorization migration adapter", () => {
                 ),
             );
 
-            const result = await resolveNotificationCapabilityForMigration(
+            const result = await resolveNotificationCapability(
                 context(),
                 capability,
             );
 
             expect(result.actor.systemRole).toBe("USER");
+            expect(result.defaultScopes).toEqual(["OWN"]);
             expect(result.scopes).toEqual(["OWN"]);
-            expect(result.usedMigrationCompatibility).toBe(false);
         }
     });
 
@@ -134,25 +180,26 @@ describe("Notification authorization migration adapter", () => {
             .mockResolvedValueOnce(
                 decision(
                     "notification.inbox.update",
-                    false,
-                    [],
-                    "NO_APPLICABLE_GRANT",
+                    true,
+                    ["OWN"],
+                    undefined,
+                    [grant("notification.inbox.update", { type: "SYSTEM_ROLE", role: "ADMIN" })],
                 ),
             );
 
-        const read = await resolveNotificationCapabilityForMigration(
+        const read = await resolveNotificationCapability(
             context("ADMIN"),
             "notification.inbox.read",
         );
-        const update = await resolveNotificationCapabilityForMigration(
-            context(),
+        const update = await resolveNotificationCapability(
+            context("ADMIN"),
             "notification.inbox.update",
         );
 
+        expect(read.defaultScopes).toEqual([]);
         expect(read.scopes).toEqual(["OWN"]);
-        expect(read.usedMigrationCompatibility).toBe(false);
+        expect(update.defaultScopes).toEqual([]);
         expect(update.scopes).toEqual(["OWN"]);
-        expect(update.usedMigrationCompatibility).toBe(true);
         expect(mocks.resolve).toHaveBeenNthCalledWith(
             1,
             context("ADMIN").authorizationActor,
@@ -160,7 +207,7 @@ describe("Notification authorization migration adapter", () => {
         );
         expect(mocks.resolve).toHaveBeenNthCalledWith(
             2,
-            context().authorizationActor,
+            context("ADMIN").authorizationActor,
             "notification.inbox.update",
         );
     });
@@ -172,17 +219,30 @@ describe("Notification authorization migration adapter", () => {
             );
 
             await expect(
-                resolveNotificationCapabilityForMigration(
+                resolveNotificationCapability(
                     context(),
                     "notification.inbox.read",
                 ),
-            ).rejects.toMatchObject({ authorizationReason: reason });
+                ).rejects.toMatchObject({ authorizationReason: reason });
         }
 
-        const resolverFailure = new Error("authorization persistence failure");
+        mocks.resolve.mockResolvedValue(
+            decision("notification.unknown", false, [], "UNKNOWN_CAPABILITY"),
+        );
+        await expect(
+            resolveNotificationCapability(context(), "notification.unknown"),
+        ).rejects.toMatchObject({
+            authorizationReason: "UNKNOWN_CAPABILITY",
+            capability: "notification.unknown",
+        });
+
+        const resolverFailure = new AuthorizationConfigurationError(
+            "UNSUPPORTED_PERSISTED_SCOPE",
+            "invalid persisted grant configuration",
+        );
         mocks.resolve.mockRejectedValue(resolverFailure);
         await expect(
-            resolveNotificationCapabilityForMigration(
+            resolveNotificationCapability(
                 context(),
                 "notification.inbox.read",
             ),
@@ -194,7 +254,7 @@ describe("Notification authorization migration adapter", () => {
             decision("notification.inbox.read", true, ["ALL"]),
         );
 
-        const result = await resolveNotificationCapabilityForMigration(
+        const result = await resolveNotificationCapability(
             context(),
             "notification.inbox.read",
         );
