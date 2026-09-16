@@ -552,6 +552,68 @@ describe("Stock authorization migration adapter", () => {
         expect(result.scopes).toEqual(["OWN"]);
     });
 
+    it("denies Dashboard ADMIN compatibility after the persisted role is downgraded to USER", async () => {
+        const tx = {
+            user: {
+                findUnique: vi.fn().mockResolvedValue({
+                    id: 7,
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                    employee: {
+                        id: 21,
+                        status: "ACTIVE",
+                        deletedAt: null,
+                    },
+                }),
+            },
+        } as never;
+        const staleActor = commandActor(context("ADMIN"));
+        mocks.resolveInTransaction.mockImplementation(
+            async (
+                authorizationActor: AuthorizationActor,
+            ): Promise<AuthorizationDecision> => authorizationActor.systemRole === "ADMIN"
+                ? decision(
+                    "stock.inventory.manage",
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [systemRoleGrant("stock.inventory.manage")],
+                )
+                : decision(
+                    "stock.inventory.manage",
+                    false,
+                    [],
+                    "NO_APPLICABLE_GRANT",
+                ),
+        );
+        expect(staleActor.authorization.authorizationActor.systemRole).toBe(
+            "ADMIN",
+        );
+
+        await expect(
+            resolveStockCapabilityInTransaction(
+                tx,
+                staleActor,
+                "stock.inventory.manage",
+            ),
+        ).rejects.toMatchObject({
+            capability: "stock.inventory.manage",
+            authorizationReason: "NO_APPLICABLE_GRANT",
+            statusCode: 403,
+        });
+        expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
+            {
+                userId: 7,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            "stock.inventory.manage",
+            tx,
+        );
+    });
+
     it.each([
         "stock.inventory.manage",
         "stock.request.process",

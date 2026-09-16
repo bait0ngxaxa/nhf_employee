@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -13,6 +14,7 @@ import {
     buildRoutineOccurrenceScope,
     buildRoutineTaskScope,
     assertActiveEmployeesInTransaction,
+    assertActiveRoutineActorInTransaction,
     resolveRoutineCapabilityForMigration,
     resolveRoutineCapabilityInTransaction,
     type RoutineMigratedCapability,
@@ -110,6 +112,102 @@ describe("Routine authorization migration adapter", () => {
             systemRole: "ADMIN",
             channel: "LIFF_SELF_SERVICE",
         } satisfies AuthorizationActor);
+    });
+
+    it("rebuilds a stale Dashboard ADMIN route actor from the current persisted USER role", async () => {
+        const tx = {
+            user: {
+                findUnique: vi.fn().mockResolvedValue({
+                    id: 7,
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                    employee: {
+                        id: 21,
+                        status: "ACTIVE",
+                        deletedAt: null,
+                    },
+                }),
+            },
+        } as unknown as Prisma.TransactionClient;
+        const routeActor = actor({ role: "ADMIN" });
+
+        const result = await assertActiveRoutineActorInTransaction(
+            tx,
+            routeActor,
+        );
+
+        expect(routeActor.role).toBe("ADMIN");
+        expect(result.authorizationActor).toEqual({
+            userId: 7,
+            employeeId: 21,
+            systemRole: "USER",
+            channel: "DASHBOARD",
+        });
+        expect(result.authorizationActor.systemRole).not.toBe(routeActor.role);
+    });
+
+    it("uses the revalidated Routine actor for the final capability decision", async () => {
+        const tx = {
+            user: {
+                findUnique: vi.fn().mockResolvedValue({
+                    id: 7,
+                    role: "USER",
+                    isActive: true,
+                    deletedAt: null,
+                    employee: {
+                        id: 21,
+                        status: "ACTIVE",
+                        deletedAt: null,
+                    },
+                }),
+            },
+        } as unknown as Prisma.TransactionClient & AuthorizationPersistenceContext;
+        const routeActor = actor({ role: "ADMIN" });
+        mocks.resolveInTransaction.mockImplementation(
+            async (
+                authorizationActor: AuthorizationActor,
+            ): Promise<AuthorizationDecision> =>
+                authorizationActor.systemRole === "ADMIN"
+                    ? decision(
+                        "routine.occurrence.override",
+                        true,
+                        ["ALL"],
+                        undefined,
+                        [systemRoleGrant("routine.occurrence.override")],
+                    )
+                    : decision(
+                        "routine.occurrence.override",
+                        false,
+                        [],
+                        "NO_APPLICABLE_GRANT",
+                    ),
+        );
+
+        const activeActor = await assertActiveRoutineActorInTransaction(
+            tx,
+            routeActor,
+        );
+
+        await expect(
+            resolveRoutineCapabilityInTransaction(
+                tx,
+                activeActor,
+                "routine.occurrence.override",
+            ),
+        ).rejects.toMatchObject({
+            authorizationReason: "NO_APPLICABLE_GRANT",
+            statusCode: 403,
+        });
+        expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
+            activeActor.authorizationActor,
+            "routine.occurrence.override",
+            tx,
+        );
+        expect(activeActor.authorizationActor.systemRole).toBe("USER");
+        expect(activeActor.authorizationActor.systemRole).not.toBe(
+            routeActor.role,
+        );
     });
 
     it("uses the public resolver and applies only the frozen USER task bridge when no grant exists", async () => {

@@ -14,6 +14,7 @@ import {
     buildLeaveAuthorizationContext,
     canUseLeaveAdminRecoveryOverride,
     LEAVE_MIGRATED_CAPABILITIES,
+    resolveLeaveActorInTransaction,
     resolveLeaveCapabilityForMigration,
     resolveLeaveCapabilityInTransaction,
 } from "./authorization";
@@ -73,6 +74,14 @@ function userGrant(
         capability: capability as EffectiveAuthorizationGrant["capability"],
         scope,
         source: { type: "USER", userId: 7 },
+    };
+}
+
+function systemRoleGrant(capability: string): EffectiveAuthorizationGrant {
+    return {
+        capability: capability as EffectiveAuthorizationGrant["capability"],
+        scope: "ALL",
+        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
     };
 }
 
@@ -296,6 +305,28 @@ describe("Leave authorization migration adapter", () => {
         expect(result.scopes).toEqual(["OWN"]);
     });
 
+    it("rebuilds a stale Dashboard ADMIN route actor from the current persisted USER role", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(activeUser("USER", 21)),
+            },
+        } as unknown as Prisma.TransactionClient;
+        const staleContext = context("ADMIN", "DASHBOARD", 21);
+
+        const result = await resolveLeaveActorInTransaction(tx, staleContext);
+
+        expect(staleContext.authorizationActor.systemRole).toBe("ADMIN");
+        expect(result).toEqual({
+            userId: 7,
+            employeeId: 21,
+            systemRole: "USER",
+            channel: "DASHBOARD",
+        });
+        expect(result.systemRole).not.toBe(
+            staleContext.authorizationActor.systemRole,
+        );
+    });
+
     it("fails closed when the active workforce identity is revoked before mutation", async () => {
         const tx = {
             user: {
@@ -310,6 +341,76 @@ describe("Leave authorization migration adapter", () => {
                 "leave.request.cancel",
             ),
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("uses the current USER actor for final authorization after a stale ADMIN preflight", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(activeUser("USER", 21)),
+            },
+        } as unknown as Prisma.TransactionClient;
+        const staleContext = context("ADMIN", "DASHBOARD", 21);
+        mocks.resolveInTransaction.mockImplementation(
+            async (
+                authorizationActor: AuthorizationActor,
+            ): Promise<AuthorizationDecision> => authorizationActor.systemRole === "ADMIN"
+                ? decision(
+                    "leave.approver.manage",
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [systemRoleGrant("leave.approver.manage")],
+                )
+                : decision(
+                    "leave.approver.manage",
+                    false,
+                    [],
+                    "NO_APPLICABLE_GRANT",
+                ),
+        );
+        expect(staleContext.authorizationActor.systemRole).toBe("ADMIN");
+
+        await expect(
+            resolveLeaveCapabilityInTransaction(
+                tx,
+                staleContext,
+                "leave.approver.manage",
+            ),
+        ).rejects.toMatchObject({
+            capability: "leave.approver.manage",
+            authorizationReason: "NO_APPLICABLE_GRANT",
+            statusCode: 403,
+        });
+        expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
+            {
+                userId: 7,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            "leave.approver.manage",
+            tx,
+        );
+    });
+
+    it("revalidates the current Employee relationship after a valid preflight actor changes", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(activeUser("USER", 22)),
+            },
+        } as unknown as Prisma.TransactionClient;
+        const preflightContext = context("USER", "DASHBOARD", 21);
+
+        await expect(
+            resolveLeaveCapabilityInTransaction(
+                tx,
+                preflightContext,
+                "leave.request.cancel",
+            ),
+        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
+        expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [21]);
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 
