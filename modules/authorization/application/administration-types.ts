@@ -4,9 +4,11 @@ import type {
     AuthorizationChannel,
     AuthorizationDomain,
     AuthorizationScope,
+    AuthorizationActor,
 } from "../contracts";
 import type { RegisteredCapabilityKey } from "../registry";
 import type {
+    AuthorizationDecision,
     AuthorizationDecisionReason,
     AuthorizationGrantSource,
 } from "./types";
@@ -259,6 +261,101 @@ export type AuthorizationAdministrationResolverEffectivePermissionStatus =
         readonly error: AuthorizationAdministrationResolutionError;
     };
 
+export type AuthorizationAdministrationEffectiveAccessState =
+    | "AVAILABLE"
+    | "UNAVAILABLE"
+    | "UNSUPPORTED"
+    | "DEFERRED";
+
+/**
+ * A trusted, code-owned runtime intent used by a domain inspector. This is
+ * deliberately not a browser-supplied scope or authorization decision.
+ */
+export interface AuthorizationAdministrationInspectionContext {
+    readonly key: string;
+    readonly label: string;
+    readonly channel: AuthorizationChannel;
+}
+
+export interface AuthorizationAdministrationEffectiveAccessLimitation {
+    readonly code: string;
+    readonly label: string;
+}
+
+/**
+ * Domain-owned inspection output. The configured decision remains the raw
+ * resolver result; `effectiveScopes` is produced by the domain's runtime
+ * composition and channel policy.
+ */
+export interface AuthorizationAdministrationEffectiveAccessInspection {
+    readonly capability: RegisteredCapabilityKey;
+    readonly context: AuthorizationAdministrationInspectionContext;
+    readonly defaultScopes: readonly AuthorizationScope[];
+    readonly configuredDecision: AuthorizationDecision | null;
+    /** Additive composition result before any domain channel clamp. */
+    readonly composedScopes: readonly AuthorizationScope[];
+    readonly effectiveScopes: readonly AuthorizationScope[];
+    readonly state: AuthorizationAdministrationEffectiveAccessState;
+    readonly limitations: readonly AuthorizationAdministrationEffectiveAccessLimitation[];
+}
+
+export interface AuthorizationAdministrationEffectiveAccessProviderInput {
+    readonly actor: AuthorizationActor;
+    readonly dashboardDecisions: ReadonlyMap<string, AuthorizationDecision>;
+    readonly resolver: Pick<AuthorizationResolver, "resolveMany">;
+}
+
+/**
+ * Structural port consumed by the generic Administration read model. Domain
+ * implementations are bound by the outer application composition layer so
+ * the authorization core does not import every business domain.
+ */
+export interface AuthorizationAdministrationEffectiveAccessProvider {
+    inspect(
+        input: AuthorizationAdministrationEffectiveAccessProviderInput,
+    ): Promise<readonly AuthorizationAdministrationEffectiveAccessInspection[]>;
+}
+
+export interface AuthorizationAdministrationDefaultAuthority {
+    readonly scopes: readonly AuthorizationScope[];
+}
+
+export interface AuthorizationAdministrationAdditionalAuthority {
+    readonly scopes: readonly AuthorizationScope[];
+    readonly grants: readonly AuthorizationAdministrationResolverEffectiveGrant[];
+    readonly reason?: AuthorizationDecisionReason;
+}
+
+export interface AuthorizationAdministrationEffectiveAuthority {
+    readonly state: AuthorizationAdministrationEffectiveAccessState;
+    readonly scopes: readonly AuthorizationScope[];
+    /** True when configured authority is present but adds no normalized scope. */
+    readonly redundant: boolean;
+}
+
+export interface AuthorizationAdministrationEffectiveAccessRow {
+    readonly capability: CapabilityAdministrationProjection;
+    readonly context: AuthorizationAdministrationInspectionContext;
+    readonly defaultAuthority: AuthorizationAdministrationDefaultAuthority;
+    readonly additionalAuthority: AuthorizationAdministrationAdditionalAuthority;
+    readonly effectiveAuthority: AuthorizationAdministrationEffectiveAuthority;
+    readonly limitations: readonly AuthorizationAdministrationEffectiveAccessLimitation[];
+}
+
+export type AuthorizationAdministrationEffectiveAccessStatus =
+    AuthorizationAdministrationResolverEffectivePermissionStatus;
+
+export interface AuthorizationAdministrationEffectiveAccessSummary {
+    /** Counts are context rows, except deferredCapabilityCount. */
+    readonly inspectedContextCount: number;
+    readonly availableContextCount: number;
+    readonly defaultBackedContextCount: number;
+    readonly additionalAuthorityContextCount: number;
+    readonly unsupportedContextCount: number;
+    readonly deferredCapabilityCount: number;
+    readonly configurationIssueCount: number;
+}
+
 export interface AuthorizationAdministrationUserDetail {
     readonly user: AuthorizationAdministrationAccountIdentity;
     readonly systemRole: UserRole;
@@ -266,8 +363,12 @@ export interface AuthorizationAdministrationUserDetail {
     readonly directGrants: readonly AuthorizationAdministrationGrantProjection[];
     /** Central resolver results; not a final domain/runtime access decision. */
     readonly resolverEffectivePermissionStatus: AuthorizationAdministrationResolverEffectivePermissionStatus;
-    /** Central resolver results; domain defaults or compatibility policies may still apply. */
+    /** Central resolver results only; domain-owned defaults may still apply. */
     readonly resolverEffectivePermissions: readonly AuthorizationAdministrationResolverEffectivePermission[];
+    /** Domain-composed capability authority; not a final resource/workflow decision. */
+    readonly effectiveAccessStatus: AuthorizationAdministrationEffectiveAccessStatus;
+    readonly effectiveAccess: readonly AuthorizationAdministrationEffectiveAccessRow[];
+    readonly effectiveAccessSummary: AuthorizationAdministrationEffectiveAccessSummary;
     readonly configurationIssues: readonly AuthorizationAdministrationConfigurationIssue[];
 }
 
@@ -346,4 +447,10 @@ export interface AuthorizationAdministrationRepository {
 export interface AuthorizationAdministrationQueryDependencies {
     readonly repository?: AuthorizationAdministrationRepository;
     readonly resolver?: Pick<AuthorizationResolver, "resolveMany">;
+}
+
+export interface AuthorizationAdministrationUserQueryDependencies
+    extends AuthorizationAdministrationQueryDependencies {
+    /** Required for User detail; bound only by the outer application layer. */
+    readonly effectiveAccessProvider: AuthorizationAdministrationEffectiveAccessProvider;
 }

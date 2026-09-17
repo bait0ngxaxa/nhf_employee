@@ -85,7 +85,7 @@ export function buildNotificationAuthorizationContext(
     });
 }
 
-function defaultNotificationScopes(
+export function defaultNotificationScopes(
     capability: NotificationCapability,
 ): readonly AuthorizationScope[] {
     switch (capability) {

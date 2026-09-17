@@ -19,6 +19,7 @@ export {
     getAuditPresentationCapabilities,
     resolveAuditCapabilityForMigration,
 } from "./application/authorization";
+export { inspectAuditEffectiveAccess } from "./application/effective-access";
 export type {
     AuditAuthorizationActor,
     AuditAuthorizationContext,

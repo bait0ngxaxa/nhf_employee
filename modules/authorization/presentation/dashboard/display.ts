@@ -5,6 +5,34 @@ import type {
     ClientDate,
 } from "./types";
 
+export function getAuthorizationChannelLabel(
+    channel: "DASHBOARD" | "LIFF_SELF_SERVICE" | "SYSTEM",
+): string {
+    switch (channel) {
+        case "DASHBOARD":
+            return "DASHBOARD";
+        case "LIFF_SELF_SERVICE":
+            return "LIFF_SELF_SERVICE";
+        case "SYSTEM":
+            return "SYSTEM";
+    }
+}
+
+export function getEffectiveAccessStateLabel(
+    state: "AVAILABLE" | "UNAVAILABLE" | "UNSUPPORTED" | "DEFERRED",
+): string {
+    switch (state) {
+        case "AVAILABLE":
+            return "AVAILABLE · มี authority";
+        case "UNAVAILABLE":
+            return "UNAVAILABLE · ไม่มี authority";
+        case "UNSUPPORTED":
+            return "UNSUPPORTED · ไม่รองรับ context นี้";
+        case "DEFERRED":
+            return "DEFERRED · ยังไม่ migrate";
+    }
+}
+
 export const authorizationTabLabels = {
     overview: "ภาพรวมและ Teams",
     users: "ผู้ใช้และสิทธิ์",

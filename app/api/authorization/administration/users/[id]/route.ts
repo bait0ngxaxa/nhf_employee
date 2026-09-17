@@ -9,6 +9,9 @@ import {
     notFound,
     operationFailed,
 } from "@/lib/ssot/http";
+import {
+    authorizationAdministrationEffectiveAccessProvider,
+} from "../../_lib/effective-access";
 import { parseAdministrationId } from "../../_lib/route-input";
 import { requireAuthorizationAdministrationApiSession } from "../../_lib/route-auth";
 
@@ -27,6 +30,7 @@ export async function GET(
         const user = await getAuthorizationAdministrationUser(
             auth.principal,
             parsedId.id,
+            { effectiveAccessProvider: authorizationAdministrationEffectiveAccessProvider },
         );
         if (user === null) return notFound();
 

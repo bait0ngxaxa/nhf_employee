@@ -150,6 +150,7 @@ describe("Authorization Administration API boundary", () => {
         expect(mocks.getUser).toHaveBeenCalledWith(
             { userId: 41, systemRole: "ADMIN" },
             7,
+            { effectiveAccessProvider: expect.objectContaining({ inspect: expect.any(Function) }) },
         );
     });
 

@@ -74,6 +74,11 @@ export type {
     ComposedAuthorizationAuthority,
 } from "./application/composition";
 export {
+    createDeferredAuthorizationAdministrationInspection,
+    createUnsupportedAuthorizationAdministrationInspection,
+    projectAuthorizationAdministrationEffectiveAccess,
+} from "./application/administration-effective-access";
+export {
     assertAuthorizationAdministrationAccess,
     getAuthorizationAdministrationCapabilityCatalog,
     getAuthorizationAdministrationOverview,
@@ -86,6 +91,18 @@ export { buildCapabilityAdministrationCatalog } from "./application/administrati
 export type {
     AuthorizationAdministrationAccountIdentity,
     AuthorizationAdministrationConfigurationIssue,
+    AuthorizationAdministrationAdditionalAuthority,
+    AuthorizationAdministrationDefaultAuthority,
+    AuthorizationAdministrationEffectiveAccessInspection,
+    AuthorizationAdministrationEffectiveAccessLimitation,
+    AuthorizationAdministrationEffectiveAccessProvider,
+    AuthorizationAdministrationEffectiveAccessProviderInput,
+    AuthorizationAdministrationEffectiveAccessRow,
+    AuthorizationAdministrationEffectiveAccessState,
+    AuthorizationAdministrationEffectiveAccessStatus,
+    AuthorizationAdministrationEffectiveAccessSummary,
+    AuthorizationAdministrationEffectiveAuthority,
+    AuthorizationAdministrationInspectionContext,
     AuthorizationAdministrationResolverEffectiveGrant,
     AuthorizationAdministrationResolverEffectivePermission,
     AuthorizationAdministrationGrantProjection,
@@ -108,6 +125,7 @@ export type {
     AuthorizationAdministrationTeamSummary,
     AuthorizationAdministrationUserSummary,
     AuthorizationAdministrationUserDetail,
+    AuthorizationAdministrationUserQueryDependencies,
     AuthorizationAdministrationUserTeamMembership,
     CapabilityAdministrationProjection,
     CapabilityAdministrationStatus,

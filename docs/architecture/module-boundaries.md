@@ -111,7 +111,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## Authorization Administration boundary (Phase 10C)
+## Authorization Administration boundary (Phase 10C + Phase 12E)
 
 `modules/authorization/` owns the Authorization Administration application
 contract. Its capability administration catalog is a projection of the
@@ -149,10 +149,27 @@ presentation filter; direct route and API checks remain authoritative.
 The workspace preserves exact Team, TeamRole, membership, and direct User grant
 operations, exposes registry readiness and invalid persisted configuration,
 and labels resolver-effective permissions as central-resolver output rather
-than universal final runtime access. `CENTRAL_WITH_COMPATIBILITY` receives an
-explicit warning. Phase 10C does not activate Team policy, retire compatibility
-floors, add delegated authorization capabilities, or infer Team membership from
-Department, manager, position, or employee state.
+than universal final runtime access. `CENTRAL_WITH_COMPATIBILITY` remains a
+historical/future-safe catalog contract; the current live catalog has no active
+compatibility capability. Phase 10C does not activate Team policy, retire
+compatibility floors, add delegated authorization capabilities, or infer Team
+membership from Department, manager, position, or employee state.
+
+Phase 12E adds the effective-access inspection without changing that boundary.
+The consuming Administration contract defines the structural
+`AuthorizationAdministrationEffectiveAccessProvider` port. Domain-owned
+inspectors for Department, Notification, Employee, Routine, Stock, Leave, and
+Audit are exported through their public module entries and are bound only in
+the outer `app/api/authorization/administration/_lib/effective-access.ts`
+composition. The generic authorization module and its React presentation must
+not import every business domain or reproduce a default-scope matrix.
+
+The provider receives trusted server-side actor/context state and bounded
+batched resolver results. It emits only registered `DASHBOARD` and
+`LIFF_SELF_SERVICE` inspection contexts. Raw resolver evidence remains in the
+User read model alongside the domain-composed Default + Additional + Effective
+projection. Resource, relationship, lifecycle, and workflow checks remain
+owned by the domain runtime paths.
 
 ## Notification boundary (H0/H1/H2/H3)
 

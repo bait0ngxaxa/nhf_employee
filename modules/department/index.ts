@@ -17,6 +17,7 @@ export {
     getDepartmentPresentationCapabilities,
     resolveDepartmentCapability,
 } from "./application/authorization";
+export { inspectDepartmentEffectiveAccess } from "./application/effective-access";
 export type {
     DepartmentAuthorizationActor,
     DepartmentAuthorizationContext,

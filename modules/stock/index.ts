@@ -105,6 +105,7 @@ export {
     resolveStockCapabilityInTransaction,
     STOCK_CAPABILITIES,
 } from "./application/authorization";
+export { inspectStockEffectiveAccess } from "./application/effective-access";
 export type { StockPresentationCapabilities } from "./application/types";
 export type {
     StockAuthorizationChannel,

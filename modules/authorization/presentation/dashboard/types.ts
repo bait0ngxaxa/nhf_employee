@@ -3,6 +3,8 @@ import type {
     AuthorizationAdministrationGrantProjection,
     AuthorizationAdministrationOverview,
     AuthorizationAdministrationConfigurationIssue,
+    AuthorizationAdministrationEffectiveAccessRow,
+    AuthorizationAdministrationEffectiveAccessSummary,
     AuthorizationAdministrationResolverEffectivePermission,
     AuthorizationAdministrationTeamDetail,
     AuthorizationAdministrationUserDetail,
@@ -60,6 +62,12 @@ export type AuthorizationAdministrationConfigurationIssueData = Clientize<
 >;
 export type AuthorizationAdministrationResolverPermissionData = Clientize<
     AuthorizationAdministrationResolverEffectivePermission
+>;
+export type AuthorizationAdministrationEffectiveAccessRowData = Clientize<
+    AuthorizationAdministrationEffectiveAccessRow
+>;
+export type AuthorizationAdministrationEffectiveAccessSummaryData = Clientize<
+    AuthorizationAdministrationEffectiveAccessSummary
 >;
 
 export type AuthorizationAdministrationMutationTeamData = Clientize<

@@ -14,11 +14,16 @@ import {
     searchAuthorizationAdministrationUsers,
 } from "@/modules/authorization";
 import type {
+    AuthorizationActor,
+    AuthorizationDecision,
+    AuthorizationResolver,
     AuthorizationResolutionData,
     AuthorizationResolutionRepository,
 } from "@/modules/authorization";
 import type {
     AuthorizationAdministrationTeamDetailRecord,
+    AuthorizationAdministrationEffectiveAccessInspection,
+    AuthorizationAdministrationEffectiveAccessProvider,
     AuthorizationAdministrationPrincipal,
     AuthorizationAdministrationRawUserIdentity,
     AuthorizationAdministrationRepository,
@@ -28,11 +33,16 @@ import type {
     AuthorizationAdministrationTeamRoleReference,
     AuthorizationAdministrationUserRecord,
 } from "./administration-types";
+import type { RegisteredCapabilityKey } from "../registry";
 
 const ADMIN_PRINCIPAL: AuthorizationAdministrationPrincipal = Object.freeze({
     userId: 99,
     systemRole: "ADMIN",
 });
+
+const EMPTY_EFFECTIVE_ACCESS_PROVIDER = {
+    inspect: async () => [],
+};
 
 const CREATED_AT = new Date("2026-01-01T00:00:00.000Z");
 const UPDATED_AT = new Date("2026-01-02T00:00:00.000Z");
@@ -257,6 +267,61 @@ function emptyRepository(
         findTeamById: vi.fn(async () => null),
         findUserById: vi.fn(async () => null),
         ...overrides,
+    };
+}
+
+function noGrantDecision(capability: string): AuthorizationDecision {
+    return {
+        capability,
+        allowed: false,
+        scopes: [],
+        grants: [],
+        reason: "NO_APPLICABLE_GRANT",
+    };
+}
+
+function createResolver(
+    overrides: Readonly<Record<string, AuthorizationDecision>> = {},
+): { readonly resolveMany: AuthorizationResolver["resolveMany"] } {
+    return {
+        resolveMany: vi.fn(async (
+            _actor: AuthorizationActor,
+            capabilityKeys: readonly string[],
+        ): Promise<ReadonlyMap<string, AuthorizationDecision>> => new Map(
+            capabilityKeys.map((capability): [string, AuthorizationDecision] => [
+                capability,
+                overrides[capability] ?? noGrantDecision(capability),
+            ]),
+        )),
+    };
+}
+
+function createEffectiveAccessProvider(
+    specifications: readonly {
+        readonly capability: RegisteredCapabilityKey;
+        readonly defaultScopes: readonly ("OWN" | "CREATED" | "ASSIGNED" | "TEAM" | "ALL")[];
+        readonly composedScopes: readonly ("OWN" | "CREATED" | "ASSIGNED" | "TEAM" | "ALL")[];
+        readonly effectiveScopes: readonly ("OWN" | "CREATED" | "ASSIGNED" | "TEAM" | "ALL")[];
+        readonly state: "AVAILABLE" | "UNAVAILABLE" | "UNSUPPORTED" | "DEFERRED";
+    }[],
+): AuthorizationAdministrationEffectiveAccessProvider {
+    return {
+        inspect: vi.fn(async ({ dashboardDecisions }) =>
+            specifications.map((specification): AuthorizationAdministrationEffectiveAccessInspection => ({
+                capability: specification.capability,
+                context: {
+                    key: "dashboard",
+                    label: "Dashboard",
+                    channel: "DASHBOARD",
+                },
+                defaultScopes: specification.defaultScopes,
+                configuredDecision: dashboardDecisions.get(specification.capability) ?? null,
+                composedScopes: specification.composedScopes,
+                effectiveScopes: specification.effectiveScopes,
+                state: specification.state,
+                limitations: [],
+            })),
+        ),
     };
 }
 
@@ -594,6 +659,159 @@ describe("Authorization Administration read models", () => {
 });
 
 describe("Authorization Administration effective permission inspector", () => {
+    it("projects normal-user Default Domain Policy when the central resolver has no grant", async () => {
+        const resolver = createResolver();
+        const repository = emptyRepository({
+            findUserById: vi.fn(async () => ({
+                ...rawUser(7),
+                teamMemberships: [],
+                userCapabilityGrants: [],
+            })),
+        });
+        const effectiveAccessProvider = createEffectiveAccessProvider([
+            {
+                capability: "employee.read",
+                defaultScopes: ["ALL"],
+                composedScopes: ["ALL"],
+                effectiveScopes: ["ALL"],
+                state: "AVAILABLE",
+            },
+            {
+                capability: "stock.request.read",
+                defaultScopes: ["OWN"],
+                composedScopes: ["OWN"],
+                effectiveScopes: ["OWN"],
+                state: "AVAILABLE",
+            },
+            {
+                capability: "audit.read",
+                defaultScopes: [],
+                composedScopes: [],
+                effectiveScopes: [],
+                state: "UNAVAILABLE",
+            },
+        ]);
+
+        const detail = await getAuthorizationAdministrationUser(
+            ADMIN_PRINCIPAL,
+            7,
+            { repository, resolver, effectiveAccessProvider },
+        );
+
+        expect(detail?.effectiveAccess).toMatchObject([
+            {
+                capability: { key: "employee.read" },
+                defaultAuthority: { scopes: ["ALL"] },
+                additionalAuthority: {
+                    scopes: [],
+                    grants: [],
+                    reason: "NO_APPLICABLE_GRANT",
+                },
+                effectiveAuthority: {
+                    state: "AVAILABLE",
+                    scopes: ["ALL"],
+                    redundant: false,
+                },
+            },
+            {
+                capability: { key: "stock.request.read" },
+                effectiveAuthority: { state: "AVAILABLE", scopes: ["OWN"] },
+            },
+            {
+                capability: { key: "audit.read" },
+                effectiveAuthority: { state: "UNAVAILABLE", scopes: [] },
+            },
+        ]);
+        expect(detail?.resolverEffectivePermissions.find(({ capability }) =>
+            capability.key === "stock.request.read",
+        )).toMatchObject({
+            allowed: false,
+            reason: "NO_APPLICABLE_GRANT",
+        });
+        expect(detail?.effectiveAccessSummary).toMatchObject({
+            availableContextCount: 2,
+            defaultBackedContextCount: 2,
+            additionalAuthorityContextCount: 0,
+            deferredCapabilityCount: 0,
+        });
+    });
+
+    it("keeps broader configured authority and redundant grants distinct", async () => {
+        const directStockGrant = {
+            capability: "stock.request.read",
+            scope: "ALL",
+            source: { type: "USER", userId: 7 },
+        } as const;
+        const directEmployeeGrant = {
+            capability: "employee.read",
+            scope: "ALL",
+            source: { type: "USER", userId: 7 },
+        } as const;
+        const resolver = createResolver({
+            "stock.request.read": {
+                capability: "stock.request.read",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [directStockGrant],
+            },
+            "employee.read": {
+                capability: "employee.read",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [directEmployeeGrant],
+            },
+        });
+        const repository = emptyRepository({
+            findUserById: vi.fn(async () => ({
+                ...rawUser(7),
+                teamMemberships: [],
+                userCapabilityGrants: [],
+            })),
+        });
+        const effectiveAccessProvider = createEffectiveAccessProvider([
+            {
+                capability: "stock.request.read",
+                defaultScopes: ["OWN"],
+                composedScopes: ["ALL"],
+                effectiveScopes: ["ALL"],
+                state: "AVAILABLE",
+            },
+            {
+                capability: "employee.read",
+                defaultScopes: ["ALL"],
+                composedScopes: ["ALL"],
+                effectiveScopes: ["ALL"],
+                state: "AVAILABLE",
+            },
+        ]);
+
+        const detail = await getAuthorizationAdministrationUser(
+            ADMIN_PRINCIPAL,
+            7,
+            { repository, resolver, effectiveAccessProvider },
+        );
+        const stock = detail?.effectiveAccess.find(({ capability }) =>
+            capability.key === "stock.request.read",
+        );
+        const employee = detail?.effectiveAccess.find(({ capability }) =>
+            capability.key === "employee.read",
+        );
+
+        expect(stock).toMatchObject({
+            defaultAuthority: { scopes: ["OWN"] },
+            additionalAuthority: {
+                scopes: ["ALL"],
+                grants: [{ origin: { type: "USER", userId: 7 } }],
+            },
+            effectiveAuthority: { scopes: ["ALL"], redundant: false },
+        });
+        expect(employee).toMatchObject({
+            defaultAuthority: { scopes: ["ALL"] },
+            additionalAuthority: { scopes: ["ALL"] },
+            effectiveAuthority: { scopes: ["ALL"], redundant: true },
+        });
+    });
+
     it("uses the central resolver and preserves Team, TeamRole, and User sources", async () => {
         const resolution = resolutionData();
         const load = vi.fn<AuthorizationResolutionRepository["load"]>(
@@ -612,7 +830,11 @@ describe("Authorization Administration effective permission inspector", () => {
         const detail = await getAuthorizationAdministrationUser(
             ADMIN_PRINCIPAL,
             7,
-            { repository, resolver },
+            {
+                repository,
+                resolver,
+                effectiveAccessProvider: EMPTY_EFFECTIVE_ACCESS_PROVIDER,
+            },
         );
 
         const routineRead = detail?.resolverEffectivePermissions.find(
@@ -720,7 +942,11 @@ describe("Authorization Administration effective permission inspector", () => {
         const detail = await getAuthorizationAdministrationUser(
             ADMIN_PRINCIPAL,
             7,
-            { repository, resolver },
+            {
+                repository,
+                resolver,
+                effectiveAccessProvider: EMPTY_EFFECTIVE_ACCESS_PROVIDER,
+            },
         );
         const routineUpdate = detail?.resolverEffectivePermissions.find(
             ({ capability }) => capability.key === "routine.task.update",
@@ -789,7 +1015,11 @@ describe("Authorization Administration effective permission inspector", () => {
         const detail = await getAuthorizationAdministrationUser(
             ADMIN_PRINCIPAL,
             7,
-            { repository, resolver },
+            {
+                repository,
+                resolver,
+                effectiveAccessProvider: EMPTY_EFFECTIVE_ACCESS_PROVIDER,
+            },
         );
         const routineRead = detail?.resolverEffectivePermissions.find(
             ({ capability }) => capability.key === "routine.task.read",
@@ -822,7 +1052,11 @@ describe("Authorization Administration effective permission inspector", () => {
         const detail = await getAuthorizationAdministrationUser(
             ADMIN_PRINCIPAL,
             7,
-            { repository, resolver: createAuthorizationResolver() },
+            {
+                repository,
+                resolver: createAuthorizationResolver(),
+                effectiveAccessProvider: EMPTY_EFFECTIVE_ACCESS_PROVIDER,
+            },
         );
         const employeeRead = detail?.resolverEffectivePermissions.find(
             ({ capability }) => capability.key === "employee.read",
@@ -863,11 +1097,20 @@ describe("Authorization Administration effective permission inspector", () => {
         const detail = await getAuthorizationAdministrationUser(
             ADMIN_PRINCIPAL,
             7,
-            { repository, resolver },
+            {
+                repository,
+                resolver,
+                effectiveAccessProvider: EMPTY_EFFECTIVE_ACCESS_PROVIDER,
+            },
         );
 
         expect(detail?.resolverEffectivePermissions).toEqual([]);
         expect(detail?.resolverEffectivePermissionStatus).toMatchObject({
+            status: "INVALID_CONFIGURATION",
+            error: { code: "UNSUPPORTED_PERSISTED_SCOPE" },
+        });
+        expect(detail?.effectiveAccess).toEqual([]);
+        expect(detail?.effectiveAccessStatus).toMatchObject({
             status: "INVALID_CONFIGURATION",
             error: { code: "UNSUPPORTED_PERSISTED_SCOPE" },
         });

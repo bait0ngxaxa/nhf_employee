@@ -44,10 +44,11 @@ const DEFERRED_EMAIL: CapabilityAdministrationMetadata = Object.freeze({
  *
  * CENTRAL_WITH_DEFAULT_POLICY is assigned where the audited domain adapter
  * composes a permanent normal-user default with central configured authority.
- * CENTRAL_WITH_COMPATIBILITY remains for adapters that still translate
- * NO_APPLICABLE_GRANT through temporary migration mechanics. An ADMIN-only
- * legacy branch does not qualify: ADMIN is already resolved by the central
- * system-role rule.
+ * CENTRAL_WITH_COMPATIBILITY remains as a historical/future-safe contract for
+ * adapters that may translate NO_APPLICABLE_GRANT through temporary migration
+ * mechanics; the current registry has no entry using it after Phase 12D. An
+ * ADMIN-only legacy branch does not qualify: ADMIN is already resolved by the
+ * central system-role rule.
  *
  * Keep this map exhaustive: a newly registered capability must receive an
  * explicit administration decision before it can be presented as grantable.

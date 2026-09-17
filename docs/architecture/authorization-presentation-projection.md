@@ -4,8 +4,9 @@ Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
 closed; Employee Phase 8A/8B/8C and Phase 12C.2 additive policy migration
 closed; Phase 9A/9B/9C Department, Audit and Notification integration closed;
 Phase 12C.3 Routine, Phase 12C.4 Stock, Phase 12C.5 Leave, and Phase 12D
-Routine deferred-capability additive policy migrations closed; Phase 12E is
-the next handoff
+Routine deferred-capability additive policy migrations closed; Phase 12E
+effective-access Administration UX is closed; the next handoff is Phase 12F
+Full Authorization Regression / Security Matrix.
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -17,6 +18,31 @@ Phase 8B section records the Dashboard projection and the Phase 8C section
 records the final complete-surface audit and regression hardening. Phase 9B is
 recorded in
 [authorization-remaining-presentation-migration.md](authorization-remaining-presentation-migration.md).
+
+## Phase 12E Administration effective-access inspection
+
+The Authorization Administration User detail now includes a bounded,
+server-derived effective-access projection in addition to the unchanged raw
+central resolver evidence. Each row is domain/context/channel aware and
+separates Default Domain Policy, Additional resolver/system authority, and
+Effective composed capability authority. The result is not a final resource,
+relationship, lifecycle, or workflow decision.
+
+The structural provider port is consumed by the Authorization Administration
+application layer and bound by outer API composition. Department, Notification,
+Employee, Routine, Stock, Leave, and Audit own their inspection policy and reuse
+their runtime additive composition/channel rules. The generic authorization
+core and React presentation contain no domain default matrix. The provider
+emits only registered `DASHBOARD` and `LIFF_SELF_SERVICE` contexts; Routine
+context variants, Stock's intentional LIFF processor behavior, Leave's
+Dashboard-only cancellation decision, unsupported Routine LIFF export, and
+deferred Email Request are represented explicitly.
+
+The User inspector preserves source/origin and TEAM constraints, shows
+domain-owned limitations, retains lifecycle caveats, filters by domain/state,
+and revalidates after direct User grant mutations. Invalid resolver
+configuration remains fail-closed. Full phase evidence is in
+[authorization-phase-12e-effective-access-ux.md](authorization-phase-12e-effective-access-ux.md).
 
 ## Contract and ownership
 
@@ -270,10 +296,9 @@ other non-Routine/non-Stock presentation and authorization paths remain on
 their existing compatibility behavior until their approved migration phases.
 Routine and Employee behavior is unchanged by the Stock projection. After
 Phase 12C.4, Stock defaults are permanent domain policy and the projection
-composes them with configured resolver authority; the Authorization
-Administration inspector still shows resolver/configured data and does not
-yet visualize the complete Stock Default + Additional + Effective result.
-That operator view remains Phase 12E.
+composes them with configured resolver authority. The Phase 12E
+Administration inspector now visualizes the complete Stock Default +
+Additional + Effective result without changing Stock enforcement.
 
 ## Leave Phase 7B projection
 
@@ -575,9 +600,9 @@ details are recorded in
 Employee Phase 8C is closed for the historical production surface, and Phase
 12C.2 is closed for its permanent additive authorization policy. This does not
 change the independent `employee.export` authority, broad read/stats/export
-policy, or any deferred Team policy. The resolver-level inspector still does
-not display the final composed Employee effective scopes; that operator view
-remains Phase 12E.
+policy, or any deferred Team policy. The Phase 12E resolver-level/effective
+access inspector now displays the final composed Employee capability scopes
+while preserving the raw resolver result.
 
 ## Phase 9B remaining-domain presentation closure
 

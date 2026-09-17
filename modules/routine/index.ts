@@ -71,6 +71,7 @@ export {
 export {
     assertRoutineCapability,
     getRoutinePresentationCapabilities,
+    inspectRoutineEffectiveAccess,
 } from "./application/authorization";
 export {
     prepareRoutineTaskExport,

@@ -111,7 +111,7 @@ export function buildEmployeeAuthorizedCommandActor(
     });
 }
 
-function defaultEmployeeScopes(
+export function defaultEmployeeScopes(
     capability: EmployeeCapability,
 ): readonly AuthorizationScope[] {
     switch (capability) {

@@ -84,7 +84,7 @@ export function buildDepartmentAuthorizationContext(
     });
 }
 
-function defaultDepartmentScopes(
+export function defaultDepartmentScopes(
     capability: DepartmentCapability,
 ): readonly AuthorizationScope[] {
     switch (capability) {

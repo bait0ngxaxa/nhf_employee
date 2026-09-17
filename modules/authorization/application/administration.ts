@@ -21,6 +21,10 @@ import {
     AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH,
     type AuthorizationAdministrationAccountIdentity,
     type AuthorizationAdministrationConfigurationIssue,
+    type AuthorizationAdministrationEffectiveAccessInspection,
+    type AuthorizationAdministrationEffectiveAccessRow,
+    type AuthorizationAdministrationEffectiveAccessStatus,
+    type AuthorizationAdministrationEffectiveAccessSummary,
     type AuthorizationAdministrationResolverEffectiveGrant,
     type AuthorizationAdministrationResolverEffectivePermission,
     type AuthorizationAdministrationGrantProjection,
@@ -46,6 +50,7 @@ import {
     type AuthorizationAdministrationOverview,
     type AuthorizationAdministrationUserSummary,
     type AuthorizationAdministrationUserDetail,
+    type AuthorizationAdministrationUserQueryDependencies,
     type AuthorizationAdministrationUserRecord,
     type AuthorizationAdministrationUserTeamMembership,
     type CapabilityAdministrationProjection,
@@ -547,6 +552,95 @@ function projectResolverEffectivePermissions(
     return freezeArray(permissions);
 }
 
+function haveSameScopes(
+    left: readonly string[],
+    right: readonly string[],
+): boolean {
+    return left.length === right.length
+        && left.every((scope, index) => scope === right[index]);
+}
+
+function projectEffectiveAccessRows(
+    inspections: readonly AuthorizationAdministrationEffectiveAccessInspection[],
+    catalogByKey: ReadonlyMap<string, CapabilityAdministrationProjection>,
+    memberships: readonly AuthorizationAdministrationUserTeamMembership[],
+): readonly AuthorizationAdministrationEffectiveAccessRow[] {
+    return freezeArray(inspections.map((inspection) => {
+        const capability = catalogByKey.get(inspection.capability);
+        if (!capability) {
+            throw new Error(
+                `Effective-access provider returned an unregistered capability: ${inspection.capability}`,
+            );
+        }
+
+        const configuredDecision = inspection.configuredDecision;
+        const grants = configuredDecision === null
+            ? []
+            : configuredDecision.grants.map((grant) =>
+                projectResolverEffectiveGrant(grant, memberships),
+            );
+        const additionalScopes = configuredDecision?.allowed === true
+            ? configuredDecision.scopes
+            : [];
+        const redundant = inspection.state === "AVAILABLE"
+            && grants.length > 0
+            && haveSameScopes(
+                inspection.composedScopes,
+                inspection.defaultScopes,
+            );
+
+        return Object.freeze({
+            capability,
+            context: Object.freeze({ ...inspection.context }),
+            defaultAuthority: Object.freeze({
+                scopes: freezeArray(inspection.defaultScopes),
+            }),
+            additionalAuthority: Object.freeze({
+                scopes: freezeArray(additionalScopes),
+                grants: freezeArray(grants),
+                ...(configuredDecision?.reason === undefined
+                    ? {}
+                    : { reason: configuredDecision.reason }),
+            }),
+            effectiveAuthority: Object.freeze({
+                state: inspection.state,
+                scopes: freezeArray(inspection.effectiveScopes),
+                redundant,
+            }),
+            limitations: freezeArray(inspection.limitations),
+        });
+    }));
+}
+
+function buildEffectiveAccessSummary(
+    rows: readonly AuthorizationAdministrationEffectiveAccessRow[],
+    configurationIssueCount: number,
+): AuthorizationAdministrationEffectiveAccessSummary {
+    const deferredCapabilities = new Set(
+        rows
+            .filter(({ effectiveAuthority }) => effectiveAuthority.state === "DEFERRED")
+            .map(({ capability }) => capability.key),
+    );
+
+    return Object.freeze({
+        inspectedContextCount: rows.length,
+        availableContextCount: rows.filter(({ effectiveAuthority }) =>
+            effectiveAuthority.state === "AVAILABLE",
+        ).length,
+        defaultBackedContextCount: rows.filter(({ defaultAuthority }) =>
+            defaultAuthority.scopes.length > 0,
+        ).length,
+        additionalAuthorityContextCount: rows.filter(({ additionalAuthority }) =>
+            additionalAuthority.grants.length > 0,
+        ).length,
+        unsupportedContextCount: rows.filter(({ effectiveAuthority }) =>
+            effectiveAuthority.state === "UNSUPPORTED",
+        ).length,
+        deferredCapabilityCount: deferredCapabilities.size,
+        configurationIssueCount,
+    });
+}
+
 function projectResolutionError(
     error: AuthorizationConfigurationError,
 ): AuthorizationAdministrationResolutionError {
@@ -688,7 +782,7 @@ export async function getAuthorizationAdministrationTeam(
 export async function getAuthorizationAdministrationUser(
     principal: AuthorizationAdministrationPrincipal,
     userId: number,
-    dependencies: AuthorizationAdministrationQueryDependencies = {},
+    dependencies: AuthorizationAdministrationUserQueryDependencies,
 ): Promise<AuthorizationAdministrationUserDetail | null> {
     assertAuthorizationAdministrationAccess(principal);
     assertValidTargetId(userId);
@@ -741,6 +835,8 @@ export async function getAuthorizationAdministrationUser(
 
     let resolverEffectivePermissionStatus: AuthorizationAdministrationResolverEffectivePermissionStatus;
     let resolverEffectivePermissions: readonly AuthorizationAdministrationResolverEffectivePermission[];
+    let effectiveAccessStatus: AuthorizationAdministrationEffectiveAccessStatus;
+    let effectiveAccess: readonly AuthorizationAdministrationEffectiveAccessRow[];
     try {
         const decisions = await resolver.resolveMany(targetActor, capabilityKeys);
         resolverEffectivePermissions = projectResolverEffectivePermissions(
@@ -750,13 +846,39 @@ export async function getAuthorizationAdministrationUser(
         );
         resolverEffectivePermissionStatus =
             projectResolverEffectivePermissionStatus(null);
+
+        try {
+            const inspections = await dependencies.effectiveAccessProvider.inspect({
+                actor: targetActor,
+                dashboardDecisions: decisions,
+                resolver,
+            });
+            effectiveAccess = projectEffectiveAccessRows(
+                inspections,
+                catalogByKey,
+                teamMemberships,
+            );
+            effectiveAccessStatus = Object.freeze({ status: "RESOLVED" as const });
+        } catch (error) {
+            if (!(error instanceof AuthorizationConfigurationError)) throw error;
+            configurationIssues.push(issueFromResolutionError(error, user.id));
+            effectiveAccess = [];
+            effectiveAccessStatus = projectResolverEffectivePermissionStatus(error);
+        }
     } catch (error) {
         if (!(error instanceof AuthorizationConfigurationError)) throw error;
         configurationIssues.push(issueFromResolutionError(error, user.id));
         resolverEffectivePermissions = [];
         resolverEffectivePermissionStatus =
             projectResolverEffectivePermissionStatus(error);
+        effectiveAccess = [];
+        effectiveAccessStatus = projectResolverEffectivePermissionStatus(error);
     }
+
+    const effectiveAccessSummary = buildEffectiveAccessSummary(
+        effectiveAccess,
+        configurationIssues.length,
+    );
 
     return Object.freeze({
         user: userIdentity,
@@ -765,6 +887,9 @@ export async function getAuthorizationAdministrationUser(
         directGrants: freezeArray(directGrants),
         resolverEffectivePermissionStatus,
         resolverEffectivePermissions,
+        effectiveAccessStatus,
+        effectiveAccess,
+        effectiveAccessSummary,
         configurationIssues: freezeArray(configurationIssues),
     });
 }

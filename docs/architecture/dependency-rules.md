@@ -64,6 +64,21 @@ composition binds the Auth implementation and supplies the same serializable
 checks, identity synchronization, token-version increment, and refresh
 revocation without a runtime module cycle.
 
+Authorization Administration effective-access inspection is a similar
+dependency-inverted seam. The structural
+`AuthorizationAdministrationEffectiveAccessProvider` contract belongs to the
+consuming `modules/authorization` Administration application layer, but the
+generic authorization module must not import Department, Notification,
+Employee, Routine, Stock, Leave, or Audit policy. Each domain owns its
+inspection contexts, default policy, channel policy, and limitation metadata
+behind its public module entry. The outer
+`app/api/authorization/administration/_lib/effective-access.ts` composition
+binds those inspectors and supplies trusted actor state plus bounded batched
+resolver decisions. React consumes only the resulting read model; it must not
+accept client-provided scopes, channels, defaults, or policy contexts as
+authority. This boundary prevents a second generic policy engine and avoids a
+cross-domain module cycle.
+
 Auth physical persistence is infrastructure-owned. Production
 `AuthRefreshToken` and `PasswordResetToken` delegate operations may occur only
 under `modules/auth/infrastructure/persistence/**`; routes, legacy adapters,

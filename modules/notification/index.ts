@@ -21,6 +21,7 @@ export {
     getNotificationPresentationCapabilities,
     resolveNotificationCapability,
 } from "./application/authorization";
+export { inspectNotificationEffectiveAccess } from "./application/effective-access";
 export type {
     NotificationAuthorizationActor,
     NotificationAuthorizationContext,

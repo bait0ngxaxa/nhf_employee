@@ -70,6 +70,7 @@ export {
     resolveLeaveCapability,
     resolveLeaveCapabilityInTransaction,
 } from "./application/authorization";
+export { inspectLeaveEffectiveAccess } from "./application/effective-access";
 export type {
     LeaveAuthorizationActor,
     LeaveAuthorizationChannel,

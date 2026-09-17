@@ -8,10 +8,12 @@ Phase 12B status: CLOSED — reusable additive composition core. Phase 12C.1 is
 CLOSED for Department + Notification, Phase 12C.2 is CLOSED for Employee,
 Phase 12C.3 is CLOSED for the enforced Routine surfaces, Phase 12C.4 is
 CLOSED for Stock, and Phase 12C.5 is CLOSED for Leave. The next handoff is
-Phase 12D, which is now CLOSED for the remaining Routine surfaces. The next
-handoff is Phase 12E — Authorization Administration effective-access UX completion.
+Phase 12D, which is now CLOSED for the remaining Routine surfaces. Phase 12E
+is now CLOSED for Authorization Administration effective-access inspection;
+the exact next handoff is Phase 12F — Full Authorization Regression / Security
+Matrix.
 
-สถานะ: Current state after Phase 12D closure; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Phase 12E Authorization Administration effective-access UX completion — NEXT; Email Request / future IT module — DEFERRED<br>
+สถานะ: Current state after Phase 12E closure; Phase 12E Authorization Administration effective-access UX completion — CLOSED; exact next phase: Phase 12F Full Authorization Regression / Security Matrix — NEXT; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-17<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -924,9 +926,10 @@ Notification remains strictly actor-owned: the registry supports only `OWN`,
 and latest/history reads, single updates, and mark-all updates retain the
 trusted authenticated `userId` in their repository predicates. Department is
 still reference data and is never converted into Team membership or authority.
-The Administration inspector remains a central resolver/configured-authority
-view; the complete Default + Additional + Effective operator view is deferred
-to Phase 12E. The exact closure record and verification are in
+At the Phase 12C.1 boundary, the Administration inspector was still a central
+resolver/configured-authority view; the complete Default + Additional +
+Effective operator view is now recorded in Phase 12E below. The exact closure
+record and verification are in
 [authorization-phase-12c1-department-notification-additive-migration.md](authorization-phase-12c1-department-notification-additive-migration.md).
 
 ## 9.3 Phase 12C.2 Employee additive default policy migration
@@ -959,11 +962,11 @@ capabilities are administratively grantable through the existing generic Team,
 TeamRole, and direct User commands. Stock is covered by Phase 12C.4 and Leave
 remains compatibility-backed; the nine enforced Routine capabilities are
 covered by Phase 12C.3. Deferred
-Routine surfaces and Email Request/future IT remain outside this phase. The
-Administration inspector continues to show
+Routine surfaces and Email Request/future IT remain outside this phase. At the
+Phase 12C.2 boundary, the Administration inspector still showed
 resolver/configured authority rather than the final composed Employee
-effective result; full Default + Additional + Effective visualization remains
-Phase 12E. Evidence is in
+effective result; Phase 12E now provides that bounded inspection. Evidence is
+in
 [authorization-phase-12c2-employee-additive-migration.md](authorization-phase-12c2-employee-additive-migration.md).
 
 ## 9.4 Historical Phase 12C.3 Routine additive default policy migration
@@ -1038,9 +1041,10 @@ compatibility capabilities are exactly the Leave family. Routine export,
 summary and reference remain deferred, as do Email Request and future IT.
 The existing generic Team, TeamRole and direct User administration commands
 now accept all seven Stock capabilities; no Stock-specific endpoint, seed,
-backfill or database migration was added. The Administration inspector remains
-a resolver/configured-authority view; complete Stock Default + Additional +
-Effective visualization remains Phase 12E.
+backfill or database migration was added. At the Phase 12C.4 boundary, the
+Administration inspector was still a resolver/configured-authority view;
+Phase 12E now provides complete Stock Default + Additional + Effective
+inspection.
 
 Evidence and the complete test/invariant inventory are in
 [authorization-phase-12c4-stock-additive-migration.md](authorization-phase-12c4-stock-additive-migration.md).
@@ -1155,8 +1159,45 @@ remaining Leave-owned boundaries are in
 Leave report/export, participant/detail, attachment, unavailable-approver
 recovery, and the LIFF cancellation decision contract remain intentionally
 domain-owned/unregistered. Email Request remains the only registered
-deferred family. The exact next phase is **Phase 12E — Authorization
-Administration effective-access UX completion**.
+deferred family. At the Phase 12D boundary, the next phase was **Phase 12E —
+Authorization Administration effective-access UX completion**; its closure is
+recorded in the section below and in
+[authorization-phase-12e-effective-access-ux.md](authorization-phase-12e-effective-access-ux.md).
+
+## 9.8 Phase 12E Authorization Administration effective-access UX completion
+
+Phase 12E is closed from starting commit
+`3b6b8ac635b6121ca712b3a88d71a5837e3a7962`. The User inspector now composes a
+domain-owned Default Domain Policy with the central resolver's Additional /
+configured authority and shows the resulting Effective capability authority.
+The raw `resolverEffectivePermissionStatus` and
+`resolverEffectivePermissions` fields remain central-resolver evidence and are
+available under advanced disclosure; they were not renamed to mean final
+access.
+
+The generic Authorization Administration contract defines a narrow effective-
+access provider port. Domain inspectors are bound by the outer API composition
+layer and reuse each domain's runtime `composeAuthorizationAuthority()` and
+channel policy. Authorization core and React do not contain a second default
+scope matrix. Dashboard and `LIFF_SELF_SERVICE` rows are emitted only for
+registered, trusted contexts. Routine task-read, summary, reference, and
+export cases retain explicit context variants; Stock retains its intentional
+LIFF processor semantics; Leave preserves Dashboard-only cancellation
+decision. Email Request remains `DEFERRED`.
+
+The UI distinguishes Default, Additional, and Effective authority, preserves
+SYSTEM_ROLE/TEAM/TEAM_ROLE/USER provenance and TEAM constraints, identifies
+redundant additive grants, exposes domain-owned limitations, preserves
+lifecycle caveats, and refreshes the read model after direct User grant add or
+remove. Invalid central configuration remains fail-closed and does not receive
+manufactured Default access. This is a capability inspection, not a resource
+simulator or final workflow decision.
+
+The closure record, implementation boundary, context inventory, and verification
+details are in
+[authorization-phase-12e-effective-access-ux.md](authorization-phase-12e-effective-access-ux.md).
+The exact next phase is **Phase 12F — Full Authorization Regression / Security
+Matrix**; Phase 12F has not started.
 
 ## 10. Explicit non-goals for Phase 0
 

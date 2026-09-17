@@ -23,6 +23,7 @@ export {
     getEmployeePresentationCapabilities,
     resolveEmployeeCapability,
 } from "./application/authorization";
+export { inspectEmployeeEffectiveAccess } from "./application/effective-access";
 export type {
     EmployeeAuthorizedCommandActor,
     EmployeeAuthorizationActor,

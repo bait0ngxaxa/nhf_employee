@@ -3,7 +3,12 @@ import type { Prisma } from "@prisma/client";
 import {
     authorization,
     composeAuthorizationAuthority,
+    createUnsupportedAuthorizationAdministrationInspection,
+    projectAuthorizationAdministrationEffectiveAccess,
     type AuthorizationActor,
+    type AuthorizationAdministrationEffectiveAccessInspection,
+    type AuthorizationAdministrationEffectiveAccessLimitation,
+    type AuthorizationAdministrationInspectionContext,
     type AuthorizationDecision,
     type AuthorizationPersistenceContext,
     type AuthorizationScope,
@@ -250,6 +255,307 @@ function applyRoutineChannelPolicy(
         isAdministrative: false,
         liffSelfServicePolicyApplied: true,
     };
+}
+
+const ROUTINE_DASHBOARD_CONTEXT: AuthorizationAdministrationInspectionContext = Object.freeze({
+    key: "dashboard",
+    label: "Dashboard",
+    channel: "DASHBOARD",
+});
+
+const ROUTINE_LIFF_CONTEXT: AuthorizationAdministrationInspectionContext = Object.freeze({
+    key: "liff.self-service",
+    label: "LIFF · Self service",
+    channel: "LIFF_SELF_SERVICE",
+});
+
+const ROUTINE_WORK_ITEM_MINE_CONTEXT: AuthorizationAdministrationInspectionContext = Object.freeze({
+    key: "dashboard.work-item.mine",
+    label: "Dashboard · Work items · Mine",
+    channel: "DASHBOARD",
+});
+
+const ROUTINE_WORK_ITEM_ALL_CONTEXT: AuthorizationAdministrationInspectionContext = Object.freeze({
+    key: "dashboard.work-item.all",
+    label: "Dashboard · Work items · All",
+    channel: "DASHBOARD",
+});
+
+const ROUTINE_MANAGEMENT_CONTEXT: AuthorizationAdministrationInspectionContext = Object.freeze({
+    key: "dashboard.management",
+    label: "Dashboard · Management",
+    channel: "DASHBOARD",
+});
+
+const ROUTINE_SUMMARY_MINE_CONTEXT: AuthorizationAdministrationInspectionContext = Object.freeze({
+    key: "dashboard.summary.mine",
+    label: "Dashboard · Summary · Mine",
+    channel: "DASHBOARD",
+});
+
+const ROUTINE_SUMMARY_ALL_CONTEXT: AuthorizationAdministrationInspectionContext = Object.freeze({
+    key: "dashboard.summary.all",
+    label: "Dashboard · Summary · All",
+    channel: "DASHBOARD",
+});
+
+const ROUTINE_TASK_LIMITATIONS: readonly AuthorizationAdministrationEffectiveAccessLimitation[] = Object.freeze([
+    Object.freeze({
+        code: "routine.resource_relationship",
+        label: "ยังต้องผ่าน creator/assignee และ focus/resource predicate ของ Routine",
+    }),
+]);
+
+const ROUTINE_OCCURRENCE_LIMITATIONS: readonly AuthorizationAdministrationEffectiveAccessLimitation[] = Object.freeze([
+    Object.freeze({
+        code: "routine.occurrence_assignment_workflow",
+        label: "ยังต้องผ่าน assignment ปัจจุบันและกฎสถานะของ occurrence",
+    }),
+]);
+
+const ROUTINE_SUMMARY_LIMITATIONS: readonly AuthorizationAdministrationEffectiveAccessLimitation[] = Object.freeze([
+    Object.freeze({
+        code: "routine.summary_scope",
+        label: "เป็น capability-level scope; query และเงื่อนไขสรุปยังตรวจใน Routine",
+    }),
+]);
+
+const ROUTINE_REFERENCE_LIMITATIONS: readonly AuthorizationAdministrationEffectiveAccessLimitation[] = Object.freeze([
+    Object.freeze({
+        code: "routine.reference_scope",
+        label: "LIFF ยังใช้ data minimization และไม่คืน employee list แม้มี scope กว้าง",
+    }),
+]);
+
+const ROUTINE_EXPORT_LIMITATIONS: readonly AuthorizationAdministrationEffectiveAccessLimitation[] = Object.freeze([
+    Object.freeze({
+        code: "routine.export_resource",
+        label: "การ export ยังต้องผ่าน resource และ lifecycle checks ของ Routine",
+    }),
+]);
+
+function getRoutineInspectionDecision(
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: RoutineCapability,
+): AuthorizationDecision {
+    const decision = decisions.get(capability);
+    if (decision === undefined) {
+        throw new Error(`Authorization resolver omitted Routine capability: ${capability}`);
+    }
+    return decision;
+}
+
+function inspectRoutineCapability(
+    actor: AuthorizationActor,
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+    capability: RoutineCapability,
+    context: AuthorizationAdministrationInspectionContext,
+    options: RoutineCapabilityOptions,
+    limitations: readonly AuthorizationAdministrationEffectiveAccessLimitation[],
+): AuthorizationAdministrationEffectiveAccessInspection {
+    const decision = getRoutineInspectionDecision(decisions, capability);
+    const authority = composeAuthorizationAuthority(
+        actor,
+        capability,
+        defaultRoutineScopes(actor, capability, options),
+        decision,
+    );
+
+    if (!authority.allowed) {
+        return projectAuthorizationAdministrationEffectiveAccess(
+            capability,
+            context,
+            authority,
+            limitations,
+        );
+    }
+
+    const effective = applyRoutineChannelPolicy(
+        actor,
+        capability,
+        options,
+        authority,
+    );
+    return projectAuthorizationAdministrationEffectiveAccess(
+        capability,
+        context,
+        authority,
+        limitations,
+        effective.scopes,
+    );
+}
+
+function inspectRoutineDashboardEffectiveAccess(
+    actor: AuthorizationActor,
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+): AuthorizationAdministrationEffectiveAccessInspection[] {
+    const inspections: AuthorizationAdministrationEffectiveAccessInspection[] = [];
+    inspections.push(
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.task.read",
+            ROUTINE_MANAGEMENT_CONTEXT,
+            { taskReadView: "management" },
+            ROUTINE_TASK_LIMITATIONS,
+        ),
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.task.read",
+            ROUTINE_WORK_ITEM_MINE_CONTEXT,
+            { taskReadView: "work-item", requestedScope: "mine" },
+            ROUTINE_TASK_LIMITATIONS,
+        ),
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.task.read",
+            ROUTINE_WORK_ITEM_ALL_CONTEXT,
+            { taskReadView: "work-item", requestedScope: "all" },
+            ROUTINE_TASK_LIMITATIONS,
+        ),
+    );
+
+    for (const capability of [
+        "routine.task.create",
+        "routine.task.update",
+        "routine.task.delete",
+    ] as const) {
+        inspections.push(inspectRoutineCapability(
+            actor,
+            decisions,
+            capability,
+            ROUTINE_DASHBOARD_CONTEXT,
+            {},
+            ROUTINE_TASK_LIMITATIONS,
+        ));
+    }
+
+    for (const capability of [
+        "routine.occurrence.read",
+        "routine.occurrence.override",
+        "routine.occurrence.reassign",
+        "routine.occurrence.change_due_date",
+        "routine.import.manage",
+    ] as const) {
+        inspections.push(inspectRoutineCapability(
+            actor,
+            decisions,
+            capability,
+            ROUTINE_DASHBOARD_CONTEXT,
+            {},
+            ROUTINE_OCCURRENCE_LIMITATIONS,
+        ));
+    }
+
+    inspections.push(
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.task.export",
+            ROUTINE_DASHBOARD_CONTEXT,
+            {},
+            ROUTINE_EXPORT_LIMITATIONS,
+        ),
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.summary.read",
+            ROUTINE_SUMMARY_MINE_CONTEXT,
+            { summaryView: "mine" },
+            ROUTINE_SUMMARY_LIMITATIONS,
+        ),
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.summary.read",
+            ROUTINE_SUMMARY_ALL_CONTEXT,
+            { summaryView: "all" },
+            ROUTINE_SUMMARY_LIMITATIONS,
+        ),
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.reference.read",
+            ROUTINE_DASHBOARD_CONTEXT,
+            {},
+            ROUTINE_REFERENCE_LIMITATIONS,
+        ),
+    );
+
+    return inspections;
+}
+
+function inspectRoutineLiffEffectiveAccess(
+    actor: AuthorizationActor,
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+): AuthorizationAdministrationEffectiveAccessInspection[] {
+    const inspections: AuthorizationAdministrationEffectiveAccessInspection[] = [];
+    inspections.push(
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.task.read",
+            ROUTINE_LIFF_CONTEXT,
+            { taskReadView: "work-item", requestedScope: "mine" },
+            ROUTINE_TASK_LIMITATIONS,
+        ),
+    );
+
+    for (const capability of [
+        "routine.task.create",
+        "routine.task.update",
+        "routine.task.delete",
+    ] as const) {
+        inspections.push(inspectRoutineCapability(
+            actor,
+            decisions,
+            capability,
+            ROUTINE_LIFF_CONTEXT,
+            {},
+            ROUTINE_TASK_LIMITATIONS,
+        ));
+    }
+
+    inspections.push(
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.summary.read",
+            ROUTINE_LIFF_CONTEXT,
+            { summaryView: "mine" },
+            ROUTINE_SUMMARY_LIMITATIONS,
+        ),
+        inspectRoutineCapability(
+            actor,
+            decisions,
+            "routine.reference.read",
+            ROUTINE_LIFF_CONTEXT,
+            {},
+            ROUTINE_REFERENCE_LIMITATIONS,
+        ),
+        createUnsupportedAuthorizationAdministrationInspection(
+            "routine.task.export",
+            ROUTINE_LIFF_CONTEXT,
+            ROUTINE_EXPORT_LIMITATIONS,
+        ),
+    );
+
+    return inspections;
+}
+
+export function inspectRoutineEffectiveAccess(
+    actor: AuthorizationActor,
+    decisions: ReadonlyMap<string, AuthorizationDecision>,
+): readonly AuthorizationAdministrationEffectiveAccessInspection[] {
+    if (actor.channel === "LIFF_SELF_SERVICE") {
+        return Object.freeze(inspectRoutineLiffEffectiveAccess(actor, decisions));
+    }
+    if (actor.channel === "DASHBOARD") {
+        return Object.freeze(inspectRoutineDashboardEffectiveAccess(actor, decisions));
+    }
+    return Object.freeze([]);
 }
 
 function buildRoutineCapabilityAuthorization(
