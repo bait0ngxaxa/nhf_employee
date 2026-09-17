@@ -72,6 +72,9 @@ const HOME = {
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
             canManageImports: false,
+            canExportTasks: false,
+            canReadSummary: true,
+            canReadReference: true,
         },
     },
 };

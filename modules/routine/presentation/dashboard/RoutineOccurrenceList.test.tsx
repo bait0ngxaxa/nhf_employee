@@ -19,6 +19,9 @@ const allRoutineCapabilities = {
     canReassignOccurrences: true,
     canChangeOccurrenceDueDate: true,
     canManageImports: true,
+    canExportTasks: true,
+    canReadSummary: true,
+    canReadReference: true,
 } satisfies RoutinePresentationCapabilities;
 
 const taskData: PaginatedRoutineTaskWorkItemsResponse = {

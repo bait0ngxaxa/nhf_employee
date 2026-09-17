@@ -26,6 +26,9 @@ export interface RoutinePresentationCapabilities {
     readonly canChangeOccurrenceDueDate: boolean;
 
     readonly canManageImports: boolean;
+    readonly canExportTasks: boolean;
+    readonly canReadSummary: boolean;
+    readonly canReadReference: boolean;
 }
 
 export interface RoutineGenerationResult {

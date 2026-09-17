@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { getAuditEntityHistory } from "@/modules/audit";
 import { prisma } from "@/lib/db/prisma";
 import { getEmployeeDisplayName } from "@/modules/employee";
+import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import {
     addCalendarDays,
     calendarDayDifference,
@@ -27,12 +28,11 @@ import type {
     RoutineTaskFilters,
 } from "../schemas/routine";
 
-import { RoutineNotFoundError } from "./errors";
+import { RoutineNotFoundError, RoutineValidationError } from "./errors";
 import {
     buildRoutineOccurrenceScope,
     buildRoutineTaskAccessScope,
     buildRoutineTaskScope,
-    isRoutineAdminActor,
     resolveRoutineCapability,
     type RoutineCapabilityAuthorization,
 } from "./authorization";
@@ -208,9 +208,10 @@ export interface SerializedRoutineTaskWorkItem {
     relevantOccurrence: SerializedRoutineTaskOccurrence | null;
 }
 
-export interface RoutineTaskWorkItemQueryOptions {
-    readonly authorizationMode?: "ENFORCED" | "DEFERRED_EXPORT";
-}
+export type SerializedRoutineTaskExportItem = Omit<
+    SerializedRoutineTaskWorkItem,
+    "canEdit" | "canDelete"
+>;
 
 function serializeAssignee(assignee: {
     employeeId: number;
@@ -472,7 +473,7 @@ async function getRoutineTaskCapabilities(
     task: RoutineTaskCapabilityTarget,
     queryActor: RoutineQueryActor,
     employeeId: number | null,
-    authorizations?: {
+    authorizations: {
         readonly edit: RoutineCapabilityAuthorization;
         readonly delete: RoutineCapabilityAuthorization;
     },
@@ -480,17 +481,8 @@ async function getRoutineTaskCapabilities(
     return resolveRoutineTaskCapabilities(task, {
         actorId: queryActor.actor.id,
         employeeId,
-        ...(authorizations
-            ? {
-                  editScopes: authorizations.edit.scopes,
-                  deleteScopes: authorizations.delete.scopes,
-              }
-            : {
-                  isAdmin: isRoutineAdminActor(
-                      queryActor.actor.role,
-                      queryActor.actor.mode,
-                  ),
-              }),
+        editScopes: authorizations.edit.scopes,
+        deleteScopes: authorizations.delete.scopes,
     });
 }
 
@@ -601,10 +593,10 @@ function buildRoutineFocusAuthorizationWhere(
     filters: RoutineOccurrenceFilters,
     actorId: number,
     employeeId: number | null,
-    scopes: readonly AuthorizationScope[] | null,
+    scopes: readonly AuthorizationScope[],
 ): RoutineFocusAuthorizationWhere {
     const allowUnscopedFocus = filters.scope === "all"
-        && (scopes === null || scopes.includes("ALL"));
+        && scopes.includes("ALL");
     if (allowUnscopedFocus) {
         return { allowUnscopedFocus, task: {}, occurrence: {} };
     }
@@ -612,8 +604,7 @@ function buildRoutineFocusAuthorizationWhere(
     const taskPredicates: Prisma.RoutineTaskWhereInput[] = [];
     const occurrencePredicates: Prisma.RoutineOccurrenceWhereInput[] = [];
     const allowsCreated = scopes?.includes("CREATED") === true;
-    const allowsAssigned = scopes === null
-        || scopes.includes("ASSIGNED")
+    const allowsAssigned = scopes.includes("ASSIGNED")
         || (filters.scope !== "all" && scopes.includes("ALL"));
 
     if (allowsCreated) {
@@ -728,18 +719,16 @@ async function findRoutineOccurrenceRowsForTasks(
     });
 }
 
-function serializeRoutineTaskWorkItem(
+function serializeRoutineTaskFields(
     task: RoutineTaskRow,
     relevantOccurrence: RoutineOccurrenceRow | undefined,
     today: string,
-    capabilities: RoutineTaskCapabilities,
-): SerializedRoutineTaskWorkItem {
+): SerializedRoutineTaskExportItem {
     const serializedOccurrence = relevantOccurrence
         ? serializeOccurrence(relevantOccurrence, today)
         : null;
 
     return {
-        ...capabilities,
         id: task.id,
         title: task.title,
         description: task.description,
@@ -846,41 +835,36 @@ export async function getRoutineOccurrences(
 export async function getRoutineTaskWorkItems(
     filters: RoutineOccurrenceFilters,
     queryActor: RoutineQueryActor,
-    options: RoutineTaskWorkItemQueryOptions = {},
 ): Promise<{
     tasks: SerializedRoutineTaskWorkItem[];
     pagination: RoutinePagination;
 }> {
     const employeeId = await resolveActorEmployeeId(queryActor);
     const today = getCurrentBangkokDate();
-    const isDeferredExport = options.authorizationMode === "DEFERRED_EXPORT";
-    const capabilityAuthorization = isDeferredExport
-        ? null
-        : await resolveRoutineCapability(
-              queryActor.actor,
-              employeeId,
-              "routine.task.read",
-              {
-                  taskReadView: "work-item",
-                  requestedScope: filters.scope,
-              },
-          );
-    const mutationAuthorizations = capabilityAuthorization
-        ? await resolveTaskMutationCapabilities(queryActor, employeeId)
-        : undefined;
-    const taskWhere = capabilityAuthorization
-        ? buildRoutineTaskReadWhere(
-              filters,
-              queryActor.actor.id,
-              employeeId,
-              capabilityAuthorization,
-          )
-        : buildTaskWhere(filters, employeeId);
+    const capabilityAuthorization = await resolveRoutineCapability(
+        queryActor.actor,
+        employeeId,
+        "routine.task.read",
+        {
+            taskReadView: "work-item",
+            requestedScope: filters.scope,
+        },
+    );
+    const mutationAuthorizations = await resolveTaskMutationCapabilities(
+        queryActor,
+        employeeId,
+    );
+    const taskWhere = buildRoutineTaskReadWhere(
+        filters,
+        queryActor.actor.id,
+        employeeId,
+        capabilityAuthorization,
+    );
     const focusAuthorization = buildRoutineFocusAuthorizationWhere(
         filters,
         queryActor.actor.id,
         employeeId,
-        isDeferredExport ? null : capabilityAuthorization?.scopes ?? [],
+        capabilityAuthorization.scopes,
     );
     const focus = await resolveRoutineFocus(
         filters,
@@ -904,7 +888,7 @@ export async function getRoutineTaskWorkItems(
             ? buildTaskMetadataWhere(filters)
             : taskWhere),
         ...(focus.kind !== "NONE" ? { id: focus.taskId } : {}),
-        ...(hasAuthorizedFocus && !isDeferredExport
+        ...(hasAuthorizedFocus
             ? focusAuthorization.task
             : {}),
     };
@@ -1060,6 +1044,90 @@ export async function getRoutineTaskWorkItems(
     };
 }
 
+export type RoutineTaskExportData =
+    | { status: "limit-exceeded"; recordCount: number; maxRows: number }
+    | {
+        status: "ready";
+        recordCount: number;
+        tasks: SerializedRoutineTaskExportItem[];
+    };
+
+export async function getRoutineTaskExportData(
+    queryActor: RoutineQueryActor,
+): Promise<RoutineTaskExportData> {
+    const employeeId = await resolveActorEmployeeId(queryActor);
+    const authorization = await resolveRoutineCapability(
+        queryActor.actor,
+        employeeId,
+        "routine.task.export",
+    );
+    const pageSize = EXPORT_LIMITS.routine.batchSize;
+    const where: Prisma.RoutineTaskWhereInput = {
+        ...buildTaskMetadataWhere({
+            scope: "all",
+            page: 1,
+            limit: pageSize,
+        }),
+        ...buildRoutineTaskScope(
+            queryActor.actor.id,
+            employeeId,
+            authorization.scopes,
+        ),
+    };
+    const [recordCount, firstPageTasks] = await Promise.all([
+        prisma.routineTask.count({ where }),
+        prisma.routineTask.findMany({
+            where,
+            select: ROUTINE_TASK_SELECT,
+            orderBy: [{ title: "asc" }, { id: "asc" }],
+            skip: 0,
+            take: pageSize,
+        }),
+    ]);
+
+    if (recordCount > EXPORT_LIMITS.routine.maxRows) {
+        return {
+            status: "limit-exceeded",
+            recordCount,
+            maxRows: EXPORT_LIMITS.routine.maxRows,
+        };
+    }
+
+    const today = getCurrentBangkokDate();
+    const serializePage = async (
+        tasks: readonly RoutineTaskRow[],
+    ): Promise<SerializedRoutineTaskExportItem[]> => {
+        const occurrenceRows = await findRoutineOccurrenceRowsForTasks(
+            tasks.map((task) => task.id),
+        );
+        const relevantByTask = resolveOccurrenceRows(
+            occurrenceRows,
+            today,
+            null,
+        );
+        return tasks.map((task) => serializeRoutineTaskFields(
+            task,
+            relevantByTask.get(task.id),
+            today,
+        ));
+    };
+
+    const tasks = await serializePage(firstPageTasks);
+    const pages = Math.ceil(recordCount / pageSize);
+    for (let page = 2; page <= pages; page += 1) {
+        const pageTasks = await prisma.routineTask.findMany({
+            where,
+            select: ROUTINE_TASK_SELECT,
+            orderBy: [{ title: "asc" }, { id: "asc" }],
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+        });
+        tasks.push(...await serializePage(pageTasks));
+    }
+
+    return { status: "ready", recordCount, tasks };
+}
+
 export async function getRoutineOccurrenceById(
     occurrenceId: number,
     queryActor: RoutineQueryActor,
@@ -1117,18 +1185,34 @@ export async function getRoutineSummary(
     within30Days: number;
     asOfDate: string;
 }> {
-    const isAdmin = isRoutineAdminActor(
-        queryActor.actor.role,
-        queryActor.actor.mode,
+    const scope = queryActor.scope ?? (
+        queryActor.actor.mode === "LIFF_SELF_SERVICE"
+            ? "mine"
+            : queryActor.actor.role === "ADMIN"
+                ? "all"
+                : "mine"
     );
+    if (scope !== "mine" && scope !== "all") {
+        throw new RoutineValidationError("ขอบเขตสรุป Routine ไม่ถูกต้อง");
+    }
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const scope = queryActor.scope ?? (isAdmin ? "all" : "mine");
+    const authorization = await resolveRoutineCapability(
+        queryActor.actor,
+        employeeId,
+        "routine.summary.read",
+        { summaryView: scope },
+    );
+    const queryScope = scope === "all"
+        && authorization.actor.channel === "DASHBOARD"
+        && authorization.scopes.includes("ALL")
+        ? "all"
+        : "mine";
     const today = getCurrentBangkokDate();
     const nextThirtyDays = addCalendarDays(today, 30);
 
     const taskWhere = buildTaskWhere(
         {
-            scope,
+            scope: queryScope,
             page: 1,
             limit: 1,
         },
@@ -1351,6 +1435,18 @@ function buildLiffRoutineTaskAccessWhere(
     };
 }
 
+function serializeRoutineTaskWorkItem(
+    task: RoutineTaskRow,
+    relevantOccurrence: RoutineOccurrenceRow | undefined,
+    today: string,
+    capabilities: RoutineTaskCapabilities,
+): SerializedRoutineTaskWorkItem {
+    return {
+        ...capabilities,
+        ...serializeRoutineTaskFields(task, relevantOccurrence, today),
+    };
+}
+
 function buildRoutineLiffSelfServiceTaskAccessWhere(
     actorId: number,
     employeeId: number | null,
@@ -1434,6 +1530,26 @@ export async function getRoutineReferenceData(
         notificationReady: boolean;
     }>;
 }> {
+    const employeeId = await resolveActorEmployeeId(queryActor);
+    const authorization = await resolveRoutineCapability(
+        queryActor.actor,
+        employeeId,
+        "routine.reference.read",
+    );
+    const employeeWhere: Prisma.EmployeeWhereInput = authorization.actor.channel === "DASHBOARD"
+        && authorization.scopes.includes("ALL")
+        ? { status: "ACTIVE", deletedAt: null }
+        : {
+              status: "ACTIVE",
+              deletedAt: null,
+              user: {
+                  is: {
+                      id: queryActor.actor.id,
+                      isActive: true,
+                      deletedAt: null,
+                  },
+              },
+          };
     const [units, categories, employees] = await Promise.all([
         prisma.routineUnit.findMany({
             where: { isActive: true },
@@ -1446,22 +1562,7 @@ export async function getRoutineReferenceData(
             orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         }),
         prisma.employee.findMany({
-            where: isRoutineAdminActor(
-                queryActor.actor.role,
-                queryActor.actor.mode,
-            )
-                ? { status: "ACTIVE", deletedAt: null }
-                : {
-                      status: "ACTIVE",
-                      deletedAt: null,
-                      user: {
-                          is: {
-                              id: queryActor.actor.id,
-                              isActive: true,
-                              deletedAt: null,
-                          },
-                      },
-                  },
+            where: employeeWhere,
             select: {
                 id: true,
                 firstName: true,

@@ -65,6 +65,9 @@ const ROUTINE_CAPABILITIES = {
     canReassignOccurrences: false,
     canChangeOccurrenceDueDate: false,
     canManageImports: false,
+    canExportTasks: false,
+    canReadSummary: true,
+    canReadReference: true,
 };
 
 const STOCK_CAPABILITIES = {

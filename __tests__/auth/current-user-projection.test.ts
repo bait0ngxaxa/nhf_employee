@@ -130,6 +130,9 @@ const ROUTINE = {
     canReassignOccurrences: true,
     canChangeOccurrenceDueDate: true,
     canManageImports: true,
+    canExportTasks: true,
+    canReadSummary: true,
+    canReadReference: true,
 };
 
 const STOCK = {

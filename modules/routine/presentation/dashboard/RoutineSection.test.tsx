@@ -46,6 +46,9 @@ const allRoutineCapabilities = {
     canReassignOccurrences: true,
     canChangeOccurrenceDueDate: true,
     canManageImports: true,
+    canExportTasks: true,
+    canReadSummary: true,
+    canReadReference: true,
 } satisfies RoutinePresentationCapabilities;
 
 const userRoutineCapabilities = {
@@ -307,6 +310,18 @@ describe("RoutineSection tabs", () => {
         expect(mocks.triggerDownload).toHaveBeenCalledWith(
             "/api/routines/export?format=xlsx",
         );
+    });
+
+    it("gates the export control by canExportTasks instead of task-read access", () => {
+        mockRoutineUser("USER", {
+            ...allRoutineCapabilities,
+            canExportTasks: false,
+        });
+
+        render(<RoutineSection />);
+
+        expect(screen.queryByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" })).not.toBeInTheDocument();
+        expect(mocks.triggerDownload).not.toHaveBeenCalled();
     });
 
     it("exposes task settings and all-occurrence tabs to an admin", () => {

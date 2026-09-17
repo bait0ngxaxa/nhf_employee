@@ -27,7 +27,7 @@ vi.mock("@/modules/authorization", async (importOriginal) => {
 
 import {
     getRoutinePresentationCapabilities,
-    ROUTINE_ENFORCED_CAPABILITIES,
+    ROUTINE_CAPABILITIES,
 } from "./authorization";
 import type { RoutineCommandActor } from "./types";
 
@@ -52,7 +52,7 @@ const IMPORT_GRANT: EffectiveAuthorizationGrant = {
 
 function allowedDecisions(): ReadonlyMap<string, AuthorizationDecision> {
     return new Map(
-        ROUTINE_ENFORCED_CAPABILITIES.map((capability) => [
+        ROUTINE_CAPABILITIES.map((capability) => [
             capability,
             { ...ALLOWED_DECISION, capability },
         ]),
@@ -79,7 +79,7 @@ describe("Routine presentation capability projection", () => {
         mocks.resolveMany.mockResolvedValue(allowedDecisions());
     });
 
-    it("projects the nine migrated capabilities into serializable booleans", async () => {
+    it("projects all twelve Routine capabilities into serializable booleans", async () => {
         await expect(
             getRoutinePresentationCapabilities(ACTOR, 21),
         ).resolves.toEqual({
@@ -92,6 +92,9 @@ describe("Routine presentation capability projection", () => {
             canReassignOccurrences: true,
             canChangeOccurrenceDueDate: true,
             canManageImports: true,
+            canExportTasks: true,
+            canReadSummary: true,
+            canReadReference: true,
         });
     });
 
@@ -132,6 +135,9 @@ describe("Routine presentation capability projection", () => {
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
             canManageImports: true,
+            canExportTasks: true,
+            canReadSummary: true,
+            canReadReference: true,
         });
     });
 
@@ -198,6 +204,9 @@ describe("Routine presentation capability projection", () => {
             canReassignOccurrences: true,
             canChangeOccurrenceDueDate: true,
             canManageImports: true,
+            canExportTasks: true,
+            canReadSummary: true,
+            canReadReference: true,
         });
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             {
@@ -206,14 +215,15 @@ describe("Routine presentation capability projection", () => {
                 systemRole: "ADMIN",
                 channel: "DASHBOARD",
             },
-            ROUTINE_ENFORCED_CAPABILITIES,
+            ROUTINE_CAPABILITIES,
         );
     });
 
     it("keeps no-grant USER default policy for LIFF self-service", async () => {
         mockResolveMany((capability) => {
             const dashboardOnly = capability.startsWith("routine.occurrence.")
-                || capability === "routine.import.manage";
+                || capability === "routine.import.manage"
+                || capability === "routine.task.export";
 
             return {
                 capability,
@@ -241,6 +251,9 @@ describe("Routine presentation capability projection", () => {
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
             canManageImports: false,
+            canExportTasks: false,
+            canReadSummary: true,
+            canReadReference: true,
         });
     });
 
@@ -265,6 +278,9 @@ describe("Routine presentation capability projection", () => {
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
             canManageImports: false,
+            canExportTasks: false,
+            canReadSummary: false,
+            canReadReference: false,
         });
     });
 
@@ -297,7 +313,8 @@ describe("Routine presentation capability projection", () => {
                 || capability === "routine.occurrence.override"
                 || capability === "routine.occurrence.reassign"
                 || capability === "routine.occurrence.change_due_date"
-                || capability === "routine.import.manage";
+                || capability === "routine.import.manage"
+                || capability === "routine.task.export";
 
             return {
                 capability,
@@ -328,6 +345,9 @@ describe("Routine presentation capability projection", () => {
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
             canManageImports: false,
+            canExportTasks: false,
+            canReadSummary: true,
+            canReadReference: true,
         });
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             {
@@ -336,7 +356,7 @@ describe("Routine presentation capability projection", () => {
                 systemRole: "ADMIN",
                 channel: "LIFF_SELF_SERVICE",
             },
-            ROUTINE_ENFORCED_CAPABILITIES,
+            ROUTINE_CAPABILITIES,
         );
     });
 });

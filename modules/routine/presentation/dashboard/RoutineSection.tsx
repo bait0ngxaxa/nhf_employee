@@ -80,6 +80,7 @@ function RoutineOccurrencePanel({
     const categoryFilterId = useId();
     const timingFilterId = useId();
     const referenceErrorId = useId();
+    const canReadReference = routineCapabilities?.canReadReference === true;
     const key = useMemo(() => {
         const params = new URLSearchParams({
             scope,
@@ -106,7 +107,7 @@ function RoutineOccurrencePanel({
         isLoading: referenceLoading,
         mutate: mutateReference,
     } = useSWR<RoutineReferenceData, Error>(
-        API_ROUTES.routines.reference,
+        canReadReference ? API_ROUTES.routines.reference : null,
         fetchRoutine,
     );
     const {
@@ -305,6 +306,7 @@ function RoutineTaskSettings({
     onTaskSaved: () => void;
 }) {
     const isSelfService = mode === "SELF_SERVICE";
+    const canReadReference = routineCapabilities?.canReadReference === true;
     const [isCreating, setIsCreating] = useState(false);
     const [editingTask, setEditingTask] = useState<RoutineTask | null>(null);
     const [taskPage, setTaskPage] = useState(1);
@@ -320,7 +322,10 @@ function RoutineTaskSettings({
         error: referenceError,
         isLoading: referenceLoading,
         mutate: mutateReference,
-    } = useSWR<RoutineReferenceData, Error>(API_ROUTES.routines.reference, fetchRoutine);
+    } = useSWR<RoutineReferenceData, Error>(
+        canReadReference ? API_ROUTES.routines.reference : null,
+        fetchRoutine,
+    );
     const tasksKey = useMemo(() => {
         const params = new URLSearchParams({
             activeOnly: "0",
@@ -487,6 +492,8 @@ export function RoutineSection() {
     const isAdmin = isAdminRole(user?.role);
     const routineCapabilities = user?.routineCapabilities;
     const canReadTasks = routineCapabilities?.canReadTasks === true;
+    const canExportTasks = routineCapabilities?.canExportTasks === true;
+    const canReadSummary = routineCapabilities?.canReadSummary === true;
     const canManageImports = routineCapabilities?.canManageImports === true;
     const searchParams = useSearchParams();
     const taskIdValue = Number(searchParams.get("taskId"));
@@ -523,7 +530,7 @@ export function RoutineSection() {
         isLoading: summaryLoading,
         mutate: mutateSummary,
     } = useSWR<RoutineSummaryResponse, Error>(
-        canReadTasks ? summaryKey : null,
+        canReadTasks && canReadSummary ? summaryKey : null,
         fetchRoutine,
         {
             keepPreviousData: true,
@@ -605,7 +612,7 @@ export function RoutineSection() {
             <SectionHeader
                 title="NHF Routine"
                 subtitle="รวมรายการ Routine ตามกำหนดเวลา ผู้รับผิดชอบ และการแจ้งเตือนที่เกี่ยวข้อง"
-                extra={(
+                extra={canExportTasks ? (
                     <Button
                         type="button"
                         variant="outline"
@@ -618,7 +625,7 @@ export function RoutineSection() {
                         ส่งออก Excel
                         <span className="text-xs font-normal text-content-muted">รายการทั้งหมด</span>
                     </Button>
-                )}
+                ) : null}
             />
             <SectionTabs
                 value={safeTab}

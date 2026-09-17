@@ -2,14 +2,14 @@ import ExcelJS from "exceljs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
-import type { SerializedRoutineTaskWorkItem } from "../../application/queries";
+import type { SerializedRoutineTaskExportItem } from "../../application/queries";
 
 const mocks = vi.hoisted(() => ({
-    getRoutineTaskWorkItems: vi.fn(),
+    getRoutineTaskExportData: vi.fn(),
 }));
 
 vi.mock("../../application/queries", () => ({
-    getRoutineTaskWorkItems: mocks.getRoutineTaskWorkItems,
+    getRoutineTaskExportData: mocks.getRoutineTaskExportData,
 }));
 
 import { prepareRoutineTaskExport } from "./routine-export";
@@ -18,10 +18,8 @@ function task(
     id: number,
     title: string,
     ownerId: number,
-): SerializedRoutineTaskWorkItem {
+): SerializedRoutineTaskExportItem {
     return {
-        canEdit: false,
-        canDelete: false,
         id,
         title,
         description: "รายละเอียดงาน",
@@ -81,19 +79,16 @@ describe("Routine task Excel export", () => {
             task(71, "งานของผู้ใช้อื่น", 42),
             task(72, "งานที่เกี่ยวข้อง", 21),
         ];
-        mocks.getRoutineTaskWorkItems.mockResolvedValue({
+        mocks.getRoutineTaskExportData.mockResolvedValue({
+            status: "ready",
+            recordCount: 2,
             tasks,
-            pagination: { page: 1, limit: 100, total: 2, pages: 1 },
         });
 
         const preparation = await prepareRoutineTaskExport(queryActor);
 
         expect(preparation.status).toBe("ready");
-        expect(mocks.getRoutineTaskWorkItems).toHaveBeenCalledWith(
-            { scope: "all", page: 1, limit: 100 },
-            queryActor,
-            { authorizationMode: "DEFERRED_EXPORT" },
-        );
+        expect(mocks.getRoutineTaskExportData).toHaveBeenCalledWith(queryActor);
         if (preparation.status !== "ready") return;
 
         expect(preparation.response.headers.get("Content-Type")).toBe(
@@ -143,14 +138,10 @@ describe("Routine task Excel export", () => {
     });
 
     it("enforces the server-side task row limit", async () => {
-        mocks.getRoutineTaskWorkItems.mockResolvedValue({
-            tasks: [],
-            pagination: {
-                page: 1,
-                limit: 100,
-                total: EXPORT_LIMITS.routine.maxRows + 1,
-                pages: EXPORT_LIMITS.routine.maxRows + 1,
-            },
+        mocks.getRoutineTaskExportData.mockResolvedValue({
+            status: "limit-exceeded",
+            recordCount: EXPORT_LIMITS.routine.maxRows + 1,
+            maxRows: EXPORT_LIMITS.routine.maxRows,
         });
 
         await expect(prepareRoutineTaskExport(queryActor)).resolves.toEqual({
@@ -158,6 +149,6 @@ describe("Routine task Excel export", () => {
             recordCount: EXPORT_LIMITS.routine.maxRows + 1,
             maxRows: EXPORT_LIMITS.routine.maxRows,
         });
-        expect(mocks.getRoutineTaskWorkItems).toHaveBeenCalledTimes(1);
+        expect(mocks.getRoutineTaskExportData).toHaveBeenCalledTimes(1);
     });
 });

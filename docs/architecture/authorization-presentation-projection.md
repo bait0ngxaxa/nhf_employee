@@ -3,8 +3,9 @@
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
 closed; Employee Phase 8A/8B/8C and Phase 12C.2 additive policy migration
 closed; Phase 9A/9B/9C Department, Audit and Notification integration closed;
-Phase 12C.3 Routine, Phase 12C.4 Stock, and Phase 12C.5 Leave additive
-policy migrations closed
+Phase 12C.3 Routine, Phase 12C.4 Stock, Phase 12C.5 Leave, and Phase 12D
+Routine deferred-capability additive policy migrations closed; Phase 12E is
+the next handoff
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -33,11 +34,14 @@ interface RoutinePresentationCapabilities {
     canReassignOccurrences: boolean;
     canChangeOccurrenceDueDate: boolean;
     canManageImports: boolean;
+    canExportTasks: boolean;
+    canReadSummary: boolean;
+    canReadReference: boolean;
 }
 ```
 
 `getRoutinePresentationCapabilities()` is the one reusable server-side
-Routine projection. It asks the central resolver for all nine enforced
+Routine projection. It asks the central resolver for all 12 registered
 capabilities through one `resolveMany()` call, then applies permanent Routine
 default composition and the Routine execution-channel policy to each decision.
 For a USER, the central resolver loads one shared authorization snapshot through
@@ -83,7 +87,9 @@ Routine navigation requires both the Routine feature flag and
 redirects authenticated actors without `canReadTasks` to access denied, and
 renders only when the feature and read capability are both available. The
 operational `mine` and `all` tabs use `canReadTasks`; their distinction remains
-server-scoped and is not reimplemented in the browser. Create, update,
+server-scoped and is not reimplemented in the browser. Export visibility uses
+`canExportTasks`, while the export API independently resolves
+`routine.task.export`. Create, update,
 lifecycle, delete, occurrence override, and import visibility use their
 corresponding projection booleans together with existing resource projections
 such as `task.canEdit` and `task.canDelete`.
@@ -112,8 +118,9 @@ LiffBootstrap
 ```
 
 `GET /api/line/home` resolves `getLiffCapabilities()` once and composes its
-modules from that response. Routine is enabled only when both the Routine
-feature flag and `routineCapabilities.canReadTasks` are true. The composition
+modules from that response. Routine is enabled only when the Routine feature
+flag, `routineCapabilities.canReadTasks`, and
+`routineCapabilities.canReadSummary` are true. The composition
 helper does not resolve authorization again and does not introduce a second
 policy table. Stock behavior remains unchanged; Leave behavior is recorded in
 the Leave Phase 7B section below.
@@ -129,8 +136,9 @@ canCreateOwnRoutine
 
 `LiffRoutineApp` independently calls the trusted `fetchLiffHome()` contract
 after `LiffBootstrap` is READY. It does not load Routine summary, task, or
-reference data until the contract confirms both module availability and
-`canReadTasks`. A denied or unavailable contract renders the existing stable
+reference data until the contract confirms module availability,
+`canReadTasks`, and `canReadSummary`; reference forms additionally require
+`canReadReference`. A denied or unavailable contract renders the existing stable
 unavailable module view and makes no Routine data requests. Direct links and
 focus query parameters follow the same gate.
 
@@ -167,7 +175,9 @@ constrained by the Routine self-service channel policy and does not gain
 `routine.occurrence.override`,
 `routine.occurrence.reassign`, `routine.occurrence.change_due_date`, or
 `routine.import.manage` presentation access. Dashboard ADMIN behavior remains
-the Phase 5B behavior.
+the Phase 5B behavior. LIFF summary/reference projections remain available only
+for self-service behavior; central/configured `ALL` authority is clamped before
+the projection is exposed.
 
 ## Presentation visibility != authorization enforcement
 
@@ -183,25 +193,21 @@ resource-specific `task.canEdit` and `task.canDelete` projections remain
 Routine-owned hints for individual resources, and mutation routes still
 enforce their own decisions.
 
-## Deferred and non-Routine behavior
+## Routine Phase 12D projection
 
-`routine.summary.read`, `routine.task.export`, and `routine.reference.read`
-remain outside this projection because they are intentionally deferred.
-Dashboard Excel export, summary authorization, reference-data authorization,
-and their existing compatibility presentation behavior therefore remain
-unchanged; no new capability rule is invented for them. In particular, the
-deferred policies remain deferred:
+The three capabilities that were deferred after Phase 12C.3 are now part of
+the same permanent projection and the same bounded central batch:
 
-```text
-routine.summary.read
-routine.task.export
-routine.reference.read
-```
+| Projection | Server-owned meaning |
+|---|---|
+| `canExportTasks` | Dashboard export is eligible according to `routine.task.export`; LIFF is false because the registry is Dashboard-only. |
+| `canReadSummary` | Summary is available; Dashboard view intent is still validated and authorized server-side as `mine`/`all`, while LIFF remains `ASSIGNED` self-service. |
+| `canReadReference` | Reference is available; Dashboard Employee visibility remains `OWN`/`ALL` according to server policy, and LIFF continues to omit the Employee list. |
 
-When the Routine module is legitimately available, the existing LIFF summary
-and reference compatibility behavior is preserved; the home gate only keeps
-actors without Routine read availability from reaching those requests through
-the Routine UI.
+The booleans are presentation hints only. They do not turn a query parameter
+into authority, expose an Employee list in LIFF, or replace the independent
+server capability checks. The only registered deferred capabilities after
+Phase 12D are `email.request.read` and `email.request.create`.
 
 ## Stock Phase 6B projection
 

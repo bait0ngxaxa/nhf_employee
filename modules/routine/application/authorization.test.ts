@@ -18,7 +18,7 @@ import {
     assertActiveRoutineActorInTransaction,
     resolveRoutineCapability,
     resolveRoutineCapabilityInTransaction,
-    type RoutineEnforcedCapability,
+    type RoutineCapability,
 } from "./authorization";
 import type { RoutineCommandActor } from "./types";
 
@@ -58,7 +58,7 @@ function actor(
 }
 
 function decision(
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
     allowed: boolean,
     scopes: readonly AuthorizationScope[] = [],
     reason?: AuthorizationDecision["reason"],
@@ -74,7 +74,7 @@ function decision(
 }
 
 function userGrant(
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
     scope: AuthorizationScope,
 ): EffectiveAuthorizationGrant {
     return {
@@ -85,7 +85,7 @@ function userGrant(
 }
 
 function systemRoleGrant(
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
 ): EffectiveAuthorizationGrant {
     return {
         capability,
@@ -444,6 +444,26 @@ describe("Routine authorization adapter", () => {
                 options: {},
                 scopes: ["ASSIGNED"] as const,
             },
+            {
+                capability: "routine.task.export" as const,
+                options: {},
+                scopes: ["ALL"] as const,
+            },
+            {
+                capability: "routine.summary.read" as const,
+                options: { summaryView: "mine" } as const,
+                scopes: ["ASSIGNED"] as const,
+            },
+            {
+                capability: "routine.summary.read" as const,
+                options: { summaryView: "all" } as const,
+                scopes: ["ALL"] as const,
+            },
+            {
+                capability: "routine.reference.read" as const,
+                options: {},
+                scopes: ["OWN"] as const,
+            },
         ];
 
         for (const testCase of cases) {
@@ -594,6 +614,62 @@ describe("Routine authorization adapter", () => {
         expect(result.liffSelfServicePolicyApplied).toBe(true);
     });
 
+    it.each([
+        {
+            capability: "routine.summary.read" as const,
+            options: { summaryView: "all" } as const,
+            expectedScopes: ["ASSIGNED"] as const,
+        },
+        {
+            capability: "routine.reference.read" as const,
+            options: {} as const,
+            expectedScopes: ["OWN"] as const,
+        },
+    ])("clamps LIFF %s to its self-service policy even with configured ALL", async ({ capability, options, expectedScopes }) => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                capability,
+                true,
+                ["ALL"],
+                undefined,
+                [userGrant(capability, "ALL")],
+            ),
+        );
+
+        const result = await resolveRoutineCapability(
+            actor({ mode: "LIFF_SELF_SERVICE" }),
+            21,
+            capability,
+            options,
+        );
+
+        expect(result.scopes).toEqual(expectedScopes);
+        expect(result.isAdministrative).toBe(false);
+        expect(result.liffSelfServicePolicyApplied).toBe(true);
+    });
+
+    it("keeps export unavailable on the LIFF channel even when the actor is an ADMIN", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "routine.task.export",
+                false,
+                [],
+                "CHANNEL_NOT_SUPPORTED",
+            ),
+        );
+
+        await expect(
+            resolveRoutineCapability(
+                actor({ role: "ADMIN", mode: "LIFF_SELF_SERVICE" }),
+                21,
+                "routine.task.export",
+            ),
+        ).rejects.toMatchObject({
+            authorizationReason: "CHANNEL_NOT_SUPPORTED",
+            statusCode: 403,
+        });
+    });
+
     it("keeps Dashboard ADMIN system-role authorization administrative", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
@@ -613,6 +689,28 @@ describe("Routine authorization adapter", () => {
 
         expect(result.isAdministrative).toBe(true);
         expect(result.scopes).toEqual(["ALL"]);
+    });
+
+    it("does not assign a Routine export default to Dashboard ADMIN", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "routine.task.export",
+                true,
+                ["ALL"],
+                undefined,
+                [systemRoleGrant("routine.task.export")],
+            ),
+        );
+
+        const result = await resolveRoutineCapability(
+            actor({ id: 99, role: "ADMIN" }),
+            null,
+            "routine.task.export",
+        );
+
+        expect(result.defaultScopes).toEqual([]);
+        expect(result.scopes).toEqual(["ALL"]);
+        expect(result.isAdministrative).toBe(true);
     });
 
     it("does not convert authorization configuration errors into default access", async () => {

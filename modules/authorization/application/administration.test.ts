@@ -365,11 +365,17 @@ describe("Authorization Administration capability catalog", () => {
             });
             expect(first.find((capability) => capability.key === key)?.nonGrantableReason).toBeUndefined();
         }
-        expect(first.find(({ key }) => key === "routine.task.export")).toMatchObject({
-            runtimeAuthorizationMode: "DEFERRED",
-            administrativeStatus: "DEFERRED",
-            administrativelyGrantable: false,
-        });
+        for (const key of [
+            "routine.task.export",
+            "routine.summary.read",
+            "routine.reference.read",
+        ]) {
+            expect(first.find((capability) => capability.key === key)).toMatchObject({
+                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
+            });
+        }
         expect(first.find(({ key }) => key === "email.request.create")).toMatchObject({
             runtimeAuthorizationMode: "DEFERRED",
             administrativeStatus: "DEFERRED",
@@ -408,6 +414,9 @@ describe("Authorization Administration capability catalog", () => {
             "routine.task.update",
             "routine.task.delete",
             "routine.occurrence.read",
+            "routine.task.export",
+            "routine.summary.read",
+            "routine.reference.read",
             "stock.catalog.read",
             "stock.request.read",
             "stock.request.create",
@@ -428,22 +437,22 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(13);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
-        )).toHaveLength(22);
+        )).toHaveLength(25);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
         )).toHaveLength(0);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "DEFERRED",
-        )).toHaveLength(5);
+        )).toHaveLength(2);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(35);
+        )).toHaveLength(38);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
         )).toHaveLength(0);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "DEFERRED",
-        )).toHaveLength(5);
+        )).toHaveLength(2);
         expect(first.every(({ administrativeStatus, administrativelyGrantable }) =>
             (administrativeStatus === "GRANTABLE") === administrativelyGrantable,
         )).toBe(true);

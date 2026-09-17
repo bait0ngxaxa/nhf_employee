@@ -83,7 +83,8 @@ function toRoutineMutationError(error: unknown): string {
 
 function hasRoutineReadAccess(home: LiffHomeResponse | null): boolean {
     return home?.modules.routine.enabled === true
-        && home.capabilities.routineCapabilities.canReadTasks === true;
+        && home.capabilities.routineCapabilities.canReadTasks === true
+        && home.capabilities.routineCapabilities.canReadSummary === true;
 }
 
 export function LiffRoutineApp(): ReactElement {
@@ -126,6 +127,8 @@ export function LiffRoutineApp(): ReactElement {
     const routineRequestIdRef = useRef(0);
     const routineCapabilities = home?.capabilities.routineCapabilities;
     const canReadTasks = routineCapabilities?.canReadTasks === true;
+    const canReadSummary = routineCapabilities?.canReadSummary === true;
+    const canReadReference = routineCapabilities?.canReadReference === true;
     const canCreateTasks = routineCapabilities?.canCreateTasks === true;
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
     const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
@@ -248,7 +251,7 @@ export function LiffRoutineApp(): ReactElement {
         const actionAllowed = mode === "CREATE"
             ? canCreateTasks
             : canUpdateTasks && task?.canEdit === true;
-        if (!routineReadAvailable || !actionAllowed) return;
+        if (!routineReadAvailable || !canReadReference || !actionAllowed) return;
         if (reference || referenceState === "LOADING") return;
         const requestId = referenceRequestIdRef.current + 1;
         referenceRequestIdRef.current = requestId;
@@ -264,7 +267,7 @@ export function LiffRoutineApp(): ReactElement {
             setReferenceError(toRoutineViewError(error));
             setReferenceState("ERROR");
         }
-    }, [canCreateTasks, canUpdateTasks, reference, referenceState, routineReadAvailable]);
+    }, [canCreateTasks, canReadReference, canUpdateTasks, reference, referenceState, routineReadAvailable]);
 
     const loadTaskDetail = useCallback((taskId: number): void => {
         if (!routineReadAvailable || !canReadTasks) return;
@@ -447,7 +450,7 @@ export function LiffRoutineApp(): ReactElement {
     const refreshRoutineData = useCallback(async (
         refreshFailureMessage = "บันทึกสำเร็จ แต่โหลดรายการ Routine ล่าสุดไม่ได้ กรุณาลองใหม่อีกครั้ง",
     ): Promise<boolean> => {
-        if (!routineReadAvailable || !canReadTasks) return false;
+        if (!routineReadAvailable || !canReadTasks || !canReadSummary) return false;
         const requestId = taskRequestIdRef.current + 1;
         taskRequestIdRef.current = requestId;
         setIsTaskLoading(true);
@@ -475,7 +478,7 @@ export function LiffRoutineApp(): ReactElement {
                 setIsTaskLoading(false);
             }
         }
-    }, [canReadTasks, routineReadAvailable, selectedFilter]);
+    }, [canReadSummary, canReadTasks, routineReadAvailable, selectedFilter]);
 
     const handleRecoveredFormMutation = useCallback(
         async (mode: LiffRoutineTaskFormMode): Promise<boolean> => {

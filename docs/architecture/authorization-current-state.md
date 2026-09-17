@@ -8,11 +8,25 @@ Phase 12B status: CLOSED — reusable additive composition core. Phase 12C.1 is
 CLOSED for Department + Notification, Phase 12C.2 is CLOSED for Employee,
 Phase 12C.3 is CLOSED for the enforced Routine surfaces, Phase 12C.4 is
 CLOSED for Stock, and Phase 12C.5 is CLOSED for Leave. The next handoff is
-Phase 12D for the remaining explicitly deferred non-IT surfaces.
+Phase 12D, which is now CLOSED for the remaining Routine surfaces. The next
+handoff is Phase 12E — Authorization Administration effective-access UX completion.
 
-สถานะ: Current state after Phase 12C.5 closure; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Phase 12D remaining deferred non-IT surfaces — NEXT; Email Request / future IT module — DEFERRED<br>
+สถานะ: Current state after Phase 12D closure; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Phase 12E Authorization Administration effective-access UX completion — NEXT; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-17<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
+
+สถานะปัจจุบันหลัง Phase 12D: `routine.task.export`, `routine.summary.read` และ
+`routine.reference.read` ใช้ permanent additive Default Domain Policy ผ่าน
+Routine adapter และ central resolver แล้ว. Registry มี `25
+CENTRAL_WITH_DEFAULT_POLICY`, `0 CENTRAL_WITH_COMPATIBILITY`, `13
+CENTRAL_ONLY`, `2 DEFERRED` จากทั้งหมด 40 รายการ; readiness คือ `38
+GRANTABLE`, `0 POLICY_ACTIVATION_REQUIRED`, `2 DEFERRED`. `DEFERRED` ที่เหลือ
+มีเฉพาะ `email.request.read` และ `email.request.create`. Phase 12D ไม่ได้
+เพิ่ม capability, scope, channel, schema, seed, backfill หรือ grant migration.
+
+หมายเหตุ: บันทึก Phase ก่อนหน้าในเอกสารนี้เป็น historical evidence ตาม
+boundary ของแต่ละ phase; สถานะ live หลัง Phase 12D ให้ยึดข้อความด้านบน,
+ตาราง Routine ปัจจุบัน และหัวข้อ 9.7 เป็นหลัก
 
 หมายเหตุ Phase 11C (historical final closure): Phase 11B enforcement hardening — **CLOSED** และ Phase 11C security regression audit — **CLOSED** ที่ baseline `5669d79ca359701bc6a637079ca738575b731cf7`. Matrix สุดท้ายมี 89 cases (`80 DIRECT`, `6 INDIRECT`, `0 MISSING`, `3 N/A`); operation ledger มี 81/81 `DIRECT`, protected routes 78/78 `DIRECT`, Authorization Administration 17/17 `DIRECT` และ combined explicit ledger 98/98 `DIRECT`. Mandatory Phase 11C.2 work items เหลือ `0`. Compatibility policies และ deferred surfaces ยังคงอยู่, สี่ future policy families ยังอยู่นอก Phase 11, และ production authorization database grant inventory ยังไม่ได้ audit. เอกสารนี้คงผล MySQL fixture failure ไว้เป็น historical evidence; Phase 11D ได้ตรวจสอบและแก้ stale fixture แล้วโดยไม่เปลี่ยน production authorization semantics. รายละเอียดเดิมอยู่ใน [authorization-phase-11c-closure.md](authorization-phase-11c-closure.md)
 
@@ -84,13 +98,13 @@ web access cookie / LIFF session / system secret
 - getApiAuthSession() ไม่ได้ตรวจแค่ account แต่ยังคง legacy contract ที่ต้องมี Employee ที่ ACTIVE และไม่ถูกลบ
 - Dashboard layout ป้องกันการเข้าใช้งานโดยต้องได้ current active Employee projection แต่ role guard มีเฉพาะบาง page; navigation และการซ่อนปุ่มเป็น presentation เท่านั้น
 - Routine มี semantics แบบ channel-aware: Admin ของ Dashboard-owned API ได้ admin scope แต่ Admin ที่ผ่าน LIFF_SELF_SERVICE ถูกปฏิบัติเหมือนผู้ใช้ self-service สำหรับ task operations
-- Routine task work-item paths และ registered-but-deferred summary/export paths ปัจจุบันยอมรับ scope=all ของ USER และ query สามารถไม่มี assignee filter; `routine.reference.read` ก็ยัง deferred ตาม legacy/domain semantics. พฤติกรรมนี้มี tests freeze ไว้และถูกบันทึกเป็น high-risk migration input
+- Routine task work-item, summary, reference และ export paths ใช้ Routine adapter และ central resolver ผ่าน permanent additive composition แล้ว. USER ที่มีสิทธิ์ตาม baseline ยังคงได้ work-item/summary `scope=all` และ broad export ตาม policy ที่ล็อกไว้; reference ใช้ OWN baseline และ ALL ที่ตั้งค่าเพิ่มได้ตาม active-Employee rules. LIFF summary/reference ยังคง self-service และไม่ส่ง broad Employee list
 - Stock server แยก requester ownership กับ processor/inventory ผ่าน central resolver, permanent Stock Default Domain Policy และ Stock-owned resource predicates; Stock presentation ใช้ granular projection จาก resolver/composition เดียวกันโดยยังไม่ใช่ server authority
 - Leave ไม่ใช่ Admin-vs-User อย่างเดียว: approval ใช้ effective approver จาก exceptionApproverId หรือ approverId; Admin override มีเฉพาะบาง Dashboard/API workflow และถูกปิดสำหรับ LIFF
 - `LeavePresentationCapabilities`, canApproveLeave, canViewLeaveReports และ LiffCapabilities เป็น projections สำหรับ presentation/entry-point behavior ไม่ใช่ authoritative server permission; capability eligibility ยังต้องประกอบกับ Leave resource/work relationship
 - LIFF Routine reference และ summary routes กำหนด actor mode เป็น `LIFF_SELF_SERVICE` จาก trusted route boundary แล้ว; Routine adapter จึงใช้ LIFF authorization channel อย่างชัดเจน และ `serializeLiffRoutineReference()` ยังคงไม่ส่ง employee list ออกไป. Regression ของ USER/ADMIN ยืนยัน channel isolation และ response contract
 - ระบบ authorization ปัจจุบันมี Team, TeamRole, TeamMembership และ persisted capability grants ได้แก่ TeamCapabilityGrant, TeamRoleCapabilityGrant และ UserCapabilityGrant รวมถึง code-owned Capability Registry, Scope Registry, AuthorizationActor และ central resolver แล้ว
-- Registered capability ไม่ได้หมายความว่า runtime path ถูกบังคับใช้ด้วย adapter เดียวกันแล้วเสมอไป: `routine.summary.read`, `routine.task.export` และ `routine.reference.read` ยัง registered ใน `modules/authorization/registry.ts` แต่ intentionally deferred, ไม่อยู่ใน `ROUTINE_ENFORCED_CAPABILITIES`, และยังใช้ deferred/domain path กับ semantics เดิม; จึงไม่มี generic presentation projection ใหม่สำหรับสาม operation นี้
+- Registered capability ไม่ได้หมายความว่า query จะข้าม resource policy ได้: capability ทั้ง 12 รายการของ Routine มี runtime path ผ่าน `ROUTINE_CAPABILITIES`; `routine.task.export`, `routine.summary.read` และ `routine.reference.read` ใช้ policy ที่มี context/channel โดยตรง และมี projection ใหม่แยก operation. Structural authorization failures ยังคง propagate/fail closed
 - ชื่อ Team และ TeamRole ไม่มี authority โดยตัวมันเอง; authority มาจาก effective capability grants ที่ central resolver ประเมิน
 - Department / departmentId ยังไม่ถูกใช้เพื่ออนุมาน authorization
 - Routine, Stock และ Leave server paths ใช้ central resolver พร้อม domain-owned resource semantics และ permanent Default Domain Policy + Phase 12B additive composition แล้ว. Department, Notification และ Employee ใช้ central resolver ร่วมกับ permanent Default Domain Policy เช่นกัน. Employee presentation และ complete-surface audit/regression hardening ของ current production surface ปิดแล้วใน Phase 8B/8C ตามลำดับ, Phase 9B presentation integration ของ Department/Audit/Notification ปิดแล้ว, และ Phase 9C closure audit ของ current migrated production surface ปิดแล้ว. รายละเอียด current Phase 12C.3 อยู่ใน [authorization-phase-12c3-routine-additive-migration.md](authorization-phase-12c3-routine-additive-migration.md), Phase 12C.4 อยู่ใน [authorization-phase-12c4-stock-additive-migration.md](authorization-phase-12c4-stock-additive-migration.md) และ Phase 12C.5 อยู่ใน [authorization-phase-12c5-leave-additive-migration.md](authorization-phase-12c5-leave-additive-migration.md)
@@ -281,9 +295,9 @@ Employee current authorization detail:
 | Routine | API | DELETE /api/routines/tasks/:id | RoutineTask | `requireActiveWorkforceOrAdminSession()` plus transaction checks | Transaction active actor and current capability | `routine.task.delete` uses permanent additive composition and is rechecked in the transaction; USER deletion remains creator-scoped | Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`; explicit USER `ALL` is not administrative | Current assignee who is not creator cannot delete under the baseline relationship policy | Default `CREATED`; configured `ALL` may broaden target lookup; existing cleanup/invariants remain | Routine flag | deleteRoutineTask, buildRoutineTaskDeleteScope, modules/routine/application/authorization.ts | Delete button based on `canDelete` | Capability/relation denial 403; state/concurrency 404/409 domain mapping | modules/routine/application/delete.test.ts, __tests__/api/routines-task-by-id.test.ts | Preserve creator-only USER delete and transaction invariants |
 | Routine | API | GET /api/routines/occurrences and GET /api/routines/occurrences/:id | RoutineOccurrence | `requireActiveWorkforceOrAdminSession()` | Active User/Employee context; active task required | `routine.occurrence.read` uses permanent additive composition before the occurrence query | Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`; LIFF is structurally unsupported; explicit supported USER grants remain additive | Occurrence-level assignee, which can differ from task-level assignment | Default `ASSIGNED`; `ASSIGNED`/`ALL` capability scopes are translated at the occurrence layer | Routine flag | getRoutineOccurrences, getRoutineOccurrenceById, modules/routine/application/authorization.ts, buildWorkOccurrenceWhere | Occurrence list/detail and focus links | Capability denial 403; feature 404, relation not-found 404, validation 400 | __tests__/api/routines-occurrences.test.ts, __tests__/api/routines-occurrence-by-id.test.ts, modules/routine/application/queries.test.ts | Distinguish task assignee from task creation ownership |
 | Routine | API | GET /api/routines/occurrences?view=tasks | RoutineTask operational work items | `requireActiveWorkforceOrAdminSession()` | Active context from route; query itself uses supplied actor/employee | `routine.task.read` with `taskReadView: "work-item"` uses permanent context-sensitive composition before `getRoutineTaskWorkItems`; scope != all filters current assignee | No independent role gate inside this query path; Routine default and configured authority are both composed | Current task assignee only when mine; focused occurrence has additional checks | Work-item default `ASSIGNED` for mine and intentionally `ALL` for all; focus path can allow occurrence-only assignment | Routine flag | app/api/routines/occurrences/route.ts, modules/routine/application/authorization.ts, modules/routine/application/queries.ts:getRoutineTaskWorkItems | Operational task cards and per-task capabilities | Route accepts valid scope; capability/workforce errors 403; no authorization error for the permanent USER all-scope default | modules/routine/application/queries.test.ts test “returns all active tasks for a regular user's all-task scope” | Phase 12A locks the work-item `scope=all` behavior; preserve it until a separate business-policy decision |
-| Routine | API | GET /api/routines/summary | Routine KPI counts | Workforce/admin helper | Active context from route | Registered `routine.summary.read` remains intentionally deferred; current route/service retains default mine and existing USER `scope=all` behavior without a migrated generic capability gate | No role gate for supplied all scope | Task assignee scope only when mine | MINE default; ALL accepted for USER and Admin | Routine flag | app/api/routines/summary/route.ts, getRoutineSummary | KPI cards; no Phase 9C capability projection | Feature 404, invalid scope 400 | __tests__/api/routine-summary.test.ts, modules/routine/application/queries.test.ts | Deferred legacy/domain path; existing all-scope USER behavior is explicitly tested |
-| Routine | API | GET /api/routines/reference | Units, categories, employee assignment references | Workforce/admin helper | Current API context | Registered `routine.reference.read` remains intentionally deferred; legacy query gives Admin all active Employees and USER only the linked active Employee | ADMIN outside LIFF self-service remains legacy/domain behavior | Own Employee vs all active Employees | Reference scope is self vs all; units/categories are shared active references | Routine flag | app/api/routines/reference/route.ts, getRoutineReferenceData | Assignee selector; no Phase 9C capability projection | Feature/auth/domain errors | __tests__/api/routines-reference.test.ts, modules/routine/application/queries.test.ts | Deferred legacy/domain path; no Department-to-permission derivation |
-| Routine | API | GET /api/routines/export | RoutineTask XLSX | Workforce/admin helper | Current API helper plus export query actor | Registered `routine.task.export` remains intentionally deferred; route calls prepareRoutineTaskExport and exporter forces scope=all on every page | No migrated generic Admin gate; existing helper/domain behavior remains | getRoutineTaskWorkItems all-scope path is used | All active operational task work items as currently queried, including USER path | Routine flag | app/api/routines/export/route.ts, modules/routine/infrastructure/reports/routine-export.ts | Export button is presentation; no Phase 9C capability projection | 401, invalid/limit 400, service error via Routine mapping | __tests__/api/routine-export.test.ts, modules/routine/infrastructure/reports/routine-export.test.ts | Deferred legacy/domain path; high-risk broad export behavior remains frozen |
+| Routine | API | GET /api/routines/summary | Routine KPI counts | Workforce/admin helper | Active context from route | Resolves `routine.summary.read` after validating `scope=mine|all`; Dashboard mine uses `ASSIGNED`, Dashboard all preserves broad `ALL`, and LIFF route forces mine/self-service | Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`; LIFF ADMIN remains self-service | Task assignee scope when mine; all is available only in trusted Dashboard context with effective `ALL` | MINE or ALL according to validated server-owned view intent | Routine flag | app/api/routines/summary/route.ts, getRoutineSummary, modules/routine/application/authorization.ts | `canReadSummary`; KPI cards remain presentation-only | Feature 404, invalid scope 400, capability/configuration errors via Routine mapping | __tests__/api/routine-summary.test.ts, __tests__/api/line-routine-self-service-routes.test.ts, modules/routine/application/queries.test.ts | Phase 12D permanent context-sensitive policy; KPI/date/active-task semantics unchanged |
+| Routine | API | GET /api/routines/reference | Units, categories, employee assignment references | Workforce/admin helper | Current API context | Resolves `routine.reference.read`; normal USER baseline is OWN/current linked active Employee, effective Dashboard ALL may expand eligible active Employees, and shared units/categories remain active reference data | Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`; LIFF channel policy remains self-service | Current linked Employee vs all eligible active Employees; LIFF response omits employees | OWN or ALL only for the Employee portion; shared references remain available | Routine flag | app/api/routines/reference/route.ts, getRoutineReferenceData, modules/routine/application/authorization.ts | `canReadReference`; LIFF serialization omits employees | Feature/auth/domain errors | __tests__/api/routines-reference.test.ts, __tests__/api/line-routine-self-service-routes.test.ts, modules/routine/application/queries.test.ts | Phase 12D permanent policy; active/deleted Employee filtering and data minimization unchanged |
+| Routine | API | GET /api/routines/export | RoutineTask XLSX | Workforce/admin helper | Current API helper plus export query actor | Resolves `routine.task.export` in the application query before the active all-scope task predicate; normal Dashboard USER receives permanent `ALL`, Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN` | No role/read-task borrowing; ADMIN authority comes from the central resolver | Broad active Routine task export as explicitly approved | ALL for eligible Dashboard users; LIFF is unsupported by the registry | Routine flag | app/api/routines/export/route.ts, modules/routine/application/queries.ts:getRoutineTaskExportData, modules/routine/infrastructure/reports/routine-export.ts | `canExportTasks`; API independently enforces the capability | 401, invalid/limit 400, capability/configuration/service errors via Routine mapping | __tests__/api/routine-export.test.ts, modules/routine/application/queries.test.ts, modules/routine/infrastructure/reports/routine-export.test.ts | Phase 12D permanent export policy; row limit, active filtering, batching, XLSX and audit behavior unchanged |
 | Routine | API | Routine occurrence due-date/assignee/override mutations | Occurrence and occurrence assignees | `requireActiveWorkforceOrAdminSession()` plus validation/rate guard | Trusted Routine actor; `assertActiveRoutineActorInTransaction`; target Employees must be active | Route/service calls `assertRoutineCapability()` for `routine.occurrence.override`, `routine.occurrence.reassign` or `routine.occurrence.change_due_date`; transaction re-resolves the same capability before domain rules | Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`; explicit supported USER grants remain reachable; LIFF is structurally unsupported | Active target assignees; row/version/reminder locks and occurrence business rules | Central-only capabilities have empty USER default and `ALL` only when authorized on DASHBOARD; domain target/state rules still apply | Routine flag | app/api/routines/occurrences/[id]/**, assertRoutineCapability, modules/routine/application/authorization.ts, modules/routine/application/mutations.ts | Occurrence controls use `canOverrideOccurrences`, `canReassignOccurrences` and `canChangeOccurrenceDueDate` | Capability denial 403; validation/state/concurrency 400/409 | __tests__/api/routines-occurrence-by-id.test.ts, __tests__/api/routines-legacy-occurrence-mutations.test.ts, modules/routine/application/mutations.test.ts | Capability authority and active target/business/transaction invariants all remain required; route is not generic Admin-only |
 | Routine | API | Routine import preview/batches/rows/apply/cancel/reference | Import batch and staged RoutineTasks | `requireActiveWorkforceOrAdminSession()` plus route-specific validation/rate/size guards | Trusted Routine actor; staging/apply transactions recheck active User/Employee and referenced Employees | Import routes and staging/application services call `routine.import.manage / ALL` through the Routine adapter and central resolver; explicit supported USER grants remain reachable | Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`; an explicit USER grant is capability authority, not a bypass of import rules | Batch/row ownership remains an import domain invariant, not a normal USER scope; referenced Employees must be active | Empty USER default; `ALL` capability prerequisite after authorization, then existing import batch/row/state rules | Routine flag | app/api/routines/imports/**, assertRoutineCapability, modules/routine/application/authorization.ts, modules/routine/application/imports/staging.ts, modules/routine/application/mutations.ts | Import controls use `canManageImports` | Capability denial 403; validation/state/transaction conflicts 400/409 | __tests__/api/routine-import-preview.test.ts, __tests__/integration/routine-import-apply.integration.test.ts, Routine authorization/mutation tests | Preserve staged import business invariants and transaction-time actor/reference checks; this capability remains central-only |
 | Routine | LIFF_SELF_SERVICE | LIFF task list/create/detail/update/delete | RoutineTask and relevant occurrence | `requireLiffWorkforceSession()` | Active linked LINE workforce | `routine.task.read/create/update/delete` are resolved through the Routine adapter with the trusted `LIFF_SELF_SERVICE` actor mode; Admin is not elevated for task relationships/capabilities | Admin role is intentionally constrained by channel mode, not used as a client-supplied authority | Creator, current active task assignee, or active occurrence-only assignee for detail; create forces linked Employee OWNER | Task list/summary forced MINE; creator/assignee relationship for detail; creator delete; assignee content edit | Routine LIFF flag; disabled 404 | app/api/line/routine/tasks/**, modules/routine/application/authorization.ts, getLiffRoutineTaskById | `/api/line/home` gates module/task read with `canReadTasks`; create uses `canCreateTasks`; edit uses `canUpdateTasks && task.canEdit`; delete uses `canDeleteTasks && task.canDelete`; lifecycle remains resource-scoped; no occurrence-admin/import controls | LIFF session 401/403/500; capability/relation/domain errors 403/404/409 | __tests__/api/line-routine-routes.test.ts, __tests__/api/line-routine-self-service-routes.test.ts, modules/routine/application/mutations.test.ts | Critical channel-aware Admin invariant; server enforcement remains authoritative |
@@ -361,7 +375,7 @@ Employee current authorization detail:
 - constants/dashboard.ts และ DashboardProvider ใช้ requiredRole: ADMIN สำหรับ menu/click behavior เท่านั้น
 - modules/stock/application/authorization.ts แปลง trusted server identity เป็น `AuthorizationActor`, เรียก central resolver และ compose permanent Stock Default Domain Policy ผ่าน `composeAuthorizationAuthority()`; ไม่มี Stock compatibility fallback
 - modules/stock/presentation/liff-stock-auth.ts:requireLiffStockProcessorSession ตรวจ LIFF workforce ก่อน แล้วจึงใช้ `stock.request.process`/`LIFF_SELF_SERVICE`; ไม่ใช้ role เป็น authority โดยตรง
-- modules/routine/application/authorization.ts:isRoutineAdminActor ตัดสิน Admin ตาม role และ mode != LIFF_SELF_SERVICE
+- modules/routine/application/authorization.ts ใช้ `ROUTINE_CAPABILITIES`, central resolver, additive default composition และ Routine channel policy; Dashboard ADMIN authority มาจาก `SYSTEM_ROLE`, ส่วน LIFF summary/reference ยังคง self-service
 - Leave registered server capabilities use the adapter at `modules/leave/application/authorization.ts`; permanent normal-USER defaults compose only with valid configured/system authority, while recovery candidate and Leave-owned relationship checks remain domain-specific
 - Stock presentation Phase 6B ใช้ `stockCapabilities` จาก central resolver สำหรับ menu, route, tabs, queries และ migrated action controls; `isAdmin` ที่เหลือใน Stock UI ใช้ได้เฉพาะ descriptive role text และไม่ใช่ authority
 
@@ -401,7 +415,7 @@ Employee current authorization detail:
 
 ### 5.5 Routine domain authorization
 
-- isRoutineAdminActor: Admin is elevated only outside LIFF self-service
+- Routine capability adapter/channel policy: Dashboard ADMIN ใช้ central `SYSTEM_ROLE / ADMIN`; LIFF task/summary/reference behavior ถูกจำกัดด้วย registry channel และ self-service policy ตาม capability
 - buildRoutineTaskEditScope: Admin all; USER creator or current Employee task assignee
 - buildRoutineTaskDeleteScope: Admin all; USER creator only
 - resolveRoutineTaskCapabilities: creator edit/delete, active task assignee edit-only, unrelated/inactive/deleted assignee no access
@@ -488,7 +502,7 @@ Query and persistence scopes found include:
 | requireDashboardAdmin | AUTHENTICATION + ACCOUNT_LIFECYCLE + role AUTHORIZATION ของ Email Request ที่ยัง deferred; outcome เป็น redirect |
 | requireDashboardAuditCapability และ requireDashboardEmployeeCapability | AUTHENTICATION + ACCOUNT_LIFECYCLE + capability AUTHORIZATION ของ Dashboard surface; outcome เป็น redirect |
 | DashboardProvider, requiredRole, LeavePresentationCapabilities, EmployeePresentationCapabilities, canApproveLeave, canViewLeaveReports และ LiffCapabilities | PRESENTATION_ONLY; บางค่าคำนวณจาก AUTHORIZATION eligibility, RESOURCE_RELATIONSHIP หรือ FEATURE_FLAG แต่ไม่ใช่ authority |
-| Routine isRoutineAdminActor | AUTHORIZATION + channel restriction |
+| Routine capability adapter and channel policy | AUTHORIZATION + channel restriction; resource/query predicates remain domain-owned |
 | LIFF Routine reference/summary route actors and Routine reference serializer | Route-derived LIFF channel is AUTHORIZATION/channel-context behavior; the no-employee-list response remains a client-visible response contract |
 | Routine build*AccessScope/Where และ creator-assignee checks | RESOURCE_RELATIONSHIP + ACCOUNT_LIFECYCLE สำหรับ active relation; query scope ไม่ใช่ generic capability |
 | Stock Admin processor/inventory route guards | AUTHENTICATION + ACCOUNT_LIFECYCLE + AUTHORIZATION |
@@ -529,9 +543,9 @@ Later migration phases must preserve these behaviors until a policy change is ex
 1. **API authentication and status distinction** — default missing/invalid API session is 401; authenticated non-Admin against requireAdminSession() is 403; route-specific response factories can intentionally map both to 403, notably Audit, Email Request and Department paths.
 2. **Legacy API workforce eligibility** — current API session resolution requires an active, non-deleted account and an eligible active, non-deleted Employee before route-level authorization.
 3. **Admin is not a universal bypass** — Admin still passes active account/workforce, input validation, resource/business relationship where the domain requires it, valid workflow state and transaction/concurrency rules.
-4. **Routine channel behavior and LIFF reference response** — Dashboard-owned API Admin is elevated by isRoutineAdminActor; LIFF self-service Admin is not elevated for Routine task operations. The LIFF Routine reference response must not expose the employee reference list, including for an authenticated LIFF Admin; serializeLiffRoutineReference() enforces that boundary. Reference and summary routes now derive `LIFF_SELF_SERVICE` explicitly at the trusted route boundary, with regression coverage for both USER and ADMIN.
+4. **Routine channel behavior and LIFF reference response** — Dashboard-owned Routine capabilities resolve Dashboard ADMIN through central `SYSTEM_ROLE / ADMIN`; LIFF self-service ADMIN is clamped by Routine channel policy for task, summary, and reference behavior. The LIFF Routine reference response must not expose the employee reference list, including for an authenticated LIFF ADMIN; `serializeLiffRoutineReference()` enforces that boundary. Reference and summary routes derive `LIFF_SELF_SERVICE` explicitly at the trusted route boundary, with regression coverage for both USER and ADMIN.
 5. **Routine creator/assignee behavior** — USER creator can edit/delete; active task assignee can edit allowed content but cannot delete, change assignees/source or change lifecycle; occurrence-only assignment is a separate read/focus relationship.
-6. **Routine all-scope current behavior** — operational task work-item, summary and export paths currently accept all-scope for a normal USER; existing tests explicitly freeze this. Any later narrowing is an approved behavior change, not an incidental resolver refactor.
+6. **Routine all-scope current behavior** — operational task work-item, Dashboard summary `scope=all`, and export paths intentionally retain broad normal-USER behavior through explicit permanent default policy; reference uses OWN baseline and configured ALL may expand only the established active-Employee query. Any later narrowing is an approved behavior change, not an incidental resolver refactor.
 7. **Stock requester/processor separation** — Stock server decisions now resolve the registered capability and compose permanent requester defaults; normal requester reads/cancels own pending requests, effective `ALL` can broaden the relevant operation, LIFF processor queue/issue retains central ADMIN or explicit USER authority, and unrelated LIFF request detail is hidden with not-found behavior.
 8. **Stock data integrity** — requester attribution is server-derived; issue/cancel/inventory mutations revalidate the actor and capability at their transactional application boundary where applicable, then use status claims, stock availability, active references and transaction rules; these remain separate from capability authorization.
 9. **Leave effective approver** — exception approver takes precedence over original approver for current actionable approval and participant access; owner cannot approve or confirm their own workflow.
@@ -827,7 +841,11 @@ compatibility, excluded boundaries และ Email Request deferral อยู่
   Routine service. The actor mode is route-derived and cannot be supplied by
   request input.
 
-### High risk
+### High risk (historical inventory before Phase 12D)
+
+The Routine summary/reference/export entry below records the risk that existed
+before Phase 12D. The current resolution is recorded in the Phase 12D section
+above and in [authorization-phase-12d-routine-deferred-migration.md](authorization-phase-12d-routine-deferred-migration.md).
 
 1. **Routine all-scope data exposure candidate** — GET /api/routines/summary?scope=all และ /api/routines/export ใช้ deferred legacy/domain path; GET /api/routines/occurrences?view=tasks&scope=all ผ่าน `routine.task.read` แบบ context-sensitive และ normal USER ที่ไม่มี grant ใช้ permanent Default Domain Policy `ALL`, ทำให้ `buildTaskAssigneeWhere` ไม่มี assignee filter. Tests ใน modules/routine/application/queries.test.ts และ __tests__/api/routine-summary.test.ts รวมทั้ง export route test ยืนยัน current behavior. สำหรับ routine.task.read path นี้ behavior เดิมถูกบันทึกเป็น Default Domain Policy ถาวรใน Phase 12A/12C.3; summary/reference/export ยังคงเป็น deferred Routine policy family และต้องมี policy phase แยกก่อนเปลี่ยน
 2. **Employee organization-wide read/export Default Domain Policy** — Employee list, stats และ CSV export ผ่าน Employee adapter/central resolver และ permanent no-grant USER default เมื่อเป็น `NO_APPLICABLE_GRANT` ยังคง broad ตาม current behavior โดยไม่มี Admin/relationship scope; export มีชื่อ, ตำแหน่ง, สังกัด, แผนก, email/phone ตาม query. Phase 12A/12C.2 บันทึกและคง behavior นี้เป็น permanent default และไม่ได้ตัดสิน PII/HR redesign หรือทำ policy narrowing
@@ -948,9 +966,10 @@ effective result; full Default + Additional + Effective visualization remains
 Phase 12E. Evidence is in
 [authorization-phase-12c2-employee-additive-migration.md](authorization-phase-12c2-employee-additive-migration.md).
 
-## 9.4 Phase 12C.3 Routine additive default policy migration
+## 9.4 Historical Phase 12C.3 Routine additive default policy migration
 
-Phase 12C.3 is closed for the nine enforced Routine capabilities. The Routine
+At the historical Phase 12C.3 boundary, the nine enforced Routine capabilities
+were closed. The Routine
 adapter now composes the central resolver decision with a permanent,
 context-sensitive normal-USER Default Domain Policy. The defaults are
 management task read `CREATED + ASSIGNED`, work-item task read `ASSIGNED` for
@@ -1028,7 +1047,7 @@ Evidence and the complete test/invariant inventory are in
 At that Phase 12C.4 boundary, the next handoff was Phase 12C.5 — Leave
 Additive Default Policy Migration; the current handoff is recorded below.
 
-## 9.6 Phase 12C.5 Leave additive default policy migration
+## 9.6 Historical Phase 12C.5 Leave additive default policy migration
 
 Phase 12C.5 is closed for all eight registered Leave capabilities. The Leave
 adapter, presentation projection, Dashboard and LIFF registered Leave routes,
@@ -1073,6 +1092,71 @@ Evidence and the complete test/invariant inventory are in
 [authorization-phase-12c5-leave-additive-migration.md](authorization-phase-12c5-leave-additive-migration.md).
 The exact next handoff is Phase 12D — remaining explicitly deferred non-IT
 authorization surfaces; Email Request/future IT remains outside that boundary.
+
+## 9.7 Phase 12D Routine deferred capability migration
+
+Phase 12D is closed for the three remaining registered Routine capabilities:
+`routine.task.export`, `routine.summary.read`, and `routine.reference.read`.
+The source and tests confirmed that the export route previously used the
+broad authenticated workforce/Admin boundary and a `DEFERRED_EXPORT` work-item
+query, the Dashboard summary accepted validated `mine` and `all` views (with a
+normal USER able to use the broad `all` view), and the reference query always
+returned active units/categories while limiting normal-user employees to the
+current linked active Employee and allowing Dashboard ADMIN to see eligible
+active Employees. LIFF summary forced `mine`, and LIFF reference serialization
+already omitted the Employee list.
+
+The permanent Default Domain Policy is now:
+
+- `routine.task.export`: eligible normal Dashboard USER `ALL`; Dashboard ADMIN
+  has an empty default and relies on central `SYSTEM_ROLE / ADMIN`; LIFF is
+  unsupported by the registry and fails closed.
+- `routine.summary.read`: Dashboard `mine` is `ASSIGNED`, Dashboard `all` is
+  `ALL` for an eligible normal USER, and LIFF is always self-service
+  `ASSIGNED`. The requested view is validated and the channel is derived by
+  the server before policy composition; a configured narrow grant cannot
+  narrow Dashboard `all`, and LIFF ADMIN/configured `ALL` cannot broaden LIFF.
+- `routine.reference.read`: normal Dashboard USER defaults to `OWN`, which
+  retains current linked/current active Employee semantics; Dashboard ADMIN
+  has an empty default and central `ALL`; a configured normal-user `ALL` may
+  expand only the existing active-Employee query. Active shared
+  units/categories remain available independently. LIFF is clamped to `OWN`
+  and continues to omit the broad Employee list during serialization.
+
+The export authorization now resolves `routine.task.export` in the Routine
+application query before constructing the active all-scope task predicate.
+The XLSX workbook remains infrastructure-owned. The old `DEFERRED_EXPORT`
+option and bypass were removed; task-read, role identity, and per-task
+`canReadTasks`/mutation projections are not used as export authority. The
+feature guard, workforce lifecycle/authentication boundary, `xlsx` format
+validation, 2,000-row maximum, active-task filter, batching/order, source
+field omission, workbook serialization, response errors, and after-response
+export audit logging remain unchanged.
+
+Summary keeps its established active-task, relevant-occurrence, date-window,
+and KPI calculations. Reference keeps active/deleted Employee filtering and
+notification-readiness projection. All three operations use the permanent
+`composeAuthorizationAuthority()` seam and preserve configured decision,
+grant provenance, default scopes, effective scopes, and relevant LIFF policy
+state. Configured Team, TeamRole, and direct User grants are accepted through
+the existing generic Administration commands according to registry scopes;
+they are additive and never narrow a baseline.
+
+`RoutinePresentationCapabilities` now projects `canExportTasks`,
+`canReadSummary`, and `canReadReference` from one bounded batch over all 12
+Routine capabilities. Dashboard export visibility uses `canExportTasks`.
+Dashboard/LIFF summary and reference loaders use their operation projections
+only to avoid unsupported requests; scope and resource authorization remain
+server-owned.
+
+The exact closure record, pre-migration trace, verification record, and
+remaining Leave-owned boundaries are in
+[authorization-phase-12d-routine-deferred-migration.md](authorization-phase-12d-routine-deferred-migration.md).
+Leave report/export, participant/detail, attachment, unavailable-approver
+recovery, and the LIFF cancellation decision contract remain intentionally
+domain-owned/unregistered. Email Request remains the only registered
+deferred family. The exact next phase is **Phase 12E — Authorization
+Administration effective-access UX completion**.
 
 ## 10. Explicit non-goals for Phase 0
 

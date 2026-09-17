@@ -35,6 +35,9 @@ const routineUser = {
         canReassignOccurrences: false,
         canChangeOccurrenceDueDate: false,
         canManageImports: false,
+        canExportTasks: true,
+        canReadSummary: true,
+        canReadReference: true,
     },
 };
 

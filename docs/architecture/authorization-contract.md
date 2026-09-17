@@ -217,9 +217,9 @@ contract values.
 | `routine.occurrence.reassign` | `ALL` | `DASHBOARD` | Occurrence reassignment; active target and concurrency checks remain Routine-owned. |
 | `routine.occurrence.change_due_date` | `ALL` | `DASHBOARD` | Explicit occurrence due-date change; date, reminder, lock, and audit behavior remain Routine-owned. |
 | `routine.import.manage` | `ALL` | `DASHBOARD` | Import preview, staging, row, apply, and cancel operations; current Admin-only behavior is `CURRENT_COMPATIBILITY`. |
-| `routine.task.export` | `ALL` | `DASHBOARD` | Routine task export. Current broad USER all-scope behavior is `POLICY_DECISION_REQUIRED`. |
-| `routine.summary.read` | `ASSIGNED`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Routine summary/KPI read. Current USER all-scope behavior is `POLICY_DECISION_REQUIRED`. |
-| `routine.reference.read` | `OWN`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Routine units/categories/assignment reference read. The LIFF response must not expose the employee list; the internal route mode issue is `OPEN`. |
+| `routine.task.export` | `ALL` | `DASHBOARD` | Centrally enforced broad active Routine export; eligible normal Dashboard USER default is `ALL`, while Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`. |
+| `routine.summary.read` | `ASSIGNED`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Centrally enforced context-sensitive KPI read: Dashboard `mine` is `ASSIGNED`, Dashboard `all` is `ALL`, and LIFF is self-service `ASSIGNED`. |
+| `routine.reference.read` | `OWN`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Centrally enforced reference read: normal Dashboard USER default is `OWN`, Dashboard ADMIN/configured `ALL` may expand active Employee references, and LIFF retains the no-Employee-list response contract. |
 
 ### 5.4 Stock
 
@@ -335,7 +335,7 @@ policies:
 
 No runtime branch is based on these labels in Phase 1.
 
-### 8.1 Phase 12A disposition
+### 8.1 Phase 12A disposition (historical target)
 
 The open-policy list above is preserved as a historical Phase 1 record. The
 permanent target is now locked by
@@ -347,14 +347,19 @@ permanent target is now locked by
 - TEAM scope retains its originating Team constraint;
 - Department remains independent from Team;
 - current domain relationships and workflow rules remain domain-owned;
-- Routine summary/reference/export and deferred Leave report/export surfaces
-  remain deferred until a later non-IT policy phase; and
+- At the Phase 12A boundary, Routine summary/reference/export and deferred Leave
+  report/export surfaces remained deferred until a later non-IT policy phase;
+  Phase 12D later migrated the three registered Routine capabilities, while
+  Leave report/export remains domain-owned; and
 - Email Request and the future IT module remain deferred and outside the Phase
   12 roadmap.
 
-Phase 12A does not implement composition, activate compatibility-backed
-grants, change catalog readiness, or modify runtime behavior. The later
-Phase 12B contract is defined in the linked record.
+Phase 12A did not implement composition, activate compatibility-backed grants,
+change catalog readiness, or modify runtime behavior. The later Phase 12B
+contract is defined in the linked record. The current live Routine status and
+the remaining registered deferred Email Request capabilities are recorded in
+[authorization-current-state.md](./authorization-current-state.md) and the
+[Phase 12D closure](./authorization-phase-12d-routine-deferred-migration.md).
 
 ## 9. Explicit Phase 1 non-goals
 

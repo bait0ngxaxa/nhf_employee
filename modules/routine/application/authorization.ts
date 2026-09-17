@@ -22,7 +22,7 @@ import type {
 
 type RoutineTransaction = Prisma.TransactionClient;
 
-export const ROUTINE_ENFORCED_CAPABILITIES = [
+export const ROUTINE_CAPABILITIES = [
     "routine.task.read",
     "routine.task.create",
     "routine.task.update",
@@ -32,21 +32,24 @@ export const ROUTINE_ENFORCED_CAPABILITIES = [
     "routine.occurrence.reassign",
     "routine.occurrence.change_due_date",
     "routine.import.manage",
+    "routine.task.export",
+    "routine.summary.read",
+    "routine.reference.read",
 ] as const;
 
-export type RoutineEnforcedCapability =
-    (typeof ROUTINE_ENFORCED_CAPABILITIES)[number];
+export type RoutineCapability = (typeof ROUTINE_CAPABILITIES)[number];
 
 export type RoutineTaskReadView = "management" | "work-item";
 
 export interface RoutineCapabilityOptions {
     readonly taskReadView?: RoutineTaskReadView;
     readonly requestedScope?: "mine" | "all";
+    readonly summaryView?: "mine" | "all";
 }
 
 export interface RoutineCapabilityAuthorization {
     readonly actor: AuthorizationActor;
-    readonly capability: RoutineEnforcedCapability;
+    readonly capability: RoutineCapability;
     readonly decision: AuthorizationDecision;
     /** Permanent normal-user Default Domain Policy scopes before composition. */
     readonly defaultScopes: readonly AuthorizationScope[];
@@ -54,7 +57,7 @@ export interface RoutineCapabilityAuthorization {
     readonly scopes: readonly AuthorizationScope[];
     /** True only for Dashboard ADMIN system-role authorization. */
     readonly isAdministrative: boolean;
-    /** True when LIFF ADMIN authority was constrained to self-service policy. */
+    /** True when a LIFF authority was constrained to self-service policy. */
     readonly liffSelfServicePolicyApplied: boolean;
 }
 
@@ -64,12 +67,12 @@ export interface RoutineActorAuthorization {
 }
 
 const ROUTINE_CAPABILITY_SET = new Set<string>(
-    ROUTINE_ENFORCED_CAPABILITIES,
+    ROUTINE_CAPABILITIES,
 );
 
-function isRoutineEnforcedCapability(
+function isRoutineCapability(
     capability: string,
-): capability is RoutineEnforcedCapability {
+): capability is RoutineCapability {
     return ROUTINE_CAPABILITY_SET.has(capability);
 }
 
@@ -109,17 +112,6 @@ export function buildRoutineAuthorizationActor(
     });
 }
 
-/**
- * Deferred summary/reference/export projections still use this role-and-
- * channel predicate. Enforced Routine capabilities use the central resolver.
- */
-export function isRoutineAdminActor(
-    role: string,
-    mode: RoutineCommandActor["mode"] = undefined,
-): boolean {
-    return role === "ADMIN" && mode !== "LIFF_SELF_SERVICE";
-}
-
 function freezeScopes(
     scopes: readonly AuthorizationScope[],
 ): readonly AuthorizationScope[] {
@@ -128,7 +120,7 @@ function freezeScopes(
 
 export function defaultRoutineScopes(
     actor: AuthorizationActor,
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
     options: RoutineCapabilityOptions = {},
 ): readonly AuthorizationScope[] {
     if (actor.systemRole !== "USER") return [];
@@ -154,11 +146,19 @@ export function defaultRoutineScopes(
         case "routine.occurrence.change_due_date":
         case "routine.import.manage":
             return [];
+        case "routine.task.export":
+            return ["ALL"];
+        case "routine.summary.read":
+            return options.summaryView === "all"
+                ? ["ALL"]
+                : ["ASSIGNED"];
+        case "routine.reference.read":
+            return ["OWN"];
     }
 }
 
 function routineLiffSelfServiceScopes(
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
     options: RoutineCapabilityOptions,
 ): readonly AuthorizationScope[] | null {
 
@@ -182,8 +182,25 @@ function routineLiffSelfServiceScopes(
         case "routine.occurrence.reassign":
         case "routine.occurrence.change_due_date":
         case "routine.import.manage":
+        case "routine.task.export":
             return null;
+        case "routine.summary.read":
+            return ["ASSIGNED"];
+        case "routine.reference.read":
+            return ["OWN"];
     }
+}
+
+function shouldApplyRoutineLiffSelfServicePolicy(
+    actor: AuthorizationActor,
+    capability: RoutineCapability,
+): boolean {
+    return actor.channel === "LIFF_SELF_SERVICE"
+        && (
+            actor.systemRole === "ADMIN"
+            || capability === "routine.summary.read"
+            || capability === "routine.reference.read"
+        );
 }
 
 function isDashboardSystemRoleAuthorization(
@@ -197,7 +214,7 @@ function isDashboardSystemRoleAuthorization(
 
 function applyRoutineChannelPolicy(
     actor: AuthorizationActor,
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
     options: RoutineCapabilityOptions,
     composedAuthority: ReturnType<typeof composeAuthorizationAuthority>,
 ): {
@@ -211,9 +228,7 @@ function applyRoutineChannelPolicy(
         );
     }
 
-    const isLiffAdmin = actor.channel === "LIFF_SELF_SERVICE"
-        && actor.systemRole === "ADMIN";
-    if (!isLiffAdmin) {
+    if (!shouldApplyRoutineLiffSelfServicePolicy(actor, capability)) {
         return {
             scopes: composedAuthority.scopes,
             isAdministrative: isDashboardSystemRoleAuthorization(
@@ -239,7 +254,7 @@ function applyRoutineChannelPolicy(
 
 function buildRoutineCapabilityAuthorization(
     actor: AuthorizationActor,
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
     decision: AuthorizationDecision,
     options: RoutineCapabilityOptions,
 ): RoutineCapabilityAuthorization {
@@ -266,15 +281,49 @@ function buildRoutineCapabilityAuthorization(
     });
 }
 
+function validateRoutineCapabilityOptions(
+    capability: RoutineCapability,
+    options: RoutineCapabilityOptions,
+): void {
+    if (
+        options.taskReadView !== undefined
+        && options.taskReadView !== "management"
+        && options.taskReadView !== "work-item"
+    ) {
+        throw new RoutineValidationError("มุมมองงาน Routine ไม่ถูกต้อง");
+    }
+    if (
+        options.requestedScope !== undefined
+        && options.requestedScope !== "mine"
+        && options.requestedScope !== "all"
+    ) {
+        throw new RoutineValidationError("ขอบเขตงาน Routine ไม่ถูกต้อง");
+    }
+    if (
+        options.summaryView !== undefined
+        && options.summaryView !== "mine"
+        && options.summaryView !== "all"
+    ) {
+        throw new RoutineValidationError("มุมมองสรุป Routine ไม่ถูกต้อง");
+    }
+    if (
+        options.summaryView !== undefined
+        && capability !== "routine.summary.read"
+    ) {
+        throw new RoutineValidationError("ตัวเลือกสรุป Routine ใช้กับ capability ที่ไม่ถูกต้อง");
+    }
+}
+
 export async function resolveRoutineCapability(
     actor: RoutineCommandActor,
     employeeId: number | null,
     capability: string,
     options: RoutineCapabilityOptions = {},
 ): Promise<RoutineCapabilityAuthorization> {
-    if (!isRoutineEnforcedCapability(capability)) {
+    if (!isRoutineCapability(capability)) {
         throw new RoutineForbiddenError();
     }
+    validateRoutineCapabilityOptions(capability, options);
     const authorizationActor = buildRoutineAuthorizationActor(actor, employeeId);
     const decision = await authorization.resolve(authorizationActor, capability);
     return buildRoutineCapabilityAuthorization(
@@ -287,7 +336,7 @@ export async function resolveRoutineCapability(
 
 function projectRoutineCapabilityDecision(
     actor: AuthorizationActor,
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
     decision: AuthorizationDecision,
 ): boolean {
     try {
@@ -311,7 +360,7 @@ function projectRoutineCapabilityDecision(
 
 function getRoutinePresentationDecision(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
-    capability: RoutineEnforcedCapability,
+    capability: RoutineCapability,
 ): AuthorizationDecision {
     const decision = decisions.get(capability);
     if (decision === undefined) {
@@ -332,10 +381,10 @@ export async function getRoutinePresentationCapabilities(
     );
     const decisions = await authorization.resolveMany(
         authorizationActor,
-        ROUTINE_ENFORCED_CAPABILITIES,
+        ROUTINE_CAPABILITIES,
     );
 
-    const canResolve = (capability: RoutineEnforcedCapability): boolean =>
+    const canResolve = (capability: RoutineCapability): boolean =>
         projectRoutineCapabilityDecision(
             authorizationActor,
             capability,
@@ -354,6 +403,9 @@ export async function getRoutinePresentationCapabilities(
             "routine.occurrence.change_due_date",
         ),
         canManageImports: canResolve("routine.import.manage"),
+        canExportTasks: canResolve("routine.task.export"),
+        canReadSummary: canResolve("routine.summary.read"),
+        canReadReference: canResolve("routine.reference.read"),
     });
 }
 
@@ -375,9 +427,10 @@ export async function resolveRoutineCapabilityInTransaction(
     capability: string,
     options: RoutineCapabilityOptions = {},
 ): Promise<RoutineCapabilityAuthorization> {
-    if (!isRoutineEnforcedCapability(capability)) {
+    if (!isRoutineCapability(capability)) {
         throw new RoutineForbiddenError();
     }
+    validateRoutineCapabilityOptions(capability, options);
     const decision = await authorization.resolveInTransaction(
         activeActor.authorizationActor,
         capability,

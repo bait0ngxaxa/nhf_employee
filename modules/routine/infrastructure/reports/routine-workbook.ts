@@ -6,13 +6,13 @@ import {
     ROUTINE_SCHEDULE_LABELS,
     ROUTINE_TIMING_STATUS_LABELS,
 } from "../../domain/labels";
-import type { SerializedRoutineTaskWorkItem } from "../../application/queries";
+import type { SerializedRoutineTaskExportItem } from "../../application/queries";
 
 const ROUTINE_SHEET_NAME = "รายการงานประจำ";
 const EMPTY_VALUE = "ไม่ได้ระบุ";
 
 export function createRoutineTaskExportWorkbook(
-    tasks: readonly SerializedRoutineTaskWorkItem[],
+    tasks: readonly SerializedRoutineTaskExportItem[],
 ): ExcelJS.Workbook {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "NHF Employee";
@@ -27,7 +27,7 @@ export function createRoutineTaskExportWorkbook(
 }
 
 function toRoutineWorksheetRow(
-    task: SerializedRoutineTaskWorkItem,
+    task: SerializedRoutineTaskExportItem,
 ): Record<string, string | number> {
     const occurrence = task.relevantOccurrence;
     return {
@@ -54,7 +54,7 @@ function toRoutineWorksheetRow(
     };
 }
 
-function formatScheduleDetails(task: SerializedRoutineTaskWorkItem): string {
+function formatScheduleDetails(task: SerializedRoutineTaskExportItem): string {
     const summary = formatRoutineScheduleSummary(task);
     const explicitText = task.scheduleText?.trim();
     if (!explicitText || explicitText === summary) return summary;
@@ -62,7 +62,7 @@ function formatScheduleDetails(task: SerializedRoutineTaskWorkItem): string {
 }
 
 function formatAssignees(
-    task: SerializedRoutineTaskWorkItem,
+    task: SerializedRoutineTaskExportItem,
     role: "OWNER" | "CO_OWNER",
 ): string {
     const names = task.assignees

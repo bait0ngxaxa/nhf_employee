@@ -1,7 +1,8 @@
 # Phase 4 — Routine authorization pilot
 
-Status: implemented as a server-side migration slice. This document records
-the Routine-specific composition around the Phase 3 authorization boundary;
+Status: historical Phase 4 server-side migration slice. Phase 12D now closes
+the remaining Routine capability surfaces; this document records the
+Routine-specific composition that existed around the Phase 3 authorization boundary;
 the Phase 0–3 contracts remain authoritative:
 
 - [Authorization current state](./authorization-current-state.md)
@@ -27,9 +28,12 @@ The following capabilities now pass through the public
 - `routine.import.manage`
 
 `routine.summary.read`, `routine.task.export`, and `routine.reference.read`
-remain deferred because their Phase 0 behavior has unresolved policy questions.
+were deferred at the Phase 4 boundary because their Phase 0 behavior had
+unresolved policy questions.
 The exporter explicitly opts into the deferred work-item path so this pilot
-does not silently change broad USER export behavior.
+did not silently change broad USER export behavior. Phase 12D supersedes this
+historical deferred state; see
+[authorization-phase-12d-routine-deferred-migration.md](./authorization-phase-12d-routine-deferred-migration.md).
 
 ## Server call chains
 
@@ -163,10 +167,10 @@ central resolution:
 The resulting context is not marked administrative. The channel is server-set
 by the LIFF route and cannot be selected by the client.
 
-## Remaining legacy role checks
+## Historical remaining legacy role checks
 
-`isRoutineAdminActor` remains only for intentionally deferred or presentation
-behavior:
+At the historical Phase 4 boundary, `isRoutineAdminActor` remained only for
+intentionally deferred or presentation behavior:
 
 - `getRoutineSummary` retains its frozen summary scope behavior;
 - `getRoutineReferenceData` retains its Dashboard-vs-user employee reference
@@ -179,6 +183,11 @@ props are also unchanged UI contracts; Phase 5 owns their broader integration.
 Other Routine role checks in recipient/scheduler/reminder code describe
 notification composition or background behavior, not a migrated request
 capability, and were not changed in this phase.
+
+Phase 12D removed the production `isRoutineAdminActor` helper after migrating
+summary, reference, and export authorization. The Dashboard `isAdminRole`
+value and `isAdmin` presentation props remain UI/domain presentation
+contracts; they are not server capability authorization.
 
 ## Query and mutation enforcement
 

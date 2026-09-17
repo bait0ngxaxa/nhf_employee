@@ -13,7 +13,8 @@ export {
 } from "./domain/schedule";
 export type {
     RoutineTaskDetailResult,
-    RoutineTaskWorkItemQueryOptions,
+    RoutineTaskExportData,
+    SerializedRoutineTaskExportItem,
     SerializedRoutineTaskWorkItem,
 } from "./application/queries";
 export type { RoutineSchedulerResult } from "./application/scheduler";
@@ -61,6 +62,7 @@ export {
     getRoutineReferenceData,
     getRoutineSummary,
     getLiffRoutineTaskById,
+    getRoutineTaskExportData,
     getRoutineTaskWorkItems,
     getRoutineTaskById,
     getRoutineTasks,

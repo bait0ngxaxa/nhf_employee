@@ -32,12 +32,6 @@ const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.fre
     runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY" as const,
 });
 
-const DEFERRED_ROUTINE: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "DEFERRED" as const,
-    nonGrantableReason:
-        "Deferred Routine runtime path is not consistently backed by central authorization.",
-});
-
 const DEFERRED_EMAIL: CapabilityAdministrationMetadata = Object.freeze({
     runtimeAuthorizationMode: "DEFERRED" as const,
     nonGrantableReason:
@@ -79,9 +73,9 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "routine.occurrence.reassign": CENTRAL_ONLY,
     "routine.occurrence.change_due_date": CENTRAL_ONLY,
     "routine.import.manage": CENTRAL_ONLY,
-    "routine.task.export": DEFERRED_ROUTINE,
-    "routine.summary.read": DEFERRED_ROUTINE,
-    "routine.reference.read": DEFERRED_ROUTINE,
+    "routine.task.export": CENTRAL_WITH_DEFAULT_POLICY,
+    "routine.summary.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "routine.reference.read": CENTRAL_WITH_DEFAULT_POLICY,
 
     "stock.catalog.read": CENTRAL_WITH_DEFAULT_POLICY,
     "stock.inventory.manage": CENTRAL_ONLY,

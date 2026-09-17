@@ -3,6 +3,7 @@ import { type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 
 import { prisma } from "@/lib/db/prisma";
+import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import {
     addCalendarDays,
     calendarDateToDate,
@@ -13,6 +14,7 @@ import {
     getRoutineOccurrences,
     getRoutineReferenceData,
     getRoutineSummary,
+    getRoutineTaskExportData,
     getLiffRoutineTaskById,
     getRoutineTaskById,
     getRoutineTaskWorkItems,
@@ -123,6 +125,7 @@ describe("NHF Routine query authorization", () => {
             options?: {
                 taskReadView?: "management" | "work-item";
                 requestedScope?: "mine" | "all";
+                summaryView?: "mine" | "all";
             },
         ) => {
             const isDashboardAdmin = actor.role === "ADMIN"
@@ -135,13 +138,19 @@ describe("NHF Routine query authorization", () => {
                             ? ["ALL"]
                             : ["ASSIGNED"]
                         : ["CREATED", "ASSIGNED"]
-                    : capability === "routine.task.update"
+                            : capability === "routine.task.update"
                         ? ["CREATED", "ASSIGNED"]
                         : capability === "routine.task.delete"
                             ? ["CREATED"]
                             : capability === "routine.occurrence.read"
                                 ? ["ASSIGNED"]
-                                : ["OWN"];
+                                : capability === "routine.task.export"
+                                    ? ["ALL"]
+                                    : capability === "routine.summary.read"
+                                        ? options?.summaryView === "all"
+                                            ? ["ALL"]
+                                            : ["ASSIGNED"]
+                                        : ["OWN"];
             return {
                 actor: {
                     userId: actor.id,
@@ -503,6 +512,85 @@ describe("NHF Routine query authorization", () => {
                 select: { id: true },
             }),
         );
+        expect(resolveRoutineCapabilityMock).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 5, role: "USER" }),
+            21,
+            "routine.summary.read",
+            { summaryView: "all" },
+        );
+    });
+
+    it("does not turn a structural summary authorization failure into a query", async () => {
+        const authorizationError = new Error("summary resolver unavailable");
+        resolveRoutineCapabilityMock.mockRejectedValueOnce(authorizationError);
+
+        await expect(getRoutineSummary({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+            scope: "all",
+        })).rejects.toBe(authorizationError);
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
+    });
+
+    it("resolves the export capability before querying the broad active task set", async () => {
+        prismaMock.routineTask.count.mockResolvedValue(2);
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            taskRow(71, 42, 5),
+            taskRow(72, 21, 99),
+        ]));
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([]));
+
+        const result = await getRoutineTaskExportData({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        expect(result.status).toBe("ready");
+        if (result.status !== "ready") return;
+        expect(result.recordCount).toBe(2);
+        expect(result.tasks.map((task) => task.id)).toEqual([71, 72]);
+        expect(result.tasks[0]).not.toHaveProperty("canEdit");
+        expect(result.tasks[0]).not.toHaveProperty("canDelete");
+        expect(resolveRoutineCapabilityMock).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 5, role: "USER" }),
+            21,
+            "routine.task.export",
+        );
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { isActive: true },
+                take: EXPORT_LIMITS.routine.batchSize,
+            }),
+        );
+    });
+
+    it("preserves the export row limit after capability resolution", async () => {
+        prismaMock.routineTask.count.mockResolvedValue(
+            EXPORT_LIMITS.routine.maxRows + 1,
+        );
+
+        await expect(getRoutineTaskExportData({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        })).resolves.toEqual({
+            status: "limit-exceeded",
+            recordCount: EXPORT_LIMITS.routine.maxRows + 1,
+            maxRows: EXPORT_LIMITS.routine.maxRows,
+        });
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.routineOccurrence.findMany).not.toHaveBeenCalled();
+    });
+
+    it("does not query export data after a structural authorization failure", async () => {
+        const authorizationError = new Error("export resolver unavailable");
+        resolveRoutineCapabilityMock.mockRejectedValueOnce(authorizationError);
+
+        await expect(getRoutineTaskExportData({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        })).rejects.toBe(authorizationError);
+        expect(prismaMock.routineTask.count).not.toHaveBeenCalled();
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 
     it("returns one task row and the nearest relevant occurrence", async () => {
@@ -603,6 +691,12 @@ describe("NHF Routine query authorization", () => {
                     assignees: { some: { employeeId: 42 } },
                 },
             }),
+        );
+        expect(resolveRoutineCapabilityMock).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 5, role: "USER" }),
+            21,
+            "routine.summary.read",
+            { summaryView: "mine" },
         );
     });
 
@@ -1859,6 +1953,55 @@ describe("NHF Routine query authorization", () => {
                 },
             }),
         );
+    });
+
+    it("expands Dashboard Employee references only when the effective scope is ALL", async () => {
+        prismaMock.routineUnit.findMany.mockResolvedValue(asNever([]));
+        prismaMock.routineCategory.findMany.mockResolvedValue(asNever([]));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([]));
+        resolveRoutineCapabilityMock.mockResolvedValueOnce({
+            actor: {
+                userId: 5,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            capability: "routine.reference.read",
+            decision: {
+                capability: "routine.reference.read",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [],
+            },
+            defaultScopes: ["OWN"],
+            scopes: ["ALL"],
+            isAdministrative: false,
+            liffSelfServicePolicyApplied: false,
+        });
+
+        await getRoutineReferenceData({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        });
+
+        expect(prismaMock.employee.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { status: "ACTIVE", deletedAt: null },
+            }),
+        );
+    });
+
+    it("does not query reference data after a structural authorization failure", async () => {
+        const authorizationError = new Error("reference resolver unavailable");
+        resolveRoutineCapabilityMock.mockRejectedValueOnce(authorizationError);
+
+        await expect(getRoutineReferenceData({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+        })).rejects.toBe(authorizationError);
+        expect(prismaMock.routineUnit.findMany).not.toHaveBeenCalled();
+        expect(prismaMock.routineCategory.findMany).not.toHaveBeenCalled();
+        expect(prismaMock.employee.findMany).not.toHaveBeenCalled();
     });
 
     it("derives notification readiness without returning linked User data", async () => {
