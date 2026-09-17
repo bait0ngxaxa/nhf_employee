@@ -32,12 +32,6 @@ const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.fre
     runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY" as const,
 });
 
-const STOCK_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
-    nonGrantableReason:
-        "The current Stock adapter may translate NO_APPLICABLE_GRANT into a compatibility scope; ordinary grants require explicit policy activation.",
-});
-
 const LEAVE_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
     runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
     nonGrantableReason:
@@ -95,11 +89,11 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "routine.summary.read": DEFERRED_ROUTINE,
     "routine.reference.read": DEFERRED_ROUTINE,
 
-    "stock.catalog.read": STOCK_COMPATIBILITY,
+    "stock.catalog.read": CENTRAL_WITH_DEFAULT_POLICY,
     "stock.inventory.manage": CENTRAL_ONLY,
-    "stock.request.read": STOCK_COMPATIBILITY,
-    "stock.request.create": STOCK_COMPATIBILITY,
-    "stock.request.cancel": STOCK_COMPATIBILITY,
+    "stock.request.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "stock.request.create": CENTRAL_WITH_DEFAULT_POLICY,
+    "stock.request.cancel": CENTRAL_WITH_DEFAULT_POLICY,
     "stock.request.process": CENTRAL_ONLY,
     "stock.report.export": CENTRAL_ONLY,
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     StockCapabilityDeniedError,
     stockService,
@@ -15,7 +15,7 @@ export async function GET(): Promise<NextResponse> {
     if (!auth.ok) return auth.response;
 
     try {
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             buildStockAuthorizationContext(
                 auth.user,
                 auth.employeeId,

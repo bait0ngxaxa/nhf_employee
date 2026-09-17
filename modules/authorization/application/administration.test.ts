@@ -325,6 +325,30 @@ describe("Authorization Administration capability catalog", () => {
             });
             expect(first.find((capability) => capability.key === key)?.nonGrantableReason).toBeUndefined();
         }
+        for (const key of [
+            "stock.catalog.read",
+            "stock.request.read",
+            "stock.request.create",
+            "stock.request.cancel",
+        ]) {
+            expect(first.find((capability) => capability.key === key)).toMatchObject({
+                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
+            });
+            expect(first.find((capability) => capability.key === key)?.nonGrantableReason).toBeUndefined();
+        }
+        for (const key of [
+            "stock.inventory.manage",
+            "stock.request.process",
+            "stock.report.export",
+        ]) {
+            expect(first.find((capability) => capability.key === key)).toMatchObject({
+                runtimeAuthorizationMode: "CENTRAL_ONLY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
+            });
+        }
         expect(first.find(({ key }) => key === "routine.task.export")).toMatchObject({
             runtimeAuthorizationMode: "DEFERRED",
             administrativeStatus: "DEFERRED",
@@ -355,10 +379,6 @@ describe("Authorization Administration capability catalog", () => {
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
         ).map(({ key }) => key)).toEqual([
-            "stock.catalog.read",
-            "stock.request.read",
-            "stock.request.create",
-            "stock.request.cancel",
             "leave.request.read",
             "leave.approval.read",
             "leave.request.create",
@@ -379,6 +399,10 @@ describe("Authorization Administration capability catalog", () => {
             "routine.task.update",
             "routine.task.delete",
             "routine.occurrence.read",
+            "stock.catalog.read",
+            "stock.request.read",
+            "stock.request.create",
+            "stock.request.cancel",
             "notification.inbox.read",
             "notification.inbox.update",
         ]);
@@ -388,19 +412,19 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(13);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
-        )).toHaveLength(11);
+        )).toHaveLength(15);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
-        )).toHaveLength(11);
+        )).toHaveLength(7);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "DEFERRED",
         )).toHaveLength(5);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(24);
+        )).toHaveLength(28);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
-        )).toHaveLength(11);
+        )).toHaveLength(7);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "DEFERRED",
         )).toHaveLength(5);

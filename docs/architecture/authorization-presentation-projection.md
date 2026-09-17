@@ -3,7 +3,8 @@
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
 closed; Employee Phase 8A/8B/8C and Phase 12C.2 additive policy migration
 closed; Phase 9A/9B/9C Department, Audit and Notification integration closed;
-Phase 12C.3 Routine additive policy migration closed
+Phase 12C.3 Routine additive policy migration closed; Phase 12C.4 Stock
+additive policy migration closed
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -204,11 +205,11 @@ the Routine UI.
 
 ## Stock Phase 6B projection
 
-สถานะ: **Phase 6A server enforcement closed; Phase 6B presentation projection closed**
+สถานะ: **Phase 6A server enforcement closed; Phase 6B presentation projection closed; Phase 12C.4 additive policy migration closed**
 
 Stock now owns the immutable `StockPresentationCapabilities` contract and
-resolves it through the same Stock adapter and compatibility translation used
-by Phase 6A. The projection is batched with one `authorization.resolveMany()`
+resolves it through the permanent Stock adapter and Phase 12B additive
+composition used by server enforcement. The projection is batched with one `authorization.resolveMany()`
 call per Dashboard current-user request or LIFF home request. It does not
 replace route guards, resource relationships, Stock domain state or
 transaction-time authorization.
@@ -251,7 +252,7 @@ stale snapshot.
 
 Dashboard-only `stock.inventory.manage` and `stock.report.export` remain false
 in LIFF because the registry does not support those capabilities on
-`LIFF_SELF_SERVICE`. LIFF USER keeps requester compatibility; LIFF ADMIN
+`LIFF_SELF_SERVICE`. LIFF USER keeps requester defaults; LIFF ADMIN
 intentionally remains processor-compatible, and an explicit USER process grant
 is honored. The Routine LIFF ADMIN self-service clamp is not applied to Stock.
 Read ALL never implies process or cancel ALL. Any remaining Stock role check is
@@ -261,7 +262,12 @@ scope, expose a control or authorize a mutation.
 Stock server enforcement remains authoritative. Email Request, Settings and
 other non-Routine/non-Stock presentation and authorization paths remain on
 their existing compatibility behavior until their approved migration phases.
-Routine and Employee behavior is unchanged by the Stock projection.
+Routine and Employee behavior is unchanged by the Stock projection. After
+Phase 12C.4, Stock defaults are permanent domain policy and the projection
+composes them with configured resolver authority; the Authorization
+Administration inspector still shows resolver/configured data and does not
+yet visualize the complete Stock Default + Additional + Effective result.
+That operator view remains Phase 12E.
 
 ## Leave Phase 7B projection
 

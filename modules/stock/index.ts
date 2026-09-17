@@ -96,13 +96,14 @@ export {
 
 export { createStockCommandActor } from "./presentation/stock-command-actor";
 export {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationActor,
     buildStockAuthorizationContext,
+    defaultStockScopes,
     getStockPresentationCapabilities,
-    resolveStockCapabilityForMigration,
+    resolveStockCapability,
     resolveStockCapabilityInTransaction,
-    STOCK_MIGRATED_CAPABILITIES,
+    STOCK_CAPABILITIES,
 } from "./application/authorization";
 export type { StockPresentationCapabilities } from "./application/types";
 export type {
@@ -112,7 +113,7 @@ export type {
     StockAuthorizedCommandActor,
     StockCapabilityAuthorization,
     StockCapabilityOptions,
-    StockMigratedCapability,
+    StockCapability,
     StockRequestQueryAuthorization,
 } from "./application/authorization";
 export { StockCapabilityDeniedError } from "./application/errors";

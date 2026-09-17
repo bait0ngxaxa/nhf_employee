@@ -286,7 +286,6 @@ describe("Phase 10B Authorization Administration commands", () => {
     });
 
     it.each([
-        ["stock.request.read", "OWN"],
         ["leave.request.read", "OWN"],
     ] as const)("rejects %s before opening a transaction when readiness is not GRANTABLE", async (capabilityKey, scope) => {
         const transactionRunner = vi.fn(
@@ -400,6 +399,104 @@ describe("Phase 10B Authorization Administration commands", () => {
         expect(repo.createTeamRoleGrant).toHaveBeenCalledWith(TX, notificationReadGrant);
         expect(repo.createUserGrant).toHaveBeenCalledWith(TX, notificationUpdateGrant);
         expect(auditAppendMock).toHaveBeenCalledTimes(6);
+    });
+
+    it("accepts add/remove for all newly unlocked Stock default-policy capabilities", async () => {
+        const catalogGrant = teamGrant({
+            capabilityKey: "stock.catalog.read",
+            scope: "ALL",
+        });
+        const requestReadGrant = roleGrant({
+            capabilityKey: "stock.request.read",
+            scope: "ALL",
+        });
+        const requestCreateGrant = userGrant({
+            capabilityKey: "stock.request.create",
+            scope: "OWN",
+        });
+        const requestCancelGrant = teamGrant({
+            capabilityKey: "stock.request.cancel",
+            scope: "ALL",
+        });
+        const repo = repository({
+            findTeamById: vi.fn().mockResolvedValue(team()),
+            findTeamGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(catalogGrant)
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(requestCancelGrant),
+            createTeamGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
+            deleteTeamGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
+            findTeamRoleById: vi.fn().mockResolvedValue(role()),
+            findTeamRoleGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(requestReadGrant),
+            createTeamRoleGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
+            deleteTeamRoleGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
+            findUserById: vi.fn().mockResolvedValue({ id: 7 }),
+            findUserGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(requestCreateGrant),
+            createUserGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
+            deleteUserGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
+        });
+        const deps = dependencies(repo);
+
+        await expect(addAuthorizationAdministrationTeamGrant(
+            ADMIN_CONTEXT,
+            10,
+            { capabilityKey: "stock.catalog.read", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(catalogGrant);
+        await expect(removeAuthorizationAdministrationTeamGrant(
+            ADMIN_CONTEXT,
+            10,
+            { capabilityKey: "stock.catalog.read", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(catalogGrant);
+
+        await expect(addAuthorizationAdministrationTeamRoleGrant(
+            ADMIN_CONTEXT,
+            10,
+            20,
+            { capabilityKey: "stock.request.read", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(requestReadGrant);
+        await expect(removeAuthorizationAdministrationTeamRoleGrant(
+            ADMIN_CONTEXT,
+            10,
+            20,
+            { capabilityKey: "stock.request.read", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(requestReadGrant);
+
+        await expect(addAuthorizationAdministrationUserGrant(
+            ADMIN_CONTEXT,
+            7,
+            { capabilityKey: "stock.request.create", scope: "OWN" },
+            deps,
+        )).resolves.toEqual(requestCreateGrant);
+        await expect(removeAuthorizationAdministrationUserGrant(
+            ADMIN_CONTEXT,
+            7,
+            { capabilityKey: "stock.request.create", scope: "OWN" },
+            deps,
+        )).resolves.toEqual(requestCreateGrant);
+
+        await expect(addAuthorizationAdministrationTeamGrant(
+            ADMIN_CONTEXT,
+            10,
+            { capabilityKey: "stock.request.cancel", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(requestCancelGrant);
+        await expect(removeAuthorizationAdministrationTeamGrant(
+            ADMIN_CONTEXT,
+            10,
+            { capabilityKey: "stock.request.cancel", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(requestCancelGrant);
+
+        expect(auditAppendMock).toHaveBeenCalledTimes(8);
     });
 
     it("accepts add/remove for all newly unlocked Routine default-policy capabilities", async () => {
@@ -671,7 +768,7 @@ describe("Phase 10B Authorization Administration commands", () => {
                 role: null,
             }]),
             listTeamGrants: vi.fn().mockResolvedValue([
-                teamGrant({ capabilityKey: "stock.request.read" }),
+                teamGrant({ capabilityKey: "leave.request.read", scope: "OWN" }),
             ]),
             listTeamRoleGrantsForTeam: vi.fn().mockResolvedValue([]),
             updateTeam,
@@ -692,7 +789,7 @@ describe("Phase 10B Authorization Administration commands", () => {
         const disabled = team({ isActive: false });
         const updateTeam = vi.fn().mockResolvedValue(disabled);
         const listTeamGrants = vi.fn().mockResolvedValue([
-            teamGrant({ capabilityKey: "stock.request.read" }),
+            teamGrant({ capabilityKey: "leave.request.read", scope: "OWN" }),
         ]);
         const repo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
@@ -725,7 +822,7 @@ describe("Phase 10B Authorization Administration commands", () => {
                 role: role({ isActive: false }),
             }]),
             listTeamRoleGrantsForTeam: vi.fn().mockResolvedValue([
-                roleGrant({ capabilityKey: "stock.request.read" }),
+                roleGrant({ capabilityKey: "leave.request.read", scope: "OWN" }),
             ]),
             updateTeam,
         });
@@ -745,7 +842,7 @@ describe("Phase 10B Authorization Administration commands", () => {
         const disabledRole = role({ isActive: false });
         const updateTeamRole = vi.fn().mockResolvedValue(disabledRole);
         const listTeamRoleGrants = vi.fn().mockResolvedValue([
-            roleGrant({ capabilityKey: "stock.request.read" }),
+            roleGrant({ capabilityKey: "leave.request.read", scope: "OWN" }),
         ]);
         const repo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
@@ -775,7 +872,7 @@ describe("Phase 10B Authorization Administration commands", () => {
             findUserById: vi.fn().mockResolvedValue({ id: 7 }),
             findMembership: vi.fn().mockResolvedValue(null),
             listTeamGrants: vi.fn().mockResolvedValue([
-                teamGrant({ capabilityKey: "stock.request.read" }),
+                teamGrant({ capabilityKey: "leave.request.read", scope: "OWN" }),
             ]),
             createMembership: membershipCreate,
         });
@@ -800,7 +897,7 @@ describe("Phase 10B Authorization Administration commands", () => {
                 role: role(),
             }]),
             listTeamRoleGrants: vi.fn().mockResolvedValue([
-                roleGrant({ capabilityKey: "stock.request.read" }),
+                roleGrant({ capabilityKey: "leave.request.read", scope: "OWN" }),
             ]),
             updateTeamRole: roleUpdate,
         });

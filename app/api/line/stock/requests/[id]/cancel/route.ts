@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/modules/line";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createStockCommandActor,
     executeCancelStockRequest,
@@ -65,7 +65,7 @@ export async function POST(
             auth.employeeId,
             "LIFF_SELF_SERVICE",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.request.cancel",
             { requestedScope: "all" },

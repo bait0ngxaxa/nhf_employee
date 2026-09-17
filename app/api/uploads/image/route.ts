@@ -3,7 +3,7 @@ import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError } from "@/lib/ssot/http";
 import { saveLocalImageUpload } from "@/lib/uploads/local";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     StockCapabilityDeniedError,
 } from "@/modules/stock";
@@ -13,7 +13,7 @@ async function authorizeImageUpload(): Promise<NextResponse | null> {
     if (!auth.ok) return auth.response;
 
     try {
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             buildStockAuthorizationContext(
                 auth.user,
                 "employeeId" in auth ? auth.employeeId : null,

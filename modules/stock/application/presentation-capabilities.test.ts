@@ -1,26 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
+    AuthorizationActor,
     AuthorizationDecision,
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const mocks = vi.hoisted(() => ({
     resolveMany: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolveMany: mocks.resolveMany,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolveMany: mocks.resolveMany,
+        },
+    };
+});
 
 import {
     buildStockAuthorizationContext,
     getStockPresentationCapabilities,
-    STOCK_MIGRATED_CAPABILITIES,
+    STOCK_CAPABILITIES,
 } from "./authorization";
+import type { StockCapability } from "./authorization";
 
 const DASHBOARD_USER = buildStockAuthorizationContext(
     { id: 7, role: "USER" },
@@ -45,7 +53,7 @@ function decision(
 }
 
 function userGrant(
-    capability: (typeof STOCK_MIGRATED_CAPABILITIES)[number],
+    capability: StockCapability,
     scope: AuthorizationScope,
 ): EffectiveAuthorizationGrant {
     return {
@@ -56,26 +64,29 @@ function userGrant(
 }
 
 function mockDecisions(
-    getDecision: (capability: (typeof STOCK_MIGRATED_CAPABILITIES)[number]) => AuthorizationDecision,
+    getDecision: (
+        capability: StockCapability,
+        actor: AuthorizationActor,
+    ) => AuthorizationDecision,
 ): void {
     mocks.resolveMany.mockImplementation(
-        async (_actor: unknown, capabilities: readonly string[]) => new Map(
+        async (actor: AuthorizationActor, capabilities: readonly string[]) => new Map(
             capabilities.map((capability) => [
                 capability,
-                getDecision(capability as (typeof STOCK_MIGRATED_CAPABILITIES)[number]),
+                getDecision(capability as StockCapability, actor),
             ]),
         ),
     );
 }
 
 function noGrantDecision(
-    capability: (typeof STOCK_MIGRATED_CAPABILITIES)[number],
+    capability: StockCapability,
 ): AuthorizationDecision {
     return decision(capability, false, [], "NO_APPLICABLE_GRANT");
 }
 
 function deniedDecision(
-    capability: (typeof STOCK_MIGRATED_CAPABILITIES)[number],
+    capability: StockCapability,
 ): AuthorizationDecision {
     return decision(capability, false, [], "CHANNEL_NOT_SUPPORTED");
 }
@@ -83,10 +94,34 @@ function deniedDecision(
 describe("Stock presentation capability projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockDecisions(noGrantDecision);
+        mockDecisions((capability, actor) => {
+            if (actor.systemRole === "ADMIN") {
+                if (
+                    actor.channel === "LIFF_SELF_SERVICE"
+                    && (capability === "stock.inventory.manage"
+                        || capability === "stock.report.export")
+                ) {
+                    return deniedDecision(capability);
+                }
+                return decision(
+                    capability,
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [
+                        {
+                            capability,
+                            scope: "ALL",
+                            source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                        },
+                    ],
+                );
+            }
+            return noGrantDecision(capability);
+        });
     });
 
-    it("uses one batched resolver call and returns the Dashboard USER compatibility floor", async () => {
+    it("uses one batched resolver call and returns the Dashboard USER default policy", async () => {
         await expect(getStockPresentationCapabilities(DASHBOARD_USER)).resolves.toEqual({
             canReadCatalog: true,
             canReadOwnRequests: true,
@@ -102,11 +137,11 @@ describe("Stock presentation capability projection", () => {
         expect(mocks.resolveMany).toHaveBeenCalledTimes(1);
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             DASHBOARD_USER.authorizationActor,
-            STOCK_MIGRATED_CAPABILITIES,
+            STOCK_CAPABILITIES,
         );
     });
 
-    it("projects the Dashboard ADMIN compatibility floor independently of role checks", async () => {
+    it("projects Dashboard ADMIN SYSTEM_ROLE authority independently of default policy", async () => {
         const capabilities = await getStockPresentationCapabilities(
             buildStockAuthorizationContext({ id: 7, role: "ADMIN" }, 21, "DASHBOARD"),
         );
@@ -124,7 +159,7 @@ describe("Stock presentation capability projection", () => {
         });
     });
 
-    it("keeps LIFF USER requester compatibility and denies processor compatibility", async () => {
+    it("keeps LIFF USER requester defaults and denies processor authority", async () => {
         const capabilities = await getStockPresentationCapabilities(
             buildStockAuthorizationContext({ id: 7, role: "USER" }, 21, "LIFF_SELF_SERVICE"),
         );
@@ -142,7 +177,7 @@ describe("Stock presentation capability projection", () => {
         });
     });
 
-    it("keeps LIFF ADMIN processor compatibility without the Routine self-service clamp", async () => {
+    it("keeps LIFF ADMIN processor authority without the Routine self-service clamp", async () => {
         const capabilities = await getStockPresentationCapabilities(
             buildStockAuthorizationContext({ id: 7, role: "ADMIN" }, 21, "LIFF_SELF_SERVICE"),
         );
@@ -273,7 +308,7 @@ describe("Stock presentation capability projection", () => {
         });
     });
 
-    it("maps expected NO_APPLICABLE_GRANT denials through compatibility", async () => {
+    it("composes expected defaults from NO_APPLICABLE_GRANT decisions", async () => {
         mockDecisions((capability) => noGrantDecision(capability));
 
         await expect(getStockPresentationCapabilities(DASHBOARD_USER)).resolves.toMatchObject({

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import {
     buildStockAuthorizationContext,
-    resolveStockCapabilityForMigration,
+    resolveStockCapability,
     StockCapabilityDeniedError,
     requireLiffStockProcessorSession,
     stockService,
@@ -35,7 +35,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             auth.employeeId,
             "LIFF_SELF_SERVICE",
         );
-        const processAuthorization = await resolveStockCapabilityForMigration(
+        const processAuthorization = await resolveStockCapability(
             authorization,
             "stock.request.process",
             { requestedScope: "all" },
@@ -43,7 +43,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         let canCancel = false;
         try {
             const cancelAuthorization =
-                await resolveStockCapabilityForMigration(
+                await resolveStockCapability(
                     authorization,
                     "stock.request.cancel",
                     { requestedScope: "all" },

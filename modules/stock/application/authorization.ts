@@ -2,10 +2,12 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationChannel,
     type AuthorizationDecision,
     type AuthorizationScope,
+    type ComposedAuthorizationAuthority,
 } from "@/modules/authorization";
 import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
@@ -15,7 +17,7 @@ import { StockCapabilityDeniedError } from "./errors";
 import type { StockCommandActor } from "../domain/types";
 import type { StockPresentationCapabilities } from "./types";
 
-export const STOCK_MIGRATED_CAPABILITIES = [
+export const STOCK_CAPABILITIES = [
     "stock.catalog.read",
     "stock.inventory.manage",
     "stock.request.read",
@@ -25,8 +27,7 @@ export const STOCK_MIGRATED_CAPABILITIES = [
     "stock.report.export",
 ] as const;
 
-export type StockMigratedCapability =
-    (typeof STOCK_MIGRATED_CAPABILITIES)[number];
+export type StockCapability = (typeof STOCK_CAPABILITIES)[number];
 
 export type StockAuthorizationChannel = Exclude<
     AuthorizationChannel,
@@ -56,15 +57,15 @@ export interface StockCapabilityOptions {
 
 export interface StockCapabilityAuthorization {
     readonly actor: StockAuthorizationActor;
-    readonly capability: StockMigratedCapability;
+    readonly capability: StockCapability;
     readonly decision: AuthorizationDecision;
+    readonly defaultScopes: readonly AuthorizationScope[];
     readonly scopes: readonly AuthorizationScope[];
     readonly isAdministrative: boolean;
-    readonly usedMigrationCompatibility: boolean;
 }
 
 const STOCK_CAPABILITY_SET = new Set<string>(
-    STOCK_MIGRATED_CAPABILITIES,
+    STOCK_CAPABILITIES,
 );
 
 const DASHBOARD_ADMIN_EMPLOYEE_OPTIONAL_CAPABILITIES = new Set<string>([
@@ -73,9 +74,9 @@ const DASHBOARD_ADMIN_EMPLOYEE_OPTIONAL_CAPABILITIES = new Set<string>([
     "stock.request.cancel",
 ]);
 
-function isStockMigratedCapability(
+function isStockCapability(
     capability: string,
-): capability is StockMigratedCapability {
+): capability is StockCapability {
     return STOCK_CAPABILITY_SET.has(capability);
 }
 
@@ -111,35 +112,11 @@ export function buildStockAuthorizationContext(
     });
 }
 
-function freezeScopes(
-    scopes: readonly AuthorizationScope[],
-): readonly AuthorizationScope[] {
-    return Object.freeze([...scopes]);
-}
-
-function legacyStockScopes(
+export function defaultStockScopes(
     actor: StockAuthorizationActor,
-    capability: StockMigratedCapability,
-    options: StockCapabilityOptions,
-): readonly AuthorizationScope[] | null {
-    if (actor.systemRole === "ADMIN") {
-        switch (capability) {
-            case "stock.catalog.read":
-                return ["ALL"];
-            case "stock.inventory.manage":
-                return actor.channel === "DASHBOARD" ? ["ALL"] : null;
-            case "stock.request.read":
-                return options.requestedScope === "all" ? ["ALL"] : ["OWN"];
-            case "stock.request.create":
-                return ["OWN"];
-            case "stock.request.cancel":
-            case "stock.request.process":
-            case "stock.report.export":
-                return capability === "stock.report.export"
-                    ? (actor.channel === "DASHBOARD" ? ["ALL"] : null)
-                    : ["ALL"];
-        }
-    }
+    capability: StockCapability,
+): readonly AuthorizationScope[] {
+    if (actor.systemRole !== "USER") return [];
 
     switch (capability) {
         case "stock.catalog.read":
@@ -151,69 +128,68 @@ function legacyStockScopes(
         case "stock.inventory.manage":
         case "stock.request.process":
         case "stock.report.export":
-            return null;
+            return [];
     }
 }
 
 function isDashboardAdministrativeAuthorization(
     actor: StockAuthorizationActor,
     decision: AuthorizationDecision,
-    usedMigrationCompatibility: boolean,
 ): boolean {
     return actor.channel === "DASHBOARD"
         && actor.systemRole === "ADMIN"
-        && (usedMigrationCompatibility
-            || decision.grants.some((grant) => grant.source.type === "SYSTEM_ROLE"));
+        && decision.grants.some((grant) => grant.source.type === "SYSTEM_ROLE");
 }
 
 function buildStockCapabilityAuthorization(
     actor: StockAuthorizationActor,
-    capability: StockMigratedCapability,
-    decision: AuthorizationDecision,
-    options: StockCapabilityOptions,
+    capability: StockCapability,
+    authority: ComposedAuthorizationAuthority,
 ): StockCapabilityAuthorization {
-    if (!decision.allowed) {
-        const legacyScopes = decision.reason === "NO_APPLICABLE_GRANT"
-            ? legacyStockScopes(actor, capability, options)
-            : null;
-        if (legacyScopes === null) {
-            throw new StockCapabilityDeniedError(
-                capability,
-                decision.reason,
-            );
-        }
-
-        return Object.freeze({
-            actor,
+    if (!authority.allowed) {
+        throw new StockCapabilityDeniedError(
             capability,
-            decision,
-            scopes: freezeScopes(legacyScopes),
-            isAdministrative: isDashboardAdministrativeAuthorization(
-                actor,
-                decision,
-                true,
-            ),
-            usedMigrationCompatibility: true,
-        });
+            authority.configuredDecision.reason,
+        );
     }
 
     return Object.freeze({
         actor,
         capability,
-        decision,
-        scopes: decision.scopes,
+        decision: authority.configuredDecision,
+        defaultScopes: authority.defaultScopes,
+        scopes: authority.scopes,
         isAdministrative: isDashboardAdministrativeAuthorization(
             actor,
-            decision,
-            false,
+            authority.configuredDecision,
         ),
-        usedMigrationCompatibility: false,
     });
+}
+
+function composeStockCapabilityAuthorization(
+    actor: StockAuthorizationActor,
+    capability: string,
+    decision: AuthorizationDecision,
+): StockCapabilityAuthorization {
+    if (!isStockCapability(capability)) {
+        throw new StockCapabilityDeniedError(
+            capability,
+            decision.reason ?? "UNKNOWN_CAPABILITY",
+        );
+    }
+
+    const authority = composeAuthorizationAuthority(
+        actor,
+        capability,
+        defaultStockScopes(actor, capability),
+        decision,
+    );
+    return buildStockCapabilityAuthorization(actor, capability, authority);
 }
 
 function getStockPresentationDecision(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
-    capability: StockMigratedCapability,
+    capability: StockCapability,
 ): AuthorizationDecision {
     const decision = decisions.get(capability);
     if (decision === undefined) {
@@ -226,16 +202,14 @@ function getStockPresentationDecision(
 
 function projectStockCapabilityDecision(
     actor: StockAuthorizationActor,
-    capability: StockMigratedCapability,
+    capability: StockCapability,
     decision: AuthorizationDecision,
-    options: StockCapabilityOptions = {},
 ): readonly AuthorizationScope[] | null {
     try {
-        return buildStockCapabilityAuthorization(
+        return composeStockCapabilityAuthorization(
             actor,
             capability,
             decision,
-            options,
         ).scopes;
     } catch (error) {
         if (
@@ -261,46 +235,34 @@ export async function getStockPresentationCapabilities(
     const actor = context.authorizationActor;
     const decisions = await authorization.resolveMany(
         actor,
-        STOCK_MIGRATED_CAPABILITIES,
+        STOCK_CAPABILITIES,
     );
 
     const project = (
-        capability: StockMigratedCapability,
-        options: StockCapabilityOptions = {},
+        capability: StockCapability,
     ): readonly AuthorizationScope[] | null =>
         projectStockCapabilityDecision(
             actor,
             capability,
             getStockPresentationDecision(decisions, capability),
-            options,
         );
 
-    const readOwnScopes = project("stock.request.read", {
-        requestedScope: "mine",
-    });
-    const readAllScopes = project("stock.request.read", {
-        requestedScope: "all",
-    });
-    const cancelOwnScopes = project("stock.request.cancel", {
-        requestedScope: "mine",
-    });
-    const cancelAllScopes = project("stock.request.cancel", {
-        requestedScope: "all",
-    });
+    const readScopes = project("stock.request.read");
+    const cancelScopes = project("stock.request.cancel");
 
     return Object.freeze({
         canReadCatalog: hasStockScope(
             project("stock.catalog.read"),
             "ALL",
         ),
-        canReadOwnRequests: hasStockScope(readOwnScopes, "OWN"),
-        canReadAllRequests: hasStockScope(readAllScopes, "ALL"),
+        canReadOwnRequests: hasStockScope(readScopes, "OWN"),
+        canReadAllRequests: hasStockScope(readScopes, "ALL"),
         canCreateRequests: hasStockScope(
             project("stock.request.create"),
             "OWN",
         ),
-        canCancelOwnRequests: hasStockScope(cancelOwnScopes, "OWN"),
-        canCancelAnyRequests: hasStockScope(cancelAllScopes, "ALL"),
+        canCancelOwnRequests: hasStockScope(cancelScopes, "OWN"),
+        canCancelAnyRequests: hasStockScope(cancelScopes, "ALL"),
         canProcessRequests: hasStockScope(
             project("stock.request.process"),
             "ALL",
@@ -316,36 +278,30 @@ export async function getStockPresentationCapabilities(
     });
 }
 
-export async function resolveStockCapabilityForMigration(
+export async function resolveStockCapability(
     context: StockAuthorizationContext,
     capability: string,
     options: StockCapabilityOptions = {},
 ): Promise<StockCapabilityAuthorization> {
+    // requestedScope describes the caller's query view, not authorization authority.
+    void options;
     const decision = await authorization.resolve(
         context.authorizationActor,
         capability,
     );
-    if (!isStockMigratedCapability(capability)) {
-        throw new StockCapabilityDeniedError(
-            capability,
-            decision.reason ?? "UNKNOWN_CAPABILITY",
-        );
-    }
-
-    return buildStockCapabilityAuthorization(
+    return composeStockCapabilityAuthorization(
         context.authorizationActor,
         capability,
         decision,
-        options,
     );
 }
 
-export async function assertStockCapabilityForMigration(
+export async function assertStockCapability(
     context: StockAuthorizationContext,
     capability: string,
     options: StockCapabilityOptions = {},
 ): Promise<StockCapabilityAuthorization> {
-    return resolveStockCapabilityForMigration(context, capability, options);
+    return resolveStockCapability(context, capability, options);
 }
 
 interface ActiveStockUserRecord {
@@ -385,7 +341,7 @@ function isActiveStockEmployee(
     return employee?.status === "ACTIVE" && employee.deletedAt === null;
 }
 
-function canUseLegacyDashboardAdminLifecycle(
+function canUseDashboardAdminAccountOnlyLifecycle(
     channel: StockAuthorizationChannel,
     role: UserRole,
     capability: string,
@@ -401,6 +357,8 @@ export async function resolveStockCapabilityInTransaction(
     capability: string,
     options: StockCapabilityOptions = {},
 ): Promise<StockCapabilityAuthorization> {
+    // requestedScope describes the caller's query view, not authorization authority.
+    void options;
     const requestedActor = actor.authorization.authorizationActor;
     if (requestedActor.userId !== actor.id) {
         throw new WorkforceAuthorizationError();
@@ -412,7 +370,7 @@ export async function resolveStockCapabilityInTransaction(
     }
 
     const currentRole = parseUserRole(user.role);
-    const employeeIsOptional = canUseLegacyDashboardAdminLifecycle(
+    const employeeIsOptional = canUseDashboardAdminAccountOnlyLifecycle(
         requestedActor.channel,
         currentRole,
         capability,
@@ -437,17 +395,9 @@ export async function resolveStockCapabilityInTransaction(
         capability,
         tx,
     );
-    if (!isStockMigratedCapability(capability)) {
-        throw new StockCapabilityDeniedError(
-            capability,
-            decision.reason ?? "UNKNOWN_CAPABILITY",
-        );
-    }
-
-    return buildStockCapabilityAuthorization(
+    return composeStockCapabilityAuthorization(
         activeActor,
         capability,
         decision,
-        options,
     );
 }

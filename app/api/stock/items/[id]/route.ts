@@ -4,7 +4,7 @@ import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createStockCommandActor,
     StockCapabilityDeniedError,
@@ -41,7 +41,7 @@ export async function PATCH(
             "employeeId" in auth ? auth.employeeId : null,
             "DASHBOARD",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.inventory.manage",
         );
@@ -109,7 +109,7 @@ export async function DELETE(
             "employeeId" in auth ? auth.employeeId : null,
             "DASHBOARD",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.inventory.manage",
         );

@@ -36,7 +36,7 @@ vi.mock("@/modules/stock", async () => {
     );
     return {
         ...actual,
-        assertStockCapabilityForMigration: stockAuthorizationMock.assert,
+        assertStockCapability: stockAuthorizationMock.assert,
         getStockBalanceReportMeta: vi.fn(),
         createStockBalanceReportXlsxResponse: vi.fn(),
         getStockRequestReportYears: vi.fn(),
@@ -76,8 +76,8 @@ describe("GET /api/stock/reports/export", () => {
                 grants: [],
             },
             scopes: ["ALL"],
+            defaultScopes: [],
             isAdministrative: true,
-            usedMigrationCompatibility: false,
         });
     });
 
@@ -206,8 +206,8 @@ describe("GET /api/stock/reports/export", () => {
                 }],
             },
             scopes: ["ALL"],
+            defaultScopes: [],
             isAdministrative: false,
-            usedMigrationCompatibility: false,
         });
         vi.mocked(getStockRequestReportYears).mockResolvedValue([2031]);
 

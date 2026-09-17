@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     buildStockAuthorizationContext,
-    resolveStockCapabilityForMigration,
+    resolveStockCapability,
     StockCapabilityDeniedError,
     stockService,
     toLiffStockRequestDetail,
@@ -31,7 +31,7 @@ export async function GET(
             auth.employeeId,
             "LIFF_SELF_SERVICE",
         );
-        const readAuthorization = await resolveStockCapabilityForMigration(
+        const readAuthorization = await resolveStockCapability(
             authorization,
             "stock.request.read",
             { requestedScope: "all" },
@@ -52,7 +52,7 @@ export async function GET(
         let canProcess = false;
         try {
             const processAuthorization =
-                await resolveStockCapabilityForMigration(
+                await resolveStockCapability(
                     authorization,
                     "stock.request.process",
                     { requestedScope: "all" },
@@ -65,7 +65,7 @@ export async function GET(
         let canCancel = false;
         try {
             const cancelAuthorization =
-                await resolveStockCapabilityForMigration(
+                await resolveStockCapability(
                     authorization,
                     "stock.request.cancel",
                     { requestedScope: "all" },

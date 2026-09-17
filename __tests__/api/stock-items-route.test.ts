@@ -41,7 +41,7 @@ vi.mock("@/modules/stock", async () => {
     );
     return {
         ...actual,
-        assertStockCapabilityForMigration: stockAuthorizationMock.assert,
+        assertStockCapability: stockAuthorizationMock.assert,
         stockService: {
             ...actual.stockService,
             updateItem: vi.fn(),
@@ -99,8 +99,8 @@ describe("Stock Item Routes", () => {
                 grants: [],
             },
             scopes: ["ALL"],
+            defaultScopes: [],
             isAdministrative: true,
-            usedMigrationCompatibility: false,
         });
     });
 
@@ -258,8 +258,8 @@ describe("Stock Item Routes", () => {
                 }],
             },
             scopes: ["ALL"],
+            defaultScopes: [],
             isAdministrative: false,
-            usedMigrationCompatibility: false,
         });
         vi.mocked(stockService.updateItem).mockResolvedValue(updatedItem as never);
 

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createStockBalanceReportXlsxResponse,
     createStockRequestReportXlsxResponse,
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     try {
         const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             buildStockAuthorizationContext(
                 auth.user,
                 "employeeId" in auth ? auth.employeeId : null,

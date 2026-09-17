@@ -3,7 +3,7 @@ import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createItemSchema,
     createStockCommandActor,
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const auth = await requireActiveWorkforceOrAdminSession();
         if (!auth.ok) return auth.response;
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             buildStockAuthorizationContext(
                 auth.user,
                 "employeeId" in auth ? auth.employeeId : null,
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             "employeeId" in auth ? auth.employeeId : null,
             "DASHBOARD",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.inventory.manage",
         );

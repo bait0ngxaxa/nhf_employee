@@ -2,7 +2,7 @@ import { requireLiffWorkforceSession } from "@/modules/line";
 import { forbidden } from "@/lib/ssot/http";
 import {
     buildStockAuthorizationContext,
-    resolveStockCapabilityForMigration,
+    resolveStockCapability,
 } from "../application/authorization";
 import { StockCapabilityDeniedError } from "../application/errors";
 
@@ -18,7 +18,7 @@ export async function requireLiffStockProcessorSession(): Promise<
         "LIFF_SELF_SERVICE",
     );
     try {
-        await resolveStockCapabilityForMigration(
+        await resolveStockCapability(
             authorization,
             "stock.request.process",
             { requestedScope: "all" },

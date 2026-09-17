@@ -9,7 +9,7 @@ import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 const mocks = vi.hoisted(() => ({
     requireLiffWorkforceSession: vi.fn(),
     requireLiffStockProcessorSession: vi.fn(),
-    resolveStockCapabilityForMigration: vi.fn(),
+    resolveStockCapability: vi.fn(),
     getItems: vi.fn(),
     getVariantAvailability: vi.fn(),
     getCategories: vi.fn(),
@@ -45,8 +45,8 @@ vi.mock("@/modules/stock", async () => {
         ...actual,
         requireLiffStockProcessorSession:
             mocks.requireLiffStockProcessorSession,
-        resolveStockCapabilityForMigration:
-            mocks.resolveStockCapabilityForMigration,
+        resolveStockCapability:
+            mocks.resolveStockCapability,
         stockService: {
             ...actual.stockService,
             getItems: mocks.getItems,
@@ -103,7 +103,7 @@ import {
     StockRequestIdempotencyConflictError,
     type StockAuthorizationContext,
     type StockCapabilityAuthorization,
-    type StockMigratedCapability,
+    type StockCapability,
 } from "@/modules/stock";
 
 const USER_AUTH = {
@@ -238,7 +238,7 @@ describe("LIFF Stock route adapters", () => {
             }
             return auth;
         });
-        mocks.resolveStockCapabilityForMigration.mockImplementation(
+        mocks.resolveStockCapability.mockImplementation(
             async (
                 context: StockAuthorizationContext,
                 capability: string,
@@ -256,7 +256,7 @@ describe("LIFF Stock route adapters", () => {
                     : (["OWN"] as const);
                 return {
                     actor,
-                    capability: capability as StockMigratedCapability,
+                    capability: capability as StockCapability,
                     decision: {
                         capability,
                         allowed: true,
@@ -264,8 +264,8 @@ describe("LIFF Stock route adapters", () => {
                         grants: [],
                     },
                     scopes,
+                    defaultScopes: [],
                     isAdministrative: false,
-                    usedMigrationCompatibility: false,
                 };
             },
         );
@@ -472,7 +472,7 @@ describe("LIFF Stock route adapters", () => {
             ...RAW_REQUEST,
             requestedBy: 7,
         });
-        mocks.resolveStockCapabilityForMigration.mockImplementation(
+        mocks.resolveStockCapability.mockImplementation(
             async (
                 context: StockAuthorizationContext,
                 capability: string,
@@ -480,7 +480,7 @@ describe("LIFF Stock route adapters", () => {
                 if (capability === "stock.request.read") {
                     return {
                         actor: context.authorizationActor,
-                        capability: capability as StockMigratedCapability,
+                        capability: capability as StockCapability,
                         decision: {
                             capability,
                             allowed: true,
@@ -488,8 +488,8 @@ describe("LIFF Stock route adapters", () => {
                             grants: [],
                         },
                         scopes: ["ALL"],
+                        defaultScopes: [],
                         isAdministrative: false,
-                        usedMigrationCompatibility: false,
                     };
                 }
                 throw new StockCapabilityDeniedError(

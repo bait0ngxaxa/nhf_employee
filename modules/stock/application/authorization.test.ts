@@ -7,14 +7,16 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 import {
     buildStockAuthorizationContext,
-    resolveStockCapabilityForMigration,
+    defaultStockScopes,
+    resolveStockCapability,
     resolveStockCapabilityInTransaction,
     type StockAuthorizedCommandActor,
-    type StockMigratedCapability,
+    type StockCapability,
 } from "./authorization";
 import { StockCapabilityDeniedError } from "./errors";
 import { requireLiffStockProcessorSession } from "../presentation/liff-stock-auth";
@@ -31,12 +33,17 @@ const liffMocks = vi.hoisted(() => ({
     forbidden: vi.fn(() => new Response(null, { status: 403 })),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: mocks.resolve,
-        resolveInTransaction: mocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: mocks.resolve,
+            resolveInTransaction: mocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/row-locks", () => ({
     lockEmployeeRows: mocks.lockEmployeeRows,
@@ -79,7 +86,7 @@ function decision(
 }
 
 function userGrant(
-    capability: StockMigratedCapability,
+    capability: StockCapability,
     scope: AuthorizationScope,
 ): EffectiveAuthorizationGrant {
     return {
@@ -90,7 +97,7 @@ function userGrant(
 }
 
 function systemRoleGrant(
-    capability: StockMigratedCapability,
+    capability: StockCapability,
 ): EffectiveAuthorizationGrant {
     return {
         capability,
@@ -110,7 +117,7 @@ function commandActor(
     };
 }
 
-describe("Stock authorization migration adapter", () => {
+describe("Stock authorization adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
         mocks.resolveInTransaction.mockReset();
@@ -129,7 +136,7 @@ describe("Stock authorization migration adapter", () => {
         } satisfies AuthorizationActor);
     });
 
-    it("keeps Dashboard USER catalog and request access on the compatibility floor", async () => {
+    it("composes the permanent Dashboard USER catalog and request defaults", async () => {
         mocks.resolve
             .mockResolvedValueOnce(
                 decision(
@@ -148,11 +155,11 @@ describe("Stock authorization migration adapter", () => {
                 ),
             );
 
-        const catalog = await resolveStockCapabilityForMigration(
+        const catalog = await resolveStockCapability(
             context(),
             "stock.catalog.read",
         );
-        const requests = await resolveStockCapabilityForMigration(
+        const requests = await resolveStockCapability(
             context(),
             "stock.request.read",
             { requestedScope: "all" },
@@ -160,7 +167,8 @@ describe("Stock authorization migration adapter", () => {
 
         expect(catalog.scopes).toEqual(["ALL"]);
         expect(requests.scopes).toEqual(["OWN"]);
-        expect(catalog.usedMigrationCompatibility).toBe(true);
+        expect(catalog.defaultScopes).toEqual(["ALL"]);
+        expect(requests.defaultScopes).toEqual(["OWN"]);
         expect(mocks.resolve).toHaveBeenNthCalledWith(
             1,
             context().authorizationActor,
@@ -168,7 +176,44 @@ describe("Stock authorization migration adapter", () => {
         );
     });
 
-    it("keeps LIFF USER requester compatibility and denies processor access", async () => {
+    it.each([
+        ["stock.catalog.read", ["ALL"]],
+        ["stock.request.read", ["OWN"]],
+        ["stock.request.create", ["OWN"]],
+        ["stock.request.cancel", ["OWN"]],
+        ["stock.inventory.manage", []],
+        ["stock.request.process", []],
+        ["stock.report.export", []],
+    ] as const)(
+        "applies the permanent USER default policy for %s",
+        async (capability, expectedScopes) => {
+            expect(defaultStockScopes(
+                context().authorizationActor,
+                capability,
+            )).toEqual(expectedScopes);
+            mocks.resolve.mockResolvedValue(
+                decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+            );
+
+            if (expectedScopes.length === 0) {
+                await expect(
+                    resolveStockCapability(context(), capability),
+                ).rejects.toMatchObject({
+                    authorizationReason: "NO_APPLICABLE_GRANT",
+                });
+                return;
+            }
+
+            const result = await resolveStockCapability(
+                context(),
+                capability,
+            );
+            expect(result.defaultScopes).toEqual(expectedScopes);
+            expect(result.scopes).toEqual(expectedScopes);
+        },
+    );
+
+    it("composes LIFF USER requester defaults and denies processor access", async () => {
         mocks.resolve
             .mockResolvedValueOnce(
                 decision(
@@ -195,11 +240,11 @@ describe("Stock authorization migration adapter", () => {
                 ),
             );
 
-        const catalog = await resolveStockCapabilityForMigration(
+        const catalog = await resolveStockCapability(
             context("USER", "LIFF_SELF_SERVICE"),
             "stock.catalog.read",
         );
-        const requests = await resolveStockCapabilityForMigration(
+        const requests = await resolveStockCapability(
             context("USER", "LIFF_SELF_SERVICE"),
             "stock.request.read",
             { requestedScope: "all" },
@@ -208,7 +253,7 @@ describe("Stock authorization migration adapter", () => {
         expect(catalog.scopes).toEqual(["ALL"]);
         expect(requests.scopes).toEqual(["OWN"]);
         await expect(
-            resolveStockCapabilityForMigration(
+            resolveStockCapability(
                 context("USER", "LIFF_SELF_SERVICE"),
                 "stock.request.process",
             ),
@@ -218,42 +263,45 @@ describe("Stock authorization migration adapter", () => {
         });
     });
 
-    it("keeps Dashboard ADMIN compatibility when no grant applies", async () => {
+    it("uses central SYSTEM_ROLE authority for Dashboard ADMIN", async () => {
         mocks.resolve
             .mockResolvedValueOnce(
                 decision(
                     "stock.inventory.manage",
-                    false,
-                    [],
-                    "NO_APPLICABLE_GRANT",
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [systemRoleGrant("stock.inventory.manage")],
                 ),
             )
             .mockResolvedValueOnce(
                 decision(
                     "stock.request.process",
-                    false,
-                    [],
-                    "NO_APPLICABLE_GRANT",
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [systemRoleGrant("stock.request.process")],
                 ),
             )
             .mockResolvedValueOnce(
                 decision(
                     "stock.report.export",
-                    false,
-                    [],
-                    "NO_APPLICABLE_GRANT",
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [systemRoleGrant("stock.report.export")],
                 ),
             );
 
-        const inventory = await resolveStockCapabilityForMigration(
+        const inventory = await resolveStockCapability(
             context("ADMIN"),
             "stock.inventory.manage",
         );
-        const process = await resolveStockCapabilityForMigration(
+        const process = await resolveStockCapability(
             context("ADMIN"),
             "stock.request.process",
         );
-        const report = await resolveStockCapabilityForMigration(
+        const report = await resolveStockCapability(
             context("ADMIN"),
             "stock.report.export",
         );
@@ -261,7 +309,10 @@ describe("Stock authorization migration adapter", () => {
         expect(inventory.scopes).toEqual(["ALL"]);
         expect(process.scopes).toEqual(["ALL"]);
         expect(report.scopes).toEqual(["ALL"]);
-        expect(inventory.usedMigrationCompatibility).toBe(true);
+        expect(inventory.defaultScopes).toEqual([]);
+        expect(process.defaultScopes).toEqual([]);
+        expect(report.defaultScopes).toEqual([]);
+        expect(inventory.isAdministrative).toBe(true);
     });
 
     it("preserves the Dashboard ADMIN mine/all request distinction", async () => {
@@ -285,12 +336,12 @@ describe("Stock authorization migration adapter", () => {
                 ),
             );
 
-        const mine = await resolveStockCapabilityForMigration(
+        const mine = await resolveStockCapability(
             context("ADMIN"),
             "stock.request.read",
             { requestedScope: "mine" },
         );
-        const all = await resolveStockCapabilityForMigration(
+        const all = await resolveStockCapability(
             context("ADMIN"),
             "stock.request.read",
             { requestedScope: "all" },
@@ -302,7 +353,7 @@ describe("Stock authorization migration adapter", () => {
         expect(all.isAdministrative).toBe(true);
     });
 
-    it("keeps LIFF ADMIN processor compatibility while leaving dashboard-only capabilities unsupported", async () => {
+    it("keeps LIFF ADMIN processor authority while leaving dashboard-only capabilities unsupported", async () => {
         mocks.resolve
             .mockResolvedValueOnce(
                 decision(
@@ -320,9 +371,17 @@ describe("Stock authorization migration adapter", () => {
                     [],
                     "CHANNEL_NOT_SUPPORTED",
                 ),
+            )
+            .mockResolvedValueOnce(
+                decision(
+                    "stock.report.export",
+                    false,
+                    [],
+                    "CHANNEL_NOT_SUPPORTED",
+                ),
             );
 
-        const processor = await resolveStockCapabilityForMigration(
+        const processor = await resolveStockCapability(
             context("ADMIN", "LIFF_SELF_SERVICE"),
             "stock.request.process",
             { requestedScope: "all" },
@@ -331,7 +390,7 @@ describe("Stock authorization migration adapter", () => {
         expect(processor.scopes).toEqual(["ALL"]);
         expect(processor.actor.channel).toBe("LIFF_SELF_SERVICE");
         await expect(
-            resolveStockCapabilityForMigration(
+            resolveStockCapability(
                 context("ADMIN", "LIFF_SELF_SERVICE"),
                 "stock.inventory.manage",
             ),
@@ -339,9 +398,18 @@ describe("Stock authorization migration adapter", () => {
             authorizationReason: "CHANNEL_NOT_SUPPORTED",
             statusCode: 403,
         });
+        await expect(
+            resolveStockCapability(
+                context("ADMIN", "LIFF_SELF_SERVICE"),
+                "stock.report.export",
+            ),
+        ).rejects.toMatchObject({
+            authorizationReason: "CHANNEL_NOT_SUPPORTED",
+            statusCode: 403,
+        });
     });
 
-    it("honors an explicit USER grant without using compatibility", async () => {
+    it("adds an explicit USER grant to the permanent policy", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "stock.request.process",
@@ -352,14 +420,14 @@ describe("Stock authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveStockCapabilityForMigration(
+        const result = await resolveStockCapability(
             context(),
             "stock.request.process",
             { requestedScope: "all" },
         );
 
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(result.defaultScopes).toEqual([]);
         expect(result.isAdministrative).toBe(false);
     });
 
@@ -374,7 +442,7 @@ describe("Stock authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveStockCapabilityForMigration(
+        const result = await resolveStockCapability(
             context(),
             "stock.request.read",
             { requestedScope: "all" },
@@ -387,11 +455,31 @@ describe("Stock authorization migration adapter", () => {
             channel: "DASHBOARD",
         });
         expect(result.scopes).toEqual(["OWN"]);
-        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(result.defaultScopes).toEqual(["OWN"]);
         expect(mocks.resolve).toHaveBeenCalledWith(
             result.actor,
             "stock.request.read",
         );
+    });
+
+    it("keeps cancel authority at OWN when the requested view is all", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "stock.request.cancel",
+                false,
+                [],
+                "NO_APPLICABLE_GRANT",
+            ),
+        );
+
+        const result = await resolveStockCapability(
+            context(),
+            "stock.request.cancel",
+            { requestedScope: "all" },
+        );
+
+        expect(result.defaultScopes).toEqual(["OWN"]);
+        expect(result.scopes).toEqual(["OWN"]);
     });
 
     it("honors an explicit LIFF USER processor grant", async () => {
@@ -405,7 +493,7 @@ describe("Stock authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveStockCapabilityForMigration(
+        const result = await resolveStockCapability(
             context("USER", "LIFF_SELF_SERVICE"),
             "stock.request.process",
             { requestedScope: "all" },
@@ -413,7 +501,7 @@ describe("Stock authorization migration adapter", () => {
 
         expect(result.actor.channel).toBe("LIFF_SELF_SERVICE");
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(result.defaultScopes).toEqual([]);
     });
 
     it("checks LIFF workforce before the central processor capability", async () => {
@@ -479,10 +567,10 @@ describe("Stock authorization migration adapter", () => {
             );
 
         await expect(
-            resolveStockCapabilityForMigration(context(), "stock.unknown"),
+            resolveStockCapability(context(), "stock.unknown"),
         ).rejects.toBeInstanceOf(StockCapabilityDeniedError);
         await expect(
-            resolveStockCapabilityForMigration(
+            resolveStockCapability(
                 context("USER", "LIFF_SELF_SERVICE"),
                 "stock.request.process",
             ),
@@ -496,7 +584,7 @@ describe("Stock authorization migration adapter", () => {
         mocks.resolve.mockRejectedValue(configurationError);
 
         await expect(
-            resolveStockCapabilityForMigration(
+            resolveStockCapability(
                 context(),
                 "stock.request.read",
             ),
@@ -552,7 +640,7 @@ describe("Stock authorization migration adapter", () => {
         expect(result.scopes).toEqual(["OWN"]);
     });
 
-    it("denies Dashboard ADMIN compatibility after the persisted role is downgraded to USER", async () => {
+    it("denies stale Dashboard ADMIN authority after the persisted role is downgraded to USER", async () => {
         const tx = {
             user: {
                 findUnique: vi.fn().mockResolvedValue({
@@ -619,7 +707,7 @@ describe("Stock authorization migration adapter", () => {
         "stock.request.process",
         "stock.request.cancel",
     ] as const)(
-        "keeps legacy Dashboard ADMIN transaction access without an employee profile for %s",
+        "keeps Dashboard ADMIN account-only transaction access without an employee profile for %s",
         async (capability) => {
             const tx = {
                 user: {
@@ -633,7 +721,13 @@ describe("Stock authorization migration adapter", () => {
                 },
             } as never;
             mocks.resolveInTransaction.mockResolvedValue(
-                decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+                decision(
+                    capability,
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [systemRoleGrant(capability)],
+                ),
             );
 
             const result = await resolveStockCapabilityInTransaction(
@@ -643,7 +737,8 @@ describe("Stock authorization migration adapter", () => {
             );
 
             expect(result.scopes).toEqual(["ALL"]);
-            expect(result.usedMigrationCompatibility).toBe(true);
+            expect(result.defaultScopes).toEqual([]);
+            expect(result.isAdministrative).toBe(true);
             expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
             expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
                 {

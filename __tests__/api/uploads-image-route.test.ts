@@ -6,7 +6,7 @@ import type * as StockModule from "@/modules/stock";
 
 const mocks = vi.hoisted(() => ({
     requireActiveWorkforceOrAdminSession: vi.fn(),
-    assertStockCapabilityForMigration: vi.fn(),
+    assertStockCapability: vi.fn(),
     saveLocalImageUpload: vi.fn(),
 }));
 
@@ -21,7 +21,7 @@ vi.mock("@/lib/uploads/local", () => ({
 
 vi.mock("@/modules/stock", async (importOriginal) => ({
     ...(await importOriginal<typeof StockModule>()),
-    assertStockCapabilityForMigration: mocks.assertStockCapabilityForMigration,
+    assertStockCapability: mocks.assertStockCapability,
 }));
 
 import { POST } from "@/app/api/uploads/image/route";
@@ -72,7 +72,7 @@ describe("POST /api/uploads/image", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(AUTH);
-        mocks.assertStockCapabilityForMigration.mockResolvedValue(undefined);
+        mocks.assertStockCapability.mockResolvedValue(undefined);
         mocks.saveLocalImageUpload.mockResolvedValue(UPLOAD);
     });
 
@@ -91,7 +91,7 @@ describe("POST /api/uploads/image", () => {
     });
 
     it("checks stock capability before parsing multipart data or writing a file", async () => {
-        mocks.assertStockCapabilityForMigration.mockRejectedValue(deniedCapability());
+        mocks.assertStockCapability.mockRejectedValue(deniedCapability());
         const request = buildRequest("item", buildFile());
 
         const response = await POST(request);
@@ -111,11 +111,11 @@ describe("POST /api/uploads/image", () => {
 
         expect(response.status).toBe(400);
         expect(mocks.saveLocalImageUpload).not.toHaveBeenCalled();
-        expect(mocks.assertStockCapabilityForMigration).toHaveBeenCalledOnce();
+        expect(mocks.assertStockCapability).toHaveBeenCalledOnce();
     });
 
     it("revalidates current authorization immediately before the filesystem side effect", async () => {
-        mocks.assertStockCapabilityForMigration
+        mocks.assertStockCapability
             .mockResolvedValueOnce(undefined)
             .mockRejectedValueOnce(deniedCapability());
 
@@ -123,13 +123,13 @@ describe("POST /api/uploads/image", () => {
 
         expect(response.status).toBe(403);
         expect(mocks.requireActiveWorkforceOrAdminSession).toHaveBeenCalledTimes(2);
-        expect(mocks.assertStockCapabilityForMigration).toHaveBeenCalledTimes(2);
+        expect(mocks.assertStockCapability).toHaveBeenCalledTimes(2);
         expect(mocks.saveLocalImageUpload).not.toHaveBeenCalled();
     });
 
     it("does not let an Admin session bypass the central inventory capability", async () => {
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(ADMIN_AUTH);
-        mocks.assertStockCapabilityForMigration.mockRejectedValue(deniedCapability());
+        mocks.assertStockCapability.mockRejectedValue(deniedCapability());
 
         const response = await POST(buildRequest("item", buildFile()));
 
@@ -143,7 +143,7 @@ describe("POST /api/uploads/image", () => {
 
         expect(response.status).toBe(200);
         expect(mocks.requireActiveWorkforceOrAdminSession).toHaveBeenCalledTimes(2);
-        expect(mocks.assertStockCapabilityForMigration).toHaveBeenCalledTimes(2);
+        expect(mocks.assertStockCapability).toHaveBeenCalledTimes(2);
         expect(mocks.saveLocalImageUpload).toHaveBeenCalledWith({
             scope: "variant",
             file,

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     cancelRequestSchema,
     createStockCommandActor,
@@ -51,7 +51,7 @@ export async function POST(
             "employeeId" in auth ? auth.employeeId : null,
             "DASHBOARD",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.request.cancel",
             { requestedScope: "all" },

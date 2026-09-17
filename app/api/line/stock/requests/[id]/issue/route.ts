@@ -1,7 +1,7 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createStockCommandActor,
     executeIssueStockRequest,
@@ -49,7 +49,7 @@ export async function POST(
             auth.employeeId,
             "LIFF_SELF_SERVICE",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.request.process",
             { requestedScope: "all" },

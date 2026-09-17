@@ -4,7 +4,7 @@ import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createStockCommandActor,
     enforceStockJsonBodySize,
@@ -77,7 +77,7 @@ export async function POST(
         );
 
         if (action === "approve" || action === "issue") {
-            await assertStockCapabilityForMigration(
+            await assertStockCapability(
                 authorization,
                 "stock.request.process",
                 { requestedScope: "all" },
@@ -100,7 +100,7 @@ export async function POST(
 
         const cancelReason =
             parsed.data.cancelReason ?? parsed.data.rejectReason ?? null;
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.request.cancel",
             { requestedScope: "all" },

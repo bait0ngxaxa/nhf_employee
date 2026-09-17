@@ -5,7 +5,7 @@ import {
 } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createRequestSchema,
     createStockCommandActor,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
 
         const capabilityAuthorization =
-            await assertStockCapabilityForMigration(
+            await assertStockCapability(
                 authorization,
                 "stock.request.read",
                 { requestedScope: scope },
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             auth.employeeId,
             "DASHBOARD",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.request.create",
             { requestedScope: "mine" },

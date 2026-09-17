@@ -19,7 +19,7 @@ import {
     STOCK_JSON_MUTATION_MAX_BYTES,
     type StockAuthorizationContext,
     type StockCapabilityAuthorization,
-    type StockMigratedCapability,
+    type StockCapability,
 } from "@/modules/stock";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
@@ -74,7 +74,7 @@ vi.mock("@/modules/stock", async () => {
     const getCategories = vi.fn();
     return {
         ...actual,
-        assertStockCapabilityForMigration: stockAuthorizationMock.assert,
+        assertStockCapability: stockAuthorizationMock.assert,
         stockService: {
             ...actual.stockService,
             getRequests,
@@ -133,7 +133,7 @@ describe("Stock Request Routes", () => {
                         : (["OWN"] as const);
                 return {
                     actor,
-                    capability: capability as StockMigratedCapability,
+                    capability: capability as StockCapability,
                     decision: {
                         capability,
                         allowed: true,
@@ -141,8 +141,8 @@ describe("Stock Request Routes", () => {
                         grants: [],
                     },
                     scopes,
+                    defaultScopes: [],
                     isAdministrative: isAdmin,
-                    usedMigrationCompatibility: false,
                 };
             },
         );
@@ -326,8 +326,8 @@ describe("Stock Request Routes", () => {
                     }],
                 },
                 scopes: ["ALL"],
+                defaultScopes: [],
                 isAdministrative: false,
-                usedMigrationCompatibility: false,
             });
             vi.mocked(stockService.getRequests).mockResolvedValue({
                 requests: [],
@@ -829,8 +829,8 @@ describe("Stock Request Routes", () => {
                     }],
                 },
                 scopes: ["ALL"],
+                defaultScopes: [],
                 isAdministrative: false,
-                usedMigrationCompatibility: false,
             });
             vi.mocked(stockService.issueRequest).mockResolvedValue({
                 request: { id: 77, requestedBy: 3 },

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
+import { authorization } from "@/modules/authorization";
 import {
     buildStockAuthorizationContext,
     stockService,
@@ -260,6 +261,42 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("issueRequest", () => {
+        it("denies processing when a route-time process grant is revoked", async () => {
+            const actor = commandActor(9, "USER");
+            prismaMock.userCapabilityGrant.findMany
+                .mockResolvedValueOnce(asNever([{
+                    userId: 9,
+                    capabilityKey: "stock.request.process",
+                    scope: "ALL",
+                }]))
+                .mockResolvedValueOnce(asNever([]));
+            prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
+                id: 9,
+                role: "USER",
+                isActive: true,
+                deletedAt: null,
+                employee: {
+                    id: 100,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }));
+
+            const routeTimeAuthorization = await authorization.resolve(
+                actor.authorization.authorizationActor,
+                "stock.request.process",
+            );
+            expect(routeTimeAuthorization.scopes).toEqual(["ALL"]);
+
+            await expect(stockService.issueRequest(55, actor)).rejects.toMatchObject({
+                authorizationReason: "NO_APPLICABLE_GRANT",
+                statusCode: 403,
+            });
+            expect(prismaMock.stockRequest.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.stockItemVariant.updateMany).not.toHaveBeenCalled();
+            expect(prismaMock.stockTransaction.create).not.toHaveBeenCalled();
+        });
+
         it("should reject issuing a pending request without a variant snapshot", async () => {
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
@@ -1737,6 +1774,82 @@ describe("Stock Service Mutations", () => {
     });
 
     describe("cancelRequest", () => {
+        it("restores the OWN baseline after a route-time cancel-all grant is revoked", async () => {
+            const actor = commandActor(9, "USER");
+            prismaMock.userCapabilityGrant.findMany
+                .mockResolvedValueOnce(asNever([{
+                    userId: 9,
+                    capabilityKey: "stock.request.cancel",
+                    scope: "ALL",
+                }]))
+                .mockResolvedValueOnce(asNever([]));
+            prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
+                id: 9,
+                role: "USER",
+                isActive: true,
+                deletedAt: null,
+                employee: {
+                    id: 100,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }));
+
+            const routeTimeAuthorization = await authorization.resolve(
+                actor.authorization.authorizationActor,
+                "stock.request.cancel",
+            );
+            expect(routeTimeAuthorization.scopes).toEqual(["ALL"]);
+
+            prismaMock.stockRequest.findUnique.mockResolvedValue(asNever({
+                id: 55,
+                status: "PENDING_ISSUE",
+                requestedBy: 3,
+            }));
+
+            await expect(
+                stockService.cancelRequest(55, actor, "ถูกยกเลิกสิทธิ์ระหว่างรายการ"),
+            ).rejects.toThrow("ไม่มีสิทธิ์ยกเลิกคำขอนี้");
+            expect(prismaMock.stockRequest.updateMany).not.toHaveBeenCalled();
+        });
+
+        it("denies an inventory write when a route-time inventory grant is revoked", async () => {
+            const actor = commandActor(9, "USER");
+            prismaMock.userCapabilityGrant.findMany
+                .mockResolvedValueOnce(asNever([{
+                    userId: 9,
+                    capabilityKey: "stock.inventory.manage",
+                    scope: "ALL",
+                }]))
+                .mockResolvedValueOnce(asNever([]));
+            prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
+                id: 9,
+                role: "USER",
+                isActive: true,
+                deletedAt: null,
+                employee: {
+                    id: 100,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                },
+            }));
+
+            const routeTimeAuthorization = await authorization.resolve(
+                actor.authorization.authorizationActor,
+                "stock.inventory.manage",
+            );
+            expect(routeTimeAuthorization.scopes).toEqual(["ALL"]);
+
+            await expect(stockService.createCategory(
+                { name: "สิทธิ์ถูกถอน" },
+                actor,
+            )).rejects.toMatchObject({
+                authorizationReason: "NO_APPLICABLE_GRANT",
+                statusCode: 403,
+            });
+            expect(prismaMock.stockCategory.create).not.toHaveBeenCalled();
+        });
+
         it("should reject user cancellation when workforce becomes inactive", async () => {
             prismaMock.user.findUnique.mockResolvedValueOnce(null);
 

@@ -17,10 +17,10 @@ that contract in
 [authorization-phase-12b-additive-composition-core.md](./authorization-phase-12b-additive-composition-core.md).
 This does not change the resolver implementation or its current resolver-level
 decision semantics.
-Phase 12C.1 uses that seam for Department and Notification, and Phase 12C.2
-uses it for Employee. Phase 12C.3 uses it for the nine enforced Routine
-capabilities; Stock and Leave retain their documented compatibility mechanics
-until their own migrations.
+Phase 12C.1 uses that seam for Department and Notification, Phase 12C.2 uses
+it for Employee, Phase 12C.3 uses it for the nine enforced Routine
+capabilities, and Phase 12C.4 uses it for the complete Stock surface. Leave
+retains its documented compatibility mechanics until Phase 12C.5.
 
 Phase 3 made authorization resolution operational and independently testable.
 The historical Phase 4 Routine pilot established the server-side seam; current
@@ -47,8 +47,8 @@ const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
 
-Department, Notification, Employee, and Routine adapters compose the resolver result
-with their trusted default scopes through the Phase 12B seam:
+Department, Notification, Employee, Routine, and Stock adapters compose the
+resolver result with their trusted default scopes through the Phase 12B seam:
 
 ```ts
 const configuredDecision = await authorization.resolve(actor, capability);
@@ -64,10 +64,10 @@ const authority = composeAuthorizationAuthority(
 Department, request, resource, or workflow dependencies. It validates default
 scopes against the supplied code-owned registry, returns normalized effective
 scopes, and preserves configured grants separately from Default Domain Policy.
-It is the runtime seam for migrated domains; Department, Notification, and
-Employee and the nine enforced Routine capabilities now use it, while the
-remaining compatibility-backed Stock and Leave adapters still use their Phase
-12A mechanics until later Phase 12C work.
+It is the runtime seam for migrated domains; Department, Notification,
+Employee, the nine enforced Routine capabilities, and all seven Stock
+capabilities now use it. Leave remains the only compatibility-backed domain
+family in the current Phase 12C migration boundary.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -182,10 +182,9 @@ domainDefaultPolicy + centralResolverConfiguredAuthority
 as an additive union after trusted identity, registered capability, supported
 channel, and valid-configuration checks. A narrower configured grant must not
 narrow the default behavior. Phase 12C.1 applies this composition to Department
-and Notification, Phase 12C.2 applies it to Employee, and Phase 12C.3 applies
-it to the enforced Routine surfaces. The remaining compatibility-backed Stock
-and Leave adapters retain their documented fallback mechanics until later
-migrations.
+and Notification, Phase 12C.2 applies it to Employee, Phase 12C.3 applies it to
+the enforced Routine surfaces, and Phase 12C.4 applies it to Stock. Leave
+retains its documented fallback mechanics until Phase 12C.5.
 
 For Employee, the permanent default is `ALL` for `employee.read`,
 `employee.stats.read`, and `employee.export`, and empty for
@@ -194,8 +193,9 @@ The Employee adapter uses this same composition after both the regular
 resolver and `resolveInTransaction()`; ADMIN remains the resolver's
 `SYSTEM_ROLE / ADMIN` authority. Routine adds a context-sensitive default policy
 and a post-composition LIFF self-service channel policy while keeping this
-resolver contract unchanged. The next runtime handoff is Phase 12C.4 — Stock
-Additive Default Policy Migration.
+resolver contract unchanged. Stock adds its permanent requester/catalog
+defaults without the Routine LIFF ADMIN clamp. The next runtime handoff is
+Phase 12C.5 — Leave Additive Default Policy Migration.
 
 ## USER semantics and lifecycle filtering
 
@@ -303,22 +303,26 @@ Prisma delegate is exposed.
 Phase 12A adds no resolver or domain runtime behavior. It records the
 permanent Default Domain Policy and the current inventory. Phase 12B provides
 additive composition. Phase 12C.1 has migrated Department + Notification,
-Phase 12C.2 has migrated Employee, and Phase 12C.3 has migrated the nine
-enforced Routine capabilities to that composition. Stock and Leave remain
-compatibility-backed until their later migrations. Routine export, summary,
+Phase 12C.2 has migrated Employee, Phase 12C.3 has migrated the nine
+enforced Routine capabilities, and Phase 12C.4 has migrated all seven Stock
+capabilities to that composition. Leave remains compatibility-backed until
+Phase 12C.5, the next Leave migration. Routine export, summary,
 and reference remain explicitly deferred; Phase 12D owns remaining non-IT
 deferred surfaces. Email Request and the future IT module remain outside that
 roadmap.
 
 ## Phase boundary
 
-The Phase 4 pilot is historical; current enforced Routine server-side
-capability composition is recorded in the Phase 12C.3 closure. The
-existing `requireAdminSession`, `requireApiSession`, `isAdminRole`,
-Stock/Leave helpers, Dashboard guards, and LIFF guards outside the migrated
-Routine call chains remain unchanged. No Team/grant administration API or UI,
+The Phase 4 pilot is historical; current enforced Routine and Stock server-side
+capability composition is recorded in the Phase 12C.3 and Phase 12C.4 closure
+records. The existing `requireAdminSession`, `requireApiSession`,
+`isAdminRole`, Leave helpers, Dashboard guards, and LIFF guards outside the
+migrated Routine/Stock call chains remain unchanged. No Team/grant administration API or UI,
 explicit deny model, authorization cache, or audit mutation workflow is
 introduced. Routine-specific scope translation, channel/resource policy, and
 transaction composition are documented in
 [authorization-phase-12c3-routine-additive-migration.md](./authorization-phase-12c3-routine-additive-migration.md);
+Stock composition, requested-view semantics, LIFF processor behavior and
+transaction lifecycle are documented in
+[authorization-phase-12c4-stock-additive-migration.md](./authorization-phase-12c4-stock-additive-migration.md);
 the pilot remains the historical record of the deferred boundaries.

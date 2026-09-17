@@ -4,7 +4,7 @@ import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     createStockCommandActor,
     enforceStockJsonBodySize,
@@ -66,7 +66,7 @@ export async function POST(
             "employeeId" in auth ? auth.employeeId : null,
             "DASHBOARD",
         );
-        await assertStockCapabilityForMigration(
+        await assertStockCapability(
             authorization,
             "stock.request.process",
             { requestedScope: "all" },

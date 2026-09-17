@@ -13,7 +13,7 @@ import {
 } from "@/lib/security/mutation-rate-limit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
-    assertStockCapabilityForMigration,
+    assertStockCapability,
     buildStockAuthorizationContext,
     stockService,
     StockCapabilityDeniedError,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             "LIFF_SELF_SERVICE",
         );
         const capabilityAuthorization =
-            await assertStockCapabilityForMigration(
+            await assertStockCapability(
                 authorization,
                 "stock.request.read",
                 { requestedScope: "mine" },
