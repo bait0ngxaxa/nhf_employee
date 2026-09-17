@@ -12,6 +12,7 @@ import {
     updateRoutineOccurrenceDueDate,
     updateRoutineTask,
 } from "./mutations";
+import { resolveRoutineCapability } from "./authorization";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -166,6 +167,50 @@ describe("NHF Routine mutations", () => {
             created: 1,
             existing: 0,
         });
+    });
+
+    it("restores the task.update baseline after a route-time ALL grant is revoked", async () => {
+        prismaMock.userCapabilityGrant.findMany
+            .mockResolvedValueOnce(asNever([{
+                userId: 3,
+                capabilityKey: "routine.task.update",
+                scope: "ALL",
+            }]))
+            .mockResolvedValueOnce(asNever([]));
+
+        await expect(
+            resolveRoutineCapability(
+                actor(3, "USER"),
+                11,
+                "routine.task.update",
+            ),
+        ).resolves.toMatchObject({ scopes: ["ALL"] });
+
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(
+            updateRoutineTask(
+                71,
+                { version: 1, title: "ไม่ควรแก้งานที่ไม่เกี่ยวข้อง" },
+                actor(3, "USER"),
+            ),
+        ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    id: 71,
+                    OR: [
+                        { createdById: 3 },
+                        { assignees: { some: { employeeId: 11 } } },
+                    ],
+                }),
+            }),
+        );
+        expect(prismaMock.routineTask.updateMany).not.toHaveBeenCalled();
     });
 
     it("lets an admin change a due date without a required reason", async () => {
@@ -755,7 +800,7 @@ describe("NHF Routine mutations", () => {
         expect(display.summary).toContain("เปลี่ยนการแจ้งเตือน");
     });
 
-    it("canonicalizes a self-service task to the authenticated employee", async () => {
+    it("keeps explicit USER ALL task creation self-service", async () => {
         const createdTask = {
             id: 72,
             version: 1,
@@ -766,6 +811,11 @@ describe("NHF Routine mutations", () => {
         prismaMock.user.findUnique.mockResolvedValue(
             asNever(activeUser("USER", 11)),
         );
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 3,
+            capabilityKey: "routine.task.create",
+            scope: "ALL",
+        }]));
         prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 11 }]));

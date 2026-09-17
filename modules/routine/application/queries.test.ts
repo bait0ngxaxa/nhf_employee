@@ -29,7 +29,7 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("./authorization", async (importOriginal) => ({
     ...(await importOriginal<typeof RoutineAuthorizationModule>()),
-    resolveRoutineCapabilityForMigration: resolveRoutineCapabilityMock,
+    resolveRoutineCapability: resolveRoutineCapabilityMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -153,11 +153,10 @@ describe("NHF Routine query authorization", () => {
                 },
                 capability,
                 decision: { capability, allowed: true, scopes, grants: [] },
+                defaultScopes: scopes,
                 scopes,
                 isAdministrative: isDashboardAdmin,
-                usedMigrationCompatibility: !isDashboardAdmin
-                    && actor.mode !== "LIFF_SELF_SERVICE",
-                usedLiffSelfServiceCompatibility: actor.mode === "LIFF_SELF_SERVICE",
+                liffSelfServicePolicyApplied: actor.mode === "LIFF_SELF_SERVICE",
             };
         });
         prismaMock.routineOccurrence.findMany.mockResolvedValue([] as never);
@@ -574,6 +573,12 @@ describe("NHF Routine query authorization", () => {
 
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({ where: { isActive: true } }),
+        );
+        expect(resolveRoutineCapabilityMock).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 5, role: "USER" }),
+            21,
+            "routine.task.read",
+            { taskReadView: "work-item", requestedScope: "all" },
         );
         expect(result.tasks.map((task) => ({ id: task.id, canEdit: task.canEdit }))).toEqual([
             { id: 71, canEdit: true },
@@ -1497,6 +1502,236 @@ describe("NHF Routine query authorization", () => {
                     ],
                 },
             }),
+        );
+    });
+
+    it("keeps the LIFF occurrence-assignee relationship with a narrow configured grant", async () => {
+        const authorizationActor = {
+            userId: 5,
+            employeeId: 42,
+            systemRole: "USER" as const,
+            channel: "LIFF_SELF_SERVICE" as const,
+        };
+        resolveRoutineCapabilityMock
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.read",
+                decision: {
+                    capability: "routine.task.read",
+                    allowed: true,
+                    scopes: ["ASSIGNED"],
+                    grants: [{
+                        capability: "routine.task.read",
+                        scope: "ASSIGNED",
+                        source: { type: "USER", userId: 5 },
+                    }],
+                },
+                defaultScopes: ["CREATED", "ASSIGNED"],
+                scopes: ["ASSIGNED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: false,
+            })
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.update",
+                decision: { capability: "routine.task.update", allowed: true, scopes: ["CREATED", "ASSIGNED"], grants: [] },
+                defaultScopes: ["CREATED", "ASSIGNED"],
+                scopes: ["CREATED", "ASSIGNED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: false,
+            })
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.delete",
+                decision: { capability: "routine.task.delete", allowed: true, scopes: ["CREATED"], grants: [] },
+                defaultScopes: ["CREATED"],
+                scopes: ["CREATED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: false,
+            });
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
+            ...taskRow(71, 42, 99),
+            unitId: 1,
+            categoryId: 1,
+            version: 1,
+            updatedById: 99,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            occurrences: [],
+        }));
+
+        await getLiffRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 42,
+        });
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    OR: expect.arrayContaining([
+                        expect.objectContaining({
+                            occurrences: expect.objectContaining({
+                                some: expect.objectContaining({
+                                    assignees: expect.objectContaining({
+                                        some: expect.objectContaining({ employeeId: 42 }),
+                                    }),
+                                }),
+                            }),
+                        }),
+                    ]),
+                }),
+            }),
+        );
+    });
+
+    it("lets a configured LIFF USER ALL grant broaden task detail beyond self-service relationships", async () => {
+        const authorizationActor = {
+            userId: 5,
+            employeeId: 42,
+            systemRole: "USER" as const,
+            channel: "LIFF_SELF_SERVICE" as const,
+        };
+        resolveRoutineCapabilityMock
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.read",
+                decision: {
+                    capability: "routine.task.read",
+                    allowed: true,
+                    scopes: ["ALL"],
+                    grants: [{
+                        capability: "routine.task.read",
+                        scope: "ALL",
+                        source: { type: "USER", userId: 5 },
+                    }],
+                },
+                defaultScopes: ["CREATED", "ASSIGNED"],
+                scopes: ["ALL"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: false,
+            })
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.update",
+                decision: { capability: "routine.task.update", allowed: true, scopes: ["CREATED", "ASSIGNED"], grants: [] },
+                defaultScopes: ["CREATED", "ASSIGNED"],
+                scopes: ["CREATED", "ASSIGNED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: false,
+            })
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.delete",
+                decision: { capability: "routine.task.delete", allowed: true, scopes: ["CREATED"], grants: [] },
+                defaultScopes: ["CREATED"],
+                scopes: ["CREATED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: false,
+            });
+        prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
+            ...taskRow(71, 900, 99),
+            unitId: 1,
+            categoryId: 1,
+            version: 1,
+            updatedById: 99,
+            createdAt: new Date("2026-08-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+            occurrences: [],
+        }));
+
+        const result = await getLiffRoutineTaskById(71, {
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 42,
+        });
+
+        expect(result.id).toBe(71);
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: 71 } }),
+        );
+    });
+
+    it("keeps LIFF ADMIN task detail inside the self-service resource envelope", async () => {
+        const authorizationActor = {
+            userId: 99,
+            employeeId: 42,
+            systemRole: "ADMIN" as const,
+            channel: "LIFF_SELF_SERVICE" as const,
+        };
+        resolveRoutineCapabilityMock
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.read",
+                decision: {
+                    capability: "routine.task.read",
+                    allowed: true,
+                    scopes: ["ALL"],
+                    grants: [{
+                        capability: "routine.task.read",
+                        scope: "ALL",
+                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                    }],
+                },
+                defaultScopes: [],
+                scopes: ["CREATED", "ASSIGNED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: true,
+            })
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.update",
+                decision: {
+                    capability: "routine.task.update",
+                    allowed: true,
+                    scopes: ["ALL"],
+                    grants: [{
+                        capability: "routine.task.update",
+                        scope: "ALL",
+                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                    }],
+                },
+                defaultScopes: [],
+                scopes: ["CREATED", "ASSIGNED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: true,
+            })
+            .mockResolvedValueOnce({
+                actor: authorizationActor,
+                capability: "routine.task.delete",
+                decision: {
+                    capability: "routine.task.delete",
+                    allowed: true,
+                    scopes: ["ALL"],
+                    grants: [{
+                        capability: "routine.task.delete",
+                        scope: "ALL",
+                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                    }],
+                },
+                defaultScopes: [],
+                scopes: ["CREATED"],
+                isAdministrative: false,
+                liffSelfServicePolicyApplied: true,
+            });
+        prismaMock.routineTask.findFirst.mockResolvedValue(null);
+
+        await expect(getLiffRoutineTaskById(71, {
+            actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+            employeeId: 42,
+        })).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
+
+        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    OR: expect.arrayContaining([
+                        expect.objectContaining({
+                            occurrences: expect.any(Object),
+                        }),
+                    ]),
+                }),
+            }),
+        );
+        expect(prismaMock.routineTask.findFirst).not.toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: 71 } }),
         );
     });
 

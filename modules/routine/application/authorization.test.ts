@@ -8,6 +8,7 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 import {
     buildRoutineAuthorizationActor,
@@ -15,9 +16,9 @@ import {
     buildRoutineTaskScope,
     assertActiveEmployeesInTransaction,
     assertActiveRoutineActorInTransaction,
-    resolveRoutineCapabilityForMigration,
+    resolveRoutineCapability,
     resolveRoutineCapabilityInTransaction,
-    type RoutineMigratedCapability,
+    type RoutineEnforcedCapability,
 } from "./authorization";
 import type { RoutineCommandActor } from "./types";
 
@@ -28,12 +29,17 @@ const mocks = vi.hoisted(() => ({
     lockUserRows: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: mocks.resolve,
-        resolveInTransaction: mocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: mocks.resolve,
+            resolveInTransaction: mocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/row-locks", () => ({
     lockEmployeeRows: mocks.lockEmployeeRows,
@@ -52,7 +58,7 @@ function actor(
 }
 
 function decision(
-    capability: RoutineMigratedCapability,
+    capability: RoutineEnforcedCapability,
     allowed: boolean,
     scopes: readonly AuthorizationScope[] = [],
     reason?: AuthorizationDecision["reason"],
@@ -68,7 +74,7 @@ function decision(
 }
 
 function userGrant(
-    capability: RoutineMigratedCapability,
+    capability: RoutineEnforcedCapability,
     scope: AuthorizationScope,
 ): EffectiveAuthorizationGrant {
     return {
@@ -79,7 +85,7 @@ function userGrant(
 }
 
 function systemRoleGrant(
-    capability: RoutineMigratedCapability,
+    capability: RoutineEnforcedCapability,
 ): EffectiveAuthorizationGrant {
     return {
         capability,
@@ -88,7 +94,7 @@ function systemRoleGrant(
     };
 }
 
-describe("Routine authorization migration adapter", () => {
+describe("Routine authorization adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
         mocks.resolveInTransaction.mockReset();
@@ -210,7 +216,7 @@ describe("Routine authorization migration adapter", () => {
         );
     });
 
-    it("uses the public resolver and applies only the frozen USER task bridge when no grant exists", async () => {
+    it("composes the permanent USER default policy when no grant exists", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "routine.task.update",
@@ -220,7 +226,7 @@ describe("Routine authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveRoutineCapabilityForMigration(
+        const result = await resolveRoutineCapability(
             actor(),
             21,
             "routine.task.update",
@@ -236,11 +242,11 @@ describe("Routine authorization migration adapter", () => {
             "routine.task.update",
         );
         expect(result.scopes).toEqual(["CREATED", "ASSIGNED"]);
-        expect(result.usedMigrationCompatibility).toBe(true);
+        expect(result.defaultScopes).toEqual(["CREATED", "ASSIGNED"]);
         expect(result.isAdministrative).toBe(false);
     });
 
-    it("does not replace a configured grant with compatibility scopes", async () => {
+    it("does not let a narrow configured grant shrink the default policy", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "routine.task.update",
@@ -251,14 +257,14 @@ describe("Routine authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveRoutineCapabilityForMigration(
+        const result = await resolveRoutineCapability(
             actor(),
             21,
             "routine.task.update",
         );
 
-        expect(result.scopes).toEqual(["CREATED"]);
-        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(result.scopes).toEqual(["CREATED", "ASSIGNED"]);
+        expect(result.defaultScopes).toEqual(["CREATED", "ASSIGNED"]);
         expect(result.decision.grants).toEqual([
             userGrant("routine.task.update", "CREATED"),
         ]);
@@ -275,7 +281,7 @@ describe("Routine authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveRoutineCapabilityForMigration(
+        const result = await resolveRoutineCapability(
             actor(),
             21,
             "routine.task.read",
@@ -288,15 +294,67 @@ describe("Routine authorization migration adapter", () => {
             systemRole: "USER",
             channel: "DASHBOARD",
         });
-        expect(result.scopes).toEqual(["ASSIGNED"]);
-        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(result.scopes).toEqual(["ALL"]);
+        expect(result.defaultScopes).toEqual(["ALL"]);
         expect(mocks.resolve).toHaveBeenCalledWith(
             result.actor,
             "routine.task.read",
         );
     });
 
-    it("keeps the task-read compatibility bridge bounded to its approved views", async () => {
+    it("composes broader configured Routine grants without losing their provenance", async () => {
+        const cases = [
+            {
+                capability: "routine.task.read" as const,
+                options: { taskReadView: "management" } as const,
+                configuredScopes: ["ALL"] as const,
+                expectedScopes: ["ALL"] as const,
+            },
+            {
+                capability: "routine.task.update" as const,
+                options: {},
+                configuredScopes: ["ALL"] as const,
+                expectedScopes: ["ALL"] as const,
+            },
+            {
+                capability: "routine.task.delete" as const,
+                options: {},
+                configuredScopes: ["ALL"] as const,
+                expectedScopes: ["ALL"] as const,
+            },
+            {
+                capability: "routine.occurrence.read" as const,
+                options: {},
+                configuredScopes: ["ALL"] as const,
+                expectedScopes: ["ALL"] as const,
+            },
+        ];
+
+        for (const testCase of cases) {
+            mocks.resolve.mockResolvedValueOnce(
+                decision(
+                    testCase.capability,
+                    true,
+                    testCase.configuredScopes,
+                    undefined,
+                    [userGrant(testCase.capability, "ALL")],
+                ),
+            );
+            const result = await resolveRoutineCapability(
+                actor(),
+                21,
+                testCase.capability,
+                testCase.options,
+            );
+            expect(result.scopes).toEqual(testCase.expectedScopes);
+            expect(result.decision.grants).toEqual([
+                userGrant(testCase.capability, "ALL"),
+            ]);
+            expect(result.isAdministrative).toBe(false);
+        }
+    });
+
+    it("applies the context-sensitive task-read default policy", async () => {
         const cases = [
             {
                 label: "management view",
@@ -331,7 +389,7 @@ describe("Routine authorization migration adapter", () => {
                 ),
             );
 
-            const result = await resolveRoutineCapabilityForMigration(
+            const result = await resolveRoutineCapability(
                 actor(),
                 21,
                 "routine.task.read",
@@ -339,7 +397,67 @@ describe("Routine authorization migration adapter", () => {
             );
 
             expect(result.scopes, testCase.label).toEqual(testCase.scopes);
-            expect(result.usedMigrationCompatibility).toBe(true);
+            expect(result.defaultScopes, testCase.label).toEqual(testCase.scopes);
+        }
+    });
+
+    it("applies the complete permanent Routine default-policy matrix", async () => {
+        const cases = [
+            {
+                capability: "routine.task.read" as const,
+                options: { taskReadView: "management" } as const,
+                scopes: ["CREATED", "ASSIGNED"] as const,
+            },
+            {
+                capability: "routine.task.read" as const,
+                options: {
+                    taskReadView: "work-item",
+                    requestedScope: "mine",
+                } as const,
+                scopes: ["ASSIGNED"] as const,
+            },
+            {
+                capability: "routine.task.read" as const,
+                options: {
+                    taskReadView: "work-item",
+                    requestedScope: "all",
+                } as const,
+                scopes: ["ALL"] as const,
+            },
+            {
+                capability: "routine.task.create" as const,
+                options: {},
+                scopes: ["OWN"] as const,
+            },
+            {
+                capability: "routine.task.update" as const,
+                options: {},
+                scopes: ["CREATED", "ASSIGNED"] as const,
+            },
+            {
+                capability: "routine.task.delete" as const,
+                options: {},
+                scopes: ["CREATED"] as const,
+            },
+            {
+                capability: "routine.occurrence.read" as const,
+                options: {},
+                scopes: ["ASSIGNED"] as const,
+            },
+        ];
+
+        for (const testCase of cases) {
+            mocks.resolve.mockResolvedValueOnce(
+                decision(testCase.capability, false, [], "NO_APPLICABLE_GRANT"),
+            );
+            const result = await resolveRoutineCapability(
+                actor(),
+                21,
+                testCase.capability,
+                testCase.options,
+            );
+            expect(result.defaultScopes).toEqual(testCase.scopes);
+            expect(result.scopes).toEqual(testCase.scopes);
         }
     });
 
@@ -354,7 +472,7 @@ describe("Routine authorization migration adapter", () => {
         );
 
         await expect(
-            resolveRoutineCapabilityForMigration(
+            resolveRoutineCapability(
                 actor(),
                 21,
                 "routine.task.read",
@@ -363,7 +481,7 @@ describe("Routine authorization migration adapter", () => {
         ).rejects.toMatchObject({ statusCode: 403 });
     });
 
-    it("never converts a structural channel denial into migration access", async () => {
+    it("never converts a structural channel denial into default access", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "routine.occurrence.read",
@@ -374,7 +492,7 @@ describe("Routine authorization migration adapter", () => {
         );
 
         await expect(
-            resolveRoutineCapabilityForMigration(
+            resolveRoutineCapability(
                 actor({ mode: "LIFF_SELF_SERVICE" }),
                 21,
                 "routine.occurrence.read",
@@ -382,7 +500,7 @@ describe("Routine authorization migration adapter", () => {
         ).rejects.toMatchObject({ statusCode: 403 });
     });
 
-    it("does not provide USER compatibility for occurrence administration or import", async () => {
+    it("does not provide a USER default for occurrence administration or import", async () => {
         for (const capability of [
             "routine.occurrence.override",
             "routine.occurrence.reassign",
@@ -394,12 +512,44 @@ describe("Routine authorization migration adapter", () => {
             );
 
             await expect(
-                resolveRoutineCapabilityForMigration(actor(), 21, capability),
+                resolveRoutineCapability(actor(), 21, capability),
             ).rejects.toMatchObject({ statusCode: 403 });
         }
     });
 
-    it("accepts a configured import grant without using the compatibility bridge", async () => {
+    it.each([
+        "routine.occurrence.override",
+        "routine.occurrence.reassign",
+        "routine.occurrence.change_due_date",
+        "routine.import.manage",
+    ] as const)("denies revoked central-only capability %s in a transaction", async (capability) => {
+        const persistenceContext = {} as AuthorizationPersistenceContext;
+        const activeActor = {
+            authorizationActor: {
+                userId: 7,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            } satisfies AuthorizationActor,
+            employeeId: 21,
+        };
+        mocks.resolveInTransaction.mockResolvedValue(
+            decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+        );
+
+        await expect(
+            resolveRoutineCapabilityInTransaction(
+                persistenceContext,
+                activeActor,
+                capability,
+            ),
+        ).rejects.toMatchObject({
+            authorizationReason: "NO_APPLICABLE_GRANT",
+            statusCode: 403,
+        });
+    });
+
+    it("accepts a configured import grant without creating a USER default", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "routine.import.manage",
@@ -410,14 +560,14 @@ describe("Routine authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveRoutineCapabilityForMigration(
+        const result = await resolveRoutineCapability(
             actor(),
             null,
             "routine.import.manage",
         );
 
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(false);
+        expect(result.defaultScopes).toEqual([]);
         expect(result.isAdministrative).toBe(false);
     });
 
@@ -432,7 +582,7 @@ describe("Routine authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveRoutineCapabilityForMigration(
+        const result = await resolveRoutineCapability(
             actor({ role: "ADMIN", mode: "LIFF_SELF_SERVICE" }),
             42,
             "routine.task.update",
@@ -441,7 +591,7 @@ describe("Routine authorization migration adapter", () => {
         expect(result.actor.channel).toBe("LIFF_SELF_SERVICE");
         expect(result.scopes).toEqual(["CREATED", "ASSIGNED"]);
         expect(result.isAdministrative).toBe(false);
-        expect(result.usedLiffSelfServiceCompatibility).toBe(true);
+        expect(result.liffSelfServicePolicyApplied).toBe(true);
     });
 
     it("keeps Dashboard ADMIN system-role authorization administrative", async () => {
@@ -455,7 +605,7 @@ describe("Routine authorization migration adapter", () => {
             ),
         );
 
-        const result = await resolveRoutineCapabilityForMigration(
+        const result = await resolveRoutineCapability(
             actor({ id: 99, role: "ADMIN" }),
             null,
             "routine.occurrence.override",
@@ -465,12 +615,12 @@ describe("Routine authorization migration adapter", () => {
         expect(result.scopes).toEqual(["ALL"]);
     });
 
-    it("does not convert authorization configuration errors into compatibility access", async () => {
+    it("does not convert authorization configuration errors into default access", async () => {
         const configurationError = new Error("invalid persisted capability");
         mocks.resolve.mockRejectedValue(configurationError);
 
         await expect(
-            resolveRoutineCapabilityForMigration(
+            resolveRoutineCapability(
                 actor(),
                 21,
                 "routine.task.read",
@@ -507,6 +657,7 @@ describe("Routine authorization migration adapter", () => {
             persistenceContext,
         );
         expect(result.scopes).toEqual(["CREATED"]);
+        expect(result.defaultScopes).toEqual(["CREATED"]);
     });
 });
 

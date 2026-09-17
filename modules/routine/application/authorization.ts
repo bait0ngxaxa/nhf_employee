@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationDecision,
     type AuthorizationPersistenceContext,
@@ -21,7 +22,7 @@ import type {
 
 type RoutineTransaction = Prisma.TransactionClient;
 
-export const ROUTINE_MIGRATED_CAPABILITIES = [
+export const ROUTINE_ENFORCED_CAPABILITIES = [
     "routine.task.read",
     "routine.task.create",
     "routine.task.update",
@@ -33,8 +34,8 @@ export const ROUTINE_MIGRATED_CAPABILITIES = [
     "routine.import.manage",
 ] as const;
 
-export type RoutineMigratedCapability =
-    (typeof ROUTINE_MIGRATED_CAPABILITIES)[number];
+export type RoutineEnforcedCapability =
+    (typeof ROUTINE_ENFORCED_CAPABILITIES)[number];
 
 export type RoutineTaskReadView = "management" | "work-item";
 
@@ -45,14 +46,16 @@ export interface RoutineCapabilityOptions {
 
 export interface RoutineCapabilityAuthorization {
     readonly actor: AuthorizationActor;
-    readonly capability: RoutineMigratedCapability;
+    readonly capability: RoutineEnforcedCapability;
     readonly decision: AuthorizationDecision;
-    /** Effective scopes after Routine's temporary migration compatibility rules. */
+    /** Permanent normal-user Default Domain Policy scopes before composition. */
+    readonly defaultScopes: readonly AuthorizationScope[];
+    /** Final Routine scopes after central composition and channel policy. */
     readonly scopes: readonly AuthorizationScope[];
     /** True only for Dashboard ADMIN system-role authorization. */
     readonly isAdministrative: boolean;
-    readonly usedMigrationCompatibility: boolean;
-    readonly usedLiffSelfServiceCompatibility: boolean;
+    /** True when LIFF ADMIN authority was constrained to self-service policy. */
+    readonly liffSelfServicePolicyApplied: boolean;
 }
 
 export interface RoutineActorAuthorization {
@@ -61,12 +64,12 @@ export interface RoutineActorAuthorization {
 }
 
 const ROUTINE_CAPABILITY_SET = new Set<string>(
-    ROUTINE_MIGRATED_CAPABILITIES,
+    ROUTINE_ENFORCED_CAPABILITIES,
 );
 
-function isRoutineMigratedCapability(
+function isRoutineEnforcedCapability(
     capability: string,
-): capability is RoutineMigratedCapability {
+): capability is RoutineEnforcedCapability {
     return ROUTINE_CAPABILITY_SET.has(capability);
 }
 
@@ -107,8 +110,8 @@ export function buildRoutineAuthorizationActor(
 }
 
 /**
- * Legacy presentation predicate retained only by deferred summary/reference
- * projections. Migrated capability decisions use the central resolver below.
+ * Deferred summary/reference/export projections still use this role-and-
+ * channel predicate. Enforced Routine capabilities use the central resolver.
  */
 export function isRoutineAdminActor(
     role: string,
@@ -123,18 +126,39 @@ function freezeScopes(
     return Object.freeze([...scopes]);
 }
 
-function legacyRoutineScopes(
+export function defaultRoutineScopes(
     actor: AuthorizationActor,
-    capability: RoutineMigratedCapability,
-    options: RoutineCapabilityOptions,
-): readonly AuthorizationScope[] | null {
-    if (actor.systemRole !== "USER") return null;
+    capability: RoutineEnforcedCapability,
+    options: RoutineCapabilityOptions = {},
+): readonly AuthorizationScope[] {
+    if (actor.systemRole !== "USER") return [];
 
-    return routineSelfServiceScopes(capability, options);
+    switch (capability) {
+        case "routine.task.read":
+            if (options.taskReadView === "work-item") {
+                return options.requestedScope === "all"
+                    ? ["ALL"]
+                    : ["ASSIGNED"];
+            }
+            return ["CREATED", "ASSIGNED"];
+        case "routine.task.create":
+            return ["OWN"];
+        case "routine.task.update":
+            return ["CREATED", "ASSIGNED"];
+        case "routine.task.delete":
+            return ["CREATED"];
+        case "routine.occurrence.read":
+            return ["ASSIGNED"];
+        case "routine.occurrence.override":
+        case "routine.occurrence.reassign":
+        case "routine.occurrence.change_due_date":
+        case "routine.import.manage":
+            return [];
+    }
 }
 
-function routineSelfServiceScopes(
-    capability: RoutineMigratedCapability,
+function routineLiffSelfServiceScopes(
+    capability: RoutineEnforcedCapability,
     options: RoutineCapabilityOptions,
 ): readonly AuthorizationScope[] | null {
 
@@ -171,77 +195,84 @@ function isDashboardSystemRoleAuthorization(
         && decision.grants.some((grant) => grant.source.type === "SYSTEM_ROLE");
 }
 
-function getEffectiveScopes(
+function applyRoutineChannelPolicy(
     actor: AuthorizationActor,
-    capability: RoutineMigratedCapability,
-    decision: AuthorizationDecision,
+    capability: RoutineEnforcedCapability,
     options: RoutineCapabilityOptions,
+    composedAuthority: ReturnType<typeof composeAuthorizationAuthority>,
 ): {
     scopes: readonly AuthorizationScope[];
-    usedMigrationCompatibility: boolean;
-    usedLiffSelfServiceCompatibility: boolean;
+    isAdministrative: boolean;
+    liffSelfServicePolicyApplied: boolean;
 } {
-    if (!decision.allowed) {
-        const legacyScopes = decision.reason === "NO_APPLICABLE_GRANT"
-            ? legacyRoutineScopes(actor, capability, options)
-            : null;
-        if (legacyScopes === null) {
-            throw new RoutineCapabilityDeniedError(decision.reason);
-        }
-        return {
-            scopes: freezeScopes(legacyScopes),
-            usedMigrationCompatibility: true,
-            usedLiffSelfServiceCompatibility: false,
-        };
+    if (!composedAuthority.allowed) {
+        throw new RoutineCapabilityDeniedError(
+            composedAuthority.configuredDecision.reason,
+        );
     }
 
     const isLiffAdmin = actor.channel === "LIFF_SELF_SERVICE"
         && actor.systemRole === "ADMIN";
     if (!isLiffAdmin) {
         return {
-            scopes: decision.scopes,
-            usedMigrationCompatibility: false,
-            usedLiffSelfServiceCompatibility: false,
+            scopes: composedAuthority.scopes,
+            isAdministrative: isDashboardSystemRoleAuthorization(
+                actor,
+                composedAuthority.configuredDecision,
+            ),
+            liffSelfServicePolicyApplied: false,
         };
     }
 
-    const selfServiceScopes = routineSelfServiceScopes(capability, options);
+    const selfServiceScopes = routineLiffSelfServiceScopes(capability, options);
     if (selfServiceScopes === null) {
-        throw new RoutineCapabilityDeniedError(decision.reason);
+        throw new RoutineCapabilityDeniedError(
+            composedAuthority.configuredDecision.reason,
+        );
     }
     return {
         scopes: freezeScopes(selfServiceScopes),
-        usedMigrationCompatibility: false,
-        usedLiffSelfServiceCompatibility: true,
+        isAdministrative: false,
+        liffSelfServicePolicyApplied: true,
     };
 }
 
 function buildRoutineCapabilityAuthorization(
     actor: AuthorizationActor,
-    capability: RoutineMigratedCapability,
+    capability: RoutineEnforcedCapability,
     decision: AuthorizationDecision,
     options: RoutineCapabilityOptions,
 ): RoutineCapabilityAuthorization {
-    const effective = getEffectiveScopes(actor, capability, decision, options);
+    const composedAuthority = composeAuthorizationAuthority(
+        actor,
+        capability,
+        defaultRoutineScopes(actor, capability, options),
+        decision,
+    );
+    const effective = applyRoutineChannelPolicy(
+        actor,
+        capability,
+        options,
+        composedAuthority,
+    );
     return Object.freeze({
         actor,
         capability,
         decision,
+        defaultScopes: composedAuthority.defaultScopes,
         scopes: effective.scopes,
-        isAdministrative: isDashboardSystemRoleAuthorization(actor, decision),
-        usedMigrationCompatibility: effective.usedMigrationCompatibility,
-        usedLiffSelfServiceCompatibility:
-            effective.usedLiffSelfServiceCompatibility,
+        isAdministrative: effective.isAdministrative,
+        liffSelfServicePolicyApplied: effective.liffSelfServicePolicyApplied,
     });
 }
 
-export async function resolveRoutineCapabilityForMigration(
+export async function resolveRoutineCapability(
     actor: RoutineCommandActor,
     employeeId: number | null,
     capability: string,
     options: RoutineCapabilityOptions = {},
 ): Promise<RoutineCapabilityAuthorization> {
-    if (!isRoutineMigratedCapability(capability)) {
+    if (!isRoutineEnforcedCapability(capability)) {
         throw new RoutineForbiddenError();
     }
     const authorizationActor = buildRoutineAuthorizationActor(actor, employeeId);
@@ -256,7 +287,7 @@ export async function resolveRoutineCapabilityForMigration(
 
 function projectRoutineCapabilityDecision(
     actor: AuthorizationActor,
-    capability: RoutineMigratedCapability,
+    capability: RoutineEnforcedCapability,
     decision: AuthorizationDecision,
 ): boolean {
     try {
@@ -280,7 +311,7 @@ function projectRoutineCapabilityDecision(
 
 function getRoutinePresentationDecision(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
-    capability: RoutineMigratedCapability,
+    capability: RoutineEnforcedCapability,
 ): AuthorizationDecision {
     const decision = decisions.get(capability);
     if (decision === undefined) {
@@ -301,10 +332,10 @@ export async function getRoutinePresentationCapabilities(
     );
     const decisions = await authorization.resolveMany(
         authorizationActor,
-        ROUTINE_MIGRATED_CAPABILITIES,
+        ROUTINE_ENFORCED_CAPABILITIES,
     );
 
-    const canResolve = (capability: RoutineMigratedCapability): boolean =>
+    const canResolve = (capability: RoutineEnforcedCapability): boolean =>
         projectRoutineCapabilityDecision(
             authorizationActor,
             capability,
@@ -327,15 +358,15 @@ export async function getRoutinePresentationCapabilities(
 }
 
 /**
- * Route preflight for legacy Admin-guarded endpoints. The mutation service
- * resolves the same capability again inside its transaction.
+ * Route preflight for Routine endpoints. The mutation service resolves the
+ * same capability again inside its transaction.
  */
-export async function assertRoutineCapabilityForMigration(
+export async function assertRoutineCapability(
     actor: RoutineCommandActor,
     employeeId: number | null,
     capability: string,
 ): Promise<void> {
-    await resolveRoutineCapabilityForMigration(actor, employeeId, capability);
+    await resolveRoutineCapability(actor, employeeId, capability);
 }
 
 export async function resolveRoutineCapabilityInTransaction(
@@ -344,7 +375,7 @@ export async function resolveRoutineCapabilityInTransaction(
     capability: string,
     options: RoutineCapabilityOptions = {},
 ): Promise<RoutineCapabilityAuthorization> {
-    if (!isRoutineMigratedCapability(capability)) {
+    if (!isRoutineEnforcedCapability(capability)) {
         throw new RoutineForbiddenError();
     }
     const decision = await authorization.resolveInTransaction(

@@ -23,7 +23,7 @@ import {
 import { isRoutineNotificationReady } from "../../domain/notification-readiness";
 import {
     assertActiveRoutineActorInTransaction,
-    resolveRoutineCapabilityForMigration,
+    resolveRoutineCapability,
     resolveRoutineCapabilityInTransaction,
 } from "../authorization";
 import { createRoutineTaskInTransaction } from "../mutations";
@@ -531,7 +531,7 @@ export async function createRoutineImportPreview(
     actor: RoutineCommandActor,
     asOfDate = getCurrentBangkokDate(),
 ): Promise<{ batch: RoutineImportBatchView; reusedExisting: boolean }> {
-    await resolveRoutineCapabilityForMigration(
+    await resolveRoutineCapability(
         actor,
         null,
         "routine.import.manage",
@@ -754,7 +754,7 @@ async function loadRoutineReferenceDataForImport(): Promise<RoutineImportReferen
 export async function getRoutineImportReferenceData(
     actor: RoutineCommandActor,
 ): Promise<RoutineImportReferenceData> {
-    await resolveRoutineCapabilityForMigration(
+    await resolveRoutineCapability(
         actor,
         null,
         "routine.import.manage",
@@ -766,7 +766,7 @@ export async function getRoutineImportBatch(
     batchId: number,
     actor: RoutineCommandActor,
 ): Promise<RoutineImportBatchView> {
-    await resolveRoutineCapabilityForMigration(
+    await resolveRoutineCapability(
         actor,
         null,
         "routine.import.manage",

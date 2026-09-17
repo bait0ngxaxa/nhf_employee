@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     requireActiveWorkforceOrAdminSession: vi.fn(),
-    assertRoutineCapabilityForMigration: vi.fn(),
+    assertRoutineCapability: vi.fn(),
     getOccurrence: vi.fn(),
     updateDueDate: vi.fn(),
     reassign: vi.fn(),
@@ -50,7 +50,7 @@ vi.mock("@/lib/auth/workforce", () => ({
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
     ...(await importOriginal()),
-    assertRoutineCapabilityForMigration: mocks.assertRoutineCapabilityForMigration,
+    assertRoutineCapability: mocks.assertRoutineCapability,
     getRoutineOccurrenceById: mocks.getOccurrence,
     updateRoutineOccurrenceDueDate: mocks.updateDueDate,
     reassignRoutineOccurrence: mocks.reassign,
@@ -66,7 +66,7 @@ describe("legacy Routine occurrence mutation routes", () => {
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
-        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
+        mocks.assertRoutineCapability.mockResolvedValue(undefined);
         mocks.getOccurrence.mockResolvedValue({ occurrence: { id: 91 } });
         mocks.updateDueDate.mockResolvedValue(committedOccurrence);
         mocks.reassign.mockResolvedValue(committedOccurrence);
@@ -165,7 +165,7 @@ describe("legacy Routine occurrence mutation routes", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+        expect(mocks.assertRoutineCapability).toHaveBeenCalledWith(
             expect.objectContaining({ id: 5, role: "USER" }),
             21,
             "routine.occurrence.change_due_date",
@@ -198,7 +198,7 @@ describe("legacy Routine occurrence mutation routes", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+        expect(mocks.assertRoutineCapability).toHaveBeenCalledWith(
             expect.objectContaining({ id: 5, role: "USER" }),
             21,
             "routine.occurrence.reassign",

@@ -67,7 +67,7 @@ export {
     serializeRoutineOccurrenceResponse,
 } from "./application/queries";
 export {
-    assertRoutineCapabilityForMigration,
+    assertRoutineCapability,
     getRoutinePresentationCapabilities,
 } from "./application/authorization";
 export {

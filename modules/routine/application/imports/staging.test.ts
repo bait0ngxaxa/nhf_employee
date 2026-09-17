@@ -22,7 +22,7 @@ const xlsxSafetyMocks = vi.hoisted(() => ({
 
 const routineAuthorizationMocks = vi.hoisted(() => ({
     assertActiveRoutineActorInTransaction: vi.fn(),
-    resolveRoutineCapabilityForMigration: vi.fn(),
+    resolveRoutineCapability: vi.fn(),
     resolveRoutineCapabilityInTransaction: vi.fn(),
 }));
 
@@ -211,7 +211,7 @@ describe("routine import preview reuse", () => {
             },
             employeeId: null,
         });
-        routineAuthorizationMocks.resolveRoutineCapabilityForMigration.mockResolvedValue({
+        routineAuthorizationMocks.resolveRoutineCapability.mockResolvedValue({
             actor: {
                 userId: 7,
                 employeeId: null,
@@ -220,10 +220,10 @@ describe("routine import preview reuse", () => {
             },
             capability: "routine.import.manage",
             decision: { capability: "routine.import.manage", allowed: true, scopes: ["ALL"], grants: [] },
+            defaultScopes: [],
             scopes: ["ALL"],
             isAdministrative: true,
-            usedMigrationCompatibility: false,
-            usedLiffSelfServiceCompatibility: false,
+            liffSelfServicePolicyApplied: false,
         });
         routineAuthorizationMocks.resolveRoutineCapabilityInTransaction.mockResolvedValue({
             actor: {
@@ -234,10 +234,10 @@ describe("routine import preview reuse", () => {
             },
             capability: "routine.import.manage",
             decision: { capability: "routine.import.manage", allowed: true, scopes: ["ALL"], grants: [] },
+            defaultScopes: [],
             scopes: ["ALL"],
             isAdministrative: true,
-            usedMigrationCompatibility: false,
-            usedLiffSelfServiceCompatibility: false,
+            liffSelfServicePolicyApplied: false,
         });
         vi.clearAllMocks();
         configureReference([activeEmployee]);

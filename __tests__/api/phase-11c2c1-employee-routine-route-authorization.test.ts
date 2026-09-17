@@ -331,7 +331,7 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
         });
     });
 
-    it("LEDGER-ROU-01 denies unrelated task workload through GET /api/routines/tasks", async () => {
+    it("LEDGER-ROU-01 keeps assigned task baseline with a narrow configured grant", async () => {
         mocks.authState.userGrants = [{
             userId: USER.id,
             capabilityKey: "routine.task.read",
@@ -351,8 +351,27 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
         expect(mocks.prisma.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
-                    createdById: USER.id,
                     isActive: true,
+                    OR: [
+                        { createdById: USER.id },
+                        {
+                            assignees: {
+                                some: {
+                                    employee: {
+                                        deletedAt: null,
+                                        status: "ACTIVE",
+                                        user: {
+                                            is: {
+                                                deletedAt: null,
+                                                isActive: true,
+                                            },
+                                        },
+                                    },
+                                    employeeId: 21,
+                                },
+                            },
+                        },
+                    ],
                 }),
             }),
         );

@@ -2,7 +2,8 @@
 
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
 closed; Employee Phase 8A/8B/8C and Phase 12C.2 additive policy migration
-closed; Phase 9A/9B Department, Audit and Notification integration closed
+closed; Phase 9A/9B/9C Department, Audit and Notification integration closed;
+Phase 12C.3 Routine additive policy migration closed
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -35,12 +36,12 @@ interface RoutinePresentationCapabilities {
 ```
 
 `getRoutinePresentationCapabilities()` is the one reusable server-side
-Routine projection. It asks the central resolver for all nine migrated
-capabilities through one `resolveMany()` call, then applies the existing
-Routine-owned Phase 4 composition to each decision. For a USER, the central
-resolver loads one shared authorization snapshot through `loadMany()` before
-evaluation. Dashboard and LIFF code do not call the generic authorization
-resolver directly and do not reproduce the Phase 4 compatibility table.
+Routine projection. It asks the central resolver for all nine enforced
+capabilities through one `resolveMany()` call, then applies permanent Routine
+default composition and the Routine execution-channel policy to each decision.
+For a USER, the central resolver loads one shared authorization snapshot through
+`loadMany()` before evaluation. Dashboard and LIFF code do not call the generic
+authorization resolver directly and do not reproduce the Routine policy table.
 
 Expected Routine authorization denial is projected as `false`. Configuration,
 registry, persistence, and other system failures continue to propagate so a
@@ -156,9 +157,13 @@ landing view or mounts `LiffRoutineApp`; capability and module authorization
 happens after bootstrap through `/api/line/home`.
 
 Dashboard and LIFF use different actor modes: Dashboard uses its Dashboard
-channel, while LIFF explicitly uses `LIFF_SELF_SERVICE`. A system ADMIN in
-LIFF therefore remains constrained to self-service task relationships and
-does not gain `routine.occurrence.override`,
+channel, while LIFF explicitly uses `LIFF_SELF_SERVICE`. Routine task-read
+presentation eligibility is context-sensitive: management uses
+`CREATED + ASSIGNED`, work-item `mine` uses `ASSIGNED`, and work-item `all`
+uses `ALL` for a normal USER without a configured grant. A normal USER's
+configured supported grant is additive. A system ADMIN in LIFF is instead
+constrained by the Routine self-service channel policy and does not gain
+`routine.occurrence.override`,
 `routine.occurrence.reassign`, `routine.occurrence.change_due_date`, or
 `routine.import.manage` presentation access. Dashboard ADMIN behavior remains
 the Phase 5B behavior.
@@ -180,7 +185,7 @@ enforce their own decisions.
 ## Deferred and non-Routine behavior
 
 `routine.summary.read`, `routine.task.export`, and `routine.reference.read`
-remain outside this projection because their legacy policy is unresolved.
+remain outside this projection because they are intentionally deferred.
 Dashboard Excel export, summary authorization, reference-data authorization,
 and their existing compatibility presentation behavior therefore remain
 unchanged; no new capability rule is invented for them. In particular, the
@@ -551,5 +556,6 @@ Notification Navbar/page entry uses `canReadInbox`, while read-state mutation
 controls and side effects require the independent `canUpdateInbox` field.
 The current-user projection resolves these domain capabilities after the active
 Employee lifecycle check and batches independent projection work. Phase 9A
-server authorization remains authoritative, Email Request remains deferred, and
-Phase 9C is not started.
+server authorization remains authoritative, Phase 9C is closed for the current
+production surface, Email Request remains deferred, and Phase 12C.3 records
+the permanent Routine presentation composition.

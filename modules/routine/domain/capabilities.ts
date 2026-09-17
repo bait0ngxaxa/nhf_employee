@@ -8,7 +8,7 @@ export interface RoutineTaskCapabilities {
 export interface RoutineTaskCapabilityActor {
     actorId: number;
     employeeId: number | null;
-    /** Retained for callers that only expose legacy presentation projections. */
+    /** Fallback for callers that do not provide capability-specific scopes. */
     isAdmin?: boolean;
     editScopes?: readonly AuthorizationScope[];
     deleteScopes?: readonly AuthorizationScope[];

@@ -280,10 +280,9 @@ describe("Authorization Administration capability catalog", () => {
             administrativelyGrantable: true,
         });
         expect(first.find(({ key }) => key === "routine.task.update")).toMatchObject({
-            runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
-            administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
-            administrativelyGrantable: false,
-            nonGrantableReason: expect.stringContaining("Routine"),
+            runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+            administrativeStatus: "GRANTABLE",
+            administrativelyGrantable: true,
         });
         expect(first.find(({ key }) => key === "department.read")).toMatchObject({
             runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
@@ -356,11 +355,6 @@ describe("Authorization Administration capability catalog", () => {
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
         ).map(({ key }) => key)).toEqual([
-            "routine.task.read",
-            "routine.task.create",
-            "routine.task.update",
-            "routine.task.delete",
-            "routine.occurrence.read",
             "stock.catalog.read",
             "stock.request.read",
             "stock.request.create",
@@ -380,6 +374,11 @@ describe("Authorization Administration capability catalog", () => {
             "employee.stats.read",
             "employee.export",
             "department.read",
+            "routine.task.read",
+            "routine.task.create",
+            "routine.task.update",
+            "routine.task.delete",
+            "routine.occurrence.read",
             "notification.inbox.read",
             "notification.inbox.update",
         ]);
@@ -389,19 +388,19 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(13);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
-        )).toHaveLength(6);
+        )).toHaveLength(11);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
-        )).toHaveLength(16);
+        )).toHaveLength(11);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "DEFERRED",
         )).toHaveLength(5);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(19);
+        )).toHaveLength(24);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
-        )).toHaveLength(16);
+        )).toHaveLength(11);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "DEFERRED",
         )).toHaveLength(5);
@@ -574,9 +573,9 @@ describe("Authorization Administration effective permission inspector", () => {
             allowed: true,
             scopes: ["ALL"],
             capability: {
-                runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
-                administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
-                administrativelyGrantable: false,
+                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
             },
         });
         expect(routineRead?.grants.map(({ source, origin }) => ({ source, origin }))).toEqual([
@@ -646,7 +645,7 @@ describe("Authorization Administration effective permission inspector", () => {
         expect(load).not.toHaveBeenCalled();
     });
 
-    it("does not present a compatibility-backed resolver denial as final runtime denial", async () => {
+    it("keeps a no-grant default-policy capability visible as a resolver denial", async () => {
         const emptyResolution: AuthorizationResolutionData = {
             userGrants: [],
             memberships: [],
@@ -684,13 +683,13 @@ describe("Authorization Administration effective permission inspector", () => {
             grants: [],
             reason: "NO_APPLICABLE_GRANT",
             capability: {
-                runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY",
-                administrativeStatus: "POLICY_ACTIVATION_REQUIRED",
-                administrativelyGrantable: false,
+                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
             },
         });
         expect(routineUpdate?.capability.runtimeAuthorizationMode).toBe(
-            "CENTRAL_WITH_COMPATIBILITY",
+            "CENTRAL_WITH_DEFAULT_POLICY",
         );
         expect(loadMany).toHaveBeenCalledTimes(1);
     });

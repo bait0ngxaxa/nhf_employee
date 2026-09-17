@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     requireActiveWorkforceOrAdminSession: vi.fn(),
-    assertRoutineCapabilityForMigration: vi.fn(),
+    assertRoutineCapability: vi.fn(),
     createRoutineImportPreview: vi.fn(),
     getRoutineImportReferenceData: vi.fn(),
     createRoutineCommandActor: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock("@/lib/auth/workforce", () => ({
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
     ...(await importOriginal()),
-    assertRoutineCapabilityForMigration: mocks.assertRoutineCapabilityForMigration,
+    assertRoutineCapability: mocks.assertRoutineCapability,
     createRoutineImportPreview: mocks.createRoutineImportPreview,
     getRoutineImportReferenceData: mocks.getRoutineImportReferenceData,
     ROUTINE_IMPORT_MAX_FILE_BYTES: 10 * 1024 * 1024,
@@ -54,7 +54,7 @@ describe("POST /api/routines/imports/preview", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(admin);
-        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
+        mocks.assertRoutineCapability.mockResolvedValue(undefined);
         mocks.enforceAuthenticatedMutationRateLimit.mockReturnValue(null);
         mocks.createRoutineCommandActor.mockReturnValue({ id: 7, role: "ADMIN", email: "admin@example.com" });
         mocks.getRoutineImportReferenceData.mockResolvedValue({
@@ -121,7 +121,7 @@ describe("GET /api/routines/imports/reference", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(admin);
-        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
+        mocks.assertRoutineCapability.mockResolvedValue(undefined);
         mocks.createRoutineCommandActor.mockReturnValue({ id: 7, role: "ADMIN", email: "admin@example.com" });
         mocks.getRoutineImportReferenceData.mockResolvedValue({
             units: [],

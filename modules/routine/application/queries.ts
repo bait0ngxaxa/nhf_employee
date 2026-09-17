@@ -33,7 +33,7 @@ import {
     buildRoutineTaskAccessScope,
     buildRoutineTaskScope,
     isRoutineAdminActor,
-    resolveRoutineCapabilityForMigration,
+    resolveRoutineCapability,
     type RoutineCapabilityAuthorization,
 } from "./authorization";
 import type { AuthorizationScope } from "@/modules/authorization";
@@ -209,7 +209,7 @@ export interface SerializedRoutineTaskWorkItem {
 }
 
 export interface RoutineTaskWorkItemQueryOptions {
-    readonly authorizationMode?: "MIGRATED" | "DEFERRED_EXPORT";
+    readonly authorizationMode?: "ENFORCED" | "DEFERRED_EXPORT";
 }
 
 function serializeAssignee(assignee: {
@@ -502,12 +502,12 @@ async function resolveTaskMutationCapabilities(
     delete: RoutineCapabilityAuthorization;
 }> {
     const [edit, deleteAuthorization] = await Promise.all([
-        resolveRoutineCapabilityForMigration(
+        resolveRoutineCapability(
             queryActor.actor,
             employeeId,
             "routine.task.update",
         ),
-        resolveRoutineCapabilityForMigration(
+        resolveRoutineCapability(
             queryActor.actor,
             employeeId,
             "routine.task.delete",
@@ -811,7 +811,7 @@ export async function getRoutineOccurrences(
     pagination: RoutinePagination;
 }> {
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const capabilityAuthorization = await resolveRoutineCapabilityForMigration(
+    const capabilityAuthorization = await resolveRoutineCapability(
         queryActor.actor,
         employeeId,
         "routine.occurrence.read",
@@ -856,7 +856,7 @@ export async function getRoutineTaskWorkItems(
     const isDeferredExport = options.authorizationMode === "DEFERRED_EXPORT";
     const capabilityAuthorization = isDeferredExport
         ? null
-        : await resolveRoutineCapabilityForMigration(
+        : await resolveRoutineCapability(
               queryActor.actor,
               employeeId,
               "routine.task.read",
@@ -1075,7 +1075,7 @@ export async function getRoutineOccurrenceById(
     }>;
 } | null> {
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const capabilityAuthorization = await resolveRoutineCapabilityForMigration(
+    const capabilityAuthorization = await resolveRoutineCapability(
         queryActor.actor,
         employeeId,
         "routine.occurrence.read",
@@ -1186,7 +1186,7 @@ export async function getRoutineTasks(
     pagination: RoutinePagination;
 }> {
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const capabilityAuthorization = await resolveRoutineCapabilityForMigration(
+    const capabilityAuthorization = await resolveRoutineCapability(
         queryActor.actor,
         employeeId,
         "routine.task.read",
@@ -1294,7 +1294,7 @@ export async function getRoutineTaskById(
     queryActor: RoutineQueryActor,
 ): Promise<RoutineTaskDetailResult> {
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const capabilityAuthorization = await resolveRoutineCapabilityForMigration(
+    const capabilityAuthorization = await resolveRoutineCapability(
         queryActor.actor,
         employeeId,
         "routine.task.read",
@@ -1328,24 +1328,36 @@ function buildLiffRoutineTaskAccessWhere(
     employeeId: number | null,
     authorization: RoutineCapabilityAuthorization,
 ): Prisma.RoutineTaskWhereInput {
-    if (
-        !authorization.usedMigrationCompatibility
-        && !authorization.usedLiffSelfServiceCompatibility
-    ) {
+    if (authorization.liffSelfServicePolicyApplied) {
         return {
             id: taskId,
-            ...buildRoutineTaskAccessScope(
+            ...buildRoutineLiffSelfServiceTaskAccessWhere(
                 queryActor.actor.id,
                 employeeId,
-                authorization.scopes,
             ),
         };
     }
 
+    if (authorization.scopes.includes("ALL")) {
+        return { id: taskId };
+    }
+
     return {
         id: taskId,
+        ...buildRoutineLiffSelfServiceTaskAccessWhere(
+            queryActor.actor.id,
+            employeeId,
+        ),
+    };
+}
+
+function buildRoutineLiffSelfServiceTaskAccessWhere(
+    actorId: number,
+    employeeId: number | null,
+): Prisma.RoutineTaskWhereInput {
+    return {
         OR: [
-            { createdById: queryActor.actor.id },
+            { createdById: actorId },
             ...(employeeId === null
                 ? []
                 : [{
@@ -1379,7 +1391,7 @@ export async function getLiffRoutineTaskById(
     queryActor: RoutineQueryActor,
 ): Promise<RoutineTaskDetailResult> {
     const employeeId = await resolveActorEmployeeId(queryActor);
-    const capabilityAuthorization = await resolveRoutineCapabilityForMigration(
+    const capabilityAuthorization = await resolveRoutineCapability(
         queryActor.actor,
         employeeId,
         "routine.task.read",

@@ -94,10 +94,10 @@ describe("Routine task create idempotency", () => {
                 scopes: ["ALL"],
                 grants: [],
             },
+            defaultScopes: [],
             scopes: ["ALL"],
             isAdministrative: true,
-            usedMigrationCompatibility: false,
-            usedLiffSelfServiceCompatibility: false,
+            liffSelfServicePolicyApplied: false,
         });
         prismaMock.routineTask.findUnique.mockResolvedValue(asNever(null));
         prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(task));
@@ -207,10 +207,10 @@ describe("Routine task create idempotency", () => {
                 scopes: ["OWN"],
                 grants: [],
             },
+            defaultScopes: ["OWN"],
             scopes: ["OWN"],
             isAdministrative: false,
-            usedMigrationCompatibility: true,
-            usedLiffSelfServiceCompatibility: false,
+            liffSelfServicePolicyApplied: false,
         });
 
         await createRoutineTask(spoofedInput, userActor, {

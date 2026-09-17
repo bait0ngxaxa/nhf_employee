@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import {
-    assertRoutineCapabilityForMigration,
+    assertRoutineCapability,
     createRoutineCommandActor,
 } from "@/modules/routine";
 import {
@@ -33,7 +33,7 @@ export async function GET(
             },
             request.headers,
         );
-        await assertRoutineCapabilityForMigration(
+        await assertRoutineCapability(
             actor,
             "employeeId" in auth ? auth.employeeId : null,
             "routine.import.manage",

@@ -4,6 +4,7 @@ import type {
     AuthorizationDecision,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const mocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -11,17 +12,22 @@ const mocks = vi.hoisted(() => ({
     resolveInTransaction: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: mocks.resolve,
-        resolveMany: mocks.resolveMany,
-        resolveInTransaction: mocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: mocks.resolve,
+            resolveMany: mocks.resolveMany,
+            resolveInTransaction: mocks.resolveInTransaction,
+        },
+    };
+});
 
 import {
     getRoutinePresentationCapabilities,
-    ROUTINE_MIGRATED_CAPABILITIES,
+    ROUTINE_ENFORCED_CAPABILITIES,
 } from "./authorization";
 import type { RoutineCommandActor } from "./types";
 
@@ -46,7 +52,7 @@ const IMPORT_GRANT: EffectiveAuthorizationGrant = {
 
 function allowedDecisions(): ReadonlyMap<string, AuthorizationDecision> {
     return new Map(
-        ROUTINE_MIGRATED_CAPABILITIES.map((capability) => [
+        ROUTINE_ENFORCED_CAPABILITIES.map((capability) => [
             capability,
             { ...ALLOWED_DECISION, capability },
         ]),
@@ -96,7 +102,7 @@ describe("Routine presentation capability projection", () => {
         expect(mocks.resolve).not.toHaveBeenCalled();
     });
 
-    it("keeps the no-grant USER compatibility floor and honors a configured grant", async () => {
+    it("keeps the no-grant USER default floor and honors a configured grant", async () => {
         mockResolveMany((capability) =>
             capability === "routine.import.manage"
                 ? {
@@ -200,11 +206,11 @@ describe("Routine presentation capability projection", () => {
                 systemRole: "ADMIN",
                 channel: "DASHBOARD",
             },
-            ROUTINE_MIGRATED_CAPABILITIES,
+            ROUTINE_ENFORCED_CAPABILITIES,
         );
     });
 
-    it("keeps no-grant USER compatibility for LIFF self-service", async () => {
+    it("keeps no-grant USER default policy for LIFF self-service", async () => {
         mockResolveMany((capability) => {
             const dashboardOnly = capability.startsWith("routine.occurrence.")
                 || capability === "routine.import.manage";
@@ -330,7 +336,7 @@ describe("Routine presentation capability projection", () => {
                 systemRole: "ADMIN",
                 channel: "LIFF_SELF_SERVICE",
             },
-            ROUTINE_MIGRATED_CAPABILITIES,
+            ROUTINE_ENFORCED_CAPABILITIES,
         );
     });
 });

@@ -32,12 +32,6 @@ const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.fre
     runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY" as const,
 });
 
-const ROUTINE_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
-    nonGrantableReason:
-        "The current Routine adapter may translate NO_APPLICABLE_GRANT into a path-specific compatibility scope; ordinary grants require explicit policy activation.",
-});
-
 const STOCK_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
     runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
     nonGrantableReason:
@@ -88,11 +82,11 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "employee.export": CENTRAL_WITH_DEFAULT_POLICY,
     "department.read": CENTRAL_WITH_DEFAULT_POLICY,
 
-    "routine.task.read": ROUTINE_COMPATIBILITY,
-    "routine.task.create": ROUTINE_COMPATIBILITY,
-    "routine.task.update": ROUTINE_COMPATIBILITY,
-    "routine.task.delete": ROUTINE_COMPATIBILITY,
-    "routine.occurrence.read": ROUTINE_COMPATIBILITY,
+    "routine.task.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "routine.task.create": CENTRAL_WITH_DEFAULT_POLICY,
+    "routine.task.update": CENTRAL_WITH_DEFAULT_POLICY,
+    "routine.task.delete": CENTRAL_WITH_DEFAULT_POLICY,
+    "routine.occurrence.read": CENTRAL_WITH_DEFAULT_POLICY,
     "routine.occurrence.override": CENTRAL_ONLY,
     "routine.occurrence.reassign": CENTRAL_ONLY,
     "routine.occurrence.change_due_date": CENTRAL_ONLY,

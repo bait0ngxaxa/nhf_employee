@@ -18,13 +18,14 @@ that contract in
 This does not change the resolver implementation or its current resolver-level
 decision semantics.
 Phase 12C.1 uses that seam for Department and Notification, and Phase 12C.2
-uses it for Employee. Routine, Stock, and Leave retain their documented
-compatibility mechanics until their own migrations.
+uses it for Employee. Phase 12C.3 uses it for the nine enforced Routine
+capabilities; Stock and Leave retain their documented compatibility mechanics
+until their own migrations.
 
 Phase 3 made authorization resolution operational and independently testable.
-The Phase 4 Routine pilot now composes this boundary for its migrated
-server-side capabilities; this document continues to describe the generic
-resolver contract rather than Routine policy.
+The historical Phase 4 Routine pilot established the server-side seam; current
+enforced Routine policy is recorded in the Phase 12C.3 closure. This document
+continues to describe the generic resolver contract rather than Routine policy.
 
 ## Public API
 
@@ -46,7 +47,7 @@ const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
 
-Department, Notification, and Employee adapters compose the resolver result
+Department, Notification, Employee, and Routine adapters compose the resolver result
 with their trusted default scopes through the Phase 12B seam:
 
 ```ts
@@ -64,8 +65,9 @@ Department, request, resource, or workflow dependencies. It validates default
 scopes against the supplied code-owned registry, returns normalized effective
 scopes, and preserves configured grants separately from Default Domain Policy.
 It is the runtime seam for migrated domains; Department, Notification, and
-Employee now use it, while the remaining compatibility-backed adapters still
-use their Phase 12A mechanics until later Phase 12C work.
+Employee and the nine enforced Routine capabilities now use it, while the
+remaining compatibility-backed Stock and Leave adapters still use their Phase
+12A mechanics until later Phase 12C work.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -180,17 +182,20 @@ domainDefaultPolicy + centralResolverConfiguredAuthority
 as an additive union after trusted identity, registered capability, supported
 channel, and valid-configuration checks. A narrower configured grant must not
 narrow the default behavior. Phase 12C.1 applies this composition to Department
-and Notification, and Phase 12C.2 applies it to Employee; the remaining
-compatibility-backed adapters retain their documented fallback mechanics until
-later migrations.
+and Notification, Phase 12C.2 applies it to Employee, and Phase 12C.3 applies
+it to the enforced Routine surfaces. The remaining compatibility-backed Stock
+and Leave adapters retain their documented fallback mechanics until later
+migrations.
 
 For Employee, the permanent default is `ALL` for `employee.read`,
 `employee.stats.read`, and `employee.export`, and empty for
 `employee.create`, `employee.update`, `employee.delete`, and `employee.import`.
 The Employee adapter uses this same composition after both the regular
 resolver and `resolveInTransaction()`; ADMIN remains the resolver's
-`SYSTEM_ROLE / ADMIN` authority. The next runtime handoff is Phase 12C.3 —
-Routine Additive Default Policy Migration.
+`SYSTEM_ROLE / ADMIN` authority. Routine adds a context-sensitive default policy
+and a post-composition LIFF self-service channel policy while keeping this
+resolver contract unchanged. The next runtime handoff is Phase 12C.4 — Stock
+Additive Default Policy Migration.
 
 ## USER semantics and lifecycle filtering
 
@@ -297,19 +302,23 @@ Prisma delegate is exposed.
 
 Phase 12A adds no resolver or domain runtime behavior. It records the
 permanent Default Domain Policy and the current inventory. Phase 12B provides
-additive composition. Phase 12C.1 has migrated Department + Notification and
-Phase 12C.2 has migrated Employee to that composition. Routine, Stock, and
-Leave remain compatibility-backed until their later migrations. Phase 12D
-owns remaining non-IT deferred surfaces. Email Request and the future IT
-module remain outside that roadmap.
+additive composition. Phase 12C.1 has migrated Department + Notification,
+Phase 12C.2 has migrated Employee, and Phase 12C.3 has migrated the nine
+enforced Routine capabilities to that composition. Stock and Leave remain
+compatibility-backed until their later migrations. Routine export, summary,
+and reference remain explicitly deferred; Phase 12D owns remaining non-IT
+deferred surfaces. Email Request and the future IT module remain outside that
+roadmap.
 
 ## Phase boundary
 
-The Phase 4 pilot is limited to Routine server-side capability composition;
+The Phase 4 pilot is historical; current enforced Routine server-side
+capability composition is recorded in the Phase 12C.3 closure. The
 existing `requireAdminSession`, `requireApiSession`, `isAdminRole`,
 Stock/Leave helpers, Dashboard guards, and LIFF guards outside the migrated
 Routine call chains remain unchanged. No Team/grant administration API or UI,
 explicit deny model, authorization cache, or audit mutation workflow is
-introduced. Routine-specific compatibility, scope translation, and transaction
-composition are documented in
-[authorization-routine-pilot.md](./authorization-routine-pilot.md).
+introduced. Routine-specific scope translation, channel/resource policy, and
+transaction composition are documented in
+[authorization-phase-12c3-routine-additive-migration.md](./authorization-phase-12c3-routine-additive-migration.md);
+the pilot remains the historical record of the deferred boundaries.

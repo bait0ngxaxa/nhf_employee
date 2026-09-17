@@ -8,7 +8,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
     requireActiveWorkforceOrAdminSession: vi.fn(),
-    assertRoutineCapabilityForMigration: vi.fn(),
+    assertRoutineCapability: vi.fn(),
     getOccurrence: vi.fn(),
     updateOverride: vi.fn(),
 }));
@@ -54,7 +54,7 @@ vi.mock("@/lib/auth/workforce", () => ({
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
     ...(await importOriginal()),
-    assertRoutineCapabilityForMigration: mocks.assertRoutineCapabilityForMigration,
+    assertRoutineCapability: mocks.assertRoutineCapability,
     getRoutineOccurrenceById: mocks.getOccurrence,
     updateRoutineOccurrenceOverride: mocks.updateOverride,
 }));
@@ -68,7 +68,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
-        mocks.assertRoutineCapabilityForMigration.mockResolvedValue(undefined);
+        mocks.assertRoutineCapability.mockResolvedValue(undefined);
         mocks.updateOverride.mockResolvedValue(committedOccurrence);
         mocks.getOccurrence.mockResolvedValue({ occurrence: { id: 91 } });
     });
@@ -124,7 +124,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+        expect(mocks.assertRoutineCapability).toHaveBeenCalledWith(
             expect.objectContaining({ id: 5, role: "USER" }),
             21,
             "routine.occurrence.override",
@@ -179,7 +179,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         );
 
         expect(response.status).toBe(200);
-        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+        expect(mocks.assertRoutineCapability).toHaveBeenCalledWith(
             expect.objectContaining({
                 id: 5,
                 role: "USER",
@@ -229,7 +229,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
     });
 
     it("keeps capability denial ahead of legacy input parsing", async () => {
-        mocks.assertRoutineCapabilityForMigration.mockRejectedValue(
+        mocks.assertRoutineCapability.mockRejectedValue(
             new RoutineForbiddenError(),
         );
 
@@ -242,7 +242,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
 
         expect(response.status).toBe(403);
         expect(mocks.updateOverride).not.toHaveBeenCalled();
-        expect(mocks.assertRoutineCapabilityForMigration).toHaveBeenCalledWith(
+        expect(mocks.assertRoutineCapability).toHaveBeenCalledWith(
             expect.objectContaining({ id: 99, role: "ADMIN" }),
             null,
             "routine.occurrence.override",
