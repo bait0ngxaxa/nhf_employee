@@ -6,17 +6,23 @@ import { describe, expect, it, vi } from "vitest";
 import { LeaveAttachmentValidationError } from "../schemas/attachments";
 import { buildLeaveAuthorizationContext } from "../application/authorization";
 import { handleLeaveRequestSubmission } from "./request-api";
+import type * as AuthorizationModule from "@/modules/authorization";
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: vi.fn().mockResolvedValue({
-            capability: "leave.request.create",
-            allowed: true,
-            scopes: ["OWN"],
-            grants: [],
-        }),
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: vi.fn().mockResolvedValue({
+                capability: "leave.request.create",
+                allowed: true,
+                scopes: ["OWN"],
+                grants: [],
+            }),
+        },
+    };
+});
 
 describe("Leave request HTTP adapter", () => {
     it("returns a safe validation response before persistence when attachment storage rejects", async () => {

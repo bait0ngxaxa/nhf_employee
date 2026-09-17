@@ -8,6 +8,7 @@ import {
     ApproverAssignmentError,
     assignLeaveApprovers,
 } from "@/modules/leave";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -17,12 +18,17 @@ const authorizationMocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceOrAdminSession: vi.fn(),
 }));
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: authorizationMocks.resolve,
-        resolveInTransaction: authorizationMocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: authorizationMocks.resolve,
+            resolveInTransaction: authorizationMocks.resolveInTransaction,
+        },
+    };
+});
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         employee: { findMany: vi.fn() },
@@ -64,16 +70,37 @@ const ACTIVE_EMPLOYEE = {
     },
 };
 
-describe("GET /api/leave/approvers", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        authorizationMocks.resolve.mockResolvedValue({
-            capability: "leave.approver.manage",
+function authorizationDecision(actor: unknown, capability: string) {
+    const isAdmin = typeof actor === "object"
+        && actor !== null
+        && "systemRole" in actor
+        && actor.systemRole === "ADMIN";
+    return isAdmin
+        ? {
+            capability,
+            allowed: true,
+            scopes: ["ALL" as const],
+            grants: [{
+                capability,
+                scope: "ALL" as const,
+                source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+            }],
+        }
+        : {
+            capability,
             allowed: false,
             scopes: [],
             grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+            reason: "NO_APPLICABLE_GRANT" as const,
+        };
+}
+
+describe("GET /api/leave/approvers", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        authorizationMocks.resolve.mockImplementation(
+            async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
+        );
         vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "1", role: "ADMIN" } },
@@ -124,13 +151,9 @@ describe("GET /api/leave/approvers", () => {
 describe("PUT /api/leave/approvers", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        authorizationMocks.resolve.mockResolvedValue({
-            capability: "leave.approver.manage",
-            allowed: false,
-            scopes: [],
-            grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+        authorizationMocks.resolve.mockImplementation(
+            async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
+        );
         vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "1", role: "ADMIN" } },

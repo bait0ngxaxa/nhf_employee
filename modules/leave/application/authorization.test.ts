@@ -7,15 +7,17 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 import {
     assertLeaveCapabilityScope,
     buildLeaveAuthorizationContext,
     canUseLeaveAdminRecoveryOverride,
-    LEAVE_MIGRATED_CAPABILITIES,
+    LEAVE_CAPABILITIES,
     resolveLeaveActorInTransaction,
-    resolveLeaveCapabilityForMigration,
+    defaultLeaveScopes,
+    resolveLeaveCapability,
     resolveLeaveCapabilityInTransaction,
 } from "./authorization";
 
@@ -26,12 +28,17 @@ const mocks = vi.hoisted(() => ({
     lockUserRows: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: mocks.resolve,
-        resolveInTransaction: mocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: mocks.resolve,
+            resolveInTransaction: mocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/row-locks", () => ({
     lockEmployeeRows: mocks.lockEmployeeRows,
@@ -77,10 +84,13 @@ function userGrant(
     };
 }
 
-function systemRoleGrant(capability: string): EffectiveAuthorizationGrant {
+function systemRoleGrant(
+    capability: string,
+    scope: AuthorizationScope = "ALL",
+): EffectiveAuthorizationGrant {
     return {
         capability: capability as EffectiveAuthorizationGrant["capability"],
-        scope: "ALL",
+        scope,
         source: { type: "SYSTEM_ROLE", role: "ADMIN" },
     };
 }
@@ -106,7 +116,7 @@ function activeUser(
     };
 }
 
-describe("Leave authorization migration adapter", () => {
+describe("Leave authorization adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
         mocks.resolveInTransaction.mockReset();
@@ -115,7 +125,7 @@ describe("Leave authorization migration adapter", () => {
     });
 
     it("keeps the registered capability inventory and trusted actor mapping explicit", () => {
-        expect(LEAVE_MIGRATED_CAPABILITIES).toEqual([
+        expect(LEAVE_CAPABILITIES).toEqual([
             "leave.request.read",
             "leave.approval.read",
             "leave.request.create",
@@ -133,54 +143,80 @@ describe("Leave authorization migration adapter", () => {
         } satisfies AuthorizationActor);
     });
 
-    it("keeps normal USER own and assigned compatibility behavior", async () => {
-        mocks.resolve.mockResolvedValue(
-            decision("leave.request.read", false, [], "NO_APPLICABLE_GRANT"),
-        );
-        const ownRead = await resolveLeaveCapabilityForMigration(
-            context(),
-            "leave.request.read",
-        );
-        expect(ownRead.scopes).toEqual(["OWN"]);
-        expect(ownRead.usedMigrationCompatibility).toBe(true);
+    it.each([
+        ["leave.request.read", ["OWN"]],
+        ["leave.approval.read", ["ASSIGNED"]],
+        ["leave.request.create", ["OWN"]],
+        ["leave.request.cancel", ["OWN"]],
+        ["leave.request.approve", ["ASSIGNED"]],
+        ["leave.cancellation.decide", ["ASSIGNED"]],
+        ["leave.request.not_taken", ["OWN", "ASSIGNED"]],
+        ["leave.approver.manage", []],
+    ] as const)(
+        "applies the permanent USER default policy for %s",
+        async (capability, expectedScopes) => {
+            expect(defaultLeaveScopes(
+                context().authorizationActor,
+                capability,
+            )).toEqual(expectedScopes);
+            mocks.resolve.mockResolvedValue(
+                decision(capability, false, [], "NO_APPLICABLE_GRANT"),
+            );
 
-        mocks.resolve.mockResolvedValue(
-            decision("leave.approval.read", false, [], "NO_APPLICABLE_GRANT"),
-        );
-        const assignedRead = await resolveLeaveCapabilityForMigration(
-            context(),
-            "leave.approval.read",
-        );
-        expect(assignedRead.scopes).toEqual(["ASSIGNED"]);
+            if (expectedScopes.length === 0) {
+                await expect(
+                    resolveLeaveCapability(context(), capability),
+                ).rejects.toMatchObject({
+                    authorizationReason: "NO_APPLICABLE_GRANT",
+                });
+                return;
+            }
 
-        mocks.resolve.mockResolvedValue(
-            decision("leave.request.not_taken", false, [], "NO_APPLICABLE_GRANT"),
-        );
-        const notTaken = await resolveLeaveCapabilityForMigration(
-            context(),
-            "leave.request.not_taken",
-        );
-        expect(notTaken.scopes).toEqual(["OWN", "ASSIGNED"]);
-    });
+            const result = await resolveLeaveCapability(
+                context(),
+                capability,
+            );
+            expect(result.defaultScopes).toEqual(expectedScopes);
+            expect(result.scopes).toEqual(expectedScopes);
+        },
+    );
 
-    it("keeps Dashboard Admin approver management compatibility without adding recovery authority", async () => {
+    it("uses central SYSTEM_ROLE authority for Dashboard ADMIN without Leave defaults", async () => {
         mocks.resolve.mockResolvedValue(
-            decision("leave.approver.manage", false, [], "NO_APPLICABLE_GRANT"),
+            decision(
+                "leave.approver.manage",
+                true,
+                ["ALL"],
+                undefined,
+                [systemRoleGrant("leave.approver.manage")],
+            ),
         );
-        const manage = await resolveLeaveCapabilityForMigration(
+
+        const manage = await resolveLeaveCapability(
             context("ADMIN"),
             "leave.approver.manage",
         );
+
         expect(manage.scopes).toEqual(["ALL"]);
-        expect(manage.usedMigrationCompatibility).toBe(true);
+        expect(manage.defaultScopes).toEqual([]);
+        expect(manage.decision.grants).toEqual([
+            systemRoleGrant("leave.approver.manage"),
+        ]);
 
         mocks.resolve.mockResolvedValue(
-            decision("leave.cancellation.decide", false, [], "NO_APPLICABLE_GRANT"),
+            decision(
+                "leave.cancellation.decide",
+                true,
+                ["ASSIGNED"],
+                undefined,
+                [systemRoleGrant("leave.cancellation.decide", "ASSIGNED")],
+            ),
         );
-        const recovery = await resolveLeaveCapabilityForMigration(
+        const recovery = await resolveLeaveCapability(
             context("ADMIN"),
             "leave.cancellation.decide",
         );
+        expect(recovery.defaultScopes).toEqual([]);
         expect(canUseLeaveAdminRecoveryOverride(recovery)).toBe(true);
     });
 
@@ -194,11 +230,11 @@ describe("Leave authorization migration adapter", () => {
                 [userGrant("leave.approver.manage", "ALL")],
             ),
         );
-        const manage = await resolveLeaveCapabilityForMigration(
+        const manage = await resolveLeaveCapability(
             context("USER"),
             "leave.approver.manage",
         );
-        expect(manage.usedMigrationCompatibility).toBe(false);
+        expect(manage.defaultScopes).toEqual([]);
         expect(manage.scopes).toEqual(["ALL"]);
         expect(manage.actor.systemRole).toBe("USER");
 
@@ -211,11 +247,51 @@ describe("Leave authorization migration adapter", () => {
                 [userGrant("leave.request.approve", "ASSIGNED")],
             ),
         );
-        const approval = await resolveLeaveCapabilityForMigration(
+        const approval = await resolveLeaveCapability(
             context("USER"),
             "leave.request.approve",
         );
         expect(assertLeaveCapabilityScope(approval, "ASSIGNED")).toBe(approval);
+    });
+
+    it("composes configured USER grants additively without narrowing defaults", async () => {
+        mocks.resolve
+            .mockResolvedValueOnce(
+                decision(
+                    "leave.request.read",
+                    true,
+                    ["OWN"],
+                    undefined,
+                    [userGrant("leave.request.read", "OWN")],
+                ),
+            )
+            .mockResolvedValueOnce(
+                decision(
+                    "leave.request.not_taken",
+                    true,
+                    ["OWN"],
+                    undefined,
+                    [userGrant("leave.request.not_taken", "OWN")],
+                ),
+            );
+
+        const ownRead = await resolveLeaveCapability(
+            context(),
+            "leave.request.read",
+        );
+        const notTaken = await resolveLeaveCapability(
+            context(),
+            "leave.request.not_taken",
+        );
+
+        expect(ownRead.defaultScopes).toEqual(["OWN"]);
+        expect(ownRead.scopes).toEqual(["OWN"]);
+        expect(notTaken.defaultScopes).toEqual(["OWN", "ASSIGNED"]);
+        expect(notTaken.scopes).toEqual(["OWN", "ASSIGNED"]);
+        expect(notTaken.decision.grants).toEqual([
+            userGrant("leave.request.not_taken", "OWN"),
+        ]);
+        expect(notTaken.actor.systemRole).toBe("USER");
     });
 
     it("does not bridge channel, capability, or persistence-configuration failures", async () => {
@@ -228,8 +304,26 @@ describe("Leave authorization migration adapter", () => {
             ),
         );
         await expect(
-            resolveLeaveCapabilityForMigration(
+            resolveLeaveCapability(
                 context("ADMIN", "LIFF_SELF_SERVICE"),
+                "leave.cancellation.decide",
+            ),
+        ).rejects.toMatchObject({
+            authorizationReason: "CHANNEL_NOT_SUPPORTED",
+            statusCode: 403,
+        });
+
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "leave.cancellation.decide",
+                false,
+                [],
+                "CHANNEL_NOT_SUPPORTED",
+            ),
+        );
+        await expect(
+            resolveLeaveCapability(
+                context("USER", "LIFF_SELF_SERVICE"),
                 "leave.cancellation.decide",
             ),
         ).rejects.toMatchObject({
@@ -241,25 +335,34 @@ describe("Leave authorization migration adapter", () => {
             decision("leave.unknown", false, [], "UNKNOWN_CAPABILITY"),
         );
         await expect(
-            resolveLeaveCapabilityForMigration(context(), "leave.unknown"),
+            resolveLeaveCapability(context(), "leave.unknown"),
         ).rejects.toMatchObject({ authorizationReason: "UNKNOWN_CAPABILITY" });
 
         const configurationError = new Error("invalid persisted authorization");
         mocks.resolve.mockRejectedValue(configurationError);
         await expect(
-            resolveLeaveCapabilityForMigration(context(), "leave.request.read"),
+            resolveLeaveCapability(context(), "leave.request.read"),
         ).rejects.toBe(configurationError);
     });
 
-    it("keeps the recovery override Dashboard-only even when the capability is compatible", async () => {
+    it("keeps the recovery override Dashboard-only after central authorization", async () => {
         mocks.resolve.mockResolvedValue(
-            decision("leave.request.not_taken", false, [], "NO_APPLICABLE_GRANT"),
+            decision(
+                "leave.request.not_taken",
+                true,
+                ["OWN", "ASSIGNED"],
+                undefined,
+                [
+                    systemRoleGrant("leave.request.not_taken", "OWN"),
+                    systemRoleGrant("leave.request.not_taken", "ASSIGNED"),
+                ],
+            ),
         );
-        const dashboard = await resolveLeaveCapabilityForMigration(
+        const dashboard = await resolveLeaveCapability(
             context("ADMIN", "DASHBOARD"),
             "leave.request.not_taken",
         );
-        const liff = await resolveLeaveCapabilityForMigration(
+        const liff = await resolveLeaveCapability(
             context("ADMIN", "LIFF_SELF_SERVICE"),
             "leave.request.not_taken",
         );
@@ -303,6 +406,32 @@ describe("Leave authorization migration adapter", () => {
             tx,
         );
         expect(result.scopes).toEqual(["OWN"]);
+    });
+
+    it("restores the permanent USER default when an additional grant is revoked before transaction resolution", async () => {
+        const tx = {
+            user: {
+                findFirst: vi.fn().mockResolvedValue(activeUser()),
+            },
+        } as unknown as Prisma.TransactionClient;
+        mocks.resolveInTransaction.mockResolvedValue(
+            decision(
+                "leave.request.cancel",
+                false,
+                [],
+                "NO_APPLICABLE_GRANT",
+            ),
+        );
+
+        const result = await resolveLeaveCapabilityInTransaction(
+            tx,
+            context(),
+            "leave.request.cancel",
+        );
+
+        expect(result.defaultScopes).toEqual(["OWN"]);
+        expect(result.scopes).toEqual(["OWN"]);
+        expect(result.decision.reason).toBe("NO_APPLICABLE_GRANT");
     });
 
     it("rebuilds a stale Dashboard ADMIN route actor from the current persisted USER role", async () => {
@@ -436,14 +565,20 @@ describe("Leave authorization migration adapter", () => {
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 
-    it("preserves account-only Dashboard Admin approver management compatibility", async () => {
+    it("preserves account-only Dashboard Admin approver management lifecycle", async () => {
         const tx = {
             user: {
                 findFirst: vi.fn().mockResolvedValue(activeUser("ADMIN", null)),
             },
         } as unknown as Prisma.TransactionClient;
         mocks.resolveInTransaction.mockResolvedValue(
-            decision("leave.approver.manage", false, [], "NO_APPLICABLE_GRANT"),
+            decision(
+                "leave.approver.manage",
+                true,
+                ["ALL"],
+                undefined,
+                [systemRoleGrant("leave.approver.manage")],
+            ),
         );
 
         const result = await resolveLeaveCapabilityInTransaction(
@@ -459,7 +594,7 @@ describe("Leave authorization migration adapter", () => {
             channel: "DASHBOARD",
         });
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.usedMigrationCompatibility).toBe(true);
+        expect(result.defaultScopes).toEqual([]);
         expect(tx.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
             where: expect.objectContaining({
                 id: 7,

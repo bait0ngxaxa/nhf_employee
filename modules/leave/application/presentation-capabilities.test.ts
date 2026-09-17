@@ -5,21 +5,27 @@ import type {
     AuthorizationScope,
     EffectiveAuthorizationGrant,
 } from "@/modules/authorization";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const mocks = vi.hoisted(() => ({
     resolveMany: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolveMany: mocks.resolveMany,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolveMany: mocks.resolveMany,
+        },
+    };
+});
 
 import {
     buildLeaveAuthorizationContext,
     getLeavePresentationCapabilities,
-    LEAVE_MIGRATED_CAPABILITIES,
+    LEAVE_CAPABILITIES,
 } from "./authorization";
 import type { LeavePresentationCapabilities } from "./types";
 
@@ -46,7 +52,7 @@ function decision(
 }
 
 function userGrant(
-    capability: (typeof LEAVE_MIGRATED_CAPABILITIES)[number],
+    capability: (typeof LEAVE_CAPABILITIES)[number],
     scope: AuthorizationScope,
 ): EffectiveAuthorizationGrant {
     return {
@@ -57,20 +63,20 @@ function userGrant(
 }
 
 function noGrantDecision(
-    capability: (typeof LEAVE_MIGRATED_CAPABILITIES)[number],
+    capability: (typeof LEAVE_CAPABILITIES)[number],
 ): AuthorizationDecision {
     return decision(capability, false, [], "NO_APPLICABLE_GRANT");
 }
 
 function deniedDecision(
-    capability: (typeof LEAVE_MIGRATED_CAPABILITIES)[number],
+    capability: (typeof LEAVE_CAPABILITIES)[number],
 ): AuthorizationDecision {
     return decision(capability, false, [], "CHANNEL_NOT_SUPPORTED");
 }
 
 function mockDecisions(
     getDecision: (
-        capability: (typeof LEAVE_MIGRATED_CAPABILITIES)[number],
+        capability: (typeof LEAVE_CAPABILITIES)[number],
     ) => AuthorizationDecision,
 ): void {
     mocks.resolveMany.mockImplementation(
@@ -78,7 +84,7 @@ function mockDecisions(
             capabilities.map((capability) => [
                 capability,
                 getDecision(
-                    capability as (typeof LEAVE_MIGRATED_CAPABILITIES)[number],
+                    capability as (typeof LEAVE_CAPABILITIES)[number],
                 ),
             ]),
         ),
@@ -110,11 +116,30 @@ describe("Leave presentation capability projection", () => {
         expect(mocks.resolveMany).toHaveBeenCalledTimes(1);
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             DASHBOARD_USER.authorizationActor,
-            LEAVE_MIGRATED_CAPABILITIES,
+            LEAVE_CAPABILITIES,
         );
     });
 
-    it("preserves Dashboard Admin compatibility without projecting recovery authority", async () => {
+    it("uses central Dashboard Admin authority without projecting recovery authority", async () => {
+        mockDecisions((capability) => {
+            switch (capability) {
+                case "leave.request.not_taken":
+                    return decision(
+                        capability,
+                        true,
+                        ["OWN", "ASSIGNED"],
+                        undefined,
+                    );
+                case "leave.approver.manage":
+                    return decision(capability, true, ["ALL"]);
+                case "leave.approval.read":
+                case "leave.request.approve":
+                case "leave.cancellation.decide":
+                    return decision(capability, true, ["ASSIGNED"]);
+                default:
+                    return decision(capability, true, ["OWN"]);
+            }
+        });
         const projection = await getLeavePresentationCapabilities(
             buildLeaveAuthorizationContext(
                 { id: 7, role: "ADMIN" },
@@ -184,7 +209,7 @@ describe("Leave presentation capability projection", () => {
             canApproveAssignedRequests: true,
             canDecideAssignedCancellations: false,
             canRequestOwnNotTaken: true,
-            canConfirmAssignedNotTaken: false,
+            canConfirmAssignedNotTaken: true,
             canManageApprovers: true,
         });
     });
@@ -203,7 +228,7 @@ describe("Leave presentation capability projection", () => {
         };
 
         const expectOnlyCapability = async (
-            capability: (typeof LEAVE_MIGRATED_CAPABILITIES)[number],
+            capability: (typeof LEAVE_CAPABILITIES)[number],
             scope: AuthorizationScope,
             field: keyof LeavePresentationCapabilities,
         ): Promise<void> => {
@@ -217,12 +242,19 @@ describe("Leave presentation capability projection", () => {
                 )
                 : deniedDecision(candidate));
 
+            const expectedProjection = capability === "leave.request.not_taken"
+                ? {
+                    ...emptyProjection,
+                    canRequestOwnNotTaken: true,
+                    canConfirmAssignedNotTaken: true,
+                }
+                : {
+                    ...emptyProjection,
+                    [field]: true,
+                };
             await expect(
                 getLeavePresentationCapabilities(DASHBOARD_USER),
-            ).resolves.toEqual({
-                ...emptyProjection,
-                [field]: true,
-            });
+            ).resolves.toEqual(expectedProjection);
         };
 
         await expectOnlyCapability(

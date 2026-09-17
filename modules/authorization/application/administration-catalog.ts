@@ -32,12 +32,6 @@ const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.fre
     runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY" as const,
 });
 
-const LEAVE_COMPATIBILITY: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "CENTRAL_WITH_COMPATIBILITY" as const,
-    nonGrantableReason:
-        "The current Leave adapter may translate NO_APPLICABLE_GRANT into a compatibility scope; ordinary grants require explicit policy activation.",
-});
-
 const DEFERRED_ROUTINE: CapabilityAdministrationMetadata = Object.freeze({
     runtimeAuthorizationMode: "DEFERRED" as const,
     nonGrantableReason:
@@ -97,13 +91,13 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "stock.request.process": CENTRAL_ONLY,
     "stock.report.export": CENTRAL_ONLY,
 
-    "leave.request.read": LEAVE_COMPATIBILITY,
-    "leave.approval.read": LEAVE_COMPATIBILITY,
-    "leave.request.create": LEAVE_COMPATIBILITY,
-    "leave.request.cancel": LEAVE_COMPATIBILITY,
-    "leave.request.approve": LEAVE_COMPATIBILITY,
-    "leave.cancellation.decide": LEAVE_COMPATIBILITY,
-    "leave.request.not_taken": LEAVE_COMPATIBILITY,
+    "leave.request.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "leave.approval.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "leave.request.create": CENTRAL_WITH_DEFAULT_POLICY,
+    "leave.request.cancel": CENTRAL_WITH_DEFAULT_POLICY,
+    "leave.request.approve": CENTRAL_WITH_DEFAULT_POLICY,
+    "leave.cancellation.decide": CENTRAL_WITH_DEFAULT_POLICY,
+    "leave.request.not_taken": CENTRAL_WITH_DEFAULT_POLICY,
     "leave.approver.manage": CENTRAL_ONLY,
 
     "audit.read": CENTRAL_ONLY,

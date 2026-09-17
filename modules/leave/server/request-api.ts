@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
-    assertLeaveCapabilityForMigration,
+    assertLeaveCapability,
     LeaveCapabilityDeniedError,
     type LeaveAuthorizationContext,
 } from "@/modules/leave/application/authorization";
@@ -125,7 +125,7 @@ export async function handleLeaveRequestSubmission(
     let storedAttachments: StoredLeaveAttachment[] = [];
     let transactionCommitted = false;
     try {
-        await assertLeaveCapabilityForMigration(
+        await assertLeaveCapability(
             actor.authorization,
             "leave.request.create",
         );

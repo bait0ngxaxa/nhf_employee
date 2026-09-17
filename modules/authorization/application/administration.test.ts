@@ -349,6 +349,22 @@ describe("Authorization Administration capability catalog", () => {
                 administrativelyGrantable: true,
             });
         }
+        for (const key of [
+            "leave.request.read",
+            "leave.approval.read",
+            "leave.request.create",
+            "leave.request.cancel",
+            "leave.request.approve",
+            "leave.cancellation.decide",
+            "leave.request.not_taken",
+        ]) {
+            expect(first.find((capability) => capability.key === key)).toMatchObject({
+                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
+            });
+            expect(first.find((capability) => capability.key === key)?.nonGrantableReason).toBeUndefined();
+        }
         expect(first.find(({ key }) => key === "routine.task.export")).toMatchObject({
             runtimeAuthorizationMode: "DEFERRED",
             administrativeStatus: "DEFERRED",
@@ -379,13 +395,6 @@ describe("Authorization Administration capability catalog", () => {
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
         ).map(({ key }) => key)).toEqual([
-            "leave.request.read",
-            "leave.approval.read",
-            "leave.request.create",
-            "leave.request.cancel",
-            "leave.request.approve",
-            "leave.cancellation.decide",
-            "leave.request.not_taken",
         ]);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
@@ -403,6 +412,13 @@ describe("Authorization Administration capability catalog", () => {
             "stock.request.read",
             "stock.request.create",
             "stock.request.cancel",
+            "leave.request.read",
+            "leave.approval.read",
+            "leave.request.create",
+            "leave.request.cancel",
+            "leave.request.approve",
+            "leave.cancellation.decide",
+            "leave.request.not_taken",
             "notification.inbox.read",
             "notification.inbox.update",
         ]);
@@ -412,19 +428,19 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(13);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
-        )).toHaveLength(15);
+        )).toHaveLength(22);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
-        )).toHaveLength(7);
+        )).toHaveLength(0);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "DEFERRED",
         )).toHaveLength(5);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(28);
+        )).toHaveLength(35);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
-        )).toHaveLength(7);
+        )).toHaveLength(0);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "DEFERRED",
         )).toHaveLength(5);

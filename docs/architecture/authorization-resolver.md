@@ -19,8 +19,9 @@ This does not change the resolver implementation or its current resolver-level
 decision semantics.
 Phase 12C.1 uses that seam for Department and Notification, Phase 12C.2 uses
 it for Employee, Phase 12C.3 uses it for the nine enforced Routine
-capabilities, and Phase 12C.4 uses it for the complete Stock surface. Leave
-retains its documented compatibility mechanics until Phase 12C.5.
+capabilities, Phase 12C.4 uses it for the complete Stock surface, and Phase
+12C.5 uses it for the complete registered Leave surface. The remaining
+compatibility-backed migration set is now empty.
 
 Phase 3 made authorization resolution operational and independently testable.
 The historical Phase 4 Routine pilot established the server-side seam; current
@@ -47,7 +48,7 @@ const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
 
-Department, Notification, Employee, Routine, and Stock adapters compose the
+Department, Notification, Employee, Routine, Stock, and Leave adapters compose the
 resolver result with their trusted default scopes through the Phase 12B seam:
 
 ```ts
@@ -65,9 +66,9 @@ Department, request, resource, or workflow dependencies. It validates default
 scopes against the supplied code-owned registry, returns normalized effective
 scopes, and preserves configured grants separately from Default Domain Policy.
 It is the runtime seam for migrated domains; Department, Notification,
-Employee, the nine enforced Routine capabilities, and all seven Stock
-capabilities now use it. Leave remains the only compatibility-backed domain
-family in the current Phase 12C migration boundary.
+Employee, the nine enforced Routine capabilities, all seven Stock
+capabilities, and all eight registered Leave capabilities now use it. No
+current capability remains classified as `CENTRAL_WITH_COMPATIBILITY`.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -183,8 +184,8 @@ as an additive union after trusted identity, registered capability, supported
 channel, and valid-configuration checks. A narrower configured grant must not
 narrow the default behavior. Phase 12C.1 applies this composition to Department
 and Notification, Phase 12C.2 applies it to Employee, Phase 12C.3 applies it to
-the enforced Routine surfaces, and Phase 12C.4 applies it to Stock. Leave
-retains its documented fallback mechanics until Phase 12C.5.
+the enforced Routine surfaces, Phase 12C.4 applies it to Stock, and Phase
+12C.5 applies it to Leave.
 
 For Employee, the permanent default is `ALL` for `employee.read`,
 `employee.stats.read`, and `employee.export`, and empty for
@@ -194,8 +195,10 @@ resolver and `resolveInTransaction()`; ADMIN remains the resolver's
 `SYSTEM_ROLE / ADMIN` authority. Routine adds a context-sensitive default policy
 and a post-composition LIFF self-service channel policy while keeping this
 resolver contract unchanged. Stock adds its permanent requester/catalog
-defaults without the Routine LIFF ADMIN clamp. The next runtime handoff is
-Phase 12C.5 — Leave Additive Default Policy Migration.
+defaults without the Routine LIFF ADMIN clamp. Leave adds its permanent
+request/approval/cancellation/not-taken defaults without changing the
+resolver's system-role or channel semantics. The next runtime handoff is
+Phase 12D for the remaining explicitly deferred non-IT surfaces.
 
 ## USER semantics and lifecycle filtering
 
@@ -304,20 +307,20 @@ Phase 12A adds no resolver or domain runtime behavior. It records the
 permanent Default Domain Policy and the current inventory. Phase 12B provides
 additive composition. Phase 12C.1 has migrated Department + Notification,
 Phase 12C.2 has migrated Employee, Phase 12C.3 has migrated the nine
-enforced Routine capabilities, and Phase 12C.4 has migrated all seven Stock
-capabilities to that composition. Leave remains compatibility-backed until
-Phase 12C.5, the next Leave migration. Routine export, summary,
-and reference remain explicitly deferred; Phase 12D owns remaining non-IT
-deferred surfaces. Email Request and the future IT module remain outside that
-roadmap.
+enforced Routine capabilities, Phase 12C.4 has migrated all seven Stock
+capabilities, and Phase 12C.5 has migrated all eight registered Leave
+capabilities to that composition. Routine export, summary, and reference
+remain explicitly deferred; Phase 12D owns remaining non-IT deferred surfaces.
+Email Request and the future IT module remain outside that roadmap.
 
 ## Phase boundary
 
-The Phase 4 pilot is historical; current enforced Routine and Stock server-side
-capability composition is recorded in the Phase 12C.3 and Phase 12C.4 closure
-records. The existing `requireAdminSession`, `requireApiSession`,
-`isAdminRole`, Leave helpers, Dashboard guards, and LIFF guards outside the
-migrated Routine/Stock call chains remain unchanged. No Team/grant administration API or UI,
+The Phase 4 pilot is historical; current enforced Routine, Stock, and Leave
+server-side capability composition is recorded in the Phase 12C.3,
+Phase 12C.4, and Phase 12C.5 closure records. The existing
+`requireAdminSession`, `requireApiSession`, `isAdminRole`, Dashboard guards,
+and LIFF guards outside the migrated Routine/Stock/Leave call chains remain
+unchanged. No Team/grant administration API or UI,
 explicit deny model, authorization cache, or audit mutation workflow is
 introduced. Routine-specific scope translation, channel/resource policy, and
 transaction composition are documented in
@@ -325,4 +328,7 @@ transaction composition are documented in
 Stock composition, requested-view semantics, LIFF processor behavior and
 transaction lifecycle are documented in
 [authorization-phase-12c4-stock-additive-migration.md](./authorization-phase-12c4-stock-additive-migration.md);
+Leave default composition, effective-approver semantics, and transaction
+lifecycle are documented in
+[authorization-phase-12c5-leave-additive-migration.md](./authorization-phase-12c5-leave-additive-migration.md);
 the pilot remains the historical record of the deferred boundaries.

@@ -7,6 +7,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -26,12 +27,17 @@ vi.mock("@/modules/line", () => ({
     requireLiffWorkforceSession: liffAuthMocks.requireLiffWorkforceSession,
 }));
 vi.mock("@/lib/services/outbox/processor", () => ({ processOutbox: vi.fn() }));
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: authorizationMocks.resolve,
-        resolveInTransaction: authorizationMocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: authorizationMocks.resolve,
+            resolveInTransaction: authorizationMocks.resolveInTransaction,
+        },
+    };
+});
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
         $transaction: vi.fn(),
@@ -62,6 +68,54 @@ function activeAuthorizationUser(
         deletedAt: null,
         employee: { id, status: "ACTIVE", deletedAt: null },
     } as never;
+}
+
+type TestAuthorizationScope = "OWN" | "ASSIGNED" | "ALL";
+
+function isAdminAuthorizationActor(actor: unknown): boolean {
+    return typeof actor === "object"
+        && actor !== null
+        && "systemRole" in actor
+        && actor.systemRole === "ADMIN";
+}
+
+function systemRoleScopes(capability: string): readonly TestAuthorizationScope[] {
+    switch (capability) {
+        case "leave.approver.manage":
+            return ["ALL"];
+        case "leave.approval.read":
+        case "leave.request.approve":
+        case "leave.cancellation.decide":
+            return ["ASSIGNED"];
+        case "leave.request.not_taken":
+            return ["OWN", "ASSIGNED"];
+        default:
+            return ["OWN"];
+    }
+}
+
+function authorizationDecision(actor: unknown, capability: string) {
+    if (!isAdminAuthorizationActor(actor)) {
+        return {
+            capability,
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT" as const,
+        };
+    }
+
+    const scopes = systemRoleScopes(capability);
+    return {
+        capability,
+        allowed: true,
+        scopes,
+        grants: scopes.map((scope) => ({
+            capability,
+            scope,
+            source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+        })),
+    };
 }
 
 function buildCancellationRequest(
@@ -125,20 +179,12 @@ function buildCancellationRequest(
 describe("POST /api/leave/cancel", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        authorizationMocks.resolve.mockResolvedValue({
-            capability: "leave.request.cancel",
-            allowed: false,
-            scopes: [],
-            grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
-        authorizationMocks.resolveInTransaction.mockResolvedValue({
-            capability: "leave.request.cancel",
-            allowed: false,
-            scopes: [],
-            grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+        authorizationMocks.resolve.mockImplementation(
+            async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
+        );
+        authorizationMocks.resolveInTransaction.mockImplementation(
+            async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
+        );
         vi.mocked(requireApiSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "10", email: "employee@example.com", name: "Employee", role: "USER" } },

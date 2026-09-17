@@ -3,8 +3,8 @@
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
 closed; Employee Phase 8A/8B/8C and Phase 12C.2 additive policy migration
 closed; Phase 9A/9B/9C Department, Audit and Notification integration closed;
-Phase 12C.3 Routine additive policy migration closed; Phase 12C.4 Stock
-additive policy migration closed
+Phase 12C.3 Routine, Phase 12C.4 Stock, and Phase 12C.5 Leave additive
+policy migrations closed
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -463,6 +463,27 @@ the production-consumer audit, while
 Reports/export, participant/detail, attachments, and Dashboard Admin recovery
 remain explicitly deferred Leave-owned policy. No generic report, participant,
 attachment, or recovery capability is implied by the presentation projection.
+
+### Leave Phase 12C.5 additive projection update
+
+The current Leave adapter replaces the historical compatibility translation with
+the permanent additive composition path. `getLeavePresentationCapabilities()`
+still makes exactly one batched `authorization.resolveMany()` call over
+`LEAVE_CAPABILITIES`, then composes each resolver decision with the trusted
+Leave Default Domain Policy. For an eligible normal USER with no configured
+grant, the projection remains read-own, assigned-approval, create-own,
+cancel-own, approve-assigned, Dashboard cancellation-decision,
+own/assigned-not-taken, and no approver-management eligibility. A configured
+grant can add scopes but cannot remove those defaults; ADMIN defaults remain
+empty and central `SYSTEM_ROLE` authority is used.
+
+`leave.cancellation.decide` remains registered for `DASHBOARD` only. The LIFF
+projection therefore keeps `canDecideAssignedCancellations` false and does not
+bridge `CHANNEL_NOT_SUPPORTED` or invent a LIFF capability. Effective
+approver/resource/workflow checks, including exception-approver precedence and
+owner exclusion, remain Leave-domain authorization rather than presentation
+authority. The complete phase record is in
+[authorization-phase-12c5-leave-additive-migration.md](authorization-phase-12c5-leave-additive-migration.md).
 
 ## Employee Phase 8B projection
 

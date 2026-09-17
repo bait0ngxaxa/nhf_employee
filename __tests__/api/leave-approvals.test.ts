@@ -4,6 +4,7 @@ import { GET as getLeaveApprovals } from "@/app/api/leave/approvals/route";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import { getAssignedLeaveApproverWhere } from "@/modules/leave";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -14,12 +15,17 @@ vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: authorizationMocks.resolve,
-        resolveInTransaction: authorizationMocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: authorizationMocks.resolve,
+            resolveInTransaction: authorizationMocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -80,16 +86,37 @@ function createLeaveRequest(
     };
 }
 
-describe("GET /api/leave/approvals", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        authorizationMocks.resolve.mockResolvedValue({
-            capability: "leave.approval.read",
+function authorizationDecision(actor: unknown, capability: string) {
+    const isAdmin = typeof actor === "object"
+        && actor !== null
+        && "systemRole" in actor
+        && actor.systemRole === "ADMIN";
+    return isAdmin
+        ? {
+            capability,
+            allowed: true,
+            scopes: ["ASSIGNED" as const],
+            grants: [{
+                capability,
+                scope: "ASSIGNED" as const,
+                source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+            }],
+        }
+        : {
+            capability,
             allowed: false,
             scopes: [],
             grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+            reason: "NO_APPLICABLE_GRANT" as const,
+        };
+}
+
+describe("GET /api/leave/approvals", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        authorizationMocks.resolve.mockImplementation(
+            async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
+        );
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 200,

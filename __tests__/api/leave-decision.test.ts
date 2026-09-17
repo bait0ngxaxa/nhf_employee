@@ -5,6 +5,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
+import type * as AuthorizationModule from "@/modules/authorization";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
 
 const authorizationMocks = vi.hoisted(() => ({
@@ -31,12 +32,17 @@ vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: authorizationMocks.resolve,
-        resolveInTransaction: authorizationMocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: authorizationMocks.resolve,
+            resolveInTransaction: authorizationMocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -83,13 +89,15 @@ function activeAuthorizationUser(id: number): never {
 describe("POST /api/leave/decision", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        authorizationMocks.resolveInTransaction.mockResolvedValue({
-            capability: "leave.request.approve",
-            allowed: false,
-            scopes: [],
-            grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+        authorizationMocks.resolveInTransaction.mockImplementation(
+            async (_actor: unknown, capability: string) => ({
+                capability,
+                allowed: false,
+                scopes: [],
+                grants: [],
+                reason: "NO_APPLICABLE_GRANT" as const,
+            }),
+        );
         vi.mocked(requireApiSession).mockResolvedValue({
             ok: true,
             session: {

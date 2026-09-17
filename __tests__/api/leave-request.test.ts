@@ -9,6 +9,7 @@ import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import type * as LeaveModule from "@/modules/leave";
+import type * as AuthorizationModule from "@/modules/authorization";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
 
 const authorizationMocks = vi.hoisted(() => ({
@@ -39,12 +40,17 @@ vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: authorizationMocks.resolve,
-        resolveInTransaction: authorizationMocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: authorizationMocks.resolve,
+            resolveInTransaction: authorizationMocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/modules/leave", async (importOriginal) => {
     const actual = await importOriginal<typeof LeaveModule>();
@@ -153,20 +159,24 @@ describe("POST /api/leave/request", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         resetMutationRateLimit();
-        authorizationMocks.resolve.mockResolvedValue({
-            capability: "leave.request.create",
-            allowed: false,
-            scopes: [],
-            grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
-        authorizationMocks.resolveInTransaction.mockResolvedValue({
-            capability: "leave.request.create",
-            allowed: false,
-            scopes: [],
-            grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+        authorizationMocks.resolve.mockImplementation(
+            async (_actor: unknown, capability: string) => ({
+                capability,
+                allowed: false,
+                scopes: [],
+                grants: [],
+                reason: "NO_APPLICABLE_GRANT" as const,
+            }),
+        );
+        authorizationMocks.resolveInTransaction.mockImplementation(
+            async (_actor: unknown, capability: string) => ({
+                capability,
+                allowed: false,
+                scopes: [],
+                grants: [],
+                reason: "NO_APPLICABLE_GRANT" as const,
+            }),
+        );
         vi.mocked(prisma.user.findUnique).mockResolvedValue({
             isActive: true,
             employee: { id: mockEmployeeId, status: "ACTIVE", deletedAt: null },

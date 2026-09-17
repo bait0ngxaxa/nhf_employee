@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 import type * as NextServerModule from "next/server";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -31,12 +32,17 @@ vi.mock("@/lib/services/outbox/processor", () => ({
     processOutbox: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolve: authorizationMocks.resolve,
-        resolveInTransaction: authorizationMocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolve: authorizationMocks.resolve,
+            resolveInTransaction: authorizationMocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -85,16 +91,60 @@ function activeAuthorizationUser(
     } as never;
 }
 
-describe("/api/leave/not-taken", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        authorizationMocks.resolveInTransaction.mockResolvedValue({
-            capability: "leave.request.not_taken",
+type TestAuthorizationScope = "OWN" | "ASSIGNED" | "ALL";
+
+function isAdminAuthorizationActor(actor: unknown): boolean {
+    return typeof actor === "object"
+        && actor !== null
+        && "systemRole" in actor
+        && actor.systemRole === "ADMIN";
+}
+
+function systemRoleScopes(capability: string): readonly TestAuthorizationScope[] {
+    switch (capability) {
+        case "leave.approver.manage":
+            return ["ALL"];
+        case "leave.approval.read":
+        case "leave.request.approve":
+        case "leave.cancellation.decide":
+            return ["ASSIGNED"];
+        case "leave.request.not_taken":
+            return ["OWN", "ASSIGNED"];
+        default:
+            return ["OWN"];
+    }
+}
+
+function authorizationDecision(actor: unknown, capability: string) {
+    if (!isAdminAuthorizationActor(actor)) {
+        return {
+            capability,
             allowed: false,
             scopes: [],
             grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+            reason: "NO_APPLICABLE_GRANT" as const,
+        };
+    }
+
+    const scopes = systemRoleScopes(capability);
+    return {
+        capability,
+        allowed: true,
+        scopes,
+        grants: scopes.map((scope) => ({
+            capability,
+            scope,
+            source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+        })),
+    };
+}
+
+describe("/api/leave/not-taken", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        authorizationMocks.resolveInTransaction.mockImplementation(
+            async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
+        );
         vi.mocked(getApiAuthSession).mockResolvedValue({
             user: {
                 id: "1",

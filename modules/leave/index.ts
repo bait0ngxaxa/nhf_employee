@@ -59,14 +59,15 @@ export {
 
 // Central authorization adapter for registered Leave capabilities.
 export {
-    assertLeaveCapabilityForMigration,
+    assertLeaveCapability,
     assertLeaveCapabilityScope,
     buildLeaveAuthorizationActor,
     buildLeaveAuthorizationContext,
     canUseLeaveAdminRecoveryOverride,
     getLeavePresentationCapabilities,
-    LEAVE_MIGRATED_CAPABILITIES,
-    resolveLeaveCapabilityForMigration,
+    LEAVE_CAPABILITIES,
+    defaultLeaveScopes,
+    resolveLeaveCapability,
     resolveLeaveCapabilityInTransaction,
 } from "./application/authorization";
 export type {
@@ -74,7 +75,7 @@ export type {
     LeaveAuthorizationChannel,
     LeaveAuthorizationContext,
     LeaveCapabilityAuthorization,
-    LeaveMigratedCapability,
+    LeaveCapability,
 } from "./application/authorization";
 export { LeaveCapabilityDeniedError } from "./application/authorization";
 export type { LeavePresentationCapabilities } from "./application/types";

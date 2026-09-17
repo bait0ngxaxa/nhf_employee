@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
-    assertLeaveCapabilityForMigration,
+    assertLeaveCapability,
     buildLeaveAuthorizationContext,
     getLeaveApprovalList,
     LeaveCapabilityDeniedError,
@@ -45,7 +45,7 @@ export async function GET(req: Request): Promise<NextResponse> {
             auth.employeeId,
             "DASHBOARD",
         );
-        await assertLeaveCapabilityForMigration(
+        await assertLeaveCapability(
             authorization,
             "leave.approval.read",
         );

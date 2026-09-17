@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationChannel,
     type AuthorizationDecision,
@@ -13,7 +14,7 @@ import type { UserRole } from "@/lib/ssot/permissions";
 
 import type { LeavePresentationCapabilities } from "./types";
 
-export const LEAVE_MIGRATED_CAPABILITIES = [
+export const LEAVE_CAPABILITIES = [
     "leave.request.read",
     "leave.approval.read",
     "leave.request.create",
@@ -24,8 +25,7 @@ export const LEAVE_MIGRATED_CAPABILITIES = [
     "leave.approver.manage",
 ] as const;
 
-export type LeaveMigratedCapability =
-    (typeof LEAVE_MIGRATED_CAPABILITIES)[number];
+export type LeaveCapability = (typeof LEAVE_CAPABILITIES)[number];
 
 export type LeaveAuthorizationChannel = Exclude<
     AuthorizationChannel,
@@ -42,10 +42,10 @@ export interface LeaveAuthorizationContext {
 
 export interface LeaveCapabilityAuthorization {
     readonly actor: LeaveAuthorizationActor;
-    readonly capability: LeaveMigratedCapability;
+    readonly capability: LeaveCapability;
     readonly decision: AuthorizationDecision;
+    readonly defaultScopes: readonly AuthorizationScope[];
     readonly scopes: readonly AuthorizationScope[];
-    readonly usedMigrationCompatibility: boolean;
 }
 
 export class LeaveCapabilityDeniedError extends Error {
@@ -65,12 +65,12 @@ export class LeaveCapabilityDeniedError extends Error {
 }
 
 const LEAVE_CAPABILITY_SET = new Set<string>(
-    LEAVE_MIGRATED_CAPABILITIES,
+    LEAVE_CAPABILITIES,
 );
 
-function isLeaveMigratedCapability(
+function isLeaveCapability(
     capability: string,
-): capability is LeaveMigratedCapability {
+): capability is LeaveCapability {
     return LEAVE_CAPABILITY_SET.has(capability);
 }
 
@@ -102,16 +102,12 @@ export function buildLeaveAuthorizationContext(
     });
 }
 
-function freezeScopes(
-    scopes: readonly AuthorizationScope[],
-): readonly AuthorizationScope[] {
-    return Object.freeze([...scopes]);
-}
-
-function legacyLeaveScopes(
+export function defaultLeaveScopes(
     actor: LeaveAuthorizationActor,
-    capability: LeaveMigratedCapability,
-): readonly AuthorizationScope[] | null {
+    capability: LeaveCapability,
+): readonly AuthorizationScope[] {
+    if (actor.systemRole !== "USER") return [];
+
     switch (capability) {
         case "leave.request.read":
         case "leave.request.create":
@@ -121,11 +117,11 @@ function legacyLeaveScopes(
         case "leave.request.approve":
             return ["ASSIGNED"];
         case "leave.cancellation.decide":
-            return actor.channel === "DASHBOARD" ? ["ASSIGNED"] : null;
+            return actor.channel === "DASHBOARD" ? ["ASSIGNED"] : [];
         case "leave.request.not_taken":
             return ["OWN", "ASSIGNED"];
         case "leave.approver.manage":
-            return actor.systemRole === "ADMIN" ? ["ALL"] : null;
+            return [];
     }
 }
 
@@ -134,45 +130,38 @@ function buildLeaveCapabilityAuthorization(
     capability: string,
     decision: AuthorizationDecision,
 ): LeaveCapabilityAuthorization {
-    if (!isLeaveMigratedCapability(capability)) {
+    if (!isLeaveCapability(capability)) {
         throw new LeaveCapabilityDeniedError(
             capability,
             decision.reason ?? "UNKNOWN_CAPABILITY",
         );
     }
 
-    if (!decision.allowed) {
-        const compatibilityScopes = decision.reason === "NO_APPLICABLE_GRANT"
-            ? legacyLeaveScopes(actor, capability)
-            : null;
-        if (compatibilityScopes === null) {
-            throw new LeaveCapabilityDeniedError(
-                capability,
-                decision.reason,
-            );
-        }
-
-        return Object.freeze({
-            actor,
+    const authority = composeAuthorizationAuthority(
+        actor,
+        capability,
+        defaultLeaveScopes(actor, capability),
+        decision,
+    );
+    if (!authority.allowed) {
+        throw new LeaveCapabilityDeniedError(
             capability,
-            decision,
-            scopes: freezeScopes(compatibilityScopes),
-            usedMigrationCompatibility: true,
-        });
+            decision.reason,
+        );
     }
 
     return Object.freeze({
         actor,
         capability,
-        decision,
-        scopes: decision.scopes,
-        usedMigrationCompatibility: false,
+        decision: authority.configuredDecision,
+        defaultScopes: authority.defaultScopes,
+        scopes: authority.scopes,
     });
 }
 
 function getLeavePresentationDecision(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
-    capability: LeaveMigratedCapability,
+    capability: LeaveCapability,
 ): AuthorizationDecision {
     const decision = decisions.get(capability);
     if (decision === undefined) {
@@ -185,7 +174,7 @@ function getLeavePresentationDecision(
 
 function projectLeaveCapabilityDecision(
     actor: LeaveAuthorizationActor,
-    capability: LeaveMigratedCapability,
+    capability: LeaveCapability,
     decision: AuthorizationDecision,
 ): readonly AuthorizationScope[] | null {
     try {
@@ -223,11 +212,11 @@ export async function getLeavePresentationCapabilities(
     const actor = context.authorizationActor;
     const decisions = await authorization.resolveMany(
         actor,
-        LEAVE_MIGRATED_CAPABILITIES,
+        LEAVE_CAPABILITIES,
     );
 
     const project = (
-        capability: LeaveMigratedCapability,
+        capability: LeaveCapability,
     ): readonly AuthorizationScope[] | null =>
         projectLeaveCapabilityDecision(
             actor,
@@ -275,7 +264,7 @@ export async function getLeavePresentationCapabilities(
     });
 }
 
-export async function resolveLeaveCapabilityForMigration(
+export async function resolveLeaveCapability(
     context: LeaveAuthorizationContext,
     capability: string,
 ): Promise<LeaveCapabilityAuthorization> {
@@ -284,11 +273,11 @@ export async function resolveLeaveCapabilityForMigration(
     return buildLeaveCapabilityAuthorization(actor, capability, decision);
 }
 
-export async function assertLeaveCapabilityForMigration(
+export async function assertLeaveCapability(
     context: LeaveAuthorizationContext,
     capability: string,
 ): Promise<LeaveCapabilityAuthorization> {
-    return resolveLeaveCapabilityForMigration(context, capability);
+    return resolveLeaveCapability(context, capability);
 }
 
 export function assertLeaveCapabilityScope(

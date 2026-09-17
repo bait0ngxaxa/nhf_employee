@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
-    assertLeaveCapabilityForMigration,
+    assertLeaveCapability,
     buildLeaveAuthorizationContext,
     ApproverAssignmentError,
     assignLeaveApprovers,
@@ -26,7 +26,7 @@ export async function GET(): Promise<NextResponse> {
             return auth.response.status === 401 ? forbidden() : auth.response;
         }
 
-        await assertLeaveCapabilityForMigration(
+        await assertLeaveCapability(
             buildLeaveAuthorizationContext(
                 auth.user,
                 "employeeId" in auth ? auth.employeeId : null,
@@ -66,7 +66,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
             "employeeId" in auth ? auth.employeeId : null,
             "DASHBOARD",
         );
-        await assertLeaveCapabilityForMigration(
+        await assertLeaveCapability(
             authorization,
             "leave.approver.manage",
         );

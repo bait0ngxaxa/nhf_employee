@@ -8,16 +8,22 @@ import { assignLeaveApprovers } from "../approvals/approver-assignment";
 import { buildLeaveAuthorizationContext } from "../authorization";
 import { buildLeaveActionDeliveryIdentity } from "../notifications/notification-payloads";
 import { runSerializableTransaction } from "@/lib/db/transaction";
+import type * as AuthorizationModule from "@/modules/authorization";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolveInTransaction: vi.fn(),
 }));
 
-vi.mock("@/modules/authorization", () => ({
-    authorization: {
-        resolveInTransaction: authorizationMocks.resolveInTransaction,
-    },
-}));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: {
+            ...actual.authorization,
+            resolveInTransaction: authorizationMocks.resolveInTransaction,
+        },
+    };
+});
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: {
@@ -72,6 +78,19 @@ function deferred(): Deferred {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
+}
+
+function systemRoleDecision(capability: string) {
+    return {
+        capability,
+        allowed: true,
+        scopes: ["ALL" as const],
+        grants: [{
+            capability,
+            scope: "ALL" as const,
+            source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+        }],
+    };
 }
 
 function createHarness(options: {
@@ -248,13 +267,9 @@ async function createLeaveRequest(harness: ReturnType<typeof createHarness>): Pr
 describe("leave request and manager reassignment serialization", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        authorizationMocks.resolveInTransaction.mockResolvedValue({
-            capability: "leave.approver.manage",
-            allowed: false,
-            scopes: [],
-            grants: [],
-            reason: "NO_APPLICABLE_GRANT",
-        });
+        authorizationMocks.resolveInTransaction.mockImplementation(
+            async (_actor: unknown, capability: string) => systemRoleDecision(capability),
+        );
     });
 
     it("lets request creation win, then rejects reassignment on the committed PENDING request", async () => {

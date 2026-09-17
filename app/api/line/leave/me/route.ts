@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
-    assertLeaveCapabilityForMigration,
+    assertLeaveCapability,
     buildLeaveAuthorizationContext,
     getEmployeeLeaveActions,
     getEmployeeLeaveProfile,
@@ -41,7 +41,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             auth.employeeId,
             "LIFF_SELF_SERVICE",
         );
-        await assertLeaveCapabilityForMigration(
+        await assertLeaveCapability(
             authorization,
             "leave.request.read",
         );
