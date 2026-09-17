@@ -10,14 +10,15 @@ Phase 12C.3 is CLOSED for the enforced Routine surfaces, Phase 12C.4 is
 CLOSED for Stock, and Phase 12C.5 is CLOSED for Leave. The next handoff is
 Phase 12D, which is now CLOSED for the remaining Routine surfaces. Phase 12E
 is now CLOSED for Authorization Administration effective-access inspection;
-the exact next handoff is Phase 12F — Full Authorization Regression / Security
-Matrix.
+Phase 12F is now CLOSED for the full authorization regression/security matrix;
+the exact next handoff is Phase 12G — First Production Capability Deployment
+Readiness.
 
-สถานะ: Current state after Phase 12E closure; Phase 12E Authorization Administration effective-access UX completion — CLOSED; exact next phase: Phase 12F Full Authorization Regression / Security Matrix — NEXT; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
+สถานะ: Current state after Phase 12F closure; Phase 12F Full Authorization Regression / Security Matrix — CLOSED; exact next phase: Phase 12G First Production Capability Deployment Readiness — NEXT; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-17<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
-สถานะปัจจุบันหลัง Phase 12D: `routine.task.export`, `routine.summary.read` และ
+สถานะปัจจุบันหลัง Phase 12F: `routine.task.export`, `routine.summary.read` และ
 `routine.reference.read` ใช้ permanent additive Default Domain Policy ผ่าน
 Routine adapter และ central resolver แล้ว. Registry มี `25
 CENTRAL_WITH_DEFAULT_POLICY`, `0 CENTRAL_WITH_COMPATIBILITY`, `13
@@ -27,8 +28,8 @@ GRANTABLE`, `0 POLICY_ACTIVATION_REQUIRED`, `2 DEFERRED`. `DEFERRED` ที่�
 เพิ่ม capability, scope, channel, schema, seed, backfill หรือ grant migration.
 
 หมายเหตุ: บันทึก Phase ก่อนหน้าในเอกสารนี้เป็น historical evidence ตาม
-boundary ของแต่ละ phase; สถานะ live หลัง Phase 12D ให้ยึดข้อความด้านบน,
-ตาราง Routine ปัจจุบัน และหัวข้อ 9.7 เป็นหลัก
+boundary ของแต่ละ phase; สถานะ live หลัง Phase 12F ให้ยึดข้อความด้านบน,
+ตาราง capability/route ปัจจุบัน และหัวข้อ 9.9 เป็นหลัก
 
 หมายเหตุ Phase 11C (historical final closure): Phase 11B enforcement hardening — **CLOSED** และ Phase 11C security regression audit — **CLOSED** ที่ baseline `5669d79ca359701bc6a637079ca738575b731cf7`. Matrix สุดท้ายมี 89 cases (`80 DIRECT`, `6 INDIRECT`, `0 MISSING`, `3 N/A`); operation ledger มี 81/81 `DIRECT`, protected routes 78/78 `DIRECT`, Authorization Administration 17/17 `DIRECT` และ combined explicit ledger 98/98 `DIRECT`. Mandatory Phase 11C.2 work items เหลือ `0`. Compatibility policies และ deferred surfaces ยังคงอยู่, สี่ future policy families ยังอยู่นอก Phase 11, และ production authorization database grant inventory ยังไม่ได้ audit. เอกสารนี้คงผล MySQL fixture failure ไว้เป็น historical evidence; Phase 11D ได้ตรวจสอบและแก้ stale fixture แล้วโดยไม่เปลี่ยน production authorization semantics. รายละเอียดเดิมอยู่ใน [authorization-phase-11c-closure.md](authorization-phase-11c-closure.md)
 
@@ -1196,8 +1197,31 @@ simulator or final workflow decision.
 The closure record, implementation boundary, context inventory, and verification
 details are in
 [authorization-phase-12e-effective-access-ux.md](authorization-phase-12e-effective-access-ux.md).
-The exact next phase is **Phase 12F — Full Authorization Regression / Security
-Matrix**; Phase 12F has not started.
+That section is the historical Phase 12E handoff record; Phase 12F supersedes
+its next-phase statement.
+
+## 9.9 Phase 12F full authorization regression / security matrix
+
+Phase 12F is closed at audit baseline
+`4646e259bcb2e5900aa1a679ccc78aaae6cbe186`.
+The authoritative current regression matrix is
+[authorization-phase-12f-security-regression-matrix.md](authorization-phase-12f-security-regression-matrix.md),
+with its closure summary in
+[authorization-phase-12f-closure.md](authorization-phase-12f-closure.md).
+
+The current source-derived inventory is 40 registered capabilities:
+`25 DEFAULT_POLICY_AUTHORIZATION`, `0 CENTRAL_WITH_COMPATIBILITY`,
+`13 CENTRAL_ONLY_AUTHORIZATION`, and `2 DEFERRED_AUTHORIZATION_SURFACE`; the
+readiness split is `38 GRANTABLE`, `0 POLICY_ACTIVATION_REQUIRED`, and
+`2 DEFERRED`. The matrix contains 86 current operation-ledger rows, including
+83 protected migrated route/capability rows with DIRECT route evidence and
+three Stock presentation-only rows, plus 17 DIRECT Administration rows.
+Cross-cutting arithmetic is `58 = 53 DIRECT + 2 INDIRECT + 0 MISSING + 3 N/A`.
+
+This closure establishes code/runtime regression evidence only. It did not
+query or mutate production authorization configuration, create Teams/Role or
+grants, seed defaults, backfill data, or begin rollout. The exact next phase is
+**Phase 12G — First Production Capability Deployment Readiness**.
 
 ## 10. Explicit non-goals for Phase 0
 

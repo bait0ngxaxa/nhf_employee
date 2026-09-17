@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
-import { forbidden, jsonError } from "@/lib/ssot/http";
+import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { saveLocalImageUpload } from "@/lib/uploads/local";
+import {
+    AuthorizationConfigurationError,
+} from "@/modules/authorization";
 import {
     assertStockCapability,
     buildStockAuthorizationContext,
@@ -24,6 +27,13 @@ async function authorizeImageUpload(): Promise<NextResponse | null> {
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
+        }
+        if (error instanceof AuthorizationConfigurationError) {
+            console.error("Error authorizing image upload", {
+                errorType: error.name,
+                code: error.code,
+            });
+            return serverError();
         }
         throw error;
     }

@@ -1,5 +1,8 @@
 import { requireLiffWorkforceSession } from "@/modules/line";
-import { forbidden } from "@/lib/ssot/http";
+import {
+    AuthorizationConfigurationError,
+} from "@/modules/authorization";
+import { forbidden, serverError } from "@/lib/ssot/http";
 import {
     buildStockAuthorizationContext,
     resolveStockCapability,
@@ -26,6 +29,13 @@ export async function requireLiffStockProcessorSession(): Promise<
     } catch (error) {
         if (error instanceof StockCapabilityDeniedError) {
             return { ok: false, response: forbidden() };
+        }
+        if (error instanceof AuthorizationConfigurationError) {
+            console.error("Error resolving LIFF Stock processor authorization", {
+                errorType: error.name,
+                code: error.code,
+            });
+            return { ok: false, response: serverError() };
         }
         throw error;
     }
