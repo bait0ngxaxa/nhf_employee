@@ -20,7 +20,7 @@ import {
     AsyncFormDialogContent,
 } from "@/components/ui/async-form-dialog";
 import { Button } from "@/components/ui/button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DialogDescription, DialogFooter, DialogHeader, DialogScrollArea, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +33,7 @@ import {
     getCapabilityPresentation,
     getCapabilitySearchText,
 } from "../permission-presentation";
+import { createAuthorizationTechnicalKey } from "../technical-key";
 import type {
     AuthorizationAdministrationOverviewData,
     AuthorizationAdministrationTeamDetailData,
@@ -96,6 +97,7 @@ export function TeamFormDialog({
     }) => Promise<void>;
 }): React.ReactElement {
     const [key, setKey] = useState("");
+    const [initialKey, setInitialKey] = useState("");
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [error, setError] = useState<unknown>(null);
@@ -105,13 +107,14 @@ export function TeamFormDialog({
 
     useEffect(() => {
         if (!open) return;
-        setKey(team?.key ?? "new-team");
+        const nextKey = team?.key ?? createAuthorizationTechnicalKey("team");
+        setKey(nextKey);
+        setInitialKey(nextKey);
         setName(team?.name ?? "");
         setDescription(team?.description ?? "");
         setError(null);
     }, [open, team]);
 
-    const initialKey = team?.key ?? "new-team";
     const initialName = team?.name ?? "";
     const initialDescription = team?.description ?? "";
     const dirty = key !== initialKey || name !== initialName || description !== initialDescription;
@@ -193,7 +196,7 @@ export function TeamFormDialog({
                     <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">ขั้นสูง · รหัสทางเทคนิค</summary>
                     <div className="mt-3 space-y-2">
                         <Label htmlFor={keyId}>รหัสทางเทคนิค</Label>
-                        <Input id={keyId} value={key} onChange={(event) => setKey(event.target.value)} readOnly={mode === "edit"} aria-readonly={mode === "edit" || undefined} placeholder="new-team" maxLength={191} autoComplete="off" className={mode === "edit" ? "bg-surface-subtle font-mono" : "font-mono"} />
+                        <Input id={keyId} value={key} onChange={(event) => setKey(event.target.value)} readOnly={mode === "edit"} aria-readonly={mode === "edit" || undefined} placeholder="new-team-..." maxLength={191} autoComplete="off" className={mode === "edit" ? "bg-surface-subtle font-mono" : "font-mono"} />
                         <p className="text-xs leading-5 text-content-secondary">ใช้สำหรับอ้างอิงภายในระบบเท่านั้น ต้องไม่ใช้ชื่อกลุ่มเพื่อกำหนดสิทธิ์</p>
                     </div>
                 </details>
@@ -218,6 +221,7 @@ export function TeamRoleFormDialog({
     readonly onSubmit: (input: { readonly key?: string; readonly name: string }) => Promise<void>;
 }): React.ReactElement {
     const [key, setKey] = useState("");
+    const [initialKey, setInitialKey] = useState("");
     const [name, setName] = useState("");
     const [error, setError] = useState<unknown>(null);
     const keyId = useId();
@@ -225,12 +229,13 @@ export function TeamRoleFormDialog({
 
     useEffect(() => {
         if (!open) return;
-        setKey(role?.key ?? "new-role");
+        const nextKey = role?.key ?? createAuthorizationTechnicalKey("role");
+        setKey(nextKey);
+        setInitialKey(nextKey);
         setName(role?.name ?? "");
         setError(null);
     }, [open, role]);
 
-    const initialKey = role?.key ?? "new-role";
     const initialName = role?.name ?? "";
     const dirty = key !== initialKey || name !== initialName;
 
@@ -286,7 +291,7 @@ export function TeamRoleFormDialog({
                     <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">ขั้นสูง · รหัสทางเทคนิค</summary>
                     <div className="mt-3 space-y-2">
                         <Label htmlFor={keyId}>รหัสทางเทคนิค</Label>
-                        <Input id={keyId} value={key} onChange={(event) => setKey(event.target.value)} readOnly={mode === "edit"} aria-readonly={mode === "edit" || undefined} placeholder="new-role" maxLength={191} autoComplete="off" className={mode === "edit" ? "bg-surface-subtle font-mono" : "font-mono"} />
+                        <Input id={keyId} value={key} onChange={(event) => setKey(event.target.value)} readOnly={mode === "edit"} aria-readonly={mode === "edit" || undefined} placeholder="new-role-..." maxLength={191} autoComplete="off" className={mode === "edit" ? "bg-surface-subtle font-mono" : "font-mono"} />
                         <p className="text-xs leading-5 text-content-secondary">ใช้สำหรับอ้างอิงภายในระบบเท่านั้น และเปลี่ยนไม่ได้หลังสร้าง</p>
                     </div>
                 </details>
@@ -584,7 +589,8 @@ export function GrantFormDialog({
                         {sourceDescription} ระบบจะแสดงเฉพาะสิทธิ์ที่พร้อมจัดการ
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4 px-5 py-5">
+                <DialogScrollArea>
+                    <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4 px-5 py-5">
                     {step === "choose" ? (
                         <>
                             <ol className="grid gap-2 rounded-lg border border-border-subtle bg-surface-subtle/60 px-4 py-3 text-sm text-content-secondary sm:grid-cols-3">
@@ -674,13 +680,14 @@ export function GrantFormDialog({
                             </details>
                         </div>
                     )}
-                    {error ? <FormError error={error} /> : null}
-                    <DialogFooter className="pt-2">
-                        <AsyncFormDialogClose variant="outline" disabled={busy}>ยกเลิก</AsyncFormDialogClose>
-                        {step === "review" ? <Button type="button" variant="ghost" onClick={() => { setError(null); setStep("choose"); }} disabled={busy}>ย้อนกลับ</Button> : null}
-                        <SubmitButton busy={busy} label={step === "review" ? "ยืนยันเพิ่มสิทธิ์" : "ตรวจสอบการเปลี่ยนแปลง"} />
-                    </DialogFooter>
-                </form>
+                        {error ? <FormError error={error} /> : null}
+                        <DialogFooter className="pt-2">
+                            <AsyncFormDialogClose variant="outline" disabled={busy}>ยกเลิก</AsyncFormDialogClose>
+                            {step === "review" ? <Button type="button" variant="ghost" onClick={() => { setError(null); setStep("choose"); }} disabled={busy}>ย้อนกลับ</Button> : null}
+                            <SubmitButton busy={busy} label={step === "review" ? "ยืนยันเพิ่มสิทธิ์" : "ตรวจสอบการเปลี่ยนแปลง"} />
+                        </DialogFooter>
+                    </form>
+                </DialogScrollArea>
             </AsyncFormDialogContent>
         </AsyncFormDialog>
     );

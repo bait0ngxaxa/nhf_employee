@@ -87,6 +87,53 @@ describe("Authorization Administration dialogs", () => {
         }));
     });
 
+    it("generates a fresh technical key for each new Team form session", async () => {
+        const submittedKeys: string[] = [];
+        const onSubmit = vi.fn(async (input: { readonly key?: string; readonly name: string; readonly description: string | null }) => {
+            if (input.key) submittedKeys.push(input.key);
+        });
+        const view = render(
+            <TeamFormDialog
+                open
+                mode="create"
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={onSubmit}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("ชื่อกลุ่ม"), { target: { value: "กลุ่มแรก" } });
+        fireEvent.click(screen.getByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" }));
+        await waitFor(() => expect(submittedKeys).toHaveLength(1));
+
+        view.rerender(
+            <TeamFormDialog
+                open={false}
+                mode="create"
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={onSubmit}
+            />,
+        );
+        view.rerender(
+            <TeamFormDialog
+                open
+                mode="create"
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={onSubmit}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("ชื่อกลุ่ม"), { target: { value: "กลุ่มที่สอง" } });
+        fireEvent.click(screen.getByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" }));
+        await waitFor(() => expect(submittedKeys).toHaveLength(2));
+
+        expect(submittedKeys[0]).toMatch(/^new-team-/);
+        expect(submittedKeys[1]).toMatch(/^new-team-/);
+        expect(submittedKeys[1]).not.toBe(submittedKeys[0]);
+    });
+
     it("keeps a Team key read-only in the metadata editor", () => {
         render(
             <TeamFormDialog
@@ -135,5 +182,26 @@ describe("Authorization Administration dialogs", () => {
             capabilityKey: "employee.read",
             scope: "ALL",
         }));
+    });
+
+    it("keeps the permission form body scrollable after selecting an ability", () => {
+        render(
+            <GrantFormDialog
+                open
+                source="TEAM"
+                capabilities={capabilities}
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={vi.fn(async () => undefined)}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: /เพิ่มพนักงาน/ }));
+
+        const dialog = screen.getByRole("dialog");
+        const scrollArea = dialog.querySelector('[data-slot="dialog-scroll-area"]');
+
+        expect(scrollArea).toBeInTheDocument();
+        expect(scrollArea).toHaveClass("overflow-y-auto");
     });
 });

@@ -16,6 +16,7 @@ import { TeamAdministration } from "./components/TeamAdministration";
 import { UserAccessPanel } from "./components/UserAccessPanel";
 import { getMutationErrorCopy } from "./display";
 import { useAuthorizationAdministrationData } from "./hooks/useAuthorizationAdministration";
+import { createAuthorizationTechnicalKey } from "./technical-key";
 import type {
     AuthorizationAdministrationOverviewData,
     CreateAuthorizationTeamInput,
@@ -165,7 +166,7 @@ export function AuthorizationAdministrationWorkspace({
                 onClose={() => setCreateTeamOpen(false)}
                 onSubmit={async (input) => {
                     await handleCreateTeam({
-                        key: input.key ?? "new-team",
+                        key: input.key ?? createAuthorizationTechnicalKey("team"),
                         name: input.name,
                         description: input.description,
                     });

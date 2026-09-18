@@ -30,6 +30,7 @@ import { ActiveStatus, LifecycleStatus } from "./AuthorizationStatus";
 import { ConfigurationIssues } from "./ConfigurationIssues";
 import { GrantList } from "./GrantList";
 import { formatAuthorizationDate, getMutationErrorCopy } from "../display";
+import { createAuthorizationTechnicalKey } from "../technical-key";
 import type {
     AuthorizationAdministrationOverviewData,
     AuthorizationAdministrationGrantProjectionData,
@@ -241,7 +242,7 @@ export function TeamAdministration({
                     if (roleEditor?.mode === "edit" && editingRole) {
                         await runMutation("role-save", async () => { await updateTeamRole(team.id, editingRole.id, { name: input.name }); }, "บันทึกบทบาทแล้ว");
                     } else if (roleEditor?.mode === "create") {
-                        await runMutation("role-save", async () => { await createTeamRole(team.id, { key: input.key ?? "new-role", name: input.name }); }, "สร้างบทบาทแล้ว");
+                        await runMutation("role-save", async () => { await createTeamRole(team.id, { key: input.key ?? createAuthorizationTechnicalKey("role"), name: input.name }); }, "สร้างบทบาทแล้ว");
                     } else {
                         throw new Error("ไม่พบข้อมูลบทบาทที่ต้องการแก้ไข");
                     }
