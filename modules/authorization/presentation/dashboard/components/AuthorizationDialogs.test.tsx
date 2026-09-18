@@ -75,10 +75,10 @@ describe("Authorization Administration dialogs", () => {
             />,
         );
 
-        fireEvent.change(screen.getByLabelText("key"), { target: { value: "operations" } });
-        fireEvent.change(screen.getByLabelText("ชื่อ Team"), { target: { value: "Operations" } });
-        fireEvent.change(screen.getByLabelText("คำอธิบาย (ไม่บังคับ)"), { target: { value: "ทีมปฏิบัติการ" } });
-        fireEvent.click(screen.getByRole("button", { name: "สร้าง Team" }));
+        fireEvent.change(screen.getByLabelText("รหัสทางเทคนิค"), { target: { value: "operations" } });
+        fireEvent.change(screen.getByLabelText("ชื่อกลุ่ม"), { target: { value: "Operations" } });
+        fireEvent.change(screen.getByLabelText("คำอธิบายกลุ่ม (ไม่บังคับ)"), { target: { value: "ทีมปฏิบัติการ" } });
+        fireEvent.click(screen.getByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" }));
 
         await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
             key: "operations",
@@ -99,12 +99,13 @@ describe("Authorization Administration dialogs", () => {
             />,
         );
 
-        const keyInput = screen.getByLabelText("key");
+        const keyInput = screen.getByLabelText("รหัสทางเทคนิค");
         expect(keyInput).toHaveValue("operations");
         expect(keyInput).toHaveAttribute("readonly");
     });
 
-    it("offers only supported scopes and excludes TEAM scope for direct User grants", () => {
+    it("groups business abilities, hides non-grantable items, and excludes TEAM scope for direct User grants", async () => {
+        const onSubmit = vi.fn(async () => undefined);
         render(
             <GrantFormDialog
                 open
@@ -112,16 +113,27 @@ describe("Authorization Administration dialogs", () => {
                 capabilities={capabilities}
                 busy={false}
                 onClose={vi.fn()}
-                onSubmit={vi.fn(async () => undefined)}
+                onSubmit={onSubmit}
             />,
         );
 
-        fireEvent.change(screen.getByLabelText("Capability"), {
-            target: { value: "employee.read" },
-        });
+        expect(screen.getByRole("heading", { name: "บุคลากร" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /ดูข้อมูลพนักงาน/ })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /ดูงานประจำ/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /employee\.read/ })).not.toBeInTheDocument();
 
-        expect(screen.queryByRole("option", { name: "TEAM" })).not.toBeInTheDocument();
-        expect(screen.getByRole("option", { name: "ALL" })).toBeInTheDocument();
-        expect(screen.getByRole("option", { name: /routine\.task\.read/ })).toBeDisabled();
+        fireEvent.click(screen.getByRole("button", { name: /ดูข้อมูลพนักงาน/ }));
+
+        expect(screen.queryByRole("radio", { name: /ภายในกลุ่มนี้/ })).not.toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: /ทั้งหมด/ })).toBeChecked();
+
+        fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" }));
+        expect(screen.getByText("ตรวจสอบสิ่งที่จะเปลี่ยน")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันเพิ่มสิทธิ์" }));
+
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
+            capabilityKey: "employee.read",
+            scope: "ALL",
+        }));
     });
 });

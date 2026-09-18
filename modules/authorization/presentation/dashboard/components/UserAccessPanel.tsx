@@ -10,16 +10,19 @@ import { Label } from "@/components/ui/label";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 
 import { addUserGrant, removeUserGrant } from "../api";
-import { GrantFormDialog } from "./AuthorizationDialogs";
-import { AuthorizationStatus, LifecycleStatus } from "./AuthorizationStatus";
-import { ConfigurationIssues } from "./ConfigurationIssues";
-import { GrantList } from "./GrantList";
 import {
     getAuthorizationChannelLabel,
+    getAuthorizationDomainLabel,
     getEffectiveAccessStateLabel,
     getRequestId,
     getRuntimeModeLabel,
 } from "../display";
+import {
+    getAuthorizationScopePresentation,
+    getAuthorizationSourceDescription,
+    getAuthorizationSourceLabel,
+    getCapabilityPresentation,
+} from "../permission-presentation";
 import type {
     AuthorizationAdministrationGrantProjectionData,
     AuthorizationAdministrationOverviewData,
@@ -27,6 +30,10 @@ import type {
     AuthorizationAdministrationUserSummaryData,
     AuthorizationCapabilityGrantInput,
 } from "../types";
+import { GrantFormDialog } from "./AuthorizationDialogs";
+import { AuthorizationStatus, LifecycleStatus } from "./AuthorizationStatus";
+import { ConfigurationIssues } from "./ConfigurationIssues";
+import { GrantList } from "./GrantList";
 
 type EffectiveAccessState = AuthorizationAdministrationUserDetailData["effectiveAccess"][number]["effectiveAuthority"]["state"];
 type EffectiveFilter = "ALL" | EffectiveAccessState;
@@ -89,8 +96,8 @@ export function UserAccessPanel({
                 throw operationError;
             }
             const refreshed = await revalidate();
-            toast.success("เพิ่ม Direct User grant แล้ว", refreshed ? undefined : {
-                description: "คำสั่งสำเร็จแล้ว แต่โหลดข้อมูล User ล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่",
+            toast.success("เพิ่มสิทธิ์เฉพาะบุคคลแล้ว", refreshed ? undefined : {
+                description: "บันทึกสำเร็จแล้ว แต่โหลดข้อมูลผู้ใช้ล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่",
             });
             setGrantDialogOpen(false);
         } finally {
@@ -109,8 +116,8 @@ export function UserAccessPanel({
                 throw operationError;
             }
             const refreshed = await revalidate();
-            toast.success("ลบ Direct User grant แล้ว", refreshed ? undefined : {
-                description: "คำสั่งสำเร็จแล้ว แต่โหลดข้อมูล User ล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่",
+            toast.success("นำสิทธิ์เฉพาะบุคคลออกแล้ว", refreshed ? undefined : {
+                description: "บันทึกสำเร็จแล้ว แต่โหลดข้อมูลผู้ใช้ล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่",
             });
         } finally {
             setPending(null);
@@ -128,25 +135,25 @@ export function UserAccessPanel({
                 onQueryChange={onQueryChange}
                 onSelectUser={onSelectUser}
             />
-            {loading && !user ? <LoadingState label="กำลังโหลด User detail และ effective access" /> : null}
-            {error && !user ? <ErrorState title="โหลด User detail ไม่สำเร็จ" description="ตรวจสอบ User ID และโหลดข้อมูลล่าสุดอีกครั้ง" action={{ label: "ลองใหม่", onClick: () => void onRefresh() }} /> : null}
-            {!user && !loading && !error ? <EmptyState title="เลือก User เพื่อดูสิทธิ์" description="ค้นหา User จากชื่อ email หรือ User ID แล้วเลือกผลลัพธ์" icon={<UserRound className="h-6 w-6" aria-hidden="true" />} /> : null}
+            {loading && !user ? <LoadingState label="กำลังโหลดสิทธิ์ของผู้ใช้" /> : null}
+            {error && !user ? <ErrorState title="โหลดข้อมูลผู้ใช้ไม่สำเร็จ" description="ตรวจสอบผู้ใช้และโหลดข้อมูลล่าสุดอีกครั้ง" action={{ label: "ลองใหม่", onClick: () => void onRefresh() }} /> : null}
+            {!user && !loading && !error ? <EmptyState title="เลือกผู้ใช้เพื่อดูสิทธิ์" description="ค้นหาผู้ใช้จากชื่อ อีเมล หรือรหัสผู้ใช้ แล้วเลือกผลลัพธ์" icon={<UserRound className="h-6 w-6" aria-hidden="true" />} /> : null}
             {user ? (
                 <div className="space-y-5">
-                    {error ? <p role="alert" className="text-sm text-status-danger-strong">ข้อมูล User อาจไม่ใช่ข้อมูลล่าสุด: {error.message}</p> : null}
+                    {error ? <p role="alert" className="text-sm text-status-warning-strong">ข้อมูลผู้ใช้อาจไม่ใช่ข้อมูลล่าสุด กรุณากดโหลดใหม่</p> : null}
                     <UserIdentityPanel user={user} />
-                    <ConfigurationIssues issues={user.configurationIssues} title="User authorization configuration issues" />
+                    <ConfigurationIssues issues={user.configurationIssues} />
+                    <EffectiveAccessInspector user={user} />
                     <MembershipsPanel user={user} onSelectTeam={onSelectTeam} />
                     <GrantList
-                        title="User Exceptions"
-                        description="สิทธิ์เฉพาะผู้ใช้ควรใช้เฉพาะกรณียกเว้น สิทธิ์ปกติควรมาจาก Team และ TeamRole รายการนี้เป็น additive direct grant แยกจาก Team configuration"
+                        title="สิทธิ์เฉพาะบุคคล"
+                        description="ใช้เมื่อต้องให้สิทธิ์เฉพาะบุคคลเป็นกรณีพิเศษ โดยปกติควรจัดสิทธิ์ผ่านกลุ่มและบทบาท"
                         source="USER"
                         grants={user.directGrants}
                         busy={pending !== null}
                         onAdd={() => setGrantDialogOpen(true)}
                         onRemove={removeGrant}
                     />
-                    <EffectiveAccessInspector user={user} />
                     <GrantFormDialog
                         open={grantDialogOpen}
                         source="USER"
@@ -180,10 +187,10 @@ function UserDirectorySearch({
 }): ReactElement {
     return (
         <section className="rounded-xl border border-border-subtle bg-surface-raised">
-            <div className="border-b border-border-subtle px-4 py-4 sm:px-5"><h2 className="text-base font-semibold text-content-heading">ค้นหา User</h2><p className="mt-1 text-sm leading-6 text-content-secondary">เลือกจาก directory ที่จำกัดเฉพาะ identity และ lifecycle fields ที่จำเป็นต่อการตรวจสอบ configuration</p></div>
-            <div className="px-4 py-4 sm:px-5"><Label htmlFor="authorization-user-search">ชื่อ, email หรือ User ID</Label><div className="relative mt-2"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" aria-hidden="true" /><Input id="authorization-user-search" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="เช่น somchai@example.com หรือ 42" maxLength={100} className="pl-9" autoComplete="off" /></div></div>
-            {error ? <div role="alert" className="border-t border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-strong sm:px-5"><p>ค้นหา User ไม่สำเร็จ กรุณาลองใหม่</p>{getRequestId(error) ? <p className="mt-1 text-xs">Request ID: {getRequestId(error)}</p> : null}</div> : null}
-            {query.trim().length > 0 ? <div className="border-t border-border-subtle" aria-live="polite">{loading ? <div className="flex items-center gap-2 px-4 py-4 text-sm text-content-secondary sm:px-5" role="status"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />กำลังค้นหา</div> : users.length === 0 ? <p className="px-4 py-4 text-sm text-content-secondary sm:px-5">ไม่พบ User ที่ตรงกับคำค้น</p> : <div className="divide-y divide-border-subtle">{users.map((item) => <button type="button" key={item.id} onClick={() => onSelectUser(item.id)} aria-pressed={item.id === selectedUserId} className={`flex min-h-16 w-full items-start justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5 ${item.id === selectedUserId ? "bg-action-primary-surface" : ""}`}><span className="min-w-0"><span className="block truncate font-semibold text-content-heading">{item.name}</span><span className="mt-0.5 block truncate text-sm text-content-secondary">{item.email}</span><span className="mt-0.5 block text-xs text-content-muted">User ID {item.id}{item.employee ? ` · ${item.employee.displayName}` : ""}</span></span><span className="flex shrink-0 flex-col items-end gap-1"><LifecycleStatus isActive={item.isActive} deletedAt={item.deletedAt} />{item.role === "ADMIN" ? <AuthorizationStatus tone="warning">ADMIN</AuthorizationStatus> : null}</span></button>)}</div>}</div> : <p className="border-t border-border-subtle px-4 py-3 text-xs leading-5 text-content-muted sm:px-5">พิมพ์คำค้นอย่างน้อย 1 ตัวอักษรเพื่อเริ่มค้นหา ระบบจะแสดงผลลัพธ์แบบ bounded เท่านั้น</p>}
+            <div className="border-b border-border-subtle px-4 py-4 sm:px-5"><h2 className="text-base font-semibold text-content-heading">ค้นหาผู้ใช้</h2><p className="mt-1 text-sm leading-6 text-content-secondary">ค้นหาผู้ใช้เพื่อดูสิทธิ์ที่ใช้งานได้ กลุ่มที่อยู่ และสิทธิ์เฉพาะบุคคล</p></div>
+            <div className="px-4 py-4 sm:px-5"><Label htmlFor="authorization-user-search">ชื่อ อีเมล หรือรหัสผู้ใช้</Label><div className="relative mt-2"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" aria-hidden="true" /><Input id="authorization-user-search" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="เช่น somchai@example.com หรือ 42" maxLength={100} className="pl-9" autoComplete="off" /></div></div>
+            {error ? <div role="alert" className="border-t border-status-danger-border bg-status-danger-surface px-4 py-3 text-sm text-status-danger-strong sm:px-5"><p>ค้นหาผู้ใช้ไม่สำเร็จ กรุณาลองใหม่</p>{getRequestId(error) ? <p className="mt-1 text-xs">Request ID: {getRequestId(error)}</p> : null}</div> : null}
+            {query.trim().length > 0 ? <div className="border-t border-border-subtle" aria-live="polite">{loading ? <div className="flex items-center gap-2 px-4 py-4 text-sm text-content-secondary sm:px-5" role="status"><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />กำลังค้นหา</div> : users.length === 0 ? <p className="px-4 py-4 text-sm text-content-secondary sm:px-5">ไม่พบผู้ใช้ที่ตรงกับคำค้น</p> : <div className="divide-y divide-border-subtle">{users.map((item) => <button type="button" key={item.id} onClick={() => onSelectUser(item.id)} aria-pressed={item.id === selectedUserId} className={`flex min-h-16 w-full items-start justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5 ${item.id === selectedUserId ? "bg-action-primary-surface" : ""}`}><span className="min-w-0"><span className="block truncate font-semibold text-content-heading">{item.name}</span><span className="mt-0.5 block truncate text-sm text-content-secondary">{item.email}</span><span className="mt-0.5 block text-xs text-content-muted">{item.employee?.displayName ?? "ยังไม่มีข้อมูลพนักงาน"}</span></span><span className="flex shrink-0 flex-col items-end gap-1"><LifecycleStatus isActive={item.isActive} deletedAt={item.deletedAt} />{item.role === "ADMIN" ? <AuthorizationStatus tone="warning">ผู้ดูแลระบบ</AuthorizationStatus> : null}</span></button>)}</div>}</div> : <p className="border-t border-border-subtle px-4 py-3 text-xs leading-5 text-content-muted sm:px-5">พิมพ์คำค้นอย่างน้อย 1 ตัวอักษรเพื่อเริ่มค้นหา</p>}
         </section>
     );
 }
@@ -192,65 +199,41 @@ function UserIdentityPanel({ user }: { readonly user: AuthorizationAdministratio
     const identity = user.user;
     return (
         <section className="rounded-xl border border-border-subtle bg-surface-raised">
-            <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-content-heading">{identity.name}</h2><LifecycleStatus isActive={identity.isActive} deletedAt={identity.deletedAt} />{user.systemRole === "ADMIN" ? <AuthorizationStatus tone="warning">SYSTEM ADMIN</AuthorizationStatus> : null}</div><p className="mt-1 text-sm text-content-secondary">{identity.email}</p></div><span className="font-mono text-xs text-content-secondary">User ID {identity.id}</span></div>
-            {!identity.isActive || identity.deletedAt !== null ? <div className="border-b border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong sm:px-5">บัญชีนี้ไม่ Active การกำหนด configuration ไม่ได้ทำให้บัญชีผ่าน runtime lifecycle checks</div> : null}
-            <dl className="grid gap-4 px-4 py-4 text-sm sm:grid-cols-2 lg:grid-cols-4 sm:px-5"><IdentityField label="System role" value={user.systemRole} /><IdentityField label="Account status" value={identity.deletedAt !== null ? "Deleted / unavailable" : identity.isActive ? "Active" : "Inactive"} /><IdentityField label="Employee" value={identity.employee?.displayName ?? "ไม่เชื่อมกับพนักงาน"} /><IdentityField label="Employee status" value={identity.employee ? `${identity.employee.status}${identity.employee.deletedAt ? " · Deleted" : ""}` : "—"} /></dl>
+            <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-content-heading">{identity.name}</h2><LifecycleStatus isActive={identity.isActive} deletedAt={identity.deletedAt} />{user.systemRole === "ADMIN" ? <AuthorizationStatus tone="warning">ผู้ดูแลระบบ</AuthorizationStatus> : null}</div><p className="mt-1 text-sm text-content-secondary">{identity.email}</p></div><details className="text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสผู้ใช้</summary><span className="mt-1 block font-mono text-content-muted">{identity.id}</span></details></div>
+            {!identity.isActive || identity.deletedAt !== null ? <div className="border-b border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong sm:px-5">บัญชีนี้ไม่พร้อมใช้งาน การมีสิทธิ์ในระบบไม่ได้ทำให้ผ่านการตรวจสอบสถานะบัญชีหรือพนักงาน</div> : null}
+            <dl className="grid gap-4 px-4 py-4 text-sm sm:grid-cols-2 lg:grid-cols-4 sm:px-5"><IdentityField label="บทบาทระบบ" value={user.systemRole === "ADMIN" ? "ผู้ดูแลระบบ" : "ผู้ใช้งานทั่วไป"} /><IdentityField label="สถานะบัญชี" value={identity.deletedAt !== null ? "ถูกลบ / ใช้งานไม่ได้" : identity.isActive ? "ใช้งานอยู่" : "ปิดใช้งาน"} /><IdentityField label="พนักงาน" value={identity.employee?.displayName ?? "ไม่เชื่อมกับข้อมูลพนักงาน"} /><IdentityField label="สถานะพนักงาน" value={identity.employee ? getEmployeeStatusLabel(identity.employee.status, identity.employee.deletedAt) : "—"} /></dl>
+            <details className="border-t border-border-subtle px-4 py-3 text-sm sm:px-5"><summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary><dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-semibold text-content-secondary">system role</dt><dd className="font-mono text-content-body">{user.systemRole}</dd></div><div><dt className="font-semibold text-content-secondary">account id</dt><dd className="font-mono text-content-body">{identity.id}</dd></div></dl></details>
         </section>
     );
 }
 
 function MembershipsPanel({ user, onSelectTeam }: { readonly user: AuthorizationAdministrationUserDetailData; readonly onSelectTeam: (teamId: number) => void }): ReactElement {
-    return <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised"><div className="border-b border-border-subtle px-4 py-4 sm:px-5"><h3 className="text-base font-semibold text-content-heading">Team memberships</h3><p className="mt-1 text-sm leading-6 text-content-secondary">แสดง configuration ทั้งหมด รวมถึง Team หรือ TeamRole ที่ inactive</p></div>{user.teamMemberships.length === 0 ? <p className="px-4 py-8 text-center text-sm text-content-secondary sm:px-5">User นี้ยังไม่มี Team membership</p> : <div className="overflow-x-auto"><table className="min-w-[680px] w-full text-left text-sm"><caption className="sr-only">Team memberships ของ {user.user.name}</caption><thead className="border-b border-border-subtle bg-surface-subtle text-xs font-semibold text-content-secondary"><tr><th scope="col" className="px-4 py-3 sm:px-5">Team</th><th scope="col" className="px-4 py-3">Team status</th><th scope="col" className="px-4 py-3">TeamRole</th><th scope="col" className="px-4 py-3">Role status</th></tr></thead><tbody className="divide-y divide-border-subtle">{user.teamMemberships.map((membership) => <tr key={`${membership.teamId}:${membership.userId}`}><td className="px-4 py-3 sm:px-5"><Button type="button" variant="link" size="sm" className="h-auto min-h-0 p-0 text-left font-semibold text-action-primary-foreground" onClick={() => onSelectTeam(membership.teamId)}>{membership.team.name}<span className="ml-2 font-mono text-xs font-normal">({membership.team.key})</span></Button></td><td className="px-4 py-3"><LifecycleEntityStatus isActive={membership.team.isActive} /></td><td className="px-4 py-3">{membership.teamRole ? `${membership.teamRole.name} (${membership.teamRole.key})` : <span className="text-content-secondary">ไม่กำหนด TeamRole</span>}</td><td className="px-4 py-3">{membership.teamRole ? <LifecycleEntityStatus isActive={membership.teamRole.isActive} /> : "—"}</td></tr>)}</tbody></table></div>}</section>;
+    return <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised"><div className="border-b border-border-subtle px-4 py-4 sm:px-5"><h3 className="text-base font-semibold text-content-heading">กลุ่มที่ผู้ใช้อยู่</h3><p className="mt-1 text-sm leading-6 text-content-secondary">สิทธิ์ของกลุ่มมีผลกับสมาชิกทุกคน ส่วนสิทธิ์ของบทบาทมีผลเฉพาะบทบาทที่ระบุ</p></div>{user.teamMemberships.length === 0 ? <p className="px-4 py-8 text-center text-sm text-content-secondary sm:px-5">ผู้ใช้นี้ยังไม่อยู่ในกลุ่มใด</p> : <div className="overflow-x-auto"><table className="min-w-[680px] w-full text-left text-sm"><caption className="sr-only">กลุ่มที่ {user.user.name} อยู่</caption><thead className="border-b border-border-subtle bg-surface-subtle text-xs font-semibold text-content-secondary"><tr><th scope="col" className="px-4 py-3 sm:px-5">กลุ่ม</th><th scope="col" className="px-4 py-3">บทบาทในกลุ่ม</th><th scope="col" className="px-4 py-3">สถานะ</th></tr></thead><tbody className="divide-y divide-border-subtle">{user.teamMemberships.map((membership) => <tr key={`${membership.teamId}:${membership.userId}`}><td className="px-4 py-3 sm:px-5"><Button type="button" variant="link" size="sm" className="h-auto min-h-0 p-0 text-left font-semibold text-action-primary-foreground" onClick={() => onSelectTeam(membership.teamId)}>{membership.team.name}</Button><details className="mt-1 text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสทางเทคนิค</summary><span className="mt-1 block font-mono text-content-muted">{membership.team.key}</span></details></td><td className="px-4 py-3">{membership.teamRole ? membership.teamRole.name : <span className="text-content-secondary">ไม่กำหนดบทบาท</span>}{membership.teamRole ? <details className="mt-1 text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสบทบาท</summary><span className="mt-1 block font-mono text-content-muted">{membership.teamRole.key}</span></details> : null}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-1"><LifecycleEntityStatus isActive={membership.team.isActive} />{membership.teamRole ? <LifecycleEntityStatus isActive={membership.teamRole.isActive} /> : null}</div></td></tr>)}</tbody></table></div>}</section>;
 }
 
 function EffectiveAccessInspector({ user }: { readonly user: AuthorizationAdministrationUserDetailData }): ReactElement {
     const [filter, setFilter] = useState<EffectiveFilter>("ALL");
     const [domain, setDomain] = useState("ALL");
     const domains = useMemo(() => [...new Set(user.effectiveAccess.map((item) => item.capability.domain))].sort(), [user.effectiveAccess]);
-    const rows = useMemo(() => user.effectiveAccess.filter((row) =>
-        (filter === "ALL" || row.effectiveAuthority.state === filter)
-        && (domain === "ALL" || row.capability.domain === domain),
-    ), [domain, filter, user.effectiveAccess]);
+    const rows = useMemo(() => user.effectiveAccess.filter((row) => (filter === "ALL" || row.effectiveAuthority.state === filter) && (domain === "ALL" || row.capability.domain === domain)), [domain, filter, user.effectiveAccess]);
+    const groups = useMemo(() => {
+        const grouped = new Map<string, AuthorizationAdministrationUserDetailData["effectiveAccess"][number][]>();
+        for (const row of rows) {
+            const existing = grouped.get(row.capability.domain);
+            if (existing) existing.push(row);
+            else grouped.set(row.capability.domain, [row]);
+        }
+        return [...grouped.entries()].sort(([left], [right]) => getAuthorizationDomainLabel(left).localeCompare(getAuthorizationDomainLabel(right), "th"));
+    }, [rows]);
     const rawStatus = user.resolverEffectivePermissionStatus;
     const effectiveStatus = user.effectiveAccessStatus;
     return (
         <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
-            <div className="border-b border-border-subtle px-4 py-4 sm:px-5">
-                <div className="flex items-start gap-3">
-                    <Info className="mt-0.5 h-5 w-5 shrink-0 text-action-primary-foreground" aria-hidden="true" />
-                    <div>
-                        <h3 className="text-base font-semibold text-content-heading">Effective Access Inspector</h3>
-                        <p className="mt-1 max-w-4xl text-sm leading-6 text-content-secondary">
-                            แสดง Default Domain Policy + Additional / Resolver authority = Effective capability authority แยกตาม context และ channel ที่ระบบรองรับ ผลนี้เป็น capability-layer inspection ไม่ใช่คำตัดสินสิทธิ์ต่อ resource หรือ workflow รายการใดรายการหนึ่ง
-                        </p>
-                        <p className="mt-2 text-xs leading-5 text-content-muted">
-                            Configuration ที่แสดงไม่ทำให้ User ที่ inactive/deleted หรือ Employee ที่ไม่เข้าเงื่อนไขผ่าน lifecycle checks ได้
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <div className="border-b border-border-subtle px-4 py-4 sm:px-5"><div className="flex items-start gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-action-primary-foreground" aria-hidden="true" /><div><h3 className="text-base font-semibold text-content-heading">สิทธิ์ที่ใช้งานได้</h3><p className="mt-1 max-w-4xl text-sm leading-6 text-content-secondary">สรุปว่าผู้ใช้นี้มีความสามารถใดในแต่ละหมวดงาน และครอบคลุมข้อมูลในระดับใด</p><p className="mt-2 text-xs leading-5 text-content-muted">สิทธิ์นี้เป็นขอบเขตการใช้งานโดยรวม การทำรายการจริงยังขึ้นอยู่กับเจ้าของข้อมูล ผู้รับผิดชอบ สถานะรายการ และขั้นตอนการทำงาน</p></div></div></div>
             {rawStatus.status === "INVALID_CONFIGURATION" ? <InvalidResolutionState error={rawStatus.error} /> : effectiveStatus.status === "INVALID_CONFIGURATION" ? <InvalidEffectiveAccessState error={effectiveStatus.error} /> : <>
                 <EffectiveAccessSummary summary={user.effectiveAccessSummary} />
-                <div className="grid gap-3 border-b border-border-subtle bg-surface-subtle/60 px-4 py-3 md:grid-cols-[12rem_15rem] sm:px-5">
-                    <div>
-                        <Label htmlFor="authorization-effective-filter">Effective state</Label>
-                        <select id="authorization-effective-filter" value={filter} onChange={(event) => setFilter(event.target.value as EffectiveFilter)} className="mt-2 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                            <option value="ALL">ทั้งหมด</option>
-                            <option value="AVAILABLE">Available</option>
-                            <option value="UNAVAILABLE">Unavailable</option>
-                            <option value="UNSUPPORTED">Unsupported / N/A</option>
-                            <option value="DEFERRED">Deferred</option>
-                        </select>
-                    </div>
-                    <div>
-                        <Label htmlFor="authorization-effective-domain">Domain</Label>
-                        <select id="authorization-effective-domain" value={domain} onChange={(event) => setDomain(event.target.value)} className="mt-2 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                            <option value="ALL">ทุก Domain</option>
-                            {domains.map((item) => <option key={item} value={item}>{item}</option>)}
-                        </select>
-                    </div>
-                </div>
-                {rows.length === 0 ? <p className="px-4 py-8 text-center text-sm text-content-secondary sm:px-5">ไม่พบ effective access ตาม filter นี้</p> : <div className="divide-y divide-border-subtle">{rows.map((row) => <EffectiveAccessRow key={`${row.capability.key}:${row.context.key}`} row={row} />)}</div>}
+                <div className="grid gap-3 border-b border-border-subtle bg-surface-subtle/60 px-4 py-3 md:grid-cols-[12rem_15rem] sm:px-5"><div><Label htmlFor="authorization-effective-filter">สถานะสิทธิ์</Label><select id="authorization-effective-filter" value={filter} onChange={(event) => setFilter(event.target.value as EffectiveFilter)} className="mt-2 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="ALL">ทั้งหมด</option><option value="AVAILABLE">ใช้งานได้</option><option value="UNAVAILABLE">ยังไม่มีสิทธิ์</option><option value="UNSUPPORTED">ช่องทางนี้ไม่รองรับ</option><option value="DEFERRED">ยังไม่เปิดให้จัดการ</option></select></div><div><Label htmlFor="authorization-effective-domain">หมวดงาน</Label><select id="authorization-effective-domain" value={domain} onChange={(event) => setDomain(event.target.value)} className="mt-2 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="ALL">ทุกหมวดงาน</option>{domains.map((item) => <option key={item} value={item}>{getAuthorizationDomainLabel(item)}</option>)}</select></div></div>
+                {groups.length === 0 ? <p className="px-4 py-8 text-center text-sm text-content-secondary sm:px-5">ไม่พบสิทธิ์ตามตัวกรองนี้</p> : <div className="divide-y divide-border-subtle">{groups.map(([groupDomain, groupRows]) => <section key={groupDomain} aria-labelledby={`effective-domain-${groupDomain}`}><h4 id={`effective-domain-${groupDomain}`} className="bg-surface-subtle/60 px-4 py-3 text-sm font-semibold text-content-heading sm:px-5">{getAuthorizationDomainLabel(groupDomain)}</h4><div className="divide-y divide-border-subtle">{groupRows.map((row) => <EffectiveAccessRow key={`${row.capability.key}:${row.context.key}`} row={row} />)}</div></section>)}</div>}
             </>}
             <RawResolverEvidence permissions={user.resolverEffectivePermissions} />
         </section>
@@ -259,75 +242,81 @@ function EffectiveAccessInspector({ user }: { readonly user: AuthorizationAdmini
 
 function EffectiveAccessSummary({ summary }: { readonly summary: AuthorizationAdministrationUserDetailData["effectiveAccessSummary"] }): ReactElement {
     const metrics = [
-        { label: "Available contexts", value: summary.availableContextCount, description: "capability authority ที่มีผลใน context" },
-        { label: "Default-backed", value: summary.defaultBackedContextCount, description: "context ที่มี Default Domain Policy" },
-        { label: "Additional authority", value: summary.additionalAuthorityContextCount, description: "context ที่มี configured/system grant" },
-        { label: "Deferred capabilities", value: summary.deferredCapabilityCount, description: "ยังไม่ migrate เป็น effective policy" },
-        { label: "Configuration issues", value: summary.configurationIssueCount, description: "ปัญหาที่ต้องตรวจสอบจาก server" },
+        { label: "ใช้งานได้", value: summary.availableContextCount, description: "บริบทที่มีสิทธิ์ใช้งาน" },
+        { label: "สิทธิ์พื้นฐาน", value: summary.defaultBackedContextCount, description: "บริบทที่มีสิทธิ์พื้นฐานของระบบ" },
+        { label: "สิทธิ์ที่เพิ่มให้", value: summary.additionalAuthorityContextCount, description: "บริบทที่มีสิทธิ์เพิ่มเติม" },
+        { label: "ยังไม่เปิดให้จัดการ", value: summary.deferredCapabilityCount, description: "แสดงไว้เพื่อการตรวจสอบ" },
+        { label: "ต้องตรวจสอบ", value: summary.configurationIssueCount, description: "รายการที่ระบบแจ้งเตือน" },
     ];
     return <div className="grid gap-3 border-b border-border-subtle px-4 py-4 sm:grid-cols-2 sm:px-5 lg:grid-cols-5">{metrics.map((metric) => <div key={metric.label} className="rounded-lg border border-border-subtle bg-surface-subtle/50 px-3 py-3"><p className="text-xs text-content-secondary">{metric.label}</p><p className="mt-1 text-xl font-semibold tabular-nums text-content-heading">{metric.value}</p><p className="mt-1 text-xs leading-5 text-content-muted">{metric.description}</p></div>)}</div>;
 }
 
 function EffectiveAccessRow({ row }: { readonly row: AuthorizationAdministrationUserDetailData["effectiveAccess"][number] }): ReactElement {
-    const stateTone = row.effectiveAuthority.state === "AVAILABLE"
-        ? "allow"
-        : row.effectiveAuthority.state === "DEFERRED"
-            ? "deferred"
-            : "neutral";
-    return <article className="px-4 py-5 sm:px-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="break-all font-mono text-xs font-semibold text-content-heading">{row.capability.key}</span>
-                    <AuthorizationStatus tone={stateTone}>{getEffectiveAccessStateLabel(row.effectiveAuthority.state)}</AuthorizationStatus>
-                </div>
-                <p className="mt-1 text-xs text-content-secondary">{row.capability.domain} · {row.capability.description}</p>
-            </div>
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-                <AuthorizationStatus tone="neutral">{row.context.label}</AuthorizationStatus>
-                <AuthorizationStatus tone="neutral">{getAuthorizationChannelLabel(row.context.channel)}</AuthorizationStatus>
-            </div>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <AuthorityCard label="Default Domain Policy" detail="code-owned · ไม่ใช่ persisted grant" scopes={row.defaultAuthority.scopes} />
-            <AuthorityCard label="Additional / Resolver authority" detail={row.additionalAuthority.reason ? `resolver: ${row.additionalAuthority.reason}` : "configured/system authority"} scopes={row.additionalAuthority.scopes} />
-            <AuthorityCard label="Effective capability authority" detail="ยังไม่ใช่ unconditional resource access" scopes={row.effectiveAuthority.scopes} state={row.effectiveAuthority.state} />
-        </div>
-        {row.effectiveAuthority.redundant ? <p className="mt-3 rounded-md border border-status-warning-border bg-status-warning-surface px-3 py-2 text-xs leading-5 text-status-warning-strong">Additional authority มีอยู่ แต่ไม่ขยาย normalized composed scope จาก Default ใน context นี้ (ไม่ใช่ configuration error)</p> : null}
-        {row.additionalAuthority.grants.length > 0 ? <details className="mt-3 rounded-lg border border-border-subtle bg-surface-subtle/40 px-3 py-2"><summary className="cursor-pointer text-xs font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">ดู source / provenance ของ Additional</summary><ul className="mt-2 grid gap-2 md:grid-cols-2">{row.additionalAuthority.grants.map((grant, index) => <li key={`${grant.origin.type}-${grant.scope}-${index}`} className="rounded-lg border border-border-subtle bg-surface-raised px-3 py-2 text-xs leading-5"><div className="flex flex-wrap items-center gap-2"><AuthorizationStatus tone="neutral">{grant.origin.type}</AuthorizationStatus><span className="font-mono text-content-body">{grant.scope}</span></div><p className="mt-1 text-content-secondary">{formatGrantOrigin(grant.origin)}</p>{grant.constraint ? <p className="mt-1 font-mono text-content-body">constraint.teamId: {grant.constraint.teamId}</p> : null}</li>)}</ul></details> : null}
-        {row.limitations.length > 0 ? <div className="mt-3 border-t border-border-subtle pt-3"><p className="text-xs font-semibold text-content-secondary">Domain limits</p><ul className="mt-1 grid gap-1 text-xs leading-5 text-content-secondary">{row.limitations.map((limitation) => <li key={limitation.code}>• {limitation.label}</li>)}</ul></div> : null}
-    </article>;
+    const presentation = getCapabilityPresentation(row.capability.key);
+    const stateTone = row.effectiveAuthority.state === "AVAILABLE" ? "allow" : row.effectiveAuthority.state === "UNAVAILABLE" ? "deny" : row.effectiveAuthority.state === "DEFERRED" ? "deferred" : "neutral";
+    return <article className="px-4 py-5 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h5 className="text-sm font-semibold text-content-heading">{presentation?.actionLabel ?? "สิทธิ์ที่ต้องตรวจสอบ"}</h5><AuthorizationStatus tone={stateTone}>{getEffectiveAccessStateLabel(row.effectiveAuthority.state)}</AuthorizationStatus></div><p className="mt-1 text-sm leading-6 text-content-secondary">{presentation?.description ?? row.capability.description}</p><p className="mt-1 text-xs text-content-muted">บริบท: {row.context.label}</p></div><div className="flex flex-wrap gap-2 lg:justify-end"><AuthorizationStatus tone="neutral">{getAuthorizationChannelLabel(row.context.channel)}</AuthorizationStatus></div></div><div className="mt-4 grid gap-3 md:grid-cols-3"><AuthorityCard label="สิทธิ์พื้นฐาน" detail="สิทธิ์พื้นฐานของระบบ ไม่ใช่สิทธิ์ที่เพิ่มไว้เฉพาะรายการ" scopes={row.defaultAuthority.scopes} capabilityKey={row.capability.key} /><AuthorityCard label="สิทธิ์ที่เพิ่มให้" detail="สิทธิ์เพิ่มเติมจากกลุ่ม บทบาท หรือผู้ใช้" scopes={row.additionalAuthority.scopes} capabilityKey={row.capability.key} /><AuthorityCard label="สิทธิ์ที่ใช้งานได้" detail="ยังต้องผ่านกฎของข้อมูลและขั้นตอนการทำงาน" scopes={row.effectiveAuthority.scopes} capabilityKey={row.capability.key} state={row.effectiveAuthority.state} /></div>{row.effectiveAuthority.redundant ? <p className="mt-3 rounded-md border border-status-warning-border bg-status-warning-surface px-3 py-2 text-sm leading-6 text-status-warning-strong">สิทธิ์นี้ไม่ได้เพิ่มการเข้าถึง ผู้ใช้นี้มีขอบเขตเดียวกันอยู่แล้วจากสิทธิ์พื้นฐานหรือแหล่งอื่น</p> : null}{row.additionalAuthority.grants.length > 0 ? <SourceDisclosure grants={row.additionalAuthority.grants} /> : null}{row.limitations.length > 0 ? <div className="mt-3 border-t border-border-subtle pt-3"><p className="text-sm font-semibold text-content-secondary">ข้อจำกัดของหมวดงาน</p><ul className="mt-1 grid gap-1 text-sm leading-6 text-content-secondary">{row.limitations.map((limitation) => <li key={limitation.code}>• {limitation.label}</li>)}</ul></div> : null}<details className="mt-3 text-xs"><summary className="cursor-pointer font-semibold text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary><dl className="mt-2 grid gap-2 border-t border-border-subtle pt-2 sm:grid-cols-2"><div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{row.capability.key}</dd></div><div><dt className="font-semibold text-content-secondary">context key</dt><dd className="break-all font-mono text-content-body">{row.context.key}</dd></div><div><dt className="font-semibold text-content-secondary">channel</dt><dd className="font-mono text-content-body">{row.context.channel}</dd></div><div><dt className="font-semibold text-content-secondary">runtime mode</dt><dd className="font-mono text-content-body">{row.capability.runtimeAuthorizationMode}</dd></div></dl></details></article>;
 }
 
-function AuthorityCard({ label, detail, scopes, state }: { readonly label: string; readonly detail: string; readonly scopes: readonly string[]; readonly state?: EffectiveAccessState }): ReactElement {
-    return <div className="rounded-lg border border-border-subtle bg-surface-subtle/50 px-3 py-3"><p className="text-xs font-semibold text-content-secondary">{label}</p><p className="mt-1 text-xs leading-5 text-content-muted">{detail}</p>{state ? <p className="mt-2"><AuthorizationStatus tone={state === "AVAILABLE" ? "allow" : state === "DEFERRED" ? "deferred" : "neutral"}>{getEffectiveAccessStateLabel(state)}</AuthorizationStatus></p> : null}<p className="mt-2 font-mono text-xs text-content-body">{scopes.join(", ") || "None"}</p></div>;
+function AuthorityCard({ label, detail, scopes, capabilityKey, state }: { readonly label: string; readonly detail: string; readonly scopes: readonly string[]; readonly capabilityKey: string; readonly state?: EffectiveAccessState }): ReactElement {
+    return <div className="rounded-lg border border-border-subtle bg-surface-subtle/50 px-3 py-3"><p className="text-xs font-semibold text-content-secondary">{label}</p><p className="mt-1 text-xs leading-5 text-content-muted">{detail}</p>{state ? <p className="mt-2"><AuthorizationStatus tone={state === "AVAILABLE" ? "allow" : state === "UNAVAILABLE" ? "deny" : state === "DEFERRED" ? "deferred" : "neutral"}>{getEffectiveAccessStateLabel(state)}</AuthorizationStatus></p> : null}{scopes.length === 0 ? <p className="mt-2 text-sm text-content-muted">ไม่มีขอบเขตที่ใช้งานได้</p> : <ul className="mt-2 space-y-2">{scopes.map((scope) => { const presentation = getAuthorizationScopePresentation(scope, capabilityKey); return <li key={scope}><p className="text-sm font-semibold text-content-heading">{presentation.label}</p><p className="text-xs leading-5 text-content-secondary">{presentation.description}</p></li>; })}</ul>}</div>;
+}
+
+function SourceDisclosure({ grants }: { readonly grants: readonly AuthorizationAdministrationUserDetailData["effectiveAccess"][number]["additionalAuthority"]["grants"][number][] }): ReactElement {
+    return <details className="mt-3 rounded-lg border border-border-subtle bg-surface-subtle/40 px-3 py-2"><summary className="cursor-pointer text-sm font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">ที่มาของสิทธิ์</summary><ul className="mt-2 grid gap-2 md:grid-cols-2">{grants.map((grant, index) => <li key={`${grant.origin.type}-${grant.scope}-${index}`} className="rounded-lg border border-border-subtle bg-surface-raised px-3 py-2 text-sm leading-6"><p className="font-semibold text-content-heading">{getSourceOriginLabel(grant.origin)}</p><p className="text-xs text-content-secondary">{getAuthorizationSourceDescription(grant.origin.type)}</p><details className="mt-1 text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary><p className="mt-1 font-mono text-content-body">source: {grant.origin.type} · scope: {grant.scope}</p>{grant.constraint ? <p className="font-mono text-content-body">constraint.teamId: {grant.constraint.teamId}</p> : null}</details></li>)}</ul></details>;
 }
 
 function RawResolverEvidence({ permissions }: { readonly permissions: AuthorizationAdministrationUserDetailData["resolverEffectivePermissions"] }): ReactElement {
-    return <details className="border-t border-border-subtle"><summary className="cursor-pointer px-4 py-4 text-sm font-semibold text-content-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5">Advanced: Central resolver evidence (Dashboard)</summary><div className="border-t border-border-subtle"><p className="px-4 py-3 text-xs leading-5 text-content-secondary sm:px-5">ข้อมูลนี้เป็น configured/system authority จาก central resolver เท่านั้น เก็บไว้เพื่อวินิจฉัย source, reason, origin และ Team constraint; ห้ามอ่านแทน Effective capability authority ด้านบน</p>{permissions.length === 0 ? <p className="px-4 py-6 text-center text-sm text-content-secondary sm:px-5">ไม่มี raw resolver rows เนื่องจาก configuration invalid หรือยังไม่มีข้อมูล</p> : <div className="divide-y divide-border-subtle">{permissions.map((permission) => <ResolverPermissionRow key={permission.capability.key} permission={permission} />)}</div>}</div></details>;
+    return <details className="border-t border-border-subtle"><summary className="cursor-pointer px-4 py-4 text-sm font-semibold text-content-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5">รายละเอียดทางเทคนิค · หลักฐานจากระบบสิทธิ์</summary><div className="border-t border-border-subtle"><p className="px-4 py-3 text-xs leading-5 text-content-secondary sm:px-5">ข้อมูลนี้ใช้ตรวจสอบผลจากระบบกลาง แหล่งที่มา เหตุผล และข้อจำกัด ไม่ใช่ผลตัดสินรายการข้อมูลหรือ workflow โดยตรง</p>{permissions.length === 0 ? <p className="px-4 py-6 text-center text-sm text-content-secondary sm:px-5">ไม่มีข้อมูลสำหรับตรวจสอบ</p> : <div className="divide-y divide-border-subtle">{permissions.map((permission) => <ResolverPermissionRow key={permission.capability.key} permission={permission} />)}</div>}</div></details>;
 }
 
 function ResolverPermissionRow({ permission }: { readonly permission: AuthorizationAdministrationUserDetailData["resolverEffectivePermissions"][number] }): ReactElement {
     const mode = permission.capability.runtimeAuthorizationMode;
-    return <article className="px-4 py-4 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="break-all font-mono text-xs font-semibold text-content-heading">{permission.capability.key}</span><AuthorizationStatus tone={permission.allowed ? "allow" : "deny"}>{permission.allowed ? "ALLOW" : "DENY"}</AuthorizationStatus><AuthorizationStatus tone={mode === "CENTRAL_WITH_COMPATIBILITY" ? "warning" : mode === "DEFERRED" ? "deferred" : "neutral"}>{getRuntimeModeLabel(mode)}</AuthorizationStatus></div><p className="mt-1 text-xs text-content-secondary">{permission.capability.domain} · {permission.capability.description}</p></div><div className="text-left lg:text-right"><p className="text-xs text-content-secondary">Resolver scopes</p><p className="mt-1 font-mono text-xs text-content-body">{permission.scopes.join(", ") || "—"}</p></div></div>{!permission.allowed && permission.reason ? <p className="mt-3 flex gap-2 text-sm text-status-warning-strong"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />Resolver reason: {permission.reason}</p> : null}<div className="mt-3 border-t border-border-subtle pt-3"><p className="text-xs font-semibold text-content-secondary">Grant sources</p>{permission.grants.length === 0 ? <p className="mt-1 text-xs text-content-muted">ไม่มี grant ที่ใช้กับผลนี้</p> : <ul className="mt-2 grid gap-2 md:grid-cols-2">{permission.grants.map((grant, index) => <li key={`${grant.origin.type}-${grant.scope}-${index}`} className="rounded-lg border border-border-subtle bg-surface-subtle/50 px-3 py-2 text-xs leading-5"><div className="flex flex-wrap items-center gap-2"><AuthorizationStatus tone="neutral">{grant.origin.type}</AuthorizationStatus><span className="font-mono text-content-body">{grant.scope}</span></div><p className="mt-1 text-content-secondary">{formatGrantOrigin(grant.origin)}</p>{grant.constraint ? <p className="mt-1 font-mono text-content-body">constraint.teamId: {grant.constraint.teamId}</p> : null}</li>)}</ul>}</div>{mode === "DEFERRED" ? <p className="mt-3 text-xs leading-5 text-content-secondary">Capability นี้อยู่ในสถานะ DEFERRED; แสดงเพื่อการตรวจสอบเท่านั้น</p> : null}</article>;
+    return <article className="px-4 py-4 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="break-all font-mono text-xs font-semibold text-content-heading">{permission.capability.key}</span><AuthorizationStatus tone={permission.allowed ? "allow" : "deny"}>{permission.allowed ? "ALLOW" : "DENY"}</AuthorizationStatus><AuthorizationStatus tone={mode === "CENTRAL_WITH_COMPATIBILITY" ? "warning" : mode === "DEFERRED" ? "deferred" : "neutral"}>{getRuntimeModeLabel(mode)}</AuthorizationStatus></div><p className="mt-1 text-xs text-content-secondary">{permission.capability.domain} · {permission.capability.description}</p></div><div className="text-left lg:text-right"><p className="text-xs text-content-secondary">resolver scopes</p><p className="mt-1 font-mono text-xs text-content-body">{permission.scopes.join(", ") || "—"}</p></div></div>{!permission.allowed && permission.reason ? <p className="mt-3 flex gap-2 text-sm text-status-warning-strong"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />reason: {permission.reason}</p> : null}<div className="mt-3 border-t border-border-subtle pt-3"><p className="text-xs font-semibold text-content-secondary">grant sources</p>{permission.grants.length === 0 ? <p className="mt-1 text-xs text-content-muted">ไม่มี grant ที่ใช้กับผลนี้</p> : <ul className="mt-2 grid gap-2 md:grid-cols-2">{permission.grants.map((grant, index) => <li key={`${grant.origin.type}-${grant.scope}-${index}`} className="rounded-lg border border-border-subtle bg-surface-subtle/50 px-3 py-2 text-xs leading-5"><div className="flex flex-wrap items-center gap-2"><AuthorizationStatus tone="neutral">{grant.origin.type}</AuthorizationStatus><span className="font-mono text-content-body">{grant.scope}</span></div><p className="mt-1 text-content-secondary">{formatTechnicalOrigin(grant.origin)}</p>{grant.constraint ? <p className="mt-1 font-mono text-content-body">constraint.teamId: {grant.constraint.teamId}</p> : null}</li>)}</ul>}</div></article>;
 }
 
 function InvalidResolutionState({ error }: { readonly error: InvalidResolutionStatus["error"] }): ReactElement {
-    return <div role="alert" className="border-b border-status-danger-border bg-status-danger-surface px-4 py-5 text-status-danger-strong sm:px-5"><div className="flex items-start gap-3"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><div><h4 className="font-semibold">Resolver ไม่สามารถเชื่อถือผลลัพธ์ได้</h4><p className="mt-1 text-sm leading-6">พบ INVALID_CONFIGURATION จาก server ห้ามตีความรายการนี้เป็นผล ALLOW/DENY ปกติ และห้ามซ่อมแซมจาก client</p><dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">{Object.entries(error).filter(([, value]) => value !== undefined).map(([key, value]) => <div key={key}><dt className="font-semibold">{key}</dt><dd className="font-mono">{String(value)}</dd></div>)}</dl></div></div></div>;
+    return <div role="alert" className="border-b border-status-danger-border bg-status-danger-surface px-4 py-5 text-status-danger-strong sm:px-5"><div className="flex items-start gap-3"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><div><h4 className="font-semibold">พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ</h4><p className="mt-1 text-sm leading-6">ระบบไม่สามารถสรุปสิทธิ์ที่ใช้งานได้อย่างปลอดภัย จึงไม่แสดงผลแบบอนุญาตโดยอัตโนมัติ</p><TechnicalErrorDetails error={error} /></div></div></div>;
 }
 
 function InvalidEffectiveAccessState({ error }: { readonly error: InvalidEffectiveAccessStatus["error"] }): ReactElement {
-    return <div role="alert" className="border-b border-status-danger-border bg-status-danger-surface px-4 py-5 text-status-danger-strong sm:px-5"><div className="flex items-start gap-3"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><div><h4 className="font-semibold">Effective access projection ไม่สามารถเชื่อถือได้</h4><p className="mt-1 text-sm leading-6">พบ configuration error ระหว่าง compose policy จาก server จึงไม่แสดงผล Effective แบบ permissive</p><dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">{Object.entries(error).filter(([, value]) => value !== undefined).map(([key, value]) => <div key={key}><dt className="font-semibold">{key}</dt><dd className="font-mono">{String(value)}</dd></div>)}</dl></div></div></div>;
+    return <div role="alert" className="border-b border-status-danger-border bg-status-danger-surface px-4 py-5 text-status-danger-strong sm:px-5"><div className="flex items-start gap-3"><AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" /><div><h4 className="font-semibold">พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ</h4><p className="mt-1 text-sm leading-6">ระบบไม่สามารถคำนวณสิทธิ์ที่ใช้งานได้อย่างปลอดภัย จึงคงสถานะผิดปกติไว้</p><TechnicalErrorDetails error={error} /></div></div></div>;
 }
 
-function formatGrantOrigin(origin: AuthorizationAdministrationUserDetailData["resolverEffectivePermissions"][number]["grants"][number]["origin"]): string {
+function TechnicalErrorDetails({ error }: { readonly error: object }): ReactElement {
+    return <details className="mt-3 rounded-lg border border-status-danger-border/70 px-3 py-2 text-xs"><summary className="cursor-pointer font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary><dl className="mt-2 grid gap-2 sm:grid-cols-2">{Object.entries(error).filter(([, value]) => value !== undefined).map(([key, value]) => <div key={key}><dt className="font-semibold">{key}</dt><dd className="break-all font-mono">{String(value)}</dd></div>)}</dl></details>;
+}
+
+function getSourceOriginLabel(origin: AuthorizationAdministrationUserDetailData["resolverEffectivePermissions"][number]["grants"][number]["origin"]): string {
     switch (origin.type) {
-        case "SYSTEM_ROLE": return "ADMIN · system role (ไม่ขึ้นกับ Team grants)";
-        case "TEAM": return `Team: ${origin.team?.name ?? `Team ${origin.teamId}`} · Team ID ${origin.teamId}`;
-        case "TEAM_ROLE": return `TeamRole: ${origin.teamRole?.name ?? `TeamRole ${origin.teamRoleId}`} @ ${origin.team?.name ?? `Team ${origin.teamId}`}`;
-        case "USER": return `Direct User Grant · User ID ${origin.userId}`;
+        case "SYSTEM_ROLE": return getAuthorizationSourceLabel("SYSTEM_ROLE");
+        case "TEAM": return `${getAuthorizationSourceLabel("TEAM")}: ${origin.team?.name ?? "กลุ่มที่ต้องตรวจสอบ"}`;
+        case "TEAM_ROLE": return `${getAuthorizationSourceLabel("TEAM_ROLE")}: ${origin.teamRole?.name ?? "บทบาทที่ต้องตรวจสอบ"}`;
+        case "USER": return getAuthorizationSourceLabel("USER");
+    }
+}
+
+function formatTechnicalOrigin(origin: AuthorizationAdministrationUserDetailData["resolverEffectivePermissions"][number]["grants"][number]["origin"]): string {
+    switch (origin.type) {
+        case "SYSTEM_ROLE": return `role: ${origin.role}`;
+        case "TEAM": return `teamId: ${origin.teamId}`;
+        case "TEAM_ROLE": return `teamId: ${origin.teamId} · teamRoleId: ${origin.teamRoleId}`;
+        case "USER": return `userId: ${origin.userId}`;
     }
 }
 
 function IdentityField({ label, value }: { readonly label: string; readonly value: string }): ReactElement { return <div><dt className="text-xs text-content-secondary">{label}</dt><dd className="mt-1 break-words text-content-body">{value}</dd></div>; }
-function LifecycleEntityStatus({ isActive }: { readonly isActive: boolean }): ReactElement { return <AuthorizationStatus tone={isActive ? "active" : "inactive"}>{isActive ? "Active" : "Inactive"}</AuthorizationStatus>; }
+function LifecycleEntityStatus({ isActive }: { readonly isActive: boolean }): ReactElement { return <AuthorizationStatus tone={isActive ? "active" : "inactive"}>{isActive ? "ใช้งานอยู่" : "ปิดใช้งาน"}</AuthorizationStatus>; }
+
+function getEmployeeStatusLabel(status: string, deletedAt: Date | string | null): string {
+    if (deletedAt !== null) return "ข้อมูลพนักงานถูกลบ";
+    switch (status) {
+        case "ACTIVE":
+            return "พนักงานใช้งานอยู่";
+        case "INACTIVE":
+            return "พนักงานปิดใช้งาน";
+        case "SUSPENDED":
+            return "พนักงานถูกระงับ";
+        default:
+            return "ต้องตรวจสอบสถานะพนักงาน";
+    }
+}

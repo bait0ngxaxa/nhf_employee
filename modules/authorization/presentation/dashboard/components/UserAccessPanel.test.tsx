@@ -285,38 +285,38 @@ afterEach(() => {
 });
 
 describe("User Access presentation", () => {
-    it("keeps Default, Additional, Effective, provenance, and deferred state visibly distinct", () => {
+    it("keeps base, added, effective, provenance, and deferred state visibly distinct", () => {
         renderPanel();
 
-        expect(screen.getAllByText("Default Domain Policy").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("Additional / Resolver authority").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("Effective capability authority").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("สิทธิ์พื้นฐาน").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("สิทธิ์ที่เพิ่มให้").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("สิทธิ์ที่ใช้งานได้").length).toBeGreaterThan(0);
         expect(screen.getAllByText("SYSTEM_ROLE").length).toBeGreaterThan(0);
-        expect(screen.getByText(/ดู source \/ provenance ของ Additional/)).toBeInTheDocument();
-        expect(screen.getAllByText(/DEFERRED · ยังไม่ migrate/).length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ที่มาของสิทธิ์").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ยังไม่เปิดให้จัดการ").length).toBeGreaterThan(0);
         expect(screen.queryByText("มี Compatibility Policy")).not.toBeInTheDocument();
-        expect(screen.getByText("SYSTEM ADMIN")).toBeInTheDocument();
+        expect(screen.getAllByText("ผู้ดูแลระบบ").length).toBeGreaterThan(0);
         expect(screen.getByText("Operations")).toBeInTheDocument();
     });
 
     it("does not turn NO_APPLICABLE_GRANT into final denial when Default exists", () => {
         renderPanel(normalUser);
 
-        expect(screen.getAllByText("AVAILABLE · มี authority").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("Default Domain Policy").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ใช้งานได้").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("สิทธิ์พื้นฐาน").length).toBeGreaterThan(0);
         expect(screen.getAllByText(/NO_APPLICABLE_GRANT/).length).toBeGreaterThan(0);
-        expect(screen.getAllByText("UNAVAILABLE · ไม่มี authority").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ยังไม่มีสิทธิ์").length).toBeGreaterThan(0);
     });
 
     it("shows trusted context variants, LIFF distinction, unsupported and deferred states", () => {
         renderPanel(normalUser);
 
-        expect(screen.getByText("Dashboard · Management")).toBeInTheDocument();
-        expect(screen.getByText("Dashboard · Work items · Mine")).toBeInTheDocument();
-        expect(screen.getByText("Dashboard · Work items · All")).toBeInTheDocument();
-        expect(screen.getAllByText("LIFF · Self service").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("UNSUPPORTED · ไม่รองรับ context นี้").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("DEFERRED · ยังไม่ migrate").length).toBeGreaterThan(0);
+        expect(screen.getByText(/บริบท: Dashboard · Management/)).toBeInTheDocument();
+        expect(screen.getByText(/บริบท: Dashboard · Work items · Mine/)).toBeInTheDocument();
+        expect(screen.getByText(/บริบท: Dashboard · Work items · All/)).toBeInTheDocument();
+        expect(screen.getAllByText(/บริบท: LIFF · Self service/).length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ช่องทางนี้ไม่รองรับ").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ยังไม่เปิดให้จัดการ").length).toBeGreaterThan(0);
     });
 
     it("keeps INVALID_CONFIGURATION fail-closed and does not render effective rows", () => {
@@ -344,24 +344,27 @@ describe("User Access presentation", () => {
 
         renderPanel(invalidUser);
 
-        expect(screen.getByText("Resolver ไม่สามารถเชื่อถือผลลัพธ์ได้")).toBeInTheDocument();
+        expect(screen.getByText("พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ")).toBeInTheDocument();
         expect(screen.getByText("UNKNOWN_PERSISTED_CAPABILITY")).toBeInTheDocument();
         expect(screen.queryByText("ALLOW")).not.toBeInTheDocument();
-        expect(screen.queryByText("Default Domain Policy")).not.toBeInTheDocument();
+        expect(screen.queryByText("สิทธิ์พื้นฐาน")).not.toBeInTheDocument();
     });
 
     it("keeps the domain and effective-state filters usable", () => {
         renderPanel(normalUser);
 
-        fireEvent.change(screen.getByLabelText("Effective state"), {
+        fireEvent.change(screen.getByLabelText("สถานะสิทธิ์"), {
             target: { value: "DEFERRED" },
         });
-        expect(screen.getByText("email.request.read")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "อีเมล" })).toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText("Domain"), {
+        fireEvent.change(screen.getByLabelText("สถานะสิทธิ์"), {
+            target: { value: "ALL" },
+        });
+        fireEvent.change(screen.getByLabelText("หมวดงาน"), {
             target: { value: "audit" },
         });
-        expect(screen.getByText("audit.read")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "การตรวจสอบ" })).toBeInTheDocument();
     });
 
     it("keeps User search results available for selection", () => {
@@ -392,12 +395,11 @@ describe("User Access presentation", () => {
         const onRefresh = vi.fn(async () => undefined);
         renderPanel(normalUser, onRefresh);
 
-        fireEvent.click(screen.getByRole("button", { name: /^เพิ่ม grant$/ }));
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มสิทธิ์" }));
         const dialog = await screen.findByRole("dialog");
-        fireEvent.change(within(dialog).getByLabelText("Capability"), {
-            target: { value: "audit.read" },
-        });
-        fireEvent.click(within(dialog).getByRole("button", { name: /^เพิ่ม grant$/ }));
+        fireEvent.click(within(dialog).getByRole("button", { name: /ดูบันทึกการใช้งานระบบ/ }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยืนยันเพิ่มสิทธิ์" }));
 
         await vi.waitFor(() => {
             expect(grantApi.addUserGrant).toHaveBeenCalledWith(7, {
@@ -413,9 +415,9 @@ describe("User Access presentation", () => {
         const onRefresh = vi.fn(async () => undefined);
         renderPanel({ ...normalUser, directGrants: [directUserGrantProjection] }, onRefresh);
 
-        fireEvent.click(screen.getByRole("button", { name: "ลบ grant audit.read ALL" }));
+        fireEvent.click(screen.getByRole("button", { name: /นำสิทธิ์ ดูบันทึกการใช้งานระบบ ออกจากรายการ/ }));
         const dialog = await screen.findByRole("alertdialog");
-        fireEvent.click(within(dialog).getByRole("button", { name: /^ลบ grant$/ }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "นำสิทธิ์ออก" }));
 
         await vi.waitFor(() => {
             expect(grantApi.removeUserGrant).toHaveBeenCalledWith(7, {

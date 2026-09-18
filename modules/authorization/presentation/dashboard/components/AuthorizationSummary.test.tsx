@@ -60,14 +60,14 @@ describe("AuthorizationSummary", () => {
 
         expect(screen.getByText("Active Team")).toBeInTheDocument();
         expect(screen.getByText("Legacy Team")).toBeInTheDocument();
-        expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("Inactive").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ใช้งานอยู่").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("ปิดใช้งาน").length).toBeGreaterThan(0);
 
         fireEvent.change(screen.getByLabelText("สถานะ"), { target: { value: "INACTIVE" } });
         expect(screen.queryByText("Active Team")).not.toBeInTheDocument();
         expect(screen.getByText("Legacy Team")).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "เปิดรายละเอียด" }));
+        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
         expect(onSelectTeam).toHaveBeenCalledWith(2);
     });
 
@@ -85,7 +85,7 @@ describe("AuthorizationSummary", () => {
             />,
         );
 
-        const createButtons = screen.getAllByRole("button", { name: "สร้าง Team" });
+        const createButtons = screen.getAllByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" });
         expect(createButtons.length).toBeGreaterThan(0);
         fireEvent.click(createButtons[0] as HTMLElement);
         expect(onCreateTeam).toHaveBeenCalledTimes(1);

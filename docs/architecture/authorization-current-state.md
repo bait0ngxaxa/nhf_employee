@@ -11,10 +11,11 @@ CLOSED for Stock, and Phase 12C.5 is CLOSED for Leave. The next handoff is
 Phase 12D, which is now CLOSED for the remaining Routine surfaces. Phase 12E
 is now CLOSED for Authorization Administration effective-access inspection;
 Phase 12F is now CLOSED for the full authorization regression/security matrix;
-the exact next handoff is Phase 12G — First Production Capability Deployment
-Readiness.
+Phase 12G-A — Authorization Administration UX Simplification is now CLOSED;
+the exact next handoff is Phase 12G-B — First Production Capability Deployment
+Readiness. Phase 12G-B has not started.
 
-สถานะ: Current state after Phase 12F closure; Phase 12F Full Authorization Regression / Security Matrix — CLOSED; exact next phase: Phase 12G First Production Capability Deployment Readiness — NEXT; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
+สถานะ: Current state after Phase 12G-A closure; Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; exact next phase: Phase 12G-B First Production Capability Deployment Readiness — NEXT (not started); Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-17<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -1220,8 +1221,34 @@ Cross-cutting arithmetic is `58 = 53 DIRECT + 2 INDIRECT + 0 MISSING + 3 N/A`.
 
 This closure establishes code/runtime regression evidence only. It did not
 query or mutate production authorization configuration, create Teams/Role or
-grants, seed defaults, backfill data, or begin rollout. The exact next phase is
-**Phase 12G — First Production Capability Deployment Readiness**.
+grants, seed defaults, backfill data, or begin rollout. Phase 12G-A is the
+presentation/interaction simplification recorded in
+[authorization-phase-12ga-ux-simplification.md](authorization-phase-12ga-ux-simplification.md).
+
+## 9.10 Phase 12G-A Authorization Administration UX Simplification
+
+Phase 12G-A is **CLOSED** from the Phase 12F baseline above. The primary
+Authorization Administration experience now uses administrator-facing Thai
+business vocabulary: กลุ่มผู้ใช้งาน, บทบาทในกลุ่ม, สิทธิ์เฉพาะบุคคล,
+สิทธิ์พื้นฐาน, สิทธิ์ที่เพิ่มให้ and สิทธิ์ที่ใช้งานได้. Permission selection is
+grouped by business domain, searchable using business language, limited to the
+server-projected administratively grantable capabilities, and followed by a
+plain-language impact confirmation. Scope and channel labels are presented from
+one exhaustive presentation catalog; raw keys, enum values, runtime evidence,
+configuration issue codes and resolver evidence remain behind Advanced
+disclosures.
+
+Team/TeamRole/User mutation payloads and server-owned authorization semantics
+are unchanged. User effective access continues to refresh from the authoritative
+server read model after mutation, direct User access remains an explicit
+exception, redundant additional authority remains visible, and invalid
+configuration remains fail-closed. No production configuration was seeded or
+changed and no production-readiness/canary work was started.
+
+The implementation and verification record is in
+[authorization-phase-12ga-ux-simplification.md](authorization-phase-12ga-ux-simplification.md).
+The exact next phase is **Phase 12G-B — First Production Capability Deployment
+Readiness**; Phase 12G-B is **NEXT and not started**.
 
 ## 10. Explicit non-goals for Phase 0
 

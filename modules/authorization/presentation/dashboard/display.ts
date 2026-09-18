@@ -4,18 +4,40 @@ import type {
     AuthorizationAdministrationOverviewData,
     ClientDate,
 } from "./types";
+import {
+    getAuthorizationChannelPresentation,
+    getAuthorizationDomainPresentation,
+    getAuthorizationScopePresentation,
+} from "./permission-presentation";
 
 export function getAuthorizationChannelLabel(
     channel: "DASHBOARD" | "LIFF_SELF_SERVICE" | "SYSTEM",
 ): string {
-    switch (channel) {
-        case "DASHBOARD":
-            return "DASHBOARD";
-        case "LIFF_SELF_SERVICE":
-            return "LIFF_SELF_SERVICE";
-        case "SYSTEM":
-            return "SYSTEM";
-    }
+    return getAuthorizationChannelPresentation(channel).label;
+}
+
+export function getAuthorizationChannelDescription(
+    channel: "DASHBOARD" | "LIFF_SELF_SERVICE" | "SYSTEM",
+): string {
+    return getAuthorizationChannelPresentation(channel).description;
+}
+
+export function getAuthorizationDomainLabel(domain: string): string {
+    return getAuthorizationDomainPresentation(domain).label;
+}
+
+export function getAuthorizationScopeLabel(
+    scope: string,
+    capabilityKey?: string,
+): string {
+    return getAuthorizationScopePresentation(scope, capabilityKey).label;
+}
+
+export function getAuthorizationScopeDescription(
+    scope: string,
+    capabilityKey?: string,
+): string {
+    return getAuthorizationScopePresentation(scope, capabilityKey).description;
 }
 
 export function getEffectiveAccessStateLabel(
@@ -23,28 +45,28 @@ export function getEffectiveAccessStateLabel(
 ): string {
     switch (state) {
         case "AVAILABLE":
-            return "AVAILABLE · มี authority";
+            return "ใช้งานได้";
         case "UNAVAILABLE":
-            return "UNAVAILABLE · ไม่มี authority";
+            return "ยังไม่มีสิทธิ์";
         case "UNSUPPORTED":
-            return "UNSUPPORTED · ไม่รองรับ context นี้";
+            return "ช่องทางนี้ไม่รองรับ";
         case "DEFERRED":
-            return "DEFERRED · ยังไม่ migrate";
+            return "ยังไม่เปิดให้จัดการ";
     }
 }
 
 export const authorizationTabLabels = {
-    overview: "ภาพรวมและ Teams",
+    overview: "กลุ่มและบทบาท",
     users: "ผู้ใช้และสิทธิ์",
-    capabilities: "Capability Registry",
+    capabilities: "ขั้นสูง",
 } as const;
 
 export const teamDetailTabLabels = {
     details: "รายละเอียด",
     members: "สมาชิก",
-    roles: "TeamRoles",
-    teamGrants: "Team Permissions",
-    roleGrants: "TeamRole Permissions",
+    roles: "บทบาทและสิทธิ์",
+    teamGrants: "สิทธิ์ของกลุ่ม",
+    roleGrants: "สิทธิ์ของบทบาท",
 } as const;
 
 export function formatAuthorizationDate(value: ClientDate): string {
@@ -58,11 +80,11 @@ export function getReadinessLabel(
 ): string {
     switch (status) {
         case "GRANTABLE":
-            return "พร้อมกำหนดสิทธิ์";
+            return "พร้อมเพิ่มให้ผู้ใช้หรือกลุ่ม";
         case "POLICY_ACTIVATION_REQUIRED":
-            return "ต้องเปิดใช้งาน Policy ก่อน";
+            return "ยังไม่พร้อมให้จัดการ";
         case "DEFERRED":
-            return "เลื่อนการรองรับไว้ก่อน";
+            return "ยังไม่เปิดให้จัดการ";
     }
 }
 
@@ -71,13 +93,13 @@ export function getRuntimeModeLabel(
 ): string {
     switch (mode) {
         case "CENTRAL_ONLY":
-            return "Central only";
+            return "CENTRAL_ONLY · ใช้สิทธิ์จากระบบกลาง";
         case "CENTRAL_WITH_DEFAULT_POLICY":
-            return "Central + default policy";
+            return "CENTRAL_WITH_DEFAULT_POLICY · รวมสิทธิ์พื้นฐาน";
         case "CENTRAL_WITH_COMPATIBILITY":
-            return "Central + compatibility";
+            return "CENTRAL_WITH_COMPATIBILITY · มี compatibility";
         case "DEFERRED":
-            return "Deferred";
+            return "DEFERRED · ยังไม่เปิดให้จัดการ";
     }
 }
 
@@ -86,10 +108,12 @@ export function getGrantStatusLabel(
 ): string {
     if (grant.validation.status === "VALID") {
         return grant.capability?.administrativeStatus === "GRANTABLE"
-            ? "Valid"
-            : grant.capability?.administrativeStatus ?? "ตรวจสอบ readiness";
+            ? "ใช้งานได้"
+            : grant.capability?.administrativeStatus === "DEFERRED"
+                ? "ยังไม่เปิดให้จัดการ"
+                : "ต้องตรวจสอบ";
     }
-    return `Invalid: ${grant.validation.code}`;
+    return "ต้องตรวจสอบข้อมูลสิทธิ์";
 }
 
 export function getMutationErrorCopy(error: unknown): {
@@ -102,58 +126,58 @@ export function getMutationErrorCopy(error: unknown): {
     switch (code) {
         case "DUPLICATE_MEMBERSHIP":
             return {
-                title: "สมาชิกอยู่ใน Team นี้แล้ว",
+                title: "ผู้ใช้อยู่ในกลุ่มนี้แล้ว",
                 description: "ตรวจสอบรายชื่อสมาชิกปัจจุบันก่อนเพิ่มอีกครั้ง",
             };
         case "DUPLICATE_GRANT":
             return {
-                title: "มี grant นี้อยู่แล้ว",
+                title: "มีสิทธิ์เพิ่มเติมนี้อยู่แล้ว",
                 description: "ข้อมูลอาจเปลี่ยนโดยผู้ดูแลระบบคนอื่น กรุณาโหลดข้อมูลใหม่",
             };
         case "TEAM_ROLE_TEAM_MISMATCH":
             return {
-                title: "TeamRole ไม่ได้อยู่ใน Team นี้",
-                description: "ระบบไม่อนุญาตให้กำหนดบทบาทข้าม Team",
+                title: "บทบาทนี้ไม่อยู่ในกลุ่มที่เลือก",
+                description: "ระบบไม่อนุญาตให้กำหนดบทบาทข้ามกลุ่ม",
             };
         case "UNKNOWN_CAPABILITY":
             return {
-                title: "ไม่พบ Capability นี้ใน registry",
-                description: "โหลด Capability Registry ล่าสุด แล้วตรวจสอบรายการที่เลือกอีกครั้ง",
+                title: "ไม่พบสิทธิ์ในรายการระบบ",
+                description: "โหลดข้อมูลล่าสุด แล้วเลือกสิทธิ์ที่มีอยู่ในรายการอีกครั้ง",
             };
         case "UNSUPPORTED_SCOPE":
             return {
-                title: "Scope นี้ไม่รองรับ",
-                description: "Capability ที่เลือกไม่รองรับ Scope นี้ตาม catalog จาก server",
+                title: "ขอบเขตนี้ใช้กับสิทธิ์ที่เลือกไม่ได้",
+                description: "เลือกขอบเขตที่แสดงสำหรับสิทธิ์นี้ แล้วลองอีกครั้ง",
             };
         case "DIRECT_TEAM_SCOPE_REQUIRES_ORIGIN":
             return {
-                title: "Direct User grant ใช้ Team scope ไม่ได้",
-                description: "สิทธิ์เฉพาะผู้ใช้ต้องไม่มี Team origin และควรใช้เฉพาะกรณียกเว้น",
+                title: "สิทธิ์เฉพาะบุคคลใช้ขอบเขตภายในกลุ่มไม่ได้",
+                description: "หากต้องการให้สิทธิ์กับทั้งกลุ่ม ให้เพิ่มสิทธิ์ที่กลุ่มหรือบทบาทในกลุ่ม",
             };
         case "UNSUPPORTED_ADMIN_TEAM_SCOPE":
             return {
-                title: "Team scope นี้ยังไม่รองรับ",
-                description: "ตรวจสอบ Team origin และ capability catalog จาก server ก่อนดำเนินการต่อ",
+                title: "ขอบเขตของกลุ่มนี้ยังไม่รองรับ",
+                description: "เลือกขอบเขตที่ระบบแสดงสำหรับสิทธิ์นี้ แล้วลองอีกครั้ง",
             };
         case "CAPABILITY_POLICY_ACTIVATION_REQUIRED":
             return {
-                title: "Capability นี้ยังไม่พร้อมให้กำหนด",
-                description: "ต้องมีการเปิดใช้งาน Policy อย่างชัดเจนก่อนจึงจะเพิ่มหรือลบ grant ได้",
+                title: "สิทธิ์นี้ยังไม่พร้อมให้จัดการ",
+                description: "ยังไม่สามารถเพิ่มหรือนำสิทธิ์นี้ออกได้ในขณะนี้",
             };
         case "CAPABILITY_DEFERRED":
             return {
-                title: "Capability นี้อยู่ระหว่างการเลื่อนการรองรับ",
-                description: "ยังไม่สามารถจัดการ grant ของ Capability นี้ได้",
+                title: "สิทธิ์นี้ยังไม่เปิดให้จัดการ",
+                description: "รายการนี้จะแสดงไว้สำหรับการตรวจสอบทางเทคนิคเท่านั้น",
             };
         case "INVALID_AUTHORIZATION_CONFIGURATION":
             return {
-                title: "พบ configuration สิทธิ์ที่ไม่ถูกต้อง",
-                description: "ระบบปฏิเสธการเปลี่ยนแปลงเพื่อรักษาความปลอดภัย กรุณาตรวจสอบรายการที่แจ้งไว้",
+                title: "พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ",
+                description: "ระบบไม่บันทึกการเปลี่ยนแปลงเพื่อรักษาความปลอดภัย กรุณาตรวจสอบรายการที่แจ้งไว้",
             };
         case "NO_STATE_CHANGE":
             return {
                 title: "ไม่มีการเปลี่ยนแปลง",
-                description: "ค่าที่ส่งมาเหมือนกับ configuration ปัจจุบัน",
+                description: "ข้อมูลที่ส่งมาเหมือนกับข้อมูลปัจจุบัน",
             };
         case "NOT_FOUND":
             return {
@@ -174,14 +198,12 @@ export function getMutationErrorCopy(error: unknown): {
         case "FORBIDDEN":
             return {
                 title: "ไม่มีสิทธิ์ดำเนินการ",
-                description: "สิทธิ์ ADMIN ต้องได้รับการตรวจสอบจาก server ทุกครั้ง",
+                description: "ระบบตรวจสอบสิทธิ์ของผู้ดูแลไม่ผ่าน",
             };
         default:
             return {
                 title: "ดำเนินการไม่สำเร็จ",
-                description: error instanceof Error
-                    ? error.message
-                    : "ตรวจสอบการเชื่อมต่อ แล้วลองใหม่อีกครั้ง",
+                description: "ตรวจสอบข้อมูลและการเชื่อมต่อ แล้วลองใหม่อีกครั้ง",
             };
     }
 }
@@ -195,17 +217,17 @@ export function getRequestId(error: unknown): string | null {
 export function getConfigurationIssueLabel(code: string): string {
     switch (code) {
         case "UNKNOWN_PERSISTED_CAPABILITY":
-            return "ไม่พบ Capability ใน registry ปัจจุบัน";
+            return "พบสิทธิ์ที่ไม่มีอยู่ในรายการระบบปัจจุบัน";
         case "UNSUPPORTED_PERSISTED_SCOPE":
-            return "Scope นี้ไม่รองรับโดย Capability";
+            return "พบขอบเขตที่ไม่รองรับกับสิทธิ์นี้";
         case "DIRECT_TEAM_SCOPE_REQUIRES_ORIGIN":
-            return "Direct User grant ไม่มี Team origin ที่ถูกต้อง";
+            return "สิทธิ์เฉพาะบุคคลมีขอบเขตของกลุ่มที่ไม่ถูกต้อง";
         case "TEAM_GRANT_ORIGIN_MISMATCH":
         case "TEAM_ROLE_GRANT_ORIGIN_MISMATCH":
-            return "แหล่งที่มาของ grant ไม่ตรงกับ entity";
+            return "แหล่งที่มาของสิทธิ์ไม่ตรงกับรายการ";
         case "TEAM_ROLE_MEMBERSHIP_MISMATCH":
-            return "ความสัมพันธ์ TeamRole ไม่ถูกต้อง";
+            return "ความสัมพันธ์ระหว่างกลุ่มกับบทบาทไม่ถูกต้อง";
         default:
-            return code;
+            return "พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ";
     }
 }

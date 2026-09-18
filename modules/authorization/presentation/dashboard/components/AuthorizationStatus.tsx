@@ -54,7 +54,7 @@ export function ActiveStatus({
 }): React.ReactElement {
     return (
         <AuthorizationStatus tone={isActive ? "active" : "inactive"}>
-            {isActive ? "Active" : "Inactive"}
+            {isActive ? "ใช้งานอยู่" : "ปิดใช้งาน"}
         </AuthorizationStatus>
     );
 }
@@ -67,7 +67,7 @@ export function LifecycleStatus({
     readonly deletedAt: string | Date | null;
 }): React.ReactElement {
     if (deletedAt !== null) {
-        return <AuthorizationStatus tone="danger">Deleted / unavailable</AuthorizationStatus>;
+        return <AuthorizationStatus tone="danger">ถูกลบ / ใช้งานไม่ได้</AuthorizationStatus>;
     }
     return <ActiveStatus isActive={isActive} />;
 }
