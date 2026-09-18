@@ -27,6 +27,16 @@ export interface AuthorizationChannelPresentation {
     readonly description: string;
 }
 
+export interface AuthorizationContextPresentation {
+    readonly label: string;
+    readonly description: string;
+}
+
+export interface AuthorizationLimitationPresentation {
+    readonly label: string;
+    readonly description: string;
+}
+
 export interface CapabilityPresentationMetadata {
     readonly actionLabel: string;
     readonly description: string;
@@ -110,6 +120,151 @@ export const authorizationChannelPresentation: Readonly<
     SYSTEM: {
         label: "ระบบ",
         description: "การทำงานภายในระบบ",
+    },
+});
+
+/**
+ * Business copy for trusted inspection contexts. The context key and the
+ * original domain label remain technical evidence; this catalog only changes
+ * how a context is introduced to an administrator.
+ */
+export const authorizationContextPresentation: Readonly<
+    Record<string, AuthorizationContextPresentation>
+> = Object.freeze({
+    dashboard: {
+        label: "เว็บระบบ",
+        description: "การใช้งานผ่านหน้าเว็บของระบบ",
+    },
+    "dashboard.management": {
+        label: "การจัดการงาน",
+        description: "การทำงานผ่านหน้าจัดการงาน",
+    },
+    "dashboard.work-item.mine": {
+        label: "งานที่รับผิดชอบ",
+        description: "การดูและทำงานกับรายการที่ผู้ใช้นี้รับผิดชอบ",
+    },
+    "dashboard.work-item.all": {
+        label: "งานทั้งหมด",
+        description: "การดูงานทั้งหมดที่ความสามารถนี้อนุญาต",
+    },
+    "dashboard.summary.mine": {
+        label: "สรุปงานที่รับผิดชอบ",
+        description: "การดูสรุปของงานที่ผู้ใช้นี้รับผิดชอบ",
+    },
+    "dashboard.summary.all": {
+        label: "สรุปงานทั้งหมด",
+        description: "การดูสรุปของงานทั้งหมดที่ระบบอนุญาต",
+    },
+    "liff.self-service": {
+        label: "การใช้งานผ่าน LINE",
+        description: "การใช้งานผ่าน LINE ในบริการตนเอง",
+    },
+});
+
+/**
+ * Operator-facing descriptions for limitation codes emitted by the current
+ * Employee, Department, Notification, Routine, Stock, Leave, and Audit
+ * effective-access providers. These values never make an authorization
+ * decision and the original code/label remains in Technical details.
+ */
+export const authorizationLimitationPresentation: Readonly<
+    Record<string, AuthorizationLimitationPresentation>
+> = Object.freeze({
+    "employee.lifecycle_and_resource": {
+        label: "ข้อมูลพนักงานยังมีเงื่อนไขการใช้งาน",
+        description: "การทำรายการจริงยังขึ้นอยู่กับสถานะพนักงานและข้อมูลที่เกี่ยวข้อง",
+    },
+    "department.resource_scope": {
+        label: "ข้อมูลหน่วยงานยังมีเงื่อนไขการเข้าถึง",
+        description: "การเข้าถึงข้อมูลหน่วยงานจริงยังขึ้นอยู่กับกฎของข้อมูลหน่วยงาน",
+    },
+    "notification.actor_owned": {
+        label: "การแจ้งเตือนเป็นของผู้ใช้รายนั้น",
+        description: "การแจ้งเตือนจะแสดงตามผู้ใช้ที่เป็นเจ้าของรายการ",
+    },
+    "routine.resource_relationship": {
+        label: "งานยังขึ้นอยู่กับความสัมพันธ์ของผู้ใช้งาน",
+        description: "การเข้าถึงงานจริงยังขึ้นอยู่กับว่าเป็นผู้สร้างหรือผู้รับผิดชอบงานนั้น",
+    },
+    "routine.occurrence_assignment_workflow": {
+        label: "รายการงานยังขึ้นอยู่กับผู้รับผิดชอบและสถานะ",
+        description: "การทำรายการจริงยังขึ้นอยู่กับผู้รับผิดชอบและสถานะของงานที่เกิดขึ้น",
+    },
+    "routine.summary_scope": {
+        label: "สรุปงานยังมีเงื่อนไขของข้อมูล",
+        description: "การสรุปผลจริงยังขึ้นอยู่กับขอบเขตและเงื่อนไขของงานในระบบ",
+    },
+    "routine.reference_scope": {
+        label: "ข้อมูลอ้างอิงขึ้นอยู่กับช่องทางการใช้งาน",
+        description: "ข้อมูลอ้างอิงที่แสดงอาจถูกจำกัดตามช่องทางและข้อมูลที่จำเป็น",
+    },
+    "routine.export_resource": {
+        label: "การส่งออกยังมีเงื่อนไขของงาน",
+        description: "การส่งออกจริงยังขึ้นอยู่กับข้อมูลและสถานะของงานที่ระบบอนุญาต",
+    },
+    "stock.catalog.resource": {
+        label: "รายการสินค้ายังมีเงื่อนไขของข้อมูล",
+        description: "การเข้าถึงรายการสินค้าจริงยังขึ้นอยู่กับสถานะของสินค้าและกฎข้อมูล",
+    },
+    "stock.inventory.integrity": {
+        label: "สต็อกต้องตรวจสอบความถูกต้องก่อนทำรายการ",
+        description: "การทำรายการจริงยังขึ้นอยู่กับยอดคงเหลือ สถานะสินค้า และความถูกต้องของสต็อก",
+    },
+    "stock.request.relationship": {
+        label: "คำขอเบิกยังขึ้นอยู่กับเจ้าของและสถานะ",
+        description: "การเข้าถึงคำขอจริงยังขึ้นอยู่กับเจ้าของคำขอและสถานะของคำขอ",
+    },
+    "stock.request.create_invariants": {
+        label: "การส่งคำขอเบิกมีเงื่อนไขของรายการ",
+        description: "การสร้างคำขอจริงยังขึ้นอยู่กับผู้ขอ ยอดคงเหลือ และเงื่อนไขการส่งคำขอ",
+    },
+    "stock.request.cancel_workflow": {
+        label: "การยกเลิกคำขอเบิกขึ้นอยู่กับขั้นตอน",
+        description: "การยกเลิกจริงยังขึ้นอยู่กับสถานะคำขอและขั้นตอนของคลัง",
+    },
+    "stock.request.process_workflow": {
+        label: "การดำเนินการคำขอเบิกขึ้นอยู่กับขั้นตอน",
+        description: "การดำเนินการจริงยังขึ้นอยู่กับสถานะคำขอ ยอดคงเหลือ และการตรวจสอบของคลัง",
+    },
+    "stock.report.resource": {
+        label: "รายงานสต็อกยังมีเงื่อนไขของข้อมูล",
+        description: "การส่งออกรายงานจริงยังขึ้นอยู่กับช่วงข้อมูลและเงื่อนไขของคลัง",
+    },
+    "leave.request.relationship": {
+        label: "คำขอลายังขึ้นอยู่กับผู้เกี่ยวข้อง",
+        description: "การเข้าถึงคำขอจริงยังขึ้นอยู่กับเจ้าของคำขอและความสัมพันธ์ในระบบลา",
+    },
+    "leave.effective_approver": {
+        label: "การอนุมัติขึ้นอยู่กับผู้อนุมัติของคำขอ",
+        description: "การอนุมัติจริงต้องเป็นผู้อนุมัติของคำขอนั้นตามขั้นตอนปัจจุบัน",
+    },
+    "leave.request.lifecycle": {
+        label: "คำขอลายังขึ้นอยู่กับสถานะและขั้นตอน",
+        description: "การทำรายการจริงยังขึ้นอยู่กับสิทธิ์คงเหลือ สถานะคำขอ และขั้นตอนการลา",
+    },
+    "leave.cancellation.workflow": {
+        label: "การยกเลิกการลายังขึ้นอยู่กับขั้นตอน",
+        description: "การพิจารณายกเลิกจริงยังขึ้นอยู่กับสถานะคำขอและขั้นตอนการลา",
+    },
+    "leave.approval.workflow": {
+        label: "การอนุมัติลายังขึ้นอยู่กับสถานะคำขอ",
+        description: "การอนุมัติจริงยังขึ้นอยู่กับผู้อนุมัติ เจ้าของคำขอ และสถานะของคำขอลา",
+    },
+    "leave.not_taken.relationship": {
+        label: "การบันทึกผลการลายังขึ้นอยู่กับผู้เกี่ยวข้อง",
+        description: "การบันทึกผลจริงยังขึ้นอยู่กับผู้เกี่ยวข้องและขั้นตอนการลา",
+    },
+    "leave.approver.workflow": {
+        label: "การจัดการผู้อนุมัติยังขึ้นอยู่กับขั้นตอน",
+        description: "การจัดการผู้อนุมัติจริงยังขึ้นอยู่กับการมอบหมายและสถานะข้อมูลการลา",
+    },
+    "audit.server_resource": {
+        label: "บันทึกการใช้งานยังมีเงื่อนไขของระบบ",
+        description: "การดูบันทึกจริงยังขึ้นอยู่กับกฎข้อมูลและการเก็บรักษาของระบบ",
+    },
+    "email.deferred_migration": {
+        label: "ความสามารถนี้ยังไม่เปิดให้จัดการ",
+        description: "รายการนี้แสดงไว้เพื่อการตรวจสอบ และยังไม่เปิดให้เพิ่มสิทธิ์",
     },
 });
 
@@ -266,6 +421,24 @@ export function getAuthorizationChannelPresentation(
     return {
         label: "ช่องทางที่ต้องตรวจสอบ",
         description: "ช่องทางนี้ไม่อยู่ในรายการที่ระบบรองรับ",
+    };
+}
+
+export function getAuthorizationContextPresentation(
+    contextKey: string,
+): AuthorizationContextPresentation {
+    return authorizationContextPresentation[contextKey] ?? {
+        label: "บริบทการใช้งาน",
+        description: "การใช้งานในบริบทนี้ยังมีรายละเอียดเพิ่มเติมในข้อมูลทางเทคนิค",
+    };
+}
+
+export function getAuthorizationLimitationPresentation(
+    code: string,
+): AuthorizationLimitationPresentation {
+    return authorizationLimitationPresentation[code] ?? {
+        label: "มีเงื่อนไขการใช้งานเพิ่มเติม",
+        description: "การทำรายการจริงยังขึ้นอยู่กับกฎของข้อมูลและขั้นตอนการทำงาน",
     };
 }
 

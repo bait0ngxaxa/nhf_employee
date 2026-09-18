@@ -184,7 +184,7 @@ describe("Authorization Administration dialogs", () => {
         }));
     });
 
-    it("keeps the permission form body scrollable after selecting an ability", () => {
+    it("keeps the permission form body scrollable while the action footer stays persistent", () => {
         render(
             <GrantFormDialog
                 open
@@ -200,8 +200,14 @@ describe("Authorization Administration dialogs", () => {
 
         const dialog = screen.getByRole("dialog");
         const scrollArea = dialog.querySelector('[data-slot="dialog-scroll-area"]');
+        const footer = dialog.querySelector('[data-slot="dialog-footer"]');
+        const selector = screen.getByTestId("permission-selector");
+        const editor = screen.getByTestId("permission-editor");
 
         expect(scrollArea).toBeInTheDocument();
         expect(scrollArea).toHaveClass("overflow-y-auto");
+        expect(footer).toBeInTheDocument();
+        expect(scrollArea?.contains(footer)).toBe(false);
+        expect(selector.parentElement).toBe(editor.parentElement);
     });
 });

@@ -2,7 +2,7 @@
 
 สถานะ: **CLOSED**
 
-Starting baseline: `a44d5b19a66f63f196f6471897473b9317d8ca97` (`audit(auth): close Phase 12F security regression matrix`)
+Starting baseline for this hardening correction: `5b28ca7d9bf5a2f81e216d23c0511508f48b594c` (`fix(auth): fix permission modal overflow and duplicate team keys`)
 
 Phase ถัดไป: **Phase 12G-B — First Production Capability Deployment Readiness**
 
@@ -64,7 +64,7 @@ primary chooser โดยไม่มี copy สำหรับผู้ดู�
 หน้า `/dashboard/authorization` ใช้โครงสร้างหลัก:
 
 1. **กลุ่มและบทบาท** — สร้างกลุ่ม ดูสมาชิก เลือกบทบาท และจัดการสิทธิ์ในบริบทเดียวกัน
-2. **ผู้ใช้และสิทธิ์** — ค้นหาผู้ใช้ ดูสิทธิ์ที่ใช้งานได้ กลุ่มที่อยู่ และสิทธิ์เฉพาะบุคคล
+2. **ผู้ใช้และสิทธิ์** — ค้นหาผู้ใช้ ดูสิทธิ์ที่ใช้งานได้ จัดการสิทธิ์เฉพาะบุคคลจากการ์ดความสามารถเดียวกัน และดูกลุ่มที่อยู่
 3. **ขั้นสูง** — ข้อมูลสิทธิ์ของระบบสำหรับ IT/operator
 
 Header อธิบายงานด้วยข้อความ `การจัดการสิทธิ์` และ
@@ -89,7 +89,7 @@ manager, position หรือ employee hierarchy ให้กลายเป็
 
 การเพิ่มสิทธิ์ใช้ flow:
 
-1. กด **เพิ่มสิทธิ์** ในกลุ่ม บทบาท หรือสิทธิ์เฉพาะบุคคล
+1. กด **เพิ่มสิทธิ์** ในกลุ่มหรือบทบาท; สำหรับผู้ใช้ให้เริ่มจาก **ปรับสิทธิ์เฉพาะบุคคล** ในการ์ดความสามารถ
 2. ค้นหาและเลือก action จากรายการที่จัดกลุ่มตามหมวดงาน
 3. เลือกขอบเขตที่ capability/source รองรับ พร้อม label และคำอธิบาย
 4. ดูหน้าตรวจสอบการเปลี่ยนแปลง
@@ -114,6 +114,23 @@ Payload ที่ส่งยังเป็น contract เดิม:
 
 ไม่มี client-side authorization simulator หรือ policy matrix ใหม่
 
+### User permission-management surface
+
+สำหรับผู้ใช้ **สิทธิ์ที่ใช้งานได้** เป็นพื้นที่หลักทั้งสำหรับตรวจสอบและจัดการ
+สิทธิ์เฉพาะบุคคล การแสดงผลจัดกลุ่มแถวตาม `capability.key` เพื่อไม่ให้ action เดิม
+ซ้ำเต็มหน้า แต่ยังแสดงทุก trusted context เป็นรายการแยกภายในการ์ดโดยไม่ union
+หรือคำนวณผลลัพธ์ใหม่ใน client
+
+การ์ดที่ administratively grantable มี editor แบบ inline ซึ่งแสดงบริบทที่ใช้งานได้
+ปัจจุบัน รายการ direct User scopes ที่บันทึกไว้ และขอบเขตที่เพิ่มได้จาก metadata
+ของ server โดยตัด `TEAM` สำหรับแหล่ง User และไม่เสนอคู่ `(capabilityKey, scope)` ซ้ำ
+การนำออกใช้การยืนยันแบบ destructive พร้อมเตือนว่าสิทธิ์พื้นฐานหรือสิทธิ์จากกลุ่ม/
+บทบาทอาจยังคงทำให้เข้าถึงรายการได้ การเปลี่ยนแปลงทุกครั้งเรียก API เดิมและโหลด
+User read model จาก server ใหม่ ไม่มี GrantList แยกขนาดใหญ่ท้ายหน้า
+
+ปุ่ม **เพิ่มสิทธิ์อื่น** อยู่ใกล้หัวข้อสิทธิ์สำหรับกรณีที่ต้องการเลือกความสามารถอื่น
+และยังใช้ chooser กลางเดิม ส่วน Team/TeamRole ยังคงจัดการตาม source ของตนเอง
+
 ## Permission removal flow
 
 Grant list ใช้คำว่า **นำสิทธิ์ออก** พร้อม action label และ scope label เช่น
@@ -126,17 +143,31 @@ Confirmation แสดงแหล่งสิทธิ์ในภาษาธ�
 
 ## Effective access presentation
 
-User page เริ่มด้วยคำตอบว่า “ผู้ใช้นี้ทำอะไรได้” โดยจัดแถวตามหมวดงานและใช้
-action label, scope label, channel label และ state label:
+User page เริ่มด้วยคำตอบว่า “ผู้ใช้นี้ทำอะไรได้” โดยจัดกลุ่มตามความสามารถทางธุรกิจ
+ภายในหมวดงาน และใช้ action label, context label, scope label, channel label และ
+state label:
 
 - `AVAILABLE` → **ใช้งานได้**
 - `UNAVAILABLE` → **ยังไม่มีสิทธิ์**
 - `UNSUPPORTED` → **ช่องทางนี้ไม่รองรับ**
 - `DEFERRED` → **ยังไม่เปิดให้จัดการ**
 
-แต่ละแถวแยก **สิทธิ์พื้นฐาน**, **สิทธิ์ที่เพิ่มให้**, และ **สิทธิ์ที่ใช้งานได้**
-พร้อมคำเตือน redundant เป็นภาษาคนว่า `สิทธิ์นี้ไม่ได้เพิ่มการเข้าถึง` โดยไม่
-ลบ provenance หรือเปลี่ยนผลลัพธ์
+การ์ดหนึ่งใบเก็บทุก context row ที่ server ส่งมาแยกกัน และแสดง **สิทธิ์พื้นฐาน**,
+**สิทธิ์ที่เพิ่มให้**, และ **สิทธิ์ที่ใช้งานได้** ของแต่ละบริบท พร้อมคำเตือน redundant
+เป็นภาษาคนว่า `สิทธิ์นี้ไม่ได้เพิ่มการเข้าถึง` โดยไม่ลบ provenance หรือเปลี่ยนผลลัพธ์
+
+Context และ limitation ที่ domain ส่งมายังคงไม่ถูกแก้ไข แต่ primary UI ใช้ metadata
+การนำเสนอ เช่น **การจัดการงาน**, **งานที่รับผิดชอบ**, และคำอธิบายเงื่อนไขข้อมูลที่
+ผู้ดูแลอ่านได้ ส่วน context key, label เดิม, limitation code และ label เดิมอยู่ใน
+**รายละเอียดทางเทคนิค**
+
+## Permission chooser interaction hardening
+
+Chooser กลางของ Team, TeamRole และ **เพิ่มสิทธิ์อื่น** ใช้ dialog ที่มี header คงที่,
+พื้นที่เนื้อหากลางที่ scroll ได้ และ footer คงที่อยู่นอก scroll region ปุ่ม
+**ยกเลิก**, **ย้อนกลับ**, **ตรวจสอบการเปลี่ยนแปลง** และ **ยืนยันเพิ่มสิทธิ์** จึงยัง
+เข้าถึงได้โดยไม่ต้องเลื่อนไปท้ายรายการ บน desktop รายการความสามารถและ editor ขอบเขต
+อยู่คนละคอลัมน์; บนหน้าจอแคบจะเรียงเป็นขั้นตอนแนวตั้งตามพื้นที่ที่มี
 
 ## Permission source and provenance
 
@@ -203,16 +234,14 @@ technical disclosure.
 
 Verification completed for this phase:
 
-- focused presentation tests: **8 files / 22 tests passed**;
-- `npm run architecture:check`: passed, 1,139 repository source files checked;
+- focused presentation tests: **8 files / 29 tests passed**;
+- `npm run architecture:check`: passed, 1,140 repository source files checked;
 - `npm run lint:strict`: passed;
 - `npm run typecheck`: passed;
-- `npm run test:run`: passed, **324 files / 2,963 tests**;
+- `npm run test:run`: passed, **324 files / 2,970 tests**;
 - `npm run test:integration:mysql`: passed, **16 files / 104 tests**;
 - `git diff --check`: passed.
 
-The full suite was rerun after an isolated architecture-test run because the
-first parallel full-suite attempt hit the existing 30-second timeout in the
-Routine browser-graph architecture test; the final full-suite run passed
-without test failures. These checks are repository verification only and must
-not be interpreted as production deployment or Phase 12G-B work.
+These results are from the final working tree after the UX hardening correction.
+The checks are repository verification only and must not be interpreted as
+production deployment or Phase 12G-B work.

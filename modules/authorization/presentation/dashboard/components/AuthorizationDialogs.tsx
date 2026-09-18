@@ -60,12 +60,14 @@ function FormError({ error }: { readonly error: unknown }): React.ReactElement {
 function SubmitButton({
     busy,
     label,
+    form,
 }: {
     readonly busy: boolean;
     readonly label: string;
+    readonly form?: string;
 }): React.ReactElement {
     return (
-        <Button type="submit" disabled={busy} aria-busy={busy}>
+        <Button type="submit" form={form} disabled={busy} aria-busy={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {busy ? "กำลังบันทึก" : label}
         </Button>
@@ -473,6 +475,7 @@ export function GrantFormDialog({
     const [step, setStep] = useState<GrantFormStep>("choose");
     const [error, setError] = useState<unknown>(null);
     const queryId = useId();
+    const formId = useId();
 
     useEffect(() => {
         if (!open) return;
@@ -523,7 +526,7 @@ export function GrantFormDialog({
                 "th",
             ));
     }, [grantableCapabilities, normalizedQuery]);
-    const selectedCapability = capabilities.find((capability) => capability.key === capabilityKey);
+    const selectedCapability = grantableCapabilities.find((capability) => capability.key === capabilityKey);
     const selectedPresentation = selectedCapability === undefined
         ? undefined
         : getCapabilityPresentation(selectedCapability.key);
@@ -579,7 +582,7 @@ export function GrantFormDialog({
                 setError(null);
             }}
         >
-            <AsyncFormDialogContent className="rounded-2xl p-0 sm:max-w-2xl">
+            <AsyncFormDialogContent className="rounded-2xl p-0 sm:max-w-4xl">
                 <AsyncFormDialogClose variant="ghost" size="icon-sm" className="absolute right-3 top-3 z-10" aria-label="ปิดแบบฟอร์มเพิ่มสิทธิ์">
                     <X aria-hidden="true" />
                 </AsyncFormDialogClose>
@@ -589,105 +592,111 @@ export function GrantFormDialog({
                         {sourceDescription} ระบบจะแสดงเฉพาะสิทธิ์ที่พร้อมจัดการ
                     </DialogDescription>
                 </DialogHeader>
-                <DialogScrollArea>
-                    <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4 px-5 py-5">
-                    {step === "choose" ? (
-                        <>
-                            <ol className="grid gap-2 rounded-lg border border-border-subtle bg-surface-subtle/60 px-4 py-3 text-sm text-content-secondary sm:grid-cols-3">
-                                <li><span className="font-semibold text-content-heading">1.</span> เลือกสิ่งที่ต้องการให้ทำ</li>
-                                <li><span className="font-semibold text-content-heading">2.</span> เลือกขอบเขต</li>
-                                <li><span className="font-semibold text-content-heading">3.</span> ตรวจสอบก่อนยืนยัน</li>
-                            </ol>
-                            <div className="space-y-2">
-                                <Label htmlFor={queryId}>ค้นหาสิทธิ์</Label>
-                                <div className="relative">
-                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" aria-hidden="true" />
-                                    <Input id={queryId} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="เช่น เบิก, คลัง, อนุมัติ, พนักงาน, งานประจำ" className="pl-9" autoComplete="off" />
-                                </div>
-                            </div>
-                            <div className="max-h-64 space-y-4 overflow-y-auto rounded-lg border border-border-subtle p-3" aria-live="polite">
-                                {groupedCapabilities.length === 0 ? (
-                                    <p className="px-2 py-5 text-center text-sm text-content-secondary">ไม่พบสิทธิ์ที่พร้อมให้จัดการจากคำค้นนี้</p>
-                                ) : groupedCapabilities.map((group) => {
-                                    const domain = getAuthorizationDomainPresentation(group.domain);
-                                    return (
-                                        <section key={group.domain} aria-labelledby={`authorization-permission-domain-${group.domain}`}>
-                                            <h3 id={`authorization-permission-domain-${group.domain}`} className="px-2 text-sm font-semibold text-content-heading">{domain.label}</h3>
-                                            <div className="mt-2 grid gap-2">
-                                                {group.capabilities.map((capability) => {
-                                                    const presentation = getCapabilityPresentation(capability.key);
-                                                    if (!presentation) return null;
-                                                    const selected = capability.key === capabilityKey;
-                                                    return (
-                                                        <button
-                                                            type="button"
-                                                            key={capability.key}
-                                                            aria-pressed={selected}
-                                                            onClick={() => setCapabilityKey(capability.key)}
-                                                            className={`rounded-lg border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-action-primary-solid bg-action-primary-surface" : "border-border-subtle bg-surface-raised hover:bg-surface-subtle"}`}
-                                                        >
-                                                            <span className="block text-sm font-semibold text-content-heading">{presentation.actionLabel}</span>
-                                                            <span className="mt-1 block text-xs leading-5 text-content-secondary">{presentation.description}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </section>
-                                    );
-                                })}
-                            </div>
-                            {selectedCapability && selectedPresentation ? (
-                                <div className="space-y-3 rounded-lg border border-action-primary-solid/40 bg-action-primary-surface px-3 py-3">
-                                    <div>
-                                        <p className="text-xs font-semibold text-action-primary-foreground">สิ่งที่จะให้ทำ</p>
-                                        <p className="mt-1 font-semibold text-content-heading">{selectedPresentation.actionLabel}</p>
-                                        <p className="mt-1 text-sm leading-6 text-content-secondary">{selectedPresentation.description}</p>
+                <DialogScrollArea className="px-5">
+                    <form id={formId} onSubmit={(event) => void handleSubmit(event)} className="space-y-4 py-5">
+                        {step === "choose" ? (
+                            <>
+                                <ol className="grid gap-2 rounded-lg border border-border-subtle bg-surface-subtle/60 px-4 py-3 text-sm text-content-secondary sm:grid-cols-3">
+                                    <li><span className="font-semibold text-content-heading">1.</span> เลือกสิ่งที่ต้องการให้ทำ</li>
+                                    <li><span className="font-semibold text-content-heading">2.</span> เลือกขอบเขต</li>
+                                    <li><span className="font-semibold text-content-heading">3.</span> ตรวจสอบก่อนยืนยัน</li>
+                                </ol>
+                                <div className="space-y-2">
+                                    <Label htmlFor={queryId}>ค้นหาสิทธิ์</Label>
+                                    <div className="relative">
+                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" aria-hidden="true" />
+                                        <Input id={queryId} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="เช่น เบิก, คลัง, อนุมัติ, พนักงาน, งานประจำ" className="pl-9" autoComplete="off" />
                                     </div>
-                                    <fieldset className="space-y-2">
-                                        <legend className="text-sm font-semibold text-content-heading">ขอบเขตการเข้าถึง</legend>
-                                        {supportedScopes.length === 0 ? <p className="text-sm text-status-danger-strong">สิทธิ์นี้ยังไม่มีขอบเขตที่ใช้ได้กับแหล่งที่มา</p> : supportedScopes.map((value) => {
-                                            const presentation = getAuthorizationScopePresentation(value, selectedCapability.key);
-                                            return (
-                                                <label key={value} className={`flex cursor-pointer gap-3 rounded-md border px-3 py-2 transition-colors ${scope === value ? "border-action-primary-solid bg-surface-raised" : "border-border-subtle bg-surface-raised/70"}`}>
-                                                    <input type="radio" name="authorization-scope" value={value} checked={scope === value} onChange={() => setScope(value)} className="mt-1 h-4 w-4 accent-action-primary-solid" />
-                                                    <span><span className="block text-sm font-semibold text-content-heading">{presentation.label}</span><span className="block text-xs leading-5 text-content-secondary">{presentation.description}</span></span>
-                                                </label>
-                                            );
-                                        })}
-                                    </fieldset>
                                 </div>
-                            ) : <p className="text-sm text-content-secondary">เลือกสิทธิ์จากรายการเพื่อดูขอบเขตการเข้าถึง</p>}
-                            <details className="rounded-lg border border-border-subtle px-3 py-2 text-sm">
-                                <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
-                                <p className="mt-2 text-xs leading-5 text-content-secondary">แสดงรหัสทางเทคนิคของรายการที่เลือกเพื่อช่วยตรวจสอบปัญหา</p>
-                                {selectedCapability ? <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{selectedCapability.key}</dd></div><div><dt className="font-semibold text-content-secondary">supported channels</dt><dd className="font-mono text-content-body">{selectedCapability.supportedChannels.join(", ")}</dd></div></dl> : null}
-                            </details>
-                        </>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="rounded-lg border border-action-primary-solid/40 bg-action-primary-surface px-4 py-4">
-                                <h3 className="text-base font-semibold text-content-heading">ตรวจสอบสิ่งที่จะเปลี่ยน</h3>
-                                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                                    <div><dt className="text-content-secondary">ให้กับ</dt><dd className="mt-1 font-semibold text-content-heading">{sourceLabel}</dd></div>
-                                    <div><dt className="text-content-secondary">สิทธิ์</dt><dd className="mt-1 font-semibold text-content-heading">{selectedPresentation?.actionLabel ?? "สิทธิ์ที่ต้องตรวจสอบ"}</dd></div>
-                                    <div className="sm:col-span-2"><dt className="text-content-secondary">ขอบเขต</dt><dd className="mt-1 font-semibold text-content-heading">{getAuthorizationScopePresentation(scope, selectedCapability?.key).label}</dd><dd className="mt-1 text-xs leading-5 text-content-secondary">{getAuthorizationScopePresentation(scope, selectedCapability?.key).description}</dd></div>
-                                </dl>
+                                <div className="grid gap-4 md:grid-cols-[minmax(0,1.05fr)_minmax(18rem,0.95fr)] md:items-start">
+                                    <div data-testid="permission-selector" className="space-y-4" aria-live="polite">
+                                        <div className="rounded-lg border border-border-subtle p-3">
+                                            {groupedCapabilities.length === 0 ? (
+                                                <p className="px-2 py-5 text-center text-sm text-content-secondary">ไม่พบสิทธิ์ที่พร้อมให้จัดการจากคำค้นนี้</p>
+                                            ) : groupedCapabilities.map((group) => {
+                                                const domain = getAuthorizationDomainPresentation(group.domain);
+                                                return (
+                                                    <section key={group.domain} aria-labelledby={`authorization-permission-domain-${group.domain}`} className="mt-4 first:mt-0">
+                                                        <h3 id={`authorization-permission-domain-${group.domain}`} className="px-2 text-sm font-semibold text-content-heading">{domain.label}</h3>
+                                                        <div className="mt-2 grid gap-2">
+                                                            {group.capabilities.map((capability) => {
+                                                                const presentation = getCapabilityPresentation(capability.key);
+                                                                if (!presentation) return null;
+                                                                const selected = capability.key === capabilityKey;
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={capability.key}
+                                                                        aria-pressed={selected}
+                                                                        onClick={() => setCapabilityKey(capability.key)}
+                                                                        className={`rounded-lg border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-action-primary-solid bg-action-primary-surface" : "border-border-subtle bg-surface-raised hover:bg-surface-subtle"}`}
+                                                                    >
+                                                                        <span className="block text-sm font-semibold text-content-heading">{presentation.actionLabel}</span>
+                                                                        <span className="mt-1 block text-xs leading-5 text-content-secondary">{presentation.description}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </section>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div data-testid="permission-editor" className="min-w-0 md:sticky md:top-0">
+                                        {selectedCapability && selectedPresentation ? (
+                                            <div className="space-y-3 rounded-lg border border-action-primary-solid/40 bg-action-primary-surface px-3 py-3">
+                                                <div>
+                                                    <p className="text-xs font-semibold text-action-primary-foreground">สิ่งที่จะให้ทำ</p>
+                                                    <p className="mt-1 font-semibold text-content-heading">{selectedPresentation.actionLabel}</p>
+                                                    <p className="mt-1 text-sm leading-6 text-content-secondary">{selectedPresentation.description}</p>
+                                                </div>
+                                                <fieldset className="space-y-2">
+                                                    <legend className="text-sm font-semibold text-content-heading">ขอบเขตการเข้าถึง</legend>
+                                                    {supportedScopes.length === 0 ? <p className="text-sm text-status-danger-strong">สิทธิ์นี้ยังไม่มีขอบเขตที่ใช้ได้กับแหล่งที่มา</p> : supportedScopes.map((value) => {
+                                                        const presentation = getAuthorizationScopePresentation(value, selectedCapability.key);
+                                                        return (
+                                                            <label key={value} className={`flex cursor-pointer gap-3 rounded-md border px-3 py-2 transition-colors ${scope === value ? "border-action-primary-solid bg-surface-raised" : "border-border-subtle bg-surface-raised/70"}`}>
+                                                                <input type="radio" name="authorization-scope" value={value} checked={scope === value} onChange={() => setScope(value)} className="mt-1 h-4 w-4 accent-action-primary-solid" />
+                                                                <span><span className="block text-sm font-semibold text-content-heading">{presentation.label}</span><span className="block text-xs leading-5 text-content-secondary">{presentation.description}</span></span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </fieldset>
+                                            </div>
+                                        ) : <div className="rounded-lg border border-dashed border-border-subtle px-4 py-6 text-sm leading-6 text-content-secondary">เลือกสิทธิ์จากรายการเพื่อดูขอบเขตการเข้าถึง</div>}
+                                    </div>
+                                </div>
+                                <details className="rounded-lg border border-border-subtle px-3 py-2 text-sm">
+                                    <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
+                                    <p className="mt-2 text-xs leading-5 text-content-secondary">แสดงรหัสทางเทคนิคของรายการที่เลือกเพื่อช่วยตรวจสอบปัญหา</p>
+                                    {selectedCapability ? <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{selectedCapability.key}</dd></div><div><dt className="font-semibold text-content-secondary">supported channels</dt><dd className="font-mono text-content-body">{selectedCapability.supportedChannels.join(", ")}</dd></div></dl> : null}
+                                </details>
+                            </>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="rounded-lg border border-action-primary-solid/40 bg-action-primary-surface px-4 py-4">
+                                    <h3 className="text-base font-semibold text-content-heading">ตรวจสอบสิ่งที่จะเปลี่ยน</h3>
+                                    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                                        <div><dt className="text-content-secondary">ให้กับ</dt><dd className="mt-1 font-semibold text-content-heading">{sourceLabel}</dd></div>
+                                        <div><dt className="text-content-secondary">สิทธิ์</dt><dd className="mt-1 font-semibold text-content-heading">{selectedPresentation?.actionLabel ?? "สิทธิ์ที่ต้องตรวจสอบ"}</dd></div>
+                                        <div className="sm:col-span-2"><dt className="text-content-secondary">ขอบเขต</dt><dd className="mt-1 font-semibold text-content-heading">{getAuthorizationScopePresentation(scope, selectedCapability?.key).label}</dd><dd className="mt-1 text-xs leading-5 text-content-secondary">{getAuthorizationScopePresentation(scope, selectedCapability?.key).description}</dd></div>
+                                    </dl>
+                                </div>
+                                <p className="text-sm leading-6 text-content-secondary">หลังบันทึก ระบบจะคำนวณสิทธิ์ที่ใช้งานได้ใหม่จาก server แล้วโหลดข้อมูลล่าสุดให้อัตโนมัติ การทำรายการจริงยังขึ้นอยู่กับเจ้าของข้อมูล ผู้รับผิดชอบ สถานะรายการ และขั้นตอนการทำงาน</p>
+                                <details className="rounded-lg border border-border-subtle px-3 py-2 text-sm">
+                                    <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
+                                    <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-3"><div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{capabilityKey}</dd></div><div><dt className="font-semibold text-content-secondary">scope</dt><dd className="font-mono text-content-body">{scope}</dd></div><div><dt className="font-semibold text-content-secondary">source</dt><dd className="font-mono text-content-body">{source}</dd></div></dl>
+                                </details>
                             </div>
-                            <p className="text-sm leading-6 text-content-secondary">หลังบันทึก ระบบจะคำนวณสิทธิ์ที่ใช้งานได้ใหม่จาก server แล้วโหลดข้อมูลล่าสุดให้อัตโนมัติ การทำรายการจริงยังขึ้นอยู่กับเจ้าของข้อมูล ผู้รับผิดชอบ สถานะรายการ และขั้นตอนการทำงาน</p>
-                            <details className="rounded-lg border border-border-subtle px-3 py-2 text-sm">
-                                <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
-                                <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-3"><div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{capabilityKey}</dd></div><div><dt className="font-semibold text-content-secondary">scope</dt><dd className="font-mono text-content-body">{scope}</dd></div><div><dt className="font-semibold text-content-secondary">source</dt><dd className="font-mono text-content-body">{source}</dd></div></dl>
-                            </details>
-                        </div>
-                    )}
+                        )}
                         {error ? <FormError error={error} /> : null}
-                        <DialogFooter className="pt-2">
-                            <AsyncFormDialogClose variant="outline" disabled={busy}>ยกเลิก</AsyncFormDialogClose>
-                            {step === "review" ? <Button type="button" variant="ghost" onClick={() => { setError(null); setStep("choose"); }} disabled={busy}>ย้อนกลับ</Button> : null}
-                            <SubmitButton busy={busy} label={step === "review" ? "ยืนยันเพิ่มสิทธิ์" : "ตรวจสอบการเปลี่ยนแปลง"} />
-                        </DialogFooter>
                     </form>
                 </DialogScrollArea>
+                <DialogFooter className="shrink-0 border-t border-border-subtle bg-surface-raised px-5 py-4">
+                    <AsyncFormDialogClose variant="outline" disabled={busy}>ยกเลิก</AsyncFormDialogClose>
+                    {step === "review" ? <Button type="button" variant="ghost" onClick={() => { setError(null); setStep("choose"); }} disabled={busy}>ย้อนกลับ</Button> : null}
+                    <SubmitButton form={formId} busy={busy} label={step === "review" ? "ยืนยันเพิ่มสิทธิ์" : "ตรวจสอบการเปลี่ยนแปลง"} />
+                </DialogFooter>
             </AsyncFormDialogContent>
         </AsyncFormDialog>
     );
