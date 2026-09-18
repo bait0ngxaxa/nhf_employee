@@ -3,6 +3,7 @@
 สถานะ: **Implementation complete — awaiting production operational acceptance**  
 Production authorization rollout: **NOT RUN**  
 Baseline: `c49caec5f14569655d1e385c1706dc7e9e22c0a8` (`fix(auth): close Phase 12G-A permission UX gaps`)  
+Corrective patch starting revision: `5426be5e9ed3d243f8117e9c1c10dce816fa1d72` (`feat(auth): add Phase 12G-B production readiness preflight`)
 วันที่จัดทำ readiness tooling: `2026-09-18`
 
 เอกสารนี้เป็น handoff สำหรับการเตรียม deploy capability จริงครั้งแรกหลัง
@@ -34,7 +35,8 @@ controlled first capability canary โดยไม่มี Team, TeamRole, memb
 - PASS / WARNING / BLOCKED / NOT_RUN result model, safe exit code และ bounded
   detail mode;
 - `validateAuthorizationProductionCanaryPlan()` สำหรับตรวจ capability, scope,
-  channel, source restriction, target lifecycle และ exact-grant duplication;
+  channel, source restriction, workforce-eligible observer, effective-access
+  delta, warning acknowledgement และ exact-grant duplication;
 - operator runbook, audit/observability contract และ rollback procedure;
 - focused unit coverage โดยใช้ in-memory snapshots และ repository doubles.
 
@@ -78,8 +80,11 @@ invalid lifecycle state, active non-grantable grant, migration evidence ที�
 
 Inactive Team/TeamRole/User/Employee ที่ยังเก็บ historical configuration และ
 redundant additive authority เป็น `WARNING` เมื่อไม่ใช่ effective authority.
-ข้อมูล inactive ที่เก็บอยู่ไม่ถูกลบ และไม่ถูกนับเป็น effective authority เพียง
-เพราะมี row อยู่.
+สำหรับ non-administratively-grantable persisted grant ให้ใช้ lifecycle ของ
+grant-owning source: active Team หรือ active TeamRole ภายใต้ active Team เป็น
+`BLOCKED` แม้ยังไม่มีสมาชิก ส่วน source ที่ inactive เป็น historical
+`WARNING`. ข้อมูล inactive ที่เก็บอยู่ไม่ถูกลบ และไม่ถูกนับเป็น effective
+authority เพียงเพราะมี row อยู่.
 
 ผล aggregate มี Team count (active/inactive), TeamRole count, membership count,
 grant count แยกตาม source, grants grouped by capability, grants grouped by
@@ -158,6 +163,9 @@ User, Team, TeamRole, capability หรือ scope ให้. Operator ต้�
 | Scope | scope ที่ capability รองรับ; ไม่เลือก `ALL` โดยอัตโนมัติ |
 | Execution channel | channel ของ protected operation ที่จะทดสอบ |
 | Business reason | requirement ที่อนุมัติแล้ว |
+| Runtime observer User | User ที่จะสร้าง session และ exercise protected path จริง |
+| Effective access before | `state`, default scopes และ effective scopes จาก authoritative Administration read model โดยระบุ observer/capability/channel เดียวกัน |
+| Warning review/disposition | review หนึ่งรายการต่อ current `WARNING` ทุกข้อ โดย match `kind/source/code` และ target fields พร้อม substantive `disposition` และ `reviewedBy` |
 | Expected authority before | ผลจาก authoritative Administration read model ก่อน add |
 | Expected authority after | ผลที่คาดหลัง add โดยระบุ source และ exact scope |
 | Expected resource/domain limitation | predicate, domain และ workflow ที่ยังต้องบังคับ |
@@ -166,11 +174,26 @@ User, Team, TeamRole, capability หรือ scope ให้. Operator ต้�
 | Rollback action | ลบ exact source + capability + scope ผ่าน Administration |
 
 `validateAuthorizationProductionCanaryPlan()` จะตรวจ registry key/scope/channel,
-administrative grantability, direct User `TEAM` restriction, target lifecycle,
-Team/TeamRole active membership ที่ทำให้ effective-access สังเกตได้ และไม่ให้
-ใช้ exact grant ที่มีอยู่แล้วเป็น canary mutation. Plan ที่มี missing field,
+administrative grantability, direct User `TEAM` restriction และ exact-grant
+duplication. Normal `USER` observer ต้องมี active, non-deleted User และ linked
+Employee ที่มีสถานะ `ACTIVE` และไม่ถูกลบ ตาม workforce/session boundary จริง;
+TEAM และ TEAM_ROLE ต้องมีสมาชิกอย่างน้อยหนึ่งคนที่ผ่านเงื่อนไขเดียวกัน.
+Established account-only ADMIN compatibility path ไม่ถูกบังคับให้มี Employee แต่
+ADMIN ไม่ qualify เป็น first capability canary เมื่อ `SYSTEM_ROLE` authority
+ทำให้ grant ใหม่ไม่เปลี่ยน effective authority.
+
+Plan ต้องแนบ effective-access state ก่อน mutation จาก authoritative
+Administration read model. Validator จะ reconcile evidence กับ resolver และ
+additive composition ที่มีอยู่ แล้วจำลองเฉพาะข้อเสนอใน memory เพื่อพิสูจน์ว่า
+หลัง grant มี effective scope ใหม่จริง. Authority จาก Team, TeamRole, direct
+User, Default Domain Policy และ ADMIN SYSTEM_ROLE ถูกนำมาพิจารณาโดยยังคง
+provenance ของ grant; ถ้า row ใหม่ไม่ทำให้ effective authority เปลี่ยน จะ
+หยุดด้วย `CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE`. Plan ที่มี missing field,
 target ไม่พบ/ไม่ active, capability deferred/non-grantable หรือ readiness มี
-blocker ต้องหยุดก่อน mutation. Warning ต้อง review และบันทึกใน canary record.
+blocker ต้องหยุดก่อน mutation. `WARNING` ไม่ทำให้ canary ผ่านเอง: ต้องมี
+matching substantive review/disposition และ reviewer สำหรับ warning ปัจจุบัน
+ทุกข้อ; missing, partial, stale หรือ unrelated acknowledgement เป็น blocker
+ของ canary validation.
 
 สำหรับ exceptional direct User grant ต้องบันทึกเหตุผลว่าเป็น exception และยัง
 คงหลักการให้ Team/TeamRole เป็น default administration workflow. ห้ามสร้าง Team
@@ -187,8 +210,10 @@ Grant แรกต้อง:
 4. ใช้อำนาจน้อยที่สุดที่เพียงพอ โดย operator เป็นผู้ตัดสินจาก requirement;
 5. reversible ด้วยการลบ exact configured grant row ผ่าน audited boundary เดิม;
 6. สังเกตได้จาก authoritative Administration effective-access read model;
-7. มี Authorization audit event ที่ตรง target/source/capability/scope;
-8. ตรวจด้วย server/API protected operation จริง ไม่ใช่ UI visibility อย่างเดียว.
+7. ต้องทำให้ effective authority เปลี่ยนอย่างสังเกตได้ ไม่ใช่เพียงเพิ่ม
+   provenance row ที่ redundant;
+8. มี Authorization audit event ที่ตรง target/source/capability/scope;
+9. ตรวจด้วย server/API protected operation จริง ไม่ใช่ UI visibility อย่างเดียว.
 
 `ALL` ไม่ใช่ค่า default ของ tooling และ scope จะไม่ถูก broaden เพื่อความสะดวก.
 การมี configured grant ไม่ได้ลบ domain resource predicate, lifecycle หรือ
@@ -204,7 +229,10 @@ workflow restriction.
 - รัน read-only production preflight;
 - ต้องมี `0 BLOCKED` findings; `WARNING` ทุกข้อถูก review พร้อม owner/action;
 - capture target User/Team/TeamRole effective-access state จาก authoritative
-  Administration read model ก่อน mutation;
+  Administration read model ก่อน mutation และบันทึก observer User,
+  capability/channel, default scopes และ effective scopes ใน canary record;
+- บันทึก substantive warning review/disposition และ `reviewedBy` ให้ครบทุก
+  current warning; validator ต้อง reject review ที่ stale หรือไม่ตรง snapshot;
 - ยืนยัน registry key, supported scope/channel และ `administrativelyGrantable`;
 - ยืนยัน target identity, Team/TeamRole membership และ User/Employee lifecycle;
 - บันทึก canary record และ approval/business reason.
@@ -307,10 +335,31 @@ cover:
 - warning-only exit behavior;
 - no mutation side effects and deterministic report projection;
 - default report redaction/bounded detail behavior;
-- explicit canary plan validation and exact-grant duplicate rejection.
+- explicit canary plan validation and exact-grant duplicate rejection;
+- workforce-eligible User/Team/TeamRole observer requirements;
+- redundant effective-authority detection across Team, TeamRole, direct User,
+  Default Domain Policy และ ADMIN SYSTEM_ROLE;
+- active-source non-grantable blocker severity with zero members;
+- matching warning review/disposition requirement, including missing, partial,
+  stale และ zero-warning cases.
 
-คำสั่งตรวจ repository จะถูกบันทึกใน completion report พร้อมผลจริง. ผลเหล่านี้
+ผลคำสั่งตรวจ repository ด้านล่างเป็นหลักฐานของ implementation เท่านั้น และ
 ไม่แทน production evidence.
+
+ผลการตรวจของ corrective patch นี้:
+
+| Command | Result |
+| --- | --- |
+| `npm.cmd run test:run -- modules/authorization/application/production-readiness.test.ts` | PASS — 1 file / 45 tests |
+| `npm.cmd run architecture:check` | PASS — 1,144 source files |
+| `npm.cmd run lint:strict` | PASS |
+| `npm.cmd run typecheck` | PASS |
+| `npm.cmd run test:run` | PASS — 325 files / 3,018 tests |
+| `npm.cmd run test:integration:mysql` | PASS — 16 files / 104 tests; local integration database had no pending migrations |
+| `git diff --check` | PASS |
+
+Integration evidence เป็น local isolated test database เท่านั้น และไม่ใช่
+production authorization evidence. ไม่ได้รัน dev server หรือ production build.
 
 ## Unresolved production-only gates
 

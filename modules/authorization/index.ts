@@ -193,6 +193,7 @@ export {
     validateAuthorizationProductionCanaryPlan,
 } from "./application/production-readiness";
 export type {
+    AuthorizationProductionCanaryEffectiveAccessBefore,
     AuthorizationProductionCanaryIssue,
     AuthorizationProductionCanaryIssueCode,
     AuthorizationProductionCanaryPlan,
@@ -224,6 +225,8 @@ export type {
     AuthorizationProductionUserGrantSnapshot,
     AuthorizationProductionUserRole,
     AuthorizationProductionUserSnapshot,
+    AuthorizationProductionWarningFindingReference,
+    AuthorizationProductionWarningReview,
 } from "./application/production-readiness";
 export {
     createAuthorizationProductionReadinessRepository,

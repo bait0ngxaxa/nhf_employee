@@ -1293,10 +1293,12 @@ gates are recorded below.
 ## 9.11 Phase 12G-B live handoff
 
 Phase 12G-B is **implementation complete / awaiting production operational
-acceptance** from baseline `c49caec5f14569655d1e385c1706dc7e9e22c0a8`. It adds
-the read-only command `npm run authorization:production:preflight`, the
-deterministic readiness model, explicit canary-plan validation, and the
-operator runbook in
+acceptance** from baseline `c49caec5f14569655d1e385c1706dc7e9e22c0a8`; its
+corrective readiness revision starts at `5426be5e9ed3d243f8117e9c1c10dce816fa1d72`.
+It adds the read-only command `npm run authorization:production:preflight`, the
+deterministic readiness model, explicit canary-plan validation (including
+workforce-eligible observers, effective-authority delta, and matching warning
+review/disposition), and the operator runbook in
 [authorization-phase-12gb-production-readiness.md](authorization-phase-12gb-production-readiness.md).
 
 The implementation does not select a production business target and does not

@@ -1,12 +1,28 @@
 import type {
+    AuthorizationActor,
     AuthorizationChannel,
+    AuthorizationScope,
     CapabilityDefinition,
 } from "../contracts";
 import { CAPABILITY_REGISTRY } from "../registry";
 import {
+    composeAuthorizationAuthority,
+} from "./composition";
+import {
     buildCapabilityAdministrationCatalog,
 } from "./administration-catalog";
-import type { CapabilityAdministrationProjection } from "./administration-types";
+import type {
+    AuthorizationAdministrationEffectiveAccessState,
+    CapabilityAdministrationProjection,
+} from "./administration-types";
+import {
+    evaluateAuthorization,
+    normalizeAuthorizationScopes,
+} from "./evaluator";
+import type {
+    AuthorizationDecision,
+    AuthorizationResolutionData,
+} from "./types";
 
 export const AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS = Object.freeze([
     "20260108060001_add_audit_log",
@@ -235,13 +251,48 @@ export interface AuthorizationProductionReadinessRepository {
     load(): Promise<AuthorizationProductionInventorySnapshot>;
 }
 
+export interface AuthorizationProductionCanaryEffectiveAccessBefore {
+    readonly observerUserId: number;
+    readonly capabilityKey: string;
+    readonly channel: AuthorizationChannel;
+    readonly state: AuthorizationAdministrationEffectiveAccessState;
+    readonly defaultScopes: readonly AuthorizationScope[];
+    readonly effectiveScopes: readonly AuthorizationScope[];
+}
+
+export type AuthorizationProductionWarningFindingReference = Pick<
+    AuthorizationProductionFinding,
+    | "kind"
+    | "source"
+    | "code"
+    | "capabilityKey"
+    | "scope"
+    | "teamId"
+    | "teamRoleId"
+    | "userId"
+    | "employeeId"
+    | "migrationName"
+>;
+
+export interface AuthorizationProductionWarningReview {
+    readonly finding: AuthorizationProductionWarningFindingReference;
+    readonly disposition: string;
+    readonly reviewedBy: string;
+}
+
 export interface AuthorizationProductionCanaryPlan {
     readonly source: "TEAM" | "TEAM_ROLE" | "USER";
     /** Team id, TeamRole id, or User id according to source. */
     readonly targetId: number;
+    /** The actual User who will exercise the canary protected path. */
+    readonly observerUserId: number;
     readonly capabilityKey: string;
     readonly scope: string;
     readonly channel: AuthorizationChannel;
+    /** Captured from the authoritative Administration effective-access read model before mutation. */
+    readonly effectiveAccessBefore: AuthorizationProductionCanaryEffectiveAccessBefore;
+    /** Explicit operator review for every WARNING in the inspected snapshot. */
+    readonly reviewedWarnings: readonly AuthorizationProductionWarningReview[];
     readonly businessReason: string;
     readonly expectedAuthorityBefore: string;
     readonly expectedAuthorityAfter: string;
@@ -256,8 +307,13 @@ export type AuthorizationProductionCanaryIssueCode =
     | "CANARY_REQUIRED_FIELD"
     | "CANARY_TARGET_NOT_FOUND"
     | "CANARY_TARGET_INACTIVE"
+    | "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE"
     | "CANARY_NO_ACTIVE_MEMBER"
     | "CANARY_GRANT_ALREADY_EXISTS"
+    | "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID"
+    | "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE"
+    | "CANARY_WARNING_REVIEW_REQUIRED"
+    | "CANARY_WARNING_REVIEW_STALE"
     | "CANARY_CHANNEL_UNSUPPORTED"
     | "CANARY_READINESS_BLOCKED";
 
@@ -571,45 +627,14 @@ function isEffectiveMembership(
         && role.isActive;
 }
 
-function isEffectivelyActiveTeam(
-    teamId: number,
-    memberships: readonly AuthorizationProductionMembershipSnapshot[],
-    teams: ReadonlyMap<number, AuthorizationProductionTeamSnapshot>,
-    roles: ReadonlyMap<number, AuthorizationProductionTeamRoleSnapshot>,
-    users: ReadonlyMap<number, AuthorizationProductionUserSnapshot>,
-): boolean {
-    const team = teams.get(teamId);
-    return team?.isActive === true
-        && memberships.some((membership) =>
-            membership.teamId === teamId
-            && isEffectiveMembership(membership, teams, roles, users),
-        );
-}
-
-function isEffectivelyActiveTeamRole(
-    teamRoleId: number,
-    memberships: readonly AuthorizationProductionMembershipSnapshot[],
-    teams: ReadonlyMap<number, AuthorizationProductionTeamSnapshot>,
-    roles: ReadonlyMap<number, AuthorizationProductionTeamRoleSnapshot>,
-    users: ReadonlyMap<number, AuthorizationProductionUserSnapshot>,
-): boolean {
-    const role = roles.get(teamRoleId);
-    return role?.isActive === true
-        && teams.get(role.teamId)?.isActive === true
-        && memberships.some((membership) =>
-            membership.teamRoleId === teamRoleId
-            && isEffectiveMembership(membership, teams, roles, users),
-        );
-}
-
 function addNonGrantableFinding(
     findings: AuthorizationProductionFinding[],
     definition: CapabilityAdministrationProjection,
     reference: PersistedGrantReference,
-    effectivelyActive: boolean,
+    sourceIsActive: boolean,
 ): void {
     addFinding(findings, {
-        severity: effectivelyActive ? "BLOCKER" : "WARNING",
+        severity: sourceIsActive ? "BLOCKER" : "WARNING",
         kind: "CONFIGURATION",
         source: reference.source === "TEAM"
             ? "TEAM_GRANT"
@@ -617,7 +642,7 @@ function addNonGrantableFinding(
                 ? "TEAM_ROLE_GRANT"
                 : "USER_GRANT",
         code: "NON_ADMINISTRATIVELY_GRANTABLE",
-        reason: effectivelyActive
+        reason: sourceIsActive
             ? `Persisted grant targets a capability whose administration status is ${definition.administrativeStatus}; it cannot be used for a controlled first deployment.`
             : `Persisted grant targets a capability whose administration status is ${definition.administrativeStatus}; the source is inactive and is not treated as effective authority.`,
         capabilityKey: reference.capabilityKey,
@@ -1019,13 +1044,7 @@ export function evaluateAuthorizationProductionReadiness(
                         findings,
                         administration,
                         { ...grant, source: "TEAM" },
-                        isEffectivelyActiveTeam(
-                            team.id,
-                            validMemberships,
-                            teams,
-                            roles,
-                            users,
-                        ),
+                        team.isActive,
                     );
                 }
             }
@@ -1124,13 +1143,7 @@ export function evaluateAuthorizationProductionReadiness(
                             source: "TEAM_ROLE",
                             teamId: role.teamId,
                         },
-                        isEffectivelyActiveTeamRole(
-                            role.id,
-                            validMemberships,
-                            teams,
-                            roles,
-                            users,
-                        ),
+                        role.isActive && team?.isActive === true,
                     );
                 }
             }
@@ -1375,6 +1388,430 @@ function isNonEmptyString(value: string): boolean {
     return value.trim().length > 0;
 }
 
+function isSubstantiveReviewText(value: unknown): boolean {
+    if (typeof value !== "string") return false;
+    const normalized = value.trim().toLowerCase();
+    return normalized.length >= 8
+        && !new Set([
+            "acknowledged",
+            "no action",
+            "none",
+            "n/a",
+            "ok",
+            "reviewed",
+        ]).has(normalized);
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return typeof value === "object" && value !== null;
+}
+
+function isWarningFindingReference(
+    value: unknown,
+): value is AuthorizationProductionWarningFindingReference {
+    if (!isRecord(value)) return false;
+    const requiredFields = ["kind", "source", "code"] as const;
+    if (requiredFields.some((field) => typeof value[field] !== "string")) {
+        return false;
+    }
+
+    const optionalNumericFields = [
+        "teamId",
+        "teamRoleId",
+        "userId",
+        "employeeId",
+    ] as const;
+    if (optionalNumericFields.some((field) =>
+        value[field] !== undefined && typeof value[field] !== "number",
+    )) {
+        return false;
+    }
+
+    const optionalStringFields = [
+        "capabilityKey",
+        "scope",
+        "migrationName",
+    ] as const;
+    return !optionalStringFields.some((field) =>
+        value[field] !== undefined && typeof value[field] !== "string",
+    );
+}
+
+function isWarningReview(value: unknown): value is AuthorizationProductionWarningReview {
+    if (!isRecord(value) || !isWarningFindingReference(value.finding)) {
+        return false;
+    }
+    return isSubstantiveReviewText(value.disposition)
+        && isSubstantiveReviewText(value.reviewedBy);
+}
+
+function findingIdentityKey(
+    finding: AuthorizationProductionWarningFindingReference,
+): string {
+    return [
+        finding.kind,
+        finding.source,
+        finding.code,
+        finding.capabilityKey ?? "",
+        finding.scope ?? "",
+        finding.teamId ?? "",
+        finding.teamRoleId ?? "",
+        finding.userId ?? "",
+        finding.employeeId ?? "",
+        finding.migrationName ?? "",
+    ].join("\u0000");
+}
+
+function validateCanaryWarningReviews(
+    plan: AuthorizationProductionCanaryPlan,
+    readiness: AuthorizationProductionReadinessEvaluation,
+    issues: AuthorizationProductionCanaryIssue[],
+): void {
+    const warnings = readiness.findings.filter(
+        (finding) => finding.severity === "WARNING",
+    );
+    const required = new Map<string, number>();
+    for (const finding of warnings) {
+        const key = findingIdentityKey(finding);
+        required.set(key, (required.get(key) ?? 0) + 1);
+    }
+
+    const reviewed = new Map<string, number>();
+    for (const review of plan.reviewedWarnings ?? []) {
+        const validReview = isWarningReview(review);
+        const key = validReview
+            ? findingIdentityKey(review.finding)
+            : "";
+        if (!validReview || !required.has(key)) {
+            addCanaryIssue(
+                issues,
+                "CANARY_WARNING_REVIEW_STALE",
+                "Warning review is missing substantive reviewer/disposition data or does not match a current readiness warning.",
+            );
+            continue;
+        }
+        reviewed.set(key, (reviewed.get(key) ?? 0) + 1);
+    }
+
+    for (const [key, count] of required) {
+        if ((reviewed.get(key) ?? 0) < count) {
+            addCanaryIssue(
+                issues,
+                "CANARY_WARNING_REVIEW_REQUIRED",
+                "Every current readiness WARNING requires a matching operator review and disposition before canary mutation.",
+            );
+        }
+    }
+}
+
+function buildCanaryResolutionData(
+    snapshot: AuthorizationProductionInventorySnapshot,
+    userId: number,
+    capabilityKey: string,
+): AuthorizationResolutionData {
+    const memberships = snapshot.memberships
+        .filter((membership) => membership.userId === userId)
+        .map((membership) => {
+            const team = snapshot.teams.find((candidate) =>
+                candidate.id === membership.teamId,
+            );
+            const role = membership.teamRoleId === null
+                ? null
+                : snapshot.teamRoles.find((candidate) =>
+                    candidate.id === membership.teamRoleId,
+                ) ?? null;
+            return {
+                userId,
+                teamId: membership.teamId,
+                isTeamActive: team?.isActive === true,
+                teamRoleId: membership.teamRoleId,
+                teamRole: role === null
+                    ? null
+                    : { id: role.id, isActive: role.isActive },
+                teamGrants: snapshot.teamGrants.filter((grant) =>
+                    grant.teamId === membership.teamId
+                    && grant.capabilityKey === capabilityKey,
+                ),
+            };
+        });
+
+    return {
+        userGrants: snapshot.userGrants.filter((grant) =>
+            grant.userId === userId
+            && grant.capabilityKey === capabilityKey,
+        ),
+        memberships,
+        teamRoleGrants: snapshot.teamRoleGrants
+            .filter((grant) =>
+                grant.capabilityKey === capabilityKey
+                && grant.teamId !== null,
+            )
+            .flatMap((grant) => grant.teamId === null
+                ? []
+                : [{
+                    teamRoleId: grant.teamRoleId,
+                    teamId: grant.teamId,
+                    capabilityKey: grant.capabilityKey,
+                    scope: grant.scope,
+                }]),
+    };
+}
+
+function appendCanaryGrant(
+    snapshot: AuthorizationProductionInventorySnapshot,
+    plan: AuthorizationProductionCanaryPlan,
+): AuthorizationProductionInventorySnapshot {
+    if (plan.source === "TEAM") {
+        return {
+            ...snapshot,
+            teamGrants: [
+                ...snapshot.teamGrants,
+                {
+                    teamId: plan.targetId,
+                    capabilityKey: plan.capabilityKey,
+                    scope: plan.scope,
+                },
+            ],
+        };
+    }
+    if (plan.source === "USER") {
+        return {
+            ...snapshot,
+            userGrants: [
+                ...snapshot.userGrants,
+                {
+                    userId: plan.targetId,
+                    capabilityKey: plan.capabilityKey,
+                    scope: plan.scope,
+                },
+            ],
+        };
+    }
+
+    const role = snapshot.teamRoles.find((candidate) =>
+        candidate.id === plan.targetId,
+    );
+    if (role === undefined) return snapshot;
+    return {
+        ...snapshot,
+        teamRoleGrants: [
+            ...snapshot.teamRoleGrants,
+            {
+                teamRoleId: role.id,
+                teamId: role.teamId,
+                capabilityKey: plan.capabilityKey,
+                scope: plan.scope,
+            },
+        ],
+    };
+}
+
+function buildCanaryActor(
+    user: AuthorizationProductionUserSnapshot,
+    channel: AuthorizationChannel,
+): AuthorizationActor {
+    return {
+        userId: user.id,
+        employeeId: user.employeeId,
+        systemRole: user.role,
+        channel,
+    };
+}
+
+function hasCanarySourceGrant(
+    decision: AuthorizationDecision,
+    plan: AuthorizationProductionCanaryPlan,
+): boolean {
+    return decision.grants.some((grant) => {
+        if (plan.source === "TEAM") {
+            return grant.source.type === "TEAM"
+                && grant.source.teamId === plan.targetId
+                && grant.scope === plan.scope;
+        }
+        if (plan.source === "TEAM_ROLE") {
+            return grant.source.type === "TEAM_ROLE"
+                && grant.source.teamRoleId === plan.targetId
+                && grant.scope === plan.scope;
+        }
+        return grant.source.type === "USER"
+            && grant.source.userId === plan.targetId
+            && grant.scope === plan.scope;
+    });
+}
+
+function areScopesEqual(
+    left: readonly AuthorizationScope[],
+    right: readonly AuthorizationScope[],
+): boolean {
+    return left.length === right.length
+        && left.every((scope, index) => scope === right[index]);
+}
+
+function validateCanaryEffectiveAuthority(
+    plan: AuthorizationProductionCanaryPlan,
+    snapshot: AuthorizationProductionInventorySnapshot,
+    users: ReadonlyMap<number, AuthorizationProductionUserSnapshot>,
+    employees: ReadonlyMap<number, AuthorizationProductionEmployeeSnapshot>,
+    issues: AuthorizationProductionCanaryIssue[],
+): void {
+    const evidence = plan.effectiveAccessBefore;
+    const observer = users.get(plan.observerUserId);
+    const definition = CAPABILITY_REGISTRY.get(plan.capabilityKey);
+    if (
+        evidence === undefined
+        || observer === undefined
+        || definition === undefined
+        || evidence.observerUserId !== plan.observerUserId
+        || evidence.capabilityKey !== plan.capabilityKey
+        || evidence.channel !== plan.channel
+    ) {
+        addCanaryIssue(
+            issues,
+            "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+            "Canary effective-access evidence must identify the same eligible observer, capability, and channel as the canary plan.",
+        );
+        return;
+    }
+
+    if (plan.source === "USER" && plan.observerUserId !== plan.targetId) {
+        addCanaryIssue(
+            issues,
+            "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+            "A direct User canary must use the granted User as its runtime observer.",
+        );
+        return;
+    }
+
+    if (
+        plan.source !== "USER"
+        && !isCanaryObserverEligible(observer, employees)
+    ) {
+        addCanaryIssue(
+            issues,
+            "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE",
+            "The selected Team or TeamRole canary observer cannot establish the normal active workforce session: an active linked Employee is required.",
+        );
+        return;
+    }
+
+    const sourceMembership = plan.source === "TEAM"
+        ? snapshot.memberships.some((membership) =>
+            membership.userId === plan.observerUserId
+            && membership.teamId === plan.targetId,
+        )
+        : plan.source === "TEAM_ROLE"
+            ? snapshot.memberships.some((membership) =>
+                membership.userId === plan.observerUserId
+                && membership.teamRoleId === plan.targetId,
+            )
+            : true;
+    if (plan.source !== "USER" && !sourceMembership) {
+        addCanaryIssue(
+            issues,
+            "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+            "Canary effective-access evidence observer is not a member of the selected Team or TeamRole target.",
+        );
+        return;
+    }
+
+    const supportedScopes = new Set(definition.scopes);
+    const defaultScopes = normalizeAuthorizationScopes(evidence.defaultScopes);
+    const effectiveScopes = normalizeAuthorizationScopes(evidence.effectiveScopes);
+    if (
+        !areScopesEqual(defaultScopes, evidence.defaultScopes)
+        || !areScopesEqual(effectiveScopes, evidence.effectiveScopes)
+        || defaultScopes.some((scope) => !supportedScopes.has(scope))
+        || effectiveScopes.some((scope) => !supportedScopes.has(scope))
+        || (evidence.state === "AVAILABLE" && effectiveScopes.length === 0)
+        || (evidence.state !== "AVAILABLE" && effectiveScopes.length > 0)
+    ) {
+        addCanaryIssue(
+            issues,
+            "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+            "Canary effective-access evidence is not a normalized, registry-supported read-model state.",
+        );
+        return;
+    }
+
+    try {
+        const actor = buildCanaryActor(observer, plan.channel);
+        const beforeDecision = evaluateAuthorization(
+            actor,
+            plan.capabilityKey,
+            buildCanaryResolutionData(snapshot, observer.id, plan.capabilityKey),
+        );
+        const beforeAuthority = composeAuthorizationAuthority(
+            actor,
+            plan.capabilityKey,
+            defaultScopes,
+            beforeDecision,
+        );
+        if (
+            !areScopesEqual(defaultScopes, beforeAuthority.defaultScopes)
+            || !areScopesEqual(effectiveScopes, beforeAuthority.scopes)
+            || (
+                evidence.state === "AVAILABLE"
+                && !beforeAuthority.allowed
+            )
+        ) {
+            addCanaryIssue(
+                issues,
+                "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+                "Canary effective-access evidence does not agree with the authoritative resolver/composition result.",
+            );
+            return;
+        }
+
+        const afterSnapshot = appendCanaryGrant(snapshot, plan);
+        const afterDecision = evaluateAuthorization(
+            actor,
+            plan.capabilityKey,
+            buildCanaryResolutionData(afterSnapshot, observer.id, plan.capabilityKey),
+        );
+        if (!hasCanarySourceGrant(afterDecision, plan)) {
+            addCanaryIssue(
+                issues,
+                "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+                "The selected source does not appear in the authoritative resolver result for the observer after the proposed grant.",
+            );
+            return;
+        }
+
+        const afterAuthority = composeAuthorizationAuthority(
+            actor,
+            plan.capabilityKey,
+            defaultScopes,
+            afterDecision,
+        );
+        const beforeConfiguredScopes = beforeAuthority.configuredDecision.allowed
+            ? normalizeAuthorizationScopes(beforeAuthority.configuredDecision.scopes)
+            : Object.freeze([] as AuthorizationScope[]);
+        const afterConfiguredScopes = afterAuthority.configuredDecision.allowed
+            ? normalizeAuthorizationScopes(afterAuthority.configuredDecision.scopes)
+            : Object.freeze([] as AuthorizationScope[]);
+        const newlyConfiguredScopes = afterConfiguredScopes.filter((scope) =>
+            !beforeConfiguredScopes.includes(scope),
+        );
+        const addsEffectiveAuthority = newlyConfiguredScopes.some((scope) =>
+            !effectiveScopes.includes(scope)
+            && !effectiveScopes.includes("ALL"),
+        );
+        if (!addsEffectiveAuthority) {
+            addCanaryIssue(
+                issues,
+                "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
+                "The proposed grant adds no effective scope beyond the authoritative effective-access state already observed for the canary observer.",
+            );
+        }
+    } catch {
+        addCanaryIssue(
+            issues,
+            "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+            "Canary effective-access evidence could not be reconciled with the authoritative resolver/composition semantics.",
+        );
+    }
+}
+
 function addCanaryIssue(
     issues: AuthorizationProductionCanaryIssue[],
     code: AuthorizationProductionCanaryIssueCode,
@@ -1390,12 +1827,31 @@ function canaryTargetHasActiveMember(
     teams: ReadonlyMap<number, AuthorizationProductionTeamSnapshot>,
     roles: ReadonlyMap<number, AuthorizationProductionTeamRoleSnapshot>,
     users: ReadonlyMap<number, AuthorizationProductionUserSnapshot>,
+    employees: ReadonlyMap<number, AuthorizationProductionEmployeeSnapshot>,
 ): boolean {
     return snapshot.memberships.some((membership) =>
         membership.teamId === teamId
         && (teamRoleId === null || membership.teamRoleId === teamRoleId)
+        && isCanaryObserverEligible(
+            users.get(membership.userId),
+            employees,
+        )
         && isEffectiveMembership(membership, teams, roles, users),
     );
+}
+
+function isCanaryObserverEligible(
+    user: AuthorizationProductionUserSnapshot | undefined,
+    employees: ReadonlyMap<number, AuthorizationProductionEmployeeSnapshot>,
+): boolean {
+    if (user === undefined || !isActiveUser(user)) return false;
+
+    // ADMIN account-only compatibility paths do not require workforce identity.
+    if (user.role === "ADMIN") return true;
+    if (user.employeeId === null) return false;
+
+    const employee = employees.get(user.employeeId);
+    return employee !== undefined && isActiveEmployee(employee);
 }
 
 export function validateAuthorizationProductionCanaryPlan(
@@ -1411,6 +1867,7 @@ export function validateAuthorizationProductionCanaryPlan(
             "The persisted authorization inventory must have zero BLOCKED findings before a canary plan is executed.",
         );
     }
+    validateCanaryWarningReviews(plan, readiness, issues);
 
     const requiredFields: readonly [string, string][] = [
         ["businessReason", plan.businessReason],
@@ -1491,13 +1948,14 @@ export function validateAuthorizationProductionCanaryPlan(
     const teams = new Map(snapshot.teams.map((team) => [team.id, team] as const));
     const roles = new Map(snapshot.teamRoles.map((role) => [role.id, role] as const));
     const users = new Map(snapshot.users.map((user) => [user.id, user] as const));
+    const employees = new Map(snapshot.employees.map((employee) => [employee.id, employee] as const));
     if (plan.source === "TEAM") {
         const team = teams.get(plan.targetId);
         if (team === undefined) {
             addCanaryIssue(issues, "CANARY_TARGET_NOT_FOUND", "Canary Team target is not present.");
         } else if (!team.isActive) {
             addCanaryIssue(issues, "CANARY_TARGET_INACTIVE", "Canary Team target is inactive.");
-        } else if (!canaryTargetHasActiveMember(plan.targetId, null, snapshot, teams, roles, users)) {
+        } else if (!canaryTargetHasActiveMember(plan.targetId, null, snapshot, teams, roles, users, employees)) {
             addCanaryIssue(issues, "CANARY_NO_ACTIVE_MEMBER", "Canary Team has no active member who can observe the grant.");
         }
     } else if (plan.source === "TEAM_ROLE") {
@@ -1506,7 +1964,7 @@ export function validateAuthorizationProductionCanaryPlan(
             addCanaryIssue(issues, "CANARY_TARGET_NOT_FOUND", "Canary TeamRole target is not present.");
         } else if (!role.isActive || teams.get(role.teamId)?.isActive !== true) {
             addCanaryIssue(issues, "CANARY_TARGET_INACTIVE", "Canary TeamRole or its Team is inactive.");
-        } else if (!canaryTargetHasActiveMember(role.teamId, role.id, snapshot, teams, roles, users)) {
+        } else if (!canaryTargetHasActiveMember(role.teamId, role.id, snapshot, teams, roles, users, employees)) {
             addCanaryIssue(issues, "CANARY_NO_ACTIVE_MEMBER", "Canary TeamRole has no active member who can observe the grant.");
         }
     } else if (plan.source === "USER") {
@@ -1517,11 +1975,8 @@ export function validateAuthorizationProductionCanaryPlan(
             addCanaryIssue(issues, "CANARY_TARGET_INACTIVE", "Canary User target is inactive or deleted.");
         } else if (user.role === "ADMIN") {
             addCanaryIssue(issues, "ADMIN_PERSISTED_GRANT_REDUNDANT", "A direct User canary grant does not change ADMIN SYSTEM_ROLE authority.");
-        } else if (user.employeeId !== null) {
-            const employee = snapshot.employees.find((employee) => employee.id === user.employeeId);
-            if (employee === undefined || !isActiveEmployee(employee)) {
-                addCanaryIssue(issues, "CANARY_TARGET_INACTIVE", "Canary User's linked Employee is inactive, deleted, or missing.");
-            }
+        } else if (!isCanaryObserverEligible(user, employees)) {
+            addCanaryIssue(issues, "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE", "Canary User cannot establish the normal active workforce session: an active linked Employee is required.");
         }
     }
 
@@ -1549,6 +2004,7 @@ export function validateAuthorizationProductionCanaryPlan(
             "The exact canary grant already exists; no new audited grant change is available to verify.",
         );
     }
+    validateCanaryEffectiveAuthority(plan, snapshot, users, employees, issues);
 
     return Object.freeze({
         status: issues.length === 0 ? "PASS" as const : "BLOCKED" as const,

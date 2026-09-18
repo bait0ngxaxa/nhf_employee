@@ -43,9 +43,19 @@ function createValidCanaryPlan(
     return {
         source: "USER",
         targetId: 10,
+        observerUserId: 10,
         capabilityKey: "employee.create",
         scope: "ALL",
         channel: "DASHBOARD",
+        effectiveAccessBefore: {
+            observerUserId: 10,
+            capabilityKey: "employee.create",
+            channel: "DASHBOARD",
+            state: "UNAVAILABLE",
+            defaultScopes: [],
+            effectiveScopes: [],
+        },
+        reviewedWarnings: [],
         businessReason: "อนุมัติคำขอที่ได้รับมอบหมายตามหน้าที่งาน",
         expectedAuthorityBefore: "ไม่มี configured grant",
         expectedAuthorityAfter: "USER / employee.create / ALL",
@@ -287,6 +297,82 @@ describe("authorization production readiness", () => {
         }));
     });
 
+    it("blocks a non-grantable capability on an active Team even with zero members", () => {
+        const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+            teams: [{ id: 1, isActive: true }],
+            teamGrants: [{
+                teamId: 1,
+                capabilityKey: "email.request.read",
+                scope: "OWN",
+            }],
+        }));
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.findings).toContainEqual(expect.objectContaining({
+            code: "NON_ADMINISTRATIVELY_GRANTABLE",
+            source: "TEAM_GRANT",
+            severity: "BLOCKER",
+        }));
+    });
+
+    it("blocks a non-grantable capability on an active TeamRole even with zero members", () => {
+        const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+            teams: [{ id: 1, isActive: true }],
+            teamRoles: [{ id: 20, teamId: 1, isActive: true }],
+            teamRoleGrants: [{
+                teamRoleId: 20,
+                teamId: 1,
+                capabilityKey: "email.request.read",
+                scope: "OWN",
+            }],
+        }));
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.findings).toContainEqual(expect.objectContaining({
+            code: "NON_ADMINISTRATIVELY_GRANTABLE",
+            source: "TEAM_ROLE_GRANT",
+            severity: "BLOCKER",
+        }));
+    });
+
+    it("keeps inactive Team non-grantable history as a warning", () => {
+        const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+            teams: [{ id: 1, isActive: false }],
+            teamGrants: [{
+                teamId: 1,
+                capabilityKey: "email.request.read",
+                scope: "OWN",
+            }],
+        }));
+
+        expect(result.status).toBe("WARNING");
+        expect(result.findings).toContainEqual(expect.objectContaining({
+            code: "NON_ADMINISTRATIVELY_GRANTABLE",
+            source: "TEAM_GRANT",
+            severity: "WARNING",
+        }));
+    });
+
+    it("keeps inactive TeamRole non-grantable history as a warning", () => {
+        const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+            teams: [{ id: 1, isActive: true }],
+            teamRoles: [{ id: 20, teamId: 1, isActive: false }],
+            teamRoleGrants: [{
+                teamRoleId: 20,
+                teamId: 1,
+                capabilityKey: "email.request.read",
+                scope: "OWN",
+            }],
+        }));
+
+        expect(result.status).toBe("WARNING");
+        expect(result.findings).toContainEqual(expect.objectContaining({
+            code: "NON_ADMINISTRATIVELY_GRANTABLE",
+            source: "TEAM_ROLE_GRANT",
+            severity: "WARNING",
+        }));
+    });
+
     it("reports missing required migrations as blockers", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             migrations: [],
@@ -369,13 +455,406 @@ describe("authorization production readiness", () => {
 
     it("validates an explicit canary plan without choosing its business target", () => {
         const snapshot = createSnapshot({
-            users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
+            users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+            employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
         });
 
         expect(validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             snapshot,
         )).toMatchObject({ status: "PASS", issues: [] });
+    });
+
+    it.each([
+        ["Team", { source: "TEAM" as const, targetId: 1 }, {
+            teams: [{ id: 1, isActive: true }],
+            memberships: [{ teamId: 1, userId: 10, teamRoleId: null }],
+        }],
+        ["TeamRole", { source: "TEAM_ROLE" as const, targetId: 20 }, {
+            teams: [{ id: 1, isActive: true }],
+            teamRoles: [{ id: 20, teamId: 1, isActive: true }],
+            memberships: [{ teamId: 1, userId: 10, teamRoleId: 20 }],
+        }],
+    ] as const)("accepts a valid %s canary with a workforce-eligible observer", (_label, plan, sourceSnapshot) => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(plan),
+            createSnapshot({
+                ...sourceSnapshot,
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result).toMatchObject({ status: "PASS", issues: [] });
+    });
+
+    it("blocks a normal User canary without a linked Employee", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE",
+        }));
+    });
+
+    it.each([
+        ["inactive", { id: 100, status: "INACTIVE" as const, deletedAt: null }],
+        ["deleted", { id: 100, status: "ACTIVE" as const, deletedAt: new Date("2026-09-01T00:00:00.000Z") }],
+    ])("blocks a normal User canary with an %s Employee", (_label, employee) => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [employee],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE",
+        }));
+    });
+
+    it("does not treat an unusable workforce member as a Team canary observer", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({ source: "TEAM", targetId: 1 }),
+            createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: null }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_ACTIVE_MEMBER",
+        }));
+    });
+
+    it("does not allow a Team canary to select an unusable observer when another member is eligible", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({ source: "TEAM", targetId: 1 }),
+            createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                memberships: [
+                    { teamId: 1, userId: 10, teamRoleId: null },
+                    { teamId: 1, userId: 11, teamRoleId: null },
+                ],
+                users: [
+                    { id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null },
+                    { id: 11, role: "USER", isActive: true, deletedAt: null, employeeId: 101 },
+                ],
+                employees: [{ id: 101, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE",
+        }));
+    });
+
+    it("does not treat an unusable workforce member as a TeamRole canary observer", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({ source: "TEAM_ROLE", targetId: 20 }),
+            createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                teamRoles: [{ id: 20, teamId: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: 20 }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_ACTIVE_MEMBER",
+        }));
+    });
+
+    it("blocks a direct User canary when a Team already supplies equal effective authority", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "employee.create",
+                    channel: "DASHBOARD",
+                    state: "AVAILABLE",
+                    defaultScopes: [],
+                    effectiveScopes: ["ALL"],
+                },
+            }),
+            createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: null }],
+                teamGrants: [{ teamId: 1, capabilityKey: "employee.create", scope: "ALL" }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
+        }));
+    });
+
+    it("blocks a direct User canary when a TeamRole already supplies equal effective authority", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "employee.create",
+                    channel: "DASHBOARD",
+                    state: "AVAILABLE",
+                    defaultScopes: [],
+                    effectiveScopes: ["ALL"],
+                },
+            }),
+            createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                teamRoles: [{ id: 20, teamId: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: 20 }],
+                teamRoleGrants: [{ teamRoleId: 20, teamId: 1, capabilityKey: "employee.create", scope: "ALL" }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
+        }));
+    });
+
+    it("blocks a Team canary when its observer already has equal direct User authority", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                source: "TEAM",
+                targetId: 1,
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "employee.create",
+                    channel: "DASHBOARD",
+                    state: "AVAILABLE",
+                    defaultScopes: [],
+                    effectiveScopes: ["ALL"],
+                },
+            }),
+            createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: null }],
+                userGrants: [{ userId: 10, capabilityKey: "employee.create", scope: "ALL" }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
+        }));
+    });
+
+    it("blocks a first canary when Default Domain Policy already supplies the authority", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                capabilityKey: "employee.read",
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "employee.read",
+                    channel: "DASHBOARD",
+                    state: "AVAILABLE",
+                    defaultScopes: ["ALL"],
+                    effectiveScopes: ["ALL"],
+                },
+            }),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
+        }));
+    });
+
+    it("does not qualify an ADMIN target when a grant cannot change SYSTEM_ROLE authority", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "employee.create",
+                    channel: "DASHBOARD",
+                    state: "AVAILABLE",
+                    defaultScopes: [],
+                    effectiveScopes: ["ALL"],
+                },
+            }),
+            createSnapshot({
+                users: [{ id: 10, role: "ADMIN", isActive: true, deletedAt: null, employeeId: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "ADMIN_PERSISTED_GRANT_REDUNDANT",
+        }));
+    });
+
+    it("passes a canary that adds genuinely new effective authority", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result).toMatchObject({ status: "PASS", issues: [] });
+    });
+
+    it("does not mutate the inventory while evaluating a hypothetical canary", () => {
+        const snapshot = createSnapshot({
+            users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+            employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+        });
+        const before = structuredClone(snapshot);
+
+        validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            snapshot,
+        );
+
+        expect(snapshot).toEqual(before);
+    });
+
+    it("blocks a WARNING readiness canary without warning review", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            createSnapshot({
+                teams: [{ id: 2, isActive: false }],
+                teamGrants: [{ teamId: 2, capabilityKey: "employee.create", scope: "ALL" }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_WARNING_REVIEW_REQUIRED",
+        }));
+    });
+
+    it("blocks WARNING readiness with only a partial warning review", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                reviewedWarnings: [{
+                    finding: {
+                        kind: "LIFECYCLE",
+                        source: "TEAM_GRANT",
+                        code: "INACTIVE_TEAM_CONFIGURATION",
+                        capabilityKey: "employee.create",
+                        scope: "ALL",
+                        teamId: 2,
+                    },
+                    disposition: "Historical Team configuration reviewed; no remediation is planned.",
+                    reviewedBy: "operator@example.invalid",
+                }],
+            }),
+            createSnapshot({
+                teams: [
+                    { id: 2, isActive: false },
+                    { id: 3, isActive: false },
+                ],
+                teamGrants: [
+                    { teamId: 2, capabilityKey: "employee.create", scope: "ALL" },
+                    { teamId: 3, capabilityKey: "employee.create", scope: "ALL" },
+                ],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_WARNING_REVIEW_REQUIRED",
+        }));
+    });
+
+    it("allows WARNING readiness after every current warning has a matching substantive review", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                reviewedWarnings: [{
+                    finding: {
+                        kind: "LIFECYCLE",
+                        source: "TEAM_GRANT",
+                        code: "INACTIVE_TEAM_CONFIGURATION",
+                        capabilityKey: "employee.create",
+                        scope: "ALL",
+                        teamId: 2,
+                    },
+                    disposition: "Historical Team configuration reviewed; no remediation is planned.",
+                    reviewedBy: "operator@example.invalid",
+                }],
+            }),
+            createSnapshot({
+                teams: [{ id: 2, isActive: false }],
+                teamGrants: [{ teamId: 2, capabilityKey: "employee.create", scope: "ALL" }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result).toMatchObject({ status: "PASS", issues: [] });
+    });
+
+    it("rejects a stale warning review that does not match the current snapshot", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                reviewedWarnings: [{
+                    finding: {
+                        kind: "LIFECYCLE",
+                        source: "TEAM_GRANT",
+                        code: "INACTIVE_TEAM_CONFIGURATION",
+                        capabilityKey: "employee.create",
+                        scope: "ALL",
+                        teamId: 99,
+                    },
+                    disposition: "Historical Team configuration reviewed; no remediation is planned.",
+                    reviewedBy: "operator@example.invalid",
+                }],
+            }),
+            createSnapshot({
+                teams: [{ id: 2, isActive: false }],
+                teamGrants: [{ teamId: 2, capabilityKey: "employee.create", scope: "ALL" }],
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_WARNING_REVIEW_STALE",
+        }));
+    });
+
+    it("does not require warning review for PASS readiness", () => {
+        const result = validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result).toMatchObject({ status: "PASS", issues: [] });
     });
 
     it("blocks canary plans with invalid source/scope, deferred capability, or existing exact grant", () => {
