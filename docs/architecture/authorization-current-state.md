@@ -11,15 +11,16 @@ CLOSED for Stock, and Phase 12C.5 is CLOSED for Leave. The next handoff is
 Phase 12D, which is now CLOSED for the remaining Routine surfaces. Phase 12E
 is now CLOSED for Authorization Administration effective-access inspection;
 Phase 12F is now CLOSED for the full authorization regression/security matrix;
-Phase 12G-A — Authorization Administration UX Simplification is now CLOSED;
+Phase 12G-A — Authorization Administration UX Simplification is now CLOSED after
+its final closure correction on baseline `14a300d03a8bd9803afcf0bce8258ae7bd08e4d4`;
 the exact next handoff is Phase 12G-B — First Production Capability Deployment
 Readiness. Phase 12G-B has not started.
 
-สถานะ: Current state after Phase 12G-A closure; Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; exact next phase: Phase 12G-B First Production Capability Deployment Readiness — NEXT (not started); Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
+สถานะ: Current state after the final Phase 12G-A closure correction; Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; exact next phase: Phase 12G-B First Production Capability Deployment Readiness — NEXT (not started); Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-18<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
-สถานะปัจจุบันหลัง Phase 12F: `routine.task.export`, `routine.summary.read` และ
+สถานะ capability ปัจจุบันหลัง Phase 12F: `routine.task.export`, `routine.summary.read` และ
 `routine.reference.read` ใช้ permanent additive Default Domain Policy ผ่าน
 Routine adapter และ central resolver แล้ว. Registry มี `25
 CENTRAL_WITH_DEFAULT_POLICY`, `0 CENTRAL_WITH_COMPATIBILITY`, `13
@@ -29,8 +30,8 @@ GRANTABLE`, `0 POLICY_ACTIVATION_REQUIRED`, `2 DEFERRED`. `DEFERRED` ที่�
 เพิ่ม capability, scope, channel, schema, seed, backfill หรือ grant migration.
 
 หมายเหตุ: บันทึก Phase ก่อนหน้าในเอกสารนี้เป็น historical evidence ตาม
-boundary ของแต่ละ phase; สถานะ live หลัง Phase 12F ให้ยึดข้อความด้านบน,
-ตาราง capability/route ปัจจุบัน และหัวข้อ 9.9 เป็นหลัก
+boundary ของแต่ละ phase; สถานะ live หลัง final Phase 12G-A closure ให้ยึดข้อความ
+ด้านบน ตาราง capability/route ปัจจุบัน และหัวข้อ 9.10 เป็นหลัก
 
 หมายเหตุ Phase 11C (historical final closure): Phase 11B enforcement hardening — **CLOSED** และ Phase 11C security regression audit — **CLOSED** ที่ baseline `5669d79ca359701bc6a637079ca738575b731cf7`. Matrix สุดท้ายมี 89 cases (`80 DIRECT`, `6 INDIRECT`, `0 MISSING`, `3 N/A`); operation ledger มี 81/81 `DIRECT`, protected routes 78/78 `DIRECT`, Authorization Administration 17/17 `DIRECT` และ combined explicit ledger 98/98 `DIRECT`. Mandatory Phase 11C.2 work items เหลือ `0`. Compatibility policies และ deferred surfaces ยังคงอยู่, สี่ future policy families ยังอยู่นอก Phase 11, และ production authorization database grant inventory ยังไม่ได้ audit. เอกสารนี้คงผล MySQL fixture failure ไว้เป็น historical evidence; Phase 11D ได้ตรวจสอบและแก้ stale fixture แล้วโดยไม่เปลี่ยน production authorization semantics. รายละเอียดเดิมอยู่ใน [authorization-phase-11c-closure.md](authorization-phase-11c-closure.md)
 
@@ -1227,35 +1228,59 @@ presentation/interaction simplification recorded in
 
 ## 9.10 Phase 12G-A Authorization Administration UX Simplification
 
-Phase 12G-A is **CLOSED** from the Phase 12F baseline above, including the final
-UX hardening correction on baseline `5b28ca7d9bf5a2f81e216d23c0511508f48b594c`.
-The primary Authorization Administration experience now uses administrator-facing
-Thai business vocabulary: กลุ่มผู้ใช้งาน, บทบาทในกลุ่ม, สิทธิ์เฉพาะบุคคล,
-สิทธิ์พื้นฐาน, สิทธิ์ที่เพิ่มให้ and สิทธิ์ที่ใช้งานได้. Permission selection is
-grouped by business domain, searchable using business language, limited to the
-server-projected administratively grantable capabilities, and followed by a
-plain-language impact confirmation. Scope, channel, trusted context and
-limitation labels are presented from one presentation catalog; raw keys, enum
-values, runtime evidence, configuration issue codes and resolver evidence remain
-behind Advanced disclosures.
+Phase 12G-A is **CLOSED** from the final closure-correction baseline
+`14a300d03a8bd9803afcf0bce8258ae7bd08e4d4` (`fix(auth): harden user permission
+management UX`). The primary Authorization Administration experience uses
+administrator-facing Thai business vocabulary: กลุ่มผู้ใช้งาน, บทบาทในกลุ่ม,
+สิทธิ์เฉพาะบุคคล, สิทธิ์พื้นฐาน, สิทธิ์ที่เพิ่มให้ and สิทธิ์ที่ใช้งานได้.
+Permission selection is grouped by business domain, searchable using business
+language, limited to the authoritative administratively grantable capabilities,
+and followed by plain-language impact confirmation. Scope, channel, trusted
+context and limitation labels are presented from one presentation catalog; raw
+keys, enum values, runtime evidence, configuration issue codes and resolver
+evidence remain behind Advanced disclosures.
 
 For a selected User, **สิทธิ์ที่ใช้งานได้** is the primary permission-management
-surface as well as the inspection surface. Effective-access rows are grouped by
-exact capability key for presentation only; every trusted context remains visible
-inside the capability card without flattening or simulating authorization. Direct
-User exceptions are edited inline in that card, with exact existing scopes shown,
-server-supported additional scopes offered, `TEAM` excluded for User source, and
-add/remove operations sent through the existing mutation APIs. There is no second
-large primary direct-grant list at the bottom of the User page. **เพิ่มสิทธิ์อื่น**
-remains next to the User permission heading for a different capability, while
-Team/TeamRole permission management remains source-specific.
+surface as well as the inspection surface. Domain headings are rendered once per
+domain, while effective-access rows remain grouped by exact capability key for
+presentation only; every trusted context remains visible inside its capability
+card without flattening or simulating authorization. Grantable capability cards
+start with their direct User editor collapsed. The compact summary matches
+`user.directGrants` by `capabilityKey`, counts only `VALID` records, and shows
+human-readable scopes or **ยังไม่มีสิทธิ์เฉพาะบุคคล**. Invalid persisted records
+are never presented as valid access and remain available as raw technical
+evidence under Advanced diagnostics.
 
-Team/TeamRole/User mutation payloads and server-owned authorization semantics
-are unchanged. User effective access continues to refresh from the authoritative
-server read model after mutation, direct User access remains an explicit
-exception, redundant additional authority remains visible, and invalid
-configuration remains fail-closed. No production configuration was seeded or
-changed and no production-readiness/canary work was started.
+Clicking **ปรับสิทธิ์เฉพาะบุคคล** expands the existing editor inside that same
+capability card; **ปิดการแก้ไข** collapses it again. Expanded cards preserve
+effective contexts, exact direct grants, available scopes, inline add/remove
+confirmation, local mutation errors and authoritative refresh after mutation.
+`TEAM` remains excluded for User source, and add/remove operations use the
+existing mutation APIs. There is no second large primary direct-grant list at the
+bottom of the User page. **เพิ่มสิทธิ์อื่น** remains next to the User permission
+heading for a different capability, while Team/TeamRole permission management
+remains source-specific.
+
+When either `resolverEffectivePermissionStatus.status` or
+`effectiveAccessStatus.status` is `INVALID_CONFIGURATION`, the User
+permission-management surface is read-only/fail-closed: **เพิ่มสิทธิ์อื่น**,
+**ปรับสิทธิ์เฉพาะบุคคล**, scope radios, add confirmations and remove controls are
+not rendered, and the fallback chooser cannot be reached. The existing fail-closed
+message and technical evidence remain available.
+
+The permission review dialog retains its fixed header, scrollable middle,
+persistent footer outside the scroll region, desktop selector/editor split and
+mobile vertical degradation. Team/TeamRole/User mutation payloads and
+server-owned authorization semantics are unchanged. User effective access
+continues to refresh from the authoritative read model after mutation, redundant
+additional authority remains visible, and no production configuration was seeded
+or changed. Phase 12G-B was not started.
+
+Final Phase 12G-A verification: focused presentation tests **8 files / 32 tests**;
+`npm run architecture:check` passed with 1,140 source files checked;
+`npm run lint:strict` passed; `npm run typecheck` passed; `npm run test:run`
+passed with **324 files / 2,973 tests**; `npm run test:integration:mysql` passed
+with **16 files / 104 tests**; and `git diff --check` passed.
 
 The implementation and verification record is in
 [authorization-phase-12ga-ux-simplification.md](authorization-phase-12ga-ux-simplification.md).

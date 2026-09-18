@@ -2,7 +2,7 @@
 
 สถานะ: **CLOSED**
 
-Starting baseline for this hardening correction: `5b28ca7d9bf5a2f81e216d23c0511508f48b594c` (`fix(auth): fix permission modal overflow and duplicate team keys`)
+Final closure-correction baseline: `14a300d03a8bd9803afcf0bce8258ae7bd08e4d4` (`fix(auth): harden user permission management UX`)
 
 Phase ถัดไป: **Phase 12G-B — First Production Capability Deployment Readiness**
 
@@ -100,7 +100,7 @@ Chooser แสดงเฉพาะรายการที่ `administratively
 รายการ deferred หรือไม่พร้อมจัดการไม่เป็น actionable option ใน flow ปกติ
 
 ก่อน submit primary confirmation แสดง target, action และขอบเขตที่มนุษย์อ่านได้
-พร้อมแจ้งว่าหลังบันทึก server จะคำนวณสิทธิ์ที่ใช้งานได้ใหม่ Technical details
+พร้อมข้อความว่า `หลังบันทึก ระบบจะคำนวณสิทธิ์ที่ใช้งานได้ใหม่ และโหลดข้อมูลล่าสุดให้อัตโนมัติ` Technical details
 ที่ยุบอยู่จะแสดง `capabilityKey`, raw `scope` และ `source` เมื่อจำเป็น
 
 Payload ที่ส่งยังเป็น contract เดิม:
@@ -121,12 +121,28 @@ Payload ที่ส่งยังเป็น contract เดิม:
 ซ้ำเต็มหน้า แต่ยังแสดงทุก trusted context เป็นรายการแยกภายในการ์ดโดยไม่ union
 หรือคำนวณผลลัพธ์ใหม่ใน client
 
-การ์ดที่ administratively grantable มี editor แบบ inline ซึ่งแสดงบริบทที่ใช้งานได้
-ปัจจุบัน รายการ direct User scopes ที่บันทึกไว้ และขอบเขตที่เพิ่มได้จาก metadata
-ของ server โดยตัด `TEAM` สำหรับแหล่ง User และไม่เสนอคู่ `(capabilityKey, scope)` ซ้ำ
-การนำออกใช้การยืนยันแบบ destructive พร้อมเตือนว่าสิทธิ์พื้นฐานหรือสิทธิ์จากกลุ่ม/
-บทบาทอาจยังคงทำให้เข้าถึงรายการได้ การเปลี่ยนแปลงทุกครั้งเรียก API เดิมและโหลด
-User read model จาก server ใหม่ ไม่มี GrantList แยกขนาดใหญ่ท้ายหน้า
+การ์ด capability ถูกจัดกลุ่มใต้หัวข้อหมวดงานหนึ่งครั้ง และแต่ละ capability ยังคง
+มีการ์ดแยกกับ context rows ของตนเอง. การ์ดที่ administratively grantable เริ่มต้น
+ด้วย editor แบบ collapsed จึงไม่แสดง radio หรือ mutation controls จนกว่าผู้ดูแลจะกด
+**ปรับสิทธิ์เฉพาะบุคคล**. สถานะสรุปที่ยุบอยู่ใช้ `user.directGrants` ที่ match
+ด้วย `capabilityKey` และนับเฉพาะรายการ `VALID` พร้อมแสดงจำนวนและชื่อขอบเขตที่อ่านได้;
+ถ้าไม่มีรายการที่ใช้ได้จะแสดง **ยังไม่มีสิทธิ์เฉพาะบุคคล**. รายการ invalid ไม่ถูก
+นำเสนอเป็น access และหลักฐาน raw อยู่ใน **รายละเอียดทางเทคนิค · หลักฐานจากระบบสิทธิ์**
+เท่านั้น.
+
+เมื่อเปิด editor จะยังอยู่ใน capability card เดิมและแสดง context ที่ใช้งานได้,
+direct User scopes ที่บันทึกไว้, ขอบเขตที่เพิ่มได้จากข้อมูล authoritative โดยตัด
+`TEAM` สำหรับแหล่ง User และไม่เสนอคู่ `(capabilityKey, scope)` ซ้ำ. ปุ่ม **ปิดการแก้ไข**
+ยุบ editor กลับเป็น summary. การนำออกใช้การยืนยันแบบ destructive พร้อมเตือนว่าสิทธิ์
+พื้นฐานหรือสิทธิ์จากกลุ่ม/บทบาทอาจยังคงทำให้เข้าถึงรายการได้ การเปลี่ยนแปลงทุกครั้ง
+เรียก API เดิมและโหลด User read model ล่าสุดหลัง mutation โดยคง editor ไว้เปิดเพื่อเห็น
+สถานะ authoritative ที่ refresh แล้ว ไม่มี GrantList แยกขนาดใหญ่ท้ายหน้า
+
+ถ้า `resolverEffectivePermissionStatus` หรือ `effectiveAccessStatus` เป็น
+`INVALID_CONFIGURATION`, พื้นที่จัดการสิทธิ์ของ User จะเป็น read-only/fail-closed:
+ไม่แสดง **เพิ่มสิทธิ์อื่น**, **ปรับสิทธิ์เฉพาะบุคคล**, radio เพิ่ม scope หรือปุ่ม
+ยืนยัน/นำออก. Fallback chooser จึงเปิดไม่ได้จาก state นี้ และ technical evidence กับ
+ข้อความ fail-closed ยังคงอยู่ใน disclosure เดิม.
 
 ปุ่ม **เพิ่มสิทธิ์อื่น** อยู่ใกล้หัวข้อสิทธิ์สำหรับกรณีที่ต้องการเลือกความสามารถอื่น
 และยังใช้ chooser กลางเดิม ส่วน Team/TeamRole ยังคงจัดการตาม source ของตนเอง
@@ -152,7 +168,8 @@ state label:
 - `UNSUPPORTED` → **ช่องทางนี้ไม่รองรับ**
 - `DEFERRED` → **ยังไม่เปิดให้จัดการ**
 
-การ์ดหนึ่งใบเก็บทุก context row ที่ server ส่งมาแยกกัน และแสดง **สิทธิ์พื้นฐาน**,
+หัวข้อหมวดงานแสดงครั้งเดียวต่อ domain และการ์ดหนึ่งใบเก็บทุก context row ที่ระบบส่งมา
+แยกกัน โดยแสดง **สิทธิ์พื้นฐาน**,
 **สิทธิ์ที่เพิ่มให้**, และ **สิทธิ์ที่ใช้งานได้** ของแต่ละบริบท พร้อมคำเตือน redundant
 เป็นภาษาคนว่า `สิทธิ์นี้ไม่ได้เพิ่มการเข้าถึง` โดยไม่ลบ provenance หรือเปลี่ยนผลลัพธ์
 
@@ -226,19 +243,21 @@ Focused presentation coverage includes:
 - `CapabilityRegistry` / Advanced system view
 - presentation vocabulary metadata
 
-The focused tests cover business-language search, grouped capabilities,
+The focused tests cover business-language search, one-heading domain grouping,
+collapsed/expanded inline User editors, compact exact direct-scope summaries,
 grantable-only actions, source-specific scope filtering, exact mutation payloads,
 business-readable removal confirmation, post-mutation refresh, fail-closed
-invalid configuration, effective states, provenance, redundant authority and
-technical disclosure.
+invalid configuration for both inspection statuses, effective states, provenance,
+redundant authority and technical disclosure. Dialog tests retain coverage for the
+fixed header, scrollable middle, persistent footer, desktop split and mobile stack.
 
 Verification completed for this phase:
 
-- focused presentation tests: **8 files / 29 tests passed**;
+- focused Phase 12G-A presentation tests: **8 files / 32 tests passed**;
 - `npm run architecture:check`: passed, 1,140 repository source files checked;
 - `npm run lint:strict`: passed;
 - `npm run typecheck`: passed;
-- `npm run test:run`: passed, **324 files / 2,970 tests**;
+- `npm run test:run`: passed, **324 files / 2,973 tests**;
 - `npm run test:integration:mysql`: passed, **16 files / 104 tests**;
 - `git diff --check`: passed.
 

@@ -176,6 +176,8 @@ describe("Authorization Administration dialogs", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" }));
         expect(screen.getByText("ตรวจสอบสิ่งที่จะเปลี่ยน")).toBeInTheDocument();
+        expect(screen.getByText(/หลังบันทึก ระบบจะคำนวณสิทธิ์ที่ใช้งานได้ใหม่ และโหลดข้อมูลล่าสุดให้อัตโนมัติ/)).toBeInTheDocument();
+        expect(screen.queryByText(/server/i)).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "ยืนยันเพิ่มสิทธิ์" }));
 
         await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({

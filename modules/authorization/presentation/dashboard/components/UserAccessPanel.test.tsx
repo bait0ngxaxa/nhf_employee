@@ -10,6 +10,7 @@ vi.mock("../api", () => grantApi);
 
 import { UserAccessPanel } from "./UserAccessPanel";
 import type {
+    AuthorizationAdministrationGrantProjectionData,
     AuthorizationAdministrationOverviewData,
     AuthorizationAdministrationUserDetailData,
     AuthorizationAdministrationUserSummaryData,
@@ -132,6 +133,17 @@ const routineDirectAssignedGrantProjection = {
     capability: routineCapability,
     validation: { status: "VALID" },
 } as const;
+
+const invalidRoutineDirectGrantProjection = {
+    capabilityKey: "routine.task.read",
+    scope: "INVALID_SCOPE",
+    capability: routineCapability,
+    validation: {
+        status: "INVALID",
+        code: "UNSUPPORTED_PERSISTED_SCOPE",
+        reason: "scope ไม่อยู่ใน registry",
+    },
+} satisfies AuthorizationAdministrationGrantProjectionData;
 
 const adminUser = {
     user: userSummary,
@@ -294,6 +306,16 @@ function renderPanel(
     );
 }
 
+function expectInvalidConfigurationSurfaceToBeReadOnly(): void {
+    expect(screen.queryByRole("button", { name: "เพิ่มสิทธิ์อื่น" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ปรับสิทธิ์เฉพาะบุคคล" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "เพิ่มสิทธิ์" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ยืนยันเพิ่มสิทธิ์" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "นำสิทธิ์ออก" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /นำออก/ })).not.toBeInTheDocument();
+}
+
 afterEach(() => {
     vi.clearAllMocks();
 });
@@ -351,7 +373,7 @@ describe("User Access presentation", () => {
         expect(within(card).queryByText("routine.task.read = ALL")).not.toBeInTheDocument();
     });
 
-    it("keeps exact direct scopes in the matching capability card without a bottom grant list", () => {
+    it("collapses direct User editing while keeping exact scopes in the matching capability card", () => {
         renderPanel({
             ...normalUser,
             directGrants: [routineDirectCreatedGrantProjection, routineDirectAssignedGrantProjection],
@@ -360,13 +382,46 @@ describe("User Access presentation", () => {
         const routineCard = screen.getByTestId("effective-capability-card-routine.task.read");
         const auditCard = screen.getByTestId("effective-capability-card-audit.read");
 
-        expect(within(routineCard).getAllByText("รายการที่สร้าง").length).toBeGreaterThan(0);
-        expect(within(routineCard).getAllByText("รายการที่รับผิดชอบ").length).toBeGreaterThan(0);
+        expect(within(routineCard).getByText("มี 2 ขอบเขตที่เพิ่มไว้")).toBeInTheDocument();
+        expect(within(routineCard).getByText("รายการที่สร้าง · รายการที่รับผิดชอบ")).toBeInTheDocument();
+        expect(within(routineCard).getByRole("button", { name: "ปรับสิทธิ์เฉพาะบุคคล" })).toBeInTheDocument();
         expect(within(routineCard).queryByRole("radio", { name: /รายการที่สร้าง/ })).not.toBeInTheDocument();
         expect(within(routineCard).queryByRole("radio", { name: /รายการที่รับผิดชอบ/ })).not.toBeInTheDocument();
+        expect(within(routineCard).queryByRole("button", { name: "เพิ่มสิทธิ์" })).not.toBeInTheDocument();
+        expect(within(routineCard).queryByRole("button", { name: /นำสิทธิ์เฉพาะบุคคล/ })).not.toBeInTheDocument();
+        fireEvent.click(within(routineCard).getByRole("button", { name: "ปรับสิทธิ์เฉพาะบุคคล" }));
         expect(within(routineCard).getByRole("radio", { name: /ทั้งหมดงานประจำทั้งหมด/ })).toBeInTheDocument();
+        expect(within(routineCard).getAllByRole("button", { name: /นำสิทธิ์เฉพาะบุคคล/ })).toHaveLength(2);
+        fireEvent.click(within(routineCard).getByRole("button", { name: "ปิดการแก้ไข" }));
+        expect(within(routineCard).queryByRole("radio", { name: /ทั้งหมดงานประจำทั้งหมด/ })).not.toBeInTheDocument();
+        expect(within(routineCard).queryByRole("button", { name: "เพิ่มสิทธิ์" })).not.toBeInTheDocument();
+        expect(within(routineCard).getByText("มี 2 ขอบเขตที่เพิ่มไว้")).toBeInTheDocument();
         expect(within(auditCard).queryByText("ผู้ใช้รายนี้ได้รับสิทธิ์นี้โดยเฉพาะ")).not.toBeInTheDocument();
+        expect(within(auditCard).getByText("ยังไม่มีสิทธิ์เฉพาะบุคคล")).toBeInTheDocument();
         expect(screen.queryByText("ยังไม่มีสิทธิ์เพิ่มเติมในส่วนนี้")).not.toBeInTheDocument();
+    });
+
+    it("does not present invalid direct records as access and keeps their evidence advanced", () => {
+        renderPanel({
+            ...normalUser,
+            directGrants: [invalidRoutineDirectGrantProjection],
+        });
+
+        const routineCard = screen.getByTestId("effective-capability-card-routine.task.read");
+        expect(within(routineCard).getByText("ยังไม่มีสิทธิ์เฉพาะบุคคล")).toBeInTheDocument();
+        expect(within(routineCard).queryByText("INVALID_SCOPE")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByText("รายละเอียดทางเทคนิค · หลักฐานจากระบบสิทธิ์"));
+        expect(screen.getByText("routine.task.read · INVALID_SCOPE")).toBeInTheDocument();
+        expect(screen.getByText("validation: UNSUPPORTED_PERSISTED_SCOPE")).toBeInTheDocument();
+    });
+
+    it("renders one business domain heading for multiple independent capability cards", () => {
+        renderPanel(normalUser);
+
+        expect(screen.getAllByRole("heading", { name: "งานประจำ" })).toHaveLength(1);
+        expect(screen.getByTestId("effective-capability-card-routine.task.read")).toBeInTheDocument();
+        expect(screen.getByTestId("effective-capability-card-routine.task.update")).toBeInTheDocument();
     });
 
     it("keeps INVALID_CONFIGURATION fail-closed and does not render effective rows", () => {
@@ -379,7 +434,7 @@ describe("User Access presentation", () => {
             ...normalUser,
             resolverEffectivePermissionStatus: { status: "INVALID_CONFIGURATION", error },
             resolverEffectivePermissions: [],
-            effectiveAccessStatus: { status: "INVALID_CONFIGURATION", error },
+            effectiveAccessStatus: { status: "RESOLVED" },
             effectiveAccess: [],
             effectiveAccessSummary: {
                 inspectedContextCount: 0,
@@ -398,6 +453,35 @@ describe("User Access presentation", () => {
         expect(screen.getByText("UNKNOWN_PERSISTED_CAPABILITY")).toBeInTheDocument();
         expect(screen.queryByText("ALLOW")).not.toBeInTheDocument();
         expect(screen.queryByText("สิทธิ์พื้นฐาน")).not.toBeInTheDocument();
+        expectInvalidConfigurationSurfaceToBeReadOnly();
+    });
+
+    it("keeps the User permission surface read-only when only effective access inspection is invalid", () => {
+        const error = {
+            code: "UNKNOWN_PERSISTED_CAPABILITY" as const,
+            capabilityKey: "old.capability",
+            teamId: 11,
+        };
+        const invalidUser: AuthorizationAdministrationUserDetailData = {
+            ...normalUser,
+            effectiveAccessStatus: { status: "INVALID_CONFIGURATION", error },
+            effectiveAccess: [],
+            effectiveAccessSummary: {
+                inspectedContextCount: 0,
+                availableContextCount: 0,
+                defaultBackedContextCount: 0,
+                additionalAuthorityContextCount: 0,
+                unsupportedContextCount: 0,
+                deferredCapabilityCount: 0,
+                configurationIssueCount: 1,
+            },
+        };
+
+        renderPanel(invalidUser);
+
+        expect(screen.getByText("พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ")).toBeInTheDocument();
+        expect(screen.getByText("UNKNOWN_PERSISTED_CAPABILITY")).toBeInTheDocument();
+        expectInvalidConfigurationSurfaceToBeReadOnly();
     });
 
     it("keeps the domain and effective-state filters usable", () => {
@@ -465,7 +549,9 @@ describe("User Access presentation", () => {
         const onRefresh = vi.fn(async () => undefined);
         renderPanel({ ...normalUser, directGrants: [directUserGrantProjection] }, onRefresh);
 
-        fireEvent.click(screen.getByRole("button", { name: /นำสิทธิ์เฉพาะบุคคล ดูบันทึกการใช้งานระบบ ทั้งหมด ออก/ }));
+        const auditCard = screen.getByTestId("effective-capability-card-audit.read");
+        fireEvent.click(within(auditCard).getByRole("button", { name: "ปรับสิทธิ์เฉพาะบุคคล" }));
+        fireEvent.click(within(auditCard).getByRole("button", { name: /นำสิทธิ์เฉพาะบุคคล ดูบันทึกการใช้งานระบบ ทั้งหมด ออก/ }));
         const dialog = await screen.findByRole("alertdialog");
         expect(within(dialog).getByText(/สิทธิ์พื้นฐาน หรือสิทธิ์จากกลุ่ม\/บทบาทอาจยังทำให้ผู้ใช้นี้เข้าถึงรายการนี้ได้/)).toBeInTheDocument();
         fireEvent.click(within(dialog).getByRole("button", { name: "นำสิทธิ์ออก" }));
@@ -485,6 +571,7 @@ describe("User Access presentation", () => {
         renderPanel(normalUser, onRefresh);
 
         const card = screen.getByTestId("effective-capability-card-routine.task.read");
+        fireEvent.click(within(card).getByRole("button", { name: "ปรับสิทธิ์เฉพาะบุคคล" }));
         fireEvent.click(within(card).getByRole("radio", { name: /ทั้งหมดงานประจำทั้งหมด/ }));
         fireEvent.click(within(card).getByRole("button", { name: "เพิ่มสิทธิ์" }));
         fireEvent.click(within(card).getByRole("button", { name: "ยืนยันเพิ่มสิทธิ์" }));
