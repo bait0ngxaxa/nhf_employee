@@ -6,8 +6,9 @@ closed; Phase 9A/9B/9C Department, Audit and Notification integration closed;
 Phase 12C.3 Routine, Phase 12C.4 Stock, Phase 12C.5 Leave, and Phase 12D
 Routine deferred-capability additive policy migrations closed; Phase 12E
 effective-access Administration UX is closed; Phase 12F full authorization
-regression/security matrix is closed; the next handoff is Phase 12G — First
-Production Capability Deployment Readiness.
+regression/security matrix is closed; Phase 12G-B First Production Capability
+Deployment Readiness is implementation-complete and awaits production
+operational acceptance.
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
