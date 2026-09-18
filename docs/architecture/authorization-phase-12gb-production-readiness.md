@@ -4,6 +4,7 @@
 Production authorization rollout: **NOT RUN**  
 Baseline: `c49caec5f14569655d1e385c1706dc7e9e22c0a8` (`fix(auth): close Phase 12G-A permission UX gaps`)  
 Corrective patch starting revision: `5426be5e9ed3d243f8117e9c1c10dce816fa1d72` (`feat(auth): add Phase 12G-B production readiness preflight`)
+Current reviewed revision before this migration-readiness correction: `1270b28abeb2c3ebc5ab0a555cc9e7a733dc7182` (`fix(auth): validate canary against authoritative effective access`)
 วันที่จัดทำ readiness tooling: `2026-09-18`
 
 เอกสารนี้เป็น handoff สำหรับการเตรียม deploy capability จริงครั้งแรกหลัง
@@ -143,11 +144,43 @@ backfill, normalization หรือ mutation call ใน preflight. ถ้า q
   `20260911100000_add_authorization_persistence` และ
   `20260914100000_add_authorization_audit_actions`.
 
-การมี migration file ใน Git ไม่ถือว่า migration ถูก apply แล้ว. Preflight ต้อง
-เห็น `_prisma_migrations.finished_at` ที่ไม่เป็น null, ไม่มี `rolled_back_at`
-และมี applied steps สำหรับแต่ละ required migration. Deployment ยังคงต้องทำ
-ตาม Prisma migration convention ปกติ เช่น `npx prisma migrate deploy` ใน
-release process ที่ได้รับอนุมัติ; phase นี้ไม่ได้เพิ่ม migration.
+การมี migration file ใน Git ไม่ถือว่า migration ถูก apply แล้ว. Required migration
+evidence ถือว่าสำเร็จเมื่อมี row ใน `_prisma_migrations`,
+`finished_at` ไม่เป็น null และ `rolled_back_at` เป็น null. ค่า
+`applied_steps_count` อาจคงอยู่ใน inventory เพื่อการวินิจฉัย แต่ไม่ใช่
+production acceptance gate และไม่ถูกใช้ปฏิเสธ migration ที่ lifecycle เสร็จสมบูรณ์.
+หาก row หายไปจะเป็น `MISSING`; หากยังไม่ finished หรือถูก rolled back จะเป็น
+`INCOMPLETE` และเป็น blocker. Deployment ยังคงต้องทำตาม Prisma migration
+convention ปกติ เช่น `npx prisma migrate deploy` ใน release process ที่ได้รับ
+อนุมัติ; phase นี้ไม่ได้เพิ่ม migration.
+
+### Corrective regression record: migration lifecycle evidence
+
+การตรวจ read-only ของ restored production snapshot บน development machine พบ
+false `REQUIRED_MIGRATION_NOT_APPLIED` ทั้งที่ direct MySQL inspection พบ required
+rows ครบและ `npx prisma migrate status` รายงานว่า schema up to date. Rows ที่มี
+หลักฐานสำเร็จคือ:
+
+| Migration | `finished_at` | `rolled_back_at` | `applied_steps_count` |
+| --- | --- | --- | ---: |
+| `20260108060001_add_audit_log` | non-null | `NULL` | 1 |
+| `20260911100000_add_authorization_persistence` | non-null | `NULL` | 1 |
+| `20260914100000_add_authorization_audit_actions` | non-null | `NULL` | 1 |
+
+สาเหตุของ false blocker คือ readiness logic เดิมบังคับให้
+`applied_steps_count` เป็น safe integer ที่มากกว่า zero ซึ่งไม่ใช่ lifecycle
+semantics ที่ต้องใช้ตัดสิน production acceptance. Regression tests จึงยืนยันทั้ง
+completed row ที่มี step count เป็น 1 และ 0 ว่าเป็น `APPLIED`, ขณะที่ unfinished,
+rolled-back และ missing rows ยังคงเป็น blocker.
+
+Snapshot เดียวกันมี aggregate ที่รายงานไว้ว่า Teams 2 (active 1, inactive 1),
+TeamRoles 1, TeamMemberships 0, Team grants 3, TeamRole grants 0 และ direct User
+grants 1; invalid configuration 0 และ warnings 1. Warning ที่เหลือคือ
+`INACTIVE_TEAM_CONFIGURATION` จาก `TEAM_GRANT`, `teamId: 1`,
+`stock.inventory.manage / ALL`. หาก rerun กับ snapshot เดิมหลัง patch และไม่มี
+เงื่อนไขอื่นเพิ่ม ผลที่คาดหมายคือ `WARNING`, blockers 0, warnings 1 แต่ agent นี้
+ยังไม่ได้ rerun preflight กับ snapshot ดังกล่าว. ดังนั้นข้อมูลนี้ไม่ใช่หลักฐานของ
+live production และ production operational gates ยังคงเป็น `NOT RUN`.
 
 ## First-production canary contract
 
@@ -358,6 +391,9 @@ cover:
 - active-source non-grantable blocker severity with zero members;
 - matching warning review/disposition requirement, including missing, partial,
   stale และ zero-warning cases.
+- migration lifecycle semantics where completed rows with positive or zero
+  `applied_steps_count` are `APPLIED`, while unfinished, rolled-back, and missing
+  rows remain blockers.
 
 ผลคำสั่งตรวจ repository ด้านล่างเป็นหลักฐานของ implementation เท่านั้น และ
 ไม่แทน production evidence.
@@ -366,11 +402,11 @@ cover:
 
 | Command | Result |
 | --- | --- |
-| `npm.cmd run test:run -- modules/authorization/application/production-readiness.test.ts` | PASS — 1 file / 47 tests |
+| `npm.cmd run test:run -- modules/authorization/application/production-readiness.test.ts` | PASS — 1 file / 50 tests |
 | `npm.cmd run architecture:check` | PASS — 1,144 source files |
 | `npm.cmd run lint:strict` | PASS |
 | `npm.cmd run typecheck` | PASS |
-| `npm.cmd run test:run` | PASS — 325 files / 3,020 tests |
+| `npm.cmd run test:run` | PASS — 325 files / 3,023 tests |
 | `npm.cmd run test:integration:mysql` | PASS — 16 files / 104 tests; local integration database had no pending migrations |
 | `git diff --check` | PASS |
 

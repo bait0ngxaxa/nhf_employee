@@ -100,7 +100,69 @@ describe("authorization production readiness", () => {
             warningCount: 0,
             blockerCount: 0,
         });
+        expect(result.migrationChecks).toEqual(
+            AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS.map((migrationName) => ({
+                migrationName,
+                status: "APPLIED",
+            })),
+        );
         expect(result.findings).toHaveLength(0);
+    });
+
+    it("treats completed migrations with zero applied steps as applied", () => {
+        const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+            migrations: appliedMigrations.map((migration) => ({
+                ...migration,
+                appliedStepsCount: 0,
+            })),
+        }));
+
+        expect(result.migrationChecks).toEqual(
+            AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS.map((migrationName) => ({
+                migrationName,
+                status: "APPLIED",
+            })),
+        );
+        expect(result.findings).not.toContainEqual(expect.objectContaining({
+            code: "REQUIRED_MIGRATION_NOT_APPLIED",
+        }));
+    });
+
+    it.each([
+        {
+            name: "unfinished",
+            migration: {
+                finishedAt: null,
+                rolledBackAt: null,
+                appliedStepsCount: 0,
+            },
+        },
+        {
+            name: "rolled back",
+            migration: {
+                finishedAt: new Date("2026-09-18T00:00:00.000Z"),
+                rolledBackAt: new Date("2026-09-18T00:01:00.000Z"),
+                appliedStepsCount: 1,
+            },
+        },
+    ])("keeps $name migrations blocked", ({ migration }) => {
+        const migrationName = AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS[0];
+        const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+            migrations: appliedMigrations.map((appliedMigration) =>
+                appliedMigration.migrationName === migrationName
+                    ? { ...appliedMigration, ...migration }
+                    : appliedMigration,
+            ),
+        }));
+
+        expect(result.migrationChecks).toContainEqual({
+            migrationName,
+            status: "INCOMPLETE",
+        });
+        expect(result.findings).toContainEqual(expect.objectContaining({
+            code: "REQUIRED_MIGRATION_NOT_APPLIED",
+            migrationName,
+        }));
     });
 
     it("accepts a valid Team grant", () => {

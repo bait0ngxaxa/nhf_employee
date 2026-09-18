@@ -793,9 +793,7 @@ function buildMigrationChecks(
             }
 
             const applied = row.finishedAt !== null
-                && row.rolledBackAt === null
-                && Number.isSafeInteger(row.appliedStepsCount)
-                && row.appliedStepsCount > 0;
+                && row.rolledBackAt === null;
             if (!applied) {
                 addFinding(findings, {
                     severity: "BLOCKER",
