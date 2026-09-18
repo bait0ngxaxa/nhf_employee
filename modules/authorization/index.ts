@@ -197,6 +197,7 @@ export type {
     AuthorizationProductionCanaryIssue,
     AuthorizationProductionCanaryIssueCode,
     AuthorizationProductionCanaryPlan,
+    AuthorizationProductionCanaryValidationDependencies,
     AuthorizationProductionCanaryValidation,
     AuthorizationProductionEmployeeSnapshot,
     AuthorizationProductionEmployeeStatus,

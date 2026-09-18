@@ -164,7 +164,7 @@ User, Team, TeamRole, capability หรือ scope ให้. Operator ต้�
 | Execution channel | channel ของ protected operation ที่จะทดสอบ |
 | Business reason | requirement ที่อนุมัติแล้ว |
 | Runtime observer User | User ที่จะสร้าง session และ exercise protected path จริง |
-| Effective access before | `state`, default scopes และ effective scopes จาก authoritative Administration read model โดยระบุ observer/capability/channel เดียวกัน |
+| Effective access before | `state`, default scopes, effective scopes และ exact domain-owned `contextKey` จาก authoritative Administration read model โดยระบุ observer/capability/channel เดียวกัน |
 | Warning review/disposition | review หนึ่งรายการต่อ current `WARNING` ทุกข้อ โดย match `kind/source/code` และ target fields พร้อม substantive `disposition` และ `reviewedBy` |
 | Expected authority before | ผลจาก authoritative Administration read model ก่อน add |
 | Expected authority after | ผลที่คาดหลัง add โดยระบุ source และ exact scope |
@@ -183,17 +183,27 @@ ADMIN ไม่ qualify เป็น first capability canary เมื่อ `SY
 ทำให้ grant ใหม่ไม่เปลี่ยน effective authority.
 
 Plan ต้องแนบ effective-access state ก่อน mutation จาก authoritative
-Administration read model. Validator จะ reconcile evidence กับ resolver และ
-additive composition ที่มีอยู่ แล้วจำลองเฉพาะข้อเสนอใน memory เพื่อพิสูจน์ว่า
-หลัง grant มี effective scope ใหม่จริง. Authority จาก Team, TeamRole, direct
-User, Default Domain Policy และ ADMIN SYSTEM_ROLE ถูกนำมาพิจารณาโดยยังคง
-provenance ของ grant; ถ้า row ใหม่ไม่ทำให้ effective authority เปลี่ยน จะ
-หยุดด้วย `CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE`. Plan ที่มี missing field,
-target ไม่พบ/ไม่ active, capability deferred/non-grantable หรือ readiness มี
-blocker ต้องหยุดก่อน mutation. `WARNING` ไม่ทำให้ canary ผ่านเอง: ต้องมี
-matching substantive review/disposition และ reviewer สำหรับ warning ปัจจุบัน
-ทุกข้อ; missing, partial, stale หรือ unrelated acknowledgement เป็น blocker
-ของ canary validation.
+Administration read model พร้อม `contextKey` ที่ตรงกับ protected operation
+จริง เช่น `liff.self-service`, `dashboard.summary.mine` หรือ
+`dashboard.summary.all`. Validator สร้าง hypothetical central resolver state
+ใน memory แล้วส่งทั้ง BEFORE และ AFTER ผ่าน
+`AuthorizationAdministrationEffectiveAccessProvider` เดิมของ outer server
+composition เพื่อให้ domain-owned default policy, context, channel clamp และ
+workflow limitation ถูกใช้ตาม runtime จริง. `defaultScopes` และ
+`effectiveScopes` ที่ operator ส่งมาเป็น evidence ที่ต้องตรงกับ provider
+เท่านั้น ไม่ใช่ input สำหรับจำลอง policy. การเปรียบเทียบต้องเป็น capability,
+channel และ `contextKey` เดียวกัน; Routine capability เดียวกันอาจมีหลาย
+context ภายใต้ channel เดียวกัน.
+
+Authority จาก Team, TeamRole, direct User, Default Domain Policy และ ADMIN
+SYSTEM_ROLE ถูกนำมาพิจารณาโดยยังคง provenance ของ grant. ถ้า row ใหม่ไม่ทำให้
+effective authority ของ context เดิมเพิ่มขึ้น จะหยุดด้วย
+`CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE`. Plan ที่มี missing field, context
+ไม่สามารถระบุได้, target ไม่พบ/ไม่ active, capability deferred/non-grantable
+หรือ readiness มี blocker ต้องหยุดก่อน mutation. `WARNING` ไม่ทำให้ canary
+ผ่านเอง: ต้องมี matching substantive review/disposition และ reviewer สำหรับ
+warning ปัจจุบันทุกข้อ; missing, partial, stale หรือ unrelated acknowledgement
+เป็น blocker ของ canary validation.
 
 สำหรับ exceptional direct User grant ต้องบันทึกเหตุผลว่าเป็น exception และยัง
 คงหลักการให้ Team/TeamRole เป็น default administration workflow. ห้ามสร้าง Team
@@ -230,7 +240,9 @@ workflow restriction.
 - ต้องมี `0 BLOCKED` findings; `WARNING` ทุกข้อถูก review พร้อม owner/action;
 - capture target User/Team/TeamRole effective-access state จาก authoritative
   Administration read model ก่อน mutation และบันทึก observer User,
-  capability/channel, default scopes และ effective scopes ใน canary record;
+  capability/channel/contextKey, default scopes และ effective scopes ใน canary
+  record; validator ต้องตรวจ evidence กับ provider เดิมทั้ง BEFORE และ
+  hypothetical AFTER โดยไม่ให้ operator กำหนด domain defaults เอง;
 - บันทึก substantive warning review/disposition และ `reviewedBy` ให้ครบทุก
   current warning; validator ต้อง reject review ที่ stale หรือไม่ตรง snapshot;
 - ยืนยัน registry key, supported scope/channel และ `administrativelyGrantable`;
@@ -339,6 +351,10 @@ cover:
 - workforce-eligible User/Team/TeamRole observer requirements;
 - redundant effective-authority detection across Team, TeamRole, direct User,
   Default Domain Policy และ ADMIN SYSTEM_ROLE;
+- authoritative effective-access provider comparison for the same capability,
+  channel and domain-owned `contextKey`, including Routine LIFF channel clamp;
+- rejection of operator-supplied before-state evidence that disagrees with the
+  domain provider;
 - active-source non-grantable blocker severity with zero members;
 - matching warning review/disposition requirement, including missing, partial,
   stale และ zero-warning cases.
@@ -350,11 +366,11 @@ cover:
 
 | Command | Result |
 | --- | --- |
-| `npm.cmd run test:run -- modules/authorization/application/production-readiness.test.ts` | PASS — 1 file / 45 tests |
+| `npm.cmd run test:run -- modules/authorization/application/production-readiness.test.ts` | PASS — 1 file / 47 tests |
 | `npm.cmd run architecture:check` | PASS — 1,144 source files |
 | `npm.cmd run lint:strict` | PASS |
 | `npm.cmd run typecheck` | PASS |
-| `npm.cmd run test:run` | PASS — 325 files / 3,018 tests |
+| `npm.cmd run test:run` | PASS — 325 files / 3,020 tests |
 | `npm.cmd run test:integration:mysql` | PASS — 16 files / 104 tests; local integration database had no pending migrations |
 | `git diff --check` | PASS |
 

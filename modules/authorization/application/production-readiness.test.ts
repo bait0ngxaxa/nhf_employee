@@ -6,10 +6,13 @@ import {
     evaluateAuthorizationProductionReadiness,
     projectAuthorizationProductionReadinessReport,
     runAuthorizationProductionPreflight,
-    validateAuthorizationProductionCanaryPlan,
+    validateAuthorizationProductionCanaryPlan as validateProductionCanaryPlan,
     type AuthorizationProductionInventorySnapshot,
     type AuthorizationProductionCanaryPlan,
 } from "./production-readiness";
+import {
+    authorizationAdministrationEffectiveAccessProvider,
+} from "@/app/api/authorization/administration/_lib/effective-access";
 
 const appliedMigrations = AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS.map(
     (migrationName) => ({
@@ -47,10 +50,12 @@ function createValidCanaryPlan(
         capabilityKey: "employee.create",
         scope: "ALL",
         channel: "DASHBOARD",
+        contextKey: "dashboard",
         effectiveAccessBefore: {
             observerUserId: 10,
             capabilityKey: "employee.create",
             channel: "DASHBOARD",
+            contextKey: "dashboard",
             state: "UNAVAILABLE",
             defaultScopes: [],
             effectiveScopes: [],
@@ -65,6 +70,17 @@ function createValidCanaryPlan(
         rollbackAction: "ลบ grant USER 10 / employee.create / ALL ผ่าน Administration",
         ...overrides,
     };
+}
+
+async function validateAuthorizationProductionCanaryPlan(
+    plan: AuthorizationProductionCanaryPlan,
+    snapshot: AuthorizationProductionInventorySnapshot,
+) {
+    return validateProductionCanaryPlan(
+        plan,
+        snapshot,
+        { effectiveAccessProvider: authorizationAdministrationEffectiveAccessProvider },
+    );
 }
 
 describe("authorization production readiness", () => {
@@ -453,13 +469,13 @@ describe("authorization production readiness", () => {
         expect("findings" in report).toBe(false);
     });
 
-    it("validates an explicit canary plan without choosing its business target", () => {
+    it("validates an explicit canary plan without choosing its business target", async () => {
         const snapshot = createSnapshot({
             users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
             employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
         });
 
-        expect(validateAuthorizationProductionCanaryPlan(
+        expect(await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             snapshot,
         )).toMatchObject({ status: "PASS", issues: [] });
@@ -475,8 +491,8 @@ describe("authorization production readiness", () => {
             teamRoles: [{ id: 20, teamId: 1, isActive: true }],
             memberships: [{ teamId: 1, userId: 10, teamRoleId: 20 }],
         }],
-    ] as const)("accepts a valid %s canary with a workforce-eligible observer", (_label, plan, sourceSnapshot) => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    ] as const)("accepts a valid %s canary with a workforce-eligible observer", async (_label, plan, sourceSnapshot) => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(plan),
             createSnapshot({
                 ...sourceSnapshot,
@@ -488,8 +504,8 @@ describe("authorization production readiness", () => {
         expect(result).toMatchObject({ status: "PASS", issues: [] });
     });
 
-    it("blocks a normal User canary without a linked Employee", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("blocks a normal User canary without a linked Employee", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             createSnapshot({
                 users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
@@ -505,8 +521,8 @@ describe("authorization production readiness", () => {
     it.each([
         ["inactive", { id: 100, status: "INACTIVE" as const, deletedAt: null }],
         ["deleted", { id: 100, status: "ACTIVE" as const, deletedAt: new Date("2026-09-01T00:00:00.000Z") }],
-    ])("blocks a normal User canary with an %s Employee", (_label, employee) => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    ])("blocks a normal User canary with an %s Employee", async (_label, employee) => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             createSnapshot({
                 users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
@@ -520,8 +536,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("does not treat an unusable workforce member as a Team canary observer", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("does not treat an unusable workforce member as a Team canary observer", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({ source: "TEAM", targetId: 1 }),
             createSnapshot({
                 teams: [{ id: 1, isActive: true }],
@@ -536,8 +552,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("does not allow a Team canary to select an unusable observer when another member is eligible", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("does not allow a Team canary to select an unusable observer when another member is eligible", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({ source: "TEAM", targetId: 1 }),
             createSnapshot({
                 teams: [{ id: 1, isActive: true }],
@@ -559,8 +575,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("does not treat an unusable workforce member as a TeamRole canary observer", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("does not treat an unusable workforce member as a TeamRole canary observer", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({ source: "TEAM_ROLE", targetId: 20 }),
             createSnapshot({
                 teams: [{ id: 1, isActive: true }],
@@ -576,13 +592,14 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("blocks a direct User canary when a Team already supplies equal effective authority", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("blocks a direct User canary when a Team already supplies equal effective authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 effectiveAccessBefore: {
                     observerUserId: 10,
                     capabilityKey: "employee.create",
                     channel: "DASHBOARD",
+                    contextKey: "dashboard",
                     state: "AVAILABLE",
                     defaultScopes: [],
                     effectiveScopes: ["ALL"],
@@ -603,13 +620,14 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("blocks a direct User canary when a TeamRole already supplies equal effective authority", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("blocks a direct User canary when a TeamRole already supplies equal effective authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 effectiveAccessBefore: {
                     observerUserId: 10,
                     capabilityKey: "employee.create",
                     channel: "DASHBOARD",
+                    contextKey: "dashboard",
                     state: "AVAILABLE",
                     defaultScopes: [],
                     effectiveScopes: ["ALL"],
@@ -631,8 +649,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("blocks a Team canary when its observer already has equal direct User authority", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("blocks a Team canary when its observer already has equal direct User authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 source: "TEAM",
                 targetId: 1,
@@ -640,6 +658,7 @@ describe("authorization production readiness", () => {
                     observerUserId: 10,
                     capabilityKey: "employee.create",
                     channel: "DASHBOARD",
+                    contextKey: "dashboard",
                     state: "AVAILABLE",
                     defaultScopes: [],
                     effectiveScopes: ["ALL"],
@@ -660,14 +679,15 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("blocks a first canary when Default Domain Policy already supplies the authority", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("blocks a first canary when Default Domain Policy already supplies the authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 capabilityKey: "employee.read",
                 effectiveAccessBefore: {
                     observerUserId: 10,
                     capabilityKey: "employee.read",
                     channel: "DASHBOARD",
+                    contextKey: "dashboard",
                     state: "AVAILABLE",
                     defaultScopes: ["ALL"],
                     effectiveScopes: ["ALL"],
@@ -685,13 +705,69 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("does not qualify an ADMIN target when a grant cannot change SYSTEM_ROLE authority", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("rejects before-state evidence that contradicts the domain effective-access provider", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                capabilityKey: "employee.read",
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "employee.read",
+                    channel: "DASHBOARD",
+                    contextKey: "dashboard",
+                    state: "UNAVAILABLE",
+                    defaultScopes: [],
+                    effectiveScopes: [],
+                },
+            }),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+        }));
+    });
+
+    it("blocks a Routine LIFF canary when domain policy clamps before and after to the same scope", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                capabilityKey: "routine.summary.read",
+                scope: "ALL",
+                channel: "LIFF_SELF_SERVICE",
+                contextKey: "liff.self-service",
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "routine.summary.read",
+                    channel: "LIFF_SELF_SERVICE",
+                    contextKey: "liff.self-service",
+                    state: "AVAILABLE",
+                    defaultScopes: ["ASSIGNED"],
+                    effectiveScopes: ["ASSIGNED"],
+                },
+            }),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
+        }));
+    });
+
+    it("does not qualify an ADMIN target when a grant cannot change SYSTEM_ROLE authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 effectiveAccessBefore: {
                     observerUserId: 10,
                     capabilityKey: "employee.create",
                     channel: "DASHBOARD",
+                    contextKey: "dashboard",
                     state: "AVAILABLE",
                     defaultScopes: [],
                     effectiveScopes: ["ALL"],
@@ -708,8 +784,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("passes a canary that adds genuinely new effective authority", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("passes a canary that adds genuinely new effective authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             createSnapshot({
                 users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
@@ -720,14 +796,14 @@ describe("authorization production readiness", () => {
         expect(result).toMatchObject({ status: "PASS", issues: [] });
     });
 
-    it("does not mutate the inventory while evaluating a hypothetical canary", () => {
+    it("does not mutate the inventory while evaluating a hypothetical canary", async () => {
         const snapshot = createSnapshot({
             users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
             employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
         });
         const before = structuredClone(snapshot);
 
-        validateAuthorizationProductionCanaryPlan(
+        await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             snapshot,
         );
@@ -735,8 +811,8 @@ describe("authorization production readiness", () => {
         expect(snapshot).toEqual(before);
     });
 
-    it("blocks a WARNING readiness canary without warning review", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("blocks a WARNING readiness canary without warning review", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             createSnapshot({
                 teams: [{ id: 2, isActive: false }],
@@ -752,8 +828,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("blocks WARNING readiness with only a partial warning review", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("blocks WARNING readiness with only a partial warning review", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 reviewedWarnings: [{
                     finding: {
@@ -788,8 +864,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("allows WARNING readiness after every current warning has a matching substantive review", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("allows WARNING readiness after every current warning has a matching substantive review", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 reviewedWarnings: [{
                     finding: {
@@ -815,8 +891,8 @@ describe("authorization production readiness", () => {
         expect(result).toMatchObject({ status: "PASS", issues: [] });
     });
 
-    it("rejects a stale warning review that does not match the current snapshot", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("rejects a stale warning review that does not match the current snapshot", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 reviewedWarnings: [{
                     finding: {
@@ -845,8 +921,8 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("does not require warning review for PASS readiness", () => {
-        const result = validateAuthorizationProductionCanaryPlan(
+    it("does not require warning review for PASS readiness", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan(),
             createSnapshot({
                 users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
@@ -857,7 +933,7 @@ describe("authorization production readiness", () => {
         expect(result).toMatchObject({ status: "PASS", issues: [] });
     });
 
-    it("blocks canary plans with invalid source/scope, deferred capability, or existing exact grant", () => {
+    it("blocks canary plans with invalid source/scope, deferred capability, or existing exact grant", async () => {
         const snapshot = createSnapshot({
             teams: [{ id: 1, isActive: true }],
             users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
@@ -865,7 +941,7 @@ describe("authorization production readiness", () => {
             teamGrants: [{ teamId: 1, capabilityKey: "employee.create", scope: "ALL" }],
         });
 
-        const invalidUserTeam = validateAuthorizationProductionCanaryPlan(
+        const invalidUserTeam = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({ scope: "TEAM" }),
             snapshot,
         );
@@ -874,7 +950,7 @@ describe("authorization production readiness", () => {
             code: "DIRECT_TEAM_SCOPE_REQUIRES_ORIGIN",
         }));
 
-        const existingGrant = validateAuthorizationProductionCanaryPlan(
+        const existingGrant = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({ source: "TEAM", targetId: 1 }),
             snapshot,
         );
@@ -883,7 +959,7 @@ describe("authorization production readiness", () => {
             code: "CANARY_GRANT_ALREADY_EXISTS",
         }));
 
-        const deferred = validateAuthorizationProductionCanaryPlan(
+        const deferred = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({ capabilityKey: "email.request.read", scope: "OWN" }),
             snapshot,
         );

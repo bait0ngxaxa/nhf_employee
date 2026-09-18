@@ -6,22 +6,22 @@ import type {
 } from "../contracts";
 import { CAPABILITY_REGISTRY } from "../registry";
 import {
-    composeAuthorizationAuthority,
-} from "./composition";
-import {
     buildCapabilityAdministrationCatalog,
 } from "./administration-catalog";
 import type {
+    AuthorizationAdministrationEffectiveAccessInspection,
+    AuthorizationAdministrationEffectiveAccessProvider,
     AuthorizationAdministrationEffectiveAccessState,
     CapabilityAdministrationProjection,
 } from "./administration-types";
 import {
-    evaluateAuthorization,
-    normalizeAuthorizationScopes,
-} from "./evaluator";
+    createAuthorizationResolver,
+} from "./resolver";
+import { normalizeAuthorizationScopes } from "./evaluator";
 import type {
     AuthorizationDecision,
     AuthorizationResolutionData,
+    AuthorizationResolutionRepository,
 } from "./types";
 
 export const AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS = Object.freeze([
@@ -255,6 +255,7 @@ export interface AuthorizationProductionCanaryEffectiveAccessBefore {
     readonly observerUserId: number;
     readonly capabilityKey: string;
     readonly channel: AuthorizationChannel;
+    readonly contextKey: string;
     readonly state: AuthorizationAdministrationEffectiveAccessState;
     readonly defaultScopes: readonly AuthorizationScope[];
     readonly effectiveScopes: readonly AuthorizationScope[];
@@ -289,6 +290,8 @@ export interface AuthorizationProductionCanaryPlan {
     readonly capabilityKey: string;
     readonly scope: string;
     readonly channel: AuthorizationChannel;
+    /** Identifies the exact domain-owned effective-access context to verify. */
+    readonly contextKey: string;
     /** Captured from the authoritative Administration effective-access read model before mutation. */
     readonly effectiveAccessBefore: AuthorizationProductionCanaryEffectiveAccessBefore;
     /** Explicit operator review for every WARNING in the inspected snapshot. */
@@ -325,6 +328,14 @@ export interface AuthorizationProductionCanaryIssue {
 export interface AuthorizationProductionCanaryValidation {
     readonly status: "PASS" | "BLOCKED";
     readonly issues: readonly AuthorizationProductionCanaryIssue[];
+}
+
+export interface AuthorizationProductionCanaryValidationDependencies {
+    /**
+     * The outer server composition's authoritative domain effective-access
+     * provider. Readiness must not recreate domain policy locally.
+     */
+    readonly effectiveAccessProvider: AuthorizationAdministrationEffectiveAccessProvider;
 }
 
 interface PersistedGrantReference {
@@ -1384,8 +1395,8 @@ export function determineAuthorizationProductionReadinessExitCode(
     return result.status === "BLOCKED" || result.status === "NOT_RUN" ? 1 : 0;
 }
 
-function isNonEmptyString(value: string): boolean {
-    return value.trim().length > 0;
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === "string" && value.trim().length > 0;
 }
 
 function isSubstantiveReviewText(value: unknown): boolean {
@@ -1507,7 +1518,7 @@ function validateCanaryWarningReviews(
 function buildCanaryResolutionData(
     snapshot: AuthorizationProductionInventorySnapshot,
     userId: number,
-    capabilityKey: string,
+    capabilityKey?: string,
 ): AuthorizationResolutionData {
     const memberships = snapshot.memberships
         .filter((membership) => membership.userId === userId)
@@ -1530,7 +1541,10 @@ function buildCanaryResolutionData(
                     : { id: role.id, isActive: role.isActive },
                 teamGrants: snapshot.teamGrants.filter((grant) =>
                     grant.teamId === membership.teamId
-                    && grant.capabilityKey === capabilityKey,
+                    && (
+                        capabilityKey === undefined
+                        || grant.capabilityKey === capabilityKey
+                    ),
                 ),
             };
         });
@@ -1538,12 +1552,18 @@ function buildCanaryResolutionData(
     return {
         userGrants: snapshot.userGrants.filter((grant) =>
             grant.userId === userId
-            && grant.capabilityKey === capabilityKey,
+            && (
+                capabilityKey === undefined
+                || grant.capabilityKey === capabilityKey
+            ),
         ),
         memberships,
         teamRoleGrants: snapshot.teamRoleGrants
             .filter((grant) =>
-                grant.capabilityKey === capabilityKey
+                (
+                    capabilityKey === undefined
+                    || grant.capabilityKey === capabilityKey
+                )
                 && grant.teamId !== null,
             )
             .flatMap((grant) => grant.teamId === null
@@ -1555,6 +1575,20 @@ function buildCanaryResolutionData(
                     scope: grant.scope,
                 }]),
     };
+}
+
+function createCanaryResolver(
+    snapshot: AuthorizationProductionInventorySnapshot,
+): ReturnType<typeof createAuthorizationResolver> {
+    const repository: AuthorizationResolutionRepository = {
+        async load({ userId, capabilityKey }): Promise<AuthorizationResolutionData> {
+            return buildCanaryResolutionData(snapshot, userId, capabilityKey);
+        },
+        async loadMany({ userId }): Promise<AuthorizationResolutionData> {
+            return buildCanaryResolutionData(snapshot, userId);
+        },
+    };
+    return createAuthorizationResolver({ repository });
 }
 
 function appendCanaryGrant(
@@ -1619,9 +1653,10 @@ function buildCanaryActor(
 }
 
 function hasCanarySourceGrant(
-    decision: AuthorizationDecision,
+    decision: AuthorizationDecision | null,
     plan: AuthorizationProductionCanaryPlan,
 ): boolean {
+    if (decision === null) return false;
     return decision.grants.some((grant) => {
         if (plan.source === "TEAM") {
             return grant.source.type === "TEAM"
@@ -1639,6 +1674,46 @@ function hasCanarySourceGrant(
     });
 }
 
+async function loadCanaryEffectiveAccess(
+    dependencies: AuthorizationProductionCanaryValidationDependencies,
+    snapshot: AuthorizationProductionInventorySnapshot,
+    actor: AuthorizationActor,
+    plan: AuthorizationProductionCanaryPlan,
+): Promise<AuthorizationAdministrationEffectiveAccessInspection> {
+    const resolver = createCanaryResolver(snapshot);
+    const capabilityKeys = CAPABILITY_REGISTRY.definitions.map(
+        (definition) => definition.key,
+    );
+    const dashboardDecisions = await resolver.resolveMany(
+        Object.freeze({
+            ...actor,
+            channel: "DASHBOARD" as const,
+        }),
+        capabilityKeys,
+    );
+    const inspections = await dependencies.effectiveAccessProvider.inspect({
+        actor,
+        dashboardDecisions,
+        resolver,
+    });
+    const matches = inspections.filter((inspection) =>
+        inspection.capability === plan.capabilityKey
+        && inspection.context.key === plan.contextKey
+        && inspection.context.channel === plan.channel,
+    );
+    if (matches.length !== 1 || matches[0] === undefined) {
+        throw new Error(
+            "Canary effective-access context is not uniquely identifiable: "
+            + plan.capabilityKey
+            + "/"
+            + plan.channel
+            + "/"
+            + plan.contextKey,
+        );
+    }
+    return matches[0];
+}
+
 function areScopesEqual(
     left: readonly AuthorizationScope[],
     right: readonly AuthorizationScope[],
@@ -1647,13 +1722,14 @@ function areScopesEqual(
         && left.every((scope, index) => scope === right[index]);
 }
 
-function validateCanaryEffectiveAuthority(
+async function validateCanaryEffectiveAuthority(
     plan: AuthorizationProductionCanaryPlan,
     snapshot: AuthorizationProductionInventorySnapshot,
     users: ReadonlyMap<number, AuthorizationProductionUserSnapshot>,
     employees: ReadonlyMap<number, AuthorizationProductionEmployeeSnapshot>,
+    dependencies: AuthorizationProductionCanaryValidationDependencies,
     issues: AuthorizationProductionCanaryIssue[],
-): void {
+): Promise<void> {
     const evidence = plan.effectiveAccessBefore;
     const observer = users.get(plan.observerUserId);
     const definition = CAPABILITY_REGISTRY.get(plan.capabilityKey);
@@ -1664,11 +1740,14 @@ function validateCanaryEffectiveAuthority(
         || evidence.observerUserId !== plan.observerUserId
         || evidence.capabilityKey !== plan.capabilityKey
         || evidence.channel !== plan.channel
+        || !isNonEmptyString(plan.contextKey)
+        || !isNonEmptyString(evidence.contextKey)
+        || evidence.contextKey !== plan.contextKey
     ) {
         addCanaryIssue(
             issues,
             "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
-            "Canary effective-access evidence must identify the same eligible observer, capability, and channel as the canary plan.",
+            "Canary effective-access evidence must identify the same eligible observer, capability, channel, and context as the canary plan.",
         );
         return;
     }
@@ -1714,61 +1793,70 @@ function validateCanaryEffectiveAuthority(
         return;
     }
 
-    const supportedScopes = new Set(definition.scopes);
-    const defaultScopes = normalizeAuthorizationScopes(evidence.defaultScopes);
-    const effectiveScopes = normalizeAuthorizationScopes(evidence.effectiveScopes);
-    if (
-        !areScopesEqual(defaultScopes, evidence.defaultScopes)
-        || !areScopesEqual(effectiveScopes, evidence.effectiveScopes)
-        || defaultScopes.some((scope) => !supportedScopes.has(scope))
-        || effectiveScopes.some((scope) => !supportedScopes.has(scope))
-        || (evidence.state === "AVAILABLE" && effectiveScopes.length === 0)
-        || (evidence.state !== "AVAILABLE" && effectiveScopes.length > 0)
-    ) {
-        addCanaryIssue(
-            issues,
-            "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
-            "Canary effective-access evidence is not a normalized, registry-supported read-model state.",
-        );
-        return;
-    }
-
     try {
-        const actor = buildCanaryActor(observer, plan.channel);
-        const beforeDecision = evaluateAuthorization(
-            actor,
-            plan.capabilityKey,
-            buildCanaryResolutionData(snapshot, observer.id, plan.capabilityKey),
+        const supportedScopes = new Set(definition.scopes);
+        const expectedDefaultScopes = normalizeAuthorizationScopes(
+            evidence.defaultScopes,
         );
-        const beforeAuthority = composeAuthorizationAuthority(
-            actor,
-            plan.capabilityKey,
-            defaultScopes,
-            beforeDecision,
+        const expectedEffectiveScopes = normalizeAuthorizationScopes(
+            evidence.effectiveScopes,
         );
         if (
-            !areScopesEqual(defaultScopes, beforeAuthority.defaultScopes)
-            || !areScopesEqual(effectiveScopes, beforeAuthority.scopes)
+            !areScopesEqual(expectedDefaultScopes, evidence.defaultScopes)
+            || !areScopesEqual(expectedEffectiveScopes, evidence.effectiveScopes)
+            || expectedDefaultScopes.some((scope) => !supportedScopes.has(scope))
+            || expectedEffectiveScopes.some((scope) => !supportedScopes.has(scope))
             || (
                 evidence.state === "AVAILABLE"
-                && !beforeAuthority.allowed
+                && expectedEffectiveScopes.length === 0
+            )
+            || (
+                evidence.state !== "AVAILABLE"
+                && expectedEffectiveScopes.length > 0
             )
         ) {
             addCanaryIssue(
                 issues,
                 "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
-                "Canary effective-access evidence does not agree with the authoritative resolver/composition result.",
+                "Canary effective-access evidence is not a normalized, registry-supported read-model state.",
+            );
+            return;
+        }
+
+        const actor = buildCanaryActor(observer, plan.channel);
+        const beforeInspection = await loadCanaryEffectiveAccess(
+            dependencies,
+            snapshot,
+            actor,
+            plan,
+        );
+        const actualDefaultScopes = normalizeAuthorizationScopes(
+            beforeInspection.defaultScopes,
+        );
+        const actualEffectiveScopes = normalizeAuthorizationScopes(
+            beforeInspection.effectiveScopes,
+        );
+        if (
+            beforeInspection.state !== evidence.state
+            || !areScopesEqual(actualDefaultScopes, expectedDefaultScopes)
+            || !areScopesEqual(actualEffectiveScopes, expectedEffectiveScopes)
+        ) {
+            addCanaryIssue(
+                issues,
+                "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+                "Canary effective-access evidence does not match the authoritative domain effective-access provider for the selected context.",
             );
             return;
         }
 
         const afterSnapshot = appendCanaryGrant(snapshot, plan);
-        const afterDecision = evaluateAuthorization(
+        const afterInspection = await loadCanaryEffectiveAccess(
+            dependencies,
+            afterSnapshot,
             actor,
-            plan.capabilityKey,
-            buildCanaryResolutionData(afterSnapshot, observer.id, plan.capabilityKey),
+            plan,
         );
-        if (!hasCanarySourceGrant(afterDecision, plan)) {
+        if (!hasCanarySourceGrant(afterInspection.configuredDecision, plan)) {
             addCanaryIssue(
                 issues,
                 "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
@@ -1777,37 +1865,25 @@ function validateCanaryEffectiveAuthority(
             return;
         }
 
-        const afterAuthority = composeAuthorizationAuthority(
-            actor,
-            plan.capabilityKey,
-            defaultScopes,
-            afterDecision,
+        const afterEffectiveScopes = normalizeAuthorizationScopes(
+            afterInspection.effectiveScopes,
         );
-        const beforeConfiguredScopes = beforeAuthority.configuredDecision.allowed
-            ? normalizeAuthorizationScopes(beforeAuthority.configuredDecision.scopes)
-            : Object.freeze([] as AuthorizationScope[]);
-        const afterConfiguredScopes = afterAuthority.configuredDecision.allowed
-            ? normalizeAuthorizationScopes(afterAuthority.configuredDecision.scopes)
-            : Object.freeze([] as AuthorizationScope[]);
-        const newlyConfiguredScopes = afterConfiguredScopes.filter((scope) =>
-            !beforeConfiguredScopes.includes(scope),
-        );
-        const addsEffectiveAuthority = newlyConfiguredScopes.some((scope) =>
-            !effectiveScopes.includes(scope)
-            && !effectiveScopes.includes("ALL"),
-        );
+        const addsEffectiveAuthority = !expectedEffectiveScopes.includes("ALL")
+            && afterEffectiveScopes.some((scope) =>
+                !expectedEffectiveScopes.includes(scope),
+            );
         if (!addsEffectiveAuthority) {
             addCanaryIssue(
                 issues,
                 "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
-                "The proposed grant adds no effective scope beyond the authoritative effective-access state already observed for the canary observer.",
+                "The proposed grant adds no effective scope beyond the authoritative domain effective-access state already observed for the canary observer and context.",
             );
         }
     } catch {
         addCanaryIssue(
             issues,
             "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
-            "Canary effective-access evidence could not be reconciled with the authoritative resolver/composition semantics.",
+            "Canary effective-access evidence could not be reconciled with the authoritative domain effective-access provider.",
         );
     }
 }
@@ -1854,10 +1930,11 @@ function isCanaryObserverEligible(
     return employee !== undefined && isActiveEmployee(employee);
 }
 
-export function validateAuthorizationProductionCanaryPlan(
+export async function validateAuthorizationProductionCanaryPlan(
     plan: AuthorizationProductionCanaryPlan,
     snapshot: AuthorizationProductionInventorySnapshot,
-): AuthorizationProductionCanaryValidation {
+    dependencies: AuthorizationProductionCanaryValidationDependencies,
+): Promise<AuthorizationProductionCanaryValidation> {
     const issues: AuthorizationProductionCanaryIssue[] = [];
     const readiness = evaluateAuthorizationProductionReadiness(snapshot);
     if (readiness.status === "BLOCKED") {
@@ -1869,7 +1946,7 @@ export function validateAuthorizationProductionCanaryPlan(
     }
     validateCanaryWarningReviews(plan, readiness, issues);
 
-    const requiredFields: readonly [string, string][] = [
+    const requiredFields: readonly [string, unknown][] = [
         ["businessReason", plan.businessReason],
         ["expectedAuthorityBefore", plan.expectedAuthorityBefore],
         ["expectedAuthorityAfter", plan.expectedAuthorityAfter],
@@ -1877,6 +1954,7 @@ export function validateAuthorizationProductionCanaryPlan(
         ["operator", plan.operator],
         ["plannedTimeWindow", plan.plannedTimeWindow],
         ["rollbackAction", plan.rollbackAction],
+        ["contextKey", plan.contextKey],
     ];
     for (const [field, value] of requiredFields) {
         if (!isNonEmptyString(value)) {
@@ -2004,7 +2082,14 @@ export function validateAuthorizationProductionCanaryPlan(
             "The exact canary grant already exists; no new audited grant change is available to verify.",
         );
     }
-    validateCanaryEffectiveAuthority(plan, snapshot, users, employees, issues);
+    await validateCanaryEffectiveAuthority(
+        plan,
+        snapshot,
+        users,
+        employees,
+        dependencies,
+        issues,
+    );
 
     return Object.freeze({
         status: issues.length === 0 ? "PASS" as const : "BLOCKED" as const,
