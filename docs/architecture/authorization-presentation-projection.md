@@ -1,5 +1,11 @@
 # Authorization presentation capability projections
 
+Phase 12H-A target note: these projection records describe current/historical
+presentation behavior and do not make the role-neutral target runtime live.
+Presentation visibility is never authority. The future ADMIN target and
+migration ledger are authoritative in
+[authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
+
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
 closed; Employee Phase 8A/8B/8C and Phase 12C.2 additive policy migration
 closed; Phase 9A/9B/9C Department, Audit and Notification integration closed;

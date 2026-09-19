@@ -1,5 +1,11 @@
 # NHF Employee — Centralized Authorization Resolver
 
+Current-target note: this document records the generic/current resolver
+contract and its pre-12H `SYSTEM_ROLE / ADMIN` behavior. Phase 12H-A's
+role-neutral business target is authoritative for the future architecture;
+runtime resolver/composition changes are deferred to Phase 12H-B and later.
+See [authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
+
 Status: Phase 3 complete. This document describes the resolver introduced
 after the Phase 1 capability contract and Phase 2 authorization persistence.
 It extends, and does not replace, the current behavior record in

@@ -1,5 +1,12 @@
 # NHF Employee — Authorization Phase 12A: Additive Default Policy Contract Lock
 
+Historical contract at the Phase 12A boundary. Phase 12H-A now supersedes
+this document's long-term `ADMIN` business-authority target; see
+[authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
+The current runtime still has the Phase 12A role-sensitive behavior until the
+later Phase 12H cutover. This document is retained as historical evidence and
+is not rewritten as though the earlier contract did not exist.
+
 Status: CLOSED — architecture contract and inventory only
 
 Audit baseline: main commit 07cec1aa0427c50acbf4dc408b506aaad1c9be0f
@@ -217,6 +224,10 @@ effective: ALL
 ~~~
 
 ## 7. ADMIN semantics
+
+The following statements are historical Phase 12A semantics at that phase
+boundary. They are retained as evidence and are superseded as the long-term
+target by Phase 12H-A; they do not describe the current Phase 12H target.
 
 ADMIN remains the highest coarse system-level authorization authority. ADMIN
 does not require Team membership or a configured grant.

@@ -4,6 +4,12 @@ Status: Phase 1 — Capability Contract & Registry (historical contract);
 Phase 12A additive policy lock: see
 [authorization-phase-12a-additive-policy-contract.md](./authorization-phase-12a-additive-policy-contract.md)
 
+Phase 12H-A target supersession: see
+[authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
+This Phase 1 document remains a historical vocabulary/registry record. It does
+not define the current long-term ADMIN business-authority target, and the
+runtime remains pre-12H until later implementation phases.
+
 This document defines the code-level authorization vocabulary for the next
 authorization phases. It does not replace or rewrite the current behavior
 baseline in [authorization-current-state.md](./authorization-current-state.md).
