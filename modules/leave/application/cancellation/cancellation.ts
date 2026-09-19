@@ -4,9 +4,10 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { isActiveEmployeeInTransaction } from "@/modules/leave/application/queries/active-employee-session";
 import {
     assertLeaveCapabilityScope,
-    canUseLeaveAdminRecoveryOverride,
+    canUseLeaveRecoveryOverride,
     resolveLeaveActorInTransaction,
     resolveLeaveCapabilityInTransaction,
+    resolveOptionalLeaveRecoveryCapabilityInTransaction,
     type LeaveAuthorizationActor,
     type LeaveAuthorizationContext,
 } from "@/modules/leave/application/authorization";
@@ -328,7 +329,7 @@ export async function confirmLeaveCancellation(
         if (authorizedEmployeeId === null) {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
         }
-        const adminOverrideReason = decision.adminOverride
+        const adminOverrideReason = decision.recoveryOverride
             ? requireAdminOverrideReason(reason)
             : null;
         if (!isBeforeLeaveStart(leaveRequest.startDate)) {
@@ -346,7 +347,7 @@ export async function confirmLeaveCancellation(
                 ...getCancellationApproverWhere(
                     authorizedEmployeeId,
                     leaveRequest,
-                    decision.adminOverride,
+                    decision.recoveryOverride,
                 ),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
@@ -396,11 +397,11 @@ export async function confirmLeaveCancellation(
         const payload: LeaveCancelledAfterApprovalPayload = {
             leaveId,
             employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-            decisionActorName: decision.authorization.actor.systemRole === "ADMIN"
+            decisionActorName: decision.recoveryOverride
                 ? actor.name ?? null
                 : getExceptionApproverName(leaveRequest),
             decisionActorRole: decision.authorization.actor.systemRole,
-            recoveryOverride: decision.adminOverride,
+            recoveryOverride: decision.recoveryOverride,
             leaveType: leaveRequest.leaveType,
             startDate: leaveRequest.startDate.toISOString(),
             endDate: leaveRequest.endDate.toISOString(),
@@ -428,7 +429,9 @@ export async function confirmLeaveCancellation(
                     ...buildLeaveAuditContext(leaveRequest, {
                         reason: adminOverrideReason,
                     }),
-                    adminOverride: decision.adminOverride,
+                    // Historical audit key retained for compatibility. Its
+                    // value now reflects the explicit recovery decision.
+                    adminOverride: decision.recoveryOverride,
                     decision: "CONFIRM",
                     originalApproverId: leaveRequest.approverId,
                     exceptionApproverId: leaveRequest.exceptionApproverId,
@@ -460,7 +463,7 @@ export async function rejectLeaveCancellation(
         if (authorizedEmployeeId === null) {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
         }
-        const adminOverrideReason = decision.adminOverride
+        const adminOverrideReason = decision.recoveryOverride
             ? requireAdminOverrideReason(reason)
             : null;
 
@@ -471,7 +474,7 @@ export async function rejectLeaveCancellation(
                 ...getCancellationApproverWhere(
                     authorizedEmployeeId,
                     leaveRequest,
-                    decision.adminOverride,
+                    decision.recoveryOverride,
                 ),
                 cancellationRequestedAt: { not: null },
                 cancellationConfirmedAt: null,
@@ -500,7 +503,9 @@ export async function rejectLeaveCancellation(
                     ...buildLeaveAuditContext(leaveRequest, {
                         reason: reason ?? null,
                     }),
-                    adminOverride: decision.adminOverride,
+                    // Historical audit key retained for compatibility. Its
+                    // value now reflects the explicit recovery decision.
+                    adminOverride: decision.recoveryOverride,
                     decision: "REJECT",
                     originalApproverId: leaveRequest.approverId,
                     exceptionApproverId: leaveRequest.exceptionApproverId,
@@ -523,7 +528,7 @@ async function getCancellationDecisionRequest(
     leaveId: string,
 ): Promise<{
     leaveRequest: LeaveCancellationRequest;
-    adminOverride: boolean;
+    recoveryOverride: boolean;
     authorization: {
         actor: LeaveAuthorizationActor;
         usesDashboardCapability: boolean;
@@ -533,21 +538,31 @@ async function getCancellationDecisionRequest(
     // registry has a deliberate contract for this existing production path.
     const usesDashboardCapability =
         actor.authorization.authorizationActor.channel === "DASHBOARD";
-    const capabilityAuthorization = usesDashboardCapability
-        ? assertLeaveCapabilityScope(
-            await resolveLeaveCapabilityInTransaction(
-                tx,
-                actor.authorization,
-                "leave.cancellation.decide",
-            ),
-            "ASSIGNED",
+    const recoveryCapabilityAuthorization = usesDashboardCapability
+        && actor.allowAdminOverride !== false
+        ? await resolveOptionalLeaveRecoveryCapabilityInTransaction(
+            tx,
+            actor.authorization,
         )
         : null;
-    const activeActor = capabilityAuthorization?.actor
-        ?? await resolveLeaveActorInTransaction(tx, actor.authorization);
-    const allowAdminOverride = capabilityAuthorization !== null
-        && actor.allowAdminOverride !== false
-        && canUseLeaveAdminRecoveryOverride(capabilityAuthorization);
+    const hasRecoveryAuthority = recoveryCapabilityAuthorization !== null
+        && canUseLeaveRecoveryOverride(recoveryCapabilityAuthorization);
+    const capabilityAuthorization = hasRecoveryAuthority
+        ? null
+        : usesDashboardCapability
+            ? assertLeaveCapabilityScope(
+                await resolveLeaveCapabilityInTransaction(
+                    tx,
+                    actor.authorization,
+                    "leave.cancellation.decide",
+                ),
+                "ASSIGNED",
+            )
+            : null;
+    const activeActor = hasRecoveryAuthority
+        ? recoveryCapabilityAuthorization.actor
+        : capabilityAuthorization?.actor
+            ?? await resolveLeaveActorInTransaction(tx, actor.authorization);
     const actorEmployeeId = activeActor.employeeId;
     if (
         activeActor.userId !== actor.userId
@@ -573,27 +588,35 @@ async function getCancellationDecisionRequest(
     }
     const decisionAuthorization = getLeaveDecisionAuthorization(
         actorEmployeeId,
-        allowAdminOverride,
+        hasRecoveryAuthority,
         leaveRequest,
     );
     if (decisionAuthorization === "OWNER") {
         throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.forbidden, 403);
     }
-    if (allowAdminOverride) {
+    if (hasRecoveryAuthority) {
         if (decisionAuthorization === "ASSIGNED_APPROVER") {
+            assertLeaveCapabilityScope(
+                await resolveLeaveCapabilityInTransaction(
+                    tx,
+                    actor.authorization,
+                    "leave.cancellation.decide",
+                ),
+                "ASSIGNED",
+            );
             return {
                 leaveRequest,
-                adminOverride: false,
+                recoveryOverride: false,
                 authorization: {
                     actor: activeActor,
                     usesDashboardCapability,
                 },
             };
         }
-        if (decisionAuthorization === "ADMIN_OVERRIDE") {
+        if (decisionAuthorization === "RECOVERY_OVERRIDE") {
             return {
                 leaveRequest,
-                adminOverride: true,
+                recoveryOverride: true,
                 authorization: {
                     actor: activeActor,
                     usesDashboardCapability,
@@ -637,7 +660,7 @@ async function getCancellationDecisionRequest(
 
     return {
         leaveRequest,
-        adminOverride: false,
+        recoveryOverride: false,
         authorization: {
             actor: activeActor,
             usesDashboardCapability,
@@ -648,10 +671,10 @@ async function getCancellationDecisionRequest(
 function getCancellationApproverWhere(
     actorEmployeeId: number,
     leaveRequest: LeaveCancellationRequest,
-    adminOverride: boolean,
+    recoveryOverride: boolean,
 ): Prisma.LeaveRequestWhereInput {
     const ownerExclusion = { employeeId: { not: actorEmployeeId } };
-    if (adminOverride) return ownerExclusion;
+    if (recoveryOverride) return ownerExclusion;
     return {
         ...ownerExclusion,
         ...(leaveRequest.exceptionApproverId !== null

@@ -3,11 +3,31 @@ export type {
     CreateEmailRequestData,
     CreateEmailRequestOptions,
     EmailRequestFilters,
+    EmailRequestReadAuthorization,
     UserContext,
     EmailRequestWithUser,
     PaginatedEmailRequestsResult,
     CreateEmailRequestResult,
 } from "./types";
+
+export {
+    assertEmailRequestCapability,
+    assertEmailRequestCapabilityScope,
+    buildEmailRequestAuthorizationActor,
+    buildEmailRequestAuthorizationContext,
+    defaultEmailRequestScopes,
+    EMAIL_REQUEST_CAPABILITIES,
+    EmailRequestCapabilityDeniedError,
+    inspectEmailRequestEffectiveAccess,
+    resolveEmailRequestCapability,
+    toEmailRequestReadAuthorization,
+} from "./authorization";
+export type {
+    EmailRequestAuthorizationActor,
+    EmailRequestAuthorizationContext,
+    EmailRequestCapability,
+    EmailRequestCapabilityAuthorization,
+} from "./authorization";
 
 // Import service functions
 import { getEmailRequests } from "./queries";

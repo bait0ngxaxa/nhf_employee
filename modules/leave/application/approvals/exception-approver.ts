@@ -27,8 +27,7 @@ type ExceptionApprover = Prisma.EmployeeGetPayload<{
 export type LeaveExceptionApproverSource =
     | "ORIGINAL_APPROVER"
     | "ASSIGNED_APPROVER"
-    | "CURRENT_MANAGER"
-    | "ADMIN";
+    | "CURRENT_MANAGER";
 
 export type LeaveExceptionApproverResolution = {
     approver: ExceptionApprover;
@@ -41,7 +40,7 @@ export type LeaveExceptionApproverResolution = {
 export type LeaveDecisionAuthorization =
     | "OWNER"
     | "ASSIGNED_APPROVER"
-    | "ADMIN_OVERRIDE"
+    | "RECOVERY_OVERRIDE"
     | "FORBIDDEN";
 
 export function getEffectiveLeaveApprover<T>(input: {
@@ -60,7 +59,7 @@ export function getEffectiveLeaveApproverId(input: {
 
 export function getLeaveDecisionAuthorization<T extends LeaveApproverState>(
     actorEmployeeId: number,
-    isAdmin: boolean,
+    hasRecoveryAuthority: boolean,
     leaveRequest: {
         employeeId: number;
         approverId: number | null;
@@ -77,8 +76,8 @@ export function getLeaveDecisionAuthorization<T extends LeaveApproverState>(
         return "ASSIGNED_APPROVER";
     }
 
-    return isAdmin && !isActiveLeaveApprover(getEffectiveLeaveApprover(leaveRequest))
-        ? "ADMIN_OVERRIDE"
+    return hasRecoveryAuthority && !isActiveLeaveApprover(getEffectiveLeaveApprover(leaveRequest))
+        ? "RECOVERY_OVERRIDE"
         : "FORBIDDEN";
 }
 
@@ -144,43 +143,7 @@ export async function resolveLeaveExceptionApprover(
         };
     }
 
-    const findAdminCandidates = async (): Promise<ExceptionApprover[]> =>
-        tx.employee.findMany({
-            where: {
-                id: { not: input.employeeId },
-                status: "ACTIVE",
-                deletedAt: null,
-                user: {
-                    is: {
-                        role: "ADMIN",
-                        isActive: true,
-                        deletedAt: null,
-                    },
-                },
-            },
-            orderBy: { id: "asc" },
-            select: EXCEPTION_APPROVER_SELECT,
-        });
-
-    const candidateAdmins = await findAdminCandidates();
-    if (candidateAdmins.length > 0) {
-        await lockEmployeeRows(tx, candidateAdmins.map(({ id }) => id));
-    }
-    const admin = (candidateAdmins.length > 0
-        ? await findAdminCandidates()
-        : candidateAdmins
-    ).find(isActiveLeaveApprover);
-    if (!admin) {
-        return null;
-    }
-
-    return {
-        approver: admin,
-        source: "ADMIN",
-        exceptionApproverId: admin.id,
-        assignedAt: new Date(),
-        shouldPersist: true,
-    };
+    return null;
 }
 
 /**

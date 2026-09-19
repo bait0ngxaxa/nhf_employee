@@ -1,11 +1,10 @@
 import { cache } from "react";
 import { prisma } from "@/lib/db/prisma";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import type {
     EmailRequestFilters,
+    EmailRequestReadAuthorization,
     PaginatedEmailRequestsResult,
     EmailRequestWithUser,
-    UserContext,
 } from "./types";
 
 /** User select config */
@@ -17,20 +16,25 @@ const EMAIL_REQUEST_USER_SELECT = {
 
 /**
  * Get paginated list of email requests
- * Admin sees all, users see only their own
+ * The resolved authorization scope selects the query breadth.
  * Cached per request for deduplication
  */
 export const getEmailRequests = cache(
     async (
         filters: EmailRequestFilters,
-        user: UserContext,
+        authorization: EmailRequestReadAuthorization,
     ): Promise<PaginatedEmailRequestsResult> => {
         const page = Math.max(1, filters.page);
         const limit = Math.min(Math.max(1, filters.limit), 100);
         const skip = (page - 1) * limit;
 
-        const isAdmin = isAdminRole(user.role);
-        const where = isAdmin ? {} : { requestedBy: user.id };
+        const where = authorization.scopes.includes("ALL")
+            ? {}
+            : authorization.scopes.includes("OWN")
+                ? { requestedBy: authorization.userId }
+                : (() => {
+                    throw new Error("Email Request read authorization has no supported scope");
+                })();
 
         const [total, emailRequests] = await Promise.all([
             prisma.emailRequest.count({ where }),

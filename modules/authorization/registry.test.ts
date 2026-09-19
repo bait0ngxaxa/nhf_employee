@@ -83,6 +83,20 @@ describe("authorization contracts", () => {
             ).toBe(true);
             expect(definition.key.split(".")[0]).toBe(definition.domain);
         }
+
+        expect(CAPABILITY_REGISTRY.get("leave.recovery.manage")).toEqual(expect.objectContaining({
+            domain: "leave",
+            scopes: ["ALL"],
+            channels: ["DASHBOARD"],
+        }));
+        expect(CAPABILITY_REGISTRY.get("email.request.read")).toEqual(expect.objectContaining({
+            scopes: ["OWN", "ALL"],
+            channels: ["DASHBOARD"],
+        }));
+        expect(CAPABILITY_REGISTRY.get("email.request.create")).toEqual(expect.objectContaining({
+            scopes: ["ALL"],
+            channels: ["DASHBOARD"],
+        }));
     });
 
     it("looks up registered keys and rejects unknown keys", () => {

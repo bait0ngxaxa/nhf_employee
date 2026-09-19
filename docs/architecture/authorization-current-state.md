@@ -37,13 +37,25 @@ historical evidence at that phase boundary. **Role-neutral core:
 IMPLEMENTED; role-neutral domain defaults: REBASELINED; role-neutral
 production enforcement: NOT CUT OVER; legacy ADMIN business compatibility:
 TEMPORARILY ACTIVE.** Phase 12H-C — Domain Default Policy Rebaseline is now
-**COMPLETE**. The next handoff is Phase 12H-D — Missing/deferred capability
-completion. See
+**COMPLETE**. The historical next handoff from that closure was Phase 12H-D;
+the current live status is recorded below. See
 [authorization-phase-12hc-domain-default-policy-rebaseline.md](authorization-phase-12hc-domain-default-policy-rebaseline.md)
 and [authorization-phase-12hb-role-neutral-core.md](authorization-phase-12hb-role-neutral-core.md).
 
-สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
-Phase 12H-C — **เสร็จสิ้น**; role-neutral domain defaults — **rebaselined**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; ขั้นถัดไป Phase 12H-D — Missing/deferred capability completion<br>
+Phase 12H-D — Missing / Deferred Business Capability Completion is now
+**COMPLETE** against baseline `2380d23e867d2d4a124bce8623dd06003c789da2`.
+The role-neutral configured core remains **IMPLEMENTED**, the domain defaults
+remain **REBASELINED**, and the two registered Email Request capabilities plus
+the reviewed `leave.recovery.manage` capability are now real centralized
+authorization surfaces. Registered `DEFERRED` capabilities: **0**. The
+production `authorization` singleton is still **NOT CUT OVER** to the
+role-neutral resolver, legacy ADMIN business compatibility remains
+**TEMPORARILY ACTIVE**, and the remaining Dashboard presentation/route role
+gates are intentionally deferred to Phase 12H-F. The next handoff is Phase
+12H-E — Production Team/grant preparation and effective-access reconciliation.
+
+สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12H-D Missing/deferred capability completion — CLOSED; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request capability migration — CLOSED in Phase 12H-D; future IT module — OUT OF SCOPE<br>
+Phase 12H-D — **เสร็จสิ้น**; registered `DEFERRED` capabilities — **0**; role-neutral domain defaults — **rebaselined**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; การย้าย role gate ของ presentation/route ที่เหลือ — **Phase 12H-F**; ขั้นถัดไป Phase 12H-E — Production Team/grant preparation and effective-access reconciliation<br>
 วันที่สำรวจ: 2026-09-19<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -306,7 +318,7 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 | Cross-cutting API | API | Any route using requireAdminSession() | Admin operation selected by caller | Same as requireApiSession() | Same as API session | isAdminRole(role) must be true | ADMIN | Domain rules remain with caller/service | Usually all only where domain route allows | Caller-specific | lib/auth/api.ts | Admin menu/route hints are separate | Default non-admin 403; custom factories may collapse unauthenticated to 403 | __tests__/api/hybrid-auth-routes.test.ts, route-specific tests | Do not treat Admin as business/workflow bypass |
 | Cross-cutting workforce | API | requireActiveWorkforceSession() | Current Employee identity | API session | User active/not deleted; Employee exists, ACTIVE, not deleted | Active workforce gate; no broad resource grant | None | Current User-to-Employee link | Current Employee only | None | lib/auth/workforce.ts | Current-user name projection | Missing profile 404 by default; inactive/deleted 403; unauthenticated normally 401 | __tests__/auth/workforce.test.ts, __tests__/auth/workforce-transaction.test.ts | Transaction variants must remain fail-closed |
 | Dashboard | DASHBOARD | Shared /dashboard layout | Dashboard session | Hybrid access cookie resolved by getCurrentUserProjection() | Account active/not deleted and current Employee lifecycle eligible | Authenticated current workforce can enter shared shell; no Admin requirement in layout | None at layout | Current Employee projection | Current Employee only | None | app/dashboard/layout.tsx, app/_lib/auth/current-user.ts | DashboardProvider receives role plus Leave/Stock/Routine/Employee projections | Missing projection redirects to /login | __tests__/auth/current-user-projection.test.ts, __tests__/lib/dashboard-routes.test.ts | Shared layout protection is not equivalent to per-page Admin authorization |
-| Dashboard | DASHBOARD | Audit page and deferred Email Request page | Audit capability page / deferred Admin page | Shared Dashboard session | Current active Employee projection | Audit uses `requireDashboardAuditCapability()` and `auditCapabilities.canReadAuditLogs`; Email Request uses `requireDashboardAdmin()` | Audit: central `audit.read / ALL`; Email Request: ADMIN | None beyond current workforce | Audit all logs after capability authorization; Email Request follows deferred Admin/requester semantics | Surface-specific | app/dashboard/_lib/route-access.ts, app/dashboard/audit/page.tsx, app/dashboard/email-request/page.tsx | Audit uses the Audit capability projection; Email Request remains Admin-shaped | Audit USER without grant redirects /access-denied; absent user /login; Email Request remains role-denied | __tests__/lib/dashboard-routes.test.ts, Audit presentation/route tests, Email Request tests | Audit direct route is capability-driven; Email Request remains deferred and its role guard is not an Audit authority |
+| Dashboard | DASHBOARD | Audit page and transitional Email Request page | Audit capability page / Email Request Admin-compatible page | Shared Dashboard session | Current active Employee projection | Audit uses `requireDashboardAuditCapability()` and `auditCapabilities.canReadAuditLogs`; Email Request page/menu still uses `requireDashboardAdmin()` while its API uses the centralized Email Request adapter | Audit: central `audit.read / ALL`; Email Request: `read OWN/ALL` and `create ALL` through the central resolver, with temporary legacy ADMIN compatibility | None beyond current workforce | Audit all logs after capability authorization; Email Request query breadth is selected by configured `OWN`/`ALL` | Surface-specific | app/dashboard/_lib/route-access.ts, app/dashboard/audit/page.tsx, app/dashboard/email-request/page.tsx, app/api/email-request/route.ts, lib/services/email-request/authorization.ts | Audit uses the Audit capability projection; Email Request server authority is capability-driven while menu/page visibility remains Admin-shaped | Audit USER without grant redirects /access-denied; absent user /login; Email Request UI remains role-gated and API denies without configured authority | __tests__/lib/dashboard-routes.test.ts, Audit presentation/route tests, Email Request tests | Email Request is no longer registered deferred; its remaining presentation/route role gate belongs to Phase 12H-F and is not API authority |
 | Dashboard | DASHBOARD | Employee Management page | Employee list/stats UI | Shared Dashboard session | Current active Employee projection | Trusted current-user Employee projection gates each presentation surface; no page role gate | No Employee presentation role gate | API list/stats remain server-authorized and organization-wide | List requires `canReadEmployees`; stats requires `canReadStats`; either can make the entry available | None | app/dashboard/employees/page.tsx, modules/employee/presentation/dashboard/EmployeeManagementSection.tsx, EmployeeProvider | `employeeCapabilities` independently gates list/stats/create/import/update/export; delete is projected but unused | UI access is not proof of API mutation/read authorization | Employee presentation tests, __tests__/api/employees-routes.test.ts, __tests__/dashboard-employee-pages.test.tsx | Phase 8C closes the main RSC boundary and complete current production-surface audit; broad data policy remains unchanged |
 | Dashboard | DASHBOARD | Leave, Routine, Stock pages and tabs | Domain UI | Shared Dashboard session | Current active Employee projection | Page-level role gates are not the authoritative domain decision; feature and API routes decide | Domain-specific | Domain-specific | UI chooses default/self/admin tabs from projection | Leave/Routine flags | app/dashboard/leave/page.tsx, app/dashboard/routine/page.tsx, app/dashboard/stock/page.tsx and domain presentations | Leave uses `leaveCapabilities` plus existing Leave relationship/report projections; Stock uses stockCapabilities; Routine retains its existing projection; feature hides | UI hidden/redirect can differ from direct API result | Domain route/presentation tests | Never document hidden UI as server enforcement |
 | Dashboard | DASHBOARD | Sidebar/menu click | Menu item | Already in authenticated shell | Current projection | requiredRole = ADMIN and feature checks are client-side navigation checks | ADMIN for configured items | None | No resource scope; menu visibility only | getAvailableMenuGroups() applies flags | constants/dashboard.ts, components/dashboard/context/dashboard/DashboardProvider.tsx | Hidden menu or client /access-denied push | Hidden or client redirect only | __tests__/constants/dashboard-menu.test.ts, __tests__/context/DashboardProvider.test.tsx | Presentation-only; direct navigation/API must still be tested |
@@ -1386,6 +1398,65 @@ Current production behavior is intentionally mixed during the rollout. Normal US
 Explicitly deferred: `leave.recovery.manage`, Email Request completion, grant/readiness data changes, schema/migration/seed/backfill work, broad presentation and route ADMIN-gate migration, and final role-neutral production enforcement cutover. Those belong to Phase 12H-D, 12H-F, 12H-E/readiness work, and 12H-G as applicable. Historical sections 9.4, 9.7, and earlier phase closure documents retain the behavior recorded at their boundaries; this section supersedes their selected Routine broad-default claims for the current target.
 
 Verification evidence for this closure is recorded in [authorization-phase-12hc-domain-default-policy-rebaseline.md](authorization-phase-12hc-domain-default-policy-rebaseline.md). Next: **Phase 12H-D — Missing/deferred capability completion**.
+
+## 9.13 Phase 12H-D Missing / Deferred Business Capability Completion
+
+Phase 12H-D is **COMPLETE** against baseline
+`2380d23e867d2d4a124bce8623dd06003c789da2`.
+
+The current target inventory is 41 registered capabilities:
+`25 CENTRAL_WITH_DEFAULT_POLICY`, `16 CENTRAL_ONLY`, `0
+CENTRAL_WITH_COMPATIBILITY`, and `0 DEFERRED`. All 41 capabilities are
+`GRANTABLE`; `POLICY_ACTIVATION_REQUIRED` is `0` and `DEFERRED` is `0`.
+The role-neutral configured core is **IMPLEMENTED** and the domain defaults
+are **REBASELINED**. Production role-neutral enforcement is **NOT CUT OVER**;
+the production resolver singleton, `SYSTEM_ROLE` support, and legacy ADMIN
+business compatibility remain intentionally active during the transition.
+
+The reviewed `leave.recovery.manage` capability is registered as
+`CENTRAL_ONLY`, with `ALL` and `DASHBOARD` as its only supported scope and
+channel. It has no Default Domain Policy and grants entry to a recovery path
+only. Cancellation and not-taken recovery still require the existing Leave
+workflow state, owner exclusion, unavailable effective approver, required
+reason, date/timing, quota, transaction/lock/revalidation, notification, audit,
+and idempotency/current-action invariants. Normal cancellation and not-taken
+confirmation continue to use their assigned-approver relationship authority.
+The recovery decision is based on the explicit capability result, not
+`actor.systemRole`; role identity remains provenance metadata only.
+
+Leave exception-approver resolution no longer searches for or persists an
+active Employee merely because its User has `role = ADMIN`. The approved
+relationship order is reusable active exception approver, active original
+approver, active current manager, then unavailable (`null`). An unavailable
+approver is handled through the explicit recovery capability rather than an
+implicit global ADMIN fallback.
+
+Email Request is now centralized configured authorization only. The adapter
+fixes the channel to `DASHBOARD`, builds its actor from trusted authenticated
+server state, exposes only registered Email Request capabilities, and has no
+default scopes. `email.request.read / OWN` constrains the query to
+`requestedBy = authenticated user id`; `ALL` selects the authorized broad
+query. `email.request.create / ALL` is checked before idempotency state or
+mutation work, while `requestedBy` remains the authenticated user. Email
+Request presentation/menu and remaining Dashboard route role gates are still
+transitional and are intentionally scheduled for Phase 12H-F; server
+authorization is authoritative.
+
+The effective-access inspector now reports real configured decisions for Email
+Request and Leave recovery. It does not manufacture deferred Email rows or
+default authority. Ordinary Authorization Administration grant commands can
+grant all 41 registered capabilities, subject to the existing origin and
+validation rules.
+
+This phase did not switch the production singleton, remove the legacy ADMIN
+compatibility seam, seed or backfill Team/grant data, migrate broad UI/menu
+role visibility, remove the recovery route's legacy ADMIN gate, migrate
+Routine presentation semantics, or perform the final enforcement cutover.
+Those remain scheduled for the later lifecycle. The exact completion record and
+verification evidence are in
+[authorization-phase-12hd-missing-deferred-capability-completion.md](authorization-phase-12hd-missing-deferred-capability-completion.md).
+The next handoff is **Phase 12H-E — Production Team/grant preparation and
+effective-access reconciliation**.
 
 ## 10. Explicit non-goals for Phase 0
 

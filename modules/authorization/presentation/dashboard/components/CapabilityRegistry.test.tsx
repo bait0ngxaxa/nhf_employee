@@ -34,10 +34,9 @@ const capabilities = [
         description: "อ่านคำขออีเมล",
         supportedScopes: ["OWN", "ALL"],
         supportedChannels: ["DASHBOARD"],
-        runtimeAuthorizationMode: "DEFERRED",
-        administrativeStatus: "DEFERRED",
-        administrativelyGrantable: false,
-        nonGrantableReason: "ยังไม่เปิดให้จัดการ",
+        runtimeAuthorizationMode: "CENTRAL_ONLY",
+        administrativeStatus: "GRANTABLE",
+        administrativelyGrantable: true,
     },
 ] satisfies AuthorizationAdministrationOverviewData["capabilities"];
 
@@ -50,7 +49,7 @@ describe("CapabilityRegistry advanced system view", () => {
         expect(screen.getByText("บุคลากร")).toBeInTheDocument();
         expect(screen.getAllByText("เว็บระบบ").length).toBeGreaterThan(0);
         expect(screen.getByText("employee.read").closest("details")).not.toHaveAttribute("open");
-        expect(screen.getAllByText("DEFERRED").length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/CENTRAL_ONLY/).length).toBeGreaterThan(0);
 
         fireEvent.change(screen.getByLabelText("ค้นหาข้อมูลสิทธิ์"), { target: { value: "เบิก" } });
 

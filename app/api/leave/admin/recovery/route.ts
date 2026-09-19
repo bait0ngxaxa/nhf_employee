@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
+    assertLeaveCapability,
+    assertLeaveCapabilityScope,
+    buildLeaveAuthorizationContext,
     getAdminLeaveRecoveryData,
+    LeaveCapabilityDeniedError,
     parseLeaveApprovalPage,
 } from "@/modules/leave";
 import { notFound, forbidden } from "@/lib/ssot/http";
@@ -26,6 +30,16 @@ export async function GET(req: Request): Promise<NextResponse> {
             return forbidden();
         }
 
+        const recoveryAuthorization = await assertLeaveCapability(
+            buildLeaveAuthorizationContext(
+                auth.user,
+                auth.employeeId,
+                "DASHBOARD",
+            ),
+            "leave.recovery.manage",
+        );
+        assertLeaveCapabilityScope(recoveryAuthorization, "ALL");
+
         const url = new URL(req.url);
         const notTakenPage = parseLeaveApprovalPage(url, "notTakenPage");
         const cancellationPage = parseLeaveApprovalPage(url, "cancellationPage");
@@ -42,6 +56,9 @@ export async function GET(req: Request): Promise<NextResponse> {
             cancellationPage,
         }));
     } catch (error) {
+        if (error instanceof LeaveCapabilityDeniedError) {
+            return forbidden();
+        }
         console.error("Error fetching leave admin recovery candidates:", error);
         return NextResponse.json(
             { error: COMMON_API_MESSAGES.failedToFetchApprovals },

@@ -157,6 +157,11 @@ describe("Authorization Administration effective-access composition", () => {
             defaultScopes: [],
             state: "UNAVAILABLE",
         });
+        expect(findRow(rows, "leave.recovery.manage", "dashboard")).toMatchObject({
+            defaultScopes: [],
+            effectiveScopes: [],
+            state: "UNAVAILABLE",
+        });
         expect(findRow(rows, "leave.cancellation.decide", "dashboard")).toBeDefined();
         expect(findRow(rows, "leave.cancellation.decide", "liff.self-service")).toBeUndefined();
 
@@ -165,12 +170,16 @@ describe("Authorization Administration effective-access composition", () => {
             state: "UNAVAILABLE",
         });
         expect(findRow(rows, "email.request.read", "dashboard")).toMatchObject({
-            configuredDecision: null,
-            state: "DEFERRED",
+            configuredDecision: noGrantDecision("email.request.read"),
+            defaultScopes: [],
+            effectiveScopes: [],
+            state: "UNAVAILABLE",
         });
         expect(findRow(rows, "email.request.create", "dashboard")).toMatchObject({
-            configuredDecision: null,
-            state: "DEFERRED",
+            configuredDecision: noGrantDecision("email.request.create"),
+            defaultScopes: [],
+            effectiveScopes: [],
+            state: "UNAVAILABLE",
         });
         expect(resolveMany).toHaveBeenCalledTimes(1);
         expect(resolveMany.mock.calls[0]?.[1]).not.toContain("email.request.read");

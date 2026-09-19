@@ -93,7 +93,7 @@ describe("Authorization Administration presentation vocabulary", () => {
             "leave.not_taken.relationship",
             "leave.approver.workflow",
             "audit.server_resource",
-            "email.deferred_migration",
+            "email.request.workflow",
         ];
 
         for (const code of currentCodes) {

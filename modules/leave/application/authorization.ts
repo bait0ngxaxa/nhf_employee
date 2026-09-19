@@ -23,6 +23,7 @@ export const LEAVE_CAPABILITIES = [
     "leave.cancellation.decide",
     "leave.request.not_taken",
     "leave.approver.manage",
+    "leave.recovery.manage",
 ] as const;
 
 export type LeaveCapability = (typeof LEAVE_CAPABILITIES)[number];
@@ -119,6 +120,7 @@ export function defaultLeaveScopes(
         case "leave.request.not_taken":
             return ["OWN", "ASSIGNED"];
         case "leave.approver.manage":
+        case "leave.recovery.manage":
             return [];
     }
 }
@@ -295,18 +297,22 @@ export function assertLeaveCapabilityScope(
     );
 }
 
-export function canUseLeaveAdminRecoveryOverride(
+export function canUseLeaveRecoveryOverride(
     capabilityAuthorization: LeaveCapabilityAuthorization,
 ): boolean {
     return (
-        (
-            capabilityAuthorization.capability === "leave.cancellation.decide"
-            || capabilityAuthorization.capability === "leave.request.not_taken"
-        )
-        && capabilityAuthorization.actor.systemRole === "ADMIN"
+        capabilityAuthorization.capability === "leave.recovery.manage"
+        && capabilityAuthorization.scopes.includes("ALL")
         && capabilityAuthorization.actor.channel === "DASHBOARD"
     );
 }
+
+/**
+ * Compatibility-named export retained while Leave callers migrate their
+ * terminology. Authority is now exclusively the dedicated recovery
+ * capability; this helper no longer inspects the actor's system role.
+ */
+export const canUseLeaveAdminRecoveryOverride = canUseLeaveRecoveryOverride;
 
 interface ActiveLeaveAuthorizationUser {
     readonly id: number;
@@ -443,4 +449,30 @@ export async function resolveLeaveCapabilityInTransaction(
     );
 
     return buildLeaveCapabilityAuthorization(activeActor, capability, decision);
+}
+
+/**
+ * Recovery has no default authority. Only the expected absence of the
+ * dedicated recovery grant is converted into `null`; structural resolver and
+ * persisted-configuration failures remain fail-closed exceptions.
+ */
+export async function resolveOptionalLeaveRecoveryCapabilityInTransaction(
+    tx: Prisma.TransactionClient,
+    context: LeaveAuthorizationContext,
+): Promise<LeaveCapabilityAuthorization | null> {
+    try {
+        return await resolveLeaveCapabilityInTransaction(
+            tx,
+            context,
+            "leave.recovery.manage",
+        );
+    } catch (error) {
+        if (
+            error instanceof LeaveCapabilityDeniedError
+            && error.authorizationReason === "NO_APPLICABLE_GRANT"
+        ) {
+            return null;
+        }
+        throw error;
+    }
 }

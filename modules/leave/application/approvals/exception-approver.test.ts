@@ -56,11 +56,7 @@ describe("resolveLeaveExceptionApprover", () => {
         vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
     });
 
-    it("excludes the leave owner from admin fallback selection", async () => {
-        vi.mocked(prisma.employee.findMany).mockResolvedValue([
-            buildAdmin(20),
-        ] as never);
-
+    it("returns unavailable without a domain relationship and never selects ADMIN by role", async () => {
         const result = await resolveLeaveExceptionApprover(
             prisma as unknown as Prisma.TransactionClient,
             {
@@ -80,12 +76,9 @@ describe("resolveLeaveExceptionApprover", () => {
             },
         );
 
-        expect(result?.approver.id).toBe(20);
-        expect(prisma.employee.findMany).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({
-                id: { not: 10 },
-            }),
-        }));
+        expect(result).toBeNull();
+        expect(prisma.employee.findMany).not.toHaveBeenCalled();
+        expect(lockMocks.lockEmployeeRows).toHaveBeenCalledWith(prisma, [10]);
     });
 
     it("locks the leave owner before resolving a current manager", async () => {
@@ -112,21 +105,14 @@ describe("resolveLeaveExceptionApprover", () => {
         expect(lockMocks.lockEmployeeRows).toHaveBeenCalledWith(prisma, [10]);
     });
 
-    it("re-reads admin fallback candidates after locking their lifecycle rows", async () => {
-        const activeAdmin = buildAdmin(40);
-        vi.mocked(prisma.employee.findMany)
-            .mockResolvedValueOnce([activeAdmin] as never)
-            .mockResolvedValueOnce([{
-                ...activeAdmin,
-                status: "INACTIVE" as const,
-            }] as never);
-
+    it("does not re-read or lock unrelated ADMIN candidates after the manager is unavailable", async () => {
+        const originalApprover = buildAdmin(40);
         const result = await resolveLeaveExceptionApprover(
             prisma as unknown as Prisma.TransactionClient,
             {
                 employeeId: 10,
                 originalApprover: {
-                    ...activeAdmin,
+                    ...originalApprover,
                     status: "INACTIVE" as const,
                     user: null,
                 },
@@ -137,7 +123,8 @@ describe("resolveLeaveExceptionApprover", () => {
 
         expect(result).toBeNull();
         expect(lockMocks.lockEmployeeRows).toHaveBeenNthCalledWith(1, prisma, [10]);
-        expect(lockMocks.lockEmployeeRows).toHaveBeenNthCalledWith(2, prisma, [40]);
+        expect(lockMocks.lockEmployeeRows).toHaveBeenCalledTimes(1);
+        expect(prisma.employee.findMany).not.toHaveBeenCalled();
     });
 
     it("creates a new persisted generation when the effective approver leaves and returns", async () => {

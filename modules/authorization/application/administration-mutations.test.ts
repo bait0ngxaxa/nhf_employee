@@ -285,7 +285,7 @@ describe("Phase 10B Authorization Administration commands", () => {
         expect(persisted).toBe(false);
     });
 
-    it("accepts add/remove for all seven Leave default-policy capabilities", async () => {
+    it("accepts add/remove for all eight registered Leave capabilities", async () => {
         const requestReadGrant = teamGrant({
             capabilityKey: "leave.request.read",
             scope: "OWN",
@@ -314,6 +314,10 @@ describe("Phase 10B Authorization Administration commands", () => {
             capabilityKey: "leave.request.not_taken",
             scope: "OWN",
         });
+        const recoveryGrant = userGrant({
+            capabilityKey: "leave.recovery.manage",
+            scope: "ALL",
+        });
         const repo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
             findTeamGrant: vi.fn()
@@ -338,7 +342,9 @@ describe("Phase 10B Authorization Administration commands", () => {
                 .mockResolvedValueOnce(null)
                 .mockResolvedValueOnce(requestCreateGrant)
                 .mockResolvedValueOnce(null)
-                .mockResolvedValueOnce(notTakenGrant),
+                .mockResolvedValueOnce(notTakenGrant)
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(recoveryGrant),
             createUserGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
             deleteUserGrant: vi.fn().mockImplementation(async (_tx, grant) => grant),
         });
@@ -437,7 +443,20 @@ describe("Phase 10B Authorization Administration commands", () => {
             deps,
         )).resolves.toEqual(notTakenGrant);
 
-        expect(auditAppendMock).toHaveBeenCalledTimes(14);
+        await expect(addAuthorizationAdministrationUserGrant(
+            ADMIN_CONTEXT,
+            7,
+            { capabilityKey: "leave.recovery.manage", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(recoveryGrant);
+        await expect(removeAuthorizationAdministrationUserGrant(
+            ADMIN_CONTEXT,
+            7,
+            { capabilityKey: "leave.recovery.manage", scope: "ALL" },
+            deps,
+        )).resolves.toEqual(recoveryGrant);
+
+        expect(auditAppendMock).toHaveBeenCalledTimes(16);
     });
 
     it("accepts add/remove through generic Team, TeamRole, and User commands for default-policy capabilities", async () => {
@@ -945,28 +964,38 @@ describe("Phase 10B Authorization Administration commands", () => {
         ).rejects.toMatchObject({ code: "UNSUPPORTED_SCOPE" });
         expect(transactionRunner).not.toHaveBeenCalled();
 
+        const emailGrant = teamGrant({ capabilityKey: "email.request.create" });
+        const emailRepo = repository({
+            findTeamById: vi.fn().mockResolvedValue(team()),
+            findTeamGrant: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(emailGrant),
+            createTeamGrant: vi.fn().mockResolvedValue(emailGrant),
+            deleteTeamGrant: vi.fn().mockResolvedValue(emailGrant),
+        });
         await expect(
             addAuthorizationAdministrationTeamGrant(
                 ADMIN_CONTEXT,
                 10,
                 { capabilityKey: "email.request.create", scope: "ALL" },
-                dependencies(repo, transactionRunner),
+                dependencies(emailRepo, transactionRunner),
             ),
-        ).rejects.toMatchObject({ code: "CAPABILITY_DEFERRED" });
+        ).resolves.toEqual(emailGrant);
         await expect(
             removeAuthorizationAdministrationTeamGrant(
                 ADMIN_CONTEXT,
                 10,
                 { capabilityKey: "email.request.create", scope: "ALL" },
-                dependencies(repo, transactionRunner),
+                dependencies(emailRepo, transactionRunner),
             ),
-        ).rejects.toMatchObject({ code: "CAPABILITY_DEFERRED" });
-        expect(transactionRunner).not.toHaveBeenCalled();
-        expect(auditAppendMock).not.toHaveBeenCalled();
+        ).resolves.toEqual(emailGrant);
+        expect(transactionRunner).toHaveBeenCalledTimes(2);
+        expect(auditAppendMock).toHaveBeenCalledTimes(2);
     });
 
-    it("guards Team lifecycle changes against affected non-grantable persisted grants", async () => {
-        const updateTeam = vi.fn();
+    it("allows Team lifecycle changes for affected Email Request grants", async () => {
+        const disabled = team({ isActive: false });
+        const updateTeam = vi.fn().mockResolvedValue(disabled);
         const repo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
             listMembershipsForTeam: vi.fn().mockResolvedValue([{
@@ -989,8 +1018,8 @@ describe("Phase 10B Authorization Administration commands", () => {
                 { isActive: false },
                 dependencies(repo),
             ),
-        ).rejects.toMatchObject({ code: "CAPABILITY_DEFERRED" });
-        expect(updateTeam).not.toHaveBeenCalled();
+        ).resolves.toEqual(disabled);
+        expect(updateTeam).toHaveBeenCalledOnce();
     });
 
     it("does not block Team lifecycle changes when no membership can receive Team grants", async () => {
@@ -1073,8 +1102,9 @@ describe("Phase 10B Authorization Administration commands", () => {
         expect(updateTeamRole).toHaveBeenCalledOnce();
     });
 
-    it("guards membership add and TeamRole lifecycle changes against affected grants", async () => {
-        const membershipCreate = vi.fn();
+    it("allows membership and TeamRole lifecycle changes for Email Request grants", async () => {
+        const membership = { teamId: 10, userId: 7, teamRoleId: null };
+        const membershipCreate = vi.fn().mockResolvedValue(membership);
         const membershipRepo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
             findUserById: vi.fn().mockResolvedValue({ id: 7 }),
@@ -1091,10 +1121,11 @@ describe("Phase 10B Authorization Administration commands", () => {
                 { userId: 7 },
                 dependencies(membershipRepo),
             ),
-        ).rejects.toMatchObject({ code: "CAPABILITY_DEFERRED" });
-        expect(membershipCreate).not.toHaveBeenCalled();
+        ).resolves.toEqual(membership);
+        expect(membershipCreate).toHaveBeenCalledOnce();
 
-        const roleUpdate = vi.fn();
+        const disabledRole = role({ isActive: false });
+        const roleUpdate = vi.fn().mockResolvedValue(disabledRole);
         const roleRepo = repository({
             findTeamById: vi.fn().mockResolvedValue(team()),
             findTeamRoleById: vi.fn().mockResolvedValue(role()),
@@ -1117,8 +1148,8 @@ describe("Phase 10B Authorization Administration commands", () => {
                 { isActive: false },
                 dependencies(roleRepo),
             ),
-        ).rejects.toMatchObject({ code: "CAPABILITY_DEFERRED" });
-        expect(roleUpdate).not.toHaveBeenCalled();
+        ).resolves.toEqual(disabledRole);
+        expect(roleUpdate).toHaveBeenCalledOnce();
     });
 
     it("creates TeamRole, rejects cross-Team membership role assignment, and audits role lifecycle", async () => {

@@ -89,6 +89,8 @@ function systemRoleScopes(capability: string): readonly TestAuthorizationScope[]
             return ["ASSIGNED"];
         case "leave.request.not_taken":
             return ["OWN", "ASSIGNED"];
+        case "leave.recovery.manage":
+            return ["ALL"];
         default:
             return ["OWN"];
     }

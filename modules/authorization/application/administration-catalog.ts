@@ -32,12 +32,6 @@ const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.fre
     runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY" as const,
 });
 
-const DEFERRED_EMAIL: CapabilityAdministrationMetadata = Object.freeze({
-    runtimeAuthorizationMode: "DEFERRED" as const,
-    nonGrantableReason:
-        "Email Request and the future IT module remain deferred.",
-});
-
 /**
  * Administration-only operational metadata. Capability identity, description,
  * scopes, and channels remain exclusively owned by CAPABILITY_REGISTRY.
@@ -94,11 +88,12 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "leave.cancellation.decide": CENTRAL_WITH_DEFAULT_POLICY,
     "leave.request.not_taken": CENTRAL_WITH_DEFAULT_POLICY,
     "leave.approver.manage": CENTRAL_ONLY,
+    "leave.recovery.manage": CENTRAL_ONLY,
 
     "audit.read": CENTRAL_ONLY,
 
-    "email.request.read": DEFERRED_EMAIL,
-    "email.request.create": DEFERRED_EMAIL,
+    "email.request.read": CENTRAL_ONLY,
+    "email.request.create": CENTRAL_ONLY,
 
     "notification.inbox.read": CENTRAL_WITH_DEFAULT_POLICY,
     "notification.inbox.update": CENTRAL_WITH_DEFAULT_POLICY,

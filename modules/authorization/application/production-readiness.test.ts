@@ -358,7 +358,7 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("blocks an active persisted grant for a non-administratively-deployable capability", () => {
+    it("accepts an active persisted grant for an administratively grantable Email capability", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
             userGrants: [{
@@ -368,14 +368,13 @@ describe("authorization production readiness", () => {
             }],
         }));
 
-        expect(result.status).toBe("BLOCKED");
-        expect(result.findings).toContainEqual(expect.objectContaining({
+        expect(result.status).toBe("PASS");
+        expect(result.findings).not.toContainEqual(expect.objectContaining({
             code: "NON_ADMINISTRATIVELY_GRANTABLE",
-            severity: "BLOCKER",
         }));
     });
 
-    it("blocks a non-grantable capability on an active Team even with zero members", () => {
+    it("accepts an Email capability on an active Team even with zero members", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             teams: [{ id: 1, isActive: true }],
             teamGrants: [{
@@ -385,15 +384,13 @@ describe("authorization production readiness", () => {
             }],
         }));
 
-        expect(result.status).toBe("BLOCKED");
-        expect(result.findings).toContainEqual(expect.objectContaining({
+        expect(result.status).toBe("PASS");
+        expect(result.findings).not.toContainEqual(expect.objectContaining({
             code: "NON_ADMINISTRATIVELY_GRANTABLE",
-            source: "TEAM_GRANT",
-            severity: "BLOCKER",
         }));
     });
 
-    it("blocks a non-grantable capability on an active TeamRole even with zero members", () => {
+    it("accepts an Email capability on an active TeamRole even with zero members", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             teams: [{ id: 1, isActive: true }],
             teamRoles: [{ id: 20, teamId: 1, isActive: true }],
@@ -405,15 +402,13 @@ describe("authorization production readiness", () => {
             }],
         }));
 
-        expect(result.status).toBe("BLOCKED");
-        expect(result.findings).toContainEqual(expect.objectContaining({
+        expect(result.status).toBe("PASS");
+        expect(result.findings).not.toContainEqual(expect.objectContaining({
             code: "NON_ADMINISTRATIVELY_GRANTABLE",
-            source: "TEAM_ROLE_GRANT",
-            severity: "BLOCKER",
         }));
     });
 
-    it("keeps inactive Team non-grantable history as a warning", () => {
+    it("keeps inactive Team Email configuration as a warning", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             teams: [{ id: 1, isActive: false }],
             teamGrants: [{
@@ -425,13 +420,13 @@ describe("authorization production readiness", () => {
 
         expect(result.status).toBe("WARNING");
         expect(result.findings).toContainEqual(expect.objectContaining({
-            code: "NON_ADMINISTRATIVELY_GRANTABLE",
+            code: "INACTIVE_TEAM_CONFIGURATION",
             source: "TEAM_GRANT",
             severity: "WARNING",
         }));
     });
 
-    it("keeps inactive TeamRole non-grantable history as a warning", () => {
+    it("keeps inactive TeamRole Email configuration as a warning", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             teams: [{ id: 1, isActive: true }],
             teamRoles: [{ id: 20, teamId: 1, isActive: false }],
@@ -445,7 +440,7 @@ describe("authorization production readiness", () => {
 
         expect(result.status).toBe("WARNING");
         expect(result.findings).toContainEqual(expect.objectContaining({
-            code: "NON_ADMINISTRATIVELY_GRANTABLE",
+            code: "INACTIVE_TEAM_ROLE_CONFIGURATION",
             source: "TEAM_ROLE_GRANT",
             severity: "WARNING",
         }));
@@ -995,7 +990,7 @@ describe("authorization production readiness", () => {
         expect(result).toMatchObject({ status: "PASS", issues: [] });
     });
 
-    it("blocks canary plans with invalid source/scope, deferred capability, or existing exact grant", async () => {
+    it("blocks canary plans with invalid source/scope or existing exact grant and accepts activated Email", async () => {
         const snapshot = createSnapshot({
             teams: [{ id: 1, isActive: true }],
             users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
@@ -1021,13 +1016,25 @@ describe("authorization production readiness", () => {
             code: "CANARY_GRANT_ALREADY_EXISTS",
         }));
 
-        const deferred = await validateAuthorizationProductionCanaryPlan(
-            createValidCanaryPlan({ capabilityKey: "email.request.read", scope: "OWN" }),
-            snapshot,
+        const activatedEmail = await validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                capabilityKey: "email.request.read",
+                scope: "OWN",
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "email.request.read",
+                    channel: "DASHBOARD",
+                    contextKey: "dashboard",
+                    state: "UNAVAILABLE",
+                    defaultScopes: [],
+                    effectiveScopes: [],
+                },
+            }),
+            createSnapshot({
+                users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
         );
-        expect(deferred.status).toBe("BLOCKED");
-        expect(deferred.issues).toContainEqual(expect.objectContaining({
-            code: "NON_ADMINISTRATIVELY_GRANTABLE",
-        }));
+        expect(activatedEmail).toMatchObject({ status: "PASS", issues: [] });
     });
 });

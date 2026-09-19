@@ -63,6 +63,7 @@ export {
     assertLeaveCapabilityScope,
     buildLeaveAuthorizationActor,
     buildLeaveAuthorizationContext,
+    canUseLeaveRecoveryOverride,
     canUseLeaveAdminRecoveryOverride,
     getLeavePresentationCapabilities,
     LEAVE_CAPABILITIES,

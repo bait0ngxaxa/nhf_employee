@@ -270,6 +270,13 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
+    defineCapability({
+        key: "leave.recovery.manage",
+        domain: "leave",
+        description: "Enter Leave recovery workflows within an authorized resource scope.",
+        scopes: ["ALL"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
 
     defineCapability({
         key: "audit.read",

@@ -3,8 +3,9 @@ import type { LeaveRequest } from "@prisma/client";
 import { isActiveEmployeeInTransaction } from "./queries/active-employee-session";
 import {
     assertLeaveCapabilityScope,
-    canUseLeaveAdminRecoveryOverride,
+    canUseLeaveRecoveryOverride,
     resolveLeaveCapabilityInTransaction,
+    resolveOptionalLeaveRecoveryCapabilityInTransaction,
     type LeaveAuthorizationContext,
 } from "./authorization";
 import {
@@ -247,14 +248,25 @@ export async function confirmLeaveNotTaken(
         )) {
             throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
         }
-        const capabilityAuthorization = assertLeaveCapabilityScope(
-            await resolveLeaveCapabilityInTransaction(
+        const recoveryCapabilityAuthorization = input.allowAdminOverride
+            && input.actor.authorization.authorizationActor.channel === "DASHBOARD"
+            ? await resolveOptionalLeaveRecoveryCapabilityInTransaction(
                 tx,
                 input.actor.authorization,
-                "leave.request.not_taken",
-            ),
-            "ASSIGNED",
-        );
+            )
+            : null;
+        const hasRecoveryAuthority = recoveryCapabilityAuthorization !== null
+            && canUseLeaveRecoveryOverride(recoveryCapabilityAuthorization);
+        const capabilityAuthorization = hasRecoveryAuthority
+            ? recoveryCapabilityAuthorization
+            : assertLeaveCapabilityScope(
+                await resolveLeaveCapabilityInTransaction(
+                    tx,
+                    input.actor.authorization,
+                    "leave.request.not_taken",
+                ),
+                "ASSIGNED",
+            );
         const userId = capabilityAuthorization.actor.userId;
         const managerId = capabilityAuthorization.actor.employeeId;
         if (
@@ -264,10 +276,6 @@ export async function confirmLeaveNotTaken(
         ) {
             throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
         }
-        const isAdmin = canUseLeaveAdminRecoveryOverride(
-            capabilityAuthorization,
-        );
-
         await lockLeaveRequestRow(tx, input.leaveId);
         let leaveRequest = await tx.leaveRequest.findUnique({
             where: { id: input.leaveId },
@@ -293,18 +301,28 @@ export async function confirmLeaveNotTaken(
 
         const decisionAuthorization = getLeaveDecisionAuthorization(
             managerId,
-            isAdmin,
+            hasRecoveryAuthority,
             leaveRequest,
         );
         if (decisionAuthorization === "OWNER") {
             throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
         }
-        if (isAdmin && decisionAuthorization === "FORBIDDEN") {
+        if (hasRecoveryAuthority && decisionAuthorization === "FORBIDDEN") {
             throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.forbidden, 403);
         }
 
-        const adminOverride = decisionAuthorization === "ADMIN_OVERRIDE";
-        if (!isAdmin) {
+        const recoveryOverride = decisionAuthorization === "RECOVERY_OVERRIDE";
+        if (hasRecoveryAuthority && decisionAuthorization === "ASSIGNED_APPROVER") {
+            assertLeaveCapabilityScope(
+                await resolveLeaveCapabilityInTransaction(
+                    tx,
+                    input.actor.authorization,
+                    "leave.request.not_taken",
+                ),
+                "ASSIGNED",
+            );
+        }
+        if (!recoveryOverride) {
             const exceptionApprover = await resolveLeaveExceptionApprover(tx, {
                 employeeId: leaveRequest.employeeId,
                 originalApprover: leaveRequest.approver,
@@ -343,7 +361,7 @@ export async function confirmLeaveNotTaken(
             }
         }
 
-        const adminOverrideReason = adminOverride
+        const adminOverrideReason = recoveryOverride
             ? requireAdminOverrideReason(input.reason)
             : null;
         const claimedRequest = await tx.leaveRequest.updateMany({
@@ -351,7 +369,7 @@ export async function confirmLeaveNotTaken(
                 id: leaveRequest.id,
                 status: "APPROVED",
                 employeeId: { not: managerId },
-                ...(adminOverride
+                ...(recoveryOverride
                     ? {}
                     : leaveRequest.exceptionApproverId !== null
                         ? { exceptionApproverId: managerId }
@@ -408,13 +426,13 @@ export async function confirmLeaveNotTaken(
         const payload: LeaveNotTakenConfirmedPayload = {
             leaveId: leaveRequest.id,
             employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-            decisionActorName: isAdmin
+            decisionActorName: recoveryOverride
                 ? input.actor.user.name
                 : currentApprover
                     ? getEmployeeDisplayName(currentApprover)
                     : null,
             decisionActorRole: capabilityAuthorization.actor.systemRole,
-            recoveryOverride: adminOverride,
+            recoveryOverride,
             leaveType: leaveRequest.leaveType,
             startDate: leaveRequest.startDate.toISOString(),
             endDate: leaveRequest.endDate.toISOString(),
@@ -439,7 +457,9 @@ export async function confirmLeaveNotTaken(
                 after: { status: "NOT_TAKEN" },
                 metadata: {
                     ...buildLeaveAuditContext(leaveRequest),
-                    adminOverride,
+                    // Historical audit key retained for compatibility. Its
+                    // value now reflects the explicit recovery decision.
+                    adminOverride: recoveryOverride,
                     decision: "CONFIRM_NOT_TAKEN",
                     originalApproverId: leaveRequest.approverId,
                     exceptionApproverId: leaveRequest.exceptionApproverId,

@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/leave/admin/recovery/route";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
+import type * as LeaveModule from "@/modules/leave";
+
+const authorizationMocks = vi.hoisted(() => ({
+    assertLeaveCapability: vi.fn(),
+    assertLeaveCapabilityScope: vi.fn(),
+    buildLeaveAuthorizationContext: vi.fn(),
+}));
 
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: vi.fn(),
@@ -16,6 +23,16 @@ vi.mock("@/lib/db/prisma", () => ({
         },
     },
 }));
+
+vi.mock("@/modules/leave", async (importOriginal) => {
+    const actual = await importOriginal<typeof LeaveModule>();
+    return {
+        ...actual,
+        assertLeaveCapability: authorizationMocks.assertLeaveCapability,
+        assertLeaveCapabilityScope: authorizationMocks.assertLeaveCapabilityScope,
+        buildLeaveAuthorizationContext: authorizationMocks.buildLeaveAuthorizationContext,
+    };
+});
 
 function createLeaveRequest(
     id: string,
@@ -65,6 +82,19 @@ function createLeaveRequest(
 describe("GET /api/leave/admin/recovery", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authorizationMocks.buildLeaveAuthorizationContext.mockReturnValue({
+            authorizationActor: {
+                userId: 1,
+                employeeId: 999,
+                systemRole: "ADMIN",
+                channel: "DASHBOARD",
+            },
+        });
+        authorizationMocks.assertLeaveCapability.mockResolvedValue({
+            capability: "leave.recovery.manage",
+            scopes: ["ALL"],
+        });
+        authorizationMocks.assertLeaveCapabilityScope.mockReturnValue(undefined);
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 999,
@@ -87,6 +117,14 @@ describe("GET /api/leave/admin/recovery", () => {
         const body = await response.json();
 
         expect(response.status).toBe(200);
+        expect(authorizationMocks.assertLeaveCapability).toHaveBeenCalledWith(
+            expect.anything(),
+            "leave.recovery.manage",
+        );
+        expect(authorizationMocks.assertLeaveCapabilityScope).toHaveBeenCalledWith(
+            expect.objectContaining({ capability: "leave.recovery.manage" }),
+            "ALL",
+        );
         expect(body.notTakenPending).toHaveLength(1);
         expect(body.cancellationPending).toHaveLength(1);
         expect(body.metadata).toEqual({
@@ -152,5 +190,6 @@ describe("GET /api/leave/admin/recovery", () => {
         expect(response.status).toBe(403);
         expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
         expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
+        expect(authorizationMocks.assertLeaveCapability).not.toHaveBeenCalled();
     });
 });

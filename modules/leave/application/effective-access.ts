@@ -77,6 +77,12 @@ const LIMITATIONS: Readonly<
             label: "การจัดการ approver ยังผ่าน assignment และ lifecycle checks ของ Leave",
         }),
     ]),
+    "leave.recovery.manage": Object.freeze([
+        Object.freeze({
+            code: "leave.recovery.workflow",
+            label: "สิทธิ์นี้ใช้เข้า recovery เท่านั้น และยังต้องผ่าน owner, effective approver และ workflow invariants",
+        }),
+    ]),
 });
 
 function asLeaveActor(actor: AuthorizationActor): LeaveAuthorizationActor {

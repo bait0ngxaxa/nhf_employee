@@ -53,10 +53,9 @@ const emailCapability = {
     description: "อ่านคำขอ Email",
     supportedScopes: ["OWN", "ALL"],
     supportedChannels: ["DASHBOARD"],
-    runtimeAuthorizationMode: "DEFERRED",
-    administrativeStatus: "DEFERRED",
-    administrativelyGrantable: false,
-    nonGrantableReason: "Email Request remains deferred",
+    runtimeAuthorizationMode: "CENTRAL_ONLY",
+    administrativeStatus: "GRANTABLE",
+    administrativelyGrantable: true,
 } satisfies AuthorizationAdministrationOverviewData["capabilities"][number];
 
 const teamReference = {
@@ -176,8 +175,8 @@ const adminUser = {
         context: { key: "dashboard", label: "Dashboard", channel: "DASHBOARD" },
         defaultAuthority: { scopes: [] },
         additionalAuthority: { scopes: [], grants: [] },
-        effectiveAuthority: { state: "DEFERRED", scopes: [], redundant: false },
-        limitations: [{ code: "email.deferred_migration", label: "Email Request ยัง deferred" }],
+        effectiveAuthority: { state: "UNAVAILABLE", scopes: [], redundant: false },
+        limitations: [{ code: "email.request.workflow", label: "Email Request ยังต้องผ่าน workflow rules" }],
     }],
     effectiveAccessSummary: {
         inspectedContextCount: 2,
@@ -185,7 +184,7 @@ const adminUser = {
         defaultBackedContextCount: 0,
         additionalAuthorityContextCount: 1,
         unsupportedContextCount: 0,
-        deferredCapabilityCount: 1,
+        deferredCapabilityCount: 0,
         configurationIssueCount: 0,
     },
     configurationIssues: [],
@@ -242,8 +241,8 @@ const normalUser = {
         context: { key: "dashboard", label: "Dashboard", channel: "DASHBOARD" },
         defaultAuthority: { scopes: [] },
         additionalAuthority: { scopes: [], grants: [] },
-        effectiveAuthority: { state: "DEFERRED", scopes: [], redundant: false },
-        limitations: [{ code: "email.deferred_migration", label: "Email Request ยัง deferred" }],
+        effectiveAuthority: { state: "UNAVAILABLE", scopes: [], redundant: false },
+        limitations: [{ code: "email.request.workflow", label: "Email Request ยังต้องผ่าน workflow rules" }],
     }],
     resolverEffectivePermissions: [{
         capability: routineUpdateCapability,
@@ -264,7 +263,7 @@ const normalUser = {
         defaultBackedContextCount: 4,
         additionalAuthorityContextCount: 2,
         unsupportedContextCount: 1,
-        deferredCapabilityCount: 1,
+        deferredCapabilityCount: 0,
         configurationIssueCount: 0,
     },
 } satisfies AuthorizationAdministrationUserDetailData;
@@ -274,9 +273,9 @@ const overview = {
     teams: [],
     summary: {
         registeredCapabilityCount: 4,
-        administrativelyGrantableCapabilityCount: 3,
+        administrativelyGrantableCapabilityCount: 4,
         policyActivationRequiredCapabilityCount: 0,
-        deferredCapabilityCount: 1,
+        deferredCapabilityCount: 0,
         teamCount: 0,
         activeTeamCount: 0,
     },
@@ -488,7 +487,7 @@ describe("User Access presentation", () => {
         renderPanel(normalUser);
 
         fireEvent.change(screen.getByLabelText("สถานะสิทธิ์"), {
-            target: { value: "DEFERRED" },
+            target: { value: "UNAVAILABLE" },
         });
         expect(screen.getByRole("heading", { name: "อีเมล" })).toBeInTheDocument();
 

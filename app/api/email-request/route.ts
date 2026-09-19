@@ -1,11 +1,15 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 
-import { requireAdminSession, requireApiSession } from "@/lib/auth/api";
+import { requireApiSession } from "@/lib/auth/api";
 import { createAuditLog } from "@/lib/server/audit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
     emailRequestService,
+    assertEmailRequestCapability,
+    buildEmailRequestAuthorizationContext,
     EmailRequestIdempotencyConflictError,
+    EmailRequestCapabilityDeniedError,
+    toEmailRequestReadAuthorization,
     type EmailRequestFilters,
 } from "@/lib/services/email-request";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
@@ -18,11 +22,22 @@ import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
-        const auth = await requireAdminSession({
+        const auth = await requireApiSession({
             unauthorizedResponse: () => unauthorized({ success: false }),
             forbiddenResponse: () => forbidden({ success: false }),
         });
         if (!auth.ok) return auth.response;
+
+        const createAuthorization = await assertEmailRequestCapability(
+            buildEmailRequestAuthorizationContext(auth.user),
+            "email.request.create",
+        );
+        if (!createAuthorization.scopes.includes("ALL")) {
+            throw new EmailRequestCapabilityDeniedError(
+                "email.request.create",
+                createAuthorization.decision.reason ?? "NO_APPLICABLE_GRANT",
+            );
+        }
 
         const parsedIdempotencyKey = idempotencyKeySchema.safeParse(
             req.headers.get("Idempotency-Key"),
@@ -104,6 +119,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             { status: result.replayed ? 200 : 201 },
         );
     } catch (error) {
+        if (error instanceof EmailRequestCapabilityDeniedError) {
+            return forbidden({ success: false });
+        }
         if (error instanceof EmailRequestIdempotencyConflictError) {
             return jsonError(error.message, 409, { success: false });
         }
@@ -119,6 +137,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         });
         if (!auth.ok) return auth.response;
 
+        const readAuthorization = toEmailRequestReadAuthorization(
+            await assertEmailRequestCapability(
+                buildEmailRequestAuthorizationContext(auth.user),
+                "email.request.read",
+            ),
+        );
+
         const { searchParams } = new URL(req.url);
         const parsedFilters = emailRequestFiltersSchema.safeParse({
             page: searchParams.get("page") ?? "1",
@@ -132,13 +157,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         }
         const filters: EmailRequestFilters = parsedFilters.data;
 
-        const result = await emailRequestService.getEmailRequests(filters, auth.user);
+        const result = await emailRequestService.getEmailRequests(
+            filters,
+            readAuthorization,
+        );
 
         return NextResponse.json({
             success: true,
             ...result,
         });
     } catch (error) {
+        if (error instanceof EmailRequestCapabilityDeniedError) {
+            return forbidden({ success: false });
+        }
         console.error("Error fetching email requests:", error);
         return operationFailed(500, { success: false });
     }

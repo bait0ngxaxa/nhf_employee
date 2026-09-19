@@ -110,6 +110,8 @@ function systemRoleScopes(capability: string): readonly TestAuthorizationScope[]
             return ["ASSIGNED"];
         case "leave.request.not_taken":
             return ["OWN", "ASSIGNED"];
+        case "leave.recovery.manage":
+            return ["ALL"];
         default:
             return ["OWN"];
     }
@@ -360,22 +362,9 @@ describe("/api/leave/not-taken", () => {
             }),
         }));
 
-        expect(response.status).toBe(200);
-        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
-            where: expect.objectContaining({
-                id: "leave-recovery-request",
-                notTakenRequestedAt: null,
-            }),
-            data: expect.objectContaining({
-                notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
-            }),
-        });
-        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                type: "LEAVE_NOT_TAKEN_REQUESTED",
-                payload: expect.stringContaining('"employeeId":99'),
-            }),
-        });
+        expect(response.status).toBe(409);
+        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(prisma.employee.findMany).not.toHaveBeenCalled();
     });
 
     it("does not create notifications when another request already claimed the leave", async () => {
@@ -888,6 +877,8 @@ describe("/api/leave/not-taken", () => {
             employee: { id: 10, firstName: "Employee", lastName: "User", user: { id: 1 } },
             approver: {
                 id: 99,
+                firstName: "Assigned",
+                lastName: "Approver",
                 status: "ACTIVE",
                 deletedAt: null,
                 user: {

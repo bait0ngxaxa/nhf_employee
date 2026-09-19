@@ -14,6 +14,7 @@ import {
     assertLeaveCapabilityScope,
     buildLeaveAuthorizationContext,
     canUseLeaveAdminRecoveryOverride,
+    canUseLeaveRecoveryOverride,
     LEAVE_CAPABILITIES,
     resolveLeaveActorInTransaction,
     defaultLeaveScopes,
@@ -134,6 +135,7 @@ describe("Leave authorization adapter", () => {
             "leave.cancellation.decide",
             "leave.request.not_taken",
             "leave.approver.manage",
+            "leave.recovery.manage",
         ]);
         expect(context().authorizationActor).toEqual({
             userId: 7,
@@ -212,18 +214,19 @@ describe("Leave authorization adapter", () => {
 
         mocks.resolve.mockResolvedValue(
             decision(
-                "leave.cancellation.decide",
+                "leave.recovery.manage",
                 true,
-                ["ASSIGNED"],
+                ["ALL"],
                 undefined,
-                [systemRoleGrant("leave.cancellation.decide", "ASSIGNED")],
+                [systemRoleGrant("leave.recovery.manage")],
             ),
         );
         const recovery = await resolveLeaveCapability(
             context("ADMIN"),
-            "leave.cancellation.decide",
+            "leave.recovery.manage",
         );
         expect(recovery.defaultScopes).toEqual([]);
+        expect(canUseLeaveRecoveryOverride(recovery)).toBe(true);
         expect(canUseLeaveAdminRecoveryOverride(recovery)).toBe(true);
     });
 
@@ -259,6 +262,28 @@ describe("Leave authorization adapter", () => {
             "leave.request.approve",
         );
         expect(assertLeaveCapabilityScope(approval, "ASSIGNED")).toBe(approval);
+    });
+
+    it("resolves explicit USER recovery authority without changing the actor role", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "leave.recovery.manage",
+                true,
+                ["ALL"],
+                undefined,
+                [userGrant("leave.recovery.manage", "ALL")],
+            ),
+        );
+
+        const recovery = await resolveLeaveCapability(
+            context("USER"),
+            "leave.recovery.manage",
+        );
+
+        expect(recovery.scopes).toEqual(["ALL"]);
+        expect(recovery.defaultScopes).toEqual([]);
+        expect(recovery.actor.systemRole).toBe("USER");
+        expect(canUseLeaveRecoveryOverride(recovery)).toBe(true);
     });
 
     it("composes configured USER grants additively without narrowing defaults", async () => {
@@ -355,27 +380,46 @@ describe("Leave authorization adapter", () => {
     it("keeps the recovery override Dashboard-only after central authorization", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
-                "leave.request.not_taken",
+                "leave.recovery.manage",
                 true,
-                ["OWN", "ASSIGNED"],
+                ["ALL"],
                 undefined,
                 [
-                    systemRoleGrant("leave.request.not_taken", "OWN"),
-                    systemRoleGrant("leave.request.not_taken", "ASSIGNED"),
+                    systemRoleGrant("leave.recovery.manage", "ALL"),
                 ],
             ),
         );
         const dashboard = await resolveLeaveCapability(
             context("ADMIN", "DASHBOARD"),
-            "leave.request.not_taken",
+            "leave.recovery.manage",
         );
         const liff = await resolveLeaveCapability(
             context("ADMIN", "LIFF_SELF_SERVICE"),
-            "leave.request.not_taken",
+            "leave.recovery.manage",
         );
 
-        expect(canUseLeaveAdminRecoveryOverride(dashboard)).toBe(true);
-        expect(canUseLeaveAdminRecoveryOverride(liff)).toBe(false);
+        expect(canUseLeaveRecoveryOverride(dashboard)).toBe(true);
+        expect(canUseLeaveRecoveryOverride(liff)).toBe(false);
+    });
+
+    it("fails closed when LIFF attempts to resolve Leave recovery", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "leave.recovery.manage",
+                false,
+                [],
+                "CHANNEL_NOT_SUPPORTED",
+            ),
+        );
+
+        await expect(
+            resolveLeaveCapability(
+                context("USER", "LIFF_SELF_SERVICE"),
+                "leave.recovery.manage",
+            ),
+        ).rejects.toMatchObject({
+            authorizationReason: "CHANNEL_NOT_SUPPORTED",
+        });
     });
 
     it("re-reads active identity inside the transaction before resolving the capability", async () => {

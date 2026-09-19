@@ -11,6 +11,15 @@ production enforcement path yet. See
 and
 [authorization-phase-12hc-domain-default-policy-rebaseline.md](./authorization-phase-12hc-domain-default-policy-rebaseline.md).
 
+Phase 12H-D completed the registered deferred business capabilities without
+changing the production enforcement target: `leave.recovery.manage` is a
+Dashboard-only centralized recovery-entry capability, and Email Request now
+uses centralized configured `OWN`/`ALL` read and `ALL` create decisions. The
+production singleton still retains temporary legacy ADMIN compatibility, and
+the remaining presentation/route role gates are intentionally scheduled for
+Phase 12H-F. The completion record is in
+[authorization-phase-12hd-missing-deferred-capability-completion.md](./authorization-phase-12hd-missing-deferred-capability-completion.md).
+
 Status: Phase 3 complete. This document describes the resolver introduced
 after the Phase 1 capability contract and Phase 2 authorization persistence.
 It extends, and does not replace, the current behavior record in

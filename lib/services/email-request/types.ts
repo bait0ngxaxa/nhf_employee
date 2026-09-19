@@ -1,5 +1,6 @@
 import type { EmailRequest } from "@prisma/client";
 import type { SharedDriveOption } from "@/constants/email-request";
+import type { AuthorizationScope } from "@/modules/authorization";
 
 // ==================== Input Types ====================
 
@@ -24,6 +25,11 @@ export interface CreateEmailRequestOptions {
 export interface EmailRequestFilters {
     page: number;
     limit: number;
+}
+
+export interface EmailRequestReadAuthorization {
+    userId: number;
+    scopes: readonly AuthorizationScope[];
 }
 
 /** User context for authorization checks */
