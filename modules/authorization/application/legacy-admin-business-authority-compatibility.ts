@@ -27,8 +27,10 @@ import type {
  *
  * This is intentionally the only application seam that can manufacture the
  * legacy SYSTEM_ROLE / ADMIN business grant or preserve its no-persistence
- * resolver behavior. Phase 12H-G enforcement cutover must remove this seam
- * after domain defaults and configured grants have been rebaselined.
+ * resolver behavior. Phase 12H-G enforcement cutover stops using this
+ * compatibility seam for production business enforcement. Keep the seam
+ * available through Phase 12H-H rollout validation; Phase 12H-I removes it
+ * after role-neutral cutover evidence is accepted.
  */
 export function evaluateLegacyAuthorization(
     actor: AuthorizationActor,
