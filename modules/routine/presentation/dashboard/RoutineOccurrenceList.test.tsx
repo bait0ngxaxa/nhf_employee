@@ -202,7 +202,7 @@ describe("RoutineOccurrenceList", () => {
         expect(dialog).toHaveTextContent("3 วันก่อนครบกำหนด · 09:00 น.");
         expect(dialog).toHaveTextContent("รอบ 2026-08");
         expect(dialog).toHaveTextContent("สมหญิง ใจงาม");
-        expect(dialog).not.toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
+        expect(dialog).not.toHaveTextContent("ข้อมูลต้นทางการนำเข้า");
         expect(fetchMock).not.toHaveBeenCalled();
     });
 

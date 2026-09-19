@@ -196,12 +196,12 @@ describe("RoutineTaskList", () => {
         );
 
         fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
-        expect(screen.getByRole("dialog")).not.toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
+        expect(screen.getByRole("dialog")).not.toHaveTextContent("ข้อมูลต้นทางการนำเข้า");
         fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
 
         rerender(<RoutineTaskList {...props} data={importedData} canReadImportMetadata />);
         fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
-        expect(screen.getByRole("dialog")).toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
+        expect(screen.getByRole("dialog")).toHaveTextContent("ข้อมูลต้นทางการนำเข้า");
         expect(screen.getByRole("dialog")).toHaveTextContent("routine.xlsx");
     });
 

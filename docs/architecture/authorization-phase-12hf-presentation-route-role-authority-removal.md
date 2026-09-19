@@ -143,6 +143,28 @@ are part of an existing compatibility contract. New configured broad authority
 does not rewrite historical values; internal branching uses role-neutral
 terminology where the value is not historical data.
 
+## Corrective provenance boundary
+
+The post-closure corrective baseline is `4e7236ef9d6d9a6b33cdf495544595a0ae4f9b67`.
+Routine task `ALL` scopes control broad task/resource behavior only. They do
+not include write authority over import provenance.
+
+Normal `routine.task.create` always strips caller-supplied
+`sourceFileName`, `sourceSheet`, and `sourceRow` before persistence and before
+the normal task-create idempotency hash is generated. This applies equally to
+configured USER `ALL`, legacy ADMIN compatibility `ALL`, Team/TeamRole `ALL`,
+and ordinary LIFF task creation. Normal `routine.task.update` also omits those
+fields from the Prisma update, so existing imported provenance remains
+unchanged during ordinary task edits.
+
+Only the import-managed apply path, which is authorized through
+`routine.import.manage / ALL`, preserves trusted source provenance. The import
+workflow, staging, ledger linkage, fingerprints, audit, occurrence generation,
+and transaction behavior remain unchanged. Query/detail serialization remains
+read-gated by the same `routine.import.manage` authority. The neutral
+presentation label is `ข้อมูลต้นทางการนำเข้า`; it does not imply role-based
+authority.
+
 ## Explicitly retained role uses
 
 The final semantic search classified all remaining production role matches:
@@ -188,3 +210,20 @@ The following checks passed:
 No development server or production build was run. No production grant, seed,
 backfill, migration, live preflight, canary, or authorization rollout was
 performed.
+
+### Post-closure corrective verification
+
+After the Phase 12H-F closure evidence above, the corrective patch was verified
+against baseline `4e7236ef9d6d9a6b33cdf495544595a0ae4f9b67`:
+
+- Routine mutation, idempotency, import/staging/apply, query, authorization,
+  and presentation regression selection: **20 files / 273 tests passed**;
+- full repository suite: **328 files / 3,110 tests passed**;
+- `npm.cmd run typecheck`: passed;
+- `npm.cmd run lint:strict`: passed;
+- `npm.cmd run architecture:check`: passed, 1,149 source files checked;
+- `git diff --check`: passed.
+
+These results are corrective verification after closure; they do not replace
+the historical Phase 12H-F evidence above. No development server or production
+build was run, and no production data or authorization grants were mutated.

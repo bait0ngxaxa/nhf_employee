@@ -176,19 +176,27 @@ function normalizeRoutineTaskCreateInput(
     capabilityAuthorization: RoutineCapabilityAuthorization,
     operation: "TASK_CREATE" | "IMPORT_APPLY",
 ): RoutineTaskCreateInput {
-    if (capabilityAuthorization.hasBroadAuthority || operation === "IMPORT_APPLY") {
+    if (operation === "IMPORT_APPLY") {
         return input;
     }
+
+    const provenanceSafeInput: RoutineTaskCreateInput = {
+        ...input,
+        sourceFileName: undefined,
+        sourceSheet: undefined,
+        sourceRow: undefined,
+    };
+    if (capabilityAuthorization.hasBroadAuthority) {
+        return provenanceSafeInput;
+    }
+
     if (actorAuthorization.employeeId === null) {
         throw new RoutineValidationError("ไม่พบข้อมูลพนักงานของบัญชีผู้ใช้");
     }
 
     return {
-        ...input,
+        ...provenanceSafeInput,
         assignees: [{ employeeId: actorAuthorization.employeeId, role: "OWNER" }],
-        sourceFileName: undefined,
-        sourceSheet: undefined,
-        sourceRow: undefined,
         reminderRules: canonicalizeReminderRules(
             input.reminderRules,
             capabilityAuthorization,
@@ -201,14 +209,17 @@ function normalizeRoutineTaskUpdateInput(
     authorization: RoutineCapabilityAuthorization,
     options: { canChangeLifecycle: boolean },
 ): RoutineTaskUpdateInput {
-    if (authorization.hasBroadAuthority) return input;
-
-    return {
+    const provenanceSafeInput: RoutineTaskUpdateInput = {
         ...input,
-        assignees: undefined,
         sourceFileName: undefined,
         sourceSheet: undefined,
         sourceRow: undefined,
+    };
+    if (authorization.hasBroadAuthority) return provenanceSafeInput;
+
+    return {
+        ...provenanceSafeInput,
+        assignees: undefined,
         isActive: options.canChangeLifecycle ? input.isActive : undefined,
         reminderRules: canonicalizeReminderRules(input.reminderRules, authorization),
     };

@@ -684,10 +684,25 @@ describe("NHF Routine mutations", () => {
 
         await updateRoutineTask(
             71,
-            { version: 1, assignees: [owner, coOwner] },
+            {
+                version: 1,
+                assignees: [owner, coOwner],
+                sourceFileName: "admin-spoof.xlsx",
+                sourceSheet: "Spoof",
+                sourceRow: 77,
+            },
             actor(99, "ADMIN"),
         );
 
+        expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    sourceFileName: undefined,
+                    sourceSheet: undefined,
+                    sourceRow: undefined,
+                }),
+            }),
+        );
         expect(prismaMock.routineTaskAssignee.createMany).toHaveBeenCalledWith({
             data: [
                 { taskId: 71, employeeId: 11, role: "OWNER" },
@@ -800,7 +815,7 @@ describe("NHF Routine mutations", () => {
         expect(display.summary).toContain("เปลี่ยนการแจ้งเตือน");
     });
 
-    it("allows configured USER ALL task creation to use broad behavior", async () => {
+    it("allows configured USER ALL task creation to use broad behavior without import provenance", async () => {
         const createdTask = {
             id: 72,
             version: 1,
@@ -851,9 +866,9 @@ describe("NHF Routine mutations", () => {
             data: expect.objectContaining({
                 createdById: 3,
                 updatedById: 3,
-                sourceFileName: "spoof.xlsx",
-                sourceSheet: "Sheet1",
-                sourceRow: 12,
+                sourceFileName: null,
+                sourceSheet: null,
+                sourceRow: null,
                 assignees: { create: [{ employeeId: 999, role: "OWNER" }] },
                 reminderRules: {
                     create: [{
@@ -864,6 +879,117 @@ describe("NHF Routine mutations", () => {
                         isActive: true,
                     }],
                 },
+            }),
+        });
+    });
+
+    it("keeps legacy ADMIN compatibility from writing import provenance through task creation", async () => {
+        const createdTask = {
+            id: 73,
+            version: 1,
+            unitId: 1,
+            categoryId: 1,
+            title: "งานจากความเข้ากันได้เดิม",
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("ADMIN", 99)),
+        );
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 11 }]));
+        prismaMock.routineTask.create.mockResolvedValue(asNever(createdTask));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(createdTask));
+
+        await createRoutineTaskInTransaction(
+            prismaMock as unknown as Prisma.TransactionClient,
+            {
+                unitId: 1,
+                categoryId: 1,
+                title: "งานจากความเข้ากันได้เดิม",
+                scheduleType: "MONTHLY_DAY",
+                scheduleConfig: { day: 10, monthOffset: 0 },
+                businessDayPolicy: "NONE",
+                isActive: true,
+                assignees: [{ employeeId: 11, role: "OWNER" }],
+                sourceFileName: "legacy-spoof.xlsx",
+                sourceSheet: "Legacy",
+                sourceRow: 13,
+                reminderRules: [{
+                    daysBefore: 1,
+                    sendHour: 9,
+                    channel: "IN_APP",
+                    recipientScope: "ADMINS",
+                    isActive: true,
+                }],
+            },
+            actor(99, "ADMIN"),
+        );
+
+        expect(prismaMock.routineTask.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                sourceFileName: null,
+                sourceSheet: null,
+                sourceRow: null,
+                assignees: { create: [{ employeeId: 11, role: "OWNER" }] },
+                reminderRules: {
+                    create: [{
+                        daysBefore: 1,
+                        sendHour: 9,
+                        channel: "IN_APP",
+                        recipientScope: "ADMINS",
+                        isActive: true,
+                    }],
+                },
+            }),
+        });
+    });
+
+    it("preserves import provenance only for import-managed task creation", async () => {
+        const createdTask = {
+            id: 74,
+            version: 1,
+            unitId: 1,
+            categoryId: 1,
+            title: "งานจากการนำเข้า",
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 3,
+            capabilityKey: "routine.import.manage",
+            scope: "ALL",
+        }]));
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 11 }]));
+        prismaMock.routineTask.create.mockResolvedValue(asNever(createdTask));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(createdTask));
+
+        await createRoutineTaskInTransaction(
+            prismaMock as unknown as Prisma.TransactionClient,
+            {
+                unitId: 1,
+                categoryId: 1,
+                title: "งานจากการนำเข้า",
+                scheduleType: "MONTHLY_DAY",
+                scheduleConfig: { day: 10, monthOffset: 0 },
+                businessDayPolicy: "NONE",
+                isActive: true,
+                assignees: [{ employeeId: 11, role: "OWNER" }],
+                sourceFileName: "trusted-import.xlsx",
+                sourceSheet: "มสช.",
+                sourceRow: 14,
+            },
+            actor(3, "USER"),
+            { authorizationCapability: "routine.import.manage" },
+        );
+
+        expect(prismaMock.routineTask.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                sourceFileName: "trusted-import.xlsx",
+                sourceSheet: "มสช.",
+                sourceRow: 14,
             }),
         });
     });
@@ -909,9 +1035,9 @@ describe("NHF Routine mutations", () => {
             businessDayPolicy: "NONE",
             isActive: true,
             version: 1,
-            sourceFileName: null,
-            sourceSheet: null,
-            sourceRow: null,
+            sourceFileName: "existing-import.xlsx",
+            sourceSheet: "มสช.",
+            sourceRow: 8,
             createdById: 99,
             updatedById: 99,
             createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -971,6 +1097,9 @@ describe("NHF Routine mutations", () => {
             data: expect.objectContaining({
                 title: "แก้ไขแล้ว",
                 updatedById: 3,
+                sourceFileName: undefined,
+                sourceSheet: undefined,
+                sourceRow: undefined,
             }),
         });
         expect(prismaMock.routineTaskAssignee.deleteMany).not.toHaveBeenCalled();
@@ -985,6 +1114,82 @@ describe("NHF Routine mutations", () => {
                 recipientScope: "ASSIGNEES",
                 isActive: true,
             }],
+        });
+    });
+
+    it("allows configured USER ALL task updates without rewriting import provenance", async () => {
+        const current = {
+            ...routineTaskForMutation(99),
+            sourceFileName: "existing-import.xlsx",
+            sourceSheet: "มสช.",
+            sourceRow: 8,
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+        };
+        const updated = {
+            ...current,
+            version: 2,
+            title: "แก้ไขแบบ broad authority",
+        };
+        prismaMock.user.findUnique.mockResolvedValue(
+            asNever(activeUser("USER", 11)),
+        );
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 3,
+            capabilityKey: "routine.task.update",
+            scope: "ALL",
+        }]));
+        prismaMock.routineUnit.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineCategory.findFirst.mockResolvedValue(asNever({ id: 1 }));
+        prismaMock.routineTask.findUnique.mockResolvedValue(asNever(current));
+        prismaMock.employee.findMany.mockResolvedValue(asNever([{ id: 21 }]));
+        prismaMock.routineTask.updateMany.mockResolvedValue(asNever({ count: 1 }));
+        prismaMock.routineTask.findUniqueOrThrow.mockResolvedValue(asNever(updated));
+
+        await updateRoutineTask(
+            71,
+            {
+                version: 1,
+                title: "แก้ไขแบบ broad authority",
+                assignees: [{ employeeId: 21, role: "OWNER" }],
+                sourceFileName: "spoof.xlsx",
+                sourceSheet: "Spoof",
+                sourceRow: 99,
+                reminderRules: [{
+                    daysBefore: 1,
+                    sendHour: 9,
+                    channel: "IN_APP",
+                    recipientScope: "ADMINS",
+                    isActive: true,
+                }],
+            },
+            actor(3, "USER"),
+        );
+
+        expect(prismaMock.routineTask.updateMany).toHaveBeenCalledWith({
+            where: { id: 71, version: 1 },
+            data: expect.objectContaining({
+                title: "แก้ไขแบบ broad authority",
+                sourceFileName: undefined,
+                sourceSheet: undefined,
+                sourceRow: undefined,
+            }),
+        });
+        expect(prismaMock.routineTaskAssignee.deleteMany).toHaveBeenCalledWith({
+            where: { taskId: 71 },
+        });
+        expect(prismaMock.routineTaskAssignee.createMany).toHaveBeenCalledWith({
+            data: [{ taskId: 71, employeeId: 21, role: "OWNER" }],
+        });
+        expect(prismaMock.routineReminderRule.createMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({
+                taskId: 71,
+                recipientScope: "ADMINS",
+            })],
+        });
+        expect(updated).toMatchObject({
+            sourceFileName: "existing-import.xlsx",
+            sourceSheet: "มสช.",
+            sourceRow: 8,
         });
     });
 
@@ -1249,7 +1454,13 @@ describe("NHF Routine mutations", () => {
 
         await updateRoutineTask(
             71,
-            { version: 1, title: "แก้ไขแล้ว" },
+            {
+                version: 1,
+                title: "แก้ไขแล้ว",
+                sourceFileName: "liff-spoof.xlsx",
+                sourceSheet: "Spoof",
+                sourceRow: 100,
+            },
             actor(99, "ADMIN", "LIFF_SELF_SERVICE"),
         );
 
@@ -1274,6 +1485,11 @@ describe("NHF Routine mutations", () => {
                         { assignees: { some: { employeeId: 99 } } },
                     ],
                 },
+                data: expect.objectContaining({
+                    sourceFileName: undefined,
+                    sourceSheet: undefined,
+                    sourceRow: undefined,
+                }),
             }),
         );
     });

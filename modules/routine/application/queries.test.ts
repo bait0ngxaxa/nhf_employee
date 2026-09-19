@@ -1518,12 +1518,12 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("allows an admin to fetch full detail and source metadata", async () => {
+    it("exposes source metadata when a non-admin has effective import-management authority", async () => {
         resolveOptionalRoutineCapabilityMock.mockResolvedValueOnce({
             scopes: ["ALL"],
         });
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
-            ...taskRow(71, 21, 5),
+            ...taskRow(71, 21, 99),
             unitId: 1,
             categoryId: 1,
             version: 2,
@@ -1537,20 +1537,22 @@ describe("NHF Routine query authorization", () => {
         }));
 
         const result = await getRoutineTaskById(71, {
-            actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
-            employeeId: null,
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
         });
 
         expect(result).toMatchObject({
             id: 71,
             canEdit: true,
-            canDelete: true,
+            canDelete: false,
             sourceFileName: "internal-import.xlsx",
             sourceSheet: "งานประจำ",
             sourceRow: 12,
         });
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { id: 71 } }),
+            expect.objectContaining({
+                where: expect.objectContaining({ id: 71 }),
+            }),
         );
     });
 

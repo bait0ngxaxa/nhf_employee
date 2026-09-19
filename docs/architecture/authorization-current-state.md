@@ -1594,6 +1594,16 @@ global admin bit. Routine import metadata is projected from the approved
 visibility decision. Historical ADMIN audit/provenance values remain readable;
 new configured broad authority is represented without rewriting history.
 
+The subsequent Phase 12H-F corrective patch closes the Routine provenance
+boundary: task `create / ALL` and `update / ALL` retain broad task/resource
+behavior but cannot write `sourceFileName`, `sourceSheet`, or `sourceRow`
+through normal task mutations. Normal create idempotency hashes use this
+sanitized semantic input, and ordinary updates omit those fields so existing
+import provenance is preserved. Only the import apply workflow authorized by
+`routine.import.manage / ALL` persists trusted provenance; query/detail
+serialization remains controlled by that capability. This applies equally to
+configured USER, legacy ADMIN compatibility, Team/TeamRole, and LIFF paths.
+
 Authorization Administration remains the explicit ADMIN-only control plane:
 its menu visibility, page/API guards, `requireDashboardAuthorizationAdministration()`,
 `assertAuthorizationAdministrationAccess()`, administration APIs, and ADMIN
@@ -1631,6 +1641,18 @@ Phase 12H-F verification evidence:
 - `npm.cmd run lint:strict`: passed;
 - `npm.cmd run architecture:check`: passed, 1,149 source files checked;
 - `git diff --check`: passed.
+
+Post-closure corrective verification for the Routine import-provenance
+boundary then ran against `4e7236ef9d6d9a6b33cdf495544595a0ae4f9b67`:
+
+- Routine mutation, idempotency, import/staging/apply, query, authorization,
+  and presentation selection: **20 files / 273 tests passed**;
+- full repository suite: **328 files / 3,110 tests passed**;
+- typecheck, strict lint, architecture check (1,149 source files), and
+  `git diff --check`: passed.
+
+This is an appended corrective result and does not rewrite the historical
+Phase 12H-F verification total.
 
 No development server or production build was run. No production grant, seed,
 backfill, migration, live preflight, canary, or authorization rollout was

@@ -315,7 +315,7 @@ export function RoutineDetailsDialog({
                         ) : null}
 
                         {showImportMetadata ? (
-                            <DetailSection icon={Database} title="ข้อมูลนำเข้า (ผู้ดูแลระบบ)">
+                            <DetailSection icon={Database} title="ข้อมูลต้นทางการนำเข้า">
                                 <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                                     <DetailItem label="ไฟล์ต้นทาง" value={optionalText(task.sourceFileName)} />
                                     <DetailItem label="ชีตต้นทาง" value={optionalText(task.sourceSheet)} />
