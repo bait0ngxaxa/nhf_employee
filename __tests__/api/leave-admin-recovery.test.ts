@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/leave/admin/recovery/route";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
+import { LeaveCapabilityDeniedError } from "@/modules/leave";
 import type * as LeaveModule from "@/modules/leave";
 
 const authorizationMocks = vi.hoisted(() => ({
@@ -191,5 +192,22 @@ describe("GET /api/leave/admin/recovery", () => {
         expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
         expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
         expect(authorizationMocks.assertLeaveCapability).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when recovery capability evaluation has no applicable grant", async () => {
+        vi.mocked(authorizationMocks.assertLeaveCapability).mockRejectedValueOnce(
+            new LeaveCapabilityDeniedError(
+                "leave.recovery.manage",
+                "NO_APPLICABLE_GRANT",
+            ),
+        );
+
+        const response = await GET(
+            new Request("http://localhost/api/leave/admin/recovery"),
+        );
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
     });
 });

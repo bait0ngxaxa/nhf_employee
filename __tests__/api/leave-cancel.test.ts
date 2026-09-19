@@ -16,6 +16,7 @@ const authorizationMocks = vi.hoisted(() => ({
 const liffAuthMocks = vi.hoisted(() => ({
     requireLiffWorkforceSession: vi.fn(),
 }));
+const configuredRecoveryUserIds = new Set<number>();
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -96,8 +97,40 @@ function systemRoleScopes(capability: string): readonly TestAuthorizationScope[]
     }
 }
 
+function configuredRecoveryUserId(actor: unknown): number | null {
+    if (
+        typeof actor !== "object"
+        || actor === null
+        || !("userId" in actor)
+        || !("systemRole" in actor)
+        || typeof actor.userId !== "number"
+        || actor.systemRole !== "USER"
+        || !configuredRecoveryUserIds.has(actor.userId)
+    ) {
+        return null;
+    }
+
+    return actor.userId;
+}
+
 function authorizationDecision(actor: unknown, capability: string) {
     if (!isAdminAuthorizationActor(actor)) {
+        const userId = capability === "leave.recovery.manage"
+            ? configuredRecoveryUserId(actor)
+            : null;
+        if (userId !== null) {
+            return {
+                capability,
+                allowed: true,
+                scopes: ["ALL"] as const,
+                grants: [{
+                    capability,
+                    scope: "ALL" as const,
+                    source: { type: "USER" as const, userId },
+                }],
+            };
+        }
+
         return {
             capability,
             allowed: false,
@@ -181,6 +214,7 @@ function buildCancellationRequest(
 describe("POST /api/leave/cancel", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        configuredRecoveryUserIds.clear();
         authorizationMocks.resolve.mockImplementation(
             async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
         );
@@ -481,6 +515,76 @@ describe("POST /api/leave/cancel", () => {
                 payload: expect.stringContaining('"employeeId":30'),
             }),
         });
+    });
+
+    it("records cancellation for recovery when no effective approver is available", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest({
+            status: "APPROVED",
+            cancellationReason: null,
+            cancellationRequestedAt: null,
+            approver: {
+                id: 20,
+                firstName: "Former",
+                lastName: "Manager",
+                email: "former@example.com",
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        }));
+        vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            ...buildCancellationRequest({
+                status: "CANCELLATION_REQUESTED",
+                cancellationReason: "ย้ายกำหนดการ",
+                cancellationRequestedAt: new Date("2098-12-21T00:00:00.000Z"),
+                approver: {
+                    id: 20,
+                    firstName: "Former",
+                    lastName: "Manager",
+                    email: "former@example.com",
+                    status: "INACTIVE",
+                    deletedAt: null,
+                    user: null,
+                },
+            }),
+        } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
+
+        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "POST",
+            body: JSON.stringify({ leaveId: "leave-cancellation", reason: "ย้ายกำหนดการ" }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                id: "leave-cancellation",
+                employeeId: 10,
+                status: "APPROVED",
+                cancellationRequestedAt: null,
+            }),
+            data: expect.objectContaining({
+                status: "CANCELLATION_REQUESTED",
+                cancellationReason: "ย้ายกำหนดการ",
+                cancellationRequestedAt: expect.any(Date),
+            }),
+        });
+        expect(prisma.leaveRequest.update).not.toHaveBeenCalled();
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+        expect(prisma.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 10,
+                type: "LEAVE_CANCELLATION_REQUESTED",
+            }),
+        });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "LEAVE_REQUEST_CANCELLATION_REQUEST",
+                details: expect.stringContaining('"exceptionApproverId":null'),
+            }),
+        });
+        expect(prisma.employee.findMany).not.toHaveBeenCalled();
     });
 
     it("confirms approved leave cancellation and returns quota in one transaction", async () => {
@@ -1332,6 +1436,104 @@ describe("POST /api/leave/cancel", () => {
                 action: "LEAVE_REQUEST_CANCELLATION_CONFIRM",
                 userId: 99,
                 userEmail: "admin@example.com",
+                details: expect.stringContaining('"adminOverride":true'),
+            }),
+        });
+    });
+
+    it("allows a configured USER to recover an unavailable cancellation request", async () => {
+        configuredRecoveryUserIds.add(77);
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "77", email: "recovery-user@example.com", name: "Recovery User", role: "USER" } },
+            user: { id: 77, email: "recovery-user@example.com", name: "Recovery User", role: "USER" },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 77, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(77));
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(
+            buildCancellationRequest({
+                id: "leave-user-recovery",
+                approver: {
+                    id: 20,
+                    firstName: "Former",
+                    lastName: "Manager",
+                    email: "former@example.com",
+                    status: "INACTIVE",
+                    deletedAt: null,
+                    user: null,
+                },
+            }),
+        );
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-user-recovery",
+            employeeId: 10,
+            year: 2099,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
+            usedHalfDays: 4,
+        });
+        vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
+            id: "quota-user-recovery",
+            usedHalfDays: 2,
+        } as never);
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue(
+            buildCancellationRequest({
+                id: "leave-user-recovery",
+                status: "CANCELLED_AFTER_APPROVAL",
+            }) as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>,
+        );
+        vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({} as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+            method: "PUT",
+            body: JSON.stringify({
+                leaveId: "leave-user-recovery",
+                reason: "ตรวจสอบแทนผู้อนุมัติที่พ้นสภาพ",
+            }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(authorizationMocks.resolveInTransaction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 77,
+                employeeId: 77,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            }),
+            "leave.recovery.manage",
+            expect.anything(),
+        );
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                id: "leave-user-recovery",
+                employeeId: { not: 77 },
+            }),
+            data: expect.objectContaining({
+                status: "CANCELLED_AFTER_APPROVAL",
+                cancellationConfirmedById: 77,
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_CANCELLED_AFTER_APPROVAL",
+                payload: expect.stringContaining('"decisionActorRole":"USER"'),
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_CANCELLED_AFTER_APPROVAL",
+                payload: expect.stringContaining('"recoveryOverride":true'),
+            }),
+        });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 77,
                 details: expect.stringContaining('"adminOverride":true'),
             }),
         });

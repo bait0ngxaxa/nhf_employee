@@ -227,13 +227,9 @@ export async function cancelLeaveRequest(
             existingApprover: leaveRequest.exceptionApprover,
             reuseExisting: false,
         });
-        if (!exceptionApprover) {
-            throw new LeaveCancellationError(
-                LEAVE_CANCELLATION_MESSAGES.approverUnavailable,
-                409,
-            );
+        if (exceptionApprover) {
+            await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
         }
-        await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
 
         const requestedAt = new Date();
         const claimedRequest = await tx.leaveRequest.updateMany({
@@ -256,24 +252,26 @@ export async function cancelLeaveRequest(
         await markApprovedNotificationsRead(tx, actor.userId, leaveRequest);
         await createCancellationRequestedNotification(tx, actor.userId, leaveRequest);
 
-        const payload: LeaveCancellationRequestedPayload = {
-            leaveId,
-            employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-            approver: buildConfiguredApproverSnapshot(exceptionApprover.approver),
-            leaveType: leaveRequest.leaveType,
-            startDate: leaveRequest.startDate.toISOString(),
-            endDate: leaveRequest.endDate.toISOString(),
-            period: leaveRequest.period,
-            durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
-            note: reason ?? "พนักงานขอยกเลิกวันลาที่อนุมัติแล้ว",
-        };
-        await tx.notificationOutbox.create({
-            data: {
-                type: "LEAVE_CANCELLATION_REQUESTED",
-                eventKey: `leave:${leaveId}:cancellation-requested`,
-                payload: JSON.stringify(payload),
-            },
-        });
+        if (exceptionApprover) {
+            const payload: LeaveCancellationRequestedPayload = {
+                leaveId,
+                employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
+                approver: buildConfiguredApproverSnapshot(exceptionApprover.approver),
+                leaveType: leaveRequest.leaveType,
+                startDate: leaveRequest.startDate.toISOString(),
+                endDate: leaveRequest.endDate.toISOString(),
+                period: leaveRequest.period,
+                durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
+                note: reason ?? "พนักงานขอยกเลิกวันลาที่อนุมัติแล้ว",
+            };
+            await tx.notificationOutbox.create({
+                data: {
+                    type: "LEAVE_CANCELLATION_REQUESTED",
+                    eventKey: `leave:${leaveId}:cancellation-requested`,
+                    payload: JSON.stringify(payload),
+                },
+            });
+        }
 
         await createLeaveAuditInTransaction(
             tx,
@@ -289,8 +287,12 @@ export async function cancelLeaveRequest(
                         reason: reason ?? null,
                     }),
                     originalApproverId: leaveRequest.approverId,
-                    exceptionApproverId: exceptionApprover.exceptionApproverId,
-                    exceptionApproverSource: exceptionApprover.source,
+                    exceptionApproverId: exceptionApprover
+                        ? exceptionApprover.exceptionApproverId
+                        : leaveRequest.exceptionApproverId,
+                    ...(exceptionApprover
+                        ? { exceptionApproverSource: exceptionApprover.source }
+                        : {}),
                 },
             },
         );
@@ -301,7 +303,9 @@ export async function cancelLeaveRequest(
                 cancellationReason: reason ?? null,
                 cancellationRequestedAt: requestedAt,
             }),
-            exceptionApproverSource: exceptionApprover.source,
+            ...(exceptionApprover
+                ? { exceptionApproverSource: exceptionApprover.source }
+                : {}),
             kind: "CANCELLATION_REQUESTED",
         };
     });

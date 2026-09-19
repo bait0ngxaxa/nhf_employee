@@ -61,6 +61,17 @@ assigned approver `ASSIGNED` as appropriate. Recovery uses
 infer permission from `leave.cancellation.decide` or
 `leave.request.not_taken / ASSIGNED`.
 
+An unavailable effective approver does not abort owner-side initiation. If the
+resolver returns `null`, an owner-authorized not-taken request remains in the
+canonical `APPROVED` + `notTakenRequestedAt` pending state, and an
+owner-authorized approved cancellation transitions to
+`CANCELLATION_REQUESTED`. Both keep `exceptionApproverId` unset/null and remain
+visible to the canonical recovery-candidate query. No ADMIN or other
+role-derived approver is manufactured. Employee-facing notification and audit
+records are preserved, while approver-targeted outbox delivery is omitted when
+there is no valid approver recipient. The later decision still requires
+`leave.recovery.manage / ALL` and all existing recovery invariants.
+
 The recovery decision is derived from the explicit capability decision rather
 than `actor.systemRole === "ADMIN"`. The actor role may still be recorded as
 identity/provenance metadata. Historical audit fields such as `adminOverride`
@@ -88,8 +99,9 @@ exception-approver fallback. The approved resolution order is:
 Locking, re-read behavior, assignment generations, persistence semantics,
 stale/inactive handling, effective-approver precedence, and notification
 deduplication remain unchanged. If no approved relationship is available, the
-request remains in the unavailable-approver condition and must use the
-explicit recovery path.
+owner request remains pending in the unavailable-approver condition and must
+use the explicit recovery path; the resolver never selects an ADMIN merely by
+role.
 
 ## Email Request migration
 
@@ -166,7 +178,7 @@ The final focused authorization/business-capability run passed:
 
 ```text
 45 test files passed
-438 tests passed
+442 tests passed
 ```
 
 It covered the registry and Administration catalog/mutations/effective access,
@@ -179,7 +191,7 @@ The broader repository suite also passed:
 
 ```text
 326 test files passed
-3,068 tests passed
+3,071 tests passed
 ```
 
 Additional checks passed:

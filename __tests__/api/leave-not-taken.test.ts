@@ -12,6 +12,7 @@ const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
     resolveInTransaction: vi.fn(),
 }));
+const configuredRecoveryUserIds = new Set<number>();
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -117,8 +118,40 @@ function systemRoleScopes(capability: string): readonly TestAuthorizationScope[]
     }
 }
 
+function configuredRecoveryUserId(actor: unknown): number | null {
+    if (
+        typeof actor !== "object"
+        || actor === null
+        || !("userId" in actor)
+        || !("systemRole" in actor)
+        || typeof actor.userId !== "number"
+        || actor.systemRole !== "USER"
+        || !configuredRecoveryUserIds.has(actor.userId)
+    ) {
+        return null;
+    }
+
+    return actor.userId;
+}
+
 function authorizationDecision(actor: unknown, capability: string) {
     if (!isAdminAuthorizationActor(actor)) {
+        const userId = capability === "leave.recovery.manage"
+            ? configuredRecoveryUserId(actor)
+            : null;
+        if (userId !== null) {
+            return {
+                capability,
+                allowed: true,
+                scopes: ["ALL"] as const,
+                grants: [{
+                    capability,
+                    scope: "ALL" as const,
+                    source: { type: "USER" as const, userId },
+                }],
+            };
+        }
+
         return {
             capability,
             allowed: false,
@@ -144,6 +177,7 @@ function authorizationDecision(actor: unknown, capability: string) {
 describe("/api/leave/not-taken", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        configuredRecoveryUserIds.clear();
         authorizationMocks.resolveInTransaction.mockImplementation(
             async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
         );
@@ -304,7 +338,7 @@ describe("/api/leave/not-taken", () => {
         });
     });
 
-    it("records a not-taken request for admin recovery when the original approver is inactive", async () => {
+    it("records a not-taken request for recovery when no effective approver is available", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-recovery-request",
             employeeId: 10,
@@ -362,8 +396,33 @@ describe("/api/leave/not-taken", () => {
             }),
         }));
 
-        expect(response.status).toBe(409);
-        expect(prisma.leaveRequest.updateMany).not.toHaveBeenCalled();
+        expect(response.status).toBe(200);
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                id: "leave-recovery-request",
+                employeeId: 10,
+                status: "APPROVED",
+                notTakenRequestedAt: null,
+            }),
+            data: expect.objectContaining({
+                notTakenReason: "ไม่ได้ลาเพราะมีงานด่วน",
+                notTakenRequestedAt: expect.any(Date),
+            }),
+        });
+        expect(prisma.notification.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 1,
+                type: "LEAVE_NOT_TAKEN_REQUESTED",
+            }),
+        });
+        expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.update).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "LEAVE_REQUEST_NOT_TAKEN_REQUEST",
+                details: expect.stringContaining('"exceptionApproverId":null'),
+            }),
+        });
         expect(prisma.employee.findMany).not.toHaveBeenCalled();
     });
 
@@ -705,6 +764,124 @@ describe("/api/leave/not-taken", () => {
             }),
         });
         expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("allows a configured USER to recover an unavailable not-taken request", async () => {
+        configuredRecoveryUserIds.add(77);
+        vi.mocked(getApiAuthSession).mockResolvedValue({
+            user: {
+                id: "77",
+                email: "recovery-user@example.com",
+                name: "Recovery User",
+                role: "USER",
+            },
+        });
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+            isActive: true,
+            deletedAt: null,
+            employee: { id: 77, status: "ACTIVE", deletedAt: null },
+        } as never);
+        vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(77, 77, "USER"));
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            id: "leave-user-recovery",
+            employeeId: 10,
+            leaveType: "VACATION",
+            startDate: new Date("2000-02-01T00:00:00.000Z"),
+            endDate: new Date("2000-02-01T00:00:00.000Z"),
+            period: "FULL_DAY",
+            durationHalfDays: 2,
+            status: "APPROVED",
+            approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
+            approvalActionVersion: 1,
+            notTakenRequestedAt: new Date("2000-02-02T00:00:00.000Z"),
+            notTakenConfirmedAt: null,
+            employee: {
+                id: 10,
+                firstName: "Employee",
+                lastName: "User",
+                email: "employee@example.com",
+                user: { id: 1 },
+            },
+            approver: {
+                id: 20,
+                firstName: "Former",
+                lastName: "Manager",
+                email: "former@example.com",
+                status: "INACTIVE",
+                deletedAt: null,
+                user: null,
+            },
+        } as never);
+        vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
+        vi.mocked(prisma.leaveQuota.findFirst).mockResolvedValue({
+            id: "quota-user-recovery",
+            employeeId: 10,
+            year: 2000,
+            leaveType: "VACATION",
+            totalHalfDays: 12,
+            carryBalanceHalfDays: 0,
+            usedHalfDays: 4,
+        });
+        vi.mocked(prisma.leaveQuota.update).mockResolvedValue({
+            id: "quota-user-recovery",
+            usedHalfDays: 2,
+        } as never);
+        vi.mocked(prisma.leaveRequest.findUniqueOrThrow).mockResolvedValue({
+            id: "leave-user-recovery",
+            status: "NOT_TAKEN",
+            durationHalfDays: 2,
+            overQuotaHalfDays: 0,
+        } as never);
+
+        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+            method: "PUT",
+            body: JSON.stringify({
+                leaveId: "leave-user-recovery",
+                reason: "ตรวจสอบแทนผู้อนุมัติที่พ้นสภาพ",
+            }),
+        }));
+
+        expect(response.status).toBe(200);
+        expect(authorizationMocks.resolveInTransaction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 77,
+                employeeId: 77,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            }),
+            "leave.recovery.manage",
+            expect.anything(),
+        );
+        expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                id: "leave-user-recovery",
+                employeeId: { not: 77 },
+            }),
+            data: expect.objectContaining({
+                status: "NOT_TAKEN",
+                notTakenConfirmedById: 77,
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                payload: expect.stringContaining('"decisionActorRole":"USER"'),
+            }),
+        });
+        expect(prisma.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "LEAVE_NOT_TAKEN_CONFIRMED",
+                payload: expect.stringContaining('"recoveryOverride":true'),
+            }),
+        });
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                userId: 77,
+                details: expect.stringContaining('"adminOverride":true'),
+            }),
+        });
     });
 
     it("requires a reason for an admin not-taken recovery override", async () => {

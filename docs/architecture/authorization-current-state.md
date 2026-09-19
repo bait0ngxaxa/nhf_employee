@@ -1424,12 +1424,23 @@ confirmation continue to use their assigned-approver relationship authority.
 The recovery decision is based on the explicit capability result, not
 `actor.systemRole`; role identity remains provenance metadata only.
 
+Owner-side initiation does not abort when no effective approver is available.
+Not-taken initiation persists the canonical `APPROVED` plus
+`notTakenRequestedAt` pending state, while approved cancellation initiation
+persists `CANCELLATION_REQUESTED`; both leave `exceptionApproverId` unset/null
+and are discoverable by the recovery candidate query. Employee-facing
+notification and audit behavior remains available, but approver-targeted
+outbox delivery is omitted when no valid recipient exists. No ADMIN fallback
+or manufactured approver is restored; the later decision must use
+`leave.recovery.manage / ALL`.
+
 Leave exception-approver resolution no longer searches for or persists an
 active Employee merely because its User has `role = ADMIN`. The approved
 relationship order is reusable active exception approver, active original
 approver, active current manager, then unavailable (`null`). An unavailable
-approver is handled through the explicit recovery capability rather than an
-implicit global ADMIN fallback.
+approver does not block owner initiation; the request remains pending with no
+manufactured approver and is handled later through the explicit recovery
+capability rather than an implicit global ADMIN fallback.
 
 Email Request is now centralized configured authorization only. The adapter
 fixes the channel to `DASHBOARD`, builds its actor from trusted authenticated

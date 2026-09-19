@@ -156,11 +156,9 @@ export async function requestLeaveNotTaken(
             existingApprover: leaveRequest.exceptionApprover,
             reuseExisting: false,
         });
-        if (!exceptionApprover) {
-            throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.approverUnavailable, 409);
+        if (exceptionApprover) {
+            await persistLeaveExceptionApprover(tx, leaveRequest.id, exceptionApprover);
         }
-
-        await persistLeaveExceptionApprover(tx, leaveRequest.id, exceptionApprover);
         const requestedAt = new Date();
         const claimedRequest = await tx.leaveRequest.updateMany({
             where: {
@@ -182,8 +180,12 @@ export async function requestLeaveNotTaken(
             ...leaveRequest,
             notTakenReason: input.note,
             notTakenRequestedAt: requestedAt,
-            exceptionApproverId: exceptionApprover.exceptionApproverId,
-            exceptionApproverAssignedAt: exceptionApprover.assignedAt,
+            exceptionApproverId: exceptionApprover
+                ? exceptionApprover.exceptionApproverId
+                : leaveRequest.exceptionApproverId,
+            exceptionApproverAssignedAt: exceptionApprover
+                ? exceptionApprover.assignedAt
+                : leaveRequest.exceptionApproverAssignedAt,
         };
         const leaveSummary = {
             startDate: leaveRequest.startDate.toISOString(),
@@ -191,22 +193,24 @@ export async function requestLeaveNotTaken(
             period: leaveRequest.period,
             durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
         };
-        const payload: LeaveNotTakenRequestedPayload = {
-            leaveId: leaveRequest.id,
-            employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
-            approver: buildConfiguredApproverSnapshot(exceptionApprover.approver),
-            leaveType: leaveRequest.leaveType,
-            ...leaveSummary,
-            note: input.note,
-        };
+        if (exceptionApprover) {
+            const payload: LeaveNotTakenRequestedPayload = {
+                leaveId: leaveRequest.id,
+                employee: buildLeaveRecipientSnapshot(leaveRequest.employee),
+                approver: buildConfiguredApproverSnapshot(exceptionApprover.approver),
+                leaveType: leaveRequest.leaveType,
+                ...leaveSummary,
+                note: input.note,
+            };
 
-        await tx.notificationOutbox.create({
-            data: {
-                type: "LEAVE_NOT_TAKEN_REQUESTED",
-                eventKey: `leave:${leaveRequest.id}:not-taken-requested`,
-                payload: JSON.stringify(payload),
-            },
-        });
+            await tx.notificationOutbox.create({
+                data: {
+                    type: "LEAVE_NOT_TAKEN_REQUESTED",
+                    eventKey: `leave:${leaveRequest.id}:not-taken-requested`,
+                    payload: JSON.stringify(payload),
+                },
+            });
+        }
         await createForUser({
             userId,
             type: "LEAVE_NOT_TAKEN_REQUESTED",
@@ -227,8 +231,12 @@ export async function requestLeaveNotTaken(
                 metadata: {
                     ...buildLeaveAuditContext(leaveRequest, { reason: input.note }),
                     originalApproverId: leaveRequest.approverId,
-                    exceptionApproverId: exceptionApprover.exceptionApproverId,
-                    exceptionApproverSource: exceptionApprover.source,
+                    exceptionApproverId: exceptionApprover
+                        ? exceptionApprover.exceptionApproverId
+                        : leaveRequest.exceptionApproverId,
+                    ...(exceptionApprover
+                        ? { exceptionApproverSource: exceptionApprover.source }
+                        : {}),
                 },
             },
         );
