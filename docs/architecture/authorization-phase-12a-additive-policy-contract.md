@@ -1,7 +1,9 @@
 # NHF Employee — Authorization Phase 12A: Additive Default Policy Contract Lock
 
 Historical contract at the Phase 12A boundary. Phase 12H-A now supersedes
-this document's long-term `ADMIN` business-authority target; see
+this document's long-term `ADMIN` business-authority target and the selected
+legacy USER-default permanence explicitly narrowed by the Phase 12H target,
+especially Routine broad authority; see
 [authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
 The current runtime still has the Phase 12A role-sensitive behavior until the
 later Phase 12H cutover. This document is retained as historical evidence and
@@ -17,6 +19,11 @@ This document records the Phase 12A product-policy decision and the
 code-owned authorization inventory. It does not implement the Phase 12B
 runtime composition. The current resolver, domain adapters, routes,
 presentation projections, database schema, and seed behavior remain unchanged.
+
+The permanent-default language below is historical Phase 12A target language.
+Phase 12H-A retains it as evidence but supersedes its ADMIN implicit business
+authority and explicitly narrows the selected legacy USER defaults recorded in
+the Phase 12H-A Routine policy.
 
 The repository has never deployed the Team/capability authorization
 architecture to production. This phase therefore requires no production grant

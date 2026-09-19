@@ -18,18 +18,19 @@ implementation-complete on baseline `c49caec5f14569655d1e385c1706dc7e9e22c0a8`
 and awaits production operational acceptance. No production authorization
 rollout has been performed.
 
-Phase 12H-A — Role-Neutral Business Authorization Contract & Inventory is now
-**COMPLETE as a documentation/inventory phase only**. The authoritative target
+Phase 12H-A — Role-Neutral Business Authorization Contract & Inventory is
+**OPEN — not closed; correction review is pending**. The authoritative target
 contract and exhaustive ledger are in
 [authorization-phase-12ha-role-neutral-contract.md](authorization-phase-12ha-role-neutral-contract.md).
 The current runtime remains pre-12H and role-sensitive: `ADMIN` still
 receives central `SYSTEM_ROLE` business authority for many registered
-capabilities. Phase 12H-A supersedes Phase 12A's long-term `ADMIN`
-business-authority target; the historical Phase 12A statements remain
+capabilities. Phase 12H-A supersedes both Phase 12A's long-term `ADMIN`
+business-authority target and the selected legacy USER-default permanence that
+12H-A explicitly narrows, especially Routine broad `task.read`, `summary.read`,
+and `task.export` authority. The historical Phase 12A statements remain
 historical evidence at that phase boundary. No Phase 12H runtime enforcement
-cutover has occurred.
-The next handoff after this inventory is Phase 12H-B — Role-Neutral Resolver /
-Composition Core.
+cutover has occurred, and the Phase 12H-B handoff is pending correction
+acceptance.
 
 สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-18<br>
@@ -40,9 +41,11 @@ Composition Core.
 resource relationship เดียวกัน. สิทธิ์ธุรกิจเพิ่มเติมต้องมาจาก Team, TeamRole
 หรือ exceptional direct User grant เท่านั้น; ADMIN ยังมีความหมายเฉพาะ
 control-plane และ lifecycle boundaries ที่ระบุในเอกสาร Phase 12H-A. ข้อความนี้
-อธิบาย target เท่านั้น ไม่ได้อ้างว่า runtime ปัจจุบันเปลี่ยนแล้ว
+อธิบาย target เท่านั้น ไม่ได้อ้างว่า runtime ปัจจุบันเปลี่ยนแล้ว. Phase 12H-A
+ยังไม่ปิด และ supersede ทั้ง ADMIN implicit business authority และ selected
+legacy USER defaults ที่ถูก narrow แล้ว โดยเฉพาะ Routine broad authority.
 
-สถานะ capability ปัจจุบันหลัง Phase 12F: `routine.task.export`, `routine.summary.read` และ
+สถานะ capability ปัจจุบันหลัง Phase 12F (historical pre-12H runtime record): `routine.task.export`, `routine.summary.read` และ
 `routine.reference.read` ใช้ permanent additive Default Domain Policy ผ่าน
 Routine adapter และ central resolver แล้ว. Registry มี `25
 CENTRAL_WITH_DEFAULT_POLICY`, `0 CENTRAL_WITH_COMPATIBILITY`, `13
@@ -424,7 +427,7 @@ Employee current authorization detail:
 - Generic session: lib/auth/api.ts:requireApiSession
 - Admin role: lib/auth/api.ts:requireAdminSession
 - Active Employee: lib/auth/workforce.ts:requireActiveWorkforceSession
-- Workforce-or-Admin route compatibility: lib/auth/workforce.ts:requireActiveWorkforceOrAdminSession
+- Workforce-or-Admin route compatibility (Phase 12H-A business-authority migration debt): lib/auth/workforce.ts:requireActiveWorkforceOrAdminSession
 - Transaction rechecks: lib/auth/workforce-transaction.ts:assertActiveWorkforceInTransaction, Routine active actor/admin assertions, Leave capability/active User-Employee rechecks in `modules/leave/application/authorization.ts` plus existing Leave relationship checks, Stock request transaction checks
 - Stock server authorization: modules/stock/application/authorization.ts, Stock route adapters and transaction-boundary mutation checks
 - Domain routes must still parse/validate input, enforce rate/body/idempotency controls and validate state; those checks are not collapsed into authorization
@@ -524,7 +527,8 @@ Query and persistence scopes found include:
 | resolveAuthenticatedAccount และ getApiAuthSession | AUTHENTICATION + ACCOUNT_LIFECYCLE |
 | requireApiSession | AUTHENTICATION + ACCOUNT_LIFECYCLE |
 | requireAdminSession และ isAdminRole | AUTHENTICATION + ACCOUNT_LIFECYCLE + AUTHORIZATION |
-| requireActiveWorkforceSession และ requireActiveWorkforceOrAdminSession | AUTHENTICATION + ACCOUNT_LIFECYCLE; Admin branch มี AUTHORIZATION เฉพาะ route contract |
+| requireActiveWorkforceSession | AUTHENTICATION + ACCOUNT_LIFECYCLE |
+| requireActiveWorkforceOrAdminSession | Legacy AUTHENTICATION/ACCOUNT_LIFECYCLE seam with an ADMIN branch classified by Phase 12H-A as BUSINESS_AUTHORITY_MIGRATE; callers must be role-neutralized |
 | assertActiveWorkforceInTransaction และ active User/Employee re-reads | ACCOUNT_LIFECYCLE + BUSINESS_RULE + DATA_INTEGRITY/CONCURRENCY |
 | requireDashboardAdmin | AUTHENTICATION + ACCOUNT_LIFECYCLE + role AUTHORIZATION ของ Email Request ที่ยัง deferred; outcome เป็น redirect |
 | requireDashboardAuditCapability และ requireDashboardEmployeeCapability | AUTHENTICATION + ACCOUNT_LIFECYCLE + capability AUTHORIZATION ของ Dashboard surface; outcome เป็น redirect |
@@ -879,7 +883,7 @@ above and in [authorization-phase-12d-routine-deferred-migration.md](authorizati
 ### Medium risk / ambiguity
 
 4. **Audit export endpoint is not a data-export authority** — POST /api/audit-logs/export เพียงบันทึก audit event แต่ authenticated USER ส่ง entityType, recordCount และ filters ได้โดยไม่มี body schema/role guard. Actual data export endpoints มี policy ต่างกัน; ต้องแยก “เริ่ม export” กับ “บันทึก export event” ใน future policy phase แยกต่างหาก
-5. **requireActiveWorkforceOrAdminSession lifecycle seam** — helper branch อนุญาต Admin ที่ไม่มี Employee แต่ `requireApiSession()` ซึ่งเป็น upstream production boundary ตรวจ eligible Employee ก่อนแล้ว; ขณะเดียวกัน Stock transaction adapter ยังมี Dashboard ADMIN account-only lifecycle branch เฉพาะสำหรับ `inventory.manage`, `request.process` และ `request.cancel`, ส่วน Leave ยังคงมี Dashboard Admin account-only lifecycle branch ที่แคบของตนเอง. Routine ยังคง branch lifecycle ที่แคบตาม approved Dashboard ADMIN account-only exception แต่ enforced capability authority ของ Routine ผ่าน central composition แล้ว. ดังนั้น reachability ของ account-only Admin ต่างกันระหว่าง stable HTTP chain, direct application/test seam และ race ระหว่าง lifecycle. Phase 11C/11D ตรวจสอบ seam นี้แล้วและคงไว้เป็น lifecycle boundary ที่แคบ ไม่ใช่ central capability bypass
+5. **requireActiveWorkforceOrAdminSession business-route migration seam** — helper branch อนุญาต Admin ที่ไม่มี Employee ขณะที่ USER ต้องผ่าน active-workforce check. `requireApiSession()` upstream อาจจำกัด reachability ในบาง HTTP chain แต่ไม่ทำให้ helper นี้ role-neutral; direct application/test callers และ race ระหว่าง lifecycle ยังเห็น semantic ต่างกัน. Stock, Routine, Leave และ upload callers ต้องย้ายไป trusted role-neutral workforce boundary ตาม AL-03 ก่อน retire/role-neutralize ADMIN branch. Phase 11C/11D บันทึกการคง helper ไว้เป็น historical compatibility seam; Phase 12H-A จัด seam นี้เป็น BUSINESS_AUTHORITY_MIGRATE ไม่ใช่ allowlisted lifecycle primitive
 6. **Role checks กระจายหลายชั้น** — isAdminRole, literal ADMIN ใน Routine/Leave query, route guards, capability projection และ caller-supplied flags ยังพบในระบบ แต่ใน migrated paths ใช้เป็น lifecycle, channel policy, domain/workflow หรือ presentation identity ตาม classification; ไม่ใช่ independent authority แทน adapter/resolver. Routine Dashboard ADMIN ใช้ central `SYSTEM_ROLE` และ LIFF ADMIN ใช้ channel policy; Stock server authority ถูกย้ายไปที่ adapter/resolver แล้ว, Stock presentation Phase 6B และ Employee Dashboard presentation Phase 8B ใช้ granular projection โดย role checks ที่เหลือใน Employee Dashboard เป็นของ unrelated Admin-only surfaces หรือ descriptive behavior เท่านั้น
 7. **Service commands บางตัวเชื่อ caller** — ประเด็น Stock issue/cancel ที่เคยพึ่ง route composition ถูกแก้ใน Phase 6A ด้วย authorized command actor และ transaction-boundary revalidation; โดเมนอื่นยังต้องประเมินตาม migration ของตนเอง
 8. **Presentation projection ปะปนกับ authority ในชื่อ** — `LeavePresentationCapabilities`, canApproveLeave, canViewLeaveReports, LiffCapabilities, Routine canEdit/canDelete มีประโยชน์ต่อ UX แต่ไม่เป็น guarantee ว่า route จะผ่าน; capability eligibility ยังไม่ใช่ resource/work relationship

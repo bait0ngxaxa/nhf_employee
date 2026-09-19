@@ -25,7 +25,9 @@ Phase 1 establishes:
 - the code-owned capability inventory and registry; and
 - the public module seam future phases will consume.
 
-Configured authorization remains additive `ALLOW` grants. Phase 1 did not
+Configured authorization remains additive `ALLOW` grants. The following
+Phase 12A wording is retained as historical evidence, not as the current
+Phase 12H target. Phase 1 did not
 implement grant persistence, effective-grant resolution, a resolver, or an
 authorization evaluator. Phase 12A now locks existing NHF USER behavior as a
 permanent Default Domain Policy: a normal USER's effective authority is the
@@ -35,6 +37,12 @@ distinct from the final domain decision until Phase 12B composes these layers.
 `ADMIN` remains the highest system role, but the actor role is not a bypass for
 authentication, workforce lifecycle, resource relationships, workflow state,
 validation, transactions, channel restrictions, or concurrency rules.
+
+Phase 12H-A supersedes that historical target in two respects: ADMIN has no
+implicit business capability authority, and selected legacy USER defaults are
+explicitly narrowed. In particular, Routine broad `routine.task.read`,
+`routine.summary.read`, and `routine.task.export` authority is not an automatic
+target default. See the Phase 12H-A contract for the role-neutral replacements.
 
 The existing role source of truth remains
 [`lib/ssot/permissions.ts`](../../lib/ssot/permissions.ts). The authorization
@@ -341,10 +349,11 @@ policies:
 
 No runtime branch is based on these labels in Phase 1.
 
-### 8.1 Phase 12A disposition (historical target)
+### 8.1 Phase 12A disposition (historical target, superseded by Phase 12H-A)
 
 The open-policy list above is preserved as a historical Phase 1 record. The
-permanent target is now locked by
+following Phase 12A disposition is also historical and is superseded where
+Phase 12H-A explicitly changes the target. It was locked by
 [Authorization Phase 12A](./authorization-phase-12a-additive-policy-contract.md):
 
 - existing no-grant USER behavior is the permanent Default Domain Policy;

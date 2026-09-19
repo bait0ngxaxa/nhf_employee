@@ -1,14 +1,16 @@
 # NHF Employee — Phase 12H-A: Role-Neutral Business Authorization Contract & Inventory
 
-Status: **COMPLETE — contract and inventory only**
+Status: **OPEN — correction required before Phase 12H-B; not closed**
 
 Reviewed baseline: `5a72b9e57216701f2c620b54e035c9dc1740f53d`
 (`fix(auth): use migration lifecycle for readiness checks`)
 
 This document is the authoritative Phase 12H-A target contract and migration
 ledger. It records the future authorization architecture and the exhaustive
-current-code inventory needed by later Phase 12H work. It does not claim that
-the target runtime has been deployed.
+current-code inventory needed by later Phase 12H work. The inventory is under
+correction review; closure remains pending acceptance of the pre-12H-B
+corrections recorded below. It does not claim that the target runtime has been
+deployed.
 
 ## 1. Locked target contract
 
@@ -60,10 +62,21 @@ business-domain prerequisite merely by being ADMIN.
 
 ### 1.1 Supersession boundary
 
-Phase 12A was a valid historical contract at its phase boundary. Its
-long-term assumption that `ADMIN` is the highest coarse business authority,
-that ADMIN does not need configured grants, and that the normal USER behavior
-is the permanent default is **superseded by this Phase 12H-A target**.
+Phase 12A was a valid historical contract at its phase boundary. Phase 12H-A
+supersedes two parts of its long-term target:
+
+1. The assumption that `ADMIN` is the highest coarse business authority and
+   does not need configured grants.
+2. The assumption that every existing normal-USER behavior is permanently
+   preserved as the default. Phase 12H-A explicitly narrows selected legacy
+   Routine defaults: broad `routine.task.read` `ALL`,
+   `routine.summary.read` `ALL`, and `routine.task.export` `ALL` are no longer
+   automatic defaults. Their role-neutral target defaults are recorded in
+   Section 3 and the capability inventory.
+
+Both changes are **superseded by this Phase 12H-A target**. Other approved
+normal-USER defaults remain the starting role-neutral baseline unless this
+contract explicitly narrows them.
 
 The Phase 12A document is retained as historical evidence. Its statements
 about the runtime at that boundary must not be rewritten as though they never
@@ -357,10 +370,10 @@ implement the same decision are grouped into one row. The resulting ledger has
 | Classification | Count |
 | --- | ---: |
 | `CONTROL_PLANE_KEEP` | 3 |
-| `AUTHENTICATION_OR_LIFECYCLE_KEEP` | 5 |
+| `AUTHENTICATION_OR_LIFECYCLE_KEEP` | 4 |
 | `PRESENTATION_IDENTITY_ONLY` | 3 |
-| `BUSINESS_AUTHORITY_MIGRATE` | 17 |
-| `DOMAIN_RELATIONSHIP_POLICY` | 4 |
+| `BUSINESS_AUTHORITY_MIGRATE` | 19 |
+| `DOMAIN_RELATIONSHIP_POLICY` | 3 |
 | `TEST_OR_DOCUMENTATION_ONLY` | 0 |
 | **Total** | **32** |
 
@@ -375,7 +388,7 @@ implement the same decision are grouped into one row. The resulting ledger has
 | CP-03 | `lib/ssot/admin-bootstrap.ts`; `modules/auth/application/signup.ts`; `app/api/auth/signup/route.ts` | Bootstrap allowlist assigns and reports the initial ADMIN role | `CONTROL_PLANE_KEEP` | Keep as bootstrap administration; do not treat it as business capability authority |
 | AL-01 | `lib/ssot/permissions.ts` | Defines the trusted `ADMIN`/`USER` identity vocabulary and `isAdminRole` helper | `AUTHENTICATION_OR_LIFECYCLE_KEEP` | Keep as system identity input; callers must be narrowed to the allowlist or domain policy |
 | AL-02 | `lib/auth/api.ts` | `requireAdminSession` authenticates an API session and checks ADMIN | `AUTHENTICATION_OR_LIFECYCLE_KEEP` | Keep as a primitive only for control-plane callers; migrate the Email caller |
-| AL-03 | `lib/auth/workforce.ts` | `requireActiveWorkforceOrAdminSession` has an ADMIN lifecycle branch | `AUTHENTICATION_OR_LIFECYCLE_KEEP` | Retain only as a lifecycle seam where proven; it must not imply business capability authority |
+| AL-03 | `lib/auth/workforce.ts`; `app/api/stock/**`; `app/api/routines/**`; `app/api/leave/**`; `app/api/uploads/image/route.ts` | `requireActiveWorkforceOrAdminSession` lets ADMIN callers proceed through the helper's ADMIN branch without the same active-Employee requirement as USER callers, and the helper is used by business routes across Stock, Routine, Leave, and upload paths | `BUSINESS_AUTHORITY_MIGRATE` | 12H-B records the role-neutral session boundary; 12H-F/G migrates callers to `requireActiveWorkforceSession` or another explicitly role-neutral boundary and retires the ADMIN branch. Keep `requireApiSession`, identity parsing, and the role-neutral workforce helper as authentication/lifecycle primitives |
 | AL-04 | `modules/auth/application/employee-account-lifecycle.ts` | Prevents deactivation of the last active ADMIN | `AUTHENTICATION_OR_LIFECYCLE_KEEP` | Keep as the last-active-ADMIN safeguard |
 | BA-05 | `app/api/email-request/route.ts`; `app/dashboard/_lib/route-access.ts`; `constants/dashboard.ts`; `components/dashboard/context/dashboard/DashboardProvider.tsx` | Email Request POST/page/menu are ADMIN-only | `BUSINESS_AUTHORITY_MIGRATE` | 12H-D uses configured `email.request.create` and read scopes |
 | BA-06 | `lib/services/email-request/queries.ts` | ADMIN sees all Email Requests; other actors see requester-owned rows | `BUSINESS_AUTHORITY_MIGRATE` | 12H-D maps `OWN`/`ALL` configured authority while retaining requester predicates |
@@ -385,7 +398,7 @@ implement the same decision are grouped into one row. The resulting ledger has
 | BA-10 | `app/dashboard/leave/page.tsx`; `constants/dashboard.ts`; `modules/leave/presentation/dashboard/LeaveManagementSection.tsx` | Recovery tab visibility and deep-link availability use ADMIN | `BUSINESS_AUTHORITY_MIGRATE` | 12H-F projects recovery authority; UI remains non-authoritative |
 | BA-11 | `modules/leave/application/not-taken.ts` | ADMIN recovery override can confirm not-taken work when the normal approver path is unavailable | `BUSINESS_AUTHORITY_MIGRATE` | 12H-D/G uses dedicated configured recovery entry authority and keeps reason/state/quota checks |
 | BA-12 | `app/api/leave/attachments/[attachmentId]/route.ts`; `modules/leave/application/queries/participant-access.ts` | ADMIN bypasses participant ownership for private Leave attachment reads | `BUSINESS_AUTHORITY_MIGRATE` | 12H-D/G replaces the role bypass with an explicit approved policy; no generic capability is invented in 12H-A |
-| DR-01 | `modules/leave/application/approvals/exception-approver.ts` | An active ADMIN Employee can be selected as a fallback exception approver | `DOMAIN_RELATIONSHIP_POLICY` | Preserve as a Leave relationship/workflow decision only after 12H-D review; it is not actor capability authority |
+| DR-01 | `modules/leave/application/approvals/exception-approver.ts` | The `role: "ADMIN"` query selects and persists an ADMIN Employee as a fallback exception approver; that persisted relationship then supplies effective `ASSIGNED` workflow authority | `BUSINESS_AUTHORITY_MIGRATE` | 12H-D preserves the Leave exception-approver/domain relationship concept but removes ADMIN as the candidate source. Use approved Leave configuration, Team, or another role-neutral domain relationship; preserve effective-approver, state, transaction, and audit invariants |
 | BA-13 | `modules/routine/application/authorization.ts` | Default scopes are empty for non-USER actors; Dashboard ADMIN is marked administrative and LIFF ADMIN is channel-clamped | `BUSINESS_AUTHORITY_MIGRATE` | 12H-B/C removes system-role default branching while retaining channel and domain rules |
 | BA-14 | `modules/routine/application/queries.ts` | Dashboard summary defaults to `all` when `queryActor.actor.role === "ADMIN"` | `BUSINESS_AUTHORITY_MIGRATE` | 12H-C changes the target default to `ASSIGNED`; configured `ALL` remains additive |
 | BA-15 | `modules/routine/domain/capabilities.ts` | Compatibility fallback `isAdmin` allows edit/delete when scope data is absent | `BUSINESS_AUTHORITY_MIGRATE` | 12H-I removes the system-role compatibility fallback after all callers use effective capability scopes |
@@ -415,7 +428,15 @@ boundaries:
 | Authorization Administration | `app/api/authorization/administration/**`; `app/dashboard/authorization/page.tsx`; `modules/authorization/application/administration.ts`; `modules/authorization/application/administration-mutations.ts` | True system/control plane | ADMIN manages Team, TeamRole, membership, and configured capability grants |
 | Bootstrap ADMIN assignment | `lib/ssot/admin-bootstrap.ts`; `modules/auth/application/signup.ts`; `app/api/auth/signup/route.ts` | Bootstrap administration | The allowlist determines initial control-plane authority during account creation |
 | ADMIN account lifecycle | `modules/auth/application/employee-account-lifecycle.ts` | Authentication/lifecycle | Last-active-ADMIN protection is an account safety invariant, not a business capability |
-| Trusted authentication/session helpers | `lib/ssot/permissions.ts`; `lib/auth/api.ts`; `lib/auth/workforce.ts`; related session identity adapters | Authentication/lifecycle | These helpers establish or validate trusted identity/lifecycle context; they do not authorize a business operation by themselves |
+| Trusted authentication/session helpers | `lib/ssot/permissions.ts`; `lib/auth/api.ts`; `lookupWorkforceSession` / `requireActiveWorkforceSession` in `lib/auth/workforce.ts`; related session identity adapters | Authentication/lifecycle | These helpers establish or validate trusted identity/lifecycle context; they do not authorize a business operation by themselves |
+
+`requireActiveWorkforceOrAdminSession()` is explicitly **not** on this
+allowlist. Its ADMIN branch is a business-authority migration surface because
+it can admit account-only or otherwise non-equivalent ADMIN context into
+business routes that require an active workforce context for USER actors. The
+helper and its callers must be retired or role-neutralized after the callers
+are migrated; this does not turn `requireApiSession()` or trusted identity
+parsing into business capability authority.
 
 No Leave recovery, Email Request, Routine management, Stock inventory/request
 processing, Audit visibility, Employee mutation, or other domain operation is
@@ -433,12 +454,15 @@ architecture:
   central-only entries;
 - the current deferred Email Request ADMIN-only create gate and ADMIN-wide
   read query;
+- the ADMIN branch of `requireActiveWorkforceOrAdminSession()` and its business
+  route callers;
 - Routine Dashboard ADMIN broad task/summary/reference/export behavior,
   administrative form normalization, and role-derived summary scope;
 - Stock ADMIN inventory/process/broad request cancellation behavior and
   role-derived processor notification mode;
 - Leave ADMIN recovery/override behavior, account-only approver-management
-  lifecycle exception, and private attachment bypass; and
+  lifecycle exception, private attachment bypass, and ADMIN-selected fallback
+  exception approver relationship; and
 - any presentation/route role gate that exposes one of those business
   operations.
 
@@ -454,9 +478,9 @@ readers to this contract without being rewritten wholesale:
 
 | Document | Phase 12H-A treatment |
 | --- | --- |
-| `docs/architecture/authorization-current-state.md` | Records that 12H-A introduced the new target, current runtime is still pre-12H/role-sensitive, and 12H-A supersedes Phase 12A's long-term ADMIN business-authority target |
+| `docs/architecture/authorization-current-state.md` | Records that 12H-A introduced the new target, current runtime is still pre-12H/role-sensitive, and 12H-A supersedes both Phase 12A's long-term ADMIN business-authority target and the explicitly narrowed legacy USER defaults |
 | `docs/architecture/authorization-contract.md` | Remains the historical Phase 1 vocabulary/registry contract and points to the current 12H target |
-| `docs/architecture/authorization-phase-12a-additive-policy-contract.md` | Remains a historical Phase 12A boundary record; its long-term ADMIN target is superseded |
+| `docs/architecture/authorization-phase-12a-additive-policy-contract.md` | Remains a historical Phase 12A boundary record; its long-term ADMIN target and selected legacy USER-default permanence are superseded, especially for Routine broad authority |
 | `docs/architecture/authorization-resolver.md` | Remains the generic/current resolver record and distinguishes current `SYSTEM_ROLE` behavior from the 12H target |
 | `docs/architecture/authorization-presentation-projection.md` | Remains the historical/current projection record; presentation projections do not make the 12H runtime target live |
 
@@ -464,7 +488,7 @@ readers to this contract without being rewritten wholesale:
 
 | Phase | Owner and non-goal boundary |
 | --- | --- |
-| **12H-A** | Role-neutral contract and exhaustive inventory. This document is the closure record. No runtime, schema, grant, seed, or migration changes. |
+| **12H-A** | Role-neutral contract and exhaustive inventory. This document is the open review record; closure is pending the corrections in Section 10. No runtime, schema, grant, seed, or migration changes. |
 | **12H-B** | Role-neutral resolver/composition core. Remove system-role knowledge from business capability resolution/composition while keeping ADMIN control-plane authentication separate. |
 | **12H-C** | Domain Default Policy rebaseline. Rebase Employee, Department, Routine, Stock, Leave, Audit, and Notification defaults; explicitly narrow Routine broad defaults. |
 | **12H-D** | Missing/deferred business capability completion, including Leave recovery and Email Request. Register only reviewed capabilities; preserve domain invariants. |
@@ -474,7 +498,21 @@ readers to this contract without being rewritten wholesale:
 | **12H-H** | Production snapshot and live rollout validation. Validate effective access and operational/audit evidence against the approved snapshot before rollout. |
 | **12H-I** | Delete compatibility/system-role business-authority debt. Remove obsolete role fallbacks, readiness assumptions, and compatibility branches after the cutover evidence is accepted. |
 
-## 10. Intentionally unresolved or deferred items
+## 10. Corrections required before closure
+
+The following corrections are required before Phase 12H-A can close or hand
+off to Phase 12H-B:
+
+| ID | Correction | Evidence | Required disposition |
+| --- | --- | --- | --- |
+| C-01 | `requireActiveWorkforceOrAdminSession()` was incorrectly classified as an authentication/lifecycle keep. Its ADMIN branch is business-route migration debt. | `lib/auth/workforce.ts`; the AL-03 caller set in Section 5 | Keep role-neutral session primitives, but migrate callers and retire/role-neutralize the ADMIN branch in 12H-B → 12H-G |
+| C-02 | Leave fallback exception-approver selection was incorrectly classified as domain relationship policy only. `role: "ADMIN"` creates a persisted effective approver relationship and therefore indirect business authority. | `modules/leave/application/approvals/exception-approver.ts`; DR-01 | Preserve the domain relationship, but remove ADMIN as candidate source through Leave-specific configuration, Team, or another approved role-neutral relationship in 12H-D |
+| C-03 | Historical supersession wording named only ADMIN business authority. Phase 12H-A also supersedes selected legacy USER-default permanence, explicitly Routine broad task read, summary, and export defaults. | Sections 1.1 and 3; updated historical-document notes in Section 8 | Treat Phase 12H-A as the current target; retain Phase 12A as historical evidence only |
+
+Phase 12H-A remains **OPEN** until these corrections are accepted. The
+corrections do not change runtime behavior.
+
+## 11. Intentionally unresolved or deferred items
 
 No production role-check surface is left unclassified, and no registered
 capability is left without a target disposition. The following items are
@@ -488,12 +526,14 @@ intentionally deferred because Phase 12H-A is a contract/inventory phase:
 | Future IT capabilities | IT is not implemented and no keys may be registered yet. The intended capability-first shape is recorded as design input only. | Future IT module; Phase 12H-D or a later approved domain phase |
 | Role-based notification audiences | Routine/Stock ADMIN recipient selection is classified as domain relationship/recipient policy rather than actor authority. Replacing it requires product ownership decisions about notification audiences. | `modules/routine/application/recipients.ts`; `modules/routine/application/scheduler.ts`; `modules/stock/infrastructure/notifications/notifications.ts` — owning domain phase |
 
-These are not blockers for Phase 12H-A completion; they are explicitly owned
-by later phases and cannot be silently resolved by this inventory document.
+These are not the reason for the current open correction status; they are
+explicitly owned by later phases and cannot be silently resolved by this
+inventory document.
 
-## 11. Phase 12H-A definition of done
+## 12. Phase 12H-A definition of done
 
-The repository can now answer, from committed documentation:
+After the corrections in Section 10 are accepted, the repository must answer,
+from committed documentation:
 
 - a normal actor receives the role-neutral default policy for the same trusted
   context;
