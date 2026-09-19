@@ -11,9 +11,13 @@ import type {
 
 const allRoutineCapabilities = {
     canReadTasks: true,
+    canReadAllTasks: true,
     canCreateTasks: true,
+    canCreateTasksForOthers: true,
     canUpdateTasks: true,
+    canUpdateAllTasks: true,
     canDeleteTasks: true,
+    canDeleteAllTasks: true,
     canReadOccurrences: true,
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
@@ -22,6 +26,7 @@ const allRoutineCapabilities = {
     canExportTasks: true,
     canReadSummary: true,
     canReadReference: true,
+    canReadAllReferences: true,
 } satisfies RoutinePresentationCapabilities;
 
 const taskData: PaginatedRoutineTaskWorkItemsResponse = {
@@ -123,7 +128,7 @@ const employees: RoutineEmployee[] = [{
 interface RenderListOptions {
     data?: PaginatedRoutineTaskWorkItemsResponse;
     focusOccurrenceId?: number | null;
-    isAdmin?: boolean;
+    canReadImportMetadata?: boolean;
     mutate?: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
     onEditTask?: (taskId: number) => void;
     routineCapabilities?: RoutinePresentationCapabilities;
@@ -132,7 +137,7 @@ interface RenderListOptions {
 function renderList({
     data = taskData,
     focusOccurrenceId = null,
-    isAdmin = false,
+    canReadImportMetadata = false,
     mutate = vi.fn(async () => undefined),
     onEditTask = vi.fn<(taskId: number) => void>(),
     routineCapabilities = {
@@ -146,7 +151,7 @@ function renderList({
             data={data}
             error={undefined}
             isLoading={false}
-            isAdmin={isAdmin}
+            canReadImportMetadata={canReadImportMetadata}
             focusTaskId={null}
             focusOccurrenceId={focusOccurrenceId}
             onRetry={vi.fn()}
@@ -219,7 +224,7 @@ describe("RoutineOccurrenceList", () => {
         );
     });
 
-    it("separates admin task edit from the occurrence-only override", () => {
+    it("separates task edit from the occurrence-only override", () => {
         const onEditTask = vi.fn();
         const adminData: PaginatedRoutineTaskWorkItemsResponse = {
             ...taskData,
@@ -227,7 +232,7 @@ describe("RoutineOccurrenceList", () => {
         };
         renderList({
             data: adminData,
-            isAdmin: true,
+            canReadImportMetadata: true,
             onEditTask,
             routineCapabilities: allRoutineCapabilities,
         });
@@ -267,7 +272,7 @@ describe("RoutineOccurrenceList", () => {
         const fetchMock = vi.fn();
         vi.stubGlobal("fetch", fetchMock);
         renderList({
-            isAdmin: true,
+            canReadImportMetadata: true,
             routineCapabilities: {
                 ...allRoutineCapabilities,
                 canUpdateTasks: false,
@@ -292,7 +297,7 @@ describe("RoutineOccurrenceList", () => {
         const mutate = vi.fn().mockResolvedValue(undefined);
         vi.stubGlobal("fetch", fetchMock);
         renderList({
-            isAdmin: true,
+            canReadImportMetadata: true,
             mutate,
             routineCapabilities: {
                 ...allRoutineCapabilities,
@@ -374,7 +379,7 @@ describe("RoutineOccurrenceList", () => {
                 ...taskData,
                 tasks: [{ ...taskData.tasks[0], canEdit: true, canDelete: true }],
             },
-            isAdmin: false,
+            canReadImportMetadata: false,
             onEditTask,
             routineCapabilities: allRoutineCapabilities,
         });

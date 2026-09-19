@@ -222,7 +222,7 @@ describe("routine import preview reuse", () => {
             decision: { capability: "routine.import.manage", allowed: true, scopes: ["ALL"], grants: [] },
             defaultScopes: [],
             scopes: ["ALL"],
-            isAdministrative: true,
+            hasBroadAuthority: true,
             liffSelfServicePolicyApplied: false,
         });
         routineAuthorizationMocks.resolveRoutineCapabilityInTransaction.mockResolvedValue({
@@ -236,7 +236,7 @@ describe("routine import preview reuse", () => {
             decision: { capability: "routine.import.manage", allowed: true, scopes: ["ALL"], grants: [] },
             defaultScopes: [],
             scopes: ["ALL"],
-            isAdministrative: true,
+            hasBroadAuthority: true,
             liffSelfServicePolicyApplied: false,
         });
         vi.clearAllMocks();

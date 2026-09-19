@@ -41,9 +41,13 @@ vi.mock("@/modules/auth/client", () => ({
 
 const routineCapabilities = {
     canReadTasks: true,
+    canReadAllTasks: false,
     canCreateTasks: false,
+    canCreateTasksForOthers: false,
     canUpdateTasks: false,
+    canUpdateAllTasks: false,
     canDeleteTasks: false,
+    canDeleteAllTasks: false,
     canReadOccurrences: false,
     canOverrideOccurrences: false,
     canReassignOccurrences: false,
@@ -52,6 +56,7 @@ const routineCapabilities = {
     canExportTasks: true,
     canReadSummary: true,
     canReadReference: true,
+    canReadAllReferences: false,
 };
 
 const stockCapabilities = {
@@ -76,6 +81,7 @@ const noLeaveCapabilities = {
     canRequestOwnNotTaken: false,
     canConfirmAssignedNotTaken: false,
     canManageApprovers: false,
+    canManageRecovery: false,
 } as const;
 
 const employeeReadCapabilities = {
@@ -458,7 +464,7 @@ describe("DashboardProvider navigation state", () => {
         );
     });
 
-    it("keeps unrelated ADMIN-only navigation role-gated", () => {
+    it("uses Email Request projection for stale menu clicks", () => {
         navigationMocks.user = {
             ...navigationMocks.user,
             role: "USER",
@@ -480,14 +486,76 @@ describe("DashboardProvider navigation state", () => {
             );
         }
 
-        render(
+        const { rerender } = render(
             <DashboardProvider>
+                <DashboardMenuState />
                 <NavigationProbe />
             </DashboardProvider>,
         );
 
+        expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent("email-request");
         fireEvent.click(screen.getByRole("button", { name: "Email Request" }));
         expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+
+        navigationMocks.router.push.mockReset();
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            emailRequestCapabilities: {
+                canReadRequests: true,
+                canCreateRequests: false,
+            },
+        };
+        rerender(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("email-request");
+        fireEvent.click(screen.getByRole("button", { name: "Email Request" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/email-request",
+            { scroll: false },
+        );
+    });
+
+    it("keeps Authorization Administration explicitly ADMIN-only", () => {
+        navigationMocks.user = { ...navigationMocks.user, role: "USER" };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button type="button" onClick={() => handleMenuClick("authorization-administration")}>
+                    Authorization Administration
+                </button>
+            );
+        }
+
+        const { rerender } = render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+        expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent("authorization-administration");
+        fireEvent.click(screen.getByRole("button", { name: "Authorization Administration" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+
+        navigationMocks.router.push.mockReset();
+        navigationMocks.user = { ...navigationMocks.user, role: "ADMIN" };
+        rerender(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("authorization-administration");
+        fireEvent.click(screen.getByRole("button", { name: "Authorization Administration" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/authorization",
+            { scroll: false },
+        );
     });
 
     it("uses projected Audit access for visibility and stale menu clicks", () => {

@@ -36,6 +36,7 @@ const EMPTY_LEAVE_PRESENTATION_CAPABILITIES: LeavePresentationCapabilities =
         canRequestOwnNotTaken: false,
         canConfirmAssignedNotTaken: false,
         canManageApprovers: false,
+        canManageRecovery: false,
     });
 
 export async function findActiveLiffWorkforceIdentity(

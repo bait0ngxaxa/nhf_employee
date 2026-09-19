@@ -19,6 +19,7 @@ export {
     EMAIL_REQUEST_CAPABILITIES,
     EmailRequestCapabilityDeniedError,
     inspectEmailRequestEffectiveAccess,
+    getEmailRequestPresentationCapabilities,
     resolveEmailRequestCapability,
     toEmailRequestReadAuthorization,
 } from "./authorization";

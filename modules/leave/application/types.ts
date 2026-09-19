@@ -12,4 +12,5 @@ export interface LeavePresentationCapabilities {
     readonly canConfirmAssignedNotTaken: boolean;
 
     readonly canManageApprovers: boolean;
+    readonly canManageRecovery: boolean;
 }

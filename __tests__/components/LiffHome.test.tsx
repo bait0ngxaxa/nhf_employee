@@ -60,6 +60,7 @@ const HOME = {
             canRequestOwnNotTaken: false,
             canConfirmAssignedNotTaken: false,
             canManageApprovers: false,
+            canManageRecovery: false,
         },
         canCreateOwnRoutine: true,
         routineCapabilities: {

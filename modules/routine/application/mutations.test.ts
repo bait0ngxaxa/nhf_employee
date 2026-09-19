@@ -800,7 +800,7 @@ describe("NHF Routine mutations", () => {
         expect(display.summary).toContain("เปลี่ยนการแจ้งเตือน");
     });
 
-    it("keeps explicit USER ALL task creation self-service", async () => {
+    it("allows configured USER ALL task creation to use broad behavior", async () => {
         const createdTask = {
             id: 72,
             version: 1,
@@ -851,16 +851,16 @@ describe("NHF Routine mutations", () => {
             data: expect.objectContaining({
                 createdById: 3,
                 updatedById: 3,
-                sourceFileName: null,
-                sourceSheet: null,
-                sourceRow: null,
-                assignees: { create: [{ employeeId: 11, role: "OWNER" }] },
+                sourceFileName: "spoof.xlsx",
+                sourceSheet: "Sheet1",
+                sourceRow: 12,
+                assignees: { create: [{ employeeId: 999, role: "OWNER" }] },
                 reminderRules: {
                     create: [{
                         daysBefore: 1,
                         sendHour: 9,
                         channel: "IN_APP",
-                        recipientScope: "ASSIGNEES",
+                        recipientScope: "ADMINS",
                         isActive: true,
                     }],
                 },

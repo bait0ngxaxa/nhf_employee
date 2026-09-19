@@ -24,7 +24,8 @@ interface RoutineTaskDialogProps {
     intent: "create" | "edit";
     isLoading: boolean;
     canChangeStatus?: boolean;
-    mode: "SELF_SERVICE" | "ADMIN";
+    allowBroadAssignment?: boolean;
+    currentEmployeeId?: number;
     onClose: () => void;
     onRetry: () => void;
     onSaved: () => void;
@@ -38,14 +39,14 @@ const FOCUSABLE_ELEMENT_SELECTOR =
 
 function dialogTitle(
     intent: RoutineTaskDialogProps["intent"],
-    mode: RoutineTaskDialogProps["mode"],
+    allowBroadAssignment: boolean,
 ): string {
     if (intent === "edit") {
         return "แก้ไข Routine";
     }
-    return mode === "SELF_SERVICE"
-        ? "สร้างแม่แบบงานของฉัน"
-        : "สร้างแม่แบบงานประจำ";
+    return allowBroadAssignment
+        ? "สร้างแม่แบบงานประจำ"
+        : "สร้างแม่แบบงานของฉัน";
 }
 
 function isAlertDialogTarget(target: EventTarget | null): boolean {
@@ -59,7 +60,8 @@ export function RoutineTaskDialog({
     intent,
     isLoading,
     canChangeStatus = true,
-    mode,
+    allowBroadAssignment = false,
+    currentEmployeeId,
     onClose,
     onRetry,
     onSaved,
@@ -133,7 +135,7 @@ export function RoutineTaskDialog({
             >
                 <DialogHeader className="shrink-0 gap-2 border-b border-border-subtle bg-surface-subtle px-5 py-4 pr-12 text-left sm:px-6">
                     <DialogTitle className="text-xl font-semibold leading-7 tracking-tight text-content-heading">
-                        {dialogTitle(intent, mode)}
+                        {dialogTitle(intent, allowBroadAssignment)}
                     </DialogTitle>
                     <DialogDescription className="max-w-[70ch] text-sm leading-6 text-content-secondary">
                         กำหนดข้อมูลหลัก ตารางงาน ผู้รับผิดชอบ และการแจ้งเตือน แล้วบันทึกโดยไม่ออกจากรายการ Routine
@@ -166,7 +168,8 @@ export function RoutineTaskDialog({
                         ref={formRef}
                         reference={reference}
                         initialTask={intent === "edit" ? task : null}
-                        mode={mode}
+                        allowBroadAssignment={allowBroadAssignment}
+                        currentEmployeeId={currentEmployeeId}
                         canChangeStatus={canChangeStatus}
                         presentation="dialog"
                         onSaved={onSaved}

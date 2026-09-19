@@ -13,31 +13,31 @@ function assignee(
 }
 
 describe("Routine task capabilities", () => {
-    it("allows an Admin to edit every task", () => {
+    it("allows broad authority to edit every task", () => {
         expect(resolveRoutineTaskCapabilities(
             { createdById: 7, assignees: [] },
-            { actorId: 99, employeeId: null, isAdmin: true },
+            { actorId: 99, employeeId: null, hasBroadAuthority: true },
         )).toMatchObject({ canEdit: true, canDelete: true });
     });
 
     it("allows the creator to edit their task", () => {
         expect(resolveRoutineTaskCapabilities(
             { createdById: 7, assignees: [] },
-            { actorId: 7, employeeId: null, isAdmin: false },
+            { actorId: 7, employeeId: null, hasBroadAuthority: false },
         )).toMatchObject({ canEdit: true, canDelete: true });
     });
 
     it("allows the current active assignee to edit without delete access", () => {
         expect(resolveRoutineTaskCapabilities(
             { createdById: 7, assignees: [assignee(21)] },
-            { actorId: 99, employeeId: 21, isAdmin: false },
+            { actorId: 99, employeeId: 21, hasBroadAuthority: false },
         )).toMatchObject({ canEdit: true, canDelete: false });
     });
 
     it("does not allow an unrelated employee to edit", () => {
         expect(resolveRoutineTaskCapabilities(
             { createdById: 7, assignees: [assignee(21)] },
-            { actorId: 99, employeeId: 42, isAdmin: false },
+            { actorId: 99, employeeId: 42, hasBroadAuthority: false },
         )).toMatchObject({ canEdit: false, canDelete: false });
     });
 
@@ -48,7 +48,7 @@ describe("Routine task capabilities", () => {
     ])("does not allow an inactive or deleted assignee to edit", (employee) => {
         expect(resolveRoutineTaskCapabilities(
             { createdById: 7, assignees: [assignee(21, employee)] },
-            { actorId: 99, employeeId: 21, isAdmin: false },
+            { actorId: 99, employeeId: 21, hasBroadAuthority: false },
         ).canEdit).toBe(false);
     });
 });

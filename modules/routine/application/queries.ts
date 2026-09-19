@@ -33,6 +33,7 @@ import {
     buildRoutineOccurrenceScope,
     buildRoutineTaskAccessScope,
     buildRoutineTaskScope,
+    resolveOptionalRoutineCapability,
     resolveRoutineCapability,
     type RoutineCapabilityAuthorization,
 } from "./authorization";
@@ -512,8 +513,8 @@ function redactRoutineSourceMetadata<T extends {
     sourceFileName: string | null;
     sourceSheet: string | null;
     sourceRow: number | null;
-}>(task: T, isAdministrative: boolean): T {
-    if (isAdministrative) {
+}>(task: T, canReadImportMetadata: boolean): T {
+    if (canReadImportMetadata) {
         return task;
     }
 
@@ -1297,6 +1298,11 @@ export async function getRoutineTasks(
         employeeId,
         "routine.task.read",
     );
+    const importAuthorization = await resolveOptionalRoutineCapability(
+        queryActor.actor,
+        employeeId,
+        "routine.import.manage",
+    );
     const mutationAuthorizations = await resolveTaskMutationCapabilities(
         queryActor,
         employeeId,
@@ -1342,7 +1348,7 @@ export async function getRoutineTasks(
         tasks.map(async (task) => ({
             ...redactRoutineSourceMetadata(
                 task,
-                capabilityAuthorization.isAdministrative,
+                importAuthorization?.scopes.includes("ALL") === true,
             ),
             ...await getRoutineTaskCapabilities(
                 task,
@@ -1405,6 +1411,11 @@ export async function getRoutineTaskById(
         employeeId,
         "routine.task.read",
     );
+    const importAuthorization = await resolveOptionalRoutineCapability(
+        queryActor.actor,
+        employeeId,
+        "routine.import.manage",
+    );
     const mutationAuthorizations = await resolveTaskMutationCapabilities(
         queryActor,
         employeeId,
@@ -1415,7 +1426,7 @@ export async function getRoutineTaskById(
     });
     const visibleTask = redactRoutineSourceMetadata(
         task,
-        capabilityAuthorization.isAdministrative,
+        importAuthorization?.scopes.includes("ALL") === true,
     );
     return {
         ...visibleTask,

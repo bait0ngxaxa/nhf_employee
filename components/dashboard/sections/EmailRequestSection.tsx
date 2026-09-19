@@ -4,8 +4,13 @@ import type { ReactElement } from "react";
 import { EmailRequestForm, EmailRequestHistory } from "@/components/email";
 import { EmailRequestProvider } from "@/components/dashboard/context/email-request/EmailRequestProvider";
 import { useDashboardUIContext } from "@/components/dashboard/context/dashboard/DashboardContext";
+import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
 
-function EmailRequestContent(): ReactElement {
+function EmailRequestContent({
+    capabilities,
+}: {
+    capabilities: EmailRequestPresentationCapabilities;
+}): ReactElement {
     const { handleMenuClick } = useDashboardUIContext();
 
     return (
@@ -26,25 +31,33 @@ function EmailRequestContent(): ReactElement {
                     </div>
                 </div>
 
-                <div className="space-y-8">
-                    <EmailRequestForm
-                        onCancel={() => handleMenuClick("dashboard")}
-                        onSuccess={() => handleMenuClick("dashboard")}
-                    />
-                </div>
+                {capabilities.canCreateRequests ? (
+                    <div className="space-y-8">
+                        <EmailRequestForm
+                            onCancel={() => handleMenuClick("dashboard")}
+                            onSuccess={() => handleMenuClick("dashboard")}
+                        />
+                    </div>
+                ) : null}
 
-                <div>
-                    <EmailRequestHistory />
-                </div>
+                {capabilities.canReadRequests ? (
+                    <div>
+                        <EmailRequestHistory />
+                    </div>
+                ) : null}
             </div>
         </section>
     );
 }
 
-export function EmailRequestSection(): ReactElement {
+export function EmailRequestSection({
+    capabilities,
+}: {
+    capabilities: EmailRequestPresentationCapabilities;
+}): ReactElement {
     return (
-        <EmailRequestProvider>
-            <EmailRequestContent />
+        <EmailRequestProvider capabilities={capabilities}>
+            <EmailRequestContent capabilities={capabilities} />
         </EmailRequestProvider>
     );
 }

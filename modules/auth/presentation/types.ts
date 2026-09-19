@@ -5,9 +5,11 @@ import type { EmployeePresentationCapabilities } from "@/modules/employee/client
 import type { DepartmentPresentationCapabilities } from "@/modules/department";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 import type { NotificationPresentationCapabilities } from "@/modules/notification/client";
+import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
 
 export interface AuthenticatedUser {
     id: string;
+    employeeId?: number;
     role: string;
     email?: string | null;
     name?: string | null;
@@ -22,4 +24,5 @@ export interface AuthenticatedUser {
     departmentCapabilities?: DepartmentPresentationCapabilities;
     auditCapabilities?: AuditPresentationCapabilities;
     notificationCapabilities?: NotificationPresentationCapabilities;
+    emailRequestCapabilities?: EmailRequestPresentationCapabilities;
 }

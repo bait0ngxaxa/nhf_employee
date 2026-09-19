@@ -197,6 +197,12 @@ The broader repository suite also passed:
 3,071 tests passed
 ```
 
+The `326 files / 3,071 tests` result above remains the historical Phase 12H-D
+closure result. After the final 12H-D corrective patch, the later Phase 12H-E
+repository verification ran on the resulting code and reported
+`326 files / 3,091 tests` at the Phase 12H-E revision. This note does not
+replace or reinterpret the original 12H-D evidence.
+
 Additional checks passed:
 
 - `npm.cmd run typecheck`

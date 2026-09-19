@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { API_ROUTES } from "@/lib/ssot/routes";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { triggerDownload } from "@/lib/helpers/download";
 import type { RoutineTaskStatusFilter } from "../../schemas/routine";
 
@@ -48,7 +47,8 @@ async function fetchRoutine<T>(url: string): Promise<T> {
 }
 
 function RoutineOccurrencePanel({
-    isAdmin,
+    canReadImportMetadata,
+    currentEmployeeId,
     routineCapabilities,
     scope,
     taskId,
@@ -58,7 +58,8 @@ function RoutineOccurrencePanel({
     summaryError,
     summaryLoading,
 }: {
-    isAdmin: boolean;
+    canReadImportMetadata: boolean;
+    currentEmployeeId?: number;
     routineCapabilities?: RoutinePresentationCapabilities;
     scope: "mine" | "all";
     taskId: number | null;
@@ -260,7 +261,7 @@ function RoutineOccurrencePanel({
                 data={data}
                 error={error}
                 isLoading={isLoading}
-                isAdmin={isAdmin}
+                canReadImportMetadata={canReadImportMetadata}
                 routineCapabilities={routineCapabilities}
                 focusTaskId={taskId}
                 focusOccurrenceId={occurrenceId}
@@ -273,7 +274,8 @@ function RoutineOccurrencePanel({
             <RoutineTaskDialog
                 open={editingTaskId !== null}
                 intent="edit"
-                mode={isAdmin ? "ADMIN" : "SELF_SERVICE"}
+                allowBroadAssignment={routineCapabilities?.canUpdateAllTasks === true}
+                currentEmployeeId={currentEmployeeId}
                 canSubmit={canUpdateTasks && (editingTask === null || editingTask.canEdit === true)}
                 canChangeStatus={canUpdateTasks && editingTask?.canDelete === true}
                 reference={reference}
@@ -297,15 +299,14 @@ function RoutineOccurrencePanel({
 }
 
 function RoutineTaskSettings({
-    mode,
     routineCapabilities,
+    currentEmployeeId,
     onTaskSaved,
 }: {
-    mode: "SELF_SERVICE" | "ADMIN";
     routineCapabilities?: RoutinePresentationCapabilities;
+    currentEmployeeId?: number;
     onTaskSaved: () => void;
 }) {
-    const isSelfService = mode === "SELF_SERVICE";
     const canReadReference = routineCapabilities?.canReadReference === true;
     const [isCreating, setIsCreating] = useState(false);
     const [editingTask, setEditingTask] = useState<RoutineTask | null>(null);
@@ -344,7 +345,9 @@ function RoutineTaskSettings({
         { keepPreviousData: true },
     );
     const canCreateTasks = routineCapabilities?.canCreateTasks === true;
+    const canCreateTasksForOthers = routineCapabilities?.canCreateTasksForOthers === true;
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
+    const canUpdateAllTasks = routineCapabilities?.canUpdateAllTasks === true;
     const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
 
     useEffect(() => {
@@ -418,13 +421,13 @@ function RoutineTaskSettings({
     return (
         <div className="space-y-5">
             <div className="space-y-1">
-                <h2 className="text-xl font-semibold tracking-tight text-brand-strong">{isSelfService ? "จัดการงานของฉัน" : "ตั้งค่าแม่แบบงานประจำ"}</h2>
-                <p className="max-w-prose text-sm leading-6 text-content-secondary">{isSelfService ? "สร้างและจัดการแม่แบบงาน Routine ที่คุณสร้างหรือได้รับมอบหมาย" : "กำหนดตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนของแต่ละแม่แบบ"}</p>
+                <h2 className="text-xl font-semibold tracking-tight text-brand-strong">จัดการแม่แบบงาน Routine</h2>
+                <p className="max-w-prose text-sm leading-6 text-content-secondary">สร้างและจัดการแม่แบบงานตามขอบเขตสิทธิ์และความสัมพันธ์ของแต่ละรายการ</p>
             </div>
             <RoutineTaskList
                 data={tasks}
                 error={tasksError}
-                isAdmin={!isSelfService}
+                canReadImportMetadata={routineCapabilities?.canManageImports === true}
                 routineCapabilities={routineCapabilities}
                 isLoading={tasksLoading}
                 onRetry={() => void mutateTasks()}
@@ -460,7 +463,8 @@ function RoutineTaskSettings({
             <RoutineTaskDialog
                 open={isCreating || editingTask !== null}
                 intent={editingTask ? "edit" : "create"}
-                mode={mode}
+                allowBroadAssignment={editingTask ? canUpdateAllTasks : canCreateTasksForOthers}
+                currentEmployeeId={currentEmployeeId}
                 canSubmit={editingTask
                     ? canUpdateTasks && editingTask.canEdit === true
                     : canCreateTasks}
@@ -489,12 +493,14 @@ function RoutineTaskSettings({
 
 export function RoutineSection() {
     const { user } = useDashboardDataContext();
-    const isAdmin = isAdminRole(user?.role);
     const routineCapabilities = user?.routineCapabilities;
     const canReadTasks = routineCapabilities?.canReadTasks === true;
     const canExportTasks = routineCapabilities?.canExportTasks === true;
     const canReadSummary = routineCapabilities?.canReadSummary === true;
     const canManageImports = routineCapabilities?.canManageImports === true;
+    const canManageTasks = routineCapabilities?.canCreateTasks === true
+        || routineCapabilities?.canUpdateTasks === true
+        || routineCapabilities?.canDeleteTasks === true;
     const searchParams = useSearchParams();
     const taskIdValue = Number(searchParams.get("taskId"));
     const taskId = Number.isInteger(taskIdValue) && taskIdValue > 0
@@ -512,12 +518,12 @@ export function RoutineSection() {
                 ? [
                       "mine",
                       "all",
-                      ...(isAdmin ? ["settings"] : ["manage"]),
+                      ...(canManageTasks ? ["manage"] : []),
                       ...(canManageImports ? ["import"] : []),
                   ]
                 : [],
         ),
-        [canManageImports, canReadTasks, isAdmin],
+        [canManageImports, canManageTasks, canReadTasks],
     );
     const safeTab = visibleRoutineTabs.has(activeTab) ? activeTab : "mine";
     useEffect(() => {
@@ -573,29 +579,22 @@ export function RoutineSection() {
             group: "work",
             groupLabel: "รายการงาน",
             visible: visibleRoutineTabs.has("mine"),
-            content: <RoutineOccurrencePanel scope="mine" isAdmin={isAdmin} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
+            content: <RoutineOccurrencePanel scope="mine" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
         },
         {
             value: "all",
             label: "รายการทั้งหมด",
             group: "work",
             visible: visibleRoutineTabs.has("all"),
-            content: <RoutineOccurrencePanel scope="all" isAdmin={isAdmin} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
+            content: <RoutineOccurrencePanel scope="all" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
         },
         {
             value: "manage",
-            label: "จัดการงานของฉัน",
+            label: "จัดการงาน",
             group: "manage",
             groupLabel: "จัดการ",
             visible: visibleRoutineTabs.has("manage"),
-            content: <RoutineTaskSettings mode="SELF_SERVICE" routineCapabilities={routineCapabilities} onTaskSaved={() => void mutateSummary()} />,
-        },
-        {
-            value: "settings",
-            label: "ตั้งค่างานประจำ",
-            group: "manage",
-            visible: visibleRoutineTabs.has("settings"),
-            content: <RoutineTaskSettings mode="ADMIN" routineCapabilities={routineCapabilities} onTaskSaved={() => void mutateSummary()} />,
+            content: <RoutineTaskSettings currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} onTaskSaved={() => void mutateSummary()} />,
         },
         {
             value: "import",

@@ -8,7 +8,6 @@ import { AdminLeaveRecoveryDashboard } from "./AdminLeaveRecoveryDashboard";
 import { ApproverManagement } from "./ApproverManagement";
 import { LeaveReportsDashboard } from "./LeaveReportsDashboard";
 import { LEAVE_THEME_COLOR } from "./leaveTheme";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     getLeaveDashboardTabVisibility,
     type LeaveDashboardTabVisibility,
@@ -27,7 +26,6 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
     const leaveCapabilities = user?.leaveCapabilities;
     const hasApprovalRelationship = user?.canApproveLeave === true;
     const tabVisibility = getLeaveDashboardTabVisibility({
-        isAdmin: isAdminRole(user?.role),
         leaveCapabilities,
         canApproveLeave: user?.canApproveLeave,
         canViewLeaveReports: user?.canViewLeaveReports,

@@ -87,7 +87,7 @@ describe("GET /api/leave/admin/recovery", () => {
             authorizationActor: {
                 userId: 1,
                 employeeId: 999,
-                systemRole: "ADMIN",
+                systemRole: "USER",
                 channel: "DASHBOARD",
             },
         });
@@ -99,7 +99,7 @@ describe("GET /api/leave/admin/recovery", () => {
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 999,
-            user: { role: "ADMIN" },
+            user: { role: "USER" },
         } as never);
         vi.mocked(prisma.leaveRequest.findMany)
             .mockResolvedValueOnce([createLeaveRequest("not-taken-1", "APPROVED")] as never)
@@ -177,7 +177,7 @@ describe("GET /api/leave/admin/recovery", () => {
         }));
     });
 
-    it("rejects a non-admin before querying recovery data", async () => {
+    it("allows a configured USER recovery operator without role promotion", async () => {
         vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             employeeId: 30,
@@ -188,10 +188,12 @@ describe("GET /api/leave/admin/recovery", () => {
             new Request("http://localhost/api/leave/admin/recovery"),
         );
 
-        expect(response.status).toBe(403);
-        expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
-        expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
-        expect(authorizationMocks.assertLeaveCapability).not.toHaveBeenCalled();
+        expect(response.status).toBe(200);
+        expect(authorizationMocks.assertLeaveCapability).toHaveBeenCalledWith(
+            expect.anything(),
+            "leave.recovery.manage",
+        );
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalled();
     });
 
     it("fails closed when recovery capability evaluation has no applicable grant", async () => {
@@ -200,6 +202,25 @@ describe("GET /api/leave/admin/recovery", () => {
                 "leave.recovery.manage",
                 "NO_APPLICABLE_GRANT",
             ),
+        );
+
+        const response = await GET(
+            new Request("http://localhost/api/leave/admin/recovery"),
+        );
+
+        expect(response.status).toBe(403);
+        expect(prisma.leaveRequest.findMany).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.count).not.toHaveBeenCalled();
+    });
+
+    it("rejects a recovery decision without ALL scope before querying", async () => {
+        vi.mocked(authorizationMocks.assertLeaveCapabilityScope).mockImplementationOnce(
+            () => {
+                throw new LeaveCapabilityDeniedError(
+                    "leave.recovery.manage",
+                    "NO_APPLICABLE_GRANT",
+                );
+            },
         );
 
         const response = await GET(

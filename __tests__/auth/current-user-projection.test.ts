@@ -31,6 +31,8 @@ const {
     auditProjectionMock,
     notificationContextMock,
     notificationProjectionMock,
+    emailRequestContextMock,
+    emailRequestCapabilitiesMock,
 } = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
     resolveAccountMock: vi.fn(),
@@ -49,6 +51,8 @@ const {
     auditProjectionMock: vi.fn(),
     notificationContextMock: vi.fn(),
     notificationProjectionMock: vi.fn(),
+    emailRequestContextMock: vi.fn(),
+    emailRequestCapabilitiesMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
@@ -81,6 +85,10 @@ vi.mock("@/modules/audit", () => ({
 vi.mock("@/modules/notification", () => ({
     buildNotificationAuthorizationContext: notificationContextMock,
     getNotificationPresentationCapabilities: notificationProjectionMock,
+}));
+vi.mock("@/lib/services/email-request/authorization", () => ({
+    buildEmailRequestAuthorizationContext: emailRequestContextMock,
+    getEmailRequestPresentationCapabilities: emailRequestCapabilitiesMock,
 }));
 
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
@@ -118,13 +126,18 @@ const LEAVE_CAPABILITIES: LeavePresentationCapabilities = {
     canRequestOwnNotTaken: true,
     canConfirmAssignedNotTaken: true,
     canManageApprovers: true,
+    canManageRecovery: false,
 };
 
 const ROUTINE = {
     canReadTasks: true,
+    canReadAllTasks: true,
     canCreateTasks: true,
+    canCreateTasksForOthers: true,
     canUpdateTasks: true,
+    canUpdateAllTasks: true,
     canDeleteTasks: true,
+    canDeleteAllTasks: true,
     canReadOccurrences: true,
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
@@ -133,6 +146,12 @@ const ROUTINE = {
     canExportTasks: true,
     canReadSummary: true,
     canReadReference: true,
+    canReadAllReferences: true,
+};
+
+const EMAIL_REQUEST_CAPABILITIES = {
+    canReadRequests: true,
+    canCreateRequests: true,
 };
 
 const STOCK = {
@@ -206,11 +225,14 @@ describe("current-user application projection", () => {
         auditProjectionMock.mockResolvedValue(AUDIT_CAPABILITIES);
         notificationContextMock.mockReturnValue({ authorizationActor: "notification-actor" });
         notificationProjectionMock.mockResolvedValue(NOTIFICATION_CAPABILITIES);
+        emailRequestContextMock.mockReturnValue({ authorizationActor: "email-request-actor" });
+        emailRequestCapabilitiesMock.mockResolvedValue(EMAIL_REQUEST_CAPABILITIES);
     });
 
     it("returns all server-derived Dashboard projections after the Employee lifecycle check", async () => {
         await expect(getCurrentUserProjection()).resolves.toEqual({
             id: "41",
+            employeeId: 101,
             role: "ADMIN",
             email: "account@test.com",
             name: "สมชาย ใจดี (ชาย)",
@@ -225,6 +247,7 @@ describe("current-user application projection", () => {
             departmentCapabilities: DEPARTMENT_CAPABILITIES,
             auditCapabilities: AUDIT_CAPABILITIES,
             notificationCapabilities: NOTIFICATION_CAPABILITIES,
+            emailRequestCapabilities: EMAIL_REQUEST_CAPABILITIES,
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
@@ -281,6 +304,13 @@ describe("current-user application projection", () => {
         );
         expect(notificationProjectionMock).toHaveBeenCalledWith({
             authorizationActor: "notification-actor",
+        });
+        expect(emailRequestContextMock).toHaveBeenCalledWith({
+            id: 41,
+            role: "ADMIN",
+        });
+        expect(emailRequestCapabilitiesMock).toHaveBeenCalledWith({
+            authorizationActor: "email-request-actor",
         });
     });
 

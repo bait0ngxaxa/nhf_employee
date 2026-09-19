@@ -113,6 +113,10 @@ const TestComponent = () => {
 describe("EmailRequestProvider", () => {
     const mockMutate = vi.fn();
     const mockUseSWR = vi.mocked(useSWR);
+    const fullCapabilities = {
+        canReadRequests: true,
+        canCreateRequests: true,
+    } as const;
 
     function createSuccessResponse<T>(data: T): ApiResponse<T> {
         return {
@@ -175,7 +179,7 @@ describe("EmailRequestProvider", () => {
 
     it("should render children and provide initial state", () => {
         render(
-            <EmailRequestProvider>
+            <EmailRequestProvider capabilities={fullCapabilities}>
                 <TestComponent />
             </EmailRequestProvider>,
         );
@@ -186,7 +190,7 @@ describe("EmailRequestProvider", () => {
 
     it("should update form data on input change", () => {
         render(
-            <EmailRequestProvider>
+            <EmailRequestProvider capabilities={fullCapabilities}>
                 <TestComponent />
             </EmailRequestProvider>,
         );
@@ -203,7 +207,7 @@ describe("EmailRequestProvider", () => {
         );
 
         render(
-            <EmailRequestProvider>
+            <EmailRequestProvider capabilities={fullCapabilities}>
                 <TestComponent />
             </EmailRequestProvider>,
         );
@@ -248,7 +252,7 @@ describe("EmailRequestProvider", () => {
         vi.mocked(apiPost).mockResolvedValueOnce(createErrorResponse("API Error"));
 
         render(
-            <EmailRequestProvider>
+            <EmailRequestProvider capabilities={fullCapabilities}>
                 <TestComponent />
             </EmailRequestProvider>,
         );
@@ -270,7 +274,7 @@ describe("EmailRequestProvider", () => {
             .mockResolvedValueOnce(createSuccessResponse({ success: true }));
 
         render(
-            <EmailRequestProvider>
+            <EmailRequestProvider capabilities={fullCapabilities}>
                 <TestComponent />
             </EmailRequestProvider>,
         );
@@ -292,7 +296,7 @@ describe("EmailRequestProvider", () => {
         vi.mocked(apiPost).mockResolvedValue(createErrorResponse("Network Error", 503));
 
         render(
-            <EmailRequestProvider>
+            <EmailRequestProvider capabilities={fullCapabilities}>
                 <TestComponent />
             </EmailRequestProvider>,
         );
@@ -330,7 +334,7 @@ describe("EmailRequestProvider", () => {
         });
 
         render(
-            <EmailRequestProvider>
+            <EmailRequestProvider capabilities={fullCapabilities}>
                 <TestComponent />
             </EmailRequestProvider>,
         );
@@ -338,5 +342,18 @@ describe("EmailRequestProvider", () => {
         const list = screen.getByTestId("request-list");
         expect(list.children.length).toBe(2);
         expect(list.textContent).toContain("Test User 1");
+    });
+
+    it("does not start the list GET request for create-only authority", () => {
+        render(
+            <EmailRequestProvider
+                capabilities={{ canReadRequests: false, canCreateRequests: true }}
+            >
+                <TestComponent />
+            </EmailRequestProvider>,
+        );
+
+        expect(mockUseSWR).toHaveBeenCalledWith(null);
+        expect(screen.getByTestId("request-list").children).toHaveLength(0);
     });
 });

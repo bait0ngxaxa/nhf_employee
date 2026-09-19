@@ -9,7 +9,7 @@ export interface RoutineTaskCapabilityActor {
     actorId: number;
     employeeId: number | null;
     /** Fallback for callers that do not provide capability-specific scopes. */
-    isAdmin?: boolean;
+    hasBroadAuthority?: boolean;
     editScopes?: readonly AuthorizationScope[];
     deleteScopes?: readonly AuthorizationScope[];
 }
@@ -54,11 +54,11 @@ export function resolveRoutineTaskCapabilities(
     return {
         canEdit: canUseScope(
             actor.editScopes,
-            actor.isAdmin === true || isCreator || isCurrentMasterAssignee,
+            actor.hasBroadAuthority === true || isCreator || isCurrentMasterAssignee,
         ),
         canDelete: canUseScope(
             actor.deleteScopes,
-            actor.isAdmin === true || isCreator,
+            actor.hasBroadAuthority === true || isCreator,
         ),
     };
 }

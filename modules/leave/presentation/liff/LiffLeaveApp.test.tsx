@@ -274,6 +274,7 @@ const LEAVE_CAPABILITIES: LeavePresentationCapabilities = {
     canRequestOwnNotTaken: true,
     canConfirmAssignedNotTaken: true,
     canManageApprovers: false,
+    canManageRecovery: false,
 };
 
 function approvals(hasActionableWork: boolean) {

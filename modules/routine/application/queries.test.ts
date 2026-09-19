@@ -24,6 +24,7 @@ import { routineTaskFiltersSchema } from "../schemas/routine";
 import type * as RoutineAuthorizationModule from "./authorization";
 
 const resolveRoutineCapabilityMock = vi.hoisted(() => vi.fn());
+const resolveOptionalRoutineCapabilityMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -32,6 +33,7 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("./authorization", async (importOriginal) => ({
     ...(await importOriginal<typeof RoutineAuthorizationModule>()),
     resolveRoutineCapability: resolveRoutineCapabilityMock,
+    resolveOptionalRoutineCapability: resolveOptionalRoutineCapabilityMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -118,6 +120,7 @@ function occurrenceRow(
 describe("NHF Routine query authorization", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        resolveOptionalRoutineCapabilityMock.mockResolvedValue(null);
         resolveRoutineCapabilityMock.mockImplementation(async (
             actor: { id: number; role: string; mode?: "LIFF_SELF_SERVICE" },
             _employeeId: number | null,
@@ -162,7 +165,7 @@ describe("NHF Routine query authorization", () => {
                 decision: { capability, allowed: true, scopes, grants: [] },
                 defaultScopes: scopes,
                 scopes,
-                isAdministrative: isDashboardAdmin,
+                hasBroadAuthority: isDashboardAdmin,
                 liffSelfServicePolicyApplied: actor.mode === "LIFF_SELF_SERVICE",
             };
         });
@@ -545,7 +548,7 @@ describe("NHF Routine query authorization", () => {
             },
             defaultScopes: ["ASSIGNED"],
             scopes: ["ALL"],
-            isAdministrative: false,
+            hasBroadAuthority: false,
             liffSelfServicePolicyApplied: false,
         });
 
@@ -768,7 +771,7 @@ describe("NHF Routine query authorization", () => {
             },
             defaultScopes: ["CREATED", "ASSIGNED"],
             scopes: ["ALL"],
-            isAdministrative: false,
+            hasBroadAuthority: false,
             liffSelfServicePolicyApplied: false,
         });
 
@@ -1516,6 +1519,9 @@ describe("NHF Routine query authorization", () => {
     });
 
     it("allows an admin to fetch full detail and source metadata", async () => {
+        resolveOptionalRoutineCapabilityMock.mockResolvedValueOnce({
+            scopes: ["ALL"],
+        });
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
             ...taskRow(71, 21, 5),
             unitId: 1,
@@ -1734,7 +1740,7 @@ describe("NHF Routine query authorization", () => {
                 },
                 defaultScopes: ["CREATED", "ASSIGNED"],
                 scopes: ["ASSIGNED"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: false,
             })
             .mockResolvedValueOnce({
@@ -1743,7 +1749,7 @@ describe("NHF Routine query authorization", () => {
                 decision: { capability: "routine.task.update", allowed: true, scopes: ["CREATED", "ASSIGNED"], grants: [] },
                 defaultScopes: ["CREATED", "ASSIGNED"],
                 scopes: ["CREATED", "ASSIGNED"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: false,
             })
             .mockResolvedValueOnce({
@@ -1752,7 +1758,7 @@ describe("NHF Routine query authorization", () => {
                 decision: { capability: "routine.task.delete", allowed: true, scopes: ["CREATED"], grants: [] },
                 defaultScopes: ["CREATED"],
                 scopes: ["CREATED"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: false,
             });
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
@@ -1813,7 +1819,7 @@ describe("NHF Routine query authorization", () => {
                 },
                 defaultScopes: ["CREATED", "ASSIGNED"],
                 scopes: ["ALL"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: true,
             })
             .mockResolvedValueOnce({
@@ -1822,7 +1828,7 @@ describe("NHF Routine query authorization", () => {
                 decision: { capability: "routine.task.update", allowed: true, scopes: ["CREATED", "ASSIGNED"], grants: [] },
                 defaultScopes: ["CREATED", "ASSIGNED"],
                 scopes: ["CREATED", "ASSIGNED"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: false,
             })
             .mockResolvedValueOnce({
@@ -1831,7 +1837,7 @@ describe("NHF Routine query authorization", () => {
                 decision: { capability: "routine.task.delete", allowed: true, scopes: ["CREATED"], grants: [] },
                 defaultScopes: ["CREATED"],
                 scopes: ["CREATED"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: false,
             });
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
@@ -1894,7 +1900,7 @@ describe("NHF Routine query authorization", () => {
                 },
                 defaultScopes: [],
                 scopes: ["CREATED", "ASSIGNED"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: true,
             })
             .mockResolvedValueOnce({
@@ -1912,7 +1918,7 @@ describe("NHF Routine query authorization", () => {
                 },
                 defaultScopes: [],
                 scopes: ["CREATED", "ASSIGNED"],
-                isAdministrative: false,
+            hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: true,
             })
             .mockResolvedValueOnce({
@@ -1930,7 +1936,7 @@ describe("NHF Routine query authorization", () => {
                 },
                 defaultScopes: [],
                 scopes: ["CREATED"],
-                isAdministrative: false,
+                hasBroadAuthority: false,
                 liffSelfServicePolicyApplied: true,
             });
         prismaMock.routineTask.findFirst.mockResolvedValue(null);
@@ -2102,7 +2108,7 @@ describe("NHF Routine query authorization", () => {
             },
             defaultScopes: ["OWN"],
             scopes: ["ALL"],
-            isAdministrative: false,
+            hasBroadAuthority: false,
             liffSelfServicePolicyApplied: false,
         });
 

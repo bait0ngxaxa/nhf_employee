@@ -63,11 +63,12 @@ role-neutral resolver; and generic business canary eligibility requires an
 active linked Employee for both roles. The production `authorization`
 singleton and current ADMIN compatibility seam remain active, no production
 authorization data was mutated, and all production operational/live rollout
-gates remain **NOT RUN**. The next handoff is Phase 12H-F —
-Presentation/route role-authority removal.
+gates remain **NOT RUN**. The recorded next handoff was Phase 12H-F —
+Presentation/route role-authority removal. Phase 12H-F is now closed in the
+current repository state; production enforcement cutover remains Phase 12H-G.
 
 สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12H-D Missing/deferred capability completion — CLOSED; Phase 12H-E Production Team/grant preparation and effective-access reconciliation — CLOSED for repository target readiness; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request capability migration — CLOSED in Phase 12H-D; future IT module — OUT OF SCOPE<br>
-Phase 12H-E — **เสร็จสิ้นในขอบเขต repository target readiness**; authority model ของ preflight — **ROLE_NEUTRAL_TARGET**; configured authority ของ USER/ADMIN — **reconciled ด้วยกติกาเดียวกัน**; hypothetical canary — **role-neutral resolver**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; production operational/live gates — **NOT RUN**; ขั้นถัดไป Phase 12H-F — Presentation/route role-authority removal<br>
+Phase 12H-E — **เสร็จสิ้นในขอบเขต repository target readiness**; authority model ของ preflight — **ROLE_NEUTRAL_TARGET**; configured authority ของ USER/ADMIN — **reconciled ด้วยกติกาเดียวกัน**; hypothetical canary — **role-neutral resolver**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; production operational/live gates — **NOT RUN**; Phase 12H-F — Presentation/route role-authority removal — **CLOSED**; ขั้นถัดไป Phase 12H-G — production enforcement cutover<br>
 วันที่สำรวจ: 2026-09-19<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -243,7 +244,7 @@ Source entry points หลัก:
 - Role: lib/ssot/permissions.ts:isAdminRole
 - API auth: lib/auth/api.ts:requireApiSession, lib/auth/api.ts:requireAdminSession, lib/auth/server.ts:getApiAuthSession
 - Workforce: lib/auth/workforce.ts:requireActiveWorkforceSession, lib/auth/workforce.ts:requireActiveWorkforceOrAdminSession, lib/auth/workforce-transaction.ts:assertActiveWorkforceInTransaction
-- Dashboard projection/guards: app/_lib/auth/current-user.ts:getCurrentUserProjection, app/dashboard/_lib/route-access.ts:requireDashboardAuditCapability, requireDashboardEmployeeCapability และ requireDashboardAdmin (เฉพาะ Email Request ที่ยัง deferred)
+- Dashboard projection/guards: app/_lib/auth/current-user.ts:getCurrentUserProjection, app/dashboard/_lib/route-access.ts:requireDashboardAuditCapability, requireDashboardEmployeeCapability และ requireDashboardEmailRequestAccess
 - LIFF: modules/line/application/liff.ts:requireLiffWorkforceSession, modules/line/application/liff.ts:getLiffCapabilities
 - Domain-specific rules: modules/routine/application/authorization.ts, modules/routine/application/queries.ts, modules/routine/application/mutations.ts, modules/stock/application/queries/queries.ts, modules/stock/application/requests/request-mutations.ts, modules/leave/application/approvals/**, modules/leave/application/cancellation/cancellation.ts, modules/leave/application/not-taken.ts
 - Employee server authorization: modules/employee/application/authorization.ts เป็น adapter เดียวเหนือ central resolver; routes ใช้ requireApiSession() เป็น authentication/workforce eligibility แล้วให้ adapter ตัดสิน capability application authorization
@@ -286,9 +287,9 @@ Mutation ที่มีผลต่อข้อมูลสำคัญยั�
 
 - middleware.ts ตรวจ hybrid access token เฉพาะ web route เพราะ matcher ไม่ครอบ /api; ทำหน้าที่ authentication/routing ไม่ใช่ domain authorization
 - app/dashboard/layout.tsx เรียก getCurrentUserProjection; ถ้าไม่มี current active Employee projection จะ redirect ไป login
-- requireDashboardAdmin() เป็น redirect guard ของ surface ที่ประกาศ Admin-only ซึ่งปัจจุบันคือ Email Request ที่ยัง deferred; Audit ใช้ requireDashboardAuditCapability() แทน
+- `requireDashboardEmailRequestAccess()` เป็น capability-aware redirect guard ของ Email Request; Audit ใช้ `requireDashboardAuditCapability()` และ Authorization Administration ยังคงใช้ ADMIN-only guard แยกต่างหาก
 - DashboardProvider, constants/dashboard.ts และ DashboardSidebar กรอง menu/requiredRole/feature flag ฝั่ง client
-- Dashboard page ที่มี server-side authorization guard ปัจจุบันแยกตาม surface: Audit ใช้ requireDashboardAuditCapability() จาก auditCapabilities, Email Request ใช้ requireDashboardAdmin() ตาม deferred policy และ Employee New/Import ใช้ requireDashboardEmployeeCapability() ตาม capability ของตนเอง
+- Dashboard page ที่มี server-side authorization guard ปัจจุบันแยกตาม surface: Audit ใช้ `requireDashboardAuditCapability()` จาก `auditCapabilities`, Email Request ใช้ `requireDashboardEmailRequestAccess()` จาก `emailRequestCapabilities`, Authorization Administration ยังคง ADMIN-only และ Employee New/Import ใช้ `requireDashboardEmployeeCapability()` ตาม capability ของตนเอง
 - หน้า Employee Management, Leave, Routine และ Stock อาศัย layout/feature/API guards เป็นหลัก; การเห็นหรือไม่เห็น tab/button ไม่ใช่ server authorization
 
 ### 3.4 LIFF
@@ -330,10 +331,10 @@ Module / Domain, Channel, Entry Point / Operation, Resource, Authentication Requ
 | Cross-cutting API | API | Any route using requireAdminSession() | Admin operation selected by caller | Same as requireApiSession() | Same as API session | isAdminRole(role) must be true | ADMIN | Domain rules remain with caller/service | Usually all only where domain route allows | Caller-specific | lib/auth/api.ts | Admin menu/route hints are separate | Default non-admin 403; custom factories may collapse unauthenticated to 403 | __tests__/api/hybrid-auth-routes.test.ts, route-specific tests | Do not treat Admin as business/workflow bypass |
 | Cross-cutting workforce | API | requireActiveWorkforceSession() | Current Employee identity | API session | User active/not deleted; Employee exists, ACTIVE, not deleted | Active workforce gate; no broad resource grant | None | Current User-to-Employee link | Current Employee only | None | lib/auth/workforce.ts | Current-user name projection | Missing profile 404 by default; inactive/deleted 403; unauthenticated normally 401 | __tests__/auth/workforce.test.ts, __tests__/auth/workforce-transaction.test.ts | Transaction variants must remain fail-closed |
 | Dashboard | DASHBOARD | Shared /dashboard layout | Dashboard session | Hybrid access cookie resolved by getCurrentUserProjection() | Account active/not deleted and current Employee lifecycle eligible | Authenticated current workforce can enter shared shell; no Admin requirement in layout | None at layout | Current Employee projection | Current Employee only | None | app/dashboard/layout.tsx, app/_lib/auth/current-user.ts | DashboardProvider receives role plus Leave/Stock/Routine/Employee projections | Missing projection redirects to /login | __tests__/auth/current-user-projection.test.ts, __tests__/lib/dashboard-routes.test.ts | Shared layout protection is not equivalent to per-page Admin authorization |
-| Dashboard | DASHBOARD | Audit page and transitional Email Request page | Audit capability page / Email Request Admin-compatible page | Shared Dashboard session | Current active Employee projection | Audit uses `requireDashboardAuditCapability()` and `auditCapabilities.canReadAuditLogs`; Email Request page/menu still uses `requireDashboardAdmin()` while its API uses the centralized Email Request adapter | Audit: central `audit.read / ALL`; Email Request: `read OWN/ALL` and `create ALL` through the central resolver, with temporary legacy ADMIN compatibility | None beyond current workforce | Audit all logs after capability authorization; Email Request query breadth is selected by configured `OWN`/`ALL` | Surface-specific | app/dashboard/_lib/route-access.ts, app/dashboard/audit/page.tsx, app/dashboard/email-request/page.tsx, app/api/email-request/route.ts, lib/services/email-request/authorization.ts | Audit uses the Audit capability projection; Email Request server authority is capability-driven while menu/page visibility remains Admin-shaped | Audit USER without grant redirects /access-denied; absent user /login; Email Request UI remains role-gated and API denies without configured authority | __tests__/lib/dashboard-routes.test.ts, Audit presentation/route tests, Email Request tests | Email Request is no longer registered deferred; its remaining presentation/route role gate belongs to Phase 12H-F and is not API authority |
+| Dashboard | DASHBOARD | Audit page and Email Request page | Audit capability page / Email Request capability page | Shared Dashboard session | Current active Employee projection | Audit uses `requireDashboardAuditCapability()` and `auditCapabilities.canReadAuditLogs`; Email Request uses `requireDashboardEmailRequestAccess()` while its API remains independently authoritative through the centralized adapter | Audit: central `audit.read / ALL`; Email Request: `read OWN/ALL` and `create ALL` through the current resolver, with temporary legacy ADMIN compatibility | None beyond current workforce | Audit all logs after capability authorization; Email Request query breadth is selected by configured `OWN`/`ALL` | Surface-specific | app/dashboard/_lib/route-access.ts, app/dashboard/audit/page.tsx, app/dashboard/email-request/page.tsx, app/api/email-request/route.ts, lib/services/email-request/authorization.ts | Audit uses the Audit capability projection; Email Request uses `canReadRequests` / `canCreateRequests` and independently renders history/form | Missing Email Request capabilities redirect `/access-denied`; absent user `/login`; API still denies without configured authority | __tests__/lib/dashboard-routes.test.ts, Audit presentation/route tests, Email Request tests | Email Request menu/page/form/history are capability-projected; no client projection is a server authorization boundary |
 | Dashboard | DASHBOARD | Employee Management page | Employee list/stats UI | Shared Dashboard session | Current active Employee projection | Trusted current-user Employee projection gates each presentation surface; no page role gate | No Employee presentation role gate | API list/stats remain server-authorized and organization-wide | List requires `canReadEmployees`; stats requires `canReadStats`; either can make the entry available | None | app/dashboard/employees/page.tsx, modules/employee/presentation/dashboard/EmployeeManagementSection.tsx, EmployeeProvider | `employeeCapabilities` independently gates list/stats/create/import/update/export; delete is projected but unused | UI access is not proof of API mutation/read authorization | Employee presentation tests, __tests__/api/employees-routes.test.ts, __tests__/dashboard-employee-pages.test.tsx | Phase 8C closes the main RSC boundary and complete current production-surface audit; broad data policy remains unchanged |
 | Dashboard | DASHBOARD | Leave, Routine, Stock pages and tabs | Domain UI | Shared Dashboard session | Current active Employee projection | Page-level role gates are not the authoritative domain decision; feature and API routes decide | Domain-specific | Domain-specific | UI chooses default/self/admin tabs from projection | Leave/Routine flags | app/dashboard/leave/page.tsx, app/dashboard/routine/page.tsx, app/dashboard/stock/page.tsx and domain presentations | Leave uses `leaveCapabilities` plus existing Leave relationship/report projections; Stock uses stockCapabilities; Routine retains its existing projection; feature hides | UI hidden/redirect can differ from direct API result | Domain route/presentation tests | Never document hidden UI as server enforcement |
-| Dashboard | DASHBOARD | Sidebar/menu click | Menu item | Already in authenticated shell | Current projection | requiredRole = ADMIN and feature checks are client-side navigation checks | ADMIN for configured items | None | No resource scope; menu visibility only | getAvailableMenuGroups() applies flags | constants/dashboard.ts, components/dashboard/context/dashboard/DashboardProvider.tsx | Hidden menu or client /access-denied push | Hidden or client redirect only | __tests__/constants/dashboard-menu.test.ts, __tests__/context/DashboardProvider.test.tsx | Presentation-only; direct navigation/API must still be tested |
+| Dashboard | DASHBOARD | Sidebar/menu click | Menu item | Already in authenticated shell | Current projection | Capability projections and feature checks are client-side navigation checks; `requiredRole = ADMIN` remains only for Authorization Administration | ADMIN only for the configured control-plane item | None | Domain-specific capability projection; menu visibility only | getAvailableMenuGroups() applies flags and projections | constants/dashboard.ts, components/dashboard/context/dashboard/DashboardProvider.tsx | Hidden menu or client `/access-denied` push | Hidden or client redirect only | __tests__/constants/dashboard-menu.test.ts, __tests__/context/DashboardProvider.test.tsx | Presentation-only; direct navigation/API must still be tested |
 
 ### 4.2 Employee, Department and account-adjacent operations
 
@@ -417,7 +418,7 @@ Employee current authorization detail:
 | Routine export | API | See Routine matrix | RoutineTask XLSX | Workforce/admin helper | Current route helper | USER current implementation can export all operational task rows | No Admin gate in export route | No actor scope passed to exporter; all-scope query | ALL as currently implemented | Routine flag | Routine export route/infrastructure | UI export action | 401/400/500 | __tests__/api/routine-export.test.ts | Do not accidentally change during resolver migration |
 | Stock export | API | See Stock matrix | Stock reports | `requireActiveWorkforceOrAdminSession()` then Stock authorization context | API current eligible Employee for USER; approved Dashboard ADMIN account-only lifecycle does not include report export | `stock.report.export / ALL` is checked by the Stock adapter and central resolver; explicit valid USER grants are reachable | ADMIN authority comes from central `SYSTEM_ROLE`; no Stock default | Organization-wide report | ALL after capability authorization | None | app/api/stock/reports/export/route.ts, modules/stock/application/authorization.ts | `stockCapabilities.canExportReports` drives report controls | Capability denial 403; validation/report errors remain route/domain outcomes | __tests__/api/stock-reports-export-route.test.ts, Stock authorization tests | Preserve report limits and domain rules; report remains Dashboard-only |
 | Leave export | API | See Leave matrix | Leave reports | requireActiveWorkforceSession() | Active Employee | Any active workforce with corresponding manager/original-approver relationship; no role route guard | None | Manager/current-team or original approver history | Relationship-derived subset | Leave flag | Leave report route/infrastructure | canViewLeaveReports is only visibility hint | Auth/domain/validation errors | __tests__/api/leave-export.test.ts | Capability projection is not endpoint authorization |
-| Email Request | API/DASHBOARD | POST /api/email-request; GET /api/email-request | Employee email/request administration | POST requireAdminSession; GET requireApiSession | Legacy API eligibility | POST Admin-only; GET Admin sees all, USER query is restricted to requestedBy = user.id | ADMIN for create/all-read | Requester ownership for USER GET | USER OWN requests; Admin ALL | None | app/api/email-request/route.ts, lib/services/email-request/queries.ts | Admin page; history/provider projections | POST custom 403; GET 401 default/custom and query errors | __tests__/api/email-request.test.ts, __tests__/services/email-request/queries.test.ts, __tests__/services/email-request/mutations.test.ts | Preserve GET ownership query and Admin mutation guard |
+| Email Request | API/DASHBOARD | POST /api/email-request; GET /api/email-request | Employee email/request administration | `requireApiSession()` | Legacy API eligibility plus Email Request capability decision | POST requires `email.request.create / ALL`; GET requires `email.request.read / OWN|ALL`, with requester ownership retained for OWN | No direct role gate; current resolver may supply temporary ADMIN compatibility authority | Requester ownership for `OWN` GET | `OWN` requester rows; `ALL` broad rows; create always uses authenticated requester | None | app/api/email-request/route.ts, lib/services/email-request/queries.ts, lib/services/email-request/authorization.ts | `emailRequestCapabilities` independently gates page/menu/form/history | Capability denial 403; GET/POST validation and persistence errors remain route outcomes | __tests__/api/email-request.test.ts, __tests__/services/email-request/queries.test.ts, __tests__/services/email-request/mutations.test.ts, Email Request presentation tests | Preserve ownership query, idempotency, audit and server capability enforcement |
 | Settings | DASHBOARD/API | Routine settings tab and Leave approver settings | Configuration/assignment | Shared Dashboard plus route-specific APIs | Current projection/API session; approver mutation requires active workforce | No general settings API found; Routine settings UI is Admin-shaped; Leave approver settings resolves `leave.approver.manage / ALL` through central authority and supports explicit USER grants | ADMIN through central `SYSTEM_ROLE`; explicit USER grant can authorize server operation | Leave assignment domain relationship | Configuration-specific; Leave capability is not a generic team scope | Routine/Leave flags as applicable | modules/routine/presentation/dashboard/RoutineSection.tsx, app/api/leave/approvers/route.ts, Leave authorization adapter | Tabs/buttons hidden for USER | UI hidden is not enough; approver API remains authoritative | Routine/Leave presentation and route tests | Do not create settings.manage semantics from UI alone |
 | Notifications | API/DASHBOARD | GET `/api/notifications`, GET `/api/notifications/all`, PATCH `/api/notifications/[id]/read`, POST `/api/notifications/mark-all-read` and Notification page | In-app Notification | `requireApiSession()` then `notification.inbox.read / OWN` or `notification.inbox.update / OWN` | Legacy eligible active Employee | Notification adapter composes permanent Default Domain Policy `OWN` with central configured authority; read/update remain independent | ADMIN uses central SYSTEM_ROLE semantics within the registered OWN scope; Team/TeamRole/direct User grants do not change actor ownership | Owner is trusted actor `userId`; repository query/update predicates retain `userId` | OWN/current actor User only | None | app/api/notifications/**, modules/notification/application/authorization.ts, modules/notification/application/**, repository queries | Notification page/Navbar use `notificationCapabilities.canReadInbox`; read/update controls use independent `canUpdateInbox`; Phase 12C.1 projection uses the same composition path | Unauthenticated 401; invalid session 400; capability denial 403; persistence 500 | __tests__/api/notifications.test.ts, modules/notification/application/authorization.test.ts, modules/notification/application/queries.test.ts, modules/notification/application/commands.test.ts, modules/notification/infrastructure/persistence/repository.test.ts | Client user IDs are ignored; registry remains OWN-only; query/update ownership remains before data leaves persistence |
 
@@ -439,11 +440,11 @@ Employee current authorization detail:
 
 - lib/ssot/permissions.ts:isAdminRole เป็น helper กลางที่เปรียบเทียบ role กับ ADMIN; USER_ROLES มี ADMIN และ USER
 - lib/auth/api.ts:requireAdminSession เป็น generic route guard ระดับ role แต่ไม่แทนที่ domain relationship/business checks
-- app/dashboard/_lib/route-access.ts:requireDashboardAdmin เป็น redirect guard ของ Email Request ที่ยัง deferred; `requireDashboardAuditCapability` และ `requireDashboardEmployeeCapability` เป็น capability-based redirect guards ของ migrated Dashboard pages
-- constants/dashboard.ts และ DashboardProvider ใช้ requiredRole: ADMIN สำหรับ menu/click behavior เท่านั้น
+- app/dashboard/_lib/route-access.ts: `requireDashboardEmailRequestAccess` เป็น capability-based redirect guard ของ Email Request; `requireDashboardAuditCapability` และ `requireDashboardEmployeeCapability` เป็น capability-based redirect guards ของ migrated Dashboard pages
+- constants/dashboard.ts และ DashboardProvider ใช้ `requiredRole: ADMIN` เฉพาะ Authorization Administration control plane; Email Request, Leave recovery และ Routine business surfaces ใช้ capability projections
 - modules/stock/application/authorization.ts แปลง trusted server identity เป็น `AuthorizationActor`, เรียก central resolver และ compose permanent Stock Default Domain Policy ผ่าน `composeAuthorizationAuthority()`; ไม่มี Stock compatibility fallback
 - modules/stock/presentation/liff-stock-auth.ts:requireLiffStockProcessorSession ตรวจ LIFF workforce ก่อน แล้วจึงใช้ `stock.request.process`/`LIFF_SELF_SERVICE`; ไม่ใช้ role เป็น authority โดยตรง
-- modules/routine/application/authorization.ts ใช้ `ROUTINE_CAPABILITIES`, central resolver, additive default composition และ Routine channel policy; Dashboard ADMIN authority มาจาก `SYSTEM_ROLE`, ส่วน LIFF summary/reference ยังคง self-service
+- modules/routine/application/authorization.ts ใช้ `ROUTINE_CAPABILITIES`, central resolver, additive default composition และ Routine channel policy; Dashboard broad presentation/mutation behavior มาจาก effective `ALL` scopes, ส่วน LIFF ยังคง self-service-constrained
 - Leave registered server capabilities use the adapter at `modules/leave/application/authorization.ts`; permanent normal-USER defaults compose only with valid configured/system authority, while recovery candidate and Leave-owned relationship checks remain domain-specific
 - Stock presentation Phase 6B ใช้ `stockCapabilities` จาก central resolver สำหรับ menu, route, tabs, queries และ migrated action controls; `isAdmin` ที่เหลือใน Stock UI ใช้ได้เฉพาะ descriptive role text และไม่ใช่ authority
 
@@ -451,12 +452,12 @@ Employee current authorization detail:
 
 - Authentication/routing: middleware.ts
 - Current workforce projection: app/_lib/auth/current-user.ts:getCurrentUserProjection
-- Page access guards: app/dashboard/_lib/route-access.ts:requireDashboardAuditCapability, requireDashboardEmployeeCapability และ requireDashboardAdmin (เฉพาะ Email Request ที่ยัง deferred); `/dashboard/employees` ใช้ `canAccessEmployeeDashboard()` จาก trusted projection
+- Page access guards: app/dashboard/_lib/route-access.ts:requireDashboardAuditCapability, requireDashboardEmployeeCapability และ `requireDashboardEmailRequestAccess`; Authorization Administration ใช้ ADMIN-only guard; `/dashboard/employees` ใช้ `canAccessEmployeeDashboard()` จาก trusted projection
 - Role/feature navigation: constants/dashboard.ts:getAvailableMenuGroups, components/dashboard/context/dashboard/DashboardProvider.tsx:handleMenuClick
 - Leave presentation projections: modules/leave/application/approvals/approval-queries.ts:getCurrentEmployeeLeaveProjection, modules/leave/presentation/dashboard/LeaveManagementSection.tsx
 - Employee UI action hints: modules/employee/presentation/dashboard/EmployeeTable.tsx, EmployeeManagementSection.tsx
 - Stock presentation projection: modules/stock/application/authorization.ts:getStockPresentationCapabilities; Dashboard current-user contract, StockProvider and StockSection consume `stockCapabilities`
-- Routine UI Admin/settings/import behavior: modules/routine/presentation/dashboard/RoutineSection.tsx
+- Routine UI scope-aware management/import/export behavior: modules/routine/presentation/dashboard/RoutineSection.tsx and the Routine task/occurrence presentation components
 
 ### 5.3 API guards
 
@@ -568,7 +569,7 @@ Query and persistence scopes found include:
 | requireActiveWorkforceSession | AUTHENTICATION + ACCOUNT_LIFECYCLE |
 | requireActiveWorkforceOrAdminSession | Legacy AUTHENTICATION/ACCOUNT_LIFECYCLE seam with an ADMIN branch classified by Phase 12H-A as BUSINESS_AUTHORITY_MIGRATE; callers must be role-neutralized |
 | assertActiveWorkforceInTransaction และ active User/Employee re-reads | ACCOUNT_LIFECYCLE + BUSINESS_RULE + DATA_INTEGRITY/CONCURRENCY |
-| requireDashboardAdmin | AUTHENTICATION + ACCOUNT_LIFECYCLE + role AUTHORIZATION ของ Email Request ที่ยัง deferred; outcome เป็น redirect |
+| requireDashboardEmailRequestAccess | AUTHENTICATION + ACCOUNT_LIFECYCLE + Email Request capability AUTHORIZATION; outcome เป็น redirect |
 | requireDashboardAuditCapability และ requireDashboardEmployeeCapability | AUTHENTICATION + ACCOUNT_LIFECYCLE + capability AUTHORIZATION ของ Dashboard surface; outcome เป็น redirect |
 | DashboardProvider, requiredRole, LeavePresentationCapabilities, EmployeePresentationCapabilities, canApproveLeave, canViewLeaveReports และ LiffCapabilities | PRESENTATION_ONLY; บางค่าคำนวณจาก AUTHORIZATION eligibility, RESOURCE_RELATIONSHIP หรือ FEATURE_FLAG แต่ไม่ใช่ authority |
 | Routine capability adapter and channel policy | AUTHORIZATION + channel restriction; resource/query predicates remain domain-owned |
@@ -1532,10 +1533,108 @@ Phase 12H-E verification evidence:
 - `npm.cmd run architecture:check`: passed, 1,147 source files checked;
 - `git diff --check`: passed.
 
-The next handoff is **Phase 12H-F — Presentation/route role-authority
-removal**. Production enforcement cutover remains Phase 12H-G, live rollout
+At the Phase 12H-E closure, the next handoff was **Phase 12H-F —
+Presentation/route role-authority removal**. Production enforcement cutover remains Phase 12H-G, live rollout
 validation remains Phase 12H-H, and compatibility-debt removal remains Phase
 12H-I.
+
+## 9.15 Phase 12H-F Presentation and Route Role-Authority Removal
+
+Phase 12H-F is **CLOSED** against the reviewed baseline
+`f425a251249932384e0e9b52669581ebaa3cf2bc`. Phase 12H-E was accepted and
+closed before this work. This phase removes direct `systemRole = ADMIN`
+business decisions from presentation and route-entry surfaces while preserving
+the current production resolver and its temporary ADMIN compatibility seam.
+It does not perform the Phase 12H-G production resolver cutover, mutate grants,
+seed/backfill authorization data, access a live database, or make a production
+rollout claim.
+
+Email Request now projects `email.request.read` (`OWN` or `ALL`) and
+`email.request.create` (`ALL`) through the existing adapter and current-user
+pipeline:
+
+```text
+getCurrentUserProjection()
+  -> AuthenticatedUser
+  -> DashboardUser
+  -> DashboardProvider / Email Request page
+```
+
+The menu and page require at least one usable capability. The form and history
+are independently rendered, and `EmailRequestProvider` disables its list SWR
+key when read authority is absent. Therefore create-only actors do not issue
+an unauthorized history GET, read-only actors do not receive a form, and the
+server API remains authoritative for both operations. The Email Request
+`requiredRole: ADMIN` menu/page gate and `requireDashboardAdmin()` caller were
+removed.
+
+Leave recovery now exposes `canManageRecovery` only when the effective
+`leave.recovery.manage` decision contains `ALL` for `DASHBOARD`. The recovery
+tab and availability projection use that field, and
+`GET /api/leave/admin/recovery` checks the active workforce session,
+capability/scope/channel, candidate predicate, owner exclusion, unavailable
+effective approver, and pagination before querying candidates. No direct role
+gate remains, so a configured USER recovery operator receives the same valid
+recovery path. The private Leave attachment participant `isAdmin` bypass is
+explicitly deferred to the later enforcement/domain-policy work; it was not
+mapped to an unrelated Leave capability.
+
+Routine presentation no longer chooses a business mode from ADMIN versus
+SELF_SERVICE. Its projections expose the relevant granular capabilities and
+effective broad scopes, including broad task read/create/update/delete and
+reference read where the domain contract requires them. CREATE `OWN` keeps
+self-service assignee behavior, while CREATE `ALL` enables the approved broad
+assignee behavior. UPDATE, DELETE, status, occurrence, import, export, source
+metadata, resource, version, state, concurrency, idempotency, audit,
+notification, and LIFF self-service constraints remain independently enforced.
+Routine application code uses scope-derived `hasBroadAuthority` for the
+operation being performed; it does not use an unrelated broad capability as a
+global admin bit. Routine import metadata is projected from the approved
+`routine.import.manage` authority and query serialization follows the same
+visibility decision. Historical ADMIN audit/provenance values remain readable;
+new configured broad authority is represented without rewriting history.
+
+Authorization Administration remains the explicit ADMIN-only control plane:
+its menu visibility, page/API guards, `requireDashboardAuthorizationAdministration()`,
+`assertAuthorizationAdministrationAccess()`, administration APIs, and ADMIN
+bootstrap assignment remain unchanged. Identity labels such as
+`ผู้ดูแลระบบ`/`ผู้ใช้งาน`, Stock role badges, authentication/lifecycle ADMIN
+branches, and historical provenance are not business grants. Routine and Stock
+`Role.ADMIN` notification recipient selection remains a separate recipient
+policy and was intentionally unchanged.
+
+The final semantic search classified remaining direct role matches as follows:
+
+| Classification | Remaining examples | Decision |
+|---|---|---|
+| `CONTROL_PLANE_KEEP` | Authorization Administration guards/APIs, administration menu, `requireAdminSession`, `isAdminRole` control-plane checks | Retained; permission administration is not a business capability surface |
+| `AUTHENTICATION_LIFECYCLE_KEEP` | Bootstrap ADMIN assignment, workforce-or-admin helper, narrow Routine/Stock account-lifecycle branches | Retained for lifecycle compatibility; broad caller audit belongs to 12H-G |
+| `PRESENTATION_IDENTITY_ONLY` | Dashboard/Stock identity labels and role badges | Retained because they display identity and grant no authority |
+| `DOMAIN_RECIPIENT_POLICY` | Routine/Stock `Role.ADMIN` notification audiences | Retained; recipient policy is not caller authorization |
+| `COMPATIBILITY_DEBT_12H_G_OR_I` | Legacy ADMIN business-authority compatibility seam and Stock compatibility semantics | Retained until the enforcement/cutover phases |
+| Explicitly deferred domain policy | Leave private-attachment participant ADMIN bypass | Not remapped; requires separately approved policy |
+
+There is no remaining unclassified ordinary business presentation or route-entry
+role gate in the reviewed production surface. The production authorization
+resolver remains compatibility-backed. The next phase is **12H-G — production
+enforcement cutover and full enforcement/security regression**.
+
+Phase 12H-F verification evidence:
+
+- Email/Leave/Dashboard projection and route-entry selection: **10 files / 82 tests passed**;
+- Routine authorization/query/mutation/presentation/form selection: **12 files / 212 tests passed**;
+- Authorization Administration control-plane selection: **8 files / 65 tests passed**;
+- Email API and Leave authorization/API selection: **5 files / 83 tests passed**;
+- Leave route projection regression: **1 file / 11 tests passed**;
+- full repository suite: **328 files / 3,106 tests passed**;
+- `npm.cmd run typecheck`: passed;
+- `npm.cmd run lint:strict`: passed;
+- `npm.cmd run architecture:check`: passed, 1,149 source files checked;
+- `git diff --check`: passed.
+
+No development server or production build was run. No production grant, seed,
+backfill, migration, live preflight, canary, or authorization rollout was
+performed.
 
 ## 10. Explicit non-goals for Phase 0
 

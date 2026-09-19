@@ -14,7 +14,8 @@ Routine deferred-capability additive policy migrations closed; Phase 12E
 effective-access Administration UX is closed; Phase 12F full authorization
 regression/security matrix is closed; Phase 12G-B First Production Capability
 Deployment Readiness is implementation-complete and awaits production
-operational acceptance.
+operational acceptance; Phase 12H-F presentation/route role-authority removal
+is closed, while production enforcement cutover remains Phase 12H-G.
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -579,9 +580,10 @@ management entry requires `canReadEmployees` or `canReadStats`; list/search/
 pagination uses `canReadEmployees`; stats uses `canReadStats`; add/import/edit/
 export use `canCreateEmployees`, `canImportEmployees`, `canUpdateEmployees`,
 and `canExportEmployees` respectively. `getAvailableMenuGroups()` and
-`DashboardProvider.handleMenuClick()` apply these checks without changing the
-generic `requiredRole: ADMIN` behavior for unrelated Email Request items. The
-direct Add Employee and Import Employee pages use a small trusted
+`DashboardProvider.handleMenuClick()` apply these checks; Email Request now
+uses its own `emailRequestCapabilities` projection and Authorization
+Administration remains the only Dashboard control-plane `requiredRole: ADMIN`
+item. The direct Add Employee and Import Employee pages use a small trusted
 server-side capability guard and preserve login, access-denied and render
 outcomes.
 
@@ -623,5 +625,7 @@ controls and side effects require the independent `canUpdateInbox` field.
 The current-user projection resolves these domain capabilities after the active
 Employee lifecycle check and batches independent projection work. Phase 9A
 server authorization remains authoritative, Phase 9C is closed for the current
-production surface, Email Request remains deferred, and Phase 12C.3 records
-the permanent Routine presentation composition.
+production surface, and Email Request was intentionally deferred at that
+historical boundary. Phase 12H-F now records its capability-based presentation
+closure, while Phase 12C.3 records the permanent Routine presentation
+composition.

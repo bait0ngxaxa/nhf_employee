@@ -79,14 +79,18 @@ describe("Routine presentation capability projection", () => {
         mocks.resolveMany.mockResolvedValue(allowedDecisions());
     });
 
-    it("projects all twelve Routine capabilities into serializable booleans", async () => {
+    it("projects Routine capabilities and effective broad scopes into serializable booleans", async () => {
         await expect(
             getRoutinePresentationCapabilities(ACTOR, 21),
         ).resolves.toEqual({
             canReadTasks: true,
+            canReadAllTasks: true,
             canCreateTasks: true,
+            canCreateTasksForOthers: true,
             canUpdateTasks: true,
+            canUpdateAllTasks: true,
             canDeleteTasks: true,
+            canDeleteAllTasks: true,
             canReadOccurrences: true,
             canOverrideOccurrences: true,
             canReassignOccurrences: true,
@@ -95,6 +99,7 @@ describe("Routine presentation capability projection", () => {
             canExportTasks: true,
             canReadSummary: true,
             canReadReference: true,
+            canReadAllReferences: true,
         });
     });
 
@@ -127,9 +132,13 @@ describe("Routine presentation capability projection", () => {
             getRoutinePresentationCapabilities(ACTOR, 21),
         ).resolves.toEqual({
             canReadTasks: true,
+            canReadAllTasks: false,
             canCreateTasks: true,
+            canCreateTasksForOthers: false,
             canUpdateTasks: true,
+            canUpdateAllTasks: false,
             canDeleteTasks: true,
+            canDeleteAllTasks: false,
             canReadOccurrences: true,
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
@@ -138,6 +147,7 @@ describe("Routine presentation capability projection", () => {
             canExportTasks: false,
             canReadSummary: true,
             canReadReference: true,
+            canReadAllReferences: false,
         });
     });
 
@@ -196,9 +206,13 @@ describe("Routine presentation capability projection", () => {
             getRoutinePresentationCapabilities(dashboardAdmin, null),
         ).resolves.toEqual({
             canReadTasks: true,
+            canReadAllTasks: true,
             canCreateTasks: true,
+            canCreateTasksForOthers: true,
             canUpdateTasks: true,
+            canUpdateAllTasks: true,
             canDeleteTasks: true,
+            canDeleteAllTasks: true,
             canReadOccurrences: true,
             canOverrideOccurrences: true,
             canReassignOccurrences: true,
@@ -207,6 +221,7 @@ describe("Routine presentation capability projection", () => {
             canExportTasks: true,
             canReadSummary: true,
             canReadReference: true,
+            canReadAllReferences: true,
         });
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             {
@@ -270,9 +285,13 @@ describe("Routine presentation capability projection", () => {
             getRoutinePresentationCapabilities(ACTOR, 21),
         ).resolves.toEqual({
             canReadTasks: false,
+            canReadAllTasks: false,
             canCreateTasks: false,
+            canCreateTasksForOthers: false,
             canUpdateTasks: false,
+            canUpdateAllTasks: false,
             canDeleteTasks: false,
+            canDeleteAllTasks: false,
             canReadOccurrences: false,
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
@@ -281,6 +300,7 @@ describe("Routine presentation capability projection", () => {
             canExportTasks: false,
             canReadSummary: false,
             canReadReference: false,
+            canReadAllReferences: false,
         });
     });
 
@@ -337,9 +357,13 @@ describe("Routine presentation capability projection", () => {
             getRoutinePresentationCapabilities(liffAdmin, 21),
         ).resolves.toEqual({
             canReadTasks: true,
+            canReadAllTasks: false,
             canCreateTasks: true,
+            canCreateTasksForOthers: false,
             canUpdateTasks: true,
+            canUpdateAllTasks: false,
             canDeleteTasks: true,
+            canDeleteAllTasks: false,
             canReadOccurrences: false,
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
@@ -348,6 +372,7 @@ describe("Routine presentation capability projection", () => {
             canExportTasks: false,
             canReadSummary: true,
             canReadReference: true,
+            canReadAllReferences: false,
         });
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             {

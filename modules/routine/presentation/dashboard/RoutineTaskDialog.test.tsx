@@ -77,7 +77,7 @@ describe("RoutineTaskDialog", () => {
                 open
                 canSubmit
                 intent="create"
-                mode="SELF_SERVICE"
+                allowBroadAssignment={false}
                 reference={reference}
                 task={null}
                 isLoading={false}
@@ -95,7 +95,7 @@ describe("RoutineTaskDialog", () => {
                 open
                 canSubmit
                 intent="edit"
-                mode="ADMIN"
+                allowBroadAssignment={true}
                 reference={reference}
                 task={task}
                 isLoading={false}
@@ -117,7 +117,7 @@ describe("RoutineTaskDialog", () => {
                 open
                 canSubmit={false}
                 intent="create"
-                mode="ADMIN"
+                allowBroadAssignment={true}
                 reference={reference}
                 task={null}
                 isLoading={false}
@@ -150,7 +150,7 @@ describe("RoutineTaskDialog", () => {
                 open
                 canSubmit
                 intent="create"
-                mode="SELF_SERVICE"
+                allowBroadAssignment={false}
                 reference={reference}
                 task={null}
                 isLoading={false}
@@ -220,7 +220,7 @@ function RoutineTaskDialogHarness({
                 open={open}
                 canSubmit
                 intent="create"
-                mode="SELF_SERVICE"
+                allowBroadAssignment={false}
                 reference={reference}
                 task={null}
                 isLoading={false}

@@ -13,6 +13,8 @@ import {
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
 
+import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+
 import type { EmailRequestReadAuthorization } from "./types";
 
 export const EMAIL_REQUEST_CAPABILITIES = [
@@ -169,6 +171,57 @@ export async function assertEmailRequestCapability(
     capability: string,
 ): Promise<EmailRequestCapabilityAuthorization> {
     return resolveEmailRequestCapability(context, capability);
+}
+
+function projectEmailRequestCapabilityDecision(
+    actor: EmailRequestAuthorizationActor,
+    capability: EmailRequestCapability,
+    decision: AuthorizationDecision,
+): readonly AuthorizationScope[] | null {
+    try {
+        return composeEmailRequestCapabilityAuthorization(
+            actor,
+            capability,
+            decision,
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof EmailRequestCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+export async function getEmailRequestPresentationCapabilities(
+    context: EmailRequestAuthorizationContext,
+): Promise<EmailRequestPresentationCapabilities> {
+    const actor = context.authorizationActor;
+    const decisions = await authorization.resolveMany(
+        actor,
+        EMAIL_REQUEST_CAPABILITIES,
+    );
+    const project = (
+        capability: EmailRequestCapability,
+    ): readonly AuthorizationScope[] | null => {
+        const decision = decisions.get(capability);
+        if (decision === undefined) {
+            throw new Error(
+                `Authorization resolver omitted Email Request capability: ${capability}`,
+            );
+        }
+        return projectEmailRequestCapabilityDecision(actor, capability, decision);
+    };
+    const readScopes = project("email.request.read");
+    const createScopes = project("email.request.create");
+
+    return Object.freeze({
+        canReadRequests: readScopes?.includes("OWN") === true
+            || readScopes?.includes("ALL") === true,
+        canCreateRequests: createScopes?.includes("ALL") === true,
+    });
 }
 
 export function assertEmailRequestCapabilityScope(

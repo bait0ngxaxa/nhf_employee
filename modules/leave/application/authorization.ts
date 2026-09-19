@@ -261,6 +261,10 @@ export async function getLeavePresentationCapabilities(
             project("leave.approver.manage"),
             "ALL",
         ),
+        canManageRecovery: hasLeaveScope(
+            project("leave.recovery.manage"),
+            "ALL",
+        ),
     });
 }
 

@@ -92,6 +92,7 @@ const LEAVE_CAPABILITIES = {
     canRequestOwnNotTaken: true,
     canConfirmAssignedNotTaken: true,
     canManageApprovers: false,
+    canManageRecovery: false,
 } as const;
 
 function expectActionableApproverQuery(): void {
@@ -211,6 +212,7 @@ describe("LIFF capability derivation", () => {
             canRequestOwnNotTaken: false,
             canConfirmAssignedNotTaken: false,
             canManageApprovers: false,
+            canManageRecovery: false,
         });
         expect(leaveRequestFindFirstMock).not.toHaveBeenCalled();
     });

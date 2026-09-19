@@ -18,6 +18,7 @@ import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
+import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
 
 /** Flat lookup used by handleMenuClick for feature and capability validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -46,7 +47,6 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         label: "ส่งคำร้องพนักงานใหม่",
         icon: Mail,
         description: "ส่งคำร้องอีเมล สารบรรณ และ Shared Drive ให้ทีมไอที",
-        requiredRole: "ADMIN",
     },
     {
         id: "employee-management",
@@ -149,6 +149,13 @@ export function canAccessEmployeeDashboard(
         || capabilities?.canReadStats === true;
 }
 
+export function canAccessEmailRequestDashboard(
+    capabilities?: EmailRequestPresentationCapabilities,
+): boolean {
+    return capabilities?.canReadRequests === true
+        || capabilities?.canCreateRequests === true;
+}
+
 export const LEAVE_DASHBOARD_TABS = [
     "my-leave",
     "approvals",
@@ -160,7 +167,6 @@ export const LEAVE_DASHBOARD_TABS = [
 export type LeaveDashboardTab = (typeof LEAVE_DASHBOARD_TABS)[number];
 
 export interface LeaveDashboardAvailabilityInput {
-    isAdmin: boolean;
     leaveCapabilities?: LeavePresentationCapabilities;
     canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;
@@ -176,7 +182,6 @@ export type LeaveDashboardTabVisibility = Record<
  * existing Leave-owned relationship/deferred-policy projections.
  */
 export function getLeaveDashboardTabVisibility({
-    isAdmin,
     leaveCapabilities,
     canApproveLeave,
     canViewLeaveReports,
@@ -186,7 +191,7 @@ export function getLeaveDashboardTabVisibility({
         approvals:
             leaveCapabilities?.canReadAssignedApprovals === true
             && canApproveLeave === true,
-        recovery: isAdmin,
+        recovery: leaveCapabilities?.canManageRecovery === true,
         reports: canViewLeaveReports === true,
         "approver-settings": leaveCapabilities?.canManageApprovers === true,
     };
@@ -220,14 +225,14 @@ export function getAvailableMenuGroups(
     isAdmin: boolean,
     routineCapabilities?: RoutinePresentationCapabilities,
     stockCapabilities?: StockPresentationCapabilities,
-    leaveAvailability?: Omit<LeaveDashboardAvailabilityInput, "isAdmin">,
+    leaveAvailability?: LeaveDashboardAvailabilityInput,
     employeeCapabilities?: EmployeePresentationCapabilities,
     auditCapabilities?: AuditPresentationCapabilities,
+    emailRequestCapabilities?: EmailRequestPresentationCapabilities,
 ): MenuGroup[] {
     const stockAvailable = canAccessStockDashboard(stockCapabilities);
     const employeeAvailable = canAccessEmployeeDashboard(employeeCapabilities);
     const leaveAvailable = canAccessLeaveDashboard({
-        isAdmin,
         ...(leaveAvailability ?? {}),
     });
 
@@ -241,6 +246,9 @@ export function getAvailableMenuGroups(
             }
             if (item.id === "audit-logs") {
                 return auditCapabilities?.canReadAuditLogs === true;
+            }
+            if (item.id === "email-request") {
+                return canAccessEmailRequestDashboard(emailRequestCapabilities);
             }
             return !item.requiredRole
                 || (item.requiredRole === "ADMIN" && isAdmin);

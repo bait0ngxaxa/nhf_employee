@@ -60,8 +60,8 @@ export interface RoutineCapabilityAuthorization {
     readonly defaultScopes: readonly AuthorizationScope[];
     /** Final Routine scopes after central composition and channel policy. */
     readonly scopes: readonly AuthorizationScope[];
-    /** True only for Dashboard ADMIN system-role authorization. */
-    readonly isAdministrative: boolean;
+    /** True when this capability resolves to an effective ALL scope. */
+    readonly hasBroadAuthority: boolean;
     /** True when a LIFF authority was constrained to self-service policy. */
     readonly liffSelfServicePolicyApplied: boolean;
 }
@@ -200,15 +200,6 @@ function shouldApplyRoutineLiffSelfServicePolicy(
     return actor.channel === "LIFF_SELF_SERVICE";
 }
 
-function isDashboardSystemRoleAuthorization(
-    actor: AuthorizationActor,
-    decision: AuthorizationDecision,
-): boolean {
-    return actor.channel === "DASHBOARD"
-        && actor.systemRole === "ADMIN"
-        && decision.grants.some((grant) => grant.source.type === "SYSTEM_ROLE");
-}
-
 function applyRoutineChannelPolicy(
     actor: AuthorizationActor,
     capability: RoutineCapability,
@@ -218,7 +209,7 @@ function applyRoutineChannelPolicy(
     >,
 ): {
     scopes: readonly AuthorizationScope[];
-    isAdministrative: boolean;
+    hasBroadAuthority: boolean;
     liffSelfServicePolicyApplied: boolean;
 } {
     if (!composedAuthority.allowed) {
@@ -230,10 +221,7 @@ function applyRoutineChannelPolicy(
     if (!shouldApplyRoutineLiffSelfServicePolicy(actor)) {
         return {
             scopes: composedAuthority.scopes,
-            isAdministrative: isDashboardSystemRoleAuthorization(
-                actor,
-                composedAuthority.configuredDecision,
-            ),
+            hasBroadAuthority: composedAuthority.scopes.includes("ALL"),
             liffSelfServicePolicyApplied: false,
         };
     }
@@ -246,7 +234,7 @@ function applyRoutineChannelPolicy(
     }
     return {
         scopes: freezeScopes(selfServiceScopes),
-        isAdministrative: false,
+        hasBroadAuthority: false,
         liffSelfServicePolicyApplied: true,
     };
 }
@@ -576,7 +564,7 @@ function buildRoutineCapabilityAuthorization(
         decision,
         defaultScopes: composedAuthority.defaultScopes,
         scopes: effective.scopes,
-        isAdministrative: effective.isAdministrative,
+        hasBroadAuthority: effective.hasBroadAuthority,
         liffSelfServicePolicyApplied: effective.liffSelfServicePolicyApplied,
     });
 }
@@ -634,25 +622,48 @@ export async function resolveRoutineCapability(
     );
 }
 
-function projectRoutineCapabilityDecision(
-    actor: AuthorizationActor,
-    capability: RoutineCapability,
-    decision: AuthorizationDecision,
-): boolean {
+export async function resolveOptionalRoutineCapability(
+    actor: RoutineCommandActor,
+    employeeId: number | null,
+    capability: string,
+    options: RoutineCapabilityOptions = {},
+): Promise<RoutineCapabilityAuthorization | null> {
     try {
-        buildRoutineCapabilityAuthorization(
+        return await resolveRoutineCapability(
             actor,
+            employeeId,
             capability,
-            decision,
-            {},
+            options,
         );
-        return true;
     } catch (error) {
         if (
             error instanceof RoutineCapabilityDeniedError
             && error.authorizationReason !== "UNKNOWN_CAPABILITY"
         ) {
-            return false;
+            return null;
+        }
+        throw error;
+    }
+}
+
+function projectRoutineCapabilityDecision(
+    actor: AuthorizationActor,
+    capability: RoutineCapability,
+    decision: AuthorizationDecision,
+): readonly AuthorizationScope[] | null {
+    try {
+        return buildRoutineCapabilityAuthorization(
+            actor,
+            capability,
+            decision,
+            {},
+        ).scopes;
+    } catch (error) {
+        if (
+            error instanceof RoutineCapabilityDeniedError
+            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
+        ) {
+            return null;
         }
         throw error;
     }
@@ -684,28 +695,45 @@ export async function getRoutinePresentationCapabilities(
         ROUTINE_CAPABILITIES,
     );
 
-    const canResolve = (capability: RoutineCapability): boolean =>
+    const getScopes = (capability: RoutineCapability): readonly AuthorizationScope[] | null =>
         projectRoutineCapabilityDecision(
             authorizationActor,
             capability,
             getRoutinePresentationDecision(decisions, capability),
         );
 
+    const taskReadScopes = getScopes("routine.task.read");
+    const taskCreateScopes = getScopes("routine.task.create");
+    const taskUpdateScopes = getScopes("routine.task.update");
+    const taskDeleteScopes = getScopes("routine.task.delete");
+    const referenceReadScopes = getScopes("routine.reference.read");
+
+    const hasScope = (
+        scopes: readonly AuthorizationScope[] | null,
+        scope: AuthorizationScope,
+    ): boolean => scopes?.includes(scope) === true
+        || scopes?.includes("ALL") === true;
+
     return Object.freeze({
-        canReadTasks: canResolve("routine.task.read"),
-        canCreateTasks: canResolve("routine.task.create"),
-        canUpdateTasks: canResolve("routine.task.update"),
-        canDeleteTasks: canResolve("routine.task.delete"),
-        canReadOccurrences: canResolve("routine.occurrence.read"),
-        canOverrideOccurrences: canResolve("routine.occurrence.override"),
-        canReassignOccurrences: canResolve("routine.occurrence.reassign"),
-        canChangeOccurrenceDueDate: canResolve(
+        canReadTasks: taskReadScopes !== null,
+        canReadAllTasks: taskReadScopes?.includes("ALL") === true,
+        canCreateTasks: taskCreateScopes !== null,
+        canCreateTasksForOthers: taskCreateScopes?.includes("ALL") === true,
+        canUpdateTasks: taskUpdateScopes !== null,
+        canUpdateAllTasks: taskUpdateScopes?.includes("ALL") === true,
+        canDeleteTasks: taskDeleteScopes !== null,
+        canDeleteAllTasks: taskDeleteScopes?.includes("ALL") === true,
+        canReadOccurrences: getScopes("routine.occurrence.read") !== null,
+        canOverrideOccurrences: getScopes("routine.occurrence.override") !== null,
+        canReassignOccurrences: getScopes("routine.occurrence.reassign") !== null,
+        canChangeOccurrenceDueDate: getScopes(
             "routine.occurrence.change_due_date",
-        ),
-        canManageImports: canResolve("routine.import.manage"),
-        canExportTasks: canResolve("routine.task.export"),
-        canReadSummary: canResolve("routine.summary.read"),
-        canReadReference: canResolve("routine.reference.read"),
+        ) !== null,
+        canManageImports: getScopes("routine.import.manage") !== null,
+        canExportTasks: getScopes("routine.task.export") !== null,
+        canReadSummary: getScopes("routine.summary.read") !== null,
+        canReadReference: referenceReadScopes !== null,
+        canReadAllReferences: hasScope(referenceReadScopes, "ALL"),
     });
 }
 

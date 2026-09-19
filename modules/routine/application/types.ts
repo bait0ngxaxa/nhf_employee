@@ -16,9 +16,13 @@ export interface RoutineQueryActor {
 
 export interface RoutinePresentationCapabilities {
     readonly canReadTasks: boolean;
+    readonly canReadAllTasks: boolean;
     readonly canCreateTasks: boolean;
+    readonly canCreateTasksForOthers: boolean;
     readonly canUpdateTasks: boolean;
+    readonly canUpdateAllTasks: boolean;
     readonly canDeleteTasks: boolean;
+    readonly canDeleteAllTasks: boolean;
 
     readonly canReadOccurrences: boolean;
     readonly canOverrideOccurrences: boolean;
@@ -29,6 +33,7 @@ export interface RoutinePresentationCapabilities {
     readonly canExportTasks: boolean;
     readonly canReadSummary: boolean;
     readonly canReadReference: boolean;
+    readonly canReadAllReferences: boolean;
 }
 
 export interface RoutineGenerationResult {

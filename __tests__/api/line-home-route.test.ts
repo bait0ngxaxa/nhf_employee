@@ -63,6 +63,7 @@ const CAPABILITIES = {
         canRequestOwnNotTaken: true,
         canConfirmAssignedNotTaken: false,
         canManageApprovers: false,
+        canManageRecovery: false,
     },
     canCreateOwnRoutine: true,
     routineCapabilities: {

@@ -101,6 +101,7 @@ const LIFF_CAPABILITIES: LeavePresentationCapabilities = {
     canRequestOwnNotTaken: true,
     canConfirmAssignedNotTaken: true,
     canManageApprovers: false,
+    canManageRecovery: false,
 };
 
 describe("LIFF Leave mobile components", () => {

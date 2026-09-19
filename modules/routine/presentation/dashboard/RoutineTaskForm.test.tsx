@@ -218,7 +218,7 @@ describe("RoutineTaskForm reminder rules", () => {
                     }],
                 }}
                 initialTask={null}
-                mode="SELF_SERVICE"
+                allowBroadAssignment={false}
                 onSaved={vi.fn()}
                 onCancel={vi.fn()}
             />,
@@ -253,6 +253,7 @@ describe("RoutineTaskForm reminder rules", () => {
                     }],
                 }}
                 initialTask={null}
+                allowBroadAssignment={true}
                 onSaved={onSaved}
                 onCancel={vi.fn()}
             />,
@@ -329,6 +330,7 @@ describe("RoutineTaskForm reminder rules", () => {
                     employees: [{ id: 11, firstName: "สมชาย", lastName: "ใจดี", nickname: null }],
                 }}
                 initialTask={null}
+                allowBroadAssignment={true}
                 onSaved={vi.fn()}
                 onCancel={vi.fn()}
             />,
@@ -368,7 +370,7 @@ describe("RoutineTaskForm reminder rules", () => {
                     }],
                 }}
                 initialTask={null}
-                mode="SELF_SERVICE"
+                allowBroadAssignment={false}
                 onSaved={onSaved}
                 onCancel={vi.fn()}
             />,
@@ -456,7 +458,7 @@ describe("RoutineTaskForm reminder rules", () => {
                     }],
                 }}
                 initialTask={initialTask}
-                mode="SELF_SERVICE"
+                allowBroadAssignment={false}
                 onSaved={vi.fn()}
                 onCancel={vi.fn()}
             />,
@@ -465,7 +467,7 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(screen.getByText("มานะ ดีใจ")).toBeInTheDocument();
         expect(screen.queryByText("สมชาย ใจดี")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้รับผิดชอบคือคุณ และการแจ้งเตือนจะส่งทั้งในระบบและอีเมล")).not.toBeInTheDocument();
-        expect(screen.getByText("ผู้รับผิดชอบของงานนี้ถูกปรับโดยผู้ดูแลระบบ")).toBeInTheDocument();
+        expect(screen.getByText("ผู้รับผิดชอบของงานนี้ถูกปรับจากการจัดการงาน")).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole("button", { name: "บันทึกการแก้ไข" }));
 

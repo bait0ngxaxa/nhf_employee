@@ -28,6 +28,10 @@ import {
     buildNotificationAuthorizationContext,
     getNotificationPresentationCapabilities,
 } from "@/modules/notification";
+import {
+    buildEmailRequestAuthorizationContext,
+    getEmailRequestPresentationCapabilities,
+} from "@/lib/services/email-request/authorization";
 import type { AuthenticatedUser } from "@/modules/auth/client";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { getUserDisplayName } from "@/shared/identity/display";
@@ -60,6 +64,7 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         departmentCapabilities,
         auditCapabilities,
         notificationCapabilities,
+        emailRequestCapabilities,
     ] = await Promise.all([
         getCurrentEmployeeLeaveProjection(
             employee.id,
@@ -121,10 +126,17 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
                 employee.id,
             ),
         ),
+        getEmailRequestPresentationCapabilities(
+            buildEmailRequestAuthorizationContext({
+                id: account.userId,
+                role: account.role,
+            }),
+        ),
     ]);
 
     return {
         id: String(account.userId),
+        employeeId: employee.id,
         role: account.role,
         email: account.email,
         name: getUserDisplayName({
@@ -149,5 +161,6 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         departmentCapabilities,
         auditCapabilities,
         notificationCapabilities,
+        emailRequestCapabilities,
     };
 }

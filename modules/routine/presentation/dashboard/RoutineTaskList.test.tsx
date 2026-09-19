@@ -7,9 +7,13 @@ import type { RoutineTask } from "./types";
 
 const allRoutineCapabilities = {
     canReadTasks: true,
+    canReadAllTasks: true,
     canCreateTasks: true,
+    canCreateTasksForOthers: true,
     canUpdateTasks: true,
+    canUpdateAllTasks: true,
     canDeleteTasks: true,
+    canDeleteAllTasks: true,
     canReadOccurrences: true,
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
@@ -18,6 +22,7 @@ const allRoutineCapabilities = {
     canExportTasks: true,
     canReadSummary: true,
     canReadReference: true,
+    canReadAllReferences: true,
 } satisfies RoutinePresentationCapabilities;
 
 const task = {
@@ -59,7 +64,7 @@ function makeProps() {
             pagination: { page: 1, limit: 20, total: 1, pages: 1 },
         },
         error: undefined,
-        isAdmin: true,
+        canReadImportMetadata: true,
         isLoading: false,
         routineCapabilities: allRoutineCapabilities,
         onRetry: vi.fn(),
@@ -174,7 +179,7 @@ describe("RoutineTaskList", () => {
         expect(row).not.toHaveTextContent("ทุกเดือน");
     });
 
-    it("shows import metadata only in an admin detail dialog", () => {
+    it("shows import metadata only with import-management authority", () => {
         const importedTask: RoutineTask = {
             ...task,
             sourceFileName: "routine.xlsx",
@@ -187,14 +192,14 @@ describe("RoutineTaskList", () => {
             tasks: [importedTask],
         };
         const { rerender } = render(
-            <RoutineTaskList {...props} data={importedData} isAdmin={false} />,
+            <RoutineTaskList {...props} data={importedData} canReadImportMetadata={false} />,
         );
 
         fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
         expect(screen.getByRole("dialog")).not.toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
         fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
 
-        rerender(<RoutineTaskList {...props} data={importedData} isAdmin />);
+        rerender(<RoutineTaskList {...props} data={importedData} canReadImportMetadata />);
         fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
         expect(screen.getByRole("dialog")).toHaveTextContent("ข้อมูลนำเข้า (ผู้ดูแลระบบ)");
         expect(screen.getByRole("dialog")).toHaveTextContent("routine.xlsx");
@@ -240,7 +245,7 @@ describe("RoutineTaskList", () => {
         render(
             <RoutineTaskList
                 {...props}
-                isAdmin={false}
+                canReadImportMetadata={false}
                 routineCapabilities={{
                     ...allRoutineCapabilities,
                     canCreateTasks: false,
@@ -257,9 +262,9 @@ describe("RoutineTaskList", () => {
         expect(screen.queryByRole("button", { name: "ลบ" })).not.toBeInTheDocument();
     });
 
-    it("allows a non-admin actor with explicitly granted task capabilities", () => {
+    it("allows an actor with explicitly granted task capabilities", () => {
         const props = makeProps();
-        render(<RoutineTaskList {...props} isAdmin={false} />);
+        render(<RoutineTaskList {...props} canReadImportMetadata={true} />);
 
         expect(screen.getByRole("button", { name: "สร้างแม่แบบงาน" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แก้ไข" })).toBeInTheDocument();

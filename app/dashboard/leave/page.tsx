@@ -14,7 +14,6 @@ import {
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import type { DashboardPageSearchParams } from "@/lib/ssot/routes";
 import { APP_ROUTES } from "@/lib/ssot/routes";
-import { isAdminRole } from "@/lib/ssot/permissions";
 
 export const metadata: Metadata = {
     title: "Leave Management | NHFapp",
@@ -35,7 +34,6 @@ export default async function LeaveDashboardPage({
     }
 
     const leaveAvailability = {
-        isAdmin: isAdminRole(user.role),
         leaveCapabilities: user.leaveCapabilities,
         canApproveLeave: user.canApproveLeave,
         canViewLeaveReports: user.canViewLeaveReports,

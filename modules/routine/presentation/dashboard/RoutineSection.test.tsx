@@ -38,9 +38,13 @@ const routineReference = {
 
 const allRoutineCapabilities = {
     canReadTasks: true,
+    canReadAllTasks: true,
     canCreateTasks: true,
+    canCreateTasksForOthers: true,
     canUpdateTasks: true,
+    canUpdateAllTasks: true,
     canDeleteTasks: true,
+    canDeleteAllTasks: true,
     canReadOccurrences: true,
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
@@ -49,10 +53,16 @@ const allRoutineCapabilities = {
     canExportTasks: true,
     canReadSummary: true,
     canReadReference: true,
+    canReadAllReferences: true,
 } satisfies RoutinePresentationCapabilities;
 
 const userRoutineCapabilities = {
     ...allRoutineCapabilities,
+    canReadAllTasks: false,
+    canCreateTasksForOthers: false,
+    canUpdateAllTasks: false,
+    canDeleteAllTasks: false,
+    canReadAllReferences: false,
     canManageImports: false,
 } satisfies RoutinePresentationCapabilities;
 
@@ -106,12 +116,10 @@ vi.mock("@/components/ui/section-tabs", async () => {
             onValueChange: (value: string) => void;
         }) => {
             const activeTab = tabs.find((tab) => tab.value === value && tab.visible !== false);
-            const managementTab = tabs.find((tab) => tab.value === "settings" && tab.visible !== false);
+            const managementTab = tabs.find((tab) => tab.value === "manage" && tab.visible !== false);
             const contentTabs = activeTab === undefined
                 ? managementTab ? [managementTab] : []
-                : activeTab.value === managementTab?.value
-                    ? [activeTab]
-                    : managementTab ? [activeTab, managementTab] : [activeTab];
+                : [activeTab];
             return (
             <div>
                 {tabs
@@ -223,13 +231,13 @@ describe("RoutineSection tabs", () => {
         vi.unstubAllGlobals();
     });
 
-    it("does not expose admin tabs to a regular user", () => {
+    it("does not expose import tools without import capability", () => {
         mockRoutineUser("USER");
 
         render(<RoutineSection />);
 
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
-        expect(screen.getByText("จัดการงานของฉัน")).toBeInTheDocument();
+        expect(screen.getByText("จัดการงาน")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
         expect(screen.queryByText("ตั้งค่างานประจำ")).not.toBeInTheDocument();
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
@@ -324,14 +332,14 @@ describe("RoutineSection tabs", () => {
         expect(mocks.triggerDownload).not.toHaveBeenCalled();
     });
 
-    it("exposes task settings and all-occurrence tabs to an admin", () => {
+    it("exposes broad task management from capability authority", () => {
         mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
 
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
-        expect(screen.getByText("ตั้งค่างานประจำ")).toBeInTheDocument();
+        expect(screen.getByText("จัดการงาน")).toBeInTheDocument();
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
     });
 
@@ -342,20 +350,20 @@ describe("RoutineSection tabs", () => {
 
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
-        expect(screen.getByText("จัดการงานของฉัน")).toBeInTheDocument();
+        expect(screen.queryByText("จัดการงาน")).not.toBeInTheDocument();
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "สร้างแม่แบบงานทดสอบ" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "แก้ไข Routine ทดสอบ" })).not.toBeInTheDocument();
     });
 
-    it("lets a non-admin actor with explicit capabilities use Routine actions", () => {
+    it("lets a configured USER with broad capabilities use Routine actions", () => {
         mockRoutineUser("USER", allRoutineCapabilities);
 
         render(<RoutineSection />);
 
-        expect(screen.getByText("จัดการงานของฉัน")).toBeInTheDocument();
+        expect(screen.getByText("จัดการงาน")).toBeInTheDocument();
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "จัดการงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
         expect(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
         expect(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" })).toBeInTheDocument();
@@ -395,6 +403,7 @@ describe("RoutineSection tabs", () => {
         mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
         fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" }));
 
         expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
@@ -412,7 +421,7 @@ describe("RoutineSection tabs", () => {
         vi.stubGlobal("fetch", fetchMock);
 
         render(<RoutineSection />);
-        fireEvent.click(screen.getByRole("button", { name: "จัดการงานของฉัน" }));
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
         fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" }));
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), {
             target: { value: "3" },
@@ -469,10 +478,11 @@ describe("RoutineSection tabs", () => {
         expect(within(timingFilter).getByRole("option", { name: "ยังไม่ถึงกำหนด" })).toBeInTheDocument();
     });
 
-    it("requests all tasks for the admin settings list", () => {
+    it("requests all tasks for the management list", () => {
         mockRoutineUser("ADMIN");
 
         render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
 
         expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/tasks?activeOnly=0&page=1&limit=20",
@@ -585,6 +595,7 @@ describe("RoutineSection tabs", () => {
             .filter((key) => key.includes("/api/routines/tasks"));
 
         render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
 
         const taskList = screen.getByTestId("routine-task-list");
         fireEvent.click(within(taskList).getByRole("button", { name: "ไปหน้าถัดไป" }));
@@ -607,6 +618,7 @@ describe("RoutineSection tabs", () => {
             .filter((key) => key.includes("/api/routines/tasks"));
 
         render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
 
         const searchInput = screen.getByRole("textbox", { name: "ค้นหาแม่แบบงาน" });
         fireEvent.click(within(screen.getByTestId("routine-task-list")).getByRole("button", { name: "ไปหน้าถัดไป" }));

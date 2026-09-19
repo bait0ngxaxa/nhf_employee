@@ -3,18 +3,18 @@ import type { Metadata } from "next";
 
 import { EmailRequestSection } from "@/components/dashboard/sections/EmailRequestSection";
 import { EmailRequestSectionSkeleton } from "@/components/dashboard/feedback/EmailRequestSectionSkeleton";
-import { requireDashboardAdmin } from "@/app/dashboard/_lib/route-access";
+import { requireDashboardEmailRequestAccess } from "@/app/dashboard/_lib/route-access";
 
 export const metadata: Metadata = {
     title: "New Employee Request | NHFapp",
 };
 
 export default async function EmailRequestDashboardPage() {
-    await requireDashboardAdmin();
+    const capabilities = await requireDashboardEmailRequestAccess();
 
     return (
         <Suspense fallback={<EmailRequestSectionSkeleton />}>
-            <EmailRequestSection />
+            <EmailRequestSection capabilities={capabilities} />
         </Suspense>
     );
 }

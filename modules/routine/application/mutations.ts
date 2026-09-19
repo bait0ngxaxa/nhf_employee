@@ -129,11 +129,30 @@ type RoutineReminderRuleRecord = {
     isActive: boolean;
 };
 
+function hasHistoricalAdminProvenance(
+    authorization: RoutineCapabilityAuthorization,
+): boolean {
+    return authorization.decision.grants.some(
+        (grant) => grant.source.type === "SYSTEM_ROLE",
+    );
+}
+
+function routineOwnershipMode(
+    authorization: RoutineCapabilityAuthorization,
+    broadOperation = false,
+): "ADMIN" | "BROAD_AUTHORITY" | "SELF_SERVICE" {
+    if (hasHistoricalAdminProvenance(authorization)) return "ADMIN";
+    if (authorization.hasBroadAuthority || broadOperation) {
+        return "BROAD_AUTHORITY";
+    }
+    return "SELF_SERVICE";
+}
+
 function canonicalizeReminderRules(
     rules: RoutineTaskCreateInput["reminderRules"] | RoutineTaskUpdateInput["reminderRules"],
     authorization: RoutineCapabilityAuthorization,
 ): typeof rules {
-    if (authorization.isAdministrative || rules === undefined) {
+    if (authorization.hasBroadAuthority || rules === undefined) {
         return rules;
     }
     const canonicalRules = rules.map((rule) => ({
@@ -157,7 +176,7 @@ function normalizeRoutineTaskCreateInput(
     capabilityAuthorization: RoutineCapabilityAuthorization,
     operation: "TASK_CREATE" | "IMPORT_APPLY",
 ): RoutineTaskCreateInput {
-    if (capabilityAuthorization.isAdministrative || operation === "IMPORT_APPLY") {
+    if (capabilityAuthorization.hasBroadAuthority || operation === "IMPORT_APPLY") {
         return input;
     }
     if (actorAuthorization.employeeId === null) {
@@ -182,7 +201,7 @@ function normalizeRoutineTaskUpdateInput(
     authorization: RoutineCapabilityAuthorization,
     options: { canChangeLifecycle: boolean },
 ): RoutineTaskUpdateInput {
-    if (authorization.isAdministrative) return input;
+    if (authorization.hasBroadAuthority) return input;
 
     return {
         ...input,
@@ -435,9 +454,10 @@ export async function createRoutineTaskInTransaction(
             affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
             scheduleType,
             version: task.version,
-            ownershipMode: capabilityAuthorization.isAdministrative || capability === "routine.import.manage"
-                ? "ADMIN"
-                : "SELF_SERVICE",
+            ownershipMode: routineOwnershipMode(
+                capabilityAuthorization,
+                capability === "routine.import.manage",
+            ),
             createdById: actor.id,
         },
     );
@@ -663,9 +683,7 @@ export async function deleteRoutineTask(
                 taskId,
                 title: task.title,
                 version: task.version,
-                ownershipMode: capabilityAuthorization.isAdministrative
-                    ? "ADMIN"
-                    : "SELF_SERVICE",
+                ownershipMode: routineOwnershipMode(capabilityAuthorization),
                 createdById: task.createdById,
             },
         );
@@ -702,18 +720,20 @@ export async function updateRoutineTask(
         if (!current) throw new RoutineNotFoundError();
 
         const canChangeLifecycle =
-            capabilityAuthorization.isAdministrative || current.createdById === actor.id;
+            capabilityAuthorization.hasBroadAuthority || current.createdById === actor.id;
         const isAssigned = actorAuthorization.employeeId !== null
             && current.assignees.some(
                 (assignee) => assignee.employeeId === actorAuthorization.employeeId,
             );
-        const authorizationSource = capabilityAuthorization.isAdministrative
+        const authorizationSource = hasHistoricalAdminProvenance(capabilityAuthorization)
             ? "ADMIN"
-            : current.createdById === actor.id
-                ? "CREATOR"
-                : isAssigned
-                    ? "ASSIGNEE"
-                    : "CAPABILITY";
+            : capabilityAuthorization.hasBroadAuthority
+                ? "BROAD_AUTHORITY"
+                : current.createdById === actor.id
+                    ? "CREATOR"
+                    : isAssigned
+                        ? "ASSIGNEE"
+                        : "CAPABILITY";
         const normalizedInput = normalizeRoutineTaskUpdateInput(
             input,
             capabilityAuthorization,
@@ -861,9 +881,7 @@ export async function updateRoutineTask(
                 affectedEmployeeIds: nextAssignees?.map(
                     (assignee) => assignee.employeeId,
                 ) ?? current.assignees.map((assignee) => assignee.employeeId),
-                ownershipMode: capabilityAuthorization.isAdministrative
-                    ? "ADMIN"
-                    : "SELF_SERVICE",
+                ownershipMode: routineOwnershipMode(capabilityAuthorization),
                 authorizationSource,
                 createdById: current.createdById,
                 assigneesChanged,

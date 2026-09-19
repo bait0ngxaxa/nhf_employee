@@ -31,7 +31,7 @@ interface RoutineOccurrenceListProps {
     error: Error | undefined;
     focusOccurrenceId: number | null;
     focusTaskId: number | null;
-    isAdmin: boolean;
+    canReadImportMetadata: boolean;
     isLoading: boolean;
     mutate: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
     routineCapabilities?: RoutinePresentationCapabilities;
@@ -55,7 +55,7 @@ export function RoutineOccurrenceList({
     error,
     focusOccurrenceId,
     focusTaskId,
-    isAdmin,
+    canReadImportMetadata,
     isLoading,
     mutate,
     onEditTask,
@@ -227,7 +227,7 @@ export function RoutineOccurrenceList({
                 task={detailsTask}
                 open={detailsOpen}
                 onOpenChange={setDetailsOpen}
-                isAdmin={isAdmin}
+                canReadImportMetadata={canReadImportMetadata}
             />
             <RoutineOccurrenceEditDialog
                 task={occurrenceEditTask}

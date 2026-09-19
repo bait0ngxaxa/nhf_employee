@@ -77,7 +77,8 @@ interface RoutineTaskFormProps {
     onSaved: () => void;
     onCancel: () => void;
     canChangeStatus?: boolean;
-    mode?: "SELF_SERVICE" | "ADMIN";
+    allowBroadAssignment?: boolean;
+    currentEmployeeId?: number;
     presentation?: "dialog" | "standalone";
 }
 
@@ -181,18 +182,24 @@ function RoutineTaskForm({
     onSaved,
     onCancel,
     canChangeStatus = true,
-    mode = "ADMIN",
+    allowBroadAssignment = false,
+    currentEmployeeId,
     presentation = "standalone",
 }: RoutineTaskFormProps, ref): ReactElement {
     const units = uniqueRoutineUnits(reference.units);
-    const isSelfService = mode === "SELF_SERVICE";
-    const selfEmployee = isSelfService ? reference.employees[0] : undefined;
+    const usesOwnAssignment = !allowBroadAssignment;
+    const selfEmployee = usesOwnAssignment
+        ? reference.employees.find((employee) => employee.id === currentEmployeeId)
+            ?? (currentEmployeeId === undefined && reference.employees.length === 1
+                ? reference.employees[0]
+                : undefined)
+        : undefined;
     const selfServiceAssignees = initialTask
         ? initialTask.assignees
         : selfEmployee
             ? [{ employeeId: selfEmployee.id, role: "OWNER" as const, employee: selfEmployee }]
             : [];
-    const hasReassignedSelfServiceTask = Boolean(
+    const hasReassignedOwnTask = Boolean(
         initialTask
         && selfEmployee
         && initialTask.assignees.some((assignee) => assignee.employeeId !== selfEmployee.id),
@@ -324,14 +331,14 @@ function RoutineTaskForm({
         setError(null);
         setFieldErrors({});
         const ownerCount = Object.values(assignees).filter((role) => role === "OWNER").length;
-        if (!isSelfService && ownerCount !== 1) {
+        if (allowBroadAssignment && ownerCount !== 1) {
             setError("กรุณาเลือกผู้รับผิดชอบหลัก 1 คน");
             setFieldErrors({ assignees: "ต้องมีผู้รับผิดชอบหลัก 1 คน" });
             focusFirstRoutineInvalidField({ assignees: "ต้องมีผู้รับผิดชอบหลัก 1 คน" });
             submitLockRef.current = false;
             return;
         }
-        if (isSelfService && !selfEmployee) {
+        if (usesOwnAssignment && !selfEmployee) {
             setError("ไม่พบข้อมูลพนักงานของบัญชีผู้ใช้");
             submitLockRef.current = false;
             return;
@@ -341,7 +348,7 @@ function RoutineTaskForm({
             daysBefore: Number(rule.daysBefore),
             sendHour: parseRoutineSendTime(rule.sendHour),
             channel: "IN_APP" as const,
-            recipientScope: isSelfService ? "ASSIGNEES" : rule.recipientScope,
+            recipientScope: usesOwnAssignment ? "ASSIGNEES" : rule.recipientScope,
             isActive: rule.isActive,
         }));
         const reminderTimeErrors = getRoutineReminderFieldErrors(form.reminderRules);
@@ -352,7 +359,7 @@ function RoutineTaskForm({
             submitLockRef.current = false;
             return;
         }
-        const assigneesPayload = isSelfService
+        const assigneesPayload = usesOwnAssignment
             ? initialTask
                 ? undefined
                 : selfEmployee
@@ -463,17 +470,17 @@ function RoutineTaskForm({
             >
                 {presentation === "standalone" ? (
                     <div className="space-y-1">
-                        <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? "แก้ไข Routine" : (isSelfService ? "สร้างแม่แบบงานของฉัน" : "สร้างแม่แบบงานประจำ")}</h3>
+                        <h3 className="text-xl font-semibold tracking-tight text-content-heading">{initialTask ? "แก้ไข Routine" : (usesOwnAssignment ? "สร้างแม่แบบงานของฉัน" : "สร้างแม่แบบงานประจำ")}</h3>
                         <p className="max-w-prose text-sm leading-6 text-content-secondary">กำหนดข้อมูลหลัก ตารางงาน ผู้รับผิดชอบ และการแจ้งเตือนในแบบฟอร์มเดียว</p>
                     </div>
                 ) : null}
-            {isSelfService ? (
+            {usesOwnAssignment ? (
                 <div className="rounded-lg border border-brand-border bg-brand-surface px-4 py-3 text-sm leading-6 text-brand-strong">
                     {initialTask ? (
                         <>
                             <p>
-                                {hasReassignedSelfServiceTask
-                                    ? "ผู้รับผิดชอบของงานนี้ถูกปรับโดยผู้ดูแลระบบ"
+                                {hasReassignedOwnTask
+                                    ? "ผู้รับผิดชอบของงานนี้ถูกปรับจากการจัดการงาน"
                                     : "ผู้รับผิดชอบปัจจุบันของงานนี้เป็นไปตามข้อมูลในระบบ"}
                             </p>
                             <p>การแจ้งเตือนจะส่งทั้งในระบบและอีเมล</p>
@@ -534,14 +541,14 @@ function RoutineTaskForm({
                 selectedPreset={reminderPreset}
                 errors={fieldErrors}
                 disabled={isSubmitting}
-                selfService={isSelfService}
+                selfService={usesOwnAssignment}
                 onPresetChange={applyReminderPreset}
                 onAddRule={() => addReminderRule()}
                 onUpdateRule={updateReminderRule}
                 onRemoveRule={removeReminderRule}
             />
 
-            {isSelfService ? (
+            {usesOwnAssignment ? (
                 <fieldset className="space-y-2 rounded-xl border border-border-subtle bg-surface-subtle p-4 sm:p-5">
                     <legend className="px-1 text-base font-semibold text-content-heading">ผู้รับผิดชอบ</legend>
                     <p className="text-sm leading-6 text-content-secondary">
@@ -583,7 +590,7 @@ function RoutineTaskForm({
                             <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
                             กำลังบันทึก…
                         </>
-                    ) : initialTask ? "บันทึกการแก้ไข" : isSelfService ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}
+                    ) : initialTask ? "บันทึกการแก้ไข" : usesOwnAssignment ? "บันทึกงานของฉัน" : "บันทึกแม่แบบงาน"}
                 </Button>
             </DialogFooter>
             <AlertDialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>

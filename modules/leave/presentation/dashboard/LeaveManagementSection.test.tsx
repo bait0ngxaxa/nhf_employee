@@ -54,6 +54,7 @@ const DEFAULT_LEAVE_CAPABILITIES: LeavePresentationCapabilities = {
     canRequestOwnNotTaken: true,
     canConfirmAssignedNotTaken: true,
     canManageApprovers: false,
+    canManageRecovery: false,
 };
 
 function mockDashboardUser(user: {
@@ -133,12 +134,17 @@ describe("LeaveManagementSection permissions", () => {
         expect(screen.getByRole("button", { name: "รีพอร์ต" })).toBeInTheDocument();
     });
 
-    it("shows only recovery for an admin who is not an approver", async () => {
+    it("shows recovery only when recovery capability is projected", async () => {
         mockDashboardUser({
             role: "ADMIN",
             isManager: false,
             canApproveLeave: false,
             canViewLeaveReports: false,
+            leaveCapabilities: {
+                ...DEFAULT_LEAVE_CAPABILITIES,
+                canReadOwnRequests: false,
+                canManageRecovery: true,
+            },
         });
 
         render(<LeaveManagementSection />);
@@ -157,6 +163,11 @@ describe("LeaveManagementSection permissions", () => {
             isManager: false,
             canApproveLeave: false,
             canViewLeaveReports: true,
+            leaveCapabilities: {
+                ...DEFAULT_LEAVE_CAPABILITIES,
+                canReadOwnRequests: false,
+                canManageRecovery: true,
+            },
         });
 
         render(<LeaveManagementSection />);
@@ -175,6 +186,10 @@ describe("LeaveManagementSection permissions", () => {
             isManager: false,
             canApproveLeave: true,
             canViewLeaveReports: false,
+            leaveCapabilities: {
+                ...DEFAULT_LEAVE_CAPABILITIES,
+                canManageRecovery: true,
+            },
         });
 
         render(<LeaveManagementSection />);
@@ -221,6 +236,7 @@ describe("LeaveManagementSection permissions", () => {
             leaveCapabilities: {
                 ...DEFAULT_LEAVE_CAPABILITIES,
                 canManageApprovers: true,
+                canManageRecovery: false,
             },
         });
 
@@ -229,6 +245,33 @@ describe("LeaveManagementSection permissions", () => {
         await waitFor(() => {
             expect(screen.getByRole("button", { name: "จัดการผู้อนุมัติ" })).toBeInTheDocument();
         });
+        expect(screen.queryByRole("button", { name: "กู้คืนรายการลา" })).not.toBeInTheDocument();
+    });
+
+    it("shows recovery for a configured USER and hides it for an ADMIN without recovery capability", async () => {
+        mockDashboardUser({
+            role: "USER",
+            canApproveLeave: false,
+            leaveCapabilities: {
+                ...DEFAULT_LEAVE_CAPABILITIES,
+                canManageRecovery: true,
+            },
+        });
+
+        const { rerender } = render(<LeaveManagementSection />);
+        await waitFor(() => {
+            expect(screen.getByRole("button", { name: "กู้คืนรายการลา" })).toBeInTheDocument();
+        });
+
+        mockDashboardUser({
+            role: "ADMIN",
+            canApproveLeave: false,
+            leaveCapabilities: {
+                ...DEFAULT_LEAVE_CAPABILITIES,
+                canManageRecovery: false,
+            },
+        });
+        rerender(<LeaveManagementSection />);
         expect(screen.queryByRole("button", { name: "กู้คืนรายการลา" })).not.toBeInTheDocument();
     });
 });

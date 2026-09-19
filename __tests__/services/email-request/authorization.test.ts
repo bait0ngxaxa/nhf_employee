@@ -9,6 +9,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({
     resolve: vi.fn(),
+    resolveMany: vi.fn(),
 }));
 
 vi.mock("@/modules/authorization", async (importOriginal) => {
@@ -18,6 +19,7 @@ vi.mock("@/modules/authorization", async (importOriginal) => {
         authorization: {
             ...actual.authorization,
             resolve: mocks.resolve,
+            resolveMany: mocks.resolveMany,
         },
     };
 });
@@ -27,6 +29,7 @@ import {
     buildEmailRequestAuthorizationContext,
     defaultEmailRequestScopes,
     EmailRequestCapabilityDeniedError,
+    getEmailRequestPresentationCapabilities,
     resolveEmailRequestCapability,
 } from "@/lib/services/email-request/authorization";
 
@@ -60,6 +63,7 @@ function decision(
 describe("Email Request authorization adapter", () => {
     beforeEach(() => {
         mocks.resolve.mockReset();
+        mocks.resolveMany.mockReset();
     });
 
     it("denies a USER without configured authority and provides no defaults", async () => {
@@ -168,5 +172,68 @@ describe("Email Request authorization adapter", () => {
         );
         expect(admin.scopes).toEqual(["ALL"]);
         expect(admin.defaultScopes).toEqual([]);
+    });
+
+    it.each([
+        {
+            label: "read-only",
+            readScopes: ["OWN"] as const,
+            createScopes: [] as const,
+            expected: { canReadRequests: true, canCreateRequests: false },
+        },
+        {
+            label: "create-only",
+            readScopes: [] as const,
+            createScopes: ["ALL"] as const,
+            expected: { canReadRequests: false, canCreateRequests: true },
+        },
+        {
+            label: "read and create",
+            readScopes: ["ALL"] as const,
+            createScopes: ["ALL"] as const,
+            expected: { canReadRequests: true, canCreateRequests: true },
+        },
+        {
+            label: "no capability",
+            readScopes: [] as const,
+            createScopes: [] as const,
+            expected: { canReadRequests: false, canCreateRequests: false },
+        },
+    ])("projects configured USER Email Request $label authority", async ({
+        readScopes,
+        createScopes,
+        expected,
+    }) => {
+        mocks.resolveMany.mockResolvedValue(new Map([
+            ["email.request.read", decision("email.request.read", readScopes)],
+            ["email.request.create", decision("email.request.create", createScopes)],
+        ]));
+
+        await expect(
+            getEmailRequestPresentationCapabilities(
+                buildEmailRequestAuthorizationContext({ id: 7, role: "USER" }),
+            ),
+        ).resolves.toEqual(expected);
+        expect(mocks.resolveMany).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: 7, channel: "DASHBOARD" }),
+            ["email.request.read", "email.request.create"],
+        );
+    });
+
+    it("keeps ADMIN compatibility in the projection through resolved capability grants", async () => {
+        mocks.resolveMany.mockResolvedValue(new Map([
+            ["email.request.read", decision("email.request.read", ["ALL"], [
+                grant("email.request.read", "ALL", { type: "SYSTEM_ROLE", role: "ADMIN" }),
+            ])],
+            ["email.request.create", decision("email.request.create", ["ALL"], [
+                grant("email.request.create", "ALL", { type: "SYSTEM_ROLE", role: "ADMIN" }),
+            ])],
+        ]));
+
+        await expect(
+            getEmailRequestPresentationCapabilities(
+                buildEmailRequestAuthorizationContext({ id: 7, role: "ADMIN" }),
+            ),
+        ).resolves.toEqual({ canReadRequests: true, canCreateRequests: true });
     });
 });

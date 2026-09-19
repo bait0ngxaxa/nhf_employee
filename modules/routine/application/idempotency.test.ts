@@ -96,7 +96,7 @@ describe("Routine task create idempotency", () => {
             },
             defaultScopes: [],
             scopes: ["ALL"],
-            isAdministrative: true,
+            hasBroadAuthority: true,
             liffSelfServicePolicyApplied: false,
         });
         prismaMock.routineTask.findUnique.mockResolvedValue(asNever(null));
@@ -209,7 +209,7 @@ describe("Routine task create idempotency", () => {
             },
             defaultScopes: ["OWN"],
             scopes: ["OWN"],
-            isAdministrative: false,
+            hasBroadAuthority: false,
             liffSelfServicePolicyApplied: false,
         });
 

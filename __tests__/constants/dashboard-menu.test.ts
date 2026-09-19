@@ -15,15 +15,20 @@ import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
+import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
 
 const originalRoutineFlag = process.env.NEXT_PUBLIC_FEATURE_ROUTINE;
 const originalLeaveFlag = process.env.NEXT_PUBLIC_FEATURE_LEAVE;
 
 const routineCapabilities = {
     canReadTasks: true,
+    canReadAllTasks: false,
     canCreateTasks: false,
+    canCreateTasksForOthers: false,
     canUpdateTasks: false,
+    canUpdateAllTasks: false,
     canDeleteTasks: false,
+    canDeleteAllTasks: false,
     canReadOccurrences: false,
     canOverrideOccurrences: false,
     canReassignOccurrences: false,
@@ -32,6 +37,7 @@ const routineCapabilities = {
     canExportTasks: true,
     canReadSummary: true,
     canReadReference: true,
+    canReadAllReferences: false,
 } satisfies RoutinePresentationCapabilities;
 
 const stockCapabilities = {
@@ -56,6 +62,7 @@ const noLeaveCapabilities = {
     canRequestOwnNotTaken: false,
     canConfirmAssignedNotTaken: false,
     canManageApprovers: false,
+    canManageRecovery: false,
 } satisfies LeavePresentationCapabilities;
 
 const ownLeaveCapabilities = {
@@ -96,6 +103,16 @@ const employeeAllCapabilities = {
 const auditCapabilities = {
     canReadAuditLogs: true,
 } satisfies AuditPresentationCapabilities;
+
+const emailReadCapabilities: EmailRequestPresentationCapabilities = {
+    canReadRequests: true,
+    canCreateRequests: false,
+};
+
+const emailCreateCapabilities: EmailRequestPresentationCapabilities = {
+    canReadRequests: false,
+    canCreateRequests: true,
+};
 
 function getMenuIds(
     isAdmin: boolean,
@@ -261,21 +278,37 @@ describe("dashboard menu", () => {
         ).not.toContain("routine");
     });
 
-    it("preserves non-Routine role filtering while applying Routine capability filtering", () => {
+    it("uses Email Request capabilities independently from the system role", () => {
         process.env.NEXT_PUBLIC_FEATURE_ROUTINE = "true";
 
-        const adminMenuIds = getAvailableMenuGroups(true, routineCapabilities)
+        const adminMenuIds = getAvailableMenuGroups(
+            true,
+            routineCapabilities,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            emailReadCapabilities,
+        )
             .flatMap((group) => group.items.map((item) => item.id));
-        const userMenuIds = getAvailableMenuGroups(false, routineCapabilities)
+        const userMenuIds = getAvailableMenuGroups(
+            false,
+            routineCapabilities,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            emailCreateCapabilities,
+        )
             .flatMap((group) => group.items.map((item) => item.id));
 
         expect(adminMenuIds).toContain("routine");
         expect(userMenuIds).toContain("routine");
         expect(adminMenuIds).toContain("email-request");
-        expect(userMenuIds).not.toContain("email-request");
+        expect(userMenuIds).toContain("email-request");
     });
 
-    it("uses the Audit projection while keeping Email Request role-gated", () => {
+    it("uses the Audit and Email Request projections independently", () => {
         const grantedUserMenuIds = getAvailableMenuGroups(
             false,
             undefined,
@@ -283,6 +316,7 @@ describe("dashboard menu", () => {
             undefined,
             undefined,
             auditCapabilities,
+            emailReadCapabilities,
         ).flatMap((group) => group.items.map((item) => item.id));
         const deniedUserMenuIds = getAvailableMenuGroups(false)
             .flatMap((group) => group.items.map((item) => item.id));
@@ -293,6 +327,7 @@ describe("dashboard menu", () => {
             undefined,
             undefined,
             auditCapabilities,
+            emailCreateCapabilities,
         ).flatMap((group) => group.items.map((item) => item.id));
 
         expect(grantedUserMenuIds).toContain("audit-logs");
@@ -301,7 +336,7 @@ describe("dashboard menu", () => {
         expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === "audit-logs")?.requiredRole)
             .toBeUndefined();
         expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === "email-request")?.requiredRole)
-            .toBe("ADMIN");
+            .toBeUndefined();
     });
 
     it("shows Stock only when a Stock presentation surface is usable", () => {
@@ -357,11 +392,11 @@ describe("dashboard menu", () => {
         })).toContain("leave-management");
     });
 
-    it("keeps deferred reports, Admin recovery, and explicit USER management independent", () => {
+    it("keeps reports, recovery, and approver management independently projected", () => {
         expect(getMenuIds(false, { canViewLeaveReports: true })).toContain("leave-management");
         expect(getMenuIds(true, {
             leaveCapabilities: noLeaveCapabilities,
-        })).toContain("leave-management");
+        })).not.toContain("leave-management");
         expect(getMenuIds(false, {
             leaveCapabilities: {
                 ...noLeaveCapabilities,
@@ -370,7 +405,6 @@ describe("dashboard menu", () => {
         })).toContain("leave-management");
 
         const userManagementVisibility = getLeaveDashboardTabVisibility({
-            isAdmin: false,
             leaveCapabilities: {
                 ...noLeaveCapabilities,
                 canManageApprovers: true,
@@ -378,6 +412,17 @@ describe("dashboard menu", () => {
         });
         expect(userManagementVisibility["approver-settings"]).toBe(true);
         expect(userManagementVisibility.recovery).toBe(false);
+
+        const recoveryVisibility = getLeaveDashboardTabVisibility({
+            leaveCapabilities: {
+                ...noLeaveCapabilities,
+                canManageRecovery: true,
+            },
+        });
+        expect(recoveryVisibility.recovery).toBe(true);
+        expect(getLeaveDashboardTabVisibility({
+            leaveCapabilities: noLeaveCapabilities,
+        }).recovery).toBe(false);
     });
 
     it("keeps Leave unavailable when its feature flag is disabled", () => {
@@ -391,14 +436,12 @@ describe("dashboard menu", () => {
 
     it("normalizes inaccessible Leave deep links to the first visible surface", () => {
         const ownAvailability = {
-            isAdmin: false,
             leaveCapabilities: ownLeaveCapabilities,
         } as const;
         expect(canAccessLeaveDashboard(ownAvailability)).toBe(true);
         expect(normalizeLeaveDashboardTab("approvals", ownAvailability)).toBe("my-leave");
 
         const settingsAvailability = {
-            isAdmin: false,
             leaveCapabilities: {
                 ...noLeaveCapabilities,
                 canManageApprovers: true,

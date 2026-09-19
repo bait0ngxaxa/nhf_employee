@@ -110,6 +110,7 @@ describe("Leave presentation capability projection", () => {
             canRequestOwnNotTaken: true,
             canConfirmAssignedNotTaken: true,
             canManageApprovers: false,
+            canManageRecovery: false,
         });
         expect(Object.isFrozen(projection)).toBe(true);
 
@@ -158,6 +159,7 @@ describe("Leave presentation capability projection", () => {
             canRequestOwnNotTaken: true,
             canConfirmAssignedNotTaken: true,
             canManageApprovers: true,
+            canManageRecovery: false,
         });
     });
 
@@ -211,6 +213,7 @@ describe("Leave presentation capability projection", () => {
             canRequestOwnNotTaken: true,
             canConfirmAssignedNotTaken: true,
             canManageApprovers: true,
+            canManageRecovery: false,
         });
     });
 
@@ -225,6 +228,7 @@ describe("Leave presentation capability projection", () => {
             canRequestOwnNotTaken: false,
             canConfirmAssignedNotTaken: false,
             canManageApprovers: false,
+            canManageRecovery: false,
         };
 
         const expectOnlyCapability = async (

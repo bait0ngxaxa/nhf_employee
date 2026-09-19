@@ -27,9 +27,13 @@ const routineUser = {
     email: "account@test.com",
     routineCapabilities: {
         canReadTasks: true,
+        canReadAllTasks: false,
         canCreateTasks: false,
+        canCreateTasksForOthers: false,
         canUpdateTasks: false,
+        canUpdateAllTasks: false,
         canDeleteTasks: false,
+        canDeleteAllTasks: false,
         canReadOccurrences: false,
         canOverrideOccurrences: false,
         canReassignOccurrences: false,
@@ -38,6 +42,7 @@ const routineUser = {
         canExportTasks: true,
         canReadSummary: true,
         canReadReference: true,
+        canReadAllReferences: false,
     },
 };
 

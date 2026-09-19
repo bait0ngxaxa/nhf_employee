@@ -33,6 +33,7 @@ const noLeaveCapabilities = {
     canRequestOwnNotTaken: false,
     canConfirmAssignedNotTaken: false,
     canManageApprovers: false,
+    canManageRecovery: false,
 } as const;
 
 const ownLeaveCapabilities = {
@@ -154,11 +155,14 @@ describe("Leave Dashboard route access", () => {
         expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("reports");
     });
 
-    it("keeps Dashboard Admin recovery separate from normal approval", async () => {
+    it("renders recovery from the explicit capability projection", async () => {
         mocks.getCurrentUserProjection.mockResolvedValue({
             ...user,
-            role: "ADMIN",
-            leaveCapabilities: noLeaveCapabilities,
+            role: "USER",
+            leaveCapabilities: {
+                ...noLeaveCapabilities,
+                canManageRecovery: true,
+            },
             canApproveLeave: false,
             canViewLeaveReports: false,
         });
@@ -168,6 +172,20 @@ describe("Leave Dashboard route access", () => {
         });
 
         expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("recovery");
+    });
+
+    it("does not expose recovery from the ADMIN role without recovery capability", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            ...user,
+            role: "ADMIN",
+            leaveCapabilities: noLeaveCapabilities,
+            canApproveLeave: false,
+            canViewLeaveReports: false,
+        });
+
+        await expect(LeaveDashboardPage({
+            searchParams: Promise.resolve({ leaveTab: "recovery" }),
+        })).rejects.toThrow("NEXT_REDIRECT:/access-denied");
     });
 
     it("allows an explicit USER approver-management grant without recovery", async () => {

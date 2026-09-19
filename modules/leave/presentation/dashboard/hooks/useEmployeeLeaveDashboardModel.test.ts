@@ -27,6 +27,7 @@ describe("useEmployeeLeaveDashboardModel", () => {
         canRequestOwnNotTaken: true,
         canConfirmAssignedNotTaken: true,
         canManageApprovers: false,
+        canManageRecovery: false,
     };
     const mutate = vi.fn();
     const cancelLeave = vi.fn();

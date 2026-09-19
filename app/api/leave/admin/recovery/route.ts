@@ -12,7 +12,6 @@ import {
 import { notFound, forbidden } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { isAdminRole } from "@/lib/ssot/permissions";
 
 const RECOVERY_PAGINATION_MESSAGES = {
     invalidPage: "หมายเลขหน้าต้องเป็นจำนวนเต็มที่มากกว่าหรือเท่ากับ 1",
@@ -26,9 +25,6 @@ export async function GET(req: Request): Promise<NextResponse> {
 
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
-        if (!isAdminRole(auth.user.role)) {
-            return forbidden();
-        }
 
         const recoveryAuthorization = await assertLeaveCapability(
             buildLeaveAuthorizationContext(

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import {
     assertAuthorizationAdministrationAccess,
@@ -9,22 +8,29 @@ import {
     type AuthorizationAdministrationPrincipal,
 } from "@/modules/authorization";
 import type { EmployeePresentationCapabilities } from "@/modules/employee";
+import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
 
 export type DashboardEmployeeCapability = keyof Pick<
     EmployeePresentationCapabilities,
     "canCreateEmployees" | "canImportEmployees"
 >;
 
-export async function requireDashboardAdmin(): Promise<void> {
+export async function requireDashboardEmailRequestAccess(): Promise<EmailRequestPresentationCapabilities> {
     const user = await getCurrentUserProjection();
 
     if (!user) {
         redirect(APP_ROUTES.login);
     }
 
-    if (!isAdminRole(user.role)) {
+    const capabilities = user.emailRequestCapabilities ?? {
+        canReadRequests: false,
+        canCreateRequests: false,
+    };
+    if (!capabilities.canReadRequests && !capabilities.canCreateRequests) {
         redirect(APP_ROUTES.accessDenied);
     }
+
+    return capabilities;
 }
 
 export async function requireDashboardAuthorizationAdministration(): Promise<

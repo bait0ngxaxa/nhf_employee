@@ -10,6 +10,7 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import {
     DASHBOARD_MENU_ITEMS,
+    canAccessEmailRequestDashboard,
     canAccessEmployeeDashboard,
     canAccessLeaveDashboard,
     canAccessStockDashboard,
@@ -26,7 +27,7 @@ import {
     toDashboardMenuPath,
 } from "@/lib/ssot/routes";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
-import { isAdminRole, USER_ROLES } from "@/lib/ssot/permissions";
+import { isAdminRole } from "@/lib/ssot/permissions";
 import { useAuth } from "@/modules/auth/client";
 import { clearStockBrowseCart } from "@/modules/stock/client";
 
@@ -66,6 +67,7 @@ export function DashboardProvider({
             },
             user?.employeeCapabilities,
             user?.auditCapabilities,
+            user?.emailRequestCapabilities,
         ),
         [
             isAdmin,
@@ -76,6 +78,7 @@ export function DashboardProvider({
             user?.canViewLeaveReports,
             user?.employeeCapabilities,
             user?.auditCapabilities,
+            user?.emailRequestCapabilities,
         ],
     );
 
@@ -107,7 +110,6 @@ export function DashboardProvider({
             if (
                 menuId === "leave-management"
                 && !canAccessLeaveDashboard({
-                    isAdmin,
                     leaveCapabilities: user?.leaveCapabilities,
                     canApproveLeave: user?.canApproveLeave,
                     canViewLeaveReports: user?.canViewLeaveReports,
@@ -144,7 +146,14 @@ export function DashboardProvider({
                 router.push(APP_ROUTES.accessDenied);
                 return;
             }
-            if (menuItem?.requiredRole === USER_ROLES.ADMIN && !isAdmin) {
+            if (
+                menuId === "email-request"
+                && !canAccessEmailRequestDashboard(user?.emailRequestCapabilities)
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
+            if (menuId === "authorization-administration" && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
             }
@@ -165,6 +174,7 @@ export function DashboardProvider({
             user?.canViewLeaveReports,
             user?.employeeCapabilities,
             user?.auditCapabilities,
+            user?.emailRequestCapabilities,
         ],
     );
 

@@ -1,5 +1,10 @@
 import type { SharedDriveOption } from "@/constants/email-request";
 
+export interface EmailRequestPresentationCapabilities {
+    readonly canReadRequests: boolean;
+    readonly canCreateRequests: boolean;
+}
+
 /**
  * Email Request data interface matching Prisma model
  */

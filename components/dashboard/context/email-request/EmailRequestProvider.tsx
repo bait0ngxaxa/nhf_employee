@@ -15,6 +15,7 @@ import { isSharedDriveOption } from "@/constants/email-request";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { emailRequestSchema } from "@/lib/validations/email-request";
+import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
 import { EmailRequestContext } from "./EmailRequestContext";
 import {
     type EmailRequest,
@@ -37,6 +38,7 @@ const initialFormData: EmailRequestFormData = {
 
 interface EmailRequestProviderProps {
     children: ReactNode;
+    capabilities: EmailRequestPresentationCapabilities;
 }
 
 const defaultPagination: Pagination = {
@@ -107,7 +109,10 @@ function focusInvalidField(field: keyof EmailRequestFormData): void {
     element.focus({ preventScroll: true });
 }
 
-export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
+export function EmailRequestProvider({
+    children,
+    capabilities,
+}: EmailRequestProviderProps) {
     // List state
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -132,7 +137,9 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
         emailRequests: EmailRequest[];
         pagination: Pagination;
         error?: string;
-    }>(`${API_ROUTES.emailRequest.list}?page=${currentPage}&limit=10`);
+    }>(capabilities.canReadRequests
+        ? `${API_ROUTES.emailRequest.list}?page=${currentPage}&limit=10`
+        : null);
 
     const { emailRequests, pagination, listError } = useMemo(() => {
         return {
@@ -144,8 +151,10 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
     }, [data, swrError]);
 
     const refreshList = useCallback(() => {
-        mutate();
-    }, [mutate]);
+        if (capabilities.canReadRequests) {
+            mutate();
+        }
+    }, [capabilities.canReadRequests, mutate]);
 
     // Form handlers
     const handleInputChange = useCallback(
@@ -237,7 +246,9 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
                     toast.success("ส่งคำร้องพนักงานใหม่สำเร็จ", {
                         description: "คำร้องถูกส่งไปยังทีมไอทีแล้ว",
                     });
-                    mutate(); // Refresh the list
+                    if (capabilities.canReadRequests) {
+                        mutate();
+                    }
                     return true;
                 } else {
                     setFormError(response.error || "เกิดข้อผิดพลาด");
@@ -250,7 +261,7 @@ export function EmailRequestProvider({ children }: EmailRequestProviderProps) {
                 setIsFormLoading(false);
             }
         },
-        [formData, isFormLoading, mutate],
+        [capabilities.canReadRequests, formData, isFormLoading, mutate],
     );
 
     const value = useMemo<EmailRequestContextValue>(

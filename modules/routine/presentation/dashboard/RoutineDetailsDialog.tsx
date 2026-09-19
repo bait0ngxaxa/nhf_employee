@@ -48,7 +48,7 @@ import type {
 type RoutineDetailsTask = RoutineTask | RoutineTaskWorkItem;
 
 interface RoutineDetailsDialogProps {
-    isAdmin: boolean;
+    canReadImportMetadata: boolean;
     onOpenChange: (open: boolean) => void;
     open: boolean;
     task: RoutineDetailsTask | null;
@@ -150,7 +150,7 @@ function hasImportMetadata(task: RoutineDetailsTask): task is RoutineTask {
 }
 
 export function RoutineDetailsDialog({
-    isAdmin,
+    canReadImportMetadata,
     onOpenChange,
     open,
     task,
@@ -163,7 +163,7 @@ export function RoutineDetailsDialog({
     const hasOccurrenceAssigneeOverride = occurrence !== null
         && !areRoutineAssigneeSnapshotsEqual(task.assignees, occurrence.assignees);
     const extraDetails = task.extraDetails?.trim();
-    const showImportMetadata = isAdmin && hasImportMetadata(task);
+    const showImportMetadata = canReadImportMetadata && hasImportMetadata(task);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

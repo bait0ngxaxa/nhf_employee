@@ -244,7 +244,7 @@ describe("Routine authorization adapter", () => {
         );
         expect(result.scopes).toEqual(["CREATED", "ASSIGNED"]);
         expect(result.defaultScopes).toEqual(["CREATED", "ASSIGNED"]);
-        expect(result.isAdministrative).toBe(false);
+        expect(result.hasBroadAuthority).toBe(false);
     });
 
     it("does not let a narrow configured grant shrink the default policy", async () => {
@@ -351,7 +351,7 @@ describe("Routine authorization adapter", () => {
             expect(result.decision.grants).toEqual([
                 userGrant(testCase.capability, "ALL"),
             ]);
-            expect(result.isAdministrative).toBe(false);
+            expect(result.hasBroadAuthority).toBe(true);
         }
     });
 
@@ -617,7 +617,7 @@ describe("Routine authorization adapter", () => {
 
         expect(result.scopes).toEqual(["ALL"]);
         expect(result.defaultScopes).toEqual([]);
-        expect(result.isAdministrative).toBe(false);
+        expect(result.hasBroadAuthority).toBe(true);
     });
 
     it("clamps a LIFF ADMIN system-role result to Routine self-service scopes", async () => {
@@ -639,7 +639,7 @@ describe("Routine authorization adapter", () => {
 
         expect(result.actor.channel).toBe("LIFF_SELF_SERVICE");
         expect(result.scopes).toEqual(["CREATED", "ASSIGNED"]);
-        expect(result.isAdministrative).toBe(false);
+        expect(result.hasBroadAuthority).toBe(false);
         expect(result.liffSelfServicePolicyApplied).toBe(true);
     });
 
@@ -681,7 +681,7 @@ describe("Routine authorization adapter", () => {
         );
 
         expect(result.scopes).toEqual(expectedScopes);
-        expect(result.isAdministrative).toBe(false);
+        expect(result.hasBroadAuthority).toBe(false);
         expect(result.liffSelfServicePolicyApplied).toBe(true);
     });
 
@@ -724,7 +724,7 @@ describe("Routine authorization adapter", () => {
             "routine.occurrence.override",
         );
 
-        expect(result.isAdministrative).toBe(true);
+        expect(result.hasBroadAuthority).toBe(true);
         expect(result.scopes).toEqual(["ALL"]);
     });
 
@@ -747,7 +747,7 @@ describe("Routine authorization adapter", () => {
 
         expect(result.defaultScopes).toEqual([]);
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.isAdministrative).toBe(true);
+        expect(result.hasBroadAuthority).toBe(true);
     });
 
     it("requires configured ALL for a regular-user Routine export", async () => {
@@ -785,7 +785,7 @@ describe("Routine authorization adapter", () => {
 
         expect(result.defaultScopes).toEqual([]);
         expect(result.scopes).toEqual(["ALL"]);
-        expect(result.isAdministrative).toBe(false);
+        expect(result.hasBroadAuthority).toBe(true);
     });
 
     it("does not convert authorization configuration errors into default access", async () => {

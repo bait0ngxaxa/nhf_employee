@@ -33,7 +33,7 @@ interface RoutineTaskListProps {
     categoryId: string;
     data: PaginatedTasksResponse | undefined;
     error: Error | undefined;
-    isAdmin: boolean;
+    canReadImportMetadata: boolean;
     isLoading: boolean;
     routineCapabilities?: RoutinePresentationCapabilities;
     onCategoryChange: (value: string) => void;
@@ -75,7 +75,7 @@ export function RoutineTaskList({
     categoryId,
     data,
     error,
-    isAdmin,
+    canReadImportMetadata,
     isLoading,
     routineCapabilities,
     onCategoryChange,
@@ -328,7 +328,7 @@ export function RoutineTaskList({
                 task={detailsTask}
                 open={detailsOpen}
                 onOpenChange={setDetailsOpen}
-                isAdmin={isAdmin}
+                canReadImportMetadata={canReadImportMetadata}
             />
 
             <AlertDialog

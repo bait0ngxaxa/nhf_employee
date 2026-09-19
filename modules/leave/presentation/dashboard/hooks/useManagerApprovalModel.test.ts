@@ -40,6 +40,7 @@ describe("useManagerApprovalModel", () => {
         canRequestOwnNotTaken: true,
         canConfirmAssignedNotTaken: true,
         canManageApprovers: false,
+        canManageRecovery: false,
     };
     const mutate = vi.fn();
     const pendingLeave = {
