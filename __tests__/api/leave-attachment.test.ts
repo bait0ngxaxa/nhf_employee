@@ -4,20 +4,20 @@ import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "@/app/api/leave/attachments/[attachmentId]/route";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { readLeaveAttachment } from "@/modules/leave";
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
-    prisma: {
-        leaveAttachment: {
-            findUnique: vi.fn(),
-        },
+        prisma: {
+            leaveAttachment: {
+                findFirst: vi.fn(),
+            },
     },
 }));
 
@@ -41,7 +41,7 @@ function routeContext(
 }
 
 function mockWorkforce(employeeId: number): void {
-    vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+    vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
         ok: true,
         session: {
             user: {
@@ -62,7 +62,7 @@ function mockWorkforce(employeeId: number): void {
 }
 
 function mockAdmin(): void {
-    vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+    vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
         ok: true,
         session: {
             user: {
@@ -78,6 +78,7 @@ function mockAdmin(): void {
             email: "admin@example.com",
             name: "Admin",
         },
+        employeeId: 30,
     });
 }
 
@@ -85,7 +86,7 @@ function mockAttachment(
     employeeId: number = 10,
     approverId: number | null = 20,
 ): void {
-    vi.mocked(prisma.leaveAttachment.findUnique).mockResolvedValue({
+    vi.mocked(prisma.leaveAttachment.findFirst).mockResolvedValue({
         id: ATTACHMENT_ID,
         storageKey: STORAGE_KEY,
         contentType: "image/webp",
@@ -132,16 +133,19 @@ describe("GET /api/leave/attachments/[attachmentId]", () => {
         expect(response.status).toBe(200);
     });
 
-    it("allows an admin without requiring an employee profile", async () => {
+    it("does not allow an admin who is not a leave participant", async () => {
         mockAdmin();
+        vi.mocked(prisma.leaveAttachment.findFirst).mockResolvedValue(null);
 
         const response = await getAttachment();
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(404);
+        expect(readLeaveAttachment).not.toHaveBeenCalled();
     });
 
     it("returns 404 for another employee", async () => {
         mockWorkforce(30);
+        vi.mocked(prisma.leaveAttachment.findFirst).mockResolvedValue(null);
 
         const response = await getAttachment();
 
@@ -152,6 +156,7 @@ describe("GET /api/leave/attachments/[attachmentId]", () => {
     it("does not authorize the employee's new manager", async () => {
         mockWorkforce(30);
         mockAttachment(10, 20);
+        vi.mocked(prisma.leaveAttachment.findFirst).mockResolvedValue(null);
 
         const response = await getAttachment();
 
@@ -170,7 +175,7 @@ describe("GET /api/leave/attachments/[attachmentId]", () => {
 
     it("returns 404 when the attachment does not exist", async () => {
         mockWorkforce(10);
-        vi.mocked(prisma.leaveAttachment.findUnique).mockResolvedValue(null);
+        vi.mocked(prisma.leaveAttachment.findFirst).mockResolvedValue(null);
 
         const response = await getAttachment();
 
@@ -179,7 +184,7 @@ describe("GET /api/leave/attachments/[attachmentId]", () => {
     });
 
     it("preserves the authentication response for an unauthorized session", async () => {
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: false,
             response: NextResponse.json(
                 { error: "Unauthorized" },
@@ -190,7 +195,7 @@ describe("GET /api/leave/attachments/[attachmentId]", () => {
         const response = await getAttachment();
 
         expect(response.status).toBe(401);
-        expect(prisma.leaveAttachment.findUnique).not.toHaveBeenCalled();
+        expect(prisma.leaveAttachment.findFirst).not.toHaveBeenCalled();
         expect(readLeaveAttachment).not.toHaveBeenCalled();
     });
 
@@ -258,7 +263,7 @@ describe("GET /api/leave/attachments/[attachmentId]", () => {
         const response = await getAttachment("../private-file");
 
         expect(response.status).toBe(404);
-        expect(prisma.leaveAttachment.findUnique).not.toHaveBeenCalled();
+        expect(prisma.leaveAttachment.findFirst).not.toHaveBeenCalled();
         expect(readLeaveAttachment).not.toHaveBeenCalled();
     });
 });

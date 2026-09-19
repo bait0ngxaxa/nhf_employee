@@ -112,44 +112,26 @@ export async function getAuthorizedLeaveAttachment(
 }
 
 export interface LeaveAttachmentViewer {
-    employeeId?: number;
-    isAdmin: boolean;
+    readonly employeeId: number;
 }
 
 export async function getAuthorizedLeaveAttachmentForViewer(
     attachmentId: string,
     viewer: LeaveAttachmentViewer,
 ): Promise<AuthorizedLeaveAttachment | null> {
-    const attachment = await prisma.leaveAttachment.findUnique({
-        where: { id: attachmentId },
+    const attachment = await prisma.leaveAttachment.findFirst({
+        where: {
+            id: attachmentId,
+            leaveRequest: { is: getParticipantWhere(viewer.employeeId) },
+        },
         select: {
             storageKey: true,
             contentType: true,
-            leaveRequest: {
-                select: {
-                    employeeId: true,
-                    approverId: true,
-                    exceptionApproverId: true,
-                },
-            },
         },
     });
 
     if (!attachment) {
         return null;
-    }
-
-    if (!viewer.isAdmin) {
-        const employeeId = viewer.employeeId;
-        const canReadAttachment = employeeId !== undefined
-            && (
-                employeeId === attachment.leaveRequest.employeeId
-                || employeeId === attachment.leaveRequest.approverId
-                || employeeId === attachment.leaveRequest.exceptionApproverId
-            );
-        if (!canReadAttachment) {
-            return null;
-        }
     }
 
     return {

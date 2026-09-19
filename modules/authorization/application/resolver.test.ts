@@ -4,6 +4,7 @@ import {
     AuthorizationConfigurationError,
     AuthorizationDeniedError,
     createAuthorizationResolver,
+    createLegacyAdminCompatibleAuthorizationResolver,
     createCapabilityRegistry,
 } from "@/modules/authorization";
 import {
@@ -11,7 +12,6 @@ import {
     normalizeAuthorizationScopes,
 } from "./evaluator";
 import { evaluateLegacyAuthorization } from "./legacy-admin-business-authority-compatibility";
-import { createRoleNeutralAuthorizationResolver } from "./resolver";
 import type {
     AuthorizationActor,
     AuthorizationPersistenceContext,
@@ -802,7 +802,7 @@ describe("authorization public resolver API", () => {
         expect(load).not.toHaveBeenCalled();
     });
 
-    it("does not query persistence for ADMIN or rejected batch capabilities", async () => {
+    it("loads persistence for ADMIN and skips rejected batch capabilities", async () => {
         const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
             async () => resolution(),
         );
@@ -817,9 +817,16 @@ describe("authorization public resolver API", () => {
             actor({ systemRole: "ADMIN" }),
             ["routine.task.read", "routine.occurrence.override"],
         );
-        expect(adminDecisions.get("routine.task.read")?.allowed).toBe(true);
+        expect(adminDecisions.get("routine.task.read")?.allowed).toBe(false);
         expect(adminDecisions.get("routine.occurrence.override")?.allowed)
-            .toBe(true);
+            .toBe(false);
+        expect(loadMany).toHaveBeenCalledWith({
+            userId: USER_ID,
+            capabilityKeys: [
+                "routine.task.read",
+                "routine.occurrence.override",
+            ],
+        });
 
         const rejectedDecisions = await resolver.resolveMany(
             actor({ channel: "LIFF_SELF_SERVICE" }),
@@ -829,7 +836,7 @@ describe("authorization public resolver API", () => {
             .toBe("UNKNOWN_CAPABILITY");
         expect(rejectedDecisions.get("employee.read")?.reason)
             .toBe("CHANNEL_NOT_SUPPORTED");
-        expect(loadMany).not.toHaveBeenCalled();
+        expect(loadMany).toHaveBeenCalledTimes(1);
     });
 
     it("isolates evaluator validation to each requested capability", async () => {
@@ -879,7 +886,7 @@ describe("authorization public resolver API", () => {
         });
     });
 
-    it("does not load persistence for ADMIN or rejected requests", async () => {
+    it("loads persistence for ADMIN but not rejected requests", async () => {
         const load = vi.fn<AuthorizationResolutionRepository["load"]>(
             async () => resolution(),
         );
@@ -892,7 +899,7 @@ describe("authorization public resolver API", () => {
 
         await expect(
             resolver.can(actor({ systemRole: "ADMIN" }), CAPABILITY),
-        ).resolves.toBe(true);
+        ).resolves.toBe(false);
         await expect(
             resolver.can(actor(), "routine.task.unknown"),
         ).resolves.toBe(false);
@@ -902,16 +909,20 @@ describe("authorization public resolver API", () => {
                 "employee.read",
             ),
         ).resolves.toBe(false);
-        expect(load).not.toHaveBeenCalled();
+        expect(load).toHaveBeenCalledWith({
+            userId: USER_ID,
+            capabilityKey: CAPABILITY,
+        });
+        expect(load).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps malformed persisted ADMIN rows ignored on the legacy compatibility path", async () => {
+    it("keeps malformed persisted ADMIN rows ignored on the legacy comparison path", async () => {
         const load = vi.fn<AuthorizationResolutionRepository["load"]>(
             async () => resolution({
                 userGrants: [userGrant("OWN")],
             }),
         );
-        const resolver = createAuthorizationResolver({
+        const resolver = createLegacyAdminCompatibleAuthorizationResolver({
             repository: {
                 load,
                 loadMany: async () => resolution(),
@@ -952,7 +963,7 @@ describe("authorization public resolver API", () => {
     });
 });
 
-describe("role-neutral resolver target path", () => {
+describe("production resolver target path", () => {
     it.each([
         [
             "direct User",
@@ -984,36 +995,43 @@ describe("role-neutral resolver target path", () => {
             }),
             { type: "TEAM_ROLE", teamId: 10, teamRoleId: 20 },
         ],
-    ])("loads ADMIN %s authority from persistence", async (_source, data, source) => {
+    ])("loads USER and ADMIN %s authority from persistence", async (_source, data, source) => {
         const load = vi.fn<AuthorizationResolutionRepository["load"]>(
             async () => data,
         );
-        const resolver = createRoleNeutralAuthorizationResolver({
+        const resolver = createAuthorizationResolver({
             repository: {
                 load,
                 loadMany: async () => data,
             },
         });
 
-        const decision = await resolver.resolve(
-            actor({ systemRole: "ADMIN" }),
-            CAPABILITY,
-        );
+        for (const systemRole of ["USER", "ADMIN"] as const) {
+            const decision = await resolver.resolve(
+                actor({ systemRole }),
+                CAPABILITY,
+            );
 
-        expect(decision.allowed).toBe(true);
-        expect(decision.grants).toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({ source }),
-            ]),
-        );
-        expect(decision.grants).not.toEqual(
-            expect.arrayContaining([
-                expect.objectContaining({
-                    source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-                }),
-            ]),
-        );
-        expect(load).toHaveBeenCalledWith({
+            expect(decision.allowed).toBe(true);
+            expect(decision.grants).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ source }),
+                ]),
+            );
+            expect(decision.grants).not.toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                    }),
+                ]),
+            );
+        }
+        expect(load).toHaveBeenCalledTimes(2);
+        expect(load).toHaveBeenNthCalledWith(1, {
+            userId: USER_ID,
+            capabilityKey: CAPABILITY,
+        });
+        expect(load).toHaveBeenNthCalledWith(2, {
             userId: USER_ID,
             capabilityKey: CAPABILITY,
         });
@@ -1023,7 +1041,7 @@ describe("role-neutral resolver target path", () => {
         const load = vi.fn<AuthorizationResolutionRepository["load"]>(
             async () => resolution(),
         );
-        const resolver = createRoleNeutralAuthorizationResolver({
+        const resolver = createAuthorizationResolver({
             repository: {
                 load,
                 loadMany: async () => resolution(),
@@ -1050,7 +1068,7 @@ describe("role-neutral resolver target path", () => {
                 ],
             }),
         );
-        const resolver = createRoleNeutralAuthorizationResolver({
+        const resolver = createAuthorizationResolver({
             repository: {
                 load: async () => resolution(),
                 loadMany,
@@ -1088,7 +1106,7 @@ describe("role-neutral resolver target path", () => {
             userCapabilityGrant: { findMany: userGrantFindMany },
             teamMembership: { findMany: teamMembershipFindMany },
         } as unknown as AuthorizationPersistenceContext;
-        const resolver = createRoleNeutralAuthorizationResolver();
+        const resolver = createAuthorizationResolver();
 
         await expect(
             resolver.resolveInTransaction(
@@ -1113,7 +1131,7 @@ describe("role-neutral resolver target path", () => {
                 userGrants: [userGrant("OWN", "stock.request.create")],
             }),
         );
-        const resolver = createRoleNeutralAuthorizationResolver({
+        const resolver = createAuthorizationResolver({
             repository: {
                 load,
                 loadMany: async () => resolution(),
@@ -1139,7 +1157,7 @@ describe("role-neutral resolver target path", () => {
         const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
             async () => resolution(),
         );
-        const resolver = createRoleNeutralAuthorizationResolver({
+        const resolver = createAuthorizationResolver({
             repository: { load, loadMany },
         });
         const adminActor = actor({
@@ -1160,11 +1178,11 @@ describe("role-neutral resolver target path", () => {
             reason: "CHANNEL_NOT_SUPPORTED",
         });
         expect(load).not.toHaveBeenCalled();
-        expect(loadMany).not.toHaveBeenCalled();
+        expect(loadMany).toHaveBeenCalledTimes(0);
     });
 
     it("fails closed on malformed ADMIN target persistence instead of using legacy authority", async () => {
-        const resolver = createRoleNeutralAuthorizationResolver({
+        const resolver = createAuthorizationResolver({
             repository: {
                 load: async () => resolution({
                     userGrants: [userGrant("OWN")],

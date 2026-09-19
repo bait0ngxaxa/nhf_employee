@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
-    composeLegacyAdminCompatibleAuthorizationAuthority,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationChannel,
     type AuthorizationDecision,
@@ -68,12 +68,6 @@ const STOCK_CAPABILITY_SET = new Set<string>(
     STOCK_CAPABILITIES,
 );
 
-const DASHBOARD_ADMIN_EMPLOYEE_OPTIONAL_CAPABILITIES = new Set<string>([
-    "stock.inventory.manage",
-    "stock.request.process",
-    "stock.request.cancel",
-]);
-
 function isStockCapability(
     capability: string,
 ): capability is StockCapability {
@@ -130,15 +124,6 @@ export function defaultStockScopes(
     }
 }
 
-function isDashboardAdministrativeAuthorization(
-    actor: StockAuthorizationActor,
-    decision: AuthorizationDecision,
-): boolean {
-    return actor.channel === "DASHBOARD"
-        && actor.systemRole === "ADMIN"
-        && decision.grants.some((grant) => grant.source.type === "SYSTEM_ROLE");
-}
-
 function buildStockCapabilityAuthorization(
     actor: StockAuthorizationActor,
     capability: StockCapability,
@@ -157,10 +142,9 @@ function buildStockCapabilityAuthorization(
         decision: authority.configuredDecision,
         defaultScopes: authority.defaultScopes,
         scopes: authority.scopes,
-        isAdministrative: isDashboardAdministrativeAuthorization(
-            actor,
-            authority.configuredDecision,
-        ),
+        // The legacy ADMIN/SystemRole projection is comparison-only. Normal
+        // production authority never derives this metadata from identity.
+        isAdministrative: false,
     });
 }
 
@@ -176,7 +160,7 @@ function composeStockCapabilityAuthorization(
         );
     }
 
-    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
         defaultStockScopes(actor, capability),
@@ -339,16 +323,6 @@ function isActiveStockEmployee(
     return employee?.status === "ACTIVE" && employee.deletedAt === null;
 }
 
-function canUseDashboardAdminAccountOnlyLifecycle(
-    channel: StockAuthorizationChannel,
-    role: UserRole,
-    capability: string,
-): boolean {
-    return channel === "DASHBOARD"
-        && role === "ADMIN"
-        && DASHBOARD_ADMIN_EMPLOYEE_OPTIONAL_CAPABILITIES.has(capability);
-}
-
 export async function resolveStockCapabilityInTransaction(
     tx: Prisma.TransactionClient,
     actor: StockAuthorizedCommandActor,
@@ -368,24 +342,17 @@ export async function resolveStockCapabilityInTransaction(
     }
 
     const currentRole = parseUserRole(user.role);
-    const employeeIsOptional = canUseDashboardAdminAccountOnlyLifecycle(
-        requestedActor.channel,
-        currentRole,
-        capability,
-    );
     const activeEmployee = isActiveStockEmployee(user.employee)
         ? user.employee
         : null;
-    if (!employeeIsOptional && activeEmployee === null) {
+    if (activeEmployee === null) {
         throw new WorkforceAuthorizationError();
     }
 
-    if (!employeeIsOptional && activeEmployee !== null) {
-        await lockEmployeeRows(tx, [activeEmployee.id]);
-    }
+    await lockEmployeeRows(tx, [activeEmployee.id]);
     const activeActor = buildStockAuthorizationActor(
         { id: user.id, role: currentRole },
-        employeeIsOptional ? null : activeEmployee?.id ?? null,
+        activeEmployee.id,
         requestedActor.channel,
     );
     const decision = await authorization.resolveInTransaction(

@@ -544,10 +544,6 @@ function resolveCancellationNotificationMode(
     actorId: number,
     requestedBy: number,
 ): StockCancellationNotificationMode {
-    // Keep ADMIN notification wording separate from authorization scopes.
-    // Explicit USER ALL grants use the processor result path only when they
-    // cancel someone else's request.
-    if (authorization.actor.systemRole === "ADMIN") return "PROCESSOR";
     if (requestedBy === actorId) return "REQUESTER";
     return authorization.scopes.includes("ALL")
         ? "PROCESSOR"

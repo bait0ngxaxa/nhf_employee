@@ -173,7 +173,7 @@ describe("Notification authorization default-policy adapter", () => {
         }
     });
 
-    it("uses central ADMIN semantics and keeps read and update capabilities independent", async () => {
+    it("uses configured ADMIN authority and keeps read and update capabilities independent", async () => {
         mocks.resolve
             .mockResolvedValueOnce(
                 decision(
@@ -181,7 +181,7 @@ describe("Notification authorization default-policy adapter", () => {
                     true,
                     ["OWN"],
                     undefined,
-                    [grant("notification.inbox.read", { type: "SYSTEM_ROLE", role: "ADMIN" })],
+                    [grant("notification.inbox.read", { type: "USER", userId: 7 })],
                 ),
             )
             .mockResolvedValueOnce(
@@ -190,7 +190,7 @@ describe("Notification authorization default-policy adapter", () => {
                     true,
                     ["OWN"],
                     undefined,
-                    [grant("notification.inbox.update", { type: "SYSTEM_ROLE", role: "ADMIN" })],
+                    [grant("notification.inbox.update", { type: "USER", userId: 7 })],
                 ),
             );
 
@@ -203,9 +203,9 @@ describe("Notification authorization default-policy adapter", () => {
             "notification.inbox.update",
         );
 
-        expect(read.defaultScopes).toEqual([]);
+        expect(read.defaultScopes).toEqual(["OWN"]);
         expect(read.scopes).toEqual(["OWN"]);
-        expect(update.defaultScopes).toEqual([]);
+        expect(update.defaultScopes).toEqual(["OWN"]);
         expect(update.scopes).toEqual(["OWN"]);
         expect(mocks.resolve).toHaveBeenNthCalledWith(
             1,

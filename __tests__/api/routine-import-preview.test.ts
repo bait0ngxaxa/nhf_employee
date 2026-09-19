@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
     assertRoutineCapability: vi.fn(),
     createRoutineImportPreview: vi.fn(),
     getRoutineImportReferenceData: vi.fn(),
@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
+    requireActiveWorkforceSession: mocks.requireActiveWorkforceSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
@@ -53,7 +53,7 @@ function buildRequest(file?: File): NextRequest {
 describe("POST /api/routines/imports/preview", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(admin);
+        mocks.requireActiveWorkforceSession.mockResolvedValue(admin);
         mocks.assertRoutineCapability.mockResolvedValue(undefined);
         mocks.enforceAuthenticatedMutationRateLimit.mockReturnValue(null);
         mocks.createRoutineCommandActor.mockReturnValue({ id: 7, role: "ADMIN", email: "admin@example.com" });
@@ -77,7 +77,7 @@ describe("POST /api/routines/imports/preview", () => {
     });
 
     it("requires an authenticated workforce or admin session before parsing or staging the upload", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: false,
             response: NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 }),
         });
@@ -120,7 +120,7 @@ describe("POST /api/routines/imports/preview", () => {
 describe("GET /api/routines/imports/reference", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(admin);
+        mocks.requireActiveWorkforceSession.mockResolvedValue(admin);
         mocks.assertRoutineCapability.mockResolvedValue(undefined);
         mocks.createRoutineCommandActor.mockReturnValue({ id: 7, role: "ADMIN", email: "admin@example.com" });
         mocks.getRoutineImportReferenceData.mockResolvedValue({

@@ -45,6 +45,7 @@ vi.mock("@/modules/stock", async () => {
         ...actual,
         requireLiffStockProcessorSession:
             mocks.requireLiffStockProcessorSession,
+        assertStockCapability: mocks.resolveStockCapability,
         resolveStockCapability:
             mocks.resolveStockCapability,
         stockService: {

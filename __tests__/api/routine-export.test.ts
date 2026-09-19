@@ -19,7 +19,7 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: mocks.requireSession,
+    requireActiveWorkforceSession: mocks.requireSession,
 }));
 
 vi.mock("@/lib/server/audit", () => ({

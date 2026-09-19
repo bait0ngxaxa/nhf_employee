@@ -1,5 +1,14 @@
 # NHF Employee — Current Authorization State
 
+> **Current repository state (Phase 12H-G):** production business
+> authorization is role-neutral and configured-grant based. The normal
+> `authorization` singleton and `createAuthorizationResolver()` load
+> persistence for USER and ADMIN alike; `SYSTEM_ROLE / ADMIN` is not a
+> business grant. The older Phase 12H-B through 12H-F boundary notes below
+> remain historical records of behavior at those phase boundaries. The full
+> cutover and regression record is in
+> [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
+
 Phase 12A status: CLOSED — additive policy contract and current capability
 inventory only. See
 [authorization-phase-12a-additive-policy-contract.md](authorization-phase-12a-additive-policy-contract.md).
@@ -1683,3 +1692,26 @@ Phase 0 ไม่ได้ทำและไม่ควรตีความว
 7. เมื่อ contract ถูก review แล้วจึงออกแบบ mapping ของ ADMIN และ normal-user grants แบบ additive ALLOW โดยคง default DENY ของ future generic layer และคง channel restriction ของ LIFF
 
 ข้อเสนอข้างต้นเป็นขอบเขตสำหรับการออกแบบ Phase 1 เท่านั้น เอกสารนี้ไม่ได้เริ่ม implementation ของ Phase 1
+
+## Phase 12H-G current closure
+
+Phase 12H-G cuts over the repository's normal production business path to
+role-neutral configured authority. `authorization` and
+`createAuthorizationResolver()` load direct User, Team, and TeamRole grants
+for both USER and ADMIN. Equivalent trusted contexts therefore receive the
+same Default Domain Policy, and ADMIN without configured authority is denied
+the catalog's central-only capabilities.
+
+Normal domain adapters use `composeAuthorizationAuthority()`; the legacy
+resolver/evaluator and composition wrapper remain only for the explicitly
+named Phase 12H-H snapshot-comparison seam. The old mixed workforce helper is
+retired, and Routine, Stock, Leave approver management, and private Leave
+attachment access now require the same active workforce/participant context
+for both roles. Stock cancellation notification mode is relationship-based,
+while Routine/Stock ADMIN recipient policies remain separate domain policies.
+
+Authorization Administration, bootstrap/last-ADMIN lifecycle, identity and
+audit provenance, and approved recipient policies remain ADMIN/system-role
+uses. None is an ordinary business ALLOW/DENY source. Production/live rollout
+is **NOT RUN**. The detailed closure and verification record is in
+[authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).

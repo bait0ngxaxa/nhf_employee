@@ -616,91 +616,74 @@ describe("Leave authorization adapter", () => {
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 
-    it("preserves account-only Dashboard Admin approver management lifecycle", async () => {
+    it("rejects account-only Dashboard Admin approver management", async () => {
+        const findFirst = vi.fn().mockResolvedValue(activeUser("ADMIN", null));
         const tx = {
             user: {
-                findFirst: vi.fn().mockResolvedValue(activeUser("ADMIN", null)),
+                findFirst,
             },
         } as unknown as Prisma.TransactionClient;
+        await expect(
+            resolveLeaveCapabilityInTransaction(
+                tx,
+                context("ADMIN", "DASHBOARD", null),
+                "leave.approver.manage",
+            ),
+        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+
+        expect(findFirst).not.toHaveBeenCalled();
+        expect(mocks.lockUserRows).not.toHaveBeenCalled();
+        expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
+        expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
+    });
+
+    it("re-reads the current persisted role without making it business authority", async () => {
+        const currentUser = activeUser("USER", null);
+        currentUser.employee = { id: 21, status: "ACTIVE", deletedAt: null };
+        const findFirst = vi.fn().mockResolvedValue(currentUser);
+        const tx = {
+            user: {
+                findFirst,
+            },
+        } as unknown as Prisma.TransactionClient;
+        const staleContext = context("ADMIN", "DASHBOARD", 21);
         mocks.resolveInTransaction.mockResolvedValue(
             decision(
                 "leave.approver.manage",
                 true,
                 ["ALL"],
                 undefined,
-                [systemRoleGrant("leave.approver.manage")],
+                [userGrant("leave.approver.manage", "ALL")],
             ),
         );
 
         const result = await resolveLeaveCapabilityInTransaction(
             tx,
-            context("ADMIN", "DASHBOARD", null),
+            staleContext,
             "leave.approver.manage",
         );
-
-        expect(result.actor).toEqual({
-            userId: 7,
-            employeeId: null,
-            systemRole: "ADMIN",
-            channel: "DASHBOARD",
-        });
-        expect(result.scopes).toEqual(["ALL"]);
-        expect(result.defaultScopes).toEqual([]);
-        expect(tx.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        expect(result.actor.systemRole).toBe("USER");
+        expect(result.actor.employeeId).toBe(21);
+        expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
             where: expect.objectContaining({
                 id: 7,
-                role: "ADMIN",
                 isActive: true,
                 deletedAt: null,
             }),
         }));
+        expect(findFirst.mock.calls[0]?.[0].where).not.toHaveProperty("role");
         expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
-        expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
+        expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [21]);
         expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
             {
                 userId: 7,
-                employeeId: null,
-                systemRole: "ADMIN",
+                employeeId: 21,
+                systemRole: "USER",
                 channel: "DASHBOARD",
             },
             "leave.approver.manage",
             tx,
         );
-    });
-
-    it("fails closed when a stale account-only ADMIN preflight meets persisted USER state", async () => {
-        const currentUser = activeUser("USER", null);
-        const findFirst = vi.fn().mockImplementation(
-            async (query: Prisma.UserFindFirstArgs) => query.where?.role === currentUser.role
-                ? currentUser
-                : null,
-        );
-        const tx = {
-            user: {
-                findFirst,
-            },
-        } as unknown as Prisma.TransactionClient;
-        const staleContext = context("ADMIN", "DASHBOARD", null);
-
-        await expect(
-            resolveLeaveCapabilityInTransaction(
-                tx,
-                staleContext,
-                "leave.approver.manage",
-            ),
-        ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
-        expect(staleContext.authorizationActor.systemRole).toBe("ADMIN");
-        expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({
-                id: 7,
-                role: "ADMIN",
-                isActive: true,
-                deletedAt: null,
-            }),
-        }));
-        expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
-        expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
-        expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
     });
 
     it.each([

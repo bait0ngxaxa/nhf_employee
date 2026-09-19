@@ -7,7 +7,7 @@ import {
 } from "@/modules/routine";
 
 const mocks = vi.hoisted(() => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
     assertRoutineCapability: vi.fn(),
     getOccurrence: vi.fn(),
     updateOverride: vi.fn(),
@@ -49,7 +49,7 @@ const committedOccurrence = {
 };
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
+    requireActiveWorkforceSession: mocks.requireActiveWorkforceSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
@@ -64,7 +64,7 @@ import { PATCH } from "@/app/api/routines/occurrences/[id]/route";
 describe("PATCH /api/routines/occurrences/:id", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
@@ -102,7 +102,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
     });
 
     it("returns the committed mutation result without requiring occurrence read access", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,
@@ -142,7 +142,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
     });
 
     it("keeps the Dashboard actor and capability server-selected despite authority-shaped input", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,
@@ -207,7 +207,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
     });
 
     it("does not mutate when the caller is not an admin", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: false,
             response: NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 }),
         });

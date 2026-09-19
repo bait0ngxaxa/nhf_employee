@@ -31,14 +31,18 @@ describe("NHF Routine task deletion", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         prismaMock.$queryRaw.mockResolvedValue(asNever([]));
-        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 99,
+            capabilityKey: "routine.task.delete",
+            scope: "ALL",
+        }]));
         prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findUnique.mockResolvedValue(asNever({
             id: 99,
             role: "ADMIN",
             isActive: true,
             deletedAt: null,
-            employee: null,
+            employee: { id: 99, status: "ACTIVE", deletedAt: null },
         }));
         prismaMock.routineTask.findUnique.mockResolvedValue(asNever({
             id: 71,

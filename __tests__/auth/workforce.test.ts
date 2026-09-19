@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { requireApiSession } from "@/lib/auth/api";
-import {
-    requireActiveWorkforceOrAdminSession,
-    requireActiveWorkforceSession,
-} from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 vi.mock("@/lib/auth/api", () => ({
     requireApiSession: vi.fn(),
@@ -132,7 +129,7 @@ describe("requireActiveWorkforceSession", () => {
         if (!result.ok) expect(result.response.status).toBe(403);
     });
 
-    it("allows an active admin without an employee profile on mixed routes", async () => {
+    it("rejects an active admin without an employee profile", async () => {
         vi.mocked(requireApiSession).mockResolvedValue({
             ...ACTIVE_AUTH,
             session: {
@@ -146,9 +143,9 @@ describe("requireActiveWorkforceSession", () => {
             employee: null,
         } as never);
 
-        const result = await requireActiveWorkforceOrAdminSession();
+        const result = await requireActiveWorkforceSession();
 
-        expect(result.ok).toBe(true);
-        if (result.ok) expect(result.user.role).toBe("ADMIN");
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.response.status).toBe(404);
     });
 });

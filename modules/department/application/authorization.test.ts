@@ -164,14 +164,14 @@ describe("Department authorization default-policy adapter", () => {
         expect(result.scopes).toEqual(["ALL"]);
     });
 
-    it("accepts ADMIN through the central resolver rather than a feature-local role check", async () => {
+    it("accepts configured ADMIN authority without changing the default policy", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "department.read",
                 true,
                 ["ALL"],
                 undefined,
-                [grant("department.read", { type: "SYSTEM_ROLE", role: "ADMIN" })],
+                [grant("department.read", { type: "USER", userId: 7 })],
             ),
         );
 
@@ -184,7 +184,7 @@ describe("Department authorization default-policy adapter", () => {
             context("ADMIN").authorizationActor,
             "department.read",
         );
-        expect(result.defaultScopes).toEqual([]);
+        expect(result.defaultScopes).toEqual(["ALL"]);
         expect(result.scopes).toEqual(["ALL"]);
     });
 

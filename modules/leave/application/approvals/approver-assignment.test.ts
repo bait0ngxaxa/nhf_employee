@@ -6,6 +6,7 @@ import { buildLeaveAuthorizationContext } from "../authorization";
 import { assignLeaveApprovers } from "./approver-assignment";
 import { ACTIVE_LEAVE_EMPLOYEE_QUERY_WHERE } from "../../domain/approver-eligibility";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
+import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
 const persistenceMocks = vi.hoisted(() => ({
     lockEmployeeRows: vi.fn(),
@@ -21,6 +22,9 @@ vi.mock("@/lib/db/prisma", () => ({
         $queryRaw: vi.fn(),
         user: { findFirst: vi.fn() },
         employee: { findMany: vi.fn(), update: vi.fn() },
+        userCapabilityGrant: { findMany: vi.fn() },
+        teamMembership: { findMany: vi.fn() },
+        teamRoleCapabilityGrant: { findMany: vi.fn() },
         leaveRequest: { findMany: vi.fn() },
         auditLog: { create: vi.fn() },
     },
@@ -126,6 +130,13 @@ describe("assignLeaveApprovers", () => {
             deletedAt: null,
             employee: { id: 1, status: "ACTIVE", deletedAt: null },
         } as never);
+        vi.mocked(prisma.userCapabilityGrant.findMany).mockResolvedValue([{
+            userId: 1,
+            capabilityKey: "leave.approver.manage",
+            scope: "ALL",
+        }] as never);
+        vi.mocked(prisma.teamMembership.findMany).mockResolvedValue([] as never);
+        vi.mocked(prisma.teamRoleCapabilityGrant.findMany).mockResolvedValue([] as never);
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
             if (typeof callback === "function") return callback(prisma);
             return callback;
@@ -134,7 +145,7 @@ describe("assignLeaveApprovers", () => {
         vi.mocked(prisma.auditLog.create).mockResolvedValue({ id: 1 } as never);
     });
 
-    it("allows an active account-only Dashboard Admin to manage approvers", async () => {
+    it("rejects an account-only Dashboard Admin from managing approvers", async () => {
         vi.mocked(prisma.user.findFirst).mockResolvedValue({
             id: 1,
             role: "ADMIN",
@@ -142,25 +153,12 @@ describe("assignLeaveApprovers", () => {
             deletedAt: null,
             employee: null,
         } as never);
-        mockAssignmentLookup({ approvers: [ACTIVE_APPROVER] });
 
         await expect(assignLeaveApprovers(
             [{ employeeId: 10, managerId: 20 }],
             ACCOUNT_ONLY_ADMIN_ACTOR,
-        )).resolves.toBeUndefined();
-
-        expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({
-                id: 1,
-                role: "ADMIN",
-                isActive: true,
-                deletedAt: null,
-            }),
-        }));
-        expect(prisma.employee.update).toHaveBeenCalledWith({
-            where: { id: 10 },
-            data: { managerId: 20 },
-        });
+        )).rejects.toBeInstanceOf(WorkforceAuthorizationError);
+        expect(prisma.employee.update).not.toHaveBeenCalled();
     });
 
     it("blocks a manager change while the employee has a pending leave request", async () => {

@@ -41,7 +41,6 @@ const mocks = vi.hoisted(() => {
         authorizationResolveInTransaction: vi.fn(),
         requireApiSession: vi.fn(),
         requireActiveWorkforceSession: vi.fn(),
-        requireActiveWorkforceOrAdminSession: vi.fn(),
         requireLiffWorkforceSession: vi.fn(),
         stockServices: {
             getCategories: vi.fn(),
@@ -169,8 +168,6 @@ vi.mock("@/modules/stock", async (importOriginal) => {
 
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: mocks.requireActiveWorkforceSession,
-    requireActiveWorkforceOrAdminSession:
-        mocks.requireActiveWorkforceOrAdminSession,
 }));
 
 vi.mock("@/lib/auth/api", () => ({
@@ -449,9 +446,6 @@ describe("Phase 12F direct migrated route seams", () => {
         mocks.authState.invalidCapability = null;
         process.env.NEXT_PUBLIC_FEATURE_ROUTINE = "true";
         process.env.NEXT_PUBLIC_FEATURE_LEAVE = "true";
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(
-            DASHBOARD_AUTH,
-        );
         mocks.requireActiveWorkforceSession.mockResolvedValue(DASHBOARD_AUTH);
         mocks.requireApiSession.mockResolvedValue({
             ok: true as const,

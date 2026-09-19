@@ -115,7 +115,7 @@ describe("Employee presentation capability projection", () => {
         );
     });
 
-    it("projects centrally resolved ADMIN authority for all seven capabilities", async () => {
+    it("projects configured ADMIN authority for all seven capabilities", async () => {
         mocks.resolveMany.mockImplementation(
             async (_actor: unknown, capabilities: readonly string[]) => new Map(
                 capabilities.map((capability) => [
@@ -128,7 +128,7 @@ describe("Employee presentation capability projection", () => {
                         [{
                             capability: capability as EffectiveAuthorizationGrant["capability"],
                             scope: "ALL",
-                            source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                            source: { type: "USER", userId: 7 },
                         }],
                     ),
                 ]),

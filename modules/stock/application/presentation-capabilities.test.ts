@@ -94,31 +94,7 @@ function deniedDecision(
 describe("Stock presentation capability projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockDecisions((capability, actor) => {
-            if (actor.systemRole === "ADMIN") {
-                if (
-                    actor.channel === "LIFF_SELF_SERVICE"
-                    && (capability === "stock.inventory.manage"
-                        || capability === "stock.report.export")
-                ) {
-                    return deniedDecision(capability);
-                }
-                return decision(
-                    capability,
-                    true,
-                    ["ALL"],
-                    undefined,
-                    [
-                        {
-                            capability,
-                            scope: "ALL",
-                            source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-                        },
-                    ],
-                );
-            }
-            return noGrantDecision(capability);
-        });
+        mockDecisions((capability) => noGrantDecision(capability));
     });
 
     it("uses one batched resolver call and returns the Dashboard USER default policy", async () => {
@@ -141,7 +117,7 @@ describe("Stock presentation capability projection", () => {
         );
     });
 
-    it("projects Dashboard ADMIN SYSTEM_ROLE authority independently of default policy", async () => {
+    it("projects Dashboard ADMIN with the same default policy as USER", async () => {
         const capabilities = await getStockPresentationCapabilities(
             buildStockAuthorizationContext({ id: 7, role: "ADMIN" }, 21, "DASHBOARD"),
         );
@@ -149,13 +125,13 @@ describe("Stock presentation capability projection", () => {
         expect(capabilities).toEqual({
             canReadCatalog: true,
             canReadOwnRequests: true,
-            canReadAllRequests: true,
+            canReadAllRequests: false,
             canCreateRequests: true,
             canCancelOwnRequests: true,
-            canCancelAnyRequests: true,
-            canProcessRequests: true,
-            canManageInventory: true,
-            canExportReports: true,
+            canCancelAnyRequests: false,
+            canProcessRequests: false,
+            canManageInventory: false,
+            canExportReports: false,
         });
     });
 
@@ -177,7 +153,7 @@ describe("Stock presentation capability projection", () => {
         });
     });
 
-    it("keeps LIFF ADMIN processor authority without the Routine self-service clamp", async () => {
+    it("does not resurrect LIFF ADMIN processor authority", async () => {
         const capabilities = await getStockPresentationCapabilities(
             buildStockAuthorizationContext({ id: 7, role: "ADMIN" }, 21, "LIFF_SELF_SERVICE"),
         );
@@ -185,11 +161,11 @@ describe("Stock presentation capability projection", () => {
         expect(capabilities).toEqual({
             canReadCatalog: true,
             canReadOwnRequests: true,
-            canReadAllRequests: true,
+            canReadAllRequests: false,
             canCreateRequests: true,
             canCancelOwnRequests: true,
-            canCancelAnyRequests: true,
-            canProcessRequests: true,
+            canCancelAnyRequests: false,
+            canProcessRequests: false,
             canManageInventory: false,
             canExportReports: false,
         });

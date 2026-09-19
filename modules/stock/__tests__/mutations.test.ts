@@ -23,6 +23,7 @@ const notificationMocks = vi.hoisted(() => ({
 vi.mock("@/modules/notification", () => notificationMocks);
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
+const testActorRoles = new Map<number, "ADMIN" | "USER">();
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
@@ -32,6 +33,7 @@ function commandActor(
     id: number,
     role: "ADMIN" | "USER" = "ADMIN",
 ): StockAuthorizedCommandActor {
+    testActorRoles.set(id, role);
     return {
         id,
         email: "user-" + id + "@example.com",
@@ -131,7 +133,34 @@ describe("Stock Service Mutations", () => {
         prismaMock.stockTransaction.upsert.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
-        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        testActorRoles.clear();
+        prismaMock.userCapabilityGrant.findMany.mockImplementation(
+            (args?: Prisma.UserCapabilityGrantFindManyArgs) => {
+                const where = args?.where;
+                const userId = typeof where?.userId === "number"
+                    ? where.userId
+                    : null;
+                const capabilityKey = typeof where?.capabilityKey === "string"
+                    ? where.capabilityKey
+                    : null;
+                if (
+                    testActorRoles.get(userId ?? -1) !== "ADMIN"
+                    || capabilityKey === null
+                ) {
+                    return asNever([]);
+                }
+                const scope = capabilityKey === "stock.request.read"
+                    || capabilityKey === "stock.request.create"
+                    || capabilityKey === "stock.request.cancel"
+                    ? "OWN"
+                    : "ALL";
+                return asNever([{
+                    userId: userId ?? -1,
+                    capabilityKey,
+                    scope,
+                }]);
+            },
+        );
         prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findUnique.mockImplementation((args) =>
             asNever({
@@ -2014,6 +2043,11 @@ describe("Stock Service Mutations", () => {
         });
 
         it("should enqueue a result email when an admin cancels a request", async () => {
+            prismaMock.userCapabilityGrant.findMany.mockResolvedValueOnce(asNever([{
+                userId: 9,
+                capabilityKey: "stock.request.cancel",
+                scope: "ALL",
+            }]));
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
                     ...requestResultSnapshotFields("PRJ-ADMIN-CANCEL", 55),
@@ -2153,6 +2187,11 @@ describe("Stock Service Mutations", () => {
         });
 
         it("should enqueue a cancelled result email with a null reason", async () => {
+            prismaMock.userCapabilityGrant.findMany.mockResolvedValueOnce(asNever([{
+                userId: 9,
+                capabilityKey: "stock.request.cancel",
+                scope: "ALL",
+            }]));
             prismaMock.stockRequest.findUnique.mockResolvedValue(
                 asNever({
                     ...requestResultSnapshotFields("PRJ-ADMIN-CANCEL-NO-REASON", 55),

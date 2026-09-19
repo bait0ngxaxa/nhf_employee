@@ -96,16 +96,6 @@ function userGrant(
     };
 }
 
-function systemRoleGrant(
-    capability: StockCapability,
-): EffectiveAuthorizationGrant {
-    return {
-        capability,
-        scope: "ALL",
-        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-    };
-}
-
 function commandActor(
     authorizationContext = context(),
 ): StockAuthorizedCommandActor {
@@ -270,7 +260,7 @@ describe("Stock authorization adapter", () => {
         });
     });
 
-    it("uses central SYSTEM_ROLE authority for Dashboard ADMIN", async () => {
+    it("uses configured authority for Dashboard ADMIN", async () => {
         mocks.resolve
             .mockResolvedValueOnce(
                 decision(
@@ -278,7 +268,7 @@ describe("Stock authorization adapter", () => {
                     true,
                     ["ALL"],
                     undefined,
-                    [systemRoleGrant("stock.inventory.manage")],
+                    [userGrant("stock.inventory.manage", "ALL")],
                 ),
             )
             .mockResolvedValueOnce(
@@ -287,7 +277,7 @@ describe("Stock authorization adapter", () => {
                     true,
                     ["ALL"],
                     undefined,
-                    [systemRoleGrant("stock.request.process")],
+                    [userGrant("stock.request.process", "ALL")],
                 ),
             )
             .mockResolvedValueOnce(
@@ -296,7 +286,7 @@ describe("Stock authorization adapter", () => {
                     true,
                     ["ALL"],
                     undefined,
-                    [systemRoleGrant("stock.report.export")],
+                    [userGrant("stock.report.export", "ALL")],
                 ),
             );
 
@@ -319,10 +309,10 @@ describe("Stock authorization adapter", () => {
         expect(inventory.defaultScopes).toEqual([]);
         expect(process.defaultScopes).toEqual([]);
         expect(report.defaultScopes).toEqual([]);
-        expect(inventory.isAdministrative).toBe(true);
+        expect(inventory.isAdministrative).toBe(false);
     });
 
-    it("preserves the Dashboard ADMIN mine/all request distinction", async () => {
+    it("preserves the Dashboard ADMIN mine/all request distinction for configured authority", async () => {
         mocks.resolve
             .mockResolvedValueOnce(
                 decision(
@@ -330,7 +320,7 @@ describe("Stock authorization adapter", () => {
                     true,
                     ["ALL"],
                     undefined,
-                    [systemRoleGrant("stock.request.read")],
+                    [userGrant("stock.request.read", "ALL")],
                 ),
             )
             .mockResolvedValueOnce(
@@ -339,7 +329,7 @@ describe("Stock authorization adapter", () => {
                     true,
                     ["ALL"],
                     undefined,
-                    [systemRoleGrant("stock.request.read")],
+                    [userGrant("stock.request.read", "ALL")],
                 ),
             );
 
@@ -356,8 +346,8 @@ describe("Stock authorization adapter", () => {
 
         expect(mine.scopes).toEqual(["ALL"]);
         expect(all.scopes).toEqual(["ALL"]);
-        expect(mine.isAdministrative).toBe(true);
-        expect(all.isAdministrative).toBe(true);
+        expect(mine.isAdministrative).toBe(false);
+        expect(all.isAdministrative).toBe(false);
     });
 
     it("keeps LIFF ADMIN processor authority while leaving dashboard-only capabilities unsupported", async () => {
@@ -368,7 +358,7 @@ describe("Stock authorization adapter", () => {
                     true,
                     ["ALL"],
                     undefined,
-                    [systemRoleGrant("stock.request.process")],
+                    [userGrant("stock.request.process", "ALL")],
                 ),
             )
             .mockResolvedValueOnce(
@@ -647,7 +637,7 @@ describe("Stock authorization adapter", () => {
         expect(result.scopes).toEqual(["OWN"]);
     });
 
-    it("denies stale Dashboard ADMIN authority after the persisted role is downgraded to USER", async () => {
+    it("does not revive stale Dashboard ADMIN authority after the persisted role is downgraded to USER", async () => {
         const tx = {
             user: {
                 findUnique: vi.fn().mockResolvedValue({
@@ -664,23 +654,13 @@ describe("Stock authorization adapter", () => {
             },
         } as never;
         const staleActor = commandActor(context("ADMIN"));
-        mocks.resolveInTransaction.mockImplementation(
-            async (
-                authorizationActor: AuthorizationActor,
-            ): Promise<AuthorizationDecision> => authorizationActor.systemRole === "ADMIN"
-                ? decision(
-                    "stock.inventory.manage",
-                    true,
-                    ["ALL"],
-                    undefined,
-                    [systemRoleGrant("stock.inventory.manage")],
-                )
-                : decision(
-                    "stock.inventory.manage",
-                    false,
-                    [],
-                    "NO_APPLICABLE_GRANT",
-                ),
+        mocks.resolveInTransaction.mockResolvedValue(
+            decision(
+                "stock.inventory.manage",
+                false,
+                [],
+                "NO_APPLICABLE_GRANT",
+            ),
         );
         expect(staleActor.authorization.authorizationActor.systemRole).toBe(
             "ADMIN",
@@ -714,7 +694,7 @@ describe("Stock authorization adapter", () => {
         "stock.request.process",
         "stock.request.cancel",
     ] as const)(
-        "keeps Dashboard ADMIN account-only transaction access without an employee profile for %s",
+        "rejects Dashboard ADMIN account-only transaction access without an employee profile for %s",
         async (capability) => {
             const tx = {
                 user: {
@@ -727,36 +707,15 @@ describe("Stock authorization adapter", () => {
                     }),
                 },
             } as never;
-            mocks.resolveInTransaction.mockResolvedValue(
-                decision(
+            await expect(
+                resolveStockCapabilityInTransaction(
+                    tx,
+                    commandActor(context("ADMIN")),
                     capability,
-                    true,
-                    ["ALL"],
-                    undefined,
-                    [systemRoleGrant(capability)],
                 ),
-            );
-
-            const result = await resolveStockCapabilityInTransaction(
-                tx,
-                commandActor(context("ADMIN")),
-                capability,
-            );
-
-            expect(result.scopes).toEqual(["ALL"]);
-            expect(result.defaultScopes).toEqual([]);
-            expect(result.isAdministrative).toBe(true);
+            ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
             expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
-            expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
-                {
-                    userId: 7,
-                    employeeId: null,
-                    systemRole: "ADMIN",
-                    channel: "DASHBOARD",
-                },
-                capability,
-                tx,
-            );
+            expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
         },
     );
 

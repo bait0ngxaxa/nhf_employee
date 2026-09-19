@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
     getTasks: vi.fn(),
     createTask: vi.fn(),
 }));
@@ -12,7 +12,7 @@ vi.mock("@/lib/auth/api", () => ({
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
+    requireActiveWorkforceSession: mocks.requireActiveWorkforceSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
@@ -26,7 +26,7 @@ import { GET, POST } from "@/app/api/routines/tasks/route";
 describe("GET /api/routines/tasks active filter semantics", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
@@ -76,7 +76,7 @@ describe("GET /api/routines/tasks active filter semantics", () => {
     });
 
     it("passes a regular user's actor scope to the management query", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,
@@ -100,7 +100,7 @@ describe("GET /api/routines/tasks active filter semantics", () => {
 describe("POST /api/routines/tasks idempotency", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });

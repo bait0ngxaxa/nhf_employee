@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
     assertRoutineCapability,
     createRoutineCommandActor,
@@ -27,7 +27,7 @@ export async function PATCH(
     const sizeResponse = routineRequestSizeGuard(request);
     if (sizeResponse) return sizeResponse;
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
         const actor = createRoutineCommandActor({ id: auth.user.id, role: auth.user.role ?? "USER", email: auth.user.email ?? "" }, request.headers);
         await assertRoutineCapability(

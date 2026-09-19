@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-        requireActiveWorkforceOrAdminSession: vi.fn(),
+        requireActiveWorkforceSession: vi.fn(),
         deleteTask: vi.fn(),
         getTask: vi.fn(),
         updateTask: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock("@/lib/auth/api", () => ({
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
+    requireActiveWorkforceSession: mocks.requireActiveWorkforceSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
@@ -33,7 +33,7 @@ import { RoutineNotFoundError } from "@/modules/routine";
 describe("DELETE /api/routines/tasks/:id", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
@@ -47,7 +47,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
     });
 
     it("allows a current master assignee to fetch the task detail", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,
@@ -69,7 +69,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
     });
 
     it("returns not found when an active workforce user fetches an unrelated task detail", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 6, email: "other@example.com", role: "USER" },
             employeeId: 42,
@@ -92,7 +92,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
     });
 
     it("passes an authorized assignee PATCH to the service with the authenticated actor", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,
@@ -116,7 +116,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
     });
 
     it("passes a direct PATCH carrying lifecycle input to the backend service", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,
@@ -144,7 +144,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
     });
 
     it("returns the service denial for an unrelated employee instead of trusting UI capabilities", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 6, email: "other@example.com", role: "USER" },
             employeeId: 42,
@@ -179,7 +179,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
     });
 
     it("does not invoke deletion for a non-admin session", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: false,
             response: NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 }),
         });
@@ -194,7 +194,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
     });
 
     it("allows an active workforce user to request deletion", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,

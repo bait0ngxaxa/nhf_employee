@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
-    composeLegacyAdminCompatibleAuthorizationAuthority,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationChannel,
     type AuthorizationDecision,
@@ -137,7 +137,7 @@ function buildLeaveCapabilityAuthorization(
         );
     }
 
-    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
         defaultLeaveScopes(actor, capability),
@@ -327,86 +327,62 @@ interface ActiveLeaveAuthorizationUser {
         readonly id: number;
         readonly status: string;
         readonly deletedAt: Date | null;
-    } | null;
+    };
 }
 
 async function findActiveLeaveAuthorizationUser(
     tx: Prisma.TransactionClient,
     requestedActor: LeaveAuthorizationActor,
-    allowAccountOnlyAdminApproverManagement = false,
 ): Promise<ActiveLeaveAuthorizationUser> {
-    const isAccountOnlyAdminApproverManagement =
-        allowAccountOnlyAdminApproverManagement
-        && requestedActor.channel === "DASHBOARD"
-        && requestedActor.systemRole === "ADMIN"
-        && requestedActor.employeeId === null;
-
-    if (requestedActor.employeeId === null && !isAccountOnlyAdminApproverManagement) {
+    if (requestedActor.employeeId === null) {
         throw new WorkforceAuthorizationError();
     }
 
     await lockUserRows(tx, [requestedActor.userId]);
-    if (requestedActor.employeeId !== null) {
-        await lockEmployeeRows(tx, [requestedActor.employeeId]);
-    }
+    await lockEmployeeRows(tx, [requestedActor.employeeId]);
 
-    const user = requestedActor.employeeId === null
-        ? await tx.user.findFirst({
-            where: {
-                id: requestedActor.userId,
-                role: "ADMIN",
-                isActive: true,
-                deletedAt: null,
+    const user = await tx.user.findFirst({
+        where: {
+            id: requestedActor.userId,
+            isActive: true,
+            deletedAt: null,
+            employeeId: requestedActor.employeeId,
+            employee: {
+                is: { status: "ACTIVE", deletedAt: null },
             },
-            select: {
-                id: true,
-                role: true,
-                isActive: true,
-                deletedAt: true,
-                employee: {
-                    select: { id: true, status: true, deletedAt: true },
-                },
+        },
+        select: {
+            id: true,
+            role: true,
+            isActive: true,
+            deletedAt: true,
+            employee: {
+                select: { id: true, status: true, deletedAt: true },
             },
-        })
-        : await tx.user.findFirst({
-            where: {
-                id: requestedActor.userId,
-                isActive: true,
-                deletedAt: null,
-                employeeId: requestedActor.employeeId,
-                employee: {
-                    is: { status: "ACTIVE", deletedAt: null },
-                },
-            },
-            select: {
-                id: true,
-                role: true,
-                isActive: true,
-                deletedAt: true,
-                employee: {
-                    select: { id: true, status: true, deletedAt: true },
-                },
-            },
-        });
+        },
+    });
 
     if (!user || !user.isActive || user.deletedAt !== null) {
         throw new WorkforceAuthorizationError();
     }
 
-    const currentRole = parseUserRole(user.role);
-    if (isAccountOnlyAdminApproverManagement && currentRole !== "ADMIN") {
-        throw new WorkforceAuthorizationError();
-    }
-    if (requestedActor.employeeId !== null && (
-        user.employee === null
-        || user.employee.id !== requestedActor.employeeId
-        || user.employee.status !== "ACTIVE"
-        || user.employee.deletedAt !== null
-    )) {
+    const employee = user.employee;
+    if (
+        employee === null
+        || employee.id !== requestedActor.employeeId
+        || employee.status !== "ACTIVE"
+        || employee.deletedAt !== null
+    ) {
         throw new WorkforceAuthorizationError();
     }
 
-    return user;
+    return {
+        id: user.id,
+        role: user.role,
+        isActive: user.isActive,
+        deletedAt: user.deletedAt,
+        employee,
+    };
 }
 
 function buildCurrentLeaveAuthorizationActor(
@@ -415,7 +391,7 @@ function buildCurrentLeaveAuthorizationActor(
 ): LeaveAuthorizationActor {
     return buildLeaveAuthorizationActor(
         { id: user.id, role: parseUserRole(user.role) },
-        user.employee?.id ?? null,
+        user.employee.id,
         requestedActor.channel,
     );
 }
@@ -435,13 +411,7 @@ export async function resolveLeaveCapabilityInTransaction(
     capability: string,
 ): Promise<LeaveCapabilityAuthorization> {
     const requestedActor = context.authorizationActor;
-    const allowAccountOnlyAdminApproverManagement =
-        capability === "leave.approver.manage";
-    const user = await findActiveLeaveAuthorizationUser(
-        tx,
-        requestedActor,
-        allowAccountOnlyAdminApproverManagement,
-    );
+    const user = await findActiveLeaveAuthorizationUser(tx, requestedActor);
     const activeActor = buildCurrentLeaveAuthorizationActor(
         requestedActor,
         user,

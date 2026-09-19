@@ -1,5 +1,12 @@
 # Authorization presentation capability projections
 
+> **Current repository state (Phase 12H-G):** normal presentation and
+> effective-access projections use the same role-neutral configured resolver
+> and domain composition as server enforcement. An ADMIN identity alone does
+> not create business presentation capabilities. The older phase sections
+> below remain historical boundary records; the current cutover evidence is in
+> [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
+
 Phase 12H-A target note: these projection records describe current/historical
 presentation behavior and do not make the role-neutral target runtime live.
 Presentation visibility is never authority. The future ADMIN target and
@@ -629,3 +636,17 @@ production surface, and Email Request was intentionally deferred at that
 historical boundary. Phase 12H-F now records its capability-based presentation
 closure, while Phase 12C.3 records the permanent Routine presentation
 composition.
+
+## Phase 12H-G current projection semantics
+
+The earlier phase sections remain historical records. Current normal
+presentation/effective-access projections resolve through the production
+role-neutral configured resolver and the same domain composition used by
+server enforcement. ADMIN identity alone does not project central-only
+business surfaces; equivalent configured USER and ADMIN actors project
+equivalent access. Authorization Administration remains a separate ADMIN-only
+control-plane projection, and role-based Routine/Stock recipient policies
+remain domain recipient policy rather than current-actor authority.
+
+The full projection, route, lifecycle, and security regression record is in
+[authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).

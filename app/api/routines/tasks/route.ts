@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { createRoutineCommandActor } from "@/modules/routine";
 import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (featureResponse) return featureResponse;
 
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
         const actor = createRoutineCommandActor(
             {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (sizeResponse) return sizeResponse;
 
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
         const idempotencyKey = idempotencyKeySchema.safeParse(
             request.headers.get("idempotency-key"),

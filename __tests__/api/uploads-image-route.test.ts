@@ -5,14 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as StockModule from "@/modules/stock";
 
 const mocks = vi.hoisted(() => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
     assertStockCapability: vi.fn(),
     saveLocalImageUpload: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession:
-        mocks.requireActiveWorkforceOrAdminSession,
+    requireActiveWorkforceSession:
+        mocks.requireActiveWorkforceSession,
 }));
 
 vi.mock("@/lib/uploads/local", () => ({
@@ -71,13 +71,13 @@ function deniedCapability(): StockCapabilityDeniedError {
 describe("POST /api/uploads/image", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(AUTH);
+        mocks.requireActiveWorkforceSession.mockResolvedValue(AUTH);
         mocks.assertStockCapability.mockResolvedValue(undefined);
         mocks.saveLocalImageUpload.mockResolvedValue(UPLOAD);
     });
 
     it("authenticates before parsing multipart data or writing a file", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: false,
             response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
         });
@@ -122,13 +122,13 @@ describe("POST /api/uploads/image", () => {
         const response = await POST(buildRequest("item", buildFile()));
 
         expect(response.status).toBe(403);
-        expect(mocks.requireActiveWorkforceOrAdminSession).toHaveBeenCalledTimes(2);
+        expect(mocks.requireActiveWorkforceSession).toHaveBeenCalledTimes(2);
         expect(mocks.assertStockCapability).toHaveBeenCalledTimes(2);
         expect(mocks.saveLocalImageUpload).not.toHaveBeenCalled();
     });
 
     it("does not let an Admin session bypass the central inventory capability", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(ADMIN_AUTH);
+        mocks.requireActiveWorkforceSession.mockResolvedValue(ADMIN_AUTH);
         mocks.assertStockCapability.mockRejectedValue(deniedCapability());
 
         const response = await POST(buildRequest("item", buildFile()));
@@ -142,7 +142,7 @@ describe("POST /api/uploads/image", () => {
         const response = await POST(buildRequest("variant", file));
 
         expect(response.status).toBe(200);
-        expect(mocks.requireActiveWorkforceOrAdminSession).toHaveBeenCalledTimes(2);
+        expect(mocks.requireActiveWorkforceSession).toHaveBeenCalledTimes(2);
         expect(mocks.assertStockCapability).toHaveBeenCalledTimes(2);
         expect(mocks.saveLocalImageUpload).toHaveBeenCalledWith({
             scope: "variant",

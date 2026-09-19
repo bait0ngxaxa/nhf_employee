@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import type * as StockModule from "@/modules/stock";
 import { GET as stockReportsExportRoute } from "@/app/api/stock/reports/export/route";
 import { getApiAuthSession } from "@/lib/auth/server";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     createStockBalanceReportXlsxResponse,
@@ -27,7 +27,7 @@ vi.mock("@/lib/ssot/permissions", () => ({
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
 }));
 
 vi.mock("@/modules/stock", async () => {
@@ -52,7 +52,7 @@ describe("GET /api/stock/reports/export", () => {
             user: { id: "1", email: "admin@test.com", role: "ADMIN" },
         } as never);
         vi.mocked(isAdminRole).mockReturnValue(true);
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             user: {
                 id: 1,
@@ -152,7 +152,7 @@ describe("GET /api/stock/reports/export", () => {
     });
 
     it("denies a normal USER without the report grant", async () => {
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             user: {
                 id: 2,
@@ -177,7 +177,7 @@ describe("GET /api/stock/reports/export", () => {
     });
 
     it("allows an explicitly granted USER to export a report", async () => {
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             user: {
                 id: 2,

@@ -185,7 +185,7 @@ describe("Routine presentation capability projection", () => {
         });
     });
 
-    it("projects Dashboard ADMIN authorization without applying the LIFF clamp", async () => {
+    it("projects configured Dashboard ADMIN authority without applying the LIFF clamp", async () => {
         mockResolveMany((capability) => ({
             capability,
             allowed: true,
@@ -193,7 +193,7 @@ describe("Routine presentation capability projection", () => {
             grants: [{
                 capability: capability as EffectiveAuthorizationGrant["capability"],
                 scope: "ALL",
-                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                source: { type: "USER", userId: 7 },
             }],
         }));
 

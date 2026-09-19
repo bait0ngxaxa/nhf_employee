@@ -107,7 +107,7 @@ const mocks = vi.hoisted(() => {
         adjustStock: vi.fn(),
         prisma,
         processOutbox: vi.fn(),
-        requireActiveWorkforceOrAdminSession: vi.fn(),
+        requireActiveWorkforceSession: vi.fn(),
         requireLiffWorkforceSession: vi.fn(),
     };
 });
@@ -121,8 +121,8 @@ vi.mock("next/server", async (importOriginal) => {
 });
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession:
-        mocks.requireActiveWorkforceOrAdminSession,
+    requireActiveWorkforceSession:
+        mocks.requireActiveWorkforceSession,
 }));
 
 vi.mock("@/modules/line", () => ({
@@ -400,7 +400,7 @@ describe("Phase 11C.2C.2 exact Stock and Leave route authorization", () => {
         vi.clearAllMocks();
         mocks.authState.userGrants = [];
 
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue(
+        mocks.requireActiveWorkforceSession.mockResolvedValue(
             DASHBOARD_AUTH,
         );
         mocks.requireLiffWorkforceSession.mockResolvedValue(LIFF_USER_AUTH);
@@ -725,8 +725,9 @@ describe("Phase 11C.2C.2 exact Stock and Leave route authorization", () => {
             mocks.authorizationResolveInTransaction,
             {
                 capability: "leave.request.not_taken",
-                allowed: true,
-                scopes: ["OWN", "ASSIGNED"],
+                allowed: false,
+                scopes: [],
+                reason: "NO_APPLICABLE_GRANT",
             },
         );
         expect(mocks.prisma.leaveRequest.findUnique).toHaveBeenCalledWith(

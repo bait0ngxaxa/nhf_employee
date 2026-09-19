@@ -48,6 +48,7 @@ export type {
 export {
     authorization,
     createAuthorizationResolver,
+    createLegacyAdminCompatibleAuthorizationResolver,
 } from "./application/resolver";
 export type {
     AuthorizationResolver,
@@ -71,8 +72,8 @@ export type {
 } from "./application/types";
 export { composeAuthorizationAuthority } from "./application/composition";
 /**
- * Temporary Phase 12H-B compatibility seam.
- * Production use ends at 12H-G; remove after Phase 12H-H acceptance in 12H-I.
+ * Phase 12H-H comparison-only compatibility seam. It has no production
+ * business callers and is scheduled for deletion in Phase 12H-I.
  */
 export {
     composeLegacyAdminCompatibleAuthorizationAuthority,

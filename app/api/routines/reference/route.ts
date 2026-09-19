@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { createRoutineCommandActor } from "@/modules/routine";
 import {
     routineErrorResponse,
@@ -12,7 +12,7 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     const featureResponse = routineFeatureGuard();
     if (featureResponse) return featureResponse;
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
         const actor = createRoutineCommandActor(
             {

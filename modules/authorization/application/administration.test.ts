@@ -436,7 +436,9 @@ describe("Authorization Administration capability catalog", () => {
             "routine.reference.read",
         ]) {
             expect(first.find((capability) => capability.key === key)).toMatchObject({
-                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                runtimeAuthorizationMode: key === "routine.task.export"
+                    ? "CENTRAL_ONLY"
+                    : "CENTRAL_WITH_DEFAULT_POLICY",
                 administrativeStatus: "GRANTABLE",
                 administrativelyGrantable: true,
             });
@@ -463,6 +465,7 @@ describe("Authorization Administration capability catalog", () => {
             "routine.occurrence.reassign",
             "routine.occurrence.change_due_date",
             "routine.import.manage",
+            "routine.task.export",
             "stock.inventory.manage",
             "stock.request.process",
             "stock.report.export",
@@ -488,7 +491,6 @@ describe("Authorization Administration capability catalog", () => {
             "routine.task.update",
             "routine.task.delete",
             "routine.occurrence.read",
-            "routine.task.export",
             "routine.summary.read",
             "routine.reference.read",
             "stock.catalog.read",
@@ -508,10 +510,10 @@ describe("Authorization Administration capability catalog", () => {
         expect(first).toHaveLength(41);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_ONLY",
-        )).toHaveLength(16);
+        )).toHaveLength(17);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
-        )).toHaveLength(25);
+        )).toHaveLength(24);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
         )).toHaveLength(0);
@@ -1049,7 +1051,7 @@ describe("Authorization Administration effective permission inspector", () => {
         expect(loadMany).toHaveBeenCalledTimes(1);
     });
 
-    it("uses the central ADMIN resolver source without consulting persisted grants", async () => {
+    it("does not manufacture ADMIN authority when persisted grants are empty", async () => {
         const repository = emptyRepository({
             findUserById: vi.fn(async () => ({
                 ...userRecord(),
@@ -1072,12 +1074,10 @@ describe("Authorization Administration effective permission inspector", () => {
         );
 
         expect(employeeRead).toMatchObject({
-            allowed: true,
-            scopes: ["ALL"],
-            grants: [{
-                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-                origin: { type: "SYSTEM_ROLE", role: "ADMIN" },
-            }],
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
         });
     });
 

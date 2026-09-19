@@ -268,7 +268,7 @@ describe("Stock Request Routes", () => {
             vi.mocked(prisma.user.findUnique).mockResolvedValue({
                 isActive: true,
                 deletedAt: null,
-                employee: null,
+                employee: { id: 10, status: "ACTIVE", deletedAt: null },
             } as never);
             vi.mocked(stockService.getRequests).mockResolvedValue({
                 requests: [],
@@ -909,7 +909,7 @@ describe("Stock Request Routes", () => {
             vi.mocked(prisma.user.findUnique).mockResolvedValue({
                 isActive: true,
                 deletedAt: null,
-                employee: null,
+                employee: { id: 10, status: "ACTIVE", deletedAt: null },
             } as never);
             vi.mocked(stockService.issueRequest).mockRejectedValue(
                 new WorkforceAuthorizationError(),

@@ -156,7 +156,28 @@ describe("NHF Routine mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         prismaMock.$queryRaw.mockResolvedValue(asNever([]));
-        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.userCapabilityGrant.findMany.mockImplementation(
+            (args?: Prisma.UserCapabilityGrantFindManyArgs) => {
+                const where = args?.where;
+                const userId = typeof where?.userId === "number"
+                    ? where.userId
+                    : null;
+                const capabilityKey = typeof where?.capabilityKey === "string"
+                    ? where.capabilityKey
+                    : null;
+                if (
+                    userId !== 99
+                    || capabilityKey === null
+                ) {
+                    return asNever([]);
+                }
+                return asNever([{
+                    userId: 99,
+                    capabilityKey,
+                    scope: "ALL",
+                }]);
+            },
+        );
         prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         prismaMock.auditLog.create.mockResolvedValue(asNever({ id: 1 }));
         prismaMock.routineOccurrence.updateMany.mockResolvedValue(
@@ -810,7 +831,7 @@ describe("NHF Routine mutations", () => {
             before: { unitName: "มสช.", categoryName: "อื่น ๆ" },
             after: { unitName: "มสช.", categoryName: "อื่น ๆ" },
             reminderRulesChanged: true,
-            authorizationSource: "ADMIN",
+            authorizationSource: "BROAD_AUTHORITY",
         });
         expect(display.summary).toContain("เปลี่ยนการแจ้งเตือน");
     });
@@ -1397,7 +1418,7 @@ describe("NHF Routine mutations", () => {
         ).toMatchObject({ isActive: false });
         const auditData = prismaMock.auditLog.create.mock.calls[0]?.[0]?.data;
         expect(JSON.parse(String(auditData?.details))).toMatchObject({
-            authorizationSource: "ADMIN",
+            authorizationSource: "BROAD_AUTHORITY",
         });
     });
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { saveLocalImageUpload } from "@/lib/uploads/local";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/modules/stock";
 
 async function authorizeImageUpload(): Promise<NextResponse | null> {
-    const auth = await requireActiveWorkforceOrAdminSession();
+    const auth = await requireActiveWorkforceSession();
     if (!auth.ok) return auth.response;
 
     try {

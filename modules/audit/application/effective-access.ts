@@ -1,5 +1,5 @@
 import {
-    composeLegacyAdminCompatibleAuthorizationAuthority,
+    composeAuthorizationAuthority,
     projectAuthorizationAdministrationEffectiveAccess,
     type AuthorizationActor,
     type AuthorizationAdministrationEffectiveAccessInspection,
@@ -31,7 +31,7 @@ export function inspectAuditEffectiveAccess(
     if (decision === undefined) {
         throw new Error(`Authorization resolver omitted Audit capability: ${capability}`);
     }
-    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
         [],

@@ -1,6 +1,6 @@
 import { after, type NextRequest } from "next/server";
 
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { logDataExport } from "@/lib/server/audit";
 import { jsonError } from "@/lib/ssot/http";
 import {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     if (featureResponse) return featureResponse;
 
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         if (request.nextUrl.searchParams.get("format") !== "xlsx") {

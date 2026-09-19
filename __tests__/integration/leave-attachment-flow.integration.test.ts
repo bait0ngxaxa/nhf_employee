@@ -44,7 +44,6 @@ vi.mock("next/server", async (importOriginal) => {
 
 vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: mocks.session,
-    requireActiveWorkforceOrAdminSession: mocks.session,
 }));
 
 vi.mock("@/modules/leave", async (importOriginal) => {
@@ -378,7 +377,7 @@ describe.sequential("leave attachment flow with real MySQL", () => {
         expect(outbox?.payload).not.toContain("storageKey");
     });
 
-    it("lets the owner, stored approver, and admin open evidence but not another employee", async () => {
+    it("lets participants open evidence but not another employee or admin", async () => {
         const result = await submit(createFiles(1));
         const attachmentId = result.body.data?.attachments?.[0]?.id;
         if (!attachmentId) {
@@ -401,12 +400,16 @@ describe.sequential("leave attachment flow with real MySQL", () => {
             "USER",
             fixture.outsiderEmployeeId,
         );
-        const adminResponse = await readAttachmentAs(fixture.adminUserId, "ADMIN");
+        const adminResponse = await readAttachmentAs(
+            fixture.adminUserId,
+            "ADMIN",
+            fixture.outsiderEmployeeId,
+        );
 
         expect(ownerResponse.status).toBe(200);
         expect(approverResponse.status).toBe(200);
         expect(outsiderResponse.status).toBe(404);
-        expect(adminResponse.status).toBe(200);
+        expect(adminResponse.status).toBe(404);
         expect(approverResponse.headers.get("Cache-Control")).toBe("private, no-store");
         expect(approverResponse.headers.get("Content-Disposition")).toBe("inline");
         expect(approverResponse.headers.get("X-Content-Type-Options")).toBe("nosniff");

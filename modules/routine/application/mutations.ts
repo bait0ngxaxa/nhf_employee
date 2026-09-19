@@ -129,6 +129,11 @@ type RoutineReminderRuleRecord = {
     isActive: boolean;
 };
 
+/**
+ * Historical audit/provenance classification only. This must never affect
+ * whether a mutation is allowed; production authority is resolved before
+ * this metadata is written.
+ */
 function hasHistoricalAdminProvenance(
     authorization: RoutineCapabilityAuthorization,
 ): boolean {

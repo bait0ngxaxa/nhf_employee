@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import {
     assertLeaveCapability,
@@ -21,7 +21,7 @@ export async function GET(): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) {
             return auth.response.status === 401 ? forbidden() : auth.response;
         }
@@ -56,7 +56,7 @@ export async function PUT(req: Request): Promise<NextResponse> {
             return notFound();
         }
 
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) {
             return auth.response.status === 401 ? forbidden() : auth.response;
         }

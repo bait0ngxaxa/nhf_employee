@@ -5,7 +5,6 @@ import { requireApiSession, type ApiAuthResult } from "@/lib/auth/api";
 import { prisma } from "@/lib/db/prisma";
 import { forbidden, jsonError, operationFailed } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import { isAdminRole } from "@/lib/ssot/permissions";
 import { getEmployeeDisplayName } from "@/modules/employee";
 
 type ResponseFactory = () => NextResponse;
@@ -118,27 +117,6 @@ export async function requireActiveWorkforceSession(
             response: options.employeeProfileNotFoundResponse?.()
                 ?? operationFailed(404),
         };
-    }
-    if (!isActiveEmployee(lookup.employee)) {
-        return { ok: false, response: forbidden() };
-    }
-
-    return {
-        ...applyEmployeeIdentity(lookup.auth, lookup.employee),
-        employeeId: lookup.employee.id,
-    };
-}
-
-export async function requireActiveWorkforceOrAdminSession(): Promise<
-    ActiveWorkforceSessionResult | ApiAuthSuccess
-> {
-    const lookup = await lookupWorkforceSession();
-    if (!lookup.ok) {
-        return lookup;
-    }
-
-    if (isAdminRole(lookup.auth.user.role)) {
-        return applyEmployeeIdentity(lookup.auth, lookup.employee);
     }
     if (!isActiveEmployee(lookup.employee)) {
         return { ok: false, response: forbidden() };

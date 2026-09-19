@@ -15,7 +15,7 @@ import type {
     CapabilityAdministrationProjection,
 } from "./administration-types";
 import {
-    createRoleNeutralAuthorizationResolver,
+    createAuthorizationResolver,
 } from "./resolver";
 import { normalizeAuthorizationScopes } from "./evaluator";
 import type {
@@ -1591,7 +1591,7 @@ function buildCanaryResolutionData(
 
 function createCanaryResolver(
     snapshot: AuthorizationProductionInventorySnapshot,
-): ReturnType<typeof createRoleNeutralAuthorizationResolver> {
+): ReturnType<typeof createAuthorizationResolver> {
     const repository: AuthorizationResolutionRepository = {
         async load({ userId, capabilityKey }): Promise<AuthorizationResolutionData> {
             return buildCanaryResolutionData(snapshot, userId, capabilityKey);
@@ -1600,7 +1600,7 @@ function createCanaryResolver(
             return buildCanaryResolutionData(snapshot, userId);
         },
     };
-    return createRoleNeutralAuthorizationResolver({ repository });
+    return createAuthorizationResolver({ repository });
 }
 
 function appendCanaryGrant(

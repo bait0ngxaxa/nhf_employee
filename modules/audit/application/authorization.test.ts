@@ -73,14 +73,14 @@ describe("Audit authorization migration adapter", () => {
         } satisfies AuthorizationActor);
     });
 
-    it("allows ADMIN only through the central resolver", async () => {
+    it("allows configured ADMIN authority through the central resolver", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "audit.read",
                 true,
                 ["ALL"],
                 undefined,
-                [grant("audit.read", { type: "SYSTEM_ROLE", role: "ADMIN" })],
+                [grant("audit.read", { type: "USER", userId: 7 })],
             ),
         );
 

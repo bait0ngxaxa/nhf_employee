@@ -130,15 +130,13 @@ export function createAuthorizationResolver(
 ): AuthorizationResolver {
     return createAuthorizationResolverWithStrategy(
         dependencies,
-        LEGACY_ADMIN_BUSINESS_AUTHORITY_COMPATIBILITY,
+        ROLE_NEUTRAL_CONFIGURED_RESOLUTION,
     );
 }
 
 /**
- * Internal Phase 12H-B target factory. It shares the production resolver
- * pipeline but always loads configured grants before role-neutral evaluation.
- * The default `authorization` singleton deliberately does not use it until
- * later phases rebaseline domain defaults and perform enforcement cutover.
+ * Explicit role-neutral alias for callers that want to name the authority
+ * model in migration and regression tests.
  */
 export function createRoleNeutralAuthorizationResolver(
     dependencies: AuthorizationResolverDependencies = {},
@@ -146,6 +144,22 @@ export function createRoleNeutralAuthorizationResolver(
     return createAuthorizationResolverWithStrategy(
         dependencies,
         ROLE_NEUTRAL_CONFIGURED_RESOLUTION,
+    );
+}
+
+/**
+ * Phase 12H-H comparison-only compatibility resolver.
+ *
+ * This factory is not a production business authorization path. It preserves
+ * the pre-cutover ADMIN/SystemRole semantics solely for snapshot comparison
+ * and rollout validation until Phase 12H-I removes the compatibility seam.
+ */
+export function createLegacyAdminCompatibleAuthorizationResolver(
+    dependencies: AuthorizationResolverDependencies = {},
+): AuthorizationResolver {
+    return createAuthorizationResolverWithStrategy(
+        dependencies,
+        LEGACY_ADMIN_BUSINESS_AUTHORITY_COMPATIBILITY,
     );
 }
 

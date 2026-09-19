@@ -1,5 +1,5 @@
 import { after, type NextRequest, NextResponse } from "next/server";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
@@ -31,7 +31,7 @@ export async function POST(
         );
         if (preAuthRateLimitResponse) return preAuthRateLimitResponse;
 
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const principalRateLimitResponse =

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
     getAuthorizedLeaveAttachmentForViewer,
     leaveAttachmentIdParamSchema,
@@ -8,7 +8,6 @@ import {
 } from "@/modules/leave";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { notFound, serverError } from "@/lib/ssot/http";
-import { isAdminRole } from "@/lib/ssot/permissions";
 
 interface AttachmentRouteContext {
     params: Promise<{ attachmentId: string }>;
@@ -42,7 +41,7 @@ export async function GET(
         return notFound();
     }
 
-    const auth = await requireActiveWorkforceOrAdminSession();
+    const auth = await requireActiveWorkforceSession();
     if (!auth.ok) {
         return auth.response;
     }
@@ -55,12 +54,10 @@ export async function GET(
     }
 
     try {
-        const employeeId = "employeeId" in auth ? auth.employeeId : undefined;
         const attachment = await getAuthorizedLeaveAttachmentForViewer(
             parsedAttachmentId.data,
             {
-                employeeId,
-                isAdmin: isAdminRole(auth.user.role),
+                employeeId: auth.employeeId,
             },
         );
 

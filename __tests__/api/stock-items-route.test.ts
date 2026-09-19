@@ -7,7 +7,7 @@ import {
 } from "@/app/api/stock/items/[id]/route";
 import { getApiAuthSession } from "@/lib/auth/server";
 import { buildUserContext } from "@/lib/auth/context";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import {
     stockService,
@@ -32,7 +32,7 @@ vi.mock("@/lib/ssot/permissions", () => ({
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
 }));
 
 vi.mock("@/modules/stock", async () => {
@@ -69,7 +69,7 @@ function mockAdmin(): void {
         name: "Admin",
     });
     vi.mocked(isAdminRole).mockReturnValue(true);
-    vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+    vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
         ok: true,
         user: {
             id: 1,
@@ -199,7 +199,7 @@ describe("Stock Item Routes", () => {
     });
 
     it("denies a normal USER without the inventory grant", async () => {
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             user: {
                 id: 2,
@@ -229,7 +229,7 @@ describe("Stock Item Routes", () => {
     });
 
     it("allows an explicitly granted USER to reach the inventory operation", async () => {
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             user: {
                 id: 2,

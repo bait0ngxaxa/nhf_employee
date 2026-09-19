@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import {
@@ -21,7 +21,7 @@ export async function PATCH(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const { id } = await params;
@@ -97,7 +97,7 @@ export async function DELETE(
     { params }: RouteParams,
 ): Promise<NextResponse> {
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
 
         const { id } = await params;

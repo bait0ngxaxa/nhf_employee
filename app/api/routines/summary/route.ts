@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { createRoutineCommandActor } from "@/modules/routine";
 import {
     routineErrorResponse,
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (featureResponse) return featureResponse;
 
     try {
-        const auth = await requireActiveWorkforceOrAdminSession();
+        const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
         const parsed = routineSummaryQuerySchema.safeParse({
             scope: request.nextUrl.searchParams.get("scope") ?? undefined,

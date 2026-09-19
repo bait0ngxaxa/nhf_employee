@@ -15,7 +15,7 @@ import {
 } from "./production-readiness";
 import { CAPABILITY_REGISTRY } from "../registry";
 import { buildCapabilityAdministrationCatalog } from "./administration-catalog";
-import { createRoleNeutralAuthorizationResolver } from "./resolver";
+import { createAuthorizationResolver } from "./resolver";
 import {
     authorizationAdministrationEffectiveAccessProvider,
 } from "@/app/api/authorization/administration/_lib/effective-access";
@@ -686,7 +686,7 @@ describe("authorization production readiness", () => {
             memberships: [],
             teamRoleGrants: [],
         };
-        const resolver = createRoleNeutralAuthorizationResolver({
+        const resolver = createAuthorizationResolver({
             repository: {
                 load: async () => emptyResolution,
                 loadMany: async () => emptyResolution,
@@ -695,6 +695,9 @@ describe("authorization production readiness", () => {
         const capabilityKeys = CAPABILITY_REGISTRY.definitions.map(
             ({ key }) => key,
         );
+        const centralOnlyCapabilityKeys = buildCapabilityAdministrationCatalog()
+            .filter(({ runtimeAuthorizationMode }) => runtimeAuthorizationMode === "CENTRAL_ONLY")
+            .map(({ key }) => key);
 
         const inspectRole = async (systemRole: "USER" | "ADMIN") => {
             const actor = {
@@ -707,6 +710,13 @@ describe("authorization production readiness", () => {
             expect([...decisions.values()].every((decision) =>
                 decision.grants.every((grant) => grant.source.type !== "SYSTEM_ROLE"),
             )).toBe(true);
+            for (const capabilityKey of centralOnlyCapabilityKeys) {
+                expect(decisions.get(capabilityKey)).toMatchObject({
+                    allowed: false,
+                    scopes: [],
+                    reason: "NO_APPLICABLE_GRANT",
+                });
+            }
 
             const inspections = await authorizationAdministrationEffectiveAccessProvider.inspect({
                 actor,

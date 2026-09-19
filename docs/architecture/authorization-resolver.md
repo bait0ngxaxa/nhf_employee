@@ -1,5 +1,14 @@
 # NHF Employee — Centralized Authorization Resolver
 
+> **Current repository state (Phase 12H-G):** the normal resolver factory and
+> `authorization` singleton use the role-neutral configured strategy. USER and
+> ADMIN load the same direct User, Team, and TeamRole persistence; ADMIN does
+> not manufacture ordinary business authority. The legacy resolver/evaluator
+> and composition wrapper are retained only for Phase 12H-H comparison and
+> Phase 12H-I deletion. Earlier current-target notes in this historical
+> document describe their original phase boundary and are not the live
+> enforcement state.
+
 Current-target note: Phase 12H-B implemented the role-neutral configured
 evaluator and composition primitive, and Phase 12H-C rebaselined the covered
 domain Default Domain Policies. The production-facing resolver singleton
@@ -75,10 +84,9 @@ const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
 
-Department, Notification, Employee, Routine, Stock, and Leave adapters currently
-compose through the explicit legacy ADMIN compatibility wrapper while production
-enforcement remains pre-12H. The role-neutral primitive itself has the same
-shape and is tested independently:
+Department, Notification, Employee, Routine, Stock, Leave, Audit, and Email
+Request adapters compose through the role-neutral primitive used by production
+enforcement:
 
 ```ts
 const configuredDecision = await authorization.resolve(actor, capability);
@@ -94,9 +102,8 @@ const authority = composeAuthorizationAuthority(
 Department, request, resource, workflow, or system-role dependency. It validates
 default scopes against the supplied code-owned registry, returns normalized
 effective scopes, and preserves configured grants separately from Default Domain
-Policy. Current adapters call
-`composeLegacyAdminCompatibleAuthorizationAuthority()` so removal of the
-primitive's former ADMIN branch does not cut over domain behavior in 12H-B.
+Policy. The legacy composition wrapper remains available only to the explicit
+Phase 12H-H comparison path and is scheduled for Phase 12H-I deletion.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -106,13 +113,13 @@ configuration or an unsupported resolver contract and is allowed to propagate
 from detailed resolution.
 
 `resolveMany()` returns a read-only map of decisions keyed by the requested
-capability. The role-neutral target factory loads one shared resolution snapshot
+capability. The normal production factory loads one shared resolution snapshot
 for both USER and ADMIN through `repository.loadMany()` and evaluates each
 capability against the relevant slice of that snapshot. Unknown capabilities
-and channel denials do not trigger persistence reads. The production-compatible
-factory intentionally retains the old ADMIN no-persistence behavior. Both paths
-preserve single-capability evaluator validation by isolating persisted grants
-per capability before evaluation.
+and channel denials do not trigger persistence reads. The explicitly named
+legacy comparison factory retains the old ADMIN no-persistence behavior only
+for Phase 12H-H snapshots. Both paths preserve single-capability evaluator
+validation by isolating persisted grants per capability before evaluation.
 
 For transaction-sensitive mutations, the public resolver also exposes
 `resolveInTransaction(actor, capability, persistenceContext)`. It uses the
@@ -121,12 +128,13 @@ reading authorization persistence through the supplied transaction context.
 The context is a narrow composition seam; the raw evaluator and persistence
 adapter remain private.
 
-The module exposes `createAuthorizationResolver()` for the current compatible
-registry/persistence-port seam. The application-internal
-`createRoleNeutralAuthorizationResolver()` uses the same dependencies and
-pipeline for the target path. The default `authorization` instance uses the
-code-owned `CAPABILITY_REGISTRY` and the internal Prisma resolution adapter.
-Raw Prisma delegates and the adapter are not part of the public module API.
+The module exposes `createAuthorizationResolver()` and the `authorization`
+singleton for the production role-neutral registry/persistence-port seam.
+`createRoleNeutralAuthorizationResolver()` remains an explicit alias, while
+`createLegacyAdminCompatibleAuthorizationResolver()` is comparison-only and
+scheduled for Phase 12H-I deletion. The default instance uses the code-owned
+`CAPABILITY_REGISTRY` and the internal Prisma resolution adapter. Raw Prisma
+delegates and the adapter are not part of the public module API.
 
 ## Decision and grant contracts
 
@@ -374,3 +382,23 @@ lifecycle are documented in
 Routine deferred capability migration is recorded in
 [authorization-phase-12d-routine-deferred-migration.md](./authorization-phase-12d-routine-deferred-migration.md);
 the pilot remains the historical record of the earlier deferred boundaries.
+
+## Phase 12H-G production cutover
+
+The previous phase-boundary notes in this document are historical. The live
+repository semantics are now:
+
+- `createAuthorizationResolver()` and `authorization` use the role-neutral
+  configured evaluator and load persistence for USER and ADMIN alike;
+- normal adapters use `composeAuthorizationAuthority()` and retain default
+  policy, configured source, Team origin, channel, and fail-closed semantics;
+- `createLegacyAdminCompatibleAuthorizationResolver()`,
+  `evaluateLegacyAuthorization()`, and
+  `composeLegacyAdminCompatibleAuthorizationAuthority()` are comparison-only
+  Phase 12H-H debt scheduled for Phase 12H-I deletion; and
+- the resolver does not infer authority from `systemRole`, Team name, Role
+  name, Department, or an implicit ADMIN bundle.
+
+The production resolver/evaluator/composition regression and the remaining
+comparison debt are recorded in
+[authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).

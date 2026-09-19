@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
-    composeLegacyAdminCompatibleAuthorizationAuthority,
+    composeAuthorizationAuthority,
     createUnsupportedAuthorizationAdministrationInspection,
     projectAuthorizationAdministrationEffectiveAccess,
     type AuthorizationActor,
@@ -205,7 +205,7 @@ function applyRoutineChannelPolicy(
     capability: RoutineCapability,
     options: RoutineCapabilityOptions,
     composedAuthority: ReturnType<
-        typeof composeLegacyAdminCompatibleAuthorizationAuthority
+        typeof composeAuthorizationAuthority
     >,
 ): {
     scopes: readonly AuthorizationScope[];
@@ -336,7 +336,7 @@ function inspectRoutineCapability(
     limitations: readonly AuthorizationAdministrationEffectiveAccessLimitation[],
 ): AuthorizationAdministrationEffectiveAccessInspection {
     const decision = getRoutineInspectionDecision(decisions, capability);
-    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
         defaultRoutineScopes(actor, capability, options),
@@ -546,7 +546,7 @@ function buildRoutineCapabilityAuthorization(
     decision: AuthorizationDecision,
     options: RoutineCapabilityOptions,
 ): RoutineCapabilityAuthorization {
-    const composedAuthority = composeLegacyAdminCompatibleAuthorizationAuthority(
+    const composedAuthority = composeAuthorizationAuthority(
         actor,
         capability,
         defaultRoutineScopes(actor, capability, options),
@@ -816,23 +816,6 @@ export async function assertActiveRoutineActorInTransaction(
     const user = await findActiveUser(tx, actor.id);
     if (!user || !user.isActive || user.deletedAt !== null) {
         throw new RoutineForbiddenError("บัญชีผู้ใช้ไม่พร้อมดำเนินการ");
-    }
-
-    const systemRole = parseUserRole(user.role);
-    const isDashboardAdmin = systemRole === "ADMIN"
-        && actor.mode !== "LIFF_SELF_SERVICE";
-    if (isDashboardAdmin) {
-        if (user.employee && !isActiveEmployee(user.employee)) {
-            throw new RoutineForbiddenError("บัญชีผู้ดูแลระบบไม่พร้อมดำเนินการ");
-        }
-        return {
-            authorizationActor: buildRoutineAuthorizationActor(
-                actor,
-                user.employee?.id ?? null,
-                user.role,
-            ),
-            employeeId: user.employee?.id ?? null,
-        };
     }
 
     if (!isActiveEmployee(user.employee)) {

@@ -1,7 +1,7 @@
 import {
     authorization,
     CAPABILITY_REGISTRY,
-    composeLegacyAdminCompatibleAuthorizationAuthority,
+    composeAuthorizationAuthority,
     AuthorizationConfigurationError,
     type AuthorizationActor,
     projectAuthorizationAdministrationEffectiveAccess,
@@ -128,7 +128,7 @@ function composeEmailRequestCapabilityAuthorization(
         }
     }
 
-    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
         defaultEmailRequestScopes(actor, capability),
@@ -285,7 +285,7 @@ export function inspectEmailRequestEffectiveAccess(
             );
         }
 
-        const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
+        const authority = composeAuthorizationAuthority(
             dashboardActor,
             capability,
             defaultEmailRequestScopes(dashboardActor, capability),

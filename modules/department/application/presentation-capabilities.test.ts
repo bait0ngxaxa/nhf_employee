@@ -111,7 +111,7 @@ describe("Department presentation capability projection", () => {
         ).resolves.toEqual({ canReadDepartments: true });
     });
 
-    it("projects ADMIN through central SYSTEM_ROLE authority", async () => {
+    it("projects ADMIN through configured authority", async () => {
         const admin = buildDepartmentAuthorizationContext(
             { id: 7, role: "ADMIN" },
             21,
@@ -121,7 +121,7 @@ describe("Department presentation capability projection", () => {
             true,
             ["ALL"],
             undefined,
-            [grant({ type: "SYSTEM_ROLE", role: "ADMIN" })],
+            [grant({ type: "USER", userId: 7 })],
         ));
 
         await expect(

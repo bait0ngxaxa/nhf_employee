@@ -1,6 +1,6 @@
 import {
     authorization,
-    composeLegacyAdminCompatibleAuthorizationAuthority,
+    composeAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationDecision,
     type AuthorizationScope,
@@ -135,7 +135,7 @@ function composeNotificationCapabilityAuthorization(
         );
     }
 
-    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
+    const authority = composeAuthorizationAuthority(
         actor,
         capability,
         defaultNotificationScopes(capability),

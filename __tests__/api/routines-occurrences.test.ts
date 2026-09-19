@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: mocks.requireSession,
+    requireActiveWorkforceSession: mocks.requireSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({

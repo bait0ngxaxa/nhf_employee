@@ -1,8 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET, PUT } from "@/app/api/leave/approvers/route";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import {
     ApproverAssignmentError,
@@ -16,7 +16,7 @@ const authorizationMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
 }));
 vi.mock("@/modules/authorization", async (importOriginal) => {
     const actual = await importOriginal<typeof AuthorizationModule>();
@@ -101,7 +101,7 @@ describe("GET /api/leave/approvers", () => {
         authorizationMocks.resolve.mockImplementation(
             async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
         );
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "1", role: "ADMIN" } },
             user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
@@ -135,16 +135,15 @@ describe("GET /api/leave/approvers", () => {
         ]);
     });
 
-    it("allows an active Dashboard Admin account without an Employee profile", async () => {
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
-            ok: true,
-            session: { user: { id: "1", role: "ADMIN" } },
-            user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+    it("rejects a Dashboard Admin without an active Employee profile", async () => {
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
+            ok: false,
+            response: NextResponse.json({ error: "Not found" }, { status: 404 }),
         });
 
         const response = await GET();
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(404);
     });
 });
 
@@ -154,7 +153,7 @@ describe("PUT /api/leave/approvers", () => {
         authorizationMocks.resolve.mockImplementation(
             async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
         );
-        vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
             ok: true,
             session: { user: { id: "1", role: "ADMIN" } },
             user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },

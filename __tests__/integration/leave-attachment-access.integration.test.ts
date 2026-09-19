@@ -14,13 +14,13 @@ import {
 } from "vitest";
 
 import { GET } from "@/app/api/leave/attachments/[attachmentId]/route";
-import { requireActiveWorkforceOrAdminSession } from "@/lib/auth/workforce";
+import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { prisma } from "@/lib/db/prisma";
 import { readLeaveAttachment } from "@/modules/leave";
 import type * as LeaveModule from "@/modules/leave";
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
 }));
 
 vi.mock("@/modules/leave", async (importOriginal) => {
@@ -158,7 +158,7 @@ async function createFixture(): Promise<Fixture> {
 }
 
 function mockWorkforce(employeeId: number): void {
-    vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+    vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
         ok: true,
         session: { user: { id: "1", role: "USER" } },
         user: {
@@ -171,8 +171,8 @@ function mockWorkforce(employeeId: number): void {
     });
 }
 
-function mockAdmin(): void {
-    vi.mocked(requireActiveWorkforceOrAdminSession).mockResolvedValue({
+function mockAdmin(employeeId: number): void {
+    vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
         ok: true,
         session: { user: { id: "1", role: "ADMIN" } },
         user: {
@@ -181,6 +181,7 @@ function mockAdmin(): void {
             email: "admin@integration.test",
             name: "Admin",
         },
+        employeeId,
     });
 }
 
@@ -224,14 +225,14 @@ describe.sequential("leave attachment access with real MySQL", () => {
         expect(approverResponse.status).toBe(200);
     });
 
-    it("authorizes an admin and conceals the record from another employee", async () => {
-        mockAdmin();
+    it("conceals the record from another employee and an admin", async () => {
+        mockAdmin(fixture.outsiderId);
         const adminResponse = await requestAttachment(fixture.attachmentId);
 
         mockWorkforce(fixture.outsiderId);
         const outsiderResponse = await requestAttachment(fixture.attachmentId);
 
-        expect(adminResponse.status).toBe(200);
+        expect(adminResponse.status).toBe(404);
         expect(outsiderResponse.status).toBe(404);
     });
 });

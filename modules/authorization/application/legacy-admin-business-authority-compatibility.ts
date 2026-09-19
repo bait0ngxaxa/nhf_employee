@@ -70,13 +70,11 @@ export function shouldLoadLegacyAuthorizationPersistence(
 }
 
 /**
- * Keep current production adapters on their pre-12H ADMIN projection while
- * the shared composition primitive remains permanently role-neutral.
- *
- * The wrapper only applies to a resolver decision that explicitly contains
- * the temporary SYSTEM_ROLE grant. It delegates the actual union, validation,
- * normalization, provenance, and fail-closed behavior to the role-neutral
- * composition primitive.
+ * Phase 12H-H comparison-only composition for the pre-cutover ADMIN
+ * projection. No production adapter calls this wrapper after Phase 12H-G;
+ * it remains solely for snapshot comparison and is deleted in Phase 12H-I.
+ * The wrapper delegates union, validation, normalization, provenance, and
+ * fail-closed behavior to the role-neutral composition primitive.
  */
 export function composeLegacyAdminCompatibleAuthorizationAuthority(
     actor: AuthorizationActor,

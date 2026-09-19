@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-    requireActiveWorkforceOrAdminSession: vi.fn(),
+    requireActiveWorkforceSession: vi.fn(),
     assertRoutineCapability: vi.fn(),
     getOccurrence: vi.fn(),
     updateDueDate: vi.fn(),
@@ -45,7 +45,7 @@ const committedOccurrence = {
 };
 
 vi.mock("@/lib/auth/workforce", () => ({
-    requireActiveWorkforceOrAdminSession: mocks.requireActiveWorkforceOrAdminSession,
+    requireActiveWorkforceSession: mocks.requireActiveWorkforceSession,
 }));
 
 vi.mock("@/modules/routine", async (importOriginal) => ({
@@ -62,7 +62,7 @@ import { PATCH as patchDueDate } from "@/app/api/routines/occurrences/[id]/due-d
 describe("legacy Routine occurrence mutation routes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 99, email: "admin@example.com", role: "ADMIN" },
         });
@@ -144,7 +144,7 @@ describe("legacy Routine occurrence mutation routes", () => {
     });
 
     it("returns the committed due-date mutation without requiring occurrence read access", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,
@@ -177,7 +177,7 @@ describe("legacy Routine occurrence mutation routes", () => {
     });
 
     it("returns the committed reassignment without requiring occurrence read access", async () => {
-        mocks.requireActiveWorkforceOrAdminSession.mockResolvedValue({
+        mocks.requireActiveWorkforceSession.mockResolvedValue({
             ok: true,
             user: { id: 5, email: "user@example.com", role: "USER" },
             employeeId: 21,

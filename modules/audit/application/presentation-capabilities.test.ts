@@ -73,13 +73,13 @@ describe("Audit presentation capability projection", () => {
         ));
     });
 
-    it("uses central ADMIN authority rather than a local role compatibility floor", async () => {
+    it("uses configured ADMIN authority rather than a local role compatibility floor", async () => {
         mockDecision((capability) => decision(
             capability,
             true,
             ["ALL"],
             undefined,
-            [grant({ type: "SYSTEM_ROLE", role: "ADMIN" })],
+            [grant({ type: "USER", userId: 7 })],
         ));
 
         await expect(

@@ -40,9 +40,9 @@ const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.fre
  * composes a permanent normal-user default with central configured authority.
  * CENTRAL_WITH_COMPATIBILITY remains as a historical/future-safe contract for
  * adapters that may translate NO_APPLICABLE_GRANT through temporary migration
- * mechanics; the current registry has no entry using it after Phase 12D. An
- * ADMIN-only legacy branch does not qualify: ADMIN is already resolved by the
- * central system-role rule.
+ * mechanics; the current registry has no entry using it after Phase 12D. A
+ * legacy ADMIN-only branch does not qualify: Phase 12H-G production
+ * resolution is role-neutral, so this metadata describes only policy shape.
  *
  * Keep this map exhaustive: a newly registered capability must receive an
  * explicit administration decision before it can be presented as grantable.
@@ -68,7 +68,7 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "routine.occurrence.reassign": CENTRAL_ONLY,
     "routine.occurrence.change_due_date": CENTRAL_ONLY,
     "routine.import.manage": CENTRAL_ONLY,
-    "routine.task.export": CENTRAL_WITH_DEFAULT_POLICY,
+    "routine.task.export": CENTRAL_ONLY,
     "routine.summary.read": CENTRAL_WITH_DEFAULT_POLICY,
     "routine.reference.read": CENTRAL_WITH_DEFAULT_POLICY,
 
