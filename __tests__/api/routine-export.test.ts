@@ -66,7 +66,7 @@ describe("GET /api/routines/export", () => {
         expect(mocks.prepareExport).not.toHaveBeenCalled();
     });
 
-    it("exports all tasks for a non-admin and audits the authenticated actor", async () => {
+    it("delegates an authenticated USER export and audits the authenticated actor", async () => {
         const response = await GET(
             new NextRequest("http://localhost/api/routines/export?format=xlsx"),
         );

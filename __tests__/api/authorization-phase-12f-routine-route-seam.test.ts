@@ -515,6 +515,26 @@ describe("Phase 12F direct migrated route seams", () => {
         );
     });
 
+    it("denies a no-grant Dashboard USER export before querying task data", async () => {
+        const response = await getRoutineExport(
+            request("/api/routines/export?format=xlsx"),
+        );
+
+        expect(response.status).toBe(403);
+        expect(mocks.authorizationResolve).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: USER.id,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            }),
+            "routine.task.export",
+        );
+        expect(mocks.prisma.routineTask.count).not.toHaveBeenCalled();
+        expect(mocks.prisma.routineTask.findMany).not.toHaveBeenCalled();
+        expect(mocks.logDataExport).not.toHaveBeenCalled();
+    });
+
     it("proves Dashboard summary reaches the real Routine resolver", async () => {
         await expectDirectConfigurationBoundary(
             "routine.summary.read",

@@ -531,26 +531,54 @@ function buildRoutineTaskReadWhere(
     employeeId: number | null,
     authorization: RoutineCapabilityAuthorization,
 ): Prisma.RoutineTaskWhereInput {
-    const mineScopes = authorization.scopes.includes("ALL")
+    const hasAllScope = authorization.scopes.includes("ALL");
+    const mineScopes = hasAllScope
         ? ["ASSIGNED"] as const
         : authorization.scopes;
-    const ownershipWhere = filters.scope !== "all"
+    const authorizationWhere = filters.scope !== "all"
         ? buildRoutineTaskScope(
               actorId,
               employeeId,
               mineScopes,
           )
-        : authorization.scopes.includes("ALL")
-            ? buildTaskAssigneeWhere(filters, employeeId)
+        : hasAllScope
+            ? {}
             : buildRoutineTaskScope(
                   actorId,
                   employeeId,
                   authorization.scopes,
               );
+    const metadataWhere = buildTaskMetadataWhere(filters);
+
+    if (filters.scope !== "all" || filters.assigneeId === undefined) {
+        return {
+            ...metadataWhere,
+            ...authorizationWhere,
+        };
+    }
+
+    const requestedAssigneeWhere = buildTaskAssigneeWhere(filters, employeeId);
+    const { AND: metadataAnd, ...metadataWithoutAnd } = metadataWhere;
+    const metadataPredicates = Array.isArray(metadataAnd)
+        ? metadataAnd
+        : metadataAnd
+            ? [metadataAnd]
+            : [];
+
+    if (hasAllScope && metadataAnd === undefined) {
+        return {
+            ...metadataWhere,
+            ...requestedAssigneeWhere,
+        };
+    }
 
     return {
-        ...buildTaskMetadataWhere(filters),
-        ...ownershipWhere,
+        ...metadataWithoutAnd,
+        AND: [
+            ...metadataPredicates,
+            ...(hasAllScope ? [] : [authorizationWhere]),
+            requestedAssigneeWhere,
+        ],
     };
 }
 

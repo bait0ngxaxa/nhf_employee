@@ -723,7 +723,31 @@ describe("NHF Routine query authorization", () => {
         ]);
     });
 
-    it("allows configured ALL to broaden a Dashboard task query", async () => {
+    it("preserves an assignee filter when relationship-constraining requested all-task scope", async () => {
+        await getRoutineTaskWorkItems(
+            { scope: "all", assigneeId: 999, page: 1, limit: 20 },
+            { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
+        );
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    isActive: true,
+                    AND: [
+                        {
+                            OR: [
+                                { createdById: 5 },
+                                { assignees: { some: { employeeId: 21 } } },
+                            ],
+                        },
+                        { assignees: { some: { employeeId: 999 } } },
+                    ],
+                },
+            }),
+        );
+    });
+
+    it("preserves an assignee filter when configured ALL broadens a Dashboard task query", async () => {
         resolveRoutineCapabilityMock.mockResolvedValueOnce({
             actor: {
                 userId: 5,
@@ -749,12 +773,17 @@ describe("NHF Routine query authorization", () => {
         });
 
         await getRoutineTaskWorkItems(
-            { scope: "all", page: 1, limit: 20 },
+            { scope: "all", assigneeId: 999, page: 1, limit: 20 },
             { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
         );
 
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { isActive: true } }),
+            expect.objectContaining({
+                where: {
+                    isActive: true,
+                    assignees: { some: { employeeId: 999 } },
+                },
+            }),
         );
     });
 

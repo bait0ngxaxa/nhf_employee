@@ -50,6 +50,7 @@ Routine is the material behavior change in this phase:
 3. `routine.task.export` no longer has a default. A normal actor without configured `routine.task.export / ALL` is denied. Configured `ALL` continues through the existing export path and preserves active-task rules, row limits, batching, format and field behavior, data minimization, and audit behavior.
 4. `routine.reference.read` keeps default `OWN`. Configured `ALL` can broaden the Dashboard reference surface, while the LIFF response remains minimized and self-service.
 5. LIFF self-service policy is channel-based rather than ADMIN-role-based. Equivalent USER and ADMIN LIFF actors receive the same self-service restriction, and configured `ALL` cannot bypass creator/active-task-assignee/active-occurrence-assignee access or turn LIFF into a Dashboard administrative surface.
+6. `routine.task.read` keeps a requested `assigneeId` as a query filter even when `scope=all` is narrowed to `CREATED` / `ASSIGNED`. The filter is ANDed with the authorization relationship predicate and never creates authority; configured `ALL` preserves the same filter behavior.
 
 Existing task/occurrence ownership, assignee, active-account, focus/deep-link, mutation, transaction, concurrency, notification, audit, and response-minimization rules remain domain-owned and unchanged except for the authority narrowing above.
 
@@ -86,7 +87,7 @@ also proves:
 - requested task `scope=all` does not manufacture `ALL` and remains query-constrained;
 - configured Routine `ALL` broadens Dashboard task and summary queries where supported;
 - summary omitted/default and explicit `all` behavior;
-- normal-user export denial without configured `ALL` and success with configured `ALL`;
+- normal-user export denial without configured `ALL` and success with configured `ALL`; the real Dashboard export route seam also returns `403` for a no-grant USER before querying task data;
 - legacy Dashboard ADMIN export compatibility remains active;
 - LIFF configured broad authority remains self-service constrained;
 - `UNKNOWN_CAPABILITY`, `CHANNEL_NOT_SUPPORTED`, and resolver/configuration failures remain fail-closed;
@@ -94,9 +95,8 @@ also proves:
 
 Executed verification:
 
-- Focused authorization/domain, Routine query, resolver/composition, and summary API tests: **11 files, 290 tests passed**.
-- Affected Routine presentation/effective-access/route-seam regression tests: **6 files, 120 tests passed**.
-- Broader repository suite: **325 files, 3,055 tests passed**.
+- Focused Routine authorization/query and export-route regression tests: **4 files, 181 tests passed**.
+- Broader repository suite: **325 files, 3,057 tests passed**.
 - `npm.cmd run typecheck`: **passed**.
 - `npm.cmd run lint:strict`: **passed**.
 - `npm.cmd run architecture:check`: **passed**.

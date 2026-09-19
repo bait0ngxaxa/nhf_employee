@@ -56,7 +56,7 @@ export interface RoutineCapabilityAuthorization {
     readonly actor: AuthorizationActor;
     readonly capability: RoutineCapability;
     readonly decision: AuthorizationDecision;
-    /** Permanent normal-user Default Domain Policy scopes before composition. */
+    /** Role-neutral Default Domain Policy scopes before composition. */
     readonly defaultScopes: readonly AuthorizationScope[];
     /** Final Routine scopes after central composition and channel policy. */
     readonly scopes: readonly AuthorizationScope[];
