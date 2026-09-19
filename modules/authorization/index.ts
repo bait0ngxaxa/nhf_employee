@@ -70,6 +70,10 @@ export type {
     EffectiveAuthorizationGrant,
 } from "./application/types";
 export { composeAuthorizationAuthority } from "./application/composition";
+/** Temporary Phase 12H-B production compatibility seam; remove at enforcement cutover. */
+export {
+    composeLegacyAdminCompatibleAuthorizationAuthority,
+} from "./application/legacy-admin-business-authority-compatibility";
 export type {
     ComposedAuthorizationAuthority,
 } from "./application/composition";

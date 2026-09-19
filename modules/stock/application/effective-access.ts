@@ -1,5 +1,5 @@
 import {
-    composeAuthorizationAuthority,
+    composeLegacyAdminCompatibleAuthorizationAuthority,
     projectAuthorizationAdministrationEffectiveAccess,
     type AuthorizationActor,
     type AuthorizationAdministrationEffectiveAccessInspection,
@@ -100,7 +100,7 @@ function inspectStockCapability(
     context: AuthorizationAdministrationInspectionContext,
 ): AuthorizationAdministrationEffectiveAccessInspection {
     const stockActor = asStockActor(actor);
-    const authority = composeAuthorizationAuthority(
+    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
         stockActor,
         capability,
         defaultStockScopes(stockActor, capability),

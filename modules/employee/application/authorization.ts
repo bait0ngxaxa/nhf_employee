@@ -4,7 +4,7 @@ import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 import {
     authorization,
-    composeAuthorizationAuthority,
+    composeLegacyAdminCompatibleAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationDecision,
     type AuthorizationScope,
@@ -167,7 +167,7 @@ function composeEmployeeCapabilityAuthorization(
         );
     }
 
-    const authority = composeAuthorizationAuthority(
+    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
         actor,
         capability,
         defaultEmployeeScopes(capability),

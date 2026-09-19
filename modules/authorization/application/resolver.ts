@@ -8,9 +8,13 @@ import {
     AuthorizationDeniedError,
 } from "./errors";
 import {
-    evaluateAuthorization,
+    evaluateConfiguredAuthorization,
     getAuthorizationEvaluationContext,
 } from "./evaluator";
+import {
+    evaluateLegacyAuthorization,
+    shouldLoadLegacyAuthorizationPersistence,
+} from "./legacy-admin-business-authority-compatibility";
 import type {
     AuthorizationDecision,
     AuthorizationPersistenceContext,
@@ -55,6 +59,52 @@ export interface AuthorizationResolver {
     ): Promise<readonly AuthorizationScope[]>;
 }
 
+type AuthorizationEvaluationFunction = (
+    actor: AuthorizationActor,
+    capability: string,
+    resolutionData: AuthorizationResolutionData | undefined,
+    registry: CapabilityRegistry,
+) => AuthorizationDecision;
+
+interface AuthorizationResolutionStrategy {
+    readonly shouldLoadConfiguredResolution: (
+        actor: AuthorizationActor,
+    ) => boolean;
+    readonly evaluate: AuthorizationEvaluationFunction;
+}
+
+const ROLE_NEUTRAL_CONFIGURED_RESOLUTION: AuthorizationResolutionStrategy =
+    Object.freeze({
+        shouldLoadConfiguredResolution: (): boolean => true,
+        evaluate: (
+            actor: AuthorizationActor,
+            capability: string,
+            resolutionData: AuthorizationResolutionData | undefined,
+            registry: CapabilityRegistry,
+        ): AuthorizationDecision => evaluateConfiguredAuthorization(
+            actor,
+            capability,
+            resolutionData,
+            registry,
+        ),
+    });
+
+const LEGACY_ADMIN_BUSINESS_AUTHORITY_COMPATIBILITY:
+    AuthorizationResolutionStrategy = Object.freeze({
+        shouldLoadConfiguredResolution: shouldLoadLegacyAuthorizationPersistence,
+        evaluate: (
+            actor: AuthorizationActor,
+            capability: string,
+            resolutionData: AuthorizationResolutionData | undefined,
+            registry: CapabilityRegistry,
+        ): AuthorizationDecision => evaluateLegacyAuthorization(
+            actor,
+            capability,
+            resolutionData,
+            registry,
+        ),
+    });
+
 function selectResolutionDataForCapability(
     resolutionData: AuthorizationResolutionData,
     capability: string,
@@ -78,6 +128,31 @@ function selectResolutionDataForCapability(
 export function createAuthorizationResolver(
     dependencies: AuthorizationResolverDependencies = {},
 ): AuthorizationResolver {
+    return createAuthorizationResolverWithStrategy(
+        dependencies,
+        LEGACY_ADMIN_BUSINESS_AUTHORITY_COMPATIBILITY,
+    );
+}
+
+/**
+ * Internal Phase 12H-B target factory. It shares the production resolver
+ * pipeline but always loads configured grants before role-neutral evaluation.
+ * The default `authorization` singleton deliberately does not use it until
+ * later phases rebaseline domain defaults and perform enforcement cutover.
+ */
+export function createRoleNeutralAuthorizationResolver(
+    dependencies: AuthorizationResolverDependencies = {},
+): AuthorizationResolver {
+    return createAuthorizationResolverWithStrategy(
+        dependencies,
+        ROLE_NEUTRAL_CONFIGURED_RESOLUTION,
+    );
+}
+
+function createAuthorizationResolverWithStrategy(
+    dependencies: AuthorizationResolverDependencies,
+    strategy: AuthorizationResolutionStrategy,
+): AuthorizationResolver {
     const registry = dependencies.registry ?? CAPABILITY_REGISTRY;
     const repository =
         dependencies.repository ?? authorizationResolutionRepository;
@@ -96,15 +171,15 @@ export function createAuthorizationResolver(
             return context.decision;
         }
 
-        if (context.isAdmin) {
-            return evaluateAuthorization(actor, capability, undefined, registry);
+        if (!strategy.shouldLoadConfiguredResolution(actor)) {
+            return strategy.evaluate(actor, capability, undefined, registry);
         }
 
         const resolutionData = await resolutionRepository.load({
             userId: actor.userId,
             capabilityKey: context.definition.key,
         });
-        return evaluateAuthorization(
+        return strategy.evaluate(
             actor,
             capability,
             resolutionData,
@@ -123,7 +198,7 @@ export function createAuthorizationResolver(
         capabilities: readonly string[],
     ): Promise<ReadonlyMap<string, AuthorizationDecision>> => {
         const decisions = new Map<string, AuthorizationDecision>();
-        const userCapabilities: Array<{
+        const capabilitiesToResolve: Array<{
             readonly capability: string;
             readonly definitionKey: string;
         }> = [];
@@ -139,10 +214,10 @@ export function createAuthorizationResolver(
                 continue;
             }
 
-            if (context.isAdmin) {
+            if (!strategy.shouldLoadConfiguredResolution(actor)) {
                 decisions.set(
                     capability,
-                    evaluateAuthorization(
+                    strategy.evaluate(
                         actor,
                         capability,
                         undefined,
@@ -152,25 +227,25 @@ export function createAuthorizationResolver(
                 continue;
             }
 
-            userCapabilities.push({
+            capabilitiesToResolve.push({
                 capability,
                 definitionKey: context.definition.key,
             });
         }
 
-        if (userCapabilities.length === 0) return decisions;
+        if (capabilitiesToResolve.length === 0) return decisions;
 
         const resolutionData = await repository.loadMany({
             userId: actor.userId,
-            capabilityKeys: userCapabilities.map(
+            capabilityKeys: capabilitiesToResolve.map(
                 ({ definitionKey }) => definitionKey,
             ),
         });
 
-        for (const { capability, definitionKey } of userCapabilities) {
+        for (const { capability, definitionKey } of capabilitiesToResolve) {
             decisions.set(
                 capability,
-                evaluateAuthorization(
+                strategy.evaluate(
                     actor,
                     capability,
                     selectResolutionDataForCapability(

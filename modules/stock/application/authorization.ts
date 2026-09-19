@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
-    composeAuthorizationAuthority,
+    composeLegacyAdminCompatibleAuthorizationAuthority,
     type AuthorizationActor,
     type AuthorizationChannel,
     type AuthorizationDecision,
@@ -178,7 +178,7 @@ function composeStockCapabilityAuthorization(
         );
     }
 
-    const authority = composeAuthorizationAuthority(
+    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
         actor,
         capability,
         defaultStockScopes(actor, capability),

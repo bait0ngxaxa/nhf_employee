@@ -17,7 +17,13 @@ import type {
     CapabilityRegistry,
 } from "@/modules/authorization";
 import { CAPABILITY_REGISTRY } from "../registry";
-import { evaluateAuthorization } from "./evaluator";
+import { evaluateConfiguredAuthorization } from "./evaluator";
+import {
+    composeLegacyAdminCompatibleAuthorizationAuthority,
+    evaluateLegacyAuthorization,
+} from "./legacy-admin-business-authority-compatibility";
+
+const evaluateAuthorization = evaluateConfiguredAuthorization;
 
 const CAPABILITY = "routine.task.read";
 const USER_ID = 7;
@@ -565,7 +571,7 @@ describe("composeAuthorizationAuthority", () => {
         );
     });
 
-    it("keeps ADMIN authority at the system-role decision", () => {
+    it("composes ADMIN default and configured authority without a role branch", () => {
         const adminActor = actor({ systemRole: "ADMIN" });
         const registry = teamRegistry();
         const configuredDecision = resolveConfigured(
@@ -591,18 +597,45 @@ describe("composeAuthorizationAuthority", () => {
         );
 
         expect(composed.allowed).toBe(true);
-        expect(composed.scopes).toEqual(["ALL"]);
-        expect(composed.defaultScopes).toEqual([]);
+        expect(composed.scopes).toEqual(["OWN", "CREATED", "TEAM"]);
+        expect(composed.defaultScopes).toEqual(["OWN"]);
         expect(composed.configuredGrants).toEqual([
             {
                 capability: CAPABILITY,
-                scope: "ALL",
-                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                scope: "TEAM",
+                source: { type: "TEAM", teamId: 10 },
+                constraint: { teamId: 10 },
+            },
+            {
+                capability: CAPABILITY,
+                scope: "CREATED",
+                source: { type: "USER", userId: USER_ID },
             },
         ]);
+
+        const userDecision = resolveConfigured(
+            actor({ systemRole: "USER" }),
+            CAPABILITY,
+            resolution({
+                userGrants: [userGrant("CREATED")],
+                memberships: [
+                    membership(10, {
+                        teamGrants: [teamGrant(10, "TEAM")],
+                    }),
+                ],
+            }),
+            registry,
+        );
+        expect(composed).toEqual(composeAuthorizationAuthority(
+            actor({ systemRole: "USER" }),
+            CAPABILITY,
+            ["OWN"],
+            userDecision,
+            registry,
+        ));
     });
 
-    it("ignores USER default TEAM validation for ADMIN", () => {
+    it("validates an ADMIN default TEAM scope like a USER default", () => {
         const adminActor = actor({ systemRole: "ADMIN" });
         const registry = teamRegistry();
         const configuredDecision = resolveConfigured(
@@ -612,36 +645,64 @@ describe("composeAuthorizationAuthority", () => {
             registry,
         );
 
-        const composed = composeAuthorizationAuthority(
+        expect(() => composeAuthorizationAuthority(
             adminActor,
             CAPABILITY,
             ["TEAM"],
             configuredDecision,
             registry,
+        )).toThrowError(
+            expect.objectContaining({
+                name: "AuthorizationConfigurationError",
+                code: "DEFAULT_TEAM_SCOPE_REQUIRES_ORIGIN",
+            }),
         );
-
-        expect(composed.allowed).toBe(true);
-        expect(composed.scopes).toEqual(["ALL"]);
-        expect(composed.defaultScopes).toEqual([]);
-        expect(composed.configuredDecision).toBe(configuredDecision);
     });
 
-    it("ignores an unsupported USER default scope for ADMIN", () => {
+    it("validates an unsupported ADMIN default scope like a USER default", () => {
         const adminActor = actor({ systemRole: "ADMIN" });
         const capability = "stock.request.create";
         const configuredDecision = resolveConfigured(adminActor, capability);
 
-        const composed = composeAuthorizationAuthority(
+        expect(() => composeAuthorizationAuthority(
             adminActor,
             capability,
             ["ALL"],
             configuredDecision,
+        )).toThrowError(
+            expect.objectContaining({
+                name: "AuthorizationConfigurationError",
+                code: "UNSUPPORTED_DEFAULT_SCOPE",
+            }),
+        );
+    });
+
+    it("keeps legacy ADMIN default projection at the explicit compatibility seam", () => {
+        const adminActor = actor({ systemRole: "ADMIN" });
+        const configuredDecision = evaluateLegacyAuthorization(
+            adminActor,
+            CAPABILITY,
+            resolution(),
+            teamRegistry(),
         );
 
-        expect(composed.allowed).toBe(true);
-        expect(composed.scopes).toEqual(["OWN"]);
+        const composed = composeLegacyAdminCompatibleAuthorizationAuthority(
+            adminActor,
+            CAPABILITY,
+            ["OWN"],
+            configuredDecision,
+            teamRegistry(),
+        );
+
+        expect(composed.scopes).toEqual(["ALL"]);
         expect(composed.defaultScopes).toEqual([]);
-        expect(composed.configuredDecision).toBe(configuredDecision);
+        expect(composed.configuredGrants).toEqual([
+            {
+                capability: CAPABILITY,
+                scope: "ALL",
+                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+            },
+        ]);
     });
 
     it("keeps ADMIN structural channel denial denied", () => {

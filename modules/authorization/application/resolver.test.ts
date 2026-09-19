@@ -7,9 +7,11 @@ import {
     createCapabilityRegistry,
 } from "@/modules/authorization";
 import {
-    evaluateAuthorization,
+    evaluateConfiguredAuthorization,
     normalizeAuthorizationScopes,
 } from "./evaluator";
+import { evaluateLegacyAuthorization } from "./legacy-admin-business-authority-compatibility";
+import { createRoleNeutralAuthorizationResolver } from "./resolver";
 import type {
     AuthorizationActor,
     AuthorizationPersistenceContext,
@@ -21,6 +23,8 @@ import type {
     AuthorizationResolutionRepository,
     CapabilityDefinition,
 } from "@/modules/authorization";
+
+const evaluateAuthorization = evaluateConfiguredAuthorization;
 
 const CAPABILITY = "routine.task.read";
 const USER_ID = 7;
@@ -403,7 +407,7 @@ describe("authorization evaluator", () => {
     });
 
     it("uses ADMIN semantics without persisted grants", () => {
-        const decision = evaluateAuthorization(
+        const decision = evaluateLegacyAuthorization(
             actor({ systemRole: "ADMIN" }),
             CAPABILITY,
             resolution({
@@ -431,7 +435,7 @@ describe("authorization evaluator", () => {
             channels: ["DASHBOARD"],
         };
         const registry = createCapabilityRegistry([definition]);
-        const decision = evaluateAuthorization(
+        const decision = evaluateLegacyAuthorization(
             actor({ systemRole: "ADMIN" }),
             definition.key,
             resolution(),
@@ -449,7 +453,7 @@ describe("authorization evaluator", () => {
     });
 
     it("fails closed for an ADMIN-only origin-bound TEAM capability", () => {
-        expect(() => evaluateAuthorization(
+        expect(() => evaluateLegacyAuthorization(
             actor({ systemRole: "ADMIN" }),
             CAPABILITY,
             resolution(),
@@ -566,6 +570,166 @@ describe("authorization evaluator", () => {
                 constraint: { teamId: 10 },
             },
         ]);
+    });
+});
+
+describe("role-neutral configured authorization evaluator", () => {
+    it.each([
+        ["direct User", resolution({ userGrants: [userGrant("CREATED")] })],
+        [
+            "Team",
+            resolution({
+                memberships: [
+                    membership(10, {
+                        teamGrants: [teamGrant(10, "CREATED")],
+                    }),
+                ],
+            }),
+        ],
+        [
+            "TeamRole",
+            resolution({
+                memberships: [
+                    membership(10, {
+                        teamRole: { id: 20, isActive: true },
+                    }),
+                ],
+                teamRoleGrants: [teamRoleGrant(10, 20, "ASSIGNED")],
+            }),
+        ],
+    ])("resolves %s identically for USER and ADMIN", (_source, data) => {
+        const userDecision = evaluateConfiguredAuthorization(
+            actor({ systemRole: "USER" }),
+            CAPABILITY,
+            data,
+        );
+        const adminDecision = evaluateConfiguredAuthorization(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+            data,
+        );
+
+        expect(adminDecision).toEqual(userDecision);
+        expect(adminDecision.grants).not.toEqual(
+            expect.arrayContaining([
+                { source: { type: "SYSTEM_ROLE", role: "ADMIN" } },
+            ]),
+        );
+    });
+
+    it("returns NO_APPLICABLE_GRANT for both system roles without configured grants", () => {
+        const userDecision = evaluateConfiguredAuthorization(
+            actor({ systemRole: "USER" }),
+            CAPABILITY,
+        );
+        const adminDecision = evaluateConfiguredAuthorization(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+        );
+
+        expect(userDecision).toEqual(adminDecision);
+        expect(adminDecision).toMatchObject({
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+    });
+
+    it("unions all configured sources identically for ADMIN", () => {
+        const data = resolution({
+            userGrants: [userGrant("ALL")],
+            memberships: [
+                membership(10, {
+                    teamRole: { id: 20, isActive: true },
+                    teamGrants: [teamGrant(10, "CREATED")],
+                }),
+            ],
+            teamRoleGrants: [teamRoleGrant(10, 20, "ASSIGNED")],
+        });
+
+        const userDecision = evaluateConfiguredAuthorization(
+            actor({ systemRole: "USER" }),
+            CAPABILITY,
+            data,
+        );
+        const adminDecision = evaluateConfiguredAuthorization(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+            data,
+        );
+
+        expect(adminDecision).toEqual(userDecision);
+        expect(adminDecision.scopes).toEqual(["ALL"]);
+    });
+
+    it("keeps inactive Team and TeamRole behavior identical for ADMIN", () => {
+        const data = resolution({
+            memberships: [
+                membership(10, {
+                    isTeamActive: false,
+                    teamRole: { id: 20, isActive: true },
+                    teamGrants: [teamGrant(10, "ALL")],
+                }),
+                membership(30, {
+                    teamRole: { id: 40, isActive: false },
+                    teamGrants: [teamGrant(30, "CREATED")],
+                }),
+            ],
+            teamRoleGrants: [
+                teamRoleGrant(10, 20, "ALL"),
+                teamRoleGrant(30, 40, "ASSIGNED"),
+            ],
+        });
+
+        expect(evaluateConfiguredAuthorization(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+            data,
+        )).toEqual(evaluateConfiguredAuthorization(
+            actor({ systemRole: "USER" }),
+            CAPABILITY,
+            data,
+        ));
+        expect(evaluateConfiguredAuthorization(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+            data,
+        )).toMatchObject({
+            allowed: true,
+            scopes: ["CREATED"],
+        });
+    });
+
+    it("retains configured structural failures for ADMIN", () => {
+        expect(() => evaluateConfiguredAuthorization(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+            resolution({
+                userGrants: [userGrant("TEAM")],
+            }),
+            teamRegistry(),
+        )).toThrowError(
+            expect.objectContaining({
+                code: "DIRECT_TEAM_SCOPE_REQUIRES_ORIGIN",
+            }),
+        );
+
+        expect(() => evaluateConfiguredAuthorization(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+            resolution({
+                memberships: [
+                    membership(10, {
+                        teamGrants: [teamGrant(10, "OWN")],
+                    }),
+                ],
+            }),
+        )).toThrowError(
+            expect.objectContaining({
+                code: "UNSUPPORTED_PERSISTED_SCOPE",
+            }),
+        );
     });
 });
 
@@ -741,6 +905,29 @@ describe("authorization public resolver API", () => {
         expect(load).not.toHaveBeenCalled();
     });
 
+    it("keeps malformed persisted ADMIN rows ignored on the legacy compatibility path", async () => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => resolution({
+                userGrants: [userGrant("OWN")],
+            }),
+        );
+        const resolver = createAuthorizationResolver({
+            repository: {
+                load,
+                loadMany: async () => resolution(),
+            },
+        });
+
+        await expect(
+            resolver.resolve(actor({ systemRole: "ADMIN" }), CAPABILITY),
+        ).resolves.toMatchObject({
+            allowed: true,
+            scopes: ["ALL"],
+            grants: [{ source: { type: "SYSTEM_ROLE", role: "ADMIN" } }],
+        });
+        expect(load).not.toHaveBeenCalled();
+    });
+
     it("resolves USER grants through the supplied transaction context", async () => {
         const userGrantFindMany = vi.fn().mockResolvedValue([
             userGrant("CREATED"),
@@ -762,6 +949,236 @@ describe("authorization public resolver API", () => {
             where: { userId: USER_ID, capabilityKey: CAPABILITY },
         }));
         expect(teamMembershipFindMany).toHaveBeenCalled();
+    });
+});
+
+describe("role-neutral resolver target path", () => {
+    it.each([
+        [
+            "direct User",
+            resolution({
+                userGrants: [userGrant("CREATED")],
+            }),
+            { type: "USER", userId: USER_ID },
+        ],
+        [
+            "Team",
+            resolution({
+                memberships: [
+                    membership(10, {
+                        teamGrants: [teamGrant(10, "CREATED")],
+                    }),
+                ],
+            }),
+            { type: "TEAM", teamId: 10 },
+        ],
+        [
+            "TeamRole",
+            resolution({
+                memberships: [
+                    membership(10, {
+                        teamRole: { id: 20, isActive: true },
+                    }),
+                ],
+                teamRoleGrants: [teamRoleGrant(10, 20, "ASSIGNED")],
+            }),
+            { type: "TEAM_ROLE", teamId: 10, teamRoleId: 20 },
+        ],
+    ])("loads ADMIN %s authority from persistence", async (_source, data, source) => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => data,
+        );
+        const resolver = createRoleNeutralAuthorizationResolver({
+            repository: {
+                load,
+                loadMany: async () => data,
+            },
+        });
+
+        const decision = await resolver.resolve(
+            actor({ systemRole: "ADMIN" }),
+            CAPABILITY,
+        );
+
+        expect(decision.allowed).toBe(true);
+        expect(decision.grants).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ source }),
+            ]),
+        );
+        expect(decision.grants).not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                }),
+            ]),
+        );
+        expect(load).toHaveBeenCalledWith({
+            userId: USER_ID,
+            capabilityKey: CAPABILITY,
+        });
+    });
+
+    it("returns NO_APPLICABLE_GRANT for ADMIN when the target path loads no grants", async () => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => resolution(),
+        );
+        const resolver = createRoleNeutralAuthorizationResolver({
+            repository: {
+                load,
+                loadMany: async () => resolution(),
+            },
+        });
+
+        await expect(
+            resolver.resolve(actor({ systemRole: "ADMIN" }), CAPABILITY),
+        ).resolves.toMatchObject({
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+        expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it("batches ADMIN configured resolution and slices data per capability", async () => {
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution({
+                userGrants: [
+                    userGrant("CREATED", "routine.task.read"),
+                    userGrant("OWN", "routine.task.create"),
+                ],
+            }),
+        );
+        const resolver = createRoleNeutralAuthorizationResolver({
+            repository: {
+                load: async () => resolution(),
+                loadMany,
+            },
+        });
+
+        const decisions = await resolver.resolveMany(
+            actor({ systemRole: "ADMIN" }),
+            ["routine.task.read", "routine.task.create"],
+        );
+
+        expect(decisions.get("routine.task.read")).toMatchObject({
+            allowed: true,
+            scopes: ["CREATED"],
+            grants: [{ source: { type: "USER", userId: USER_ID } }],
+        });
+        expect(decisions.get("routine.task.create")).toMatchObject({
+            allowed: true,
+            scopes: ["OWN"],
+            grants: [{ source: { type: "USER", userId: USER_ID } }],
+        });
+        expect(loadMany).toHaveBeenCalledTimes(1);
+        expect(loadMany).toHaveBeenCalledWith({
+            userId: USER_ID,
+            capabilityKeys: ["routine.task.read", "routine.task.create"],
+        });
+    });
+
+    it("uses transaction persistence for role-neutral ADMIN resolution", async () => {
+        const userGrantFindMany = vi.fn().mockResolvedValue([
+            userGrant("CREATED"),
+        ]);
+        const teamMembershipFindMany = vi.fn().mockResolvedValue([]);
+        const persistenceContext = {
+            userCapabilityGrant: { findMany: userGrantFindMany },
+            teamMembership: { findMany: teamMembershipFindMany },
+        } as unknown as AuthorizationPersistenceContext;
+        const resolver = createRoleNeutralAuthorizationResolver();
+
+        await expect(
+            resolver.resolveInTransaction(
+                actor({ systemRole: "ADMIN" }),
+                CAPABILITY,
+                persistenceContext,
+            ),
+        ).resolves.toMatchObject({
+            allowed: true,
+            scopes: ["CREATED"],
+            grants: [{ source: { type: "USER", userId: USER_ID } }],
+        });
+        expect(userGrantFindMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: { userId: USER_ID, capabilityKey: CAPABILITY },
+        }));
+        expect(teamMembershipFindMany).toHaveBeenCalled();
+    });
+
+    it("derives can, require, and getScopes from target configured decisions", async () => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => resolution({
+                userGrants: [userGrant("OWN", "stock.request.create")],
+            }),
+        );
+        const resolver = createRoleNeutralAuthorizationResolver({
+            repository: {
+                load,
+                loadMany: async () => resolution(),
+            },
+        });
+        const adminActor = actor({ systemRole: "ADMIN" });
+
+        await expect(
+            resolver.can(adminActor, "stock.request.create"),
+        ).resolves.toBe(true);
+        await expect(
+            resolver.require(adminActor, "stock.request.create"),
+        ).resolves.toMatchObject({ allowed: true, scopes: ["OWN"] });
+        await expect(
+            resolver.getScopes(adminActor, "stock.request.create"),
+        ).resolves.toEqual(["OWN"]);
+    });
+
+    it("does not load persistence for unknown or unsupported target requests", async () => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => resolution(),
+        );
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution(),
+        );
+        const resolver = createRoleNeutralAuthorizationResolver({
+            repository: { load, loadMany },
+        });
+        const adminActor = actor({
+            systemRole: "ADMIN",
+            channel: "LIFF_SELF_SERVICE",
+        });
+
+        await expect(
+            resolver.resolve(adminActor, "routine.task.unknown"),
+        ).resolves.toMatchObject({
+            allowed: false,
+            reason: "UNKNOWN_CAPABILITY",
+        });
+        await expect(
+            resolver.resolve(adminActor, "employee.read"),
+        ).resolves.toMatchObject({
+            allowed: false,
+            reason: "CHANNEL_NOT_SUPPORTED",
+        });
+        expect(load).not.toHaveBeenCalled();
+        expect(loadMany).not.toHaveBeenCalled();
+    });
+
+    it("fails closed on malformed ADMIN target persistence instead of using legacy authority", async () => {
+        const resolver = createRoleNeutralAuthorizationResolver({
+            repository: {
+                load: async () => resolution({
+                    userGrants: [userGrant("OWN")],
+                }),
+                loadMany: async () => resolution(),
+            },
+        });
+
+        await expect(
+            resolver.resolve(actor({ systemRole: "ADMIN" }), CAPABILITY),
+        ).rejects.toMatchObject({
+            name: "AuthorizationConfigurationError",
+            code: "UNSUPPORTED_PERSISTED_SCOPE",
+        });
     });
 });
 

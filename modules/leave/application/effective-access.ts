@@ -1,5 +1,5 @@
 import {
-    composeAuthorizationAuthority,
+    composeLegacyAdminCompatibleAuthorizationAuthority,
     projectAuthorizationAdministrationEffectiveAccess,
     type AuthorizationActor,
     type AuthorizationAdministrationEffectiveAccessInspection,
@@ -105,7 +105,7 @@ function inspectLeaveCapability(
     context: AuthorizationAdministrationInspectionContext,
 ): AuthorizationAdministrationEffectiveAccessInspection {
     const leaveActor = asLeaveActor(actor);
-    const authority = composeAuthorizationAuthority(
+    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
         leaveActor,
         capability,
         defaultLeaveScopes(leaveActor, capability),

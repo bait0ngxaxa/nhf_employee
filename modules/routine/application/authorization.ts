@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 import {
     authorization,
-    composeAuthorizationAuthority,
+    composeLegacyAdminCompatibleAuthorizationAuthority,
     createUnsupportedAuthorizationAdministrationInspection,
     projectAuthorizationAdministrationEffectiveAccess,
     type AuthorizationActor,
@@ -221,7 +221,9 @@ function applyRoutineChannelPolicy(
     actor: AuthorizationActor,
     capability: RoutineCapability,
     options: RoutineCapabilityOptions,
-    composedAuthority: ReturnType<typeof composeAuthorizationAuthority>,
+    composedAuthority: ReturnType<
+        typeof composeLegacyAdminCompatibleAuthorizationAuthority
+    >,
 ): {
     scopes: readonly AuthorizationScope[];
     isAdministrative: boolean;
@@ -354,7 +356,7 @@ function inspectRoutineCapability(
     limitations: readonly AuthorizationAdministrationEffectiveAccessLimitation[],
 ): AuthorizationAdministrationEffectiveAccessInspection {
     const decision = getRoutineInspectionDecision(decisions, capability);
-    const authority = composeAuthorizationAuthority(
+    const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
         actor,
         capability,
         defaultRoutineScopes(actor, capability, options),
@@ -564,7 +566,7 @@ function buildRoutineCapabilityAuthorization(
     decision: AuthorizationDecision,
     options: RoutineCapabilityOptions,
 ): RoutineCapabilityAuthorization {
-    const composedAuthority = composeAuthorizationAuthority(
+    const composedAuthority = composeLegacyAdminCompatibleAuthorizationAuthority(
         actor,
         capability,
         defaultRoutineScopes(actor, capability, options),

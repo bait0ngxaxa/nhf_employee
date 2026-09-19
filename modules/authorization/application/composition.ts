@@ -1,5 +1,3 @@
-import { isAdminRole } from "@/lib/ssot/permissions";
-
 import type {
     AuthorizationActor,
     AuthorizationScope,
@@ -39,7 +37,7 @@ export interface ComposedAuthorizationAuthority {
  * load persistence or inspect domain/resource context.
  */
 export function composeAuthorizationAuthority(
-    actor: AuthorizationActor,
+    _actor: AuthorizationActor,
     capability: string,
     defaultScopes: readonly AuthorizationScope[],
     configuredDecision: AuthorizationDecision,
@@ -63,21 +61,6 @@ export function composeAuthorizationAuthority(
     const configuredGrants = freezeConfiguredGrants(
         configuredDecision.grants,
     );
-
-    if (isAdminRole(actor.systemRole)) {
-        const configuredScopes = configuredDecision.allowed
-            ? normalizeAuthorizationScopes(configuredDecision.scopes)
-            : Object.freeze([] as AuthorizationScope[]);
-
-        return Object.freeze({
-            capability,
-            allowed: configuredScopes.length > 0,
-            scopes: configuredScopes,
-            defaultScopes: Object.freeze([] as AuthorizationScope[]),
-            configuredDecision,
-            configuredGrants,
-        });
-    }
 
     const validatedDefaultScopes = validateDefaultScopes(
         defaultScopes,

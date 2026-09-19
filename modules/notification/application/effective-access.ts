@@ -1,5 +1,5 @@
 import {
-    composeAuthorizationAuthority,
+    composeLegacyAdminCompatibleAuthorizationAuthority,
     projectAuthorizationAdministrationEffectiveAccess,
     type AuthorizationActor,
     type AuthorizationAdministrationEffectiveAccessInspection,
@@ -42,7 +42,7 @@ export function inspectNotificationEffectiveAccess(
     decisions: ReadonlyMap<string, AuthorizationDecision>,
 ): readonly AuthorizationAdministrationEffectiveAccessInspection[] {
     return Object.freeze(NOTIFICATION_CAPABILITIES.map((capability) => {
-        const authority = composeAuthorizationAuthority(
+        const authority = composeLegacyAdminCompatibleAuthorizationAuthority(
             actor,
             capability,
             defaultNotificationScopes(capability),

@@ -1,5 +1,3 @@
-import { isAdminRole } from "@/lib/ssot/permissions";
-
 import {
     AUTHORIZATION_SCOPES,
     type AuthorizationActor,
@@ -25,10 +23,21 @@ const EMPTY_AUTHORIZATION_RESOLUTION_DATA: AuthorizationResolutionData = {
     teamRoleGrants: [],
 };
 
+type ConfiguredAuthorizationGrantSource = Extract<
+    AuthorizationGrantSource,
+    { readonly type: "TEAM" | "TEAM_ROLE" | "USER" }
+>;
+
+type ConfiguredAuthorizationGrant = Omit<
+    EffectiveAuthorizationGrant,
+    "source"
+> & {
+    readonly source: ConfiguredAuthorizationGrantSource;
+};
+
 export type AuthorizationEvaluationContext =
     | {
         readonly definition: CapabilityDefinition;
-        readonly isAdmin: boolean;
     }
     | {
         readonly decision: AuthorizationDecision;
@@ -57,7 +66,6 @@ export function getAuthorizationEvaluationContext(
 
     return {
         definition,
-        isAdmin: isAdminRole(actor.systemRole),
     };
 }
 
@@ -74,7 +82,14 @@ export function normalizeAuthorizationScopes(
     );
 }
 
-export function evaluateAuthorization(
+/**
+ * Evaluate configured Team, TeamRole, and exceptional direct User grants.
+ *
+ * This path is intentionally role-neutral. `systemRole` is carried by the
+ * trusted actor contract for control-plane and lifecycle boundaries, but it
+ * does not affect configured business-grant evaluation here.
+ */
+export function evaluateConfiguredAuthorization(
     actor: AuthorizationActor,
     capability: string,
     resolutionData: AuthorizationResolutionData =
@@ -90,11 +105,7 @@ export function evaluateAuthorization(
         return context.decision;
     }
 
-    if (context.isAdmin) {
-        return evaluateAdminAuthorization(context.definition);
-    }
-
-    return evaluateUserAuthorization(
+    return evaluateConfiguredGrants(
         actor,
         context.definition,
         resolutionData,
@@ -102,48 +113,19 @@ export function evaluateAuthorization(
     );
 }
 
-function evaluateAdminAuthorization(
-    definition: CapabilityDefinition,
-): AuthorizationDecision {
-    const adminScopes = getAdminScopes(definition);
-    const source: AuthorizationGrantSource = Object.freeze({
-        type: "SYSTEM_ROLE",
-        role: "ADMIN",
-    });
-    const grants = adminScopes.map((scope) =>
-        createEffectiveGrant(definition.key, scope, source),
-    );
+/**
+ * Compatibility name for internal callers. It intentionally points to the
+ * role-neutral configured evaluator; legacy ADMIN behavior lives elsewhere.
+ */
+export const evaluateAuthorization = evaluateConfiguredAuthorization;
 
-    return createAllowedDecision(definition.key, grants);
-}
-
-function getAdminScopes(
-    definition: CapabilityDefinition,
-): readonly AuthorizationScope[] {
-    if (definition.scopes.includes("ALL")) {
-        return ["ALL"];
-    }
-
-    const nonTeamScopes = definition.scopes.filter((scope) => scope !== "TEAM");
-    const normalizedScopes = normalizeAuthorizationScopes(nonTeamScopes);
-    if (normalizedScopes.length === 0) {
-        throw new AuthorizationConfigurationError(
-            "UNSUPPORTED_ADMIN_TEAM_SCOPE",
-            `ADMIN cannot resolve a capability with only an origin-bound TEAM scope: ${definition.key}`,
-            { capabilityKey: definition.key },
-        );
-    }
-
-    return normalizedScopes;
-}
-
-function evaluateUserAuthorization(
+function evaluateConfiguredGrants(
     actor: AuthorizationActor,
     definition: CapabilityDefinition,
     resolutionData: AuthorizationResolutionData,
     registry: CapabilityRegistry,
 ): AuthorizationDecision {
-    const grants: EffectiveAuthorizationGrant[] = [];
+    const grants: ConfiguredAuthorizationGrant[] = [];
 
     for (const userGrant of resolutionData.userGrants) {
         if (userGrant.userId !== actor.userId) {
@@ -316,9 +298,9 @@ function validatePersistedGrant(
 function createEffectiveGrant(
     capability: CapabilityKey,
     scope: AuthorizationScope,
-    source: AuthorizationGrantSource,
+    source: ConfiguredAuthorizationGrantSource,
     teamId?: number,
-): EffectiveAuthorizationGrant {
+): ConfiguredAuthorizationGrant {
     const baseGrant = {
         capability,
         scope,
@@ -341,13 +323,6 @@ function createEffectiveGrant(
         ...baseGrant,
         constraint: Object.freeze({ teamId }),
     });
-}
-
-function createAllowedDecision(
-    capability: string,
-    grants: readonly EffectiveAuthorizationGrant[],
-): AuthorizationDecision {
-    return createDecision(capability, grants);
 }
 
 function createDecision(
@@ -389,8 +364,8 @@ function createDeniedDecision(
 }
 
 function compareEffectiveAuthorizationGrants(
-    left: EffectiveAuthorizationGrant,
-    right: EffectiveAuthorizationGrant,
+    left: ConfiguredAuthorizationGrant,
+    right: ConfiguredAuthorizationGrant,
 ): number {
     const sourceOrder = compareNumbers(
         getSourceOrder(left.source),
@@ -407,22 +382,20 @@ function compareEffectiveAuthorizationGrants(
     );
 }
 
-function getSourceOrder(source: AuthorizationGrantSource): number {
+function getSourceOrder(source: ConfiguredAuthorizationGrantSource): number {
     switch (source.type) {
-        case "SYSTEM_ROLE":
-            return 0;
         case "TEAM":
-            return 1;
+            return 0;
         case "TEAM_ROLE":
-            return 2;
+            return 1;
         case "USER":
-            return 3;
+            return 2;
     }
 }
 
 function compareSourceIdentity(
-    left: AuthorizationGrantSource,
-    right: AuthorizationGrantSource,
+    left: ConfiguredAuthorizationGrantSource,
+    right: ConfiguredAuthorizationGrantSource,
 ): number {
     if (left.type === "TEAM" && right.type === "TEAM") {
         return compareNumbers(left.teamId, right.teamId);

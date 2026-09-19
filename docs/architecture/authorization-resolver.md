@@ -1,10 +1,12 @@
 # NHF Employee — Centralized Authorization Resolver
 
-Current-target note: this document records the generic/current resolver
-contract and its pre-12H `SYSTEM_ROLE / ADMIN` behavior. Phase 12H-A's
-role-neutral business target is authoritative for the future architecture;
-runtime resolver/composition changes are deferred to Phase 12H-B and later.
-See [authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
+Current-target note: Phase 12H-B has implemented the role-neutral configured
+evaluator and composition primitive, while the production-facing resolver
+singleton remains on the temporary pre-12H `SYSTEM_ROLE / ADMIN`
+compatibility strategy. The role-neutral target factory is application-internal
+and is not the production enforcement path yet. See
+[authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md)
+and [authorization-phase-12hb-role-neutral-core.md](./authorization-phase-12hb-role-neutral-core.md).
 
 Status: Phase 3 complete. This document describes the resolver introduced
 after the Phase 1 capability contract and Phase 2 authorization persistence.
@@ -16,13 +18,15 @@ or the repository module rules in [module-boundaries.md](./module-boundaries.md)
 
 Phase 12A permanently locks the existing no-grant USER domain behavior as
 Default Domain Policy and defines future configured grants as additive
-authority. The detailed inventory and Phase 12B composition contract are in
+authority. The detailed inventory and historical Phase 12B composition
+contract are in
 [authorization-phase-12a-additive-policy-contract.md](./authorization-phase-12a-additive-policy-contract.md).
-Phase 12B implements the pure application-layer composition seam described by
-that contract in
+The current pure application-layer composition seam described by that contract
+is in
 [authorization-phase-12b-additive-composition-core.md](./authorization-phase-12b-additive-composition-core.md).
-This does not change the resolver implementation or its current resolver-level
-decision semantics.
+Phase 12H-B now makes that composition primitive role-neutral and adds
+`createRoleNeutralAuthorizationResolver()` beside the legacy production
+factory; the default resolver-level production semantics remain unchanged.
 Phase 12C.1 uses that seam for Department and Notification, Phase 12C.2 uses
 it for Employee, Phase 12C.3 uses it for the enforced Routine capabilities,
 Phase 12C.4 uses it for the complete Stock surface, Phase 12C.5 uses it for
@@ -56,8 +60,10 @@ const required = await authorization.require(actor, "routine.task.read");
 const scopes = await authorization.getScopes(actor, "routine.task.read");
 ```
 
-Department, Notification, Employee, Routine, Stock, and Leave adapters compose the
-resolver result with their trusted default scopes through the Phase 12B seam:
+Department, Notification, Employee, Routine, Stock, and Leave adapters currently
+compose through the explicit legacy ADMIN compatibility wrapper while production
+enforcement remains pre-12H. The role-neutral primitive itself has the same
+shape and is tested independently:
 
 ```ts
 const configuredDecision = await authorization.resolve(actor, capability);
@@ -70,13 +76,12 @@ const authority = composeAuthorizationAuthority(
 ```
 
 `composeAuthorizationAuthority()` is pure and has no persistence, Team,
-Department, request, resource, or workflow dependencies. It validates default
-scopes against the supplied code-owned registry, returns normalized effective
-scopes, and preserves configured grants separately from Default Domain Policy.
-It is the runtime seam for migrated domains; Department, Notification,
-Employee, all twelve registered Routine capabilities, all seven Stock
-capabilities, and all eight registered Leave capabilities now use it. No
-current capability remains classified as `CENTRAL_WITH_COMPATIBILITY`.
+Department, request, resource, workflow, or system-role dependency. It validates
+default scopes against the supplied code-owned registry, returns normalized
+effective scopes, and preserves configured grants separately from Default Domain
+Policy. Current adapters call
+`composeLegacyAdminCompatibleAuthorizationAuthority()` so removal of the
+primitive's former ADMIN branch does not cut over domain behavior in 12H-B.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -86,12 +91,13 @@ configuration or an unsupported resolver contract and is allowed to propagate
 from detailed resolution.
 
 `resolveMany()` returns a read-only map of decisions keyed by the requested
-capability. For a `USER`, it loads one shared resolution snapshot through
-`repository.loadMany()` and evaluates each capability against the relevant
-slice of that snapshot. Unknown capabilities, channel denials, and `ADMIN`
-decisions do not trigger persistence reads. The batch operation preserves
-single-capability evaluator validation by isolating persisted grants per
-capability before evaluation.
+capability. The role-neutral target factory loads one shared resolution snapshot
+for both USER and ADMIN through `repository.loadMany()` and evaluates each
+capability against the relevant slice of that snapshot. Unknown capabilities
+and channel denials do not trigger persistence reads. The production-compatible
+factory intentionally retains the old ADMIN no-persistence behavior. Both paths
+preserve single-capability evaluator validation by isolating persisted grants
+per capability before evaluation.
 
 For transaction-sensitive mutations, the public resolver also exposes
 `resolveInTransaction(actor, capability, persistenceContext)`. It uses the
@@ -100,8 +106,10 @@ reading authorization persistence through the supplied transaction context.
 The context is a narrow composition seam; the raw evaluator and persistence
 adapter remain private.
 
-The module also exposes `createAuthorizationResolver()` for a narrow registry
-and persistence-port test seam. The default `authorization` instance uses the
+The module exposes `createAuthorizationResolver()` for the current compatible
+registry/persistence-port seam. The application-internal
+`createRoleNeutralAuthorizationResolver()` uses the same dependencies and
+pipeline for the target path. The default `authorization` instance uses the
 code-owned `CAPABILITY_REGISTRY` and the internal Prisma resolution adapter.
 Raw Prisma delegates and the adapter are not part of the public module API.
 
@@ -164,13 +172,18 @@ Resolution proceeds in this order:
 2. Check the actor's `DASHBOARD`, `LIFF_SELF_SERVICE`, or `SYSTEM` channel
    against the registered capability. A mismatch returns deny with
    `CHANNEL_NOT_SUPPORTED`, for both `USER` and `ADMIN`.
-3. For `ADMIN`, resolve from the registered capability definition only. No
-   Team, TeamRole, membership, or User grant is required or consulted.
-4. For `USER`, load only authorization configuration for the actor and the
-   requested capability, validate each applicable persisted grant against the
-   registry, and form the additive union of all applicable sources.
+3. On the role-neutral target path, load authorization configuration for the
+   actor and requested capability for both `USER` and `ADMIN`.
+4. Validate each applicable persisted grant against the registry and form the
+   additive union of Team, TeamRole, and direct User sources.
 5. Sort grants by source type and stable numeric IDs, normalize scopes, and
    default to deny when no valid applicable grant remains.
+
+The current production-compatible path is an explicit exception to steps 3–4:
+it preserves the pre-12H ADMIN system-role decision and no-persistence behavior
+until enforcement cutover. That exception is isolated in
+`legacy-admin-business-authority-compatibility.ts`; it is not part of the
+role-neutral evaluator.
 
 The resolver never performs authentication or account/workforce lifecycle
 checks. Its caller must provide an `AuthorizationActor` after the appropriate
@@ -231,15 +244,16 @@ contributes only rows in `TeamRoleCapabilityGrant`.
 
 ## ADMIN semantics
 
-After capability registration and channel validation, `ADMIN` is allowed from
-the registered capability definition and does not need persisted grants. If a
-capability supports `ALL`, the resolver emits an ADMIN `ALL` grant and the
-normalized scopes are `["ALL"]`. If `ALL` is not supported, it emits the
-registered non-`TEAM` scopes. A capability whose only usable scope is the
-origin-bound `TEAM` scope raises `AuthorizationConfigurationError` with
-`UNSUPPORTED_ADMIN_TEAM_SCOPE`; the resolver never invents a Team origin.
+On the role-neutral target path, ADMIN has no implicit configured authority.
+With no applicable persisted grant it receives `NO_APPLICABLE_GRANT`; with the
+same trusted identity/resource context and persisted data as USER it receives
+the same decision and source provenance. A target ADMIN decision never contains
+a `SYSTEM_ROLE` grant.
 
-ADMIN is authorization authority only. It does not bypass authentication,
+The existing `SYSTEM_ROLE / ADMIN` decision, including its registered-scope
+calculation and `UNSUPPORTED_ADMIN_TEAM_SCOPE` validation, is retained only in
+the explicitly named temporary compatibility seam. It remains authority only
+within the current production path and does not bypass authentication,
 account/workforce lifecycle, channel restrictions, resource relationships,
 workflow state, domain validation, transactions, or concurrency rules.
 
