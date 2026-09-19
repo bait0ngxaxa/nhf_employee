@@ -227,9 +227,7 @@ export async function cancelLeaveRequest(
             existingApprover: leaveRequest.exceptionApprover,
             reuseExisting: false,
         });
-        if (exceptionApprover) {
-            await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
-        }
+        await persistLeaveExceptionApprover(tx, leaveId, exceptionApprover);
 
         const requestedAt = new Date();
         const claimedRequest = await tx.leaveRequest.updateMany({
@@ -287,9 +285,7 @@ export async function cancelLeaveRequest(
                         reason: reason ?? null,
                     }),
                     originalApproverId: leaveRequest.approverId,
-                    exceptionApproverId: exceptionApprover
-                        ? exceptionApprover.exceptionApproverId
-                        : leaveRequest.exceptionApproverId,
+                    exceptionApproverId: exceptionApprover?.exceptionApproverId ?? null,
                     ...(exceptionApprover
                         ? { exceptionApproverSource: exceptionApprover.source }
                         : {}),
@@ -298,11 +294,14 @@ export async function cancelLeaveRequest(
         );
 
         const updatedRequest = await tx.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
+        const responseRequest = withCancellationInclude(updatedRequest, leaveRequest, {
+            cancellationReason: reason ?? null,
+            cancellationRequestedAt: requestedAt,
+        });
         return {
-            request: withCancellationInclude(updatedRequest, leaveRequest, {
-                cancellationReason: reason ?? null,
-                cancellationRequestedAt: requestedAt,
-            }),
+            request: exceptionApprover === null || exceptionApprover.exceptionApproverId === null
+                ? { ...responseRequest, exceptionApprover: null }
+                : responseRequest,
             ...(exceptionApprover
                 ? { exceptionApproverSource: exceptionApprover.source }
                 : {}),

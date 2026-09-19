@@ -1427,11 +1427,14 @@ The recovery decision is based on the explicit capability result, not
 Owner-side initiation does not abort when no effective approver is available.
 Not-taken initiation persists the canonical `APPROVED` plus
 `notTakenRequestedAt` pending state, while approved cancellation initiation
-persists `CANCELLATION_REQUESTED`; both leave `exceptionApproverId` unset/null
-and are discoverable by the recovery candidate query. Employee-facing
-notification and audit behavior remains available, but approver-targeted
-outbox delivery is omitted when no valid recipient exists. No ADMIN fallback
-or manufactured approver is restored; the later decision must use
+persists `CANCELLATION_REQUESTED`. Unavailable owner initiation leaves no
+current exception approver relationship unless a fresh valid relationship was
+resolved; stale relationship state and its assignment timestamp are cleared,
+with action-generation invalidation when the effective assignment changes.
+The resulting unavailable requests are discoverable by the recovery candidate
+query. Employee-facing notification and audit behavior remains available, but
+approver-targeted outbox delivery is omitted when no valid recipient exists.
+No ADMIN fallback or manufactured approver is restored; the later decision must use
 `leave.recovery.manage / ALL`.
 
 Leave exception-approver resolution no longer searches for or persists an

@@ -517,11 +517,13 @@ describe("POST /api/leave/cancel", () => {
         });
     });
 
-    it("records cancellation for recovery when no effective approver is available", async () => {
+    it("clears a stale assignment when recording a cancellation recovery request", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest({
             status: "APPROVED",
             cancellationReason: null,
             cancellationRequestedAt: null,
+            exceptionApproverId: 30,
+            exceptionApproverAssignedAt: new Date("2099-01-01T00:00:00.000Z"),
             approver: {
                 id: 20,
                 firstName: "Former",
@@ -530,6 +532,20 @@ describe("POST /api/leave/cancel", () => {
                 status: "INACTIVE",
                 deletedAt: null,
                 user: null,
+            },
+            exceptionApprover: {
+                id: 30,
+                firstName: "Previous",
+                lastName: "Approver",
+                email: "previous@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 30,
+                    email: "previous@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
             },
         }));
         vi.mocked(prisma.employee.findUnique).mockResolvedValue({ manager: null } as never);
@@ -557,6 +573,10 @@ describe("POST /api/leave/cancel", () => {
         }));
 
         expect(response.status).toBe(200);
+        const responseBody = await response.json();
+        expect(responseBody.data.exceptionApproverId).toBeNull();
+        expect(responseBody.data.exceptionApproverAssignedAt).toBeNull();
+        expect(responseBody.data.exceptionApprover).toBeNull();
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
             where: expect.objectContaining({
                 id: "leave-cancellation",
@@ -570,7 +590,14 @@ describe("POST /api/leave/cancel", () => {
                 cancellationRequestedAt: expect.any(Date),
             }),
         });
-        expect(prisma.leaveRequest.update).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.update).toHaveBeenCalledWith({
+            where: { id: "leave-cancellation" },
+            data: {
+                exceptionApproverId: null,
+                exceptionApproverAssignedAt: null,
+                approvalActionVersion: { increment: 1 },
+            },
+        });
         expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
         expect(prisma.notification.create).toHaveBeenCalledWith({
             data: expect.objectContaining({

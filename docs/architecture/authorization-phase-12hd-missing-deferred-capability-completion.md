@@ -65,8 +65,11 @@ An unavailable effective approver does not abort owner-side initiation. If the
 resolver returns `null`, an owner-authorized not-taken request remains in the
 canonical `APPROVED` + `notTakenRequestedAt` pending state, and an
 owner-authorized approved cancellation transitions to
-`CANCELLATION_REQUESTED`. Both keep `exceptionApproverId` unset/null and remain
-visible to the canonical recovery-candidate query. No ADMIN or other
+`CANCELLATION_REQUESTED`. Unavailable owner initiation leaves no current
+exception approver relationship unless a fresh valid relationship was resolved;
+a stale relationship and assignment timestamp are cleared with the applicable
+action-generation invalidation. Both remain visible to the canonical
+recovery-candidate query when no valid approver exists. No ADMIN or other
 role-derived approver is manufactured. Employee-facing notification and audit
 records are preserved, while approver-targeted outbox delivery is omitted when
 there is no valid approver recipient. The later decision still requires

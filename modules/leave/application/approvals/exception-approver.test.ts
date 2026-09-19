@@ -278,6 +278,65 @@ describe("resolveLeaveExceptionApprover", () => {
         expect(updateCall?.data).not.toHaveProperty("approvalActionVersion");
     });
 
+    it("clears a stale assignment and increments the generation when resolution is unavailable", async () => {
+        const assignedAt = new Date("2099-01-01T00:00:00.000Z");
+        const state = {
+            approverId: 20,
+            exceptionApproverId: 30 as number | null,
+            exceptionApproverAssignedAt: assignedAt as Date | null,
+            approvalActionVersion: 4,
+        };
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(state as never);
+        vi.mocked(prisma.leaveRequest.update).mockImplementation((async ({ data }: { data: unknown }) => {
+            const updateData = data as {
+                exceptionApproverId?: number | null;
+                exceptionApproverAssignedAt?: Date | null;
+                approvalActionVersion?: { increment: number };
+            };
+            state.exceptionApproverId = updateData.exceptionApproverId ?? null;
+            state.exceptionApproverAssignedAt = updateData.exceptionApproverAssignedAt ?? null;
+            state.approvalActionVersion += updateData.approvalActionVersion?.increment ?? 0;
+            return state;
+        }) as never);
+
+        await persistLeaveExceptionApprover(
+            prisma as unknown as Prisma.TransactionClient,
+            "leave-clear-stale-assignment",
+            null,
+        );
+
+        expect(state).toEqual({
+            approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
+            approvalActionVersion: 5,
+        });
+        expect(prisma.leaveRequest.update).toHaveBeenCalledWith({
+            where: { id: "leave-clear-stale-assignment" },
+            data: {
+                exceptionApproverId: null,
+                exceptionApproverAssignedAt: null,
+                approvalActionVersion: { increment: 1 },
+            },
+        });
+    });
+
+    it("does not update an already clear exception assignment", async () => {
+        vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
+            approverId: 20,
+            exceptionApproverId: null,
+            exceptionApproverAssignedAt: null,
+        } as never);
+
+        await persistLeaveExceptionApprover(
+            prisma as unknown as Prisma.TransactionClient,
+            "leave-clear-assignment-noop",
+            null,
+        );
+
+        expect(prisma.leaveRequest.update).not.toHaveBeenCalled();
+    });
+
     it("serializes concurrent retries of the same reassignment without double incrementing", async () => {
         const recoveryApprover = buildAdmin(40);
         const state = {

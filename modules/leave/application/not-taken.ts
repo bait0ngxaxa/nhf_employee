@@ -156,9 +156,7 @@ export async function requestLeaveNotTaken(
             existingApprover: leaveRequest.exceptionApprover,
             reuseExisting: false,
         });
-        if (exceptionApprover) {
-            await persistLeaveExceptionApprover(tx, leaveRequest.id, exceptionApprover);
-        }
+        await persistLeaveExceptionApprover(tx, leaveRequest.id, exceptionApprover);
         const requestedAt = new Date();
         const claimedRequest = await tx.leaveRequest.updateMany({
             where: {
@@ -180,12 +178,11 @@ export async function requestLeaveNotTaken(
             ...leaveRequest,
             notTakenReason: input.note,
             notTakenRequestedAt: requestedAt,
-            exceptionApproverId: exceptionApprover
-                ? exceptionApprover.exceptionApproverId
-                : leaveRequest.exceptionApproverId,
-            exceptionApproverAssignedAt: exceptionApprover
-                ? exceptionApprover.assignedAt
-                : leaveRequest.exceptionApproverAssignedAt,
+            exceptionApproverId: exceptionApprover?.exceptionApproverId ?? null,
+            exceptionApproverAssignedAt: exceptionApprover?.assignedAt ?? null,
+            exceptionApprover: exceptionApprover && exceptionApprover.exceptionApproverId !== null
+                ? exceptionApprover.approver
+                : null,
         };
         const leaveSummary = {
             startDate: leaveRequest.startDate.toISOString(),
@@ -231,9 +228,7 @@ export async function requestLeaveNotTaken(
                 metadata: {
                     ...buildLeaveAuditContext(leaveRequest, { reason: input.note }),
                     originalApproverId: leaveRequest.approverId,
-                    exceptionApproverId: exceptionApprover
-                        ? exceptionApprover.exceptionApproverId
-                        : leaveRequest.exceptionApproverId,
+                    exceptionApproverId: exceptionApprover?.exceptionApproverId ?? null,
                     ...(exceptionApprover
                         ? { exceptionApproverSource: exceptionApprover.source }
                         : {}),

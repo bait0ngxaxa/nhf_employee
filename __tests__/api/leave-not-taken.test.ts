@@ -338,7 +338,7 @@ describe("/api/leave/not-taken", () => {
         });
     });
 
-    it("records a not-taken request for recovery when no effective approver is available", async () => {
+    it("clears a stale assignment when recording a not-taken recovery request", async () => {
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue({
             id: "leave-recovery-request",
             employeeId: 10,
@@ -353,8 +353,8 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
             status: "APPROVED",
             approverId: 20,
-            exceptionApproverId: null,
-            exceptionApproverAssignedAt: null,
+            exceptionApproverId: 30,
+            exceptionApproverAssignedAt: new Date("2099-01-01T00:00:00.000Z"),
             approvalActionVersion: 1,
             approvedAt: new Date("2000-01-01T00:00:00.000Z"),
             rejectReason: null,
@@ -385,6 +385,20 @@ describe("/api/leave/not-taken", () => {
                 deletedAt: null,
                 user: null,
             },
+            exceptionApprover: {
+                id: 30,
+                firstName: "Previous",
+                lastName: "Approver",
+                email: "previous@example.com",
+                status: "ACTIVE",
+                deletedAt: null,
+                user: {
+                    id: 30,
+                    email: "previous@example.com",
+                    isActive: true,
+                    deletedAt: null,
+                },
+            },
         } as never);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
 
@@ -397,6 +411,10 @@ describe("/api/leave/not-taken", () => {
         }));
 
         expect(response.status).toBe(200);
+        const responseBody = await response.json();
+        expect(responseBody.data.exceptionApproverId).toBeNull();
+        expect(responseBody.data.exceptionApproverAssignedAt).toBeNull();
+        expect(responseBody.data.exceptionApprover).toBeNull();
         expect(prisma.leaveRequest.updateMany).toHaveBeenCalledWith({
             where: expect.objectContaining({
                 id: "leave-recovery-request",
@@ -416,7 +434,14 @@ describe("/api/leave/not-taken", () => {
             }),
         });
         expect(prisma.notificationOutbox.create).not.toHaveBeenCalled();
-        expect(prisma.leaveRequest.update).not.toHaveBeenCalled();
+        expect(prisma.leaveRequest.update).toHaveBeenCalledWith({
+            where: { id: "leave-recovery-request" },
+            data: {
+                exceptionApproverId: null,
+                exceptionApproverAssignedAt: null,
+                approvalActionVersion: { increment: 1 },
+            },
+        });
         expect(prisma.auditLog.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 action: "LEAVE_REQUEST_NOT_TAKEN_REQUEST",

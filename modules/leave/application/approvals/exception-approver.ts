@@ -148,34 +148,48 @@ export async function resolveLeaveExceptionApprover(
 
 /**
  * Persist the effective exception assignment and its generation together.
+ * A null resolution clears the assignment for the next workflow generation.
  * Callers must hold the LeaveRequest row lock before resolving this assignment.
  */
 export async function persistLeaveExceptionApprover(
     tx: Prisma.TransactionClient,
     leaveId: string,
-    resolution: LeaveExceptionApproverResolution,
+    resolution: LeaveExceptionApproverResolution | null,
 ): Promise<void> {
-    if (!resolution.shouldPersist) return;
+    if (resolution && !resolution.shouldPersist) return;
 
     const currentLeaveRequest = await tx.leaveRequest.findUnique({
         where: { id: leaveId },
         select: {
             approverId: true,
             exceptionApproverId: true,
+            exceptionApproverAssignedAt: true,
         },
     });
     if (!currentLeaveRequest) {
         throw new Error("Leave request not found");
     }
 
+    const nextExceptionApproverId = resolution?.exceptionApproverId ?? null;
+    const nextExceptionApproverAssignedAt = resolution?.assignedAt ?? null;
+    if (
+        resolution === null
+        && currentLeaveRequest.exceptionApproverId === null
+        && currentLeaveRequest.exceptionApproverAssignedAt === null
+    ) {
+        return;
+    }
+
+    const nextEffectiveApproverId = resolution?.approver.id
+        ?? currentLeaveRequest.approverId;
     const assignmentChanged = getEffectiveLeaveApproverId(currentLeaveRequest)
-        !== resolution.approver.id;
+        !== nextEffectiveApproverId;
 
     await tx.leaveRequest.update({
         where: { id: leaveId },
         data: {
-            exceptionApproverId: resolution.exceptionApproverId,
-            exceptionApproverAssignedAt: resolution.assignedAt,
+            exceptionApproverId: nextExceptionApproverId,
+            exceptionApproverAssignedAt: nextExceptionApproverAssignedAt,
             ...(assignmentChanged
                 ? { approvalActionVersion: { increment: 1 } }
                 : {}),
