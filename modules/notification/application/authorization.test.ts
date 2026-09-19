@@ -12,6 +12,7 @@ import type * as AuthorizationModule from "@/modules/authorization";
 import {
     assertNotificationCapabilityScope,
     buildNotificationAuthorizationContext,
+    defaultNotificationScopes,
     NotificationCapabilityDeniedError,
     NOTIFICATION_CAPABILITIES,
     resolveNotificationCapability,
@@ -92,13 +93,19 @@ describe("Notification authorization default-policy adapter", () => {
                 decision(capability, false, [], "NO_APPLICABLE_GRANT"),
             );
 
-            const result = await resolveNotificationCapability(
-                context(),
+            const user = await resolveNotificationCapability(
+                context("USER"),
+                capability,
+            );
+            const admin = await resolveNotificationCapability(
+                context("ADMIN"),
                 capability,
             );
 
-            expect(result.defaultScopes).toEqual(["OWN"]);
-            expect(result.scopes).toEqual(["OWN"]);
+            expect(defaultNotificationScopes(capability)).toEqual(["OWN"]);
+            expect(user.defaultScopes).toEqual(["OWN"]);
+            expect(admin.defaultScopes).toEqual(user.defaultScopes);
+            expect(admin.scopes).toEqual(user.scopes);
         },
     );
 

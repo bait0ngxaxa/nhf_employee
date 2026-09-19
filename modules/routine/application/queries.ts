@@ -1185,13 +1185,7 @@ export async function getRoutineSummary(
     within30Days: number;
     asOfDate: string;
 }> {
-    const scope = queryActor.scope ?? (
-        queryActor.actor.mode === "LIFF_SELF_SERVICE"
-            ? "mine"
-            : queryActor.actor.role === "ADMIN"
-                ? "all"
-                : "mine"
-    );
+    const scope = queryActor.scope ?? "mine";
     if (scope !== "mine" && scope !== "all") {
         throw new RoutineValidationError("ขอบเขตสรุป Routine ไม่ถูกต้อง");
     }

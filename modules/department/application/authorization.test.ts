@@ -12,6 +12,7 @@ import type * as AuthorizationModule from "@/modules/authorization";
 import {
     assertDepartmentCapabilityScope,
     buildDepartmentAuthorizationContext,
+    defaultDepartmentScopes,
     DEPARTMENT_CAPABILITIES,
     resolveDepartmentCapability,
 } from "./authorization";
@@ -81,19 +82,25 @@ describe("Department authorization default-policy adapter", () => {
         } satisfies AuthorizationActor);
     });
 
-    it("composes the USER default policy when no configured grant applies", async () => {
+    it("composes the same role-neutral default policy when no configured grant applies", async () => {
         mocks.resolve.mockResolvedValue(
             decision("department.read", false, [], "NO_APPLICABLE_GRANT"),
         );
 
-        const result = await resolveDepartmentCapability(
-            context(),
+        const user = await resolveDepartmentCapability(
+            context("USER"),
+            "department.read",
+        );
+        const admin = await resolveDepartmentCapability(
+            context("ADMIN"),
             "department.read",
         );
 
-        expect(result.defaultScopes).toEqual(["ALL"]);
-        expect(result.scopes).toEqual(["ALL"]);
-        expect(assertDepartmentCapabilityScope(result, "ALL")).toBe(result);
+        expect(defaultDepartmentScopes("department.read")).toEqual(["ALL"]);
+        expect(user.defaultScopes).toEqual(["ALL"]);
+        expect(admin.defaultScopes).toEqual(user.defaultScopes);
+        expect(admin.scopes).toEqual(user.scopes);
+        expect(assertDepartmentCapabilityScope(user, "ALL")).toBe(user);
     });
 
     it("retains the default policy after a configured grant is removed", async () => {

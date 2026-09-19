@@ -16,6 +16,7 @@ import {
     assertEmployeeCapabilityScope,
     buildEmployeeAuthorizationContext,
     buildEmployeeAuthorizedCommandActor,
+    defaultEmployeeScopes,
     EmployeeCapabilityDeniedError,
     EMPLOYEE_CAPABILITIES,
     resolveEmployeeCapability,
@@ -159,6 +160,45 @@ describe("Employee authorization adapter", () => {
         expect(result.defaultScopes).toEqual(["ALL"]);
         expect(result.scopes).toEqual(["ALL"]);
     });
+
+    it.each(EMPLOYEE_CAPABILITIES)(
+        "keeps the Employee default policy independent from systemRole for %s",
+        async (capability) => {
+            const expectedScopes = defaultEmployeeScopes(capability);
+            const noGrant = decision(
+                capability,
+                false,
+                [],
+                "NO_APPLICABLE_GRANT",
+            );
+
+            mocks.resolve.mockResolvedValue(noGrant);
+            const userResult = resolveEmployeeCapability(
+                context("USER"),
+                capability,
+            );
+            mocks.resolve.mockResolvedValue(noGrant);
+            const adminResult = resolveEmployeeCapability(
+                context("ADMIN"),
+                capability,
+            );
+
+            if (expectedScopes.length === 0) {
+                await expect(userResult).rejects.toMatchObject({
+                    authorizationReason: "NO_APPLICABLE_GRANT",
+                });
+                await expect(adminResult).rejects.toMatchObject({
+                    authorizationReason: "NO_APPLICABLE_GRANT",
+                });
+                return;
+            }
+
+            const [user, admin] = await Promise.all([userResult, adminResult]);
+            expect(user.defaultScopes).toEqual(expectedScopes);
+            expect(admin.defaultScopes).toEqual(expectedScopes);
+            expect(admin.scopes).toEqual(user.scopes);
+        },
+    );
 
     it.each([
         "employee.create",

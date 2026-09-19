@@ -113,11 +113,9 @@ export function buildStockAuthorizationContext(
 }
 
 export function defaultStockScopes(
-    actor: StockAuthorizationActor,
+    _actor: StockAuthorizationActor,
     capability: StockCapability,
 ): readonly AuthorizationScope[] {
-    if (actor.systemRole !== "USER") return [];
-
     switch (capability) {
         case "stock.catalog.read":
             return ["ALL"];

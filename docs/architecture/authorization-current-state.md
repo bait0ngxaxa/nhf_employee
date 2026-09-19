@@ -27,20 +27,24 @@ The role-neutral configured evaluator and composition primitive are implemented
 and tested, but the production-facing resolver singleton remains on the
 temporary legacy ADMIN compatibility strategy. `ADMIN` therefore still
 receives central `SYSTEM_ROLE` business authority in current production paths,
-and current domain defaults/routes/presentation behavior remain unchanged.
+and domain default-policy rebaseline had not yet begun at the Phase 12H-B
+boundary.
 Phase 12H-A supersedes both Phase 12A's long-term `ADMIN`
 business-authority target and the selected legacy USER-default permanence that
 12H-A explicitly narrows, especially Routine broad `task.read`, `summary.read`,
 and `task.export` authority. The historical Phase 12A statements remain
 historical evidence at that phase boundary. **Role-neutral core:
-IMPLEMENTED; role-neutral production enforcement: NOT CUT OVER; legacy ADMIN
-business compatibility: TEMPORARILY ACTIVE.** The next handoff is Phase 12H-C —
-Domain Default Policy Rebaseline. See
-[authorization-phase-12hb-role-neutral-core.md](authorization-phase-12hb-role-neutral-core.md).
+IMPLEMENTED; role-neutral domain defaults: REBASELINED; role-neutral
+production enforcement: NOT CUT OVER; legacy ADMIN business compatibility:
+TEMPORARILY ACTIVE.** Phase 12H-C — Domain Default Policy Rebaseline is now
+**COMPLETE**. The next handoff is Phase 12H-D — Missing/deferred capability
+completion. See
+[authorization-phase-12hc-domain-default-policy-rebaseline.md](authorization-phase-12hc-domain-default-policy-rebaseline.md)
+and [authorization-phase-12hb-role-neutral-core.md](authorization-phase-12hb-role-neutral-core.md).
 
 สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
-Phase 12H-B — **เสร็จสิ้นเฉพาะ role-neutral core**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; ขั้นถัดไป Phase 12H-C — Domain Default Policy Rebaseline<br>
-วันที่สำรวจ: 2026-09-18<br>
+Phase 12H-C — **เสร็จสิ้น**; role-neutral domain defaults — **rebaselined**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; ขั้นถัดไป Phase 12H-D — Missing/deferred capability completion<br>
+วันที่สำรวจ: 2026-09-19<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
 หมายเหตุ Phase 12H-A: target ระยะยาวเป็น role-neutral business authorization
@@ -66,7 +70,7 @@ GRANTABLE`, `0 POLICY_ACTIVATION_REQUIRED`, `2 DEFERRED`. `DEFERRED` ที่�
 
 หมายเหตุ: บันทึก Phase ก่อนหน้าในเอกสารนี้เป็น historical evidence ตาม
 boundary ของแต่ละ phase; สถานะ live หลัง final Phase 12G-A closure ให้ยึดข้อความ
-ด้านบน ตาราง capability/route ปัจจุบัน และหัวข้อ 9.10 เป็นหลัก
+ด้านบน ตาราง capability/route ปัจจุบัน และหัวข้อ 9.12 เป็นหลัก
 
 หมายเหตุ Phase 11C (historical final closure): Phase 11B enforcement hardening — **CLOSED** และ Phase 11C security regression audit — **CLOSED** ที่ baseline `5669d79ca359701bc6a637079ca738575b731cf7`. Matrix สุดท้ายมี 89 cases (`80 DIRECT`, `6 INDIRECT`, `0 MISSING`, `3 N/A`); operation ledger มี 81/81 `DIRECT`, protected routes 78/78 `DIRECT`, Authorization Administration 17/17 `DIRECT` และ combined explicit ledger 98/98 `DIRECT`. Mandatory Phase 11C.2 work items เหลือ `0`. Compatibility policies และ deferred surfaces ยังคงอยู่, สี่ future policy families ยังอยู่นอก Phase 11, และ production authorization database grant inventory ยังไม่ได้ audit. เอกสารนี้คงผล MySQL fixture failure ไว้เป็น historical evidence; Phase 11D ได้ตรวจสอบและแก้ stale fixture แล้วโดยไม่เปลี่ยน production authorization semantics. รายละเอียดเดิมอยู่ใน [authorization-phase-11c-closure.md](authorization-phase-11c-closure.md)
 
@@ -1136,9 +1140,12 @@ Evidence and the complete test/invariant inventory are in
 The exact next handoff is Phase 12D — remaining explicitly deferred non-IT
 authorization surfaces; Email Request/future IT remains outside that boundary.
 
-## 9.7 Phase 12D Routine deferred capability migration
+## 9.7 Historical Phase 12D Routine deferred capability migration
 
-Phase 12D is closed for the three remaining registered Routine capabilities:
+Phase 12D is closed for the three remaining registered Routine capabilities at
+its historical boundary. Its recorded defaults below are retained as evidence;
+the Phase 12H-C closure in section 9.12 supersedes the selected broad defaults
+for the current target:
 `routine.task.export`, `routine.summary.read`, and `routine.reference.read`.
 The source and tests confirmed that the export route previously used the
 broad authenticated workforce/Admin boundary and a `DEFERRED_EXPORT` work-item
@@ -1341,6 +1348,44 @@ mutate production authorization. Required migration readback, production
 inventory, target approval, canary mutation, post-canary verification, rollback
 and observation-window evidence are all **NOT RUN** until an authorized
 operator performs them.
+
+## 9.12 Phase 12H-C Domain Default Policy Rebaseline
+
+Phase 12H-C is **COMPLETE** against baseline `9d2b41c03b29a6f9fb6175f6ce7027d0e520b3d1` (`docs(auth): align compatibility seam lifecycle with rollout roadmap`). The phase rebaselines the domain-provided Default Domain Policy so equivalent trusted USER and ADMIN context receives the same default scopes. It does not replace the production resolver singleton and does not remove the legacy ADMIN compatibility seam.
+
+The role-neutral default matrix is:
+
+| Domain | Capability | Default Domain Policy |
+| --- | --- | --- |
+| Employee | `employee.read`, `employee.stats.read`, `employee.export` | `ALL` |
+| Employee | `employee.create`, `employee.update`, `employee.delete`, `employee.import` | none |
+| Department | `department.read` | `ALL` |
+| Routine | `routine.task.read` | `CREATED + ASSIGNED`; `work-item` `mine` remains `ASSIGNED`; requested `all` does not create `ALL` |
+| Routine | `routine.task.create` / `update` / `delete` | `OWN` / `CREATED + ASSIGNED` / `CREATED` |
+| Routine | `routine.occurrence.read` | `ASSIGNED` |
+| Routine | `routine.occurrence.override`, `reassign`, `change_due_date`, `routine.import.manage`, `routine.task.export` | none |
+| Routine | `routine.summary.read` | `ASSIGNED`, independent of requested summary view |
+| Routine | `routine.reference.read` | `OWN`; configured `ALL` can broaden Dashboard reference data only |
+| Stock | `stock.catalog.read` | `ALL` |
+| Stock | `stock.request.read`, `create`, `cancel` | `OWN` |
+| Stock | `stock.inventory.manage`, `request.process`, `report.export` | none |
+| Leave | `leave.request.read`, `create`, `cancel` | `OWN` |
+| Leave | `leave.approval.read`, `request.approve` | `ASSIGNED` |
+| Leave | `leave.cancellation.decide` | `ASSIGNED` on Dashboard; none on unsupported channels |
+| Leave | `leave.request.not_taken` | `OWN + ASSIGNED` |
+| Leave | `leave.approver.manage` | none |
+| Audit | `audit.read` | none; configured `ALL` is required |
+| Notification | `notification.inbox.read`, `notification.inbox.update` | `OWN` |
+
+Routine narrowing is enforced at the authorization/query boundary. A requested task `scope=all` is a view intent, not authority; without configured `ALL`, the task query uses the actor's `CREATED` / `ASSIGNED` relationship predicates. Summary defaults to `mine` in the application query path, and an explicit `all` request is also constrained to the assigned relationship unless effective configured `ALL` exists. Export has no default and therefore denies a normal actor without configured `routine.task.export / ALL`; an existing configured `ALL` still reaches the existing exporter and its limits, batching, field projection, and audit behavior. LIFF remains a self-service channel: the channel policy is applied to equivalent USER and ADMIN actors, and configured broad grants cannot turn LIFF task/reference access into a Dashboard administrative surface.
+
+The phase intentionally preserves active-account/workforce checks, ownership and relationship predicates, query pagination/filtering, resource and lifecycle rules, transactions/locks, validation, idempotency, notifications, audit behavior, export limits and data minimization. Department remains reference data and does not infer Team, TeamRole, or capability authority.
+
+Current production behavior is intentionally mixed during the rollout. Normal USER paths now use the rebaselined defaults, including the Routine narrowing above. Current Dashboard ADMIN business authority may still differ because the production adapters continue to call `composeLegacyAdminCompatibleAuthorizationAuthority()`, which preserves the central `SYSTEM_ROLE / ADMIN` decision. `SYSTEM_ROLE` support, the production `authorization` singleton, and account-only ADMIN lifecycle/recovery seams remain unchanged. This difference is compatibility behavior, not a difference in the target Default Domain Policy.
+
+Explicitly deferred: `leave.recovery.manage`, Email Request completion, grant/readiness data changes, schema/migration/seed/backfill work, broad presentation and route ADMIN-gate migration, and final role-neutral production enforcement cutover. Those belong to Phase 12H-D, 12H-F, 12H-E/readiness work, and 12H-G as applicable. Historical sections 9.4, 9.7, and earlier phase closure documents retain the behavior recorded at their boundaries; this section supersedes their selected Routine broad-default claims for the current target.
+
+Verification evidence for this closure is recorded in [authorization-phase-12hc-domain-default-policy-rebaseline.md](authorization-phase-12hc-domain-default-policy-rebaseline.md). Next: **Phase 12H-D — Missing/deferred capability completion**.
 
 ## 10. Explicit non-goals for Phase 0
 

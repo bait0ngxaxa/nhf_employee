@@ -134,9 +134,9 @@ describe("NHF Routine query authorization", () => {
                 ? ["ALL"]
                 : capability === "routine.task.read"
                     ? options?.taskReadView === "work-item"
-                        ? options?.requestedScope === "all"
-                            ? ["ALL"]
-                            : ["ASSIGNED"]
+                        ? options?.requestedScope === "mine"
+                            ? ["ASSIGNED"]
+                            : ["CREATED", "ASSIGNED"]
                         : ["CREATED", "ASSIGNED"]
                             : capability === "routine.task.update"
                         ? ["CREATED", "ASSIGNED"]
@@ -146,10 +146,8 @@ describe("NHF Routine query authorization", () => {
                                 ? ["ASSIGNED"]
                                 : capability === "routine.task.export"
                                     ? ["ALL"]
-                                    : capability === "routine.summary.read"
-                                        ? options?.summaryView === "all"
-                                            ? ["ALL"]
-                                            : ["ASSIGNED"]
+                                : capability === "routine.summary.read"
+                                        ? ["ASSIGNED"]
                                         : ["OWN"];
             return {
                 actor: {
@@ -456,7 +454,7 @@ describe("NHF Routine query authorization", () => {
                 email: "admin@example.com",
                 role: "ADMIN",
             },
-            employeeId: null,
+            employeeId: 42,
         });
 
         expect(result).toMatchObject({
@@ -467,7 +465,10 @@ describe("NHF Routine query authorization", () => {
         expect(result).not.toHaveProperty("overdue");
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { isActive: true },
+                where: {
+                    isActive: true,
+                    assignees: { some: { employeeId: 42 } },
+                },
                 select: { id: true },
             }),
         );
@@ -495,7 +496,7 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("allows a regular user to summarize the all-task scope", async () => {
+    it("constrains a regular user's requested all-task summary without ALL", async () => {
         await getRoutineSummary({
             actor: {
                 id: 5,
@@ -508,7 +509,10 @@ describe("NHF Routine query authorization", () => {
 
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { isActive: true },
+                where: {
+                    isActive: true,
+                    assignees: { some: { employeeId: 21 } },
+                },
                 select: { id: true },
             }),
         );
@@ -517,6 +521,42 @@ describe("NHF Routine query authorization", () => {
             21,
             "routine.summary.read",
             { summaryView: "all" },
+        );
+    });
+
+    it("allows configured ALL to broaden a Dashboard summary", async () => {
+        resolveRoutineCapabilityMock.mockResolvedValueOnce({
+            actor: {
+                userId: 5,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            capability: "routine.summary.read",
+            decision: {
+                capability: "routine.summary.read",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [{
+                    capability: "routine.summary.read",
+                    scope: "ALL",
+                    source: { type: "USER", userId: 5 },
+                }],
+            },
+            defaultScopes: ["ASSIGNED"],
+            scopes: ["ALL"],
+            isAdministrative: false,
+            liffSelfServicePolicyApplied: false,
+        });
+
+        await getRoutineSummary({
+            actor: { id: 5, email: "user@example.com", role: "USER" },
+            employeeId: 21,
+            scope: "all",
+        });
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { isActive: true } }),
         );
     });
 
@@ -645,7 +685,7 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("returns all active tasks for a regular user's all-task scope with per-task capabilities", async () => {
+    it("keeps a regular user's requested all-task scope relationship-constrained", async () => {
         prismaMock.routineTask.findMany.mockResolvedValue(asNever([
             taskRow(71, 42, 5),
             taskRow(72, 21, 99),
@@ -660,7 +700,15 @@ describe("NHF Routine query authorization", () => {
         );
 
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { isActive: true } }),
+            expect.objectContaining({
+                where: {
+                    isActive: true,
+                    OR: [
+                        { createdById: 5 },
+                        { assignees: { some: { employeeId: 21 } } },
+                    ],
+                },
+            }),
         );
         expect(resolveRoutineCapabilityMock).toHaveBeenCalledWith(
             expect.objectContaining({ id: 5, role: "USER" }),
@@ -673,6 +721,41 @@ describe("NHF Routine query authorization", () => {
             { id: 72, canEdit: true },
             { id: 73, canEdit: false },
         ]);
+    });
+
+    it("allows configured ALL to broaden a Dashboard task query", async () => {
+        resolveRoutineCapabilityMock.mockResolvedValueOnce({
+            actor: {
+                userId: 5,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "DASHBOARD",
+            },
+            capability: "routine.task.read",
+            decision: {
+                capability: "routine.task.read",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [{
+                    capability: "routine.task.read",
+                    scope: "ALL",
+                    source: { type: "USER", userId: 5 },
+                }],
+            },
+            defaultScopes: ["CREATED", "ASSIGNED"],
+            scopes: ["ALL"],
+            isAdministrative: false,
+            liffSelfServicePolicyApplied: false,
+        });
+
+        await getRoutineTaskWorkItems(
+            { scope: "all", page: 1, limit: 20 },
+            { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
+        );
+
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { isActive: true } }),
+        );
     });
 
     it("keeps a Dashboard Admin mine work-item query employee-scoped", async () => {
@@ -1678,7 +1761,7 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("lets a configured LIFF USER ALL grant broaden task detail beyond self-service relationships", async () => {
+    it("keeps a configured LIFF USER ALL grant inside self-service relationships", async () => {
         const authorizationActor = {
             userId: 5,
             employeeId: 42,
@@ -1702,7 +1785,7 @@ describe("NHF Routine query authorization", () => {
                 defaultScopes: ["CREATED", "ASSIGNED"],
                 scopes: ["ALL"],
                 isAdministrative: false,
-                liffSelfServicePolicyApplied: false,
+                liffSelfServicePolicyApplied: true,
             })
             .mockResolvedValueOnce({
                 actor: authorizationActor,
@@ -1740,7 +1823,22 @@ describe("NHF Routine query authorization", () => {
 
         expect(result.id).toBe(71);
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { id: 71 } }),
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    id: 71,
+                    OR: expect.arrayContaining([
+                        expect.objectContaining({
+                            occurrences: expect.objectContaining({
+                                some: expect.objectContaining({
+                                    assignees: expect.objectContaining({
+                                        some: expect.objectContaining({ employeeId: 42 }),
+                                    }),
+                                }),
+                            }),
+                        }),
+                    ]),
+                }),
+            }),
         );
     });
 

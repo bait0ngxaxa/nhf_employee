@@ -58,6 +58,22 @@ describe("GET /api/routines/summary", () => {
         expect(mocks.getSummary).toHaveBeenNthCalledWith(2, expect.objectContaining({ scope: "all" }));
     });
 
+    it("defaults a Dashboard admin without a requested scope to mine", async () => {
+        mocks.requireSession.mockResolvedValue({
+            ok: true,
+            user: { id: 99, email: "admin@example.com", role: "ADMIN" },
+            employeeId: 42,
+        });
+
+        const response = await GET(new NextRequest("http://localhost/api/routines/summary"));
+
+        expect(response.status).toBe(200);
+        expect(mocks.getSummary).toHaveBeenCalledWith(expect.objectContaining({
+            scope: "mine",
+            employeeId: 42,
+        }));
+    });
+
     it("allows a regular user's request for the all scope", async () => {
         const response = await GET(new NextRequest("http://localhost/api/routines/summary?scope=all"));
 

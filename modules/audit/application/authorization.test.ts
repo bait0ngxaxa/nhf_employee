@@ -136,6 +136,25 @@ describe("Audit authorization migration adapter", () => {
         });
     });
 
+    it("keeps Audit without default authority for USER and ADMIN", async () => {
+        for (const role of ["USER", "ADMIN"] as const) {
+            mocks.resolve.mockResolvedValue(
+                decision("audit.read", false, [], "NO_APPLICABLE_GRANT"),
+            );
+
+            await expect(
+                resolveAuditCapabilityForMigration(
+                    context(role),
+                    "audit.read",
+                ),
+            ).rejects.toMatchObject({
+                capability: "audit.read",
+                authorizationReason: "NO_APPLICABLE_GRANT",
+                statusCode: 403,
+            });
+        }
+    });
+
     it("does not bridge structural denials or resolver failures", async () => {
         for (const reason of ["UNKNOWN_CAPABILITY", "CHANNEL_NOT_SUPPORTED"] as const) {
             mocks.resolve.mockResolvedValue(

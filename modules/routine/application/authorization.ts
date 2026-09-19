@@ -124,18 +124,17 @@ function freezeScopes(
 }
 
 export function defaultRoutineScopes(
-    actor: AuthorizationActor,
+    _actor: AuthorizationActor,
     capability: RoutineCapability,
     options: RoutineCapabilityOptions = {},
 ): readonly AuthorizationScope[] {
-    if (actor.systemRole !== "USER") return [];
-
     switch (capability) {
         case "routine.task.read":
-            if (options.taskReadView === "work-item") {
-                return options.requestedScope === "all"
-                    ? ["ALL"]
-                    : ["ASSIGNED"];
+            if (
+                options.taskReadView === "work-item"
+                && options.requestedScope === "mine"
+            ) {
+                return ["ASSIGNED"];
             }
             return ["CREATED", "ASSIGNED"];
         case "routine.task.create":
@@ -152,11 +151,9 @@ export function defaultRoutineScopes(
         case "routine.import.manage":
             return [];
         case "routine.task.export":
-            return ["ALL"];
+            return [];
         case "routine.summary.read":
-            return options.summaryView === "all"
-                ? ["ALL"]
-                : ["ASSIGNED"];
+            return ["ASSIGNED"];
         case "routine.reference.read":
             return ["OWN"];
     }
@@ -169,10 +166,11 @@ function routineLiffSelfServiceScopes(
 
     switch (capability) {
         case "routine.task.read":
-            if (options.taskReadView === "work-item") {
-                return options.requestedScope === "all"
-                    ? ["ALL"]
-                    : ["ASSIGNED"];
+            if (
+                options.taskReadView === "work-item"
+                && options.requestedScope === "mine"
+            ) {
+                return ["ASSIGNED"];
             }
             return ["CREATED", "ASSIGNED"];
         case "routine.task.create":
@@ -198,14 +196,8 @@ function routineLiffSelfServiceScopes(
 
 function shouldApplyRoutineLiffSelfServicePolicy(
     actor: AuthorizationActor,
-    capability: RoutineCapability,
 ): boolean {
-    return actor.channel === "LIFF_SELF_SERVICE"
-        && (
-            actor.systemRole === "ADMIN"
-            || capability === "routine.summary.read"
-            || capability === "routine.reference.read"
-        );
+    return actor.channel === "LIFF_SELF_SERVICE";
 }
 
 function isDashboardSystemRoleAuthorization(
@@ -235,7 +227,7 @@ function applyRoutineChannelPolicy(
         );
     }
 
-    if (!shouldApplyRoutineLiffSelfServicePolicy(actor, capability)) {
+    if (!shouldApplyRoutineLiffSelfServicePolicy(actor)) {
         return {
             scopes: composedAuthority.scopes,
             isAdministrative: isDashboardSystemRoleAuthorization(

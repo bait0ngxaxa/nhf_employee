@@ -450,10 +450,14 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
         );
     });
 
-    it("preserves the frozen NO_APPLICABLE_GRANT to ALL bridge only for the task work-item view", async () => {
+    it("constrains requested all task work-items to created or assigned relationships", async () => {
         mocks.prisma.routineOccurrence.findUnique.mockResolvedValue({
             taskId: 71,
             task: { isActive: true },
+        });
+        mocks.prisma.routineOccurrence.findFirst.mockResolvedValueOnce({
+            id: 91,
+            taskId: 71,
         });
 
         const response = await getRoutineOccurrences(request(
@@ -471,10 +475,16 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
             where: expect.objectContaining({
                 id: 71,
                 isActive: true,
+                OR: expect.arrayContaining([
+                    { createdById: USER.id },
+                    {
+                        assignees: {
+                            some: expect.objectContaining({ employeeId: 21 }),
+                        },
+                    },
+                ]),
             }),
         }));
-        expect(taskQuery?.where).not.toHaveProperty("createdById");
-        expect(taskQuery?.where).not.toHaveProperty("assignees");
     });
 
     it("LEDGER-ROU-08 denies an unrelated actor through GET /api/routines/occurrences/:id", async () => {

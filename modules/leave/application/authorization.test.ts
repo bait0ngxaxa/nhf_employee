@@ -153,10 +153,14 @@ describe("Leave authorization adapter", () => {
         ["leave.request.not_taken", ["OWN", "ASSIGNED"]],
         ["leave.approver.manage", []],
     ] as const)(
-        "applies the permanent USER default policy for %s",
+        "applies the same role-neutral default policy for %s",
         async (capability, expectedScopes) => {
             expect(defaultLeaveScopes(
-                context().authorizationActor,
+                context("USER").authorizationActor,
+                capability,
+            )).toEqual(expectedScopes);
+            expect(defaultLeaveScopes(
+                context("ADMIN").authorizationActor,
                 capability,
             )).toEqual(expectedScopes);
             mocks.resolve.mockResolvedValue(
@@ -164,20 +168,23 @@ describe("Leave authorization adapter", () => {
             );
 
             if (expectedScopes.length === 0) {
-                await expect(
-                    resolveLeaveCapability(context(), capability),
-                ).rejects.toMatchObject({
-                    authorizationReason: "NO_APPLICABLE_GRANT",
-                });
+                for (const role of ["USER", "ADMIN"] as const) {
+                    await expect(
+                        resolveLeaveCapability(context(role), capability),
+                    ).rejects.toMatchObject({
+                        authorizationReason: "NO_APPLICABLE_GRANT",
+                    });
+                }
                 return;
             }
 
-            const result = await resolveLeaveCapability(
-                context(),
-                capability,
-            );
-            expect(result.defaultScopes).toEqual(expectedScopes);
-            expect(result.scopes).toEqual(expectedScopes);
+            const [user, admin] = await Promise.all([
+                resolveLeaveCapability(context("USER"), capability),
+                resolveLeaveCapability(context("ADMIN"), capability),
+            ]);
+            expect(user.defaultScopes).toEqual(expectedScopes);
+            expect(admin.defaultScopes).toEqual(expectedScopes);
+            expect(admin.scopes).toEqual(user.scopes);
         },
     );
 

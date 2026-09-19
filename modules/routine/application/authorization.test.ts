@@ -16,6 +16,7 @@ import {
     buildRoutineTaskScope,
     assertActiveEmployeesInTransaction,
     assertActiveRoutineActorInTransaction,
+    defaultRoutineScopes,
     resolveRoutineCapability,
     resolveRoutineCapabilityInTransaction,
     type RoutineCapability,
@@ -270,7 +271,7 @@ describe("Routine authorization adapter", () => {
         ]);
     });
 
-    it("does not turn a requested task view scope into a resolver grant", async () => {
+    it("does not turn a requested task view scope into an ALL resolver grant", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "routine.task.read",
@@ -294,8 +295,8 @@ describe("Routine authorization adapter", () => {
             systemRole: "USER",
             channel: "DASHBOARD",
         });
-        expect(result.scopes).toEqual(["ALL"]);
-        expect(result.defaultScopes).toEqual(["ALL"]);
+        expect(result.scopes).toEqual(["CREATED", "ASSIGNED"]);
+        expect(result.defaultScopes).toEqual(["CREATED", "ASSIGNED"]);
         expect(mocks.resolve).toHaveBeenCalledWith(
             result.actor,
             "routine.task.read",
@@ -375,7 +376,7 @@ describe("Routine authorization adapter", () => {
                     taskReadView: "work-item",
                     requestedScope: "all",
                 } as const,
-                scopes: ["ALL"] as const,
+                scopes: ["CREATED", "ASSIGNED"] as const,
             },
         ];
 
@@ -422,7 +423,7 @@ describe("Routine authorization adapter", () => {
                     taskReadView: "work-item",
                     requestedScope: "all",
                 } as const,
-                scopes: ["ALL"] as const,
+                scopes: ["CREATED", "ASSIGNED"] as const,
             },
             {
                 capability: "routine.task.create" as const,
@@ -447,7 +448,7 @@ describe("Routine authorization adapter", () => {
             {
                 capability: "routine.task.export" as const,
                 options: {},
-                scopes: ["ALL"] as const,
+                scopes: [] as const,
             },
             {
                 capability: "routine.summary.read" as const,
@@ -457,7 +458,7 @@ describe("Routine authorization adapter", () => {
             {
                 capability: "routine.summary.read" as const,
                 options: { summaryView: "all" } as const,
-                scopes: ["ALL"] as const,
+                scopes: ["ASSIGNED"] as const,
             },
             {
                 capability: "routine.reference.read" as const,
@@ -467,18 +468,46 @@ describe("Routine authorization adapter", () => {
         ];
 
         for (const testCase of cases) {
-            mocks.resolve.mockResolvedValueOnce(
-                decision(testCase.capability, false, [], "NO_APPLICABLE_GRANT"),
-            );
-            const result = await resolveRoutineCapability(
-                actor(),
-                21,
-                testCase.capability,
-                testCase.options,
-            );
-            expect(result.defaultScopes).toEqual(testCase.scopes);
-            expect(result.scopes).toEqual(testCase.scopes);
+            for (const role of ["USER", "ADMIN"] as const) {
+                mocks.resolve.mockResolvedValueOnce(
+                    decision(testCase.capability, false, [], "NO_APPLICABLE_GRANT"),
+                );
+                const result = resolveRoutineCapability(
+                    actor({ role }),
+                    21,
+                    testCase.capability,
+                    testCase.options,
+                );
+                if (testCase.scopes.length === 0) {
+                    await expect(result).rejects.toMatchObject({
+                        authorizationReason: "NO_APPLICABLE_GRANT",
+                        statusCode: 403,
+                    });
+                    continue;
+                }
+                const resolved = await result;
+                expect(resolved.defaultScopes).toEqual(testCase.scopes);
+                expect(resolved.scopes).toEqual(testCase.scopes);
+            }
         }
+    });
+
+    it("keeps task-read defaults role-neutral when the requested view is all", () => {
+        const userActor = buildRoutineAuthorizationActor(actor(), 21);
+        const adminActor = buildRoutineAuthorizationActor(actor({ role: "ADMIN" }), 21);
+
+        expect(
+            defaultRoutineScopes(userActor, "routine.task.read", {
+                taskReadView: "work-item",
+                requestedScope: "all",
+            }),
+        ).toEqual(["CREATED", "ASSIGNED"]);
+        expect(
+            defaultRoutineScopes(adminActor, "routine.task.read", {
+                taskReadView: "work-item",
+                requestedScope: "all",
+            }),
+        ).toEqual(["CREATED", "ASSIGNED"]);
     });
 
     it("does not bridge a structural task-read denial into work-item ALL", async () => {
@@ -616,6 +645,14 @@ describe("Routine authorization adapter", () => {
 
     it.each([
         {
+            capability: "routine.task.read" as const,
+            options: {
+                taskReadView: "work-item",
+                requestedScope: "all",
+            } as const,
+            expectedScopes: ["CREATED", "ASSIGNED"] as const,
+        },
+        {
             capability: "routine.summary.read" as const,
             options: { summaryView: "all" } as const,
             expectedScopes: ["ASSIGNED"] as const,
@@ -711,6 +748,44 @@ describe("Routine authorization adapter", () => {
         expect(result.defaultScopes).toEqual([]);
         expect(result.scopes).toEqual(["ALL"]);
         expect(result.isAdministrative).toBe(true);
+    });
+
+    it("requires configured ALL for a regular-user Routine export", async () => {
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "routine.task.export",
+                false,
+                [],
+                "NO_APPLICABLE_GRANT",
+            ),
+        );
+
+        await expect(
+            resolveRoutineCapability(actor(), 21, "routine.task.export"),
+        ).rejects.toMatchObject({
+            authorizationReason: "NO_APPLICABLE_GRANT",
+            statusCode: 403,
+        });
+
+        mocks.resolve.mockResolvedValue(
+            decision(
+                "routine.task.export",
+                true,
+                ["ALL"],
+                undefined,
+                [userGrant("routine.task.export", "ALL")],
+            ),
+        );
+
+        const result = await resolveRoutineCapability(
+            actor(),
+            21,
+            "routine.task.export",
+        );
+
+        expect(result.defaultScopes).toEqual([]);
+        expect(result.scopes).toEqual(["ALL"]);
+        expect(result.isAdministrative).toBe(false);
     });
 
     it("does not convert authorization configuration errors into default access", async () => {

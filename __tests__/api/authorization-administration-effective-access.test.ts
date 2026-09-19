@@ -104,7 +104,7 @@ describe("Authorization Administration effective-access composition", () => {
             state: "AVAILABLE",
         });
         expect(findRow(rows, "routine.task.read", "dashboard.work-item.all")).toMatchObject({
-            defaultScopes: ["ALL"],
+            defaultScopes: ["CREATED", "ASSIGNED"],
             state: "AVAILABLE",
         });
         expect(findRow(rows, "routine.summary.read", "dashboard.summary.mine")).toMatchObject({
@@ -112,7 +112,7 @@ describe("Authorization Administration effective-access composition", () => {
             state: "AVAILABLE",
         });
         expect(findRow(rows, "routine.summary.read", "dashboard.summary.all")).toMatchObject({
-            defaultScopes: ["ALL"],
+            defaultScopes: ["ASSIGNED"],
             state: "AVAILABLE",
         });
         expect(findRow(rows, "routine.reference.read", "dashboard")).toMatchObject({
@@ -248,9 +248,9 @@ describe("Authorization Administration effective-access composition", () => {
             state: "AVAILABLE",
         });
         expect(findRow(adminRows, "routine.summary.read", "liff.self-service")).toMatchObject({
-            defaultScopes: [],
-            effectiveScopes: [],
-            state: "UNAVAILABLE",
+            defaultScopes: ["ASSIGNED"],
+            effectiveScopes: ["ASSIGNED"],
+            state: "AVAILABLE",
         });
     });
 });

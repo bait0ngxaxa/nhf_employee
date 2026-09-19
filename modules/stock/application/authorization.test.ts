@@ -185,10 +185,14 @@ describe("Stock authorization adapter", () => {
         ["stock.request.process", []],
         ["stock.report.export", []],
     ] as const)(
-        "applies the permanent USER default policy for %s",
+        "applies the same role-neutral default policy for %s",
         async (capability, expectedScopes) => {
             expect(defaultStockScopes(
-                context().authorizationActor,
+                context("USER").authorizationActor,
+                capability,
+            )).toEqual(expectedScopes);
+            expect(defaultStockScopes(
+                context("ADMIN").authorizationActor,
                 capability,
             )).toEqual(expectedScopes);
             mocks.resolve.mockResolvedValue(
@@ -196,20 +200,23 @@ describe("Stock authorization adapter", () => {
             );
 
             if (expectedScopes.length === 0) {
-                await expect(
-                    resolveStockCapability(context(), capability),
-                ).rejects.toMatchObject({
-                    authorizationReason: "NO_APPLICABLE_GRANT",
-                });
+                for (const role of ["USER", "ADMIN"] as const) {
+                    await expect(
+                        resolveStockCapability(context(role), capability),
+                    ).rejects.toMatchObject({
+                        authorizationReason: "NO_APPLICABLE_GRANT",
+                    });
+                }
                 return;
             }
 
-            const result = await resolveStockCapability(
-                context(),
-                capability,
-            );
-            expect(result.defaultScopes).toEqual(expectedScopes);
-            expect(result.scopes).toEqual(expectedScopes);
+            const [user, admin] = await Promise.all([
+                resolveStockCapability(context("USER"), capability),
+                resolveStockCapability(context("ADMIN"), capability),
+            ]);
+            expect(user.defaultScopes).toEqual(expectedScopes);
+            expect(admin.defaultScopes).toEqual(expectedScopes);
+            expect(admin.scopes).toEqual(user.scopes);
         },
     );
 

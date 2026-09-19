@@ -1,12 +1,15 @@
 # NHF Employee — Centralized Authorization Resolver
 
-Current-target note: Phase 12H-B has implemented the role-neutral configured
-evaluator and composition primitive, while the production-facing resolver
-singleton remains on the temporary pre-12H `SYSTEM_ROLE / ADMIN`
-compatibility strategy. The role-neutral target factory is application-internal
-and is not the production enforcement path yet. See
-[authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md)
-and [authorization-phase-12hb-role-neutral-core.md](./authorization-phase-12hb-role-neutral-core.md).
+Current-target note: Phase 12H-B implemented the role-neutral configured
+evaluator and composition primitive, and Phase 12H-C rebaselined the covered
+domain Default Domain Policies. The production-facing resolver singleton
+remains on the temporary pre-12H `SYSTEM_ROLE / ADMIN` compatibility strategy;
+the role-neutral target factory is application-internal and is not the
+production enforcement path yet. See
+[authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md),
+[authorization-phase-12hb-role-neutral-core.md](./authorization-phase-12hb-role-neutral-core.md),
+and
+[authorization-phase-12hc-domain-default-policy-rebaseline.md](./authorization-phase-12hc-domain-default-policy-rebaseline.md).
 
 Status: Phase 3 complete. This document describes the resolver introduced
 after the Phase 1 capability contract and Phase 2 authorization persistence.
@@ -31,14 +34,17 @@ Phase 12C.1 uses that seam for Department and Notification, Phase 12C.2 uses
 it for Employee, Phase 12C.3 uses it for the enforced Routine capabilities,
 Phase 12C.4 uses it for the complete Stock surface, Phase 12C.5 uses it for
 the complete registered Leave surface, and Phase 12D uses it for the three
-remaining Routine capabilities. The remaining compatibility-backed migration
-set is now empty.
+remaining Routine capabilities. Phase 12H-C now rebaselines the domain
+defaults, including the Routine task-read, summary, export, reference, and
+LIFF narrowing rules. The remaining compatibility-backed migration set is now
+empty, but the legacy ADMIN compatibility seam remains active until the
+documented later cutover lifecycle.
 
 Phase 3 made authorization resolution operational and independently testable.
 The historical Phase 4 Routine pilot established the server-side seam; current
-Routine policy is recorded in the Phase 12C.3 and Phase 12D closures. This
-document continues to describe the generic resolver contract rather than
-Routine policy.
+Routine policy is recorded historically in the Phase 12C.3 and Phase 12D
+closures and currently in the Phase 12H-C closure. This document continues to
+describe the generic resolver contract rather than Routine policy.
 
 ## Public API
 
@@ -206,7 +212,9 @@ channel, and valid-configuration checks. A narrower configured grant must not
 narrow the default behavior. Phase 12C.1 applies this composition to Department
 and Notification, Phase 12C.2 applies it to Employee, Phase 12C.3 applies it to
 the enforced Routine surfaces, Phase 12C.4 applies it to Stock, and Phase
-12C.5 applies it to Leave.
+12C.5 applies it to Leave. Phase 12H-C rebaselines these domain defaults for
+the current role-neutral target; its Routine narrowing decisions are recorded
+in [authorization-phase-12hc-domain-default-policy-rebaseline.md](./authorization-phase-12hc-domain-default-policy-rebaseline.md).
 
 For Employee, the permanent default is `ALL` for `employee.read`,
 `employee.stats.read`, and `employee.export`, and empty for
@@ -219,7 +227,9 @@ resolver contract unchanged. Stock adds its permanent requester/catalog
 defaults without the Routine LIFF ADMIN clamp. Leave adds its permanent
 request/approval/cancellation/not-taken defaults without changing the
 resolver's system-role or channel semantics. The next runtime handoff is
-Phase 12E — Authorization Administration effective-access UX completion.
+Phase 12H-D — Missing/deferred capability completion; production enforcement
+still intentionally remains on the legacy compatibility path until Phase
+12H-G.
 
 ## USER semantics and lifecycle filtering
 

@@ -135,7 +135,7 @@ describe("Routine presentation capability projection", () => {
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
             canManageImports: true,
-            canExportTasks: true,
+            canExportTasks: false,
             canReadSummary: true,
             canReadReference: true,
         });

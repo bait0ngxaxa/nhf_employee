@@ -106,8 +106,6 @@ export function defaultLeaveScopes(
     actor: LeaveAuthorizationActor,
     capability: LeaveCapability,
 ): readonly AuthorizationScope[] {
-    if (actor.systemRole !== "USER") return [];
-
     switch (capability) {
         case "leave.request.read":
         case "leave.request.create":
