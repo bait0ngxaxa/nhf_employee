@@ -192,6 +192,8 @@ export type {
 } from "./application/administration-mutation-types";
 export {
     AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS,
+    AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL,
+    AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL_NOTICE,
     createAuthorizationProductionReadinessNotRunReport,
     determineAuthorizationProductionReadinessExitCode,
     evaluateAuthorizationProductionReadiness,
@@ -200,6 +202,7 @@ export {
     validateAuthorizationProductionCanaryPlan,
 } from "./application/production-readiness";
 export type {
+    AuthorizationProductionAuthorityModel,
     AuthorizationProductionCanaryEffectiveAccessBefore,
     AuthorizationProductionCanaryIssue,
     AuthorizationProductionCanaryIssueCode,

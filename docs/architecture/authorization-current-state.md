@@ -51,11 +51,23 @@ authorization surfaces. Registered `DEFERRED` capabilities: **0**. The
 production `authorization` singleton is still **NOT CUT OVER** to the
 role-neutral resolver, legacy ADMIN business compatibility remains
 **TEMPORARILY ACTIVE**, and the remaining Dashboard presentation/route role
-gates are intentionally deferred to Phase 12H-F. The next handoff is Phase
-12H-E — Production Team/grant preparation and effective-access reconciliation.
+gates are intentionally deferred to Phase 12H-F.
 
-สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12H-D Missing/deferred capability completion — CLOSED; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request capability migration — CLOSED in Phase 12H-D; future IT module — OUT OF SCOPE<br>
-Phase 12H-D — **เสร็จสิ้น**; registered `DEFERRED` capabilities — **0**; role-neutral domain defaults — **rebaselined**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; การย้าย role gate ของ presentation/route ที่เหลือ — **Phase 12H-F**; ขั้นถัดไป Phase 12H-E — Production Team/grant preparation and effective-access reconciliation<br>
+Phase 12H-E — Production Team/grant preparation and effective-access
+reconciliation is now **COMPLETE** against baseline
+`0ac8d1bcb30e23b96c413c5166bb833954a3484b`.
+Production-readiness reconciliation is now explicitly labeled
+`ROLE_NEUTRAL_TARGET`: active USER and ADMIN accounts use the same configured
+Team, TeamRole, and direct User source rules; hypothetical canaries use the
+role-neutral resolver; and generic business canary eligibility requires an
+active linked Employee for both roles. The production `authorization`
+singleton and current ADMIN compatibility seam remain active, no production
+authorization data was mutated, and all production operational/live rollout
+gates remain **NOT RUN**. The next handoff is Phase 12H-F —
+Presentation/route role-authority removal.
+
+สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12H-D Missing/deferred capability completion — CLOSED; Phase 12H-E Production Team/grant preparation and effective-access reconciliation — CLOSED for repository target readiness; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request capability migration — CLOSED in Phase 12H-D; future IT module — OUT OF SCOPE<br>
+Phase 12H-E — **เสร็จสิ้นในขอบเขต repository target readiness**; authority model ของ preflight — **ROLE_NEUTRAL_TARGET**; configured authority ของ USER/ADMIN — **reconciled ด้วยกติกาเดียวกัน**; hypothetical canary — **role-neutral resolver**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; production operational/live gates — **NOT RUN**; ขั้นถัดไป Phase 12H-F — Presentation/route role-authority removal<br>
 วันที่สำรวจ: 2026-09-19<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -1469,8 +1481,61 @@ Routine presentation semantics, or perform the final enforcement cutover.
 Those remain scheduled for the later lifecycle. The exact completion record and
 verification evidence are in
 [authorization-phase-12hd-missing-deferred-capability-completion.md](authorization-phase-12hd-missing-deferred-capability-completion.md).
-The next handoff is **Phase 12H-E — Production Team/grant preparation and
-effective-access reconciliation**.
+The historical next handoff was **Phase 12H-E — Production Team/grant
+preparation and effective-access reconciliation**; its current completion
+record follows.
+
+## 9.14 Phase 12H-E Production Team/Grant Preparation and Effective-Access Reconciliation
+
+Phase 12H-E is **COMPLETE for repository target-readiness implementation and
+verification** against baseline
+`0ac8d1bcb30e23b96c413c5166bb833954a3484b`.
+
+The production-readiness model is explicitly labeled `ROLE_NEUTRAL_TARGET`.
+Configured business authority is reconciled identically for active USER and
+ADMIN accounts from active Team membership plus Team grants, active same-Team
+TeamRole membership plus TeamRole grants, and exceptional direct User grants.
+The unique configured authority identity is `userId + capabilityKey + scope`,
+with `TEAM`, `TEAM_ROLE`, and `USER` provenance retained for duplicate-source
+warnings. `ADMIN_PERSISTED_GRANT_REDUNDANT` is obsolete in the current
+readiness contract; an ADMIN direct grant is not inherently redundant.
+
+Hypothetical canary resolution uses the Phase 12H-B role-neutral resolver
+factory and therefore does not manufacture `SYSTEM_ROLE` grants. Before/after
+effective-access comparison still goes through the existing Administration
+effective-access provider and domain-owned inspectors. A generic business
+canary observer requires an active User, active linked Employee, and a
+non-deleted/non-suspended Employee for both USER and ADMIN. Direct User
+canaries retain `observerUserId === targetId`; effective redundancy is decided
+from Default Domain Policy plus configured target authority.
+
+The preflight remains read-only and communicates that current production may
+still use the temporary ADMIN compatibility seam. The production
+`authorization` singleton, current domain adapter compatibility wrapper,
+control-plane ADMIN-only boundary, empty `AUTHORIZATION_SEED_CONFIGURATION`,
+schema, migrations, and production authorization data are unchanged. No
+production Team, TeamRole, membership, grant, seed, backfill, or live canary
+was created or executed. Production migration/inventory, operator target,
+mutation, post-canary, rollback, and observation gates remain **NOT RUN**.
+
+The current registry contains 41 accounted-for capabilities with no
+`DEFERRED` administration status. The complete implementation record is in
+[authorization-phase-12he-production-grant-effective-access-reconciliation.md](authorization-phase-12he-production-grant-effective-access-reconciliation.md).
+
+Phase 12H-E verification evidence:
+
+- production-readiness focused suite: **1 file / 67 tests passed**;
+- related authorization/domain regression selection: **12 files / 306 tests passed**;
+- full repository suite: **326 files / 3,091 tests passed**;
+- `npm.cmd run typecheck`: passed;
+- `npm.cmd run lint:strict`: passed;
+- `npm.cmd run architecture:check`: passed, 1,147 source files checked;
+- `git diff --check`: passed.
+
+The next handoff is **Phase 12H-F — Presentation/route role-authority
+removal**. Production enforcement cutover remains Phase 12H-G, live rollout
+validation remains Phase 12H-H, and compatibility-debt removal remains Phase
+12H-I.
 
 ## 10. Explicit non-goals for Phase 0
 

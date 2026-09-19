@@ -7,6 +7,13 @@ Corrective patch starting revision: `5426be5e9ed3d243f8117e9c1c10dce816fa1d72` (
 Current reviewed revision before this migration-readiness correction: `1270b28abeb2c3ebc5ab0a555cc9e7a733dc7182` (`fix(auth): validate canary against authoritative effective access`)
 วันที่จัดทำ readiness tooling: `2026-09-18`
 
+> **Supersession note — Phase 12H-E:** Phase 12H-E supersedes the
+> ADMIN/SYSTEM_ROLE readiness and canary assumptions in this historical
+> Phase 12G-B document for the role-neutral target model. This document
+> remains historical evidence for the original readiness implementation;
+> current target semantics are recorded in
+> [authorization-phase-12he-production-grant-effective-access-reconciliation.md](authorization-phase-12he-production-grant-effective-access-reconciliation.md).
+
 เอกสารนี้เป็น handoff สำหรับการเตรียม deploy capability จริงครั้งแรกหลัง
 Phase 12G-A. การผ่านของ repository tests เป็นหลักฐานว่า tooling และ contract
 ทำงานตามที่ออกแบบ ไม่ใช่หลักฐานว่า production database สะอาด มี migration ครบ

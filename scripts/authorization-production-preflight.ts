@@ -68,6 +68,8 @@ function printTerminalReport(
     report: ReturnType<typeof projectAuthorizationProductionReadinessReport>,
 ): void {
     console.log("Authorization production preflight (read-only)");
+    console.log(`Authority model: ${report.authorityModel}`);
+    console.log(`Model note: ${report.authorityModelNotice}`);
     console.log(`Environment: ${target.environment}`);
     console.log(`NODE_ENV: ${target.nodeEnvironment}`);
     console.log(`Database target: ${target.host}:${target.port}/${target.databaseName}`);
@@ -81,6 +83,7 @@ function printTerminalReport(
         { measure: "Team grants", count: report.summary.teamGrantCount },
         { measure: "TeamRole grants", count: report.summary.teamRoleGrantCount },
         { measure: "Direct User grants", count: report.summary.directUserGrantCount },
+        { measure: "Effective configured authority", count: report.summary.effectiveConfiguredAuthorityCount },
         { measure: "Invalid configuration findings", count: report.summary.invalidConfigurationCount },
         { measure: "Warning findings", count: report.summary.warningCount },
         { measure: "Blocker findings", count: report.summary.blockerCount },

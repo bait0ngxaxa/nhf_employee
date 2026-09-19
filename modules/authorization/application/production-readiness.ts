@@ -15,7 +15,7 @@ import type {
     CapabilityAdministrationProjection,
 } from "./administration-types";
 import {
-    createAuthorizationResolver,
+    createRoleNeutralAuthorizationResolver,
 } from "./resolver";
 import { normalizeAuthorizationScopes } from "./evaluator";
 import type {
@@ -29,6 +29,15 @@ export const AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS = Object.freeze([
     "20260911100000_add_authorization_persistence",
     "20260914100000_add_authorization_audit_actions",
 ] as const);
+
+export const AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL =
+    "ROLE_NEUTRAL_TARGET" as const;
+
+export const AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL_NOTICE =
+    "This report evaluates readiness for the target role-neutral authority model. Current production runtime may still use the temporary ADMIN compatibility seam.";
+
+export type AuthorizationProductionAuthorityModel =
+    typeof AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL;
 
 export type AuthorizationProductionReadinessStatus =
     | "PASS"
@@ -76,7 +85,6 @@ export type AuthorizationProductionFindingCode =
     | "INACTIVE_TEAM_ROLE_CONFIGURATION"
     | "INACTIVE_USER_CONFIGURATION"
     | "INACTIVE_EMPLOYEE_CONFIGURATION"
-    | "ADMIN_PERSISTED_GRANT_REDUNDANT"
     | "NON_ADMINISTRATIVELY_GRANTABLE"
     | "DUPLICATE_PERSISTED_AUTHORITY"
     | "REDUNDANT_CONFIGURED_AUTHORITY"
@@ -196,6 +204,7 @@ export interface AuthorizationProductionInventorySummary {
     readonly directUserGrantCount: number;
     readonly grantsByCapability: readonly AuthorizationProductionGroupedCount[];
     readonly grantsBySourceAndScope: readonly AuthorizationProductionSourceScopeCount[];
+    readonly effectiveConfiguredAuthorityCount: number;
     readonly redundantAuthorityCount: number;
     readonly invalidConfigurationCount: number;
     readonly warningCount: number;
@@ -223,6 +232,7 @@ export interface AuthorizationProductionMigrationCheck {
 }
 
 export interface AuthorizationProductionReadinessEvaluation {
+    readonly authorityModel: AuthorizationProductionAuthorityModel;
     readonly status: AuthorizationProductionReadinessStatus;
     readonly summary: AuthorizationProductionInventorySummary;
     readonly migrationChecks: readonly AuthorizationProductionMigrationCheck[];
@@ -238,6 +248,8 @@ export interface AuthorizationProductionFindingCount {
 }
 
 export interface AuthorizationProductionReadinessReport {
+    readonly authorityModel: AuthorizationProductionAuthorityModel;
+    readonly authorityModelNotice: string;
     readonly status: AuthorizationProductionReadinessStatus;
     readonly summary: AuthorizationProductionInventorySummary;
     readonly migrationChecks: readonly AuthorizationProductionMigrationCheck[];
@@ -508,7 +520,7 @@ function isActiveUser(user: AuthorizationProductionUserSnapshot): boolean {
 }
 
 function isEffectiveConfiguredUser(user: AuthorizationProductionUserSnapshot): boolean {
-    return user.role === "USER" && isActiveUser(user);
+    return isActiveUser(user);
 }
 
 function isActiveEmployee(employee: AuthorizationProductionEmployeeSnapshot): boolean {
@@ -687,6 +699,7 @@ function addConfiguredAuthority(
 function buildSummary(
     snapshot: AuthorizationProductionInventorySnapshot,
     findings: readonly AuthorizationProductionFinding[],
+    effectiveConfiguredAuthorityCount: number,
     redundantAuthorityCount: number,
 ): AuthorizationProductionInventorySummary {
     const capabilityCounts = new Map<string, number>();
@@ -743,6 +756,7 @@ function buildSummary(
         directUserGrantCount: snapshot.userGrants.length,
         grantsByCapability: Object.freeze(grantsByCapability),
         grantsBySourceAndScope: Object.freeze(grantsBySourceAndScope),
+        effectiveConfiguredAuthorityCount,
         redundantAuthorityCount,
         invalidConfigurationCount: findings.filter(
             (finding) => finding.kind === "CONFIGURATION"
@@ -1219,18 +1233,6 @@ export function evaluateAuthorizationProductionReadiness(
                 scope: grant.scope,
             });
         }
-        if (definition !== null && user.role === "ADMIN" && grant.scope !== "TEAM") {
-            addFinding(findings, {
-                severity: "WARNING",
-                kind: "OPERATIONAL",
-                source: "USER_GRANT",
-                code: "ADMIN_PERSISTED_GRANT_REDUNDANT",
-                reason: "ADMIN authority comes from SYSTEM_ROLE / ADMIN; this persisted direct User grant is not used as ADMIN authority.",
-                userId: grant.userId,
-                capabilityKey: grant.capabilityKey,
-                scope: grant.scope,
-            });
-        }
         if (definition !== null) {
             const administration = catalogByKey.get(definition.key);
             if (administration !== undefined && !administration.administrativelyGrantable) {
@@ -1252,6 +1254,7 @@ export function evaluateAuthorizationProductionReadiness(
         }
     }
 
+    const effectiveConfiguredAuthorityCount = authority.size;
     const redundantAuthorityCount = addRedundancyFindings(authority, findings);
     const migrationChecks = buildMigrationChecks(snapshot, findings);
     const sortedFindings = Object.freeze(
@@ -1259,7 +1262,12 @@ export function evaluateAuthorizationProductionReadiness(
             compareStrings(findingSortKey(left), findingSortKey(right)),
         ),
     );
-    const summary = buildSummary(snapshot, sortedFindings, redundantAuthorityCount);
+    const summary = buildSummary(
+        snapshot,
+        sortedFindings,
+        effectiveConfiguredAuthorityCount,
+        redundantAuthorityCount,
+    );
     const status: AuthorizationProductionReadinessStatus = summary.blockerCount > 0
         ? "BLOCKED"
         : summary.warningCount > 0
@@ -1267,6 +1275,7 @@ export function evaluateAuthorizationProductionReadiness(
             : "PASS";
 
     return Object.freeze({
+        authorityModel: AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL,
         status,
         summary,
         migrationChecks,
@@ -1288,6 +1297,7 @@ function emptySummary(): AuthorizationProductionInventorySummary {
         directUserGrantCount: 0,
         grantsByCapability: Object.freeze([]),
         grantsBySourceAndScope: Object.freeze([]),
+        effectiveConfiguredAuthorityCount: 0,
         redundantAuthorityCount: 0,
         invalidConfigurationCount: 0,
         warningCount: 0,
@@ -1299,6 +1309,7 @@ export function createAuthorizationProductionReadinessNotRunReport(
     reason: string,
 ): AuthorizationProductionReadinessEvaluation {
     return Object.freeze({
+        authorityModel: AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL,
         status: "NOT_RUN" as const,
         summary: emptySummary(),
         migrationChecks: Object.freeze(
@@ -1325,6 +1336,7 @@ function createInventoryReadFailureReport(): AuthorizationProductionReadinessEva
         blockerCount: 1,
     });
     return Object.freeze({
+        authorityModel: AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL,
         status: "BLOCKED" as const,
         summary,
         migrationChecks: Object.freeze(
@@ -1369,6 +1381,8 @@ export function projectAuthorizationProductionReadinessReport(
         ),
     );
     const report: AuthorizationProductionReadinessReport = {
+        authorityModel: evaluation.authorityModel,
+        authorityModelNotice: AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL_NOTICE,
         status: evaluation.status,
         summary: evaluation.summary,
         migrationChecks: evaluation.migrationChecks,
@@ -1577,7 +1591,7 @@ function buildCanaryResolutionData(
 
 function createCanaryResolver(
     snapshot: AuthorizationProductionInventorySnapshot,
-): ReturnType<typeof createAuthorizationResolver> {
+): ReturnType<typeof createRoleNeutralAuthorizationResolver> {
     const repository: AuthorizationResolutionRepository = {
         async load({ userId, capabilityKey }): Promise<AuthorizationResolutionData> {
             return buildCanaryResolutionData(snapshot, userId, capabilityKey);
@@ -1586,7 +1600,7 @@ function createCanaryResolver(
             return buildCanaryResolutionData(snapshot, userId);
         },
     };
-    return createAuthorizationResolver({ repository });
+    return createRoleNeutralAuthorizationResolver({ repository });
 }
 
 function appendCanaryGrant(
@@ -1919,9 +1933,6 @@ function isCanaryObserverEligible(
     employees: ReadonlyMap<number, AuthorizationProductionEmployeeSnapshot>,
 ): boolean {
     if (user === undefined || !isActiveUser(user)) return false;
-
-    // ADMIN account-only compatibility paths do not require workforce identity.
-    if (user.role === "ADMIN") return true;
     if (user.employeeId === null) return false;
 
     const employee = employees.get(user.employeeId);
@@ -2049,8 +2060,6 @@ export async function validateAuthorizationProductionCanaryPlan(
             addCanaryIssue(issues, "CANARY_TARGET_NOT_FOUND", "Canary User target is not present.");
         } else if (!isActiveUser(user)) {
             addCanaryIssue(issues, "CANARY_TARGET_INACTIVE", "Canary User target is inactive or deleted.");
-        } else if (user.role === "ADMIN") {
-            addCanaryIssue(issues, "ADMIN_PERSISTED_GRANT_REDUNDANT", "A direct User canary grant does not change ADMIN SYSTEM_ROLE authority.");
         } else if (!isCanaryObserverEligible(user, employees)) {
             addCanaryIssue(issues, "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE", "Canary User cannot establish the normal active workforce session: an active linked Employee is required.");
         }

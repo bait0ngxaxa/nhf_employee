@@ -2,14 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
     AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS,
+    AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL,
+    AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL_NOTICE,
     determineAuthorizationProductionReadinessExitCode,
     evaluateAuthorizationProductionReadiness,
     projectAuthorizationProductionReadinessReport,
     runAuthorizationProductionPreflight,
     validateAuthorizationProductionCanaryPlan as validateProductionCanaryPlan,
+    type AuthorizationProductionCanaryValidationDependencies,
     type AuthorizationProductionInventorySnapshot,
     type AuthorizationProductionCanaryPlan,
 } from "./production-readiness";
+import { CAPABILITY_REGISTRY } from "../registry";
+import { buildCapabilityAdministrationCatalog } from "./administration-catalog";
+import { createRoleNeutralAuthorizationResolver } from "./resolver";
 import {
     authorizationAdministrationEffectiveAccessProvider,
 } from "@/app/api/authorization/administration/_lib/effective-access";
@@ -75,11 +81,12 @@ function createValidCanaryPlan(
 async function validateAuthorizationProductionCanaryPlan(
     plan: AuthorizationProductionCanaryPlan,
     snapshot: AuthorizationProductionInventorySnapshot,
+    effectiveAccessProvider: AuthorizationProductionCanaryValidationDependencies["effectiveAccessProvider"] = authorizationAdministrationEffectiveAccessProvider,
 ) {
     return validateProductionCanaryPlan(
         plan,
         snapshot,
-        { effectiveAccessProvider: authorizationAdministrationEffectiveAccessProvider },
+        { effectiveAccessProvider },
     );
 }
 
@@ -87,6 +94,7 @@ describe("authorization production readiness", () => {
     it("passes for a clean empty configuration with applied migration evidence", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot());
 
+        expect(result.authorityModel).toBe(AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL);
         expect(result.status).toBe("PASS");
         expect(result.summary).toMatchObject({
             teamCount: 0,
@@ -96,6 +104,7 @@ describe("authorization production readiness", () => {
             teamGrantCount: 0,
             teamRoleGrantCount: 0,
             directUserGrantCount: 0,
+            effectiveConfiguredAuthorityCount: 0,
             invalidConfigurationCount: 0,
             warningCount: 0,
             blockerCount: 0,
@@ -203,6 +212,71 @@ describe("authorization production readiness", () => {
         ]);
     });
 
+    it.each(["USER", "ADMIN"] as const)(
+        "reconciles %s Team membership and Team grant as configured authority",
+        (role) => {
+            const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: null }],
+                users: [{ id: 10, role, isActive: true, deletedAt: null, employeeId: null }],
+                teamGrants: [{
+                    teamId: 1,
+                    capabilityKey: "employee.create",
+                    scope: "ALL",
+                }],
+            }));
+
+            expect(result.status).toBe("PASS");
+            expect(result.summary.effectiveConfiguredAuthorityCount).toBe(1);
+        },
+    );
+
+    it.each(["USER", "ADMIN"] as const)(
+        "reconciles %s TeamRole membership and TeamRole grant as configured authority",
+        (role) => {
+            const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                teamRoles: [{ id: 20, teamId: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: 20 }],
+                users: [{ id: 10, role, isActive: true, deletedAt: null, employeeId: null }],
+                teamRoleGrants: [{
+                    teamRoleId: 20,
+                    teamId: 1,
+                    capabilityKey: "employee.create",
+                    scope: "ALL",
+                }],
+            }));
+
+            expect(result.status).toBe("PASS");
+            expect(result.summary.effectiveConfiguredAuthorityCount).toBe(1);
+        },
+    );
+
+    it.each(["USER", "ADMIN"] as const)(
+        "detects duplicate configured authority across Team, TeamRole, and User sources for %s",
+        (role) => {
+            const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+                teams: [{ id: 1, isActive: true }],
+                teamRoles: [{ id: 20, teamId: 1, isActive: true }],
+                memberships: [{ teamId: 1, userId: 10, teamRoleId: 20 }],
+                users: [{ id: 10, role, isActive: true, deletedAt: null, employeeId: null }],
+                teamGrants: [{ teamId: 1, capabilityKey: "employee.create", scope: "ALL" }],
+                teamRoleGrants: [{ teamRoleId: 20, teamId: 1, capabilityKey: "employee.create", scope: "ALL" }],
+                userGrants: [{ userId: 10, capabilityKey: "employee.create", scope: "ALL" }],
+            }));
+
+            expect(result.status).toBe("WARNING");
+            expect(result.summary.effectiveConfiguredAuthorityCount).toBe(1);
+            expect(result.summary.redundantAuthorityCount).toBe(1);
+            expect(result.findings).toContainEqual(expect.objectContaining({
+                code: "REDUNDANT_CONFIGURED_AUTHORITY",
+                userId: 10,
+                capabilityKey: "employee.create",
+                scope: "ALL",
+            }));
+        },
+    );
+
     it("accepts a valid direct User grant without a TEAM scope", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
@@ -214,9 +288,10 @@ describe("authorization production readiness", () => {
         }));
 
         expect(result.status).toBe("PASS");
+        expect(result.summary.effectiveConfiguredAuthorityCount).toBe(1);
     });
 
-    it("does not treat a persisted grant on ADMIN as the source of ADMIN authority", () => {
+    it("treats an ADMIN direct grant as effective configured target authority", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
             users: [{ id: 10, role: "ADMIN", isActive: true, deletedAt: null, employeeId: null }],
             userGrants: [{
@@ -226,11 +301,11 @@ describe("authorization production readiness", () => {
             }],
         }));
 
-        expect(result.status).toBe("WARNING");
+        expect(result.status).toBe("PASS");
         expect(result.summary.blockerCount).toBe(0);
-        expect(result.findings).toContainEqual(expect.objectContaining({
-            code: "ADMIN_PERSISTED_GRANT_REDUNDANT",
-            severity: "WARNING",
+        expect(result.summary.effectiveConfiguredAuthorityCount).toBe(1);
+        expect(result.findings).not.toContainEqual(expect.objectContaining({
+            code: "REDUNDANT_CONFIGURED_AUTHORITY",
         }));
     });
 
@@ -248,9 +323,9 @@ describe("authorization production readiness", () => {
         expect(determineAuthorizationProductionReadinessExitCode(result)).toBe(1);
     });
 
-    it("blocks a direct User TEAM grant", () => {
+    it.each(["USER", "ADMIN"] as const)("blocks a direct User TEAM grant for %s", (role) => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
-            users: [{ id: 10, role: "USER", isActive: true, deletedAt: null, employeeId: null }],
+            users: [{ id: 10, role, isActive: true, deletedAt: null, employeeId: null }],
             userGrants: [{
                 userId: 10,
                 capabilityKey: "routine.task.read",
@@ -341,6 +416,68 @@ describe("authorization production readiness", () => {
         expect(result.summary.warningCount).toBeGreaterThan(0);
         expect(result.findings.every((finding) => finding.severity === "WARNING")).toBe(true);
     });
+
+    it.each(["USER", "ADMIN"] as const)(
+        "applies the same inactive-user lifecycle treatment to %s direct grants",
+        (role) => {
+            const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+                users: [{
+                    id: 10,
+                    role,
+                    isActive: false,
+                    deletedAt: new Date("2026-09-01T00:00:00.000Z"),
+                    employeeId: null,
+                }],
+                userGrants: [{
+                    userId: 10,
+                    capabilityKey: "employee.create",
+                    scope: "ALL",
+                }],
+            }));
+
+            expect(result.status).toBe("WARNING");
+            expect(result.summary.effectiveConfiguredAuthorityCount).toBe(0);
+            expect(result.findings).toContainEqual(expect.objectContaining({
+                code: "INACTIVE_USER_CONFIGURATION",
+                userId: 10,
+                severity: "WARNING",
+            }));
+        },
+    );
+
+    it.each(["USER", "ADMIN"] as const)(
+        "applies the same inactive-Employee lifecycle treatment to %s direct grants",
+        (role) => {
+            const result = evaluateAuthorizationProductionReadiness(createSnapshot({
+                users: [{
+                    id: 10,
+                    role,
+                    isActive: true,
+                    deletedAt: null,
+                    employeeId: 100,
+                }],
+                employees: [{
+                    id: 100,
+                    status: "INACTIVE",
+                    deletedAt: null,
+                }],
+                userGrants: [{
+                    userId: 10,
+                    capabilityKey: "employee.create",
+                    scope: "ALL",
+                }],
+            }));
+
+            expect(result.status).toBe("WARNING");
+            expect(result.summary.effectiveConfiguredAuthorityCount).toBe(1);
+            expect(result.findings).toContainEqual(expect.objectContaining({
+                code: "INACTIVE_EMPLOYEE_CONFIGURATION",
+                userId: 10,
+                employeeId: 100,
+                severity: "WARNING",
+            }));
+        },
+    );
 
     it("blocks missing lifecycle references instead of treating them as inactive history", () => {
         const result = evaluateAuthorizationProductionReadiness(createSnapshot({
@@ -457,6 +594,19 @@ describe("authorization production readiness", () => {
         )).toHaveLength(AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS.length);
     });
 
+    it("keeps all registered capabilities accounted for and grantable", () => {
+        const catalog = buildCapabilityAdministrationCatalog();
+
+        expect(CAPABILITY_REGISTRY.definitions).toHaveLength(41);
+        expect(catalog).toHaveLength(CAPABILITY_REGISTRY.definitions.length);
+        expect(catalog.map(({ key }) => key)).toEqual(
+            CAPABILITY_REGISTRY.definitions.map(({ key }) => key),
+        );
+        expect(catalog.every(({ administrativeStatus }) =>
+            administrativeStatus !== "DEFERRED",
+        )).toBe(true);
+    });
+
     it("returns a blocked result without exposing repository errors", async () => {
         const result = await runAuthorizationProductionPreflight({
             load: async () => {
@@ -524,6 +674,105 @@ describe("authorization production readiness", () => {
         expect(serialized).not.toContain("token");
         expect(serialized).not.toContain("DATABASE_URL");
         expect("findings" in report).toBe(false);
+        expect(report.authorityModel).toBe(AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL);
+        expect(report.authorityModelNotice).toBe(
+            AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL_NOTICE,
+        );
+    });
+
+    it("proves role-neutral Default Domain Policy parity and central-only denial", async () => {
+        const emptyResolution = {
+            userGrants: [],
+            memberships: [],
+            teamRoleGrants: [],
+        };
+        const resolver = createRoleNeutralAuthorizationResolver({
+            repository: {
+                load: async () => emptyResolution,
+                loadMany: async () => emptyResolution,
+            },
+        });
+        const capabilityKeys = CAPABILITY_REGISTRY.definitions.map(
+            ({ key }) => key,
+        );
+
+        const inspectRole = async (systemRole: "USER" | "ADMIN") => {
+            const actor = {
+                userId: 10,
+                employeeId: 100,
+                systemRole,
+                channel: "DASHBOARD" as const,
+            };
+            const decisions = await resolver.resolveMany(actor, capabilityKeys);
+            expect([...decisions.values()].every((decision) =>
+                decision.grants.every((grant) => grant.source.type !== "SYSTEM_ROLE"),
+            )).toBe(true);
+
+            const inspections = await authorizationAdministrationEffectiveAccessProvider.inspect({
+                actor,
+                dashboardDecisions: decisions,
+                resolver,
+            });
+            return inspections
+                .filter(({ capability }) => [
+                    "employee.read",
+                    "stock.catalog.read",
+                    "leave.request.read",
+                    "audit.read",
+                    "leave.recovery.manage",
+                    "email.request.read",
+                ].includes(capability))
+                .map((inspection) => ({
+                    capability: inspection.capability,
+                    context: inspection.context.key,
+                    defaultScopes: inspection.defaultScopes,
+                    effectiveScopes: inspection.effectiveScopes,
+                    state: inspection.state,
+                }));
+        };
+
+        const userAccess = await inspectRole("USER");
+        const adminAccess = await inspectRole("ADMIN");
+
+        expect(adminAccess).toEqual(userAccess);
+        expect(adminAccess).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                capability: "employee.read",
+                defaultScopes: ["ALL"],
+                effectiveScopes: ["ALL"],
+                state: "AVAILABLE",
+            }),
+            expect.objectContaining({
+                capability: "stock.catalog.read",
+                defaultScopes: ["ALL"],
+                effectiveScopes: ["ALL"],
+                state: "AVAILABLE",
+            }),
+            expect.objectContaining({
+                capability: "leave.request.read",
+                defaultScopes: ["OWN"],
+                effectiveScopes: ["OWN"],
+                state: "AVAILABLE",
+            }),
+            expect.objectContaining({
+                capability: "audit.read",
+                defaultScopes: [],
+                effectiveScopes: [],
+                state: "UNAVAILABLE",
+            }),
+            expect.objectContaining({
+                capability: "leave.recovery.manage",
+                defaultScopes: [],
+                effectiveScopes: [],
+                state: "UNAVAILABLE",
+            }),
+            expect.objectContaining({
+                capability: "email.request.read",
+                defaultScopes: [],
+                effectiveScopes: [],
+                state: "UNAVAILABLE",
+            }),
+        ]));
     });
 
     it("validates an explicit canary plan without choosing its business target", async () => {
@@ -817,7 +1066,7 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("does not qualify an ADMIN target when a grant cannot change SYSTEM_ROLE authority", async () => {
+    it("does not generically qualify an account-only ADMIN as a business canary observer", async () => {
         const result = await validateAuthorizationProductionCanaryPlan(
             createValidCanaryPlan({
                 effectiveAccessBefore: {
@@ -837,7 +1086,103 @@ describe("authorization production readiness", () => {
 
         expect(result.status).toBe("BLOCKED");
         expect(result.issues).toContainEqual(expect.objectContaining({
-            code: "ADMIN_PERSISTED_GRANT_REDUNDANT",
+            code: "CANARY_TARGET_NOT_WORKFORCE_ELIGIBLE",
+        }));
+    });
+
+    it("allows an active workforce ADMIN direct canary when it adds target authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            createSnapshot({
+                users: [{ id: 10, role: "ADMIN", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result).toMatchObject({ status: "PASS", issues: [] });
+    });
+
+    it("requires direct User canaries to observe the granted User for either system role", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                observerUserId: 11,
+                effectiveAccessBefore: {
+                    observerUserId: 11,
+                    capabilityKey: "employee.create",
+                    channel: "DASHBOARD",
+                    contextKey: "dashboard",
+                    state: "UNAVAILABLE",
+                    defaultScopes: [],
+                    effectiveScopes: [],
+                },
+            }),
+            createSnapshot({
+                users: [
+                    { id: 10, role: "ADMIN", isActive: true, deletedAt: null, employeeId: 100 },
+                    { id: 11, role: "USER", isActive: true, deletedAt: null, employeeId: 101 },
+                ],
+                employees: [
+                    { id: 100, status: "ACTIVE", deletedAt: null },
+                    { id: 101, status: "ACTIVE", deletedAt: null },
+                ],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_EFFECTIVE_ACCESS_EVIDENCE_INVALID",
+        }));
+    });
+
+    it("uses a target canary resolver without SYSTEM_ROLE grants", async () => {
+        const observedSources: string[] = [];
+        const effectiveAccessProvider: AuthorizationProductionCanaryValidationDependencies["effectiveAccessProvider"] = {
+            async inspect(input) {
+                for (const decision of input.dashboardDecisions.values()) {
+                    for (const grant of decision.grants) {
+                        observedSources.push(grant.source.type);
+                    }
+                }
+                return authorizationAdministrationEffectiveAccessProvider.inspect(input);
+            },
+        };
+
+        const result = await validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan(),
+            createSnapshot({
+                users: [{ id: 10, role: "ADMIN", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+            effectiveAccessProvider,
+        );
+
+        expect(result).toMatchObject({ status: "PASS", issues: [] });
+        expect(observedSources).not.toContain("SYSTEM_ROLE");
+    });
+
+    it("rejects an ADMIN direct canary when Default Domain Policy already supplies the target authority", async () => {
+        const result = await validateAuthorizationProductionCanaryPlan(
+            createValidCanaryPlan({
+                capabilityKey: "employee.read",
+                effectiveAccessBefore: {
+                    observerUserId: 10,
+                    capabilityKey: "employee.read",
+                    channel: "DASHBOARD",
+                    contextKey: "dashboard",
+                    state: "AVAILABLE",
+                    defaultScopes: ["ALL"],
+                    effectiveScopes: ["ALL"],
+                },
+            }),
+            createSnapshot({
+                users: [{ id: 10, role: "ADMIN", isActive: true, deletedAt: null, employeeId: 100 }],
+                employees: [{ id: 100, status: "ACTIVE", deletedAt: null }],
+            }),
+        );
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.issues).toContainEqual(expect.objectContaining({
+            code: "CANARY_NO_EFFECTIVE_AUTHORITY_CHANGE",
         }));
     });
 
