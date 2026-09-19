@@ -1,16 +1,15 @@
 # NHF Employee — Phase 12H-A: Role-Neutral Business Authorization Contract & Inventory
 
-Status: **OPEN — correction required before Phase 12H-B; not closed**
+Status: **COMPLETE — contract and inventory only**
 
 Reviewed baseline: `5a72b9e57216701f2c620b54e035c9dc1740f53d`
 (`fix(auth): use migration lifecycle for readiness checks`)
 
 This document is the authoritative Phase 12H-A target contract and migration
 ledger. It records the future authorization architecture and the exhaustive
-current-code inventory needed by later Phase 12H work. The inventory is under
-correction review; closure remains pending acceptance of the pre-12H-B
-corrections recorded below. It does not claim that the target runtime has been
-deployed.
+current-code inventory needed by later Phase 12H work. The pre-12H-B corrections
+recorded below have been reviewed and accepted at closure. It does not claim
+that the target runtime has been deployed.
 
 ## 1. Locked target contract
 
@@ -488,7 +487,7 @@ readers to this contract without being rewritten wholesale:
 
 | Phase | Owner and non-goal boundary |
 | --- | --- |
-| **12H-A** | Role-neutral contract and exhaustive inventory. This document is the open review record; closure is pending the corrections in Section 10. No runtime, schema, grant, seed, or migration changes. |
+| **12H-A** | Role-neutral contract and exhaustive inventory. This document is the closure record; the reviewed corrections in Section 10 are accepted. No runtime, schema, grant, seed, or migration changes. |
 | **12H-B** | Role-neutral resolver/composition core. Remove system-role knowledge from business capability resolution/composition while keeping ADMIN control-plane authentication separate. |
 | **12H-C** | Domain Default Policy rebaseline. Rebase Employee, Department, Routine, Stock, Leave, Audit, and Notification defaults; explicitly narrow Routine broad defaults. |
 | **12H-D** | Missing/deferred business capability completion, including Leave recovery and Email Request. Register only reviewed capabilities; preserve domain invariants. |
@@ -498,19 +497,19 @@ readers to this contract without being rewritten wholesale:
 | **12H-H** | Production snapshot and live rollout validation. Validate effective access and operational/audit evidence against the approved snapshot before rollout. |
 | **12H-I** | Delete compatibility/system-role business-authority debt. Remove obsolete role fallbacks, readiness assumptions, and compatibility branches after the cutover evidence is accepted. |
 
-## 10. Corrections required before closure
+## 10. Corrections accepted at closure
 
-The following corrections are required before Phase 12H-A can close or hand
-off to Phase 12H-B:
+The following corrections were reviewed and accepted before Phase 12H-A
+closure and Phase 12H-B handoff:
 
-| ID | Correction | Evidence | Required disposition |
+| ID | Accepted correction | Evidence | Follow-up disposition |
 | --- | --- | --- | --- |
 | C-01 | `requireActiveWorkforceOrAdminSession()` was incorrectly classified as an authentication/lifecycle keep. Its ADMIN branch is business-route migration debt. | `lib/auth/workforce.ts`; the AL-03 caller set in Section 5 | Keep role-neutral session primitives, but migrate callers and retire/role-neutralize the ADMIN branch in 12H-B → 12H-G |
 | C-02 | Leave fallback exception-approver selection was incorrectly classified as domain relationship policy only. `role: "ADMIN"` creates a persisted effective approver relationship and therefore indirect business authority. | `modules/leave/application/approvals/exception-approver.ts`; DR-01 | Preserve the domain relationship, but remove ADMIN as candidate source through Leave-specific configuration, Team, or another approved role-neutral relationship in 12H-D |
 | C-03 | Historical supersession wording named only ADMIN business authority. Phase 12H-A also supersedes selected legacy USER-default permanence, explicitly Routine broad task read, summary, and export defaults. | Sections 1.1 and 3; updated historical-document notes in Section 8 | Treat Phase 12H-A as the current target; retain Phase 12A as historical evidence only |
 
-Phase 12H-A remains **OPEN** until these corrections are accepted. The
-corrections do not change runtime behavior.
+These corrections do not change runtime behavior. Their implementation remains
+owned by the later phases recorded in the migration ledger.
 
 ## 11. Intentionally unresolved or deferred items
 
@@ -526,14 +525,12 @@ intentionally deferred because Phase 12H-A is a contract/inventory phase:
 | Future IT capabilities | IT is not implemented and no keys may be registered yet. The intended capability-first shape is recorded as design input only. | Future IT module; Phase 12H-D or a later approved domain phase |
 | Role-based notification audiences | Routine/Stock ADMIN recipient selection is classified as domain relationship/recipient policy rather than actor authority. Replacing it requires product ownership decisions about notification audiences. | `modules/routine/application/recipients.ts`; `modules/routine/application/scheduler.ts`; `modules/stock/infrastructure/notifications/notifications.ts` — owning domain phase |
 
-These are not the reason for the current open correction status; they are
-explicitly owned by later phases and cannot be silently resolved by this
-inventory document.
+These are explicitly owned by later phases and cannot be silently resolved by
+this inventory document.
 
 ## 12. Phase 12H-A definition of done
 
-After the corrections in Section 10 are accepted, the repository must answer,
-from committed documentation:
+The repository can answer, from committed documentation:
 
 - a normal actor receives the role-neutral default policy for the same trusted
   context;

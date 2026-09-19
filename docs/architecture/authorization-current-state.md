@@ -18,8 +18,8 @@ implementation-complete on baseline `c49caec5f14569655d1e385c1706dc7e9e22c0a8`
 and awaits production operational acceptance. No production authorization
 rollout has been performed.
 
-Phase 12H-A — Role-Neutral Business Authorization Contract & Inventory is
-**OPEN — not closed; correction review is pending**. The authoritative target
+Phase 12H-A — Role-Neutral Business Authorization Contract & Inventory is now
+**COMPLETE as a documentation/inventory phase only**. The authoritative target
 contract and exhaustive ledger are in
 [authorization-phase-12ha-role-neutral-contract.md](authorization-phase-12ha-role-neutral-contract.md).
 The current runtime remains pre-12H and role-sensitive: `ADMIN` still
@@ -28,9 +28,10 @@ capabilities. Phase 12H-A supersedes both Phase 12A's long-term `ADMIN`
 business-authority target and the selected legacy USER-default permanence that
 12H-A explicitly narrows, especially Routine broad `task.read`, `summary.read`,
 and `task.export` authority. The historical Phase 12A statements remain
-historical evidence at that phase boundary. No Phase 12H runtime enforcement
-cutover has occurred, and the Phase 12H-B handoff is pending correction
-acceptance.
+historical evidence at that phase boundary. The pre-12H-B corrections in the
+authoritative ledger have been reviewed and accepted. No Phase 12H runtime
+enforcement cutover has occurred. The next handoff is Phase 12H-B — Role-Neutral
+Resolver / Composition Core.
 
 สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request / future IT module — DEFERRED<br>
 วันที่สำรวจ: 2026-09-18<br>
@@ -42,8 +43,9 @@ resource relationship เดียวกัน. สิทธิ์ธุรก�
 หรือ exceptional direct User grant เท่านั้น; ADMIN ยังมีความหมายเฉพาะ
 control-plane และ lifecycle boundaries ที่ระบุในเอกสาร Phase 12H-A. ข้อความนี้
 อธิบาย target เท่านั้น ไม่ได้อ้างว่า runtime ปัจจุบันเปลี่ยนแล้ว. Phase 12H-A
-ยังไม่ปิด และ supersede ทั้ง ADMIN implicit business authority และ selected
-legacy USER defaults ที่ถูก narrow แล้ว โดยเฉพาะ Routine broad authority.
+ปิดแล้วในขอบเขต contract/inventory และ supersede ทั้ง ADMIN implicit business
+authority และ selected legacy USER defaults ที่ถูก narrow แล้ว โดยเฉพาะ Routine
+broad authority; runtime migration ยังไม่เริ่ม.
 
 สถานะ capability ปัจจุบันหลัง Phase 12F (historical pre-12H runtime record): `routine.task.export`, `routine.summary.read` และ
 `routine.reference.read` ใช้ permanent additive Default Domain Policy ผ่าน
