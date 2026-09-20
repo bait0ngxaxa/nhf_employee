@@ -1,6 +1,6 @@
 # NHF Employee — Current Authorization State
 
-> **Current repository state (Phase 12H-G):** production business
+> **Current repository state (Phase 12H-H):** production business
 > authorization is role-neutral and configured-grant based. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load
 > persistence for USER and ADMIN alike; `SYSTEM_ROLE / ADMIN` is not a
@@ -8,6 +8,8 @@
 > remain historical records of behavior at those phase boundaries. The full
 > cutover and regression record is in
 > [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
+> Production snapshot/live rollout evidence is tracked separately in
+> [authorization-phase-12hh-production-snapshot-live-rollout-validation.md](authorization-phase-12hh-production-snapshot-live-rollout-validation.md).
 
 Phase 12A status: CLOSED — additive policy contract and current capability
 inventory only. See
@@ -23,9 +25,11 @@ Phase 12F is now CLOSED for the full authorization regression/security matrix;
 Phase 12G-A — Authorization Administration UX Simplification is now CLOSED after
 its final closure correction on baseline `14a300d03a8bd9803afcf0bce8258ae7bd08e4d4`;
 Phase 12G-B — First Production Capability Deployment Readiness is now
-implementation-complete on baseline `c49caec5f14569655d1e385c1706dc7e9e22c0a8`
-and awaits production operational acceptance. No production authorization
-rollout has been performed.
+implementation-complete on baseline `c49caec5f14569655d1e385c1706dc7e9e22c0a8`.
+Phase 12H-G — role-neutral production business enforcement cutover and full
+security regression is now CLOSED. Phase 12H-H is the current operational
+handoff and awaits actual production snapshot/live rollout evidence. No
+production authorization rollout has been performed.
 
 Phase 12H-A — Role-Neutral Business Authorization Contract & Inventory is now
 **COMPLETE as a documentation/inventory phase only**. The authoritative target
@@ -78,6 +82,7 @@ current repository state; production enforcement cutover remains Phase 12H-G.
 
 สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12H-D Missing/deferred capability completion — CLOSED; Phase 12H-E Production Team/grant preparation and effective-access reconciliation — CLOSED for repository target readiness; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request capability migration — CLOSED in Phase 12H-D; future IT module — OUT OF SCOPE<br>
 Phase 12H-E — **เสร็จสิ้นในขอบเขต repository target readiness**; authority model ของ preflight — **ROLE_NEUTRAL_TARGET**; configured authority ของ USER/ADMIN — **reconciled ด้วยกติกาเดียวกัน**; hypothetical canary — **role-neutral resolver**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; production operational/live gates — **NOT RUN**; Phase 12H-F — Presentation/route role-authority removal — **CLOSED**; ขั้นถัดไป Phase 12H-G — production enforcement cutover<br>
+สถานะปัจจุบัน Phase 12H-H: **OPEN ในขอบเขต repository/tooling validation**; Phase 12H-G — **CLOSED**; production snapshot/live rollout, migration readback, canary, rollback และ observation evidence — **NOT RUN**; production rollout — **ยังไม่ complete**; Phase 12H-I — **ยังไม่เริ่ม**
 วันที่สำรวจ: 2026-09-19<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
@@ -1715,3 +1720,27 @@ audit provenance, and approved recipient policies remain ADMIN/system-role
 uses. None is an ordinary business ALLOW/DENY source. Production/live rollout
 is **NOT RUN**. The detailed closure and verification record is in
 [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
+
+## Phase 12H-H current operational status
+
+Phase 12H-H is **OPEN — repository/tooling validation only** against baseline
+`8bc5eedffc5f2699d10acd86c6920290787a9786`. The existing read-only production
+preflight, production-readiness evaluator, safe persistence projection,
+Administration effective-access provider, audited Authorization Administration
+mutation boundary, and canary-plan validator are reused. No second scanner,
+capability evaluator, direct SQL/Prisma production mutation path, automatic
+ADMIN backfill, seed, or repair path was introduced.
+
+The operator runbook and evidence record are in
+[authorization-phase-12hh-production-snapshot-live-rollout-validation.md](authorization-phase-12hh-production-snapshot-live-rollout-validation.md).
+No explicitly authorized production target, production deployment revision,
+live preflight, migration readback, inventory snapshot, warning disposition,
+canary mutation, rollback, or observation-window evidence was supplied or
+executed in this repository task. Therefore every live H gate is **NOT RUN**;
+production rollout is not complete and Phase 12H-H operational acceptance
+remains open.
+
+The retained legacy resolver/evaluator/composition seam remains comparison-only
+for H. Phase 12H-I has not started and must not remove the compatibility seam
+or the legacy `SYSTEM_ROLE` representation before H receives actual accepted
+production evidence.
