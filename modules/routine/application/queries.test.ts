@@ -46,6 +46,7 @@ function taskRow(
     id: number,
     employeeId = 21,
     createdById = 99,
+    recipientScope = "ASSIGNEES",
 ): Record<string, unknown> {
     return {
         id,
@@ -83,7 +84,7 @@ function taskRow(
             daysBefore: 3,
             sendHour: 9,
             channel: "IN_APP",
-            recipientScope: "ASSIGNEES",
+            recipientScope,
             isActive: true,
         }],
     };
@@ -1314,6 +1315,34 @@ describe("NHF Routine query authorization", () => {
             canDelete: false,
         }]);
     });
+
+    it.each([
+        ["legacy ADMINS", "ADMINS", "ALL_READERS"],
+        ["legacy combined scope", "ASSIGNEES_AND_ADMINS", "ASSIGNEES_AND_ALL_READERS"],
+        ["canonical ASSIGNEES", "ASSIGNEES", "ASSIGNEES"],
+    ] as const)(
+        "normalizes %s in management results",
+        async (_label, persistedScope, expectedScope) => {
+            prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+                taskRow(71, 21, 99, persistedScope),
+            ]));
+            prismaMock.routineTask.count.mockResolvedValue(1);
+
+            const result = await getRoutineTasks(
+                { activeOnly: undefined, page: 1, limit: 20 },
+                {
+                    actor: { id: 99, email: "admin@example.com", role: "ADMIN" },
+                    employeeId: null,
+                },
+            );
+
+            const scopes = result.tasks.flatMap((task) =>
+                task.reminderRules.map((rule) => rule.recipientScope));
+            expect(scopes).toEqual([expectedScope]);
+            expect(scopes).not.toContain("ADMINS");
+            expect(scopes).not.toContain("ASSIGNEES_AND_ADMINS");
+        },
+    );
 
     it("keeps creator-or-assignee scope when searching management results", async () => {
         await getRoutineTasks(

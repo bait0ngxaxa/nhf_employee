@@ -166,7 +166,9 @@ type CanonicalRoutineReminderRule = Omit<
 
 type CanonicalRoutineReminderRules = CanonicalRoutineReminderRule[];
 
-type RoutineTaskListRow = RoutineTaskRow & RoutineTaskCapabilities;
+type RoutineTaskListRow = Omit<RoutineTaskRow, "reminderRules"> & {
+    reminderRules: CanonicalRoutineReminderRules;
+} & RoutineTaskCapabilities;
 
 type RoutineTaskDetailRow = RoutineTaskRow & {
     occurrences: RoutineOccurrenceRow[];
@@ -1379,18 +1381,24 @@ export async function getRoutineTasks(
     ]);
 
     const serializedTasks = await Promise.all(
-        tasks.map(async (task) => ({
-            ...redactRoutineSourceMetadata(
-                task,
-                importAuthorization?.scopes.includes("ALL") === true,
-            ),
-            ...await getRoutineTaskCapabilities(
-                task,
-                queryActor,
-                employeeId,
-                mutationAuthorizations,
-            ),
-        })),
+        tasks.map(async (task) => {
+            const normalizedTask = {
+                ...task,
+                reminderRules: normalizeRoutineReminderRules(task.reminderRules),
+            };
+            return {
+                ...redactRoutineSourceMetadata(
+                    normalizedTask,
+                    importAuthorization?.scopes.includes("ALL") === true,
+                ),
+                ...await getRoutineTaskCapabilities(
+                    normalizedTask,
+                    queryActor,
+                    employeeId,
+                    mutationAuthorizations,
+                ),
+            };
+        }),
     );
     return {
         tasks: serializedTasks,
