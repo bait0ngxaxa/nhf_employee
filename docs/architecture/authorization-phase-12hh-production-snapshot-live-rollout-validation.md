@@ -499,13 +499,22 @@ paths were exercised without mocking `runSerializableTransaction()`,
 | Evidence | State | Result |
 |---|---|---|
 | Real system-role integration file | `PASS` | `__tests__/integration/system-role-lifecycle.integration.test.ts`: 1 file / 6 tests passed |
-| Full repository MySQL integration invocation | `NOT PASS — unrelated existing fixtures` | `npm run test:integration:mysql`: 12 files / 66 tests passed; 5 files / 44 tests failed in existing Stock/Routine/Auth-session integration fixtures that still assume implicit ADMIN business authority or stale lifecycle setup; the focused system-role file passed again after this run |
+| Full repository MySQL integration invocation | `PASS` | `npm run test:integration:mysql`: 17 files / 110 tests passed; 0 failed files and 0 failed tests |
 | Concurrent ADMIN demotion | `PASS` | Two eligible ADMIN accounts were demoted concurrently; exactly one mutation succeeded, one returned `LAST_ELIGIBLE_ADMIN`, and the committed database retained exactly one eligible ADMIN |
 | Cross-path role/lifecycle race | `PASS` | Both demotion-versus-Employee-offboarding target directions passed; one path won safely and the final database retained one eligible ADMIN |
 | Real `USER_ROLE_CHANGE` audit | `PASS` | Promotion persisted `User.role` and the same-transaction Audit row with actor, before/after role, and target metadata |
 | Role-neutral business authority | `PASS` | Promotion created no business grants; demotion preserved the target's Team membership, Team grant, TeamRole grant, and direct User grant |
 | Eligible-admin definition | `PASS` | Inactive/deleted/unlinked/inactive-Employee/suspended-Employee/deleted-Employee ADMIN rows did not count; removing the only usable ADMIN was rejected |
 | Same-transaction Audit failure rollback | `UNIT LEVEL` | The existing mocked dependency test remains the rollback proof; no artificial production failure hook was introduced solely for integration testing |
+
+The MySQL fixture rebaseline covered the previously failing Stock issuer,
+Routine import operator, Routine reminder operator, Auth-session lifecycle
+actor, and signup Employee lifecycle actor. Each received only the explicit
+business capability required by the exercised application path, and business
+fixtures now use the active linked Employee contract where required. Requester,
+negative authorization, and ineligible lifecycle fixtures were not broadened.
+No implicit `ADMIN` business authority was restored, and the Authorization
+Administration control plane remains intentionally ADMIN-only.
 
 The accepted production implementation passed this real MySQL concurrency
 proof unchanged; no production locking correction was required. This is

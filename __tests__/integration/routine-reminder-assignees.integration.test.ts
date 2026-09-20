@@ -45,6 +45,9 @@ async function cleanRoutineReminderDatabase(): Promise<void> {
     await prisma.routineCategory.deleteMany();
     await prisma.routineUnit.deleteMany();
     await prisma.auditLog.deleteMany();
+    await prisma.userCapabilityGrant.deleteMany({
+        where: { user: { email: "routine-reminder-admin@integration.test" } },
+    });
     await prisma.user.deleteMany();
     await prisma.employee.deleteMany();
     await prisma.department.deleteMany();
@@ -71,7 +74,7 @@ async function createRoutineReminderFixture(): Promise<RoutineReminderFixture> {
     });
     const ownerEmail = "routine-owner@integration.test";
     const coOwnerEmail = "routine-co-owner@integration.test";
-    const [ownerEmployee, coOwnerEmployee] = await Promise.all([
+    const [ownerEmployee, coOwnerEmployee, actorEmployee] = await Promise.all([
         prisma.employee.create({
             data: {
                 firstName: "เจ้าของงาน",
@@ -88,6 +91,17 @@ async function createRoutineReminderFixture(): Promise<RoutineReminderFixture> {
                 email: "routine-co-owner-employee@integration.test",
                 position: "เจ้าหน้าที่ทดสอบ",
                 departmentId: department.id,
+            },
+        }),
+        prisma.employee.create({
+            data: {
+                firstName: "ผู้ดูแล Routine Reminder",
+                lastName: "ทดสอบ",
+                email: "routine-reminder-admin-employee@integration.test",
+                position: "ผู้ดูแลทดสอบ",
+                departmentId: department.id,
+                status: "ACTIVE",
+                deletedAt: null,
             },
         }),
     ]);
@@ -114,9 +128,24 @@ async function createRoutineReminderFixture(): Promise<RoutineReminderFixture> {
                 name: "ผู้ดูแล Routine Reminder",
                 password: "integration-test-only",
                 role: "ADMIN",
+                employeeId: actorEmployee.id,
             },
         }),
     ]);
+    await prisma.userCapabilityGrant.createMany({
+        data: [
+            {
+                userId: admin.id,
+                capabilityKey: "routine.task.create",
+                scope: "ALL",
+            },
+            {
+                userId: admin.id,
+                capabilityKey: "routine.task.update",
+                scope: "ALL",
+            },
+        ],
+    });
     const [unit, category] = await Promise.all([
         prisma.routineUnit.create({
             data: { code: "RTN-REMINDER", name: "หน่วยงานทดสอบ Reminder" },

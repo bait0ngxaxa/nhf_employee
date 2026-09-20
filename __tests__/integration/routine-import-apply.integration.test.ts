@@ -40,6 +40,9 @@ async function cleanRoutineImportDatabase(): Promise<void> {
     await prisma.routineCategory.deleteMany();
     await prisma.routineUnit.deleteMany();
     await prisma.auditLog.deleteMany();
+    await prisma.userCapabilityGrant.deleteMany({
+        where: { user: { email: "routine-admin@integration.test" } },
+    });
     await prisma.user.deleteMany();
     await prisma.employee.deleteMany();
     await prisma.department.deleteMany();
@@ -103,21 +106,44 @@ async function createRoutineImportFixture(rowCount = 1): Promise<RoutineImportFi
     const department = await prisma.department.create({
         data: { name: "แผนกทดสอบ Routine Import", code: "RTN-IMPORT-TEST" },
     });
-    const employee = await prisma.employee.create({
-        data: {
-            firstName: "ผู้รับผิดชอบ",
-            lastName: "ทดสอบ",
-            email: "routine-owner@integration.test",
-            position: "เจ้าหน้าที่ทดสอบ",
-            departmentId: department.id,
-        },
-    });
+    const [employee, actorEmployee] = await Promise.all([
+        prisma.employee.create({
+            data: {
+                firstName: "ผู้รับผิดชอบ",
+                lastName: "ทดสอบ",
+                email: "routine-owner@integration.test",
+                position: "เจ้าหน้าที่ทดสอบ",
+                departmentId: department.id,
+                status: "ACTIVE",
+                deletedAt: null,
+            },
+        }),
+        prisma.employee.create({
+            data: {
+                firstName: "ผู้ดูแล Routine Import",
+                lastName: "ทดสอบ",
+                email: "routine-admin-employee@integration.test",
+                position: "ผู้ดูแลทดสอบ",
+                departmentId: department.id,
+                status: "ACTIVE",
+                deletedAt: null,
+            },
+        }),
+    ]);
     const admin = await prisma.user.create({
         data: {
             email: "routine-admin@integration.test",
             name: "ผู้ดูแล Routine Import",
             password: "integration-test-only",
             role: Role.ADMIN,
+            employeeId: actorEmployee.id,
+        },
+    });
+    await prisma.userCapabilityGrant.create({
+        data: {
+            userId: admin.id,
+            capabilityKey: "routine.import.manage",
+            scope: "ALL",
         },
     });
     await prisma.routineUnit.create({

@@ -42,9 +42,43 @@ export async function cleanIntegrationDatabase(
     await client.stockItemVariant.deleteMany();
     await client.stockItem.deleteMany();
     await client.stockCategory.deleteMany();
+    const fixtureUsers = await client.user.findMany({
+        where: {
+            OR: [
+                { email: { startsWith: "requester-" } },
+                { email: { startsWith: "issuer-" } },
+            ],
+        },
+        select: { id: true },
+    });
+    if (fixtureUsers.length > 0) {
+        await client.userCapabilityGrant.deleteMany({
+            where: { userId: { in: fixtureUsers.map(({ id }) => id) } },
+        });
+    }
     await client.employee.deleteMany();
     await client.department.deleteMany();
     await client.user.deleteMany();
+}
+
+async function grantStockOperatorAuthority(
+    client: PrismaClient,
+    userId: number,
+): Promise<void> {
+    await client.userCapabilityGrant.createMany({
+        data: [
+            {
+                userId,
+                capabilityKey: "stock.inventory.manage",
+                scope: "ALL",
+            },
+            {
+                userId,
+                capabilityKey: "stock.request.process",
+                scope: "ALL",
+            },
+        ],
+    });
 }
 
 function toActor(user: {
@@ -102,6 +136,7 @@ export async function createStockFixture(
             role: Role.ADMIN,
         },
     });
+    await grantStockOperatorAuthority(client, issuer.id);
     const requesterEmployee = await client.employee.create({
         data: {
             firstName: `ผู้ขอ ${suffix}`,

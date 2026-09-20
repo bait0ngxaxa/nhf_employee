@@ -55,6 +55,9 @@ async function cleanFixtures(): Promise<void> {
     await prisma.auditLog.deleteMany({
         where: { userEmail: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL, ACTOR_EMAIL] } },
     });
+    await prisma.userCapabilityGrant.deleteMany({
+        where: { user: { email: { in: [ORIGINAL_EMAIL, UPDATED_EMAIL, ACTOR_EMAIL] } } },
+    });
 
     const department = await prisma.department.findUnique({
         where: { code: DEPARTMENT_CODE },
@@ -132,6 +135,13 @@ describe.sequential("signup and Employee identity concurrency with real MySQL", 
                 password: "integration-test-password",
                 role: "ADMIN",
                 employeeId: actorEmployee.id,
+            },
+        });
+        await prisma.userCapabilityGrant.create({
+            data: {
+                userId: actorUser.id,
+                capabilityKey: "employee.update",
+                scope: "ALL",
             },
         });
 

@@ -136,6 +136,7 @@ async function cleanFixtures(): Promise<void> {
         });
         if (userIds.length > 0) {
             await prisma.authRefreshToken.deleteMany({ where: { userId: { in: userIds } } });
+            await prisma.userCapabilityGrant.deleteMany({ where: { userId: { in: userIds } } });
         }
         if (userEmails.length > 0) {
             await prisma.passwordResetToken.deleteMany({ where: { email: { in: userEmails } } });
@@ -280,13 +281,20 @@ async function createActor(): Promise<void> {
             departmentId: department.id,
         },
     });
-    await prisma.user.create({
+    const actor = await prisma.user.create({
         data: {
             email: ACTOR_EMAIL,
             name: "L1 Actor",
             password: "integration-test-password",
             role: "ADMIN",
             employeeId: employee.id,
+        },
+    });
+    await prisma.userCapabilityGrant.create({
+        data: {
+            userId: actor.id,
+            capabilityKey: "employee.update",
+            scope: "ALL",
         },
     });
 }
