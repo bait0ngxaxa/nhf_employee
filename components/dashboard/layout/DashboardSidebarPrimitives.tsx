@@ -52,7 +52,7 @@ type SidebarNavProps = {
 type SidebarFooterProps = {
     sidebarOpen: boolean;
     name: string;
-    role: string;
+    secondaryText: string;
 };
 
 function getItemLabel(item: MenuItem): string {
@@ -300,7 +300,7 @@ export function SidebarNav({
 export function SidebarFooter({
     sidebarOpen,
     name,
-    role,
+    secondaryText,
 }: SidebarFooterProps): ReactElement {
     return (
         <div
@@ -324,7 +324,7 @@ export function SidebarFooter({
                 {sidebarOpen && (
                     <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{name}</p>
-                        <p className="truncate text-xs text-sidebar-foreground/65">{role}</p>
+                        <p className="truncate text-xs text-sidebar-foreground/65">{secondaryText}</p>
                     </div>
                 )}
             </div>

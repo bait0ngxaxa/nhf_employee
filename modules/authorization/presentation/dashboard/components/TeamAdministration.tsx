@@ -29,7 +29,7 @@ import {
 import { ActiveStatus, LifecycleStatus } from "./AuthorizationStatus";
 import { ConfigurationIssues } from "./ConfigurationIssues";
 import { GrantList } from "./GrantList";
-import { formatAuthorizationDate, getMutationErrorCopy } from "../display";
+import { getMutationErrorCopy } from "../display";
 import { createAuthorizationTechnicalKey } from "../technical-key";
 import type {
     AuthorizationAdministrationOverviewData,
@@ -132,17 +132,17 @@ export function TeamAdministration({
         }
     }, [runMutation]);
 
-    if (loading && !team) return <LoadingState label="กำลังโหลดรายละเอียดกลุ่ม" />;
+    if (loading && !team) return <LoadingState label="กำลังโหลดรายละเอียดทีม" />;
     if (error && !team) {
         return (
             <ErrorState
-                title="โหลดรายละเอียดกลุ่มไม่สำเร็จ"
-                description="อาจมีการเปลี่ยนแปลงจากผู้ดูแลระบบคนอื่น หรือไม่สามารถเชื่อมต่อได้"
+                title="โหลดรายละเอียดทีมไม่สำเร็จ"
+                description="อาจมีการเปลี่ยนแปลงจากผู้มีสิทธิ์จัดการสิทธิ์คนอื่น หรือไม่สามารถเชื่อมต่อได้"
                 action={{ label: "ลองใหม่", onClick: () => void onRefresh(), icon: <RefreshCw aria-hidden="true" /> }}
             />
         );
     }
-    if (!team) return <EmptyState title="ยังไม่ได้เลือกกลุ่ม" description="เลือกกลุ่มจากรายการด้านบนเพื่อดูรายละเอียด" />;
+    if (!team) return <EmptyState title="ยังไม่ได้เลือกทีม" description="เลือกทีมจากรายการด้านบนเพื่อดูรายละเอียด" />;
 
     const selectedRole = team.roles.find((role) => role.id === selectedRoleId) ?? null;
     const isBusy = pendingKey !== null;
@@ -156,11 +156,7 @@ export function TeamAdministration({
                             <h2 className="break-words text-xl font-semibold tracking-tight text-content-heading">{team.name}</h2>
                             <ActiveStatus isActive={team.isActive} />
                         </div>
-                        <p className="mt-3 max-w-3xl text-sm leading-6 text-content-secondary">{team.description || "ยังไม่มีคำอธิบายกลุ่ม"}</p>
-                        <details className="mt-2 text-xs">
-                            <summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสทางเทคนิค</summary>
-                            <span className="mt-1 block break-all font-mono text-content-muted">{team.key}</span>
-                        </details>
+                        <p className="mt-3 max-w-3xl text-sm leading-6 text-content-secondary">{team.description || "ยังไม่มีคำอธิบายทีม"}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Button type="button" variant="outline" size="sm" onClick={() => void onRefresh()} disabled={isBusy}>
@@ -170,27 +166,26 @@ export function TeamAdministration({
                             <Edit3 aria-hidden="true" />แก้ไขข้อมูล
                         </Button>
                         <Button type="button" variant={team.isActive ? "destructive" : "default"} size="sm" onClick={() => setLifecycleTarget({ kind: "team", id: team.id, name: team.name, nextActive: !team.isActive })} disabled={isBusy}>
-                            {team.isActive ? "ปิดใช้งานกลุ่ม" : "เปิดใช้งานกลุ่ม"}
+                            {team.isActive ? "ปิดใช้งานทีม" : "เปิดใช้งานทีม"}
                         </Button>
                     </div>
                 </div>
                 <div className="grid gap-3 border-b border-border-subtle bg-surface-subtle/60 px-4 py-3 sm:grid-cols-4 sm:px-5">
-                    <Count label="บทบาทในกลุ่ม" value={team.roleCount} />
+                    <Count label="หน้าที่ในทีม" value={team.roleCount} />
                     <Count label="สมาชิก" value={team.membershipCount} />
-                    <Count label="สิทธิ์ของกลุ่ม" value={team.teamGrantCount} />
-                    <Count label="แก้ไขล่าสุด" value={formatAuthorizationDate(team.updatedAt)} compact />
+                    <Count label="สิทธิ์ของทีม" value={team.teamGrantCount} />
                 </div>
-                <nav aria-label="ส่วนของกลุ่ม" className="overflow-x-auto border-b border-border-subtle">
+                <nav aria-label="ส่วนของทีม" className="overflow-x-auto border-b border-border-subtle">
                     <div className="flex min-w-max gap-1 px-3 py-2 sm:px-4">
                         <TeamTabButton active={tab === "details"} onClick={() => setTab("details")}>รายละเอียด</TeamTabButton>
                         <TeamTabButton active={tab === "members"} onClick={() => setTab("members")}>สมาชิก</TeamTabButton>
-                        <TeamTabButton active={tab === "permissions"} onClick={() => setTab("permissions")}>บทบาทและสิทธิ์</TeamTabButton>
+                        <TeamTabButton active={tab === "permissions"} onClick={() => setTab("permissions")}>หน้าที่ในทีมและสิทธิ์</TeamTabButton>
                     </div>
                 </nav>
             </section>
 
-            {error ? <p role="alert" className="text-sm text-status-danger-strong">รายละเอียดอาจไม่ใช่ข้อมูลล่าสุด: {error.message}</p> : null}
-            <ConfigurationIssues issues={team.configurationIssues} title="พบการตั้งค่าสิทธิ์ของกลุ่มที่ต้องตรวจสอบ" />
+            {error ? <p role="alert" className="text-sm text-status-danger-strong">รายละเอียดอาจไม่ใช่ข้อมูลล่าสุด กรุณาโหลดข้อมูลทีมอีกครั้ง</p> : null}
+            <ConfigurationIssues issues={team.configurationIssues} title="พบการตั้งค่าสิทธิ์ของทีมที่ต้องตรวจสอบ" />
 
             {tab === "details" ? <TeamDetails team={team} /> : null}
             {tab === "members" ? (
@@ -199,7 +194,7 @@ export function TeamAdministration({
                     busy={isBusy}
                     onAdd={() => setMemberDialogOpen(true)}
                     onSelectUser={onSelectUser}
-                    onChangeRole={(userId, teamRoleId) => void runInlineMutation(`member-role:${userId}`, async () => { await changeMemberRole(team.id, userId, { teamRoleId }); }, userId, "เปลี่ยนบทบาทในกลุ่มแล้ว")}
+                    onChangeRole={(userId, teamRoleId) => void runInlineMutation(`member-role:${userId}`, async () => { await changeMemberRole(team.id, userId, { teamRoleId }); }, userId, "เปลี่ยนหน้าที่ในทีมแล้ว")}
                     onRemove={(userId, name) => setRemoveMemberTarget({ userId, name })}
                 />
             ) : null}
@@ -211,8 +206,8 @@ export function TeamAdministration({
                     busy={isBusy}
                     onAddTeamGrant={() => setGrantSource("TEAM")}
                     onAddRoleGrant={() => setGrantSource("TEAM_ROLE")}
-                    onRemoveTeamGrant={(grant) => runMutation(`team-grant-remove:${grant.capabilityKey}:${grant.scope}`, async () => { await removeTeamGrant(team.id, { capabilityKey: grant.capabilityKey, scope: grant.scope }); }, "นำสิทธิ์ของกลุ่มออกแล้ว")}
-                    onRemoveRoleGrant={(grant) => selectedRole ? runMutation(`role-grant-remove:${grant.capabilityKey}:${grant.scope}`, async () => { await removeTeamRoleGrant(team.id, selectedRole.id, { capabilityKey: grant.capabilityKey, scope: grant.scope }); }, "นำสิทธิ์ของบทบาทออกแล้ว") : Promise.resolve()}
+                     onRemoveTeamGrant={(grant) => runMutation(`team-grant-remove:${grant.capabilityKey}:${grant.scope}`, async () => { await removeTeamGrant(team.id, { capabilityKey: grant.capabilityKey, scope: grant.scope }); }, "นำสิทธิ์ของทีมออกแล้ว")}
+                     onRemoveRoleGrant={(grant) => selectedRole ? runMutation(`role-grant-remove:${grant.capabilityKey}:${grant.scope}`, async () => { await removeTeamRoleGrant(team.id, selectedRole.id, { capabilityKey: grant.capabilityKey, scope: grant.scope }); }, "นำสิทธิ์ของหน้าที่ในทีมออกแล้ว") : Promise.resolve()}
                     onCreateRole={() => setRoleEditor({ mode: "create" })}
                     onEditRole={(role) => setRoleEditor({ mode: "edit", role })}
                     onLifecycleRole={(role) => setLifecycleTarget({ kind: "role", id: role.id, name: role.name, nextActive: !role.isActive })}
@@ -227,7 +222,7 @@ export function TeamAdministration({
                 onClose={() => setTeamEditorOpen(false)}
                 onSubmit={async (input) => {
                     const { name, description } = input;
-                    await runMutation("team-update", async () => { await updateTeam(team.id, { name, description }); }, "บันทึกข้อมูลกลุ่มแล้ว");
+                    await runMutation("team-update", async () => { await updateTeam(team.id, { name, description }); }, "บันทึกข้อมูลทีมแล้ว");
                     setTeamEditorOpen(false);
                 }}
             />
@@ -240,11 +235,11 @@ export function TeamAdministration({
                 onSubmit={async (input) => {
                     const editingRole = roleEditor?.role;
                     if (roleEditor?.mode === "edit" && editingRole) {
-                        await runMutation("role-save", async () => { await updateTeamRole(team.id, editingRole.id, { name: input.name }); }, "บันทึกบทบาทแล้ว");
+                        await runMutation("role-save", async () => { await updateTeamRole(team.id, editingRole.id, { name: input.name }); }, "บันทึกหน้าที่ในทีมแล้ว");
                     } else if (roleEditor?.mode === "create") {
-                        await runMutation("role-save", async () => { await createTeamRole(team.id, { key: input.key ?? createAuthorizationTechnicalKey("role"), name: input.name }); }, "สร้างบทบาทแล้ว");
+                        await runMutation("role-save", async () => { await createTeamRole(team.id, { key: input.key ?? createAuthorizationTechnicalKey("role"), name: input.name }); }, "สร้างหน้าที่ในทีมแล้ว");
                     } else {
-                        throw new Error("ไม่พบข้อมูลบทบาทที่ต้องการแก้ไข");
+                        throw new Error("ไม่พบข้อมูลหน้าที่ในทีมที่ต้องการแก้ไข");
                     }
                     setRoleEditor(null);
                 }}
@@ -261,7 +256,7 @@ export function TeamAdministration({
                 onQueryChange={onDirectoryQueryChange}
                 onClose={() => setMemberDialogOpen(false)}
                 onSubmit={async (input) => {
-                    await runMutation("member-add", async () => { await addMember(team.id, input); }, "เพิ่มสมาชิกในกลุ่มแล้ว", input.userId);
+                    await runMutation("member-add", async () => { await addMember(team.id, input); }, "เพิ่มสมาชิกในทีมแล้ว", input.userId);
                     setMemberDialogOpen(false);
                 }}
             />
@@ -274,9 +269,9 @@ export function TeamAdministration({
                     onClose={() => setGrantSource(null)}
                     onSubmit={async (input) => {
                         if (grantSource === "TEAM") {
-                            await runMutation("grant-add:TEAM", async () => { await addTeamGrant(team.id, input); }, "เพิ่มสิทธิ์ให้กลุ่มแล้ว");
+                            await runMutation("grant-add:TEAM", async () => { await addTeamGrant(team.id, input); }, "เพิ่มสิทธิ์ให้ทีมแล้ว");
                         } else if (selectedRole) {
-                            await runMutation("grant-add:TEAM_ROLE", async () => { await addTeamRoleGrant(team.id, selectedRole.id, input); }, "เพิ่มสิทธิ์ให้บทบาทแล้ว");
+                            await runMutation("grant-add:TEAM_ROLE", async () => { await addTeamRoleGrant(team.id, selectedRole.id, input); }, "เพิ่มสิทธิ์ให้หน้าที่ในทีมแล้ว");
                         }
                         setGrantSource(null);
                     }}
@@ -286,9 +281,9 @@ export function TeamAdministration({
                 open={lifecycleTarget !== null}
                 title={lifecycleTarget?.nextActive ? `เปิดใช้งาน ${lifecycleTarget.name}` : `ปิดใช้งาน ${lifecycleTarget?.name ?? "รายการ"}`}
                 description={lifecycleTarget?.kind === "team" && lifecycleTarget.nextActive === false
-                    ? "สมาชิกและสิทธิ์ที่ตั้งค่าไว้จะไม่ถูกลบ แต่การเข้าถึงจากกลุ่มจะหยุดใช้งานจนกว่าจะเปิดกลุ่มอีกครั้ง"
+                    ? "สมาชิกและสิทธิ์ที่ตั้งค่าไว้จะไม่ถูกลบ แต่การเข้าถึงจากทีมจะหยุดใช้งานจนกว่าจะเปิดทีมอีกครั้ง"
                     : lifecycleTarget?.kind === "role" && lifecycleTarget.nextActive === false
-                        ? "การปิดใช้งานจะไม่ลบสมาชิกหรือสิทธิ์ของบทบาทนี้ แต่สมาชิกจะไม่ได้รับสิทธิ์จากบทบาทนี้จนกว่าจะเปิดใช้งาน"
+                        ? "การปิดใช้งานจะไม่ลบสมาชิกหรือสิทธิ์ของหน้าที่นี้ แต่สมาชิกจะไม่ได้รับสิทธิ์จากหน้าที่นี้จนกว่าจะเปิดใช้งาน"
                         : "การเปลี่ยนสถานะจะถูกตรวจสอบโดยระบบ และข้อมูลเดิมจะยังคงตรวจสอบได้"}
                 confirmLabel={lifecycleTarget?.nextActive ? "เปิดใช้งาน" : "ปิดใช้งาน"}
                 destructive={lifecycleTarget?.nextActive === false}
@@ -297,24 +292,24 @@ export function TeamAdministration({
                 onConfirm={async () => {
                     if (!lifecycleTarget) return;
                     if (lifecycleTarget.kind === "team") {
-                        await runMutation("lifecycle", async () => { await updateTeam(team.id, { isActive: lifecycleTarget.nextActive }); }, lifecycleTarget.nextActive ? "เปิดใช้งานกลุ่มแล้ว" : "ปิดใช้งานกลุ่มแล้ว");
+                        await runMutation("lifecycle", async () => { await updateTeam(team.id, { isActive: lifecycleTarget.nextActive }); }, lifecycleTarget.nextActive ? "เปิดใช้งานทีมแล้ว" : "ปิดใช้งานทีมแล้ว");
                     } else {
-                        await runMutation("lifecycle", async () => { await updateTeamRole(team.id, lifecycleTarget.id, { isActive: lifecycleTarget.nextActive }); }, lifecycleTarget.nextActive ? "เปิดใช้งานบทบาทแล้ว" : "ปิดใช้งานบทบาทแล้ว");
+                        await runMutation("lifecycle", async () => { await updateTeamRole(team.id, lifecycleTarget.id, { isActive: lifecycleTarget.nextActive }); }, lifecycleTarget.nextActive ? "เปิดใช้งานหน้าที่ในทีมแล้ว" : "ปิดใช้งานหน้าที่ในทีมแล้ว");
                     }
                     setLifecycleTarget(null);
                 }}
             />
             <ConfirmAuthorizationAction
                 open={removeMemberTarget !== null}
-                title="นำสมาชิกออกจากกลุ่ม?"
-                description={removeMemberTarget ? `นำ ${removeMemberTarget.name} ออกจาก ${team.name} หรือไม่ สิทธิ์ที่มาจากกลุ่มอาจหายไป แต่บัญชีผู้ใช้จะไม่ถูกลบ` : ""}
-                confirmLabel="นำออกจากกลุ่ม"
+                 title="นำสมาชิกออกจากทีม?"
+                 description={removeMemberTarget ? `นำ ${removeMemberTarget.name} ออกจาก ${team.name} หรือไม่ สิทธิ์ที่มาจากทีมอาจหายไป แต่บัญชีผู้ใช้จะไม่ถูกลบ` : ""}
+                 confirmLabel="นำออกจากทีม"
                 destructive
                 busy={pendingKey === "member-remove"}
                 onClose={() => setRemoveMemberTarget(null)}
                 onConfirm={async () => {
                     if (!removeMemberTarget) return;
-                    await runMutation("member-remove", async () => { await removeMember(team.id, removeMemberTarget.userId); }, "นำสมาชิกออกจากกลุ่มแล้ว", removeMemberTarget.userId);
+                     await runMutation("member-remove", async () => { await removeMember(team.id, removeMemberTarget.userId); }, "นำสมาชิกออกจากทีมแล้ว", removeMemberTarget.userId);
                     setRemoveMemberTarget(null);
                 }}
             />
@@ -351,13 +346,13 @@ function PermissionsPanel({
     return (
         <section className="space-y-4 rounded-xl border border-border-subtle bg-surface-subtle/60 p-3 sm:p-4" aria-labelledby="authorization-team-permissions-heading">
             <header>
-                <h2 id="authorization-team-permissions-heading" className="text-base font-semibold text-content-heading">สิทธิ์ของกลุ่มและบทบาท</h2>
-                <p className="mt-1 text-sm leading-6 text-content-secondary">แยกดูสิทธิ์ของกลุ่ม บทบาทในกลุ่ม และสิทธิ์ของบทบาทที่กำลังเลือก</p>
+                <h2 id="authorization-team-permissions-heading" className="text-base font-semibold text-content-heading">สิทธิ์ของทีมและหน้าที่ในทีม</h2>
+                <p className="mt-1 text-sm leading-6 text-content-secondary">แยกดูสิทธิ์ของทีม หน้าที่ในทีม และสิทธิ์ของหน้าที่ที่กำลังเลือก</p>
             </header>
             <div className="space-y-4">
                 <GrantList
-                    title="สิทธิ์ของกลุ่ม"
-                    description="สมาชิกทุกคนในกลุ่มนี้ได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ"
+                    title="สิทธิ์ของทีม"
+                    description="สมาชิกทุกคนในทีมนี้ได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ"
                     source="TEAM"
                     grants={team.teamGrants}
                     busy={busy}
@@ -383,7 +378,7 @@ function PermissionsPanel({
                         onRemove={onRemoveRoleGrant}
                     />
                 ) : (
-                    <EmptyState title="เลือกบทบาทเพื่อดูสิทธิ์" description="เลือกบทบาทจากรายการด้านบนเพื่อดูหรือจัดการสิทธิ์ของบทบาทนั้นในบริบทเดียวกัน" />
+                    <EmptyState title="เลือกหน้าที่ในทีมเพื่อดูสิทธิ์" description="เลือกหน้าที่จากรายการด้านบนเพื่อดูหรือจัดการสิทธิ์ของหน้าที่นั้น" />
                 )}
             </div>
         </section>
@@ -394,19 +389,19 @@ function TeamDetails({ team }: { readonly team: AuthorizationAdministrationTeamD
     return (
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(260px,0.7fr)]">
             <div className="rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-5">
-                <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-action-primary-foreground" aria-hidden="true" /><h3 className="text-base font-semibold text-content-heading">สิทธิ์ของกลุ่มทำงานอย่างไร</h3></div>
-                <p className="mt-2 text-sm leading-6 text-content-secondary">สิทธิ์ของกลุ่มมีผลกับสมาชิกทุกคนในกลุ่ม ส่วนสิทธิ์ของบทบาทมีผลเฉพาะสมาชิกที่ได้รับบทบาทนั้น ระบบจะตรวจสอบสถานะของกลุ่ม สมาชิก และรายการจริงอีกครั้งเมื่อใช้งาน</p>
+                <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-action-primary-foreground" aria-hidden="true" /><h3 className="text-base font-semibold text-content-heading">สิทธิ์ของทีมทำงานอย่างไร</h3></div>
+                <p className="mt-2 text-sm leading-6 text-content-secondary">สิทธิ์ของทีมมีผลกับสมาชิกทุกคนในทีม ส่วนสิทธิ์ของหน้าที่ในทีมมีผลเฉพาะสมาชิกที่ได้รับหน้าที่นั้น ระบบจะตรวจสอบสถานะของทีม สมาชิก และรายการจริงอีกครั้งเมื่อใช้งาน</p>
                 <dl className="mt-5 grid gap-3 border-t border-border-subtle pt-4 text-sm sm:grid-cols-2">
-                    <Detail label="ชื่อกลุ่ม" value={team.name} />
-                    <Detail label="สร้างเมื่อ" value={formatAuthorizationDate(team.createdAt)} />
-                    <Detail label="แก้ไขเมื่อ" value={formatAuthorizationDate(team.updatedAt)} />
+                    <Detail label="ชื่อทีม" value={team.name} />
+                    <Detail label="สมาชิก" value={String(team.membershipCount)} />
+                    <Detail label="หน้าที่ในทีม" value={String(team.roleCount)} />
                 </dl>
             </div>
             <div className="rounded-xl border border-border-subtle bg-surface-subtle/60 p-4 sm:p-5">
                 <h3 className="text-base font-semibold text-content-heading">สิ่งที่ยังคงตรวจสอบได้</h3>
                 <ul className="mt-3 space-y-2 text-sm leading-6 text-content-secondary">
                     <li>• สมาชิกทั้งหมด รวมบัญชีที่ปิดใช้งาน</li>
-                    <li>• บทบาทและสิทธิ์ที่ตั้งค่าไว้</li>
+                    <li>• หน้าที่ในทีมและสิทธิ์ที่ตั้งค่าไว้</li>
                     <li>• รายการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ</li>
                 </ul>
             </div>
@@ -432,20 +427,20 @@ function MembersPanel({
     return (
         <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
             <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
-                <div><h3 className="text-base font-semibold text-content-heading">สมาชิกในกลุ่ม</h3><p className="mt-1 text-sm leading-6 text-content-secondary">สมาชิกในกลุ่มเป็นรายชื่อที่กำหนดไว้โดยตรง และไม่อนุมานจากแผนกหรือตำแหน่ง</p></div>
+                <div><h3 className="text-base font-semibold text-content-heading">สมาชิกทีม</h3><p className="mt-1 text-sm leading-6 text-content-secondary">สมาชิกทีมเป็นรายชื่อที่กำหนดไว้โดยตรง และไม่อนุมานจากแผนกหรือตำแหน่ง</p></div>
                 <Button type="button" size="sm" onClick={onAdd} disabled={busy}><Plus aria-hidden="true" />เพิ่มสมาชิก</Button>
             </div>
-            {team.memberships.length === 0 ? <EmptyState compact className="m-4 border-dashed" title="ยังไม่มีสมาชิก" description="ค้นหาผู้ใช้เพื่อเพิ่มสมาชิกในกลุ่มนี้" action={{ label: "เพิ่มสมาชิก", onClick: onAdd, icon: <Plus aria-hidden="true" /> }} /> : (
+            {team.memberships.length === 0 ? <EmptyState compact className="m-4 border-dashed" title="ยังไม่มีสมาชิก" description="ค้นหาผู้ใช้เพื่อเพิ่มสมาชิกในทีมนี้" action={{ label: "เพิ่มสมาชิก", onClick: onAdd, icon: <Plus aria-hidden="true" /> }} /> : (
                 <div className="overflow-x-auto">
                     <table className="min-w-[920px] w-full text-left text-sm">
                         <caption className="sr-only">สมาชิกของ {team.name}</caption>
-                        <thead className="border-b border-border-subtle bg-surface-subtle text-xs font-semibold text-content-secondary"><tr><th scope="col" className="px-4 py-3 sm:px-5">ผู้ใช้</th><th scope="col" className="px-4 py-3">สถานะบัญชี</th><th scope="col" className="px-4 py-3">พนักงาน</th><th scope="col" className="px-4 py-3">บทบาทในกลุ่ม</th><th scope="col" className="px-4 py-3"><span className="sr-only">การดำเนินการ</span></th></tr></thead>
+                        <thead className="border-b border-border-subtle bg-surface-subtle text-xs font-semibold text-content-secondary"><tr><th scope="col" className="px-4 py-3 sm:px-5">ผู้ใช้</th><th scope="col" className="px-4 py-3">สถานะบัญชี</th><th scope="col" className="px-4 py-3">พนักงาน</th><th scope="col" className="px-4 py-3">หน้าที่ในทีม</th><th scope="col" className="px-4 py-3"><span className="sr-only">การดำเนินการ</span></th></tr></thead>
                         <tbody className="divide-y divide-border-subtle">{team.memberships.map((membership) => <tr key={membership.userId}>
-                            <td className="px-4 py-3 sm:px-5"><button type="button" className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onSelectUser(membership.userId)}><span className="block font-semibold text-content-heading">{membership.user.name}</span><span className="mt-0.5 block text-xs text-content-secondary">{membership.user.email}</span></button><details className="mt-1 text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary><span className="mt-1 block font-mono text-content-muted">userId: {membership.user.id}</span></details></td>
+                            <td className="px-4 py-3 sm:px-5"><button type="button" className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onSelectUser(membership.userId)}><span className="block font-semibold text-content-heading">{membership.user.name}</span><span className="mt-0.5 block text-xs text-content-secondary">{membership.user.email}</span></button></td>
                             <td className="px-4 py-3"><LifecycleStatus isActive={membership.user.isActive} deletedAt={membership.user.deletedAt} /></td>
                             <td className="px-4 py-3">{membership.user.employee ? <span className="space-y-1"><span className="block text-content-body">{membership.user.employee.displayName}</span><span className="block text-xs text-content-secondary">{getEmployeeStatusLabel(membership.user.employee.status, membership.user.employee.deletedAt)}</span></span> : <span className="text-content-secondary">ไม่เชื่อมกับพนักงาน</span>}</td>
-                            <td className="px-4 py-3"><select aria-label={`บทบาทในกลุ่มของ ${membership.user.name}`} value={membership.teamRoleId ? String(membership.teamRoleId) : ""} onChange={(event) => onChangeRole(membership.userId, event.target.value ? Number(event.target.value) : null)} disabled={busy} className="h-11 min-w-48 rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="">ไม่กำหนดบทบาท</option>{team.roles.map((role) => <option key={role.id} value={role.id} disabled={!role.isActive}>{role.name}{role.isActive ? "" : " — ปิดใช้งาน"}</option>)}</select></td>
-                            <td className="px-4 py-3 text-right"><Button type="button" variant="outline" size="xs" onClick={() => onRemove(membership.userId, membership.user.name)} disabled={busy} aria-label={`นำ ${membership.user.name} ออกจากกลุ่ม`}><UserMinus aria-hidden="true" />นำออก</Button></td>
+                            <td className="px-4 py-3"><select aria-label={`หน้าที่ในทีมของ ${membership.user.name}`} value={membership.teamRoleId ? String(membership.teamRoleId) : ""} onChange={(event) => onChangeRole(membership.userId, event.target.value ? Number(event.target.value) : null)} disabled={busy} className="h-11 min-w-48 rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="">ไม่มีหน้าที่เฉพาะ</option>{team.roles.map((role) => <option key={role.id} value={role.id} disabled={!role.isActive}>{role.name}{role.isActive ? "" : " — ปิดใช้งาน"}</option>)}</select></td>
+                            <td className="px-4 py-3 text-right"><Button type="button" variant="outline" size="xs" onClick={() => onRemove(membership.userId, membership.user.name)} disabled={busy} aria-label={`นำ ${membership.user.name} ออกจากทีม`}><UserMinus aria-hidden="true" />นำออก</Button></td>
                         </tr>)}</tbody>
                     </table>
                 </div>
@@ -473,8 +468,8 @@ function RolesPanel({
 }): ReactElement {
     return (
         <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
-            <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"><div><h3 className="text-base font-semibold text-content-heading">บทบาทในกลุ่ม</h3><p className="mt-1 text-sm leading-6 text-content-secondary">บทบาทช่วยแยกหน้าที่ของสมาชิกภายในกลุ่ม และสิทธิ์ของแต่ละบทบาทจะแสดงต่อในบริบทเดียวกัน</p></div><Button type="button" size="sm" onClick={onCreate} disabled={busy}><Plus aria-hidden="true" />สร้างบทบาท</Button></div>
-            {team.roles.length === 0 ? <EmptyState compact className="m-4 border-dashed" title="ยังไม่มีบทบาท" description="สร้างบทบาทเมื่อสมาชิกในกลุ่มมีหน้าที่ต่างกัน" action={{ label: "สร้างบทบาท", onClick: onCreate, icon: <Plus aria-hidden="true" /> }} /> : <div className="overflow-x-auto"><table className="min-w-[760px] w-full text-left text-sm"><caption className="sr-only">บทบาทในกลุ่มของ {team.name}</caption><thead className="border-b border-border-subtle bg-surface-subtle text-xs font-semibold text-content-secondary"><tr><th scope="col" className="px-4 py-3 sm:px-5">บทบาท</th><th scope="col" className="px-4 py-3">สถานะ</th><th scope="col" className="px-4 py-3">สมาชิก</th><th scope="col" className="px-4 py-3">สิทธิ์</th><th scope="col" className="px-4 py-3"><span className="sr-only">การดำเนินการ</span></th></tr></thead><tbody className="divide-y divide-border-subtle">{team.roles.map((role) => <tr key={role.id} className={selectedRoleId === role.id ? "bg-action-primary-surface" : undefined}><td className="px-4 py-3 sm:px-5"><button type="button" aria-pressed={selectedRoleId === role.id} onClick={() => onSelect(role.id)} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="block font-semibold text-content-heading">{role.name}</span><span className="mt-1 block text-xs text-content-secondary">เลือกเพื่อดูสิทธิ์ของบทบาท</span></button><details className="mt-1 text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสทางเทคนิค</summary><span className="mt-1 block break-all font-mono text-content-muted">{role.key}</span></details></td><td className="px-4 py-3"><ActiveStatus isActive={role.isActive} /></td><td className="px-4 py-3 tabular-nums">{role.membershipCount}</td><td className="px-4 py-3 tabular-nums">{role.grantCount}</td><td className="px-4 py-3 text-right"><div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" size="xs" onClick={() => onEdit(role)} disabled={busy}><Edit3 aria-hidden="true" />แก้ไข</Button><Button type="button" variant={role.isActive ? "outline" : "default"} size="xs" onClick={() => onLifecycle(role)} disabled={busy}>{role.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</Button></div></td></tr>)}</tbody></table></div>}
+            <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"><div><h3 className="text-base font-semibold text-content-heading">หน้าที่ในทีม</h3><p className="mt-1 text-sm leading-6 text-content-secondary">หน้าที่ช่วยแยกความรับผิดชอบของสมาชิกภายในทีม และสิทธิ์ของแต่ละหน้าที่จะแสดงต่อในบริบทเดียวกัน</p></div><Button type="button" size="sm" onClick={onCreate} disabled={busy}><Plus aria-hidden="true" />เพิ่มหน้าที่</Button></div>
+            {team.roles.length === 0 ? <EmptyState compact className="m-4 border-dashed" title="ยังไม่มีหน้าที่เฉพาะ" description="เพิ่มหน้าที่เมื่อสมาชิกในทีมมีความรับผิดชอบต่างกัน" action={{ label: "เพิ่มหน้าที่", onClick: onCreate, icon: <Plus aria-hidden="true" /> }} /> : <div className="overflow-x-auto"><table className="min-w-[760px] w-full text-left text-sm"><caption className="sr-only">หน้าที่ในทีมของ {team.name}</caption><thead className="border-b border-border-subtle bg-surface-subtle text-xs font-semibold text-content-secondary"><tr><th scope="col" className="px-4 py-3 sm:px-5">หน้าที่ในทีม</th><th scope="col" className="px-4 py-3">สถานะ</th><th scope="col" className="px-4 py-3">สมาชิก</th><th scope="col" className="px-4 py-3">สิทธิ์</th><th scope="col" className="px-4 py-3"><span className="sr-only">การดำเนินการ</span></th></tr></thead><tbody className="divide-y divide-border-subtle">{team.roles.map((role) => <tr key={role.id} className={selectedRoleId === role.id ? "bg-action-primary-surface" : undefined}><td className="px-4 py-3 sm:px-5"><button type="button" aria-pressed={selectedRoleId === role.id} onClick={() => onSelect(role.id)} className="text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="block font-semibold text-content-heading">{role.name}</span><span className="mt-1 block text-xs text-content-secondary">เลือกเพื่อดูสิทธิ์ของหน้าที่</span></button></td><td className="px-4 py-3"><ActiveStatus isActive={role.isActive} /></td><td className="px-4 py-3 tabular-nums">{role.membershipCount}</td><td className="px-4 py-3 tabular-nums">{role.grantCount}</td><td className="px-4 py-3 text-right"><div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" size="xs" onClick={() => onEdit(role)} disabled={busy}><Edit3 aria-hidden="true" />แก้ไข</Button><Button type="button" variant={role.isActive ? "outline" : "default"} size="xs" onClick={() => onLifecycle(role)} disabled={busy}>{role.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"}</Button></div></td></tr>)}</tbody></table></div>}
         </section>
     );
 }
@@ -498,8 +493,8 @@ function RoleGrantsPanel({
     const grants = role ? team.teamRoleGrants.filter((grant) => grant.teamRoleId === role.id) : [];
     return (
         <div className="space-y-4">
-            <section className="rounded-xl border border-border-subtle bg-surface-raised px-4 py-4 sm:px-5"><label htmlFor="authorization-selected-team-role" className="text-sm font-semibold text-content-heading">บทบาทที่กำลังดูสิทธิ์</label><select id="authorization-selected-team-role" value={selectedRoleId === null ? "" : String(selectedRoleId)} onChange={(event) => onSelectedRoleIdChange(event.target.value ? Number(event.target.value) : null)} className="mt-2 h-11 w-full max-w-xl rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="">เลือกบทบาท</option>{team.roles.map((item) => <option key={item.id} value={item.id}>{item.name}{item.isActive ? "" : " — ปิดใช้งาน"}</option>)}</select><p className="mt-2 text-xs leading-5 text-content-secondary">เฉพาะสมาชิกที่มีบทบาทนี้ในกลุ่มจะได้รับสิทธิ์ของบทบาท</p></section>
-            {role ? <GrantList title={`สิทธิ์ของบทบาท · ${role.name}`} description="เฉพาะสมาชิกที่มีบทบาทนี้ในกลุ่มจะได้รับสิทธิ์เพิ่มเติมนี้" source="TEAM_ROLE" grants={grants} busy={busy} onAdd={onAdd} onRemove={(grant) => onRemove(grant)} /> : <EmptyState title="เลือกบทบาท" description="เลือกบทบาทเพื่อดูหรือจัดการสิทธิ์ของบทบาทนั้น" />}
+            <section className="rounded-xl border border-border-subtle bg-surface-raised px-4 py-4 sm:px-5"><label htmlFor="authorization-selected-team-role" className="text-sm font-semibold text-content-heading">หน้าที่ที่กำลังดูสิทธิ์</label><select id="authorization-selected-team-role" value={selectedRoleId === null ? "" : String(selectedRoleId)} onChange={(event) => onSelectedRoleIdChange(event.target.value ? Number(event.target.value) : null)} className="mt-2 h-11 w-full max-w-xl rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="">เลือกหน้าที่ในทีม</option>{team.roles.map((item) => <option key={item.id} value={item.id}>{item.name}{item.isActive ? "" : " — ปิดใช้งาน"}</option>)}</select><p className="mt-2 text-xs leading-5 text-content-secondary">เฉพาะสมาชิกที่มีหน้าที่นี้ในทีมจะได้รับสิทธิ์ของหน้าที่</p></section>
+            {role ? <GrantList title={`สิทธิ์ของหน้าที่ในทีม · ${role.name}`} description="เฉพาะสมาชิกที่มีหน้าที่นี้ในทีมจะได้รับสิทธิ์เพิ่มเติมนี้" source="TEAM_ROLE" grants={grants} busy={busy} onAdd={onAdd} onRemove={(grant) => onRemove(grant)} /> : <EmptyState title="เลือกหน้าที่ในทีม" description="เลือกหน้าที่เพื่อดูหรือจัดการสิทธิ์ของหน้าที่นั้น" />}
         </div>
     );
 }

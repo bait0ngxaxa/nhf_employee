@@ -27,8 +27,8 @@ const INTRO_POINTS: IntroPoint[] = [
         description: "จุดเริ่มต้นสำหรับผู้ใช้งาน NHF",
     },
     {
-        title: "เข้าถึงตามบทบาท",
-        description: "เหมาะกับผู้ใช้งานในแต่ละบทบาทขององค์กร",
+        title: "เข้าถึงตามสิทธิ์ที่ได้รับ",
+        description: "แสดงเฉพาะงานและบริการที่บัญชีนี้ใช้งานได้",
     },
     {
         title: "ใช้งานง่าย",
@@ -186,7 +186,7 @@ export default async function Home() {
                             </p>
                         </div>
                         <p className="text-sm font-semibold text-content-muted">
-                            เวอร์ชันสำหรับพนักงานและผู้ดูแลระบบ
+                            สำหรับการทำงานภายใน NHF
                         </p>
                     </div>
                     <IntroPointList />

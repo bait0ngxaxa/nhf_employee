@@ -64,7 +64,7 @@ describe("Authorization Administration presentation vocabulary", () => {
 
         expect(getAuthorizationContextPresentation("future.context")).toEqual({
             label: "บริบทการใช้งาน",
-            description: "การใช้งานในบริบทนี้ยังมีรายละเอียดเพิ่มเติมในข้อมูลทางเทคนิค",
+            description: "การใช้งานในบริบทนี้ยังมีเงื่อนไขเพิ่มเติม",
         });
     });
 

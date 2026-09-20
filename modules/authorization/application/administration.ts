@@ -156,6 +156,15 @@ function projectAccountIdentity(
                 status: user.employee.status,
                 deletedAt: user.employee.deletedAt,
             }),
+        ...(user.teamMemberships === undefined
+            ? {}
+            : {
+                teams: Object.freeze(user.teamMemberships.map(({ team }) => Object.freeze({
+                    id: team.id,
+                    name: team.name,
+                    isActive: team.isActive,
+                }))),
+            }),
     });
 }
 

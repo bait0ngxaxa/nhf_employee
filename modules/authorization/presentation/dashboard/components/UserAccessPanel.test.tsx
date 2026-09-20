@@ -82,6 +82,7 @@ const userSummary = {
     isActive: true,
     deletedAt: null,
     employee: null,
+    teams: [{ id: 11, name: "Operations", isActive: true }],
 } satisfies AuthorizationAdministrationUserSummaryData;
 
 const configuredAdminGrant = {
@@ -332,7 +333,8 @@ describe("User Access presentation", () => {
         expect(screen.getAllByText("ที่มาของสิทธิ์").length).toBeGreaterThan(0);
         expect(screen.getAllByText("ยังไม่เปิดให้จัดการ").length).toBeGreaterThan(0);
         expect(screen.queryByText("มี Compatibility Policy")).not.toBeInTheDocument();
-        expect(screen.getAllByText("ผู้ดูแลระบบ").length).toBeGreaterThan(0);
+        expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
+        expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
         expect(screen.getByText("Operations")).toBeInTheDocument();
     });
 
@@ -341,7 +343,7 @@ describe("User Access presentation", () => {
 
         expect(screen.getAllByText("ใช้งานได้").length).toBeGreaterThan(0);
         expect(screen.getAllByText("สิทธิ์พื้นฐาน").length).toBeGreaterThan(0);
-        expect(screen.getAllByText(/NO_APPLICABLE_GRANT/).length).toBeGreaterThan(0);
+        expect(screen.queryByText(/NO_APPLICABLE_GRANT/)).not.toBeInTheDocument();
         expect(screen.getAllByText("ยังไม่มีสิทธิ์").length).toBeGreaterThan(0);
     });
 
@@ -353,7 +355,7 @@ describe("User Access presentation", () => {
         expect(screen.getAllByText("งานทั้งหมด").length).toBeGreaterThan(0);
         expect(screen.getAllByText("การใช้งานผ่าน LINE").length).toBeGreaterThan(0);
         for (const technicalLabel of ["Dashboard · Management", "Dashboard · Work items · Mine", "LIFF · Self service"]) {
-            expect(screen.getAllByText(technicalLabel).every((node) => node.closest("details") !== null)).toBe(true);
+            expect(screen.queryByText(technicalLabel)).not.toBeInTheDocument();
         }
         expect(screen.getAllByText("ช่องทางนี้ไม่รองรับ").length).toBeGreaterThan(0);
         expect(screen.getAllByText("ยังไม่เปิดให้จัดการ").length).toBeGreaterThan(0);
@@ -370,7 +372,7 @@ describe("User Access presentation", () => {
         expect(within(card).getAllByText("บริบทการใช้งาน").length).toBeGreaterThan(0);
         expect(within(card).getAllByText("ดูงานประจำ").length).toBeGreaterThan(0);
         expect(within(card).getAllByText("งานยังขึ้นอยู่กับความสัมพันธ์ของผู้ใช้งาน").length).toBeGreaterThan(0);
-        expect(within(card).getAllByText(/original label: ยังต้องผ่าน assignee predicate/).every((node) => node.closest("details") !== null)).toBe(true);
+        expect(within(card).queryByText(/original label: ยังต้องผ่าน assignee predicate/)).not.toBeInTheDocument();
         expect(within(card).queryByText("routine.task.read = ALL")).not.toBeInTheDocument();
     });
 
@@ -402,7 +404,7 @@ describe("User Access presentation", () => {
         expect(screen.queryByText("ยังไม่มีสิทธิ์เพิ่มเติมในส่วนนี้")).not.toBeInTheDocument();
     });
 
-    it("does not present invalid direct records as access and keeps their evidence advanced", () => {
+    it("does not present invalid direct records or technical evidence", () => {
         renderPanel({
             ...normalUser,
             directGrants: [invalidRoutineDirectGrantProjection],
@@ -412,9 +414,8 @@ describe("User Access presentation", () => {
         expect(within(routineCard).getByText("ยังไม่มีสิทธิ์เฉพาะบุคคล")).toBeInTheDocument();
         expect(within(routineCard).queryByText("INVALID_SCOPE")).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByText("รายละเอียดทางเทคนิค · หลักฐานจากระบบสิทธิ์"));
-        expect(screen.getByText("routine.task.read · INVALID_SCOPE")).toBeInTheDocument();
-        expect(screen.getByText("validation: UNSUPPORTED_PERSISTED_SCOPE")).toBeInTheDocument();
+        expect(screen.queryByText("routine.task.read · INVALID_SCOPE")).not.toBeInTheDocument();
+        expect(screen.queryByText("validation: UNSUPPORTED_PERSISTED_SCOPE")).not.toBeInTheDocument();
     });
 
     it("renders one business domain heading for multiple independent capability cards", () => {
@@ -451,7 +452,8 @@ describe("User Access presentation", () => {
         renderPanel(invalidUser);
 
         expect(screen.getByText("พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ")).toBeInTheDocument();
-        expect(screen.getByText("UNKNOWN_PERSISTED_CAPABILITY")).toBeInTheDocument();
+        expect(screen.getByText(/บางสิทธิ์ของผู้ใช้นี้ไม่สามารถนำมาใช้งานได้อย่างปลอดภัย/)).toBeInTheDocument();
+        expect(screen.queryByText("UNKNOWN_PERSISTED_CAPABILITY")).not.toBeInTheDocument();
         expect(screen.queryByText("ALLOW")).not.toBeInTheDocument();
         expect(screen.queryByText("สิทธิ์พื้นฐาน")).not.toBeInTheDocument();
         expectInvalidConfigurationSurfaceToBeReadOnly();
@@ -481,7 +483,8 @@ describe("User Access presentation", () => {
         renderPanel(invalidUser);
 
         expect(screen.getByText("พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ")).toBeInTheDocument();
-        expect(screen.getByText("UNKNOWN_PERSISTED_CAPABILITY")).toBeInTheDocument();
+        expect(screen.getByText(/บางสิทธิ์ของผู้ใช้นี้ไม่สามารถนำมาใช้งานได้อย่างปลอดภัย/)).toBeInTheDocument();
+        expect(screen.queryByText("UNKNOWN_PERSISTED_CAPABILITY")).not.toBeInTheDocument();
         expectInvalidConfigurationSurfaceToBeReadOnly();
     });
 
@@ -490,16 +493,16 @@ describe("User Access presentation", () => {
         const onRefresh = vi.fn(async () => undefined);
         renderPanel(normalUser, onRefresh);
 
-        expect(screen.getByRole("heading", { name: "บัญชีและบทบาทระบบ" })).toBeInTheDocument();
-        expect(screen.getByRole("heading", { name: "บทบาทผู้ดูแลระบบ" })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "แต่งตั้งเป็นผู้ดูแลระบบ" }));
+        expect(screen.getByRole("heading", { name: "ข้อมูลผู้ใช้งาน" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "การเข้าถึงการจัดการสิทธิ์" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "อนุญาตให้จัดการสิทธิ์" }));
 
         const dialog = await screen.findByRole("alertdialog");
-        expect(within(dialog).getByRole("heading", { name: "แต่งตั้งเป็นผู้ดูแลระบบหรือไม่?" })).toBeInTheDocument();
-        expect(within(dialog).getByText(/ไม่ได้เพิ่มสิทธิ์การทำงานของโมดูลต่าง ๆ/)).toBeInTheDocument();
+        expect(within(dialog).getByRole("heading", { name: "อนุญาตให้จัดการสิทธิ์หรือไม่?" })).toBeInTheDocument();
+        expect(within(dialog).getByText(/ไม่ได้เพิ่มสิทธิ์ในงาน Stock, Leave, Routine หรือโมดูลอื่น/)).toBeInTheDocument();
         expect(grantApi.changeUserSystemRole).not.toHaveBeenCalled();
 
-        fireEvent.click(within(dialog).getByRole("button", { name: "ยืนยันแต่งตั้งเป็นผู้ดูแลระบบ" }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "อนุญาตให้จัดการสิทธิ์" }));
         await vi.waitFor(() => {
             expect(grantApi.changeUserSystemRole).toHaveBeenCalledWith(7, { systemRole: "ADMIN" });
         });
@@ -511,13 +514,13 @@ describe("User Access presentation", () => {
         const onRefresh = vi.fn(async () => undefined);
         renderPanel(adminUser, onRefresh);
 
-        fireEvent.click(screen.getByRole("button", { name: "ยกเลิกบทบาทผู้ดูแลระบบ" }));
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิกการเข้าถึง" }));
         const dialog = await screen.findByRole("alertdialog");
-        expect(within(dialog).getByRole("heading", { name: "ยกเลิกบทบาทผู้ดูแลระบบหรือไม่?" })).toBeInTheDocument();
-        expect(within(dialog).getByText(/จะไม่ลบสมาชิก Team, TeamRole หรือสิทธิ์เฉพาะบุคคล/)).toBeInTheDocument();
+        expect(within(dialog).getByRole("heading", { name: "ยกเลิกการเข้าถึงการจัดการสิทธิ์หรือไม่?" })).toBeInTheDocument();
+        expect(within(dialog).getByText(/จะไม่ลบสมาชิกทีม หน้าที่ในทีม หรือสิทธิ์เฉพาะบุคคล/)).toBeInTheDocument();
         expect(grantApi.changeUserSystemRole).not.toHaveBeenCalled();
 
-        fireEvent.click(within(dialog).getByRole("button", { name: "ยืนยันยกเลิกบทบาทผู้ดูแลระบบ" }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยกเลิกการเข้าถึง" }));
         await vi.waitFor(() => {
             expect(grantApi.changeUserSystemRole).toHaveBeenCalledWith(7, { systemRole: "USER" });
         });
@@ -562,6 +565,7 @@ describe("User Access presentation", () => {
 
         fireEvent.click(screen.getByRole("button", { name: /สมชาย ใจดี/ }));
         expect(onSelectUser).toHaveBeenCalledWith(7);
+        expect(screen.getByText("ทีม Operations")).toBeInTheDocument();
     });
 
     it("revalidates effective access after adding a direct User grant", async () => {
@@ -593,7 +597,7 @@ describe("User Access presentation", () => {
         fireEvent.click(within(auditCard).getByRole("button", { name: "ปรับสิทธิ์เฉพาะบุคคล" }));
         fireEvent.click(within(auditCard).getByRole("button", { name: /นำสิทธิ์เฉพาะบุคคล ดูบันทึกการใช้งานระบบ ทั้งหมด ออก/ }));
         const dialog = await screen.findByRole("alertdialog");
-        expect(within(dialog).getByText(/สิทธิ์พื้นฐาน หรือสิทธิ์จากกลุ่ม\/บทบาทอาจยังทำให้ผู้ใช้นี้เข้าถึงรายการนี้ได้/)).toBeInTheDocument();
+        expect(within(dialog).getByText(/สิทธิ์พื้นฐาน หรือสิทธิ์จากทีม\/หน้าที่ในทีมอาจยังทำให้ผู้ใช้นี้เข้าถึงรายการนี้ได้/)).toBeInTheDocument();
         fireEvent.click(within(dialog).getByRole("button", { name: "นำสิทธิ์ออก" }));
 
         await vi.waitFor(() => {

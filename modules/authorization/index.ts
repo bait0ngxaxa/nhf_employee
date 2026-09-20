@@ -136,6 +136,7 @@ export type {
     AuthorizationAdministrationTeamRoleReference,
     AuthorizationAdministrationTeamSummary,
     AuthorizationAdministrationUserSummary,
+    AuthorizationAdministrationUserTeamSummary,
     AuthorizationAdministrationUserDetail,
     AuthorizationAdministrationUserQueryDependencies,
     AuthorizationAdministrationUserTeamMembership,
@@ -247,3 +248,4 @@ export type {
 export {
     createAuthorizationProductionReadinessRepository,
 } from "./infrastructure/persistence/authorization-production-readiness-repository";
+export { findActiveUserTeams } from "./infrastructure/persistence/user-team-queries";

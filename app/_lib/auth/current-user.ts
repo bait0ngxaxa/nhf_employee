@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { resolveAuthenticatedAccount } from "@/modules/auth";
+import { findActiveUserTeams } from "@/modules/authorization";
 import {
     buildEmployeeAuthorizationContext,
     findCurrentEmployeeProjection,
@@ -46,6 +47,8 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
 
     const employee = await findCurrentEmployeeProjection(account.userId);
     if (!employee) return null;
+
+    const teams = await findActiveUserTeams(account.userId);
 
     const employeeAuthorizationContext = buildEmployeeAuthorizationContext(
         {
@@ -149,6 +152,7 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
             },
         }),
         department: employee.departmentName ?? undefined,
+        teams,
         isManager: employee.isManager,
         canApproveLeave:
             leaveCapabilities.canReadAssignedApprovals

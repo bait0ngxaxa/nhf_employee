@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, type ReactElement } from "react";
-import { RefreshCw, Settings2, ShieldCheck, Users } from "lucide-react";
+import { RefreshCw, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import {
     TeamFormDialog,
 } from "./components/AuthorizationDialogs";
 import { AuthorizationSummary } from "./components/AuthorizationSummary";
-import { CapabilityRegistry } from "./components/CapabilityRegistry";
 import { TeamAdministration } from "./components/TeamAdministration";
 import { UserAccessPanel } from "./components/UserAccessPanel";
 import { getMutationErrorCopy } from "./display";
@@ -22,14 +21,14 @@ import type {
     CreateAuthorizationTeamInput,
 } from "./types";
 
-type WorkspaceTab = "overview" | "users" | "capabilities";
+type WorkspaceTab = "teams" | "users";
 
 export function AuthorizationAdministrationWorkspace({
     initialOverview,
 }: {
     readonly initialOverview?: AuthorizationAdministrationOverviewData;
 }): ReactElement {
-    const [tab, setTab] = useState<WorkspaceTab>("overview");
+    const [tab, setTab] = useState<WorkspaceTab>("teams");
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
     const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
     const [directoryQuery, setDirectoryQuery] = useState("");
@@ -71,14 +70,14 @@ export function AuthorizationAdministrationWorkspace({
         }
 
         setSelectedTeamId(team.id);
-        setTab("overview");
+        setTab("teams");
         setCreateTeamOpen(false);
         try {
             await refreshOverview();
-            toast.success("สร้างกลุ่มผู้ใช้งานแล้ว");
+            toast.success("สร้างทีมแล้ว");
         } catch {
-            toast.success("สร้างกลุ่มผู้ใช้งานแล้ว", {
-                description: "โหลดรายการล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่เพื่อตรวจสอบกลุ่มที่สร้าง",
+            toast.success("สร้างทีมแล้ว", {
+                description: "โหลดรายการล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่เพื่อตรวจสอบทีมที่สร้าง",
             });
         } finally {
             setCreateTeamBusy(false);
@@ -87,7 +86,7 @@ export function AuthorizationAdministrationWorkspace({
 
     const selectTeam = useCallback((teamId: number): void => {
         setSelectedTeamId(teamId);
-        setTab("overview");
+        setTab("teams");
     }, []);
 
     const selectUser = useCallback((userId: number): void => {
@@ -99,22 +98,20 @@ export function AuthorizationAdministrationWorkspace({
         <main className="mx-auto w-full max-w-[1440px] space-y-5 px-4 py-5 sm:px-6 sm:py-7 xl:px-8">
             <header className="flex flex-col gap-4 border-b border-border-subtle pb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-4xl">
-                    <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-action-primary-foreground"><ShieldCheck className="h-4 w-4" aria-hidden="true" />พื้นที่ผู้ดูแลระบบ</div>
-                    <h1 className="mt-2 text-2xl font-semibold tracking-tight text-content-heading sm:text-3xl">การจัดการสิทธิ์</h1>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-content-secondary">จัดกลุ่มผู้ใช้งาน กำหนดบทบาท และเพิ่มสิทธิ์ที่จำเป็นสำหรับการทำงาน</p>
+                    <h1 className="text-2xl font-semibold tracking-tight text-content-heading sm:text-3xl">การจัดการสิทธิ์</h1>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-content-secondary">จัดทีม สมาชิก และสิทธิ์การทำงานของแต่ละส่วนในระบบ</p>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={() => void refreshRelevant()} disabled={data.overviewLoading} aria-busy={data.overviewLoading}><RefreshCw className={data.overviewLoading ? "animate-spin" : ""} aria-hidden="true" />โหลดข้อมูลล่าสุด</Button>
             </header>
 
             <nav aria-label="ส่วนการจัดการสิทธิ์" className="overflow-x-auto rounded-xl border border-border-subtle bg-surface-raised">
                 <div className="flex min-w-max gap-1 p-2">
-                    <WorkspaceTabButton active={tab === "overview"} onClick={() => setTab("overview")}><ShieldCheck aria-hidden="true" />กลุ่มและบทบาท</WorkspaceTabButton>
-                    <WorkspaceTabButton active={tab === "users"} onClick={() => setTab("users")}><Users aria-hidden="true" />ผู้ใช้และสิทธิ์</WorkspaceTabButton>
-                    <WorkspaceTabButton active={tab === "capabilities"} onClick={() => setTab("capabilities")}><Settings2 aria-hidden="true" />ขั้นสูง</WorkspaceTabButton>
+                    <WorkspaceTabButton active={tab === "teams"} onClick={() => setTab("teams")}>ทีม</WorkspaceTabButton>
+                    <WorkspaceTabButton active={tab === "users"} onClick={() => setTab("users")}><Users aria-hidden="true" />ผู้ใช้งาน</WorkspaceTabButton>
                 </div>
             </nav>
 
-            {tab === "overview" ? (
+            {tab === "teams" ? (
                 <>
                     <AuthorizationSummary
                         overview={overview}
@@ -158,8 +155,6 @@ export function AuthorizationAdministrationWorkspace({
                     onRefresh={() => refreshRelevant(selectedUserId ?? undefined, false)}
                 />
             ) : null}
-            {tab === "capabilities" && overview ? <CapabilityRegistry capabilities={overview.capabilities} /> : null}
-
             <TeamFormDialog
                 open={createTeamOpen}
                 mode="create"

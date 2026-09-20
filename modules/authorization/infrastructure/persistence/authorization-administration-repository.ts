@@ -45,6 +45,12 @@ const TEAM_ROLE_REFERENCE_SELECT = {
     isActive: true,
 } as const satisfies Prisma.TeamRoleSelect;
 
+const USER_TEAM_PRESENTATION_SELECT = {
+    id: true,
+    name: true,
+    isActive: true,
+} as const satisfies Prisma.TeamSelect;
+
 const USER_IDENTITY_SELECT = {
     id: true,
     name: true,
@@ -60,6 +66,13 @@ const USER_IDENTITY_SELECT = {
             nickname: true,
             status: true,
             deletedAt: true,
+        },
+    },
+    teamMemberships: {
+        where: { team: { isActive: true } },
+        orderBy: [{ team: { name: "asc" } }, { teamId: "asc" }],
+        select: {
+            team: { select: USER_TEAM_PRESENTATION_SELECT },
         },
     },
 } as const satisfies Prisma.UserSelect;

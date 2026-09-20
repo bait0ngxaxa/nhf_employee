@@ -33,6 +33,7 @@ const {
     notificationProjectionMock,
     emailRequestContextMock,
     emailRequestCapabilitiesMock,
+    userTeamsMock,
 } = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
     resolveAccountMock: vi.fn(),
@@ -53,6 +54,7 @@ const {
     notificationProjectionMock: vi.fn(),
     emailRequestContextMock: vi.fn(),
     emailRequestCapabilitiesMock: vi.fn(),
+    userTeamsMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
@@ -89,6 +91,9 @@ vi.mock("@/modules/notification", () => ({
 vi.mock("@/lib/services/email-request/authorization", () => ({
     buildEmailRequestAuthorizationContext: emailRequestContextMock,
     getEmailRequestPresentationCapabilities: emailRequestCapabilitiesMock,
+}));
+vi.mock("@/modules/authorization", () => ({
+    findActiveUserTeams: userTeamsMock,
 }));
 
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
@@ -228,6 +233,7 @@ describe("current-user application projection", () => {
         notificationProjectionMock.mockResolvedValue(NOTIFICATION_CAPABILITIES);
         emailRequestContextMock.mockReturnValue({ authorizationActor: "email-request-actor" });
         emailRequestCapabilitiesMock.mockResolvedValue(EMAIL_REQUEST_CAPABILITIES);
+        userTeamsMock.mockResolvedValue([{ id: 8, name: "IT" }]);
     });
 
     it("returns all server-derived Dashboard projections after the Employee lifecycle check", async () => {
@@ -238,6 +244,7 @@ describe("current-user application projection", () => {
             email: "account@test.com",
             name: "สมชาย ใจดี (ชาย)",
             department: "วิชาการ",
+            teams: [{ id: 8, name: "IT" }],
             isManager: false,
             canApproveLeave: true,
             canViewLeaveReports: false,
@@ -252,6 +259,7 @@ describe("current-user application projection", () => {
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
+        expect(userTeamsMock).toHaveBeenCalledWith(41);
         expect(employeeAuthorizationContextMock).toHaveBeenCalledWith(
             { id: 41, role: "ADMIN" },
             101,
@@ -322,6 +330,7 @@ describe("current-user application projection", () => {
         expect(leaveProjectionMock).not.toHaveBeenCalled();
         expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
         expect(employeeCapabilitiesMock).not.toHaveBeenCalled();
+        expect(userTeamsMock).not.toHaveBeenCalled();
         expect(departmentProjectionMock).not.toHaveBeenCalled();
         expect(auditProjectionMock).not.toHaveBeenCalled();
         expect(notificationProjectionMock).not.toHaveBeenCalled();

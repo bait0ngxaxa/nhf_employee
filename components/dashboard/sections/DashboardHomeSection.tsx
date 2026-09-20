@@ -12,6 +12,7 @@ import {
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { LineAddFriendCard } from "@/components/dashboard/line/LineAddFriendCard";
+import { formatTeamSummary } from "@/shared/identity/team-presentation";
 
 const MENU_ITEM_CONFIG: Record<
     string,
@@ -294,7 +295,7 @@ export function DashboardHomeSection() {
     const regularItems = activeItems.filter(
         (item) => MENU_ITEM_CONFIG[item.id]?.featured !== true,
     );
-    const userName = getDisplayText(user?.name, "ผู้ใช้งาน");
+    const userName = getDisplayText(user?.name, "บัญชี NHF");
     const userNameParts = userName.split(/\s+/).filter(Boolean);
     const lastNamePart = userNameParts[userNameParts.length - 1];
     const hasNickname =
@@ -303,7 +304,7 @@ export function DashboardHomeSection() {
         ? userNameParts.slice(0, -1).join(" ")
         : userName;
     const nickname = hasNickname ? lastNamePart : undefined;
-    const userRole = getDisplayText(user?.role, "พนักงาน");
+    const userTeamSummary = formatTeamSummary(user?.teams);
     const userDepartment = getDisplayText(user?.department, "ฝ่ายทั่วไป");
 
     return (
@@ -350,10 +351,10 @@ export function DashboardHomeSection() {
                         <dl className="mt-8 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-4 border-t border-border-subtle pt-4 sm:gap-x-10">
                             <div className="min-w-0">
                                 <dt className="text-xs font-semibold tracking-[0.08em] text-content-muted">
-                                    สถานะ
+                                    ทีม
                                 </dt>
                                 <dd className="mt-1 truncate text-sm font-bold text-content-primary">
-                                    {userRole}
+                                    {userTeamSummary}
                                 </dd>
                             </div>
                             <div className="min-w-0">

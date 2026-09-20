@@ -104,26 +104,26 @@ function renderTeam() {
 }
 
 describe("TeamAdministration", () => {
-    it("keeps configuration issues visible and exposes role/member sections", () => {
+    it("keeps configuration issues visible and exposes Team/member sections", () => {
         renderTeam();
 
-        expect(screen.getByText(/พบการตั้งค่าสิทธิ์ของกลุ่มที่ต้องตรวจสอบ/)).toBeInTheDocument();
-        expect(screen.getByText(/capability: old\.capability/).closest("details")).not.toHaveAttribute("open");
-        fireEvent.click(screen.getByRole("button", { name: "บทบาทและสิทธิ์" }));
-        expect(screen.getByRole("button", { name: "สร้างบทบาท" })).toBeInTheDocument();
+        expect(screen.getByText(/พบการตั้งค่าสิทธิ์ของทีมที่ต้องตรวจสอบ/)).toBeInTheDocument();
+        expect(screen.queryByText("old.capability")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "หน้าที่ในทีมและสิทธิ์" }));
+        expect(screen.getByRole("button", { name: "เพิ่มหน้าที่" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "สมาชิก" }));
         expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: /นำ สมชาย ใจดี ออกจากกลุ่ม/ })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /นำ สมชาย ใจดี ออกจากทีม/ })).toBeInTheDocument();
     });
 
     it("requires confirmation before disabling a Team and explains retained configuration", () => {
         renderTeam();
 
-        fireEvent.click(screen.getByRole("button", { name: "ปิดใช้งานกลุ่ม" }));
+        fireEvent.click(screen.getByRole("button", { name: "ปิดใช้งานทีม" }));
 
         expect(screen.getByRole("alertdialog")).toBeInTheDocument();
         expect(screen.getByText(/สมาชิกและสิทธิ์ที่ตั้งค่าไว้จะไม่ถูกลบ/)).toBeInTheDocument();
-        expect(screen.getByText(/การเข้าถึงจากกลุ่มจะหยุดใช้งาน/)).toBeInTheDocument();
+        expect(screen.getByText(/การเข้าถึงจากทีมจะหยุดใช้งาน/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
         expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });

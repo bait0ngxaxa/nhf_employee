@@ -31,6 +31,7 @@ function mockSidebarContext(desktopSidebarCollapsed: boolean): void {
             name: "สมชาย ใจดี",
             role: "ADMIN",
             department: "IT",
+            teams: [{ id: 1, name: "IT" }],
             employeeCapabilities: adminEmployeeCapabilities,
         },
         isAdmin: true,
@@ -121,5 +122,36 @@ describe("DashboardSidebar", () => {
         expect(
             screen.queryByRole("button", { name: "ย่อเมนู" }),
         ).not.toBeInTheDocument();
+    });
+
+    it("shows Team context without exposing the internal system role", () => {
+        mockSidebarContext(false);
+
+        render(<DashboardSidebar />);
+
+        expect(screen.getByText("ทีม IT")).toBeInTheDocument();
+        expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
+        expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
+        expect(screen.queryByText("บทบาทระบบ")).not.toBeInTheDocument();
+    });
+
+    it("uses the neutral no-Team fallback", () => {
+        mockSidebarContext(false);
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: {
+                name: "สมชาย ใจดี",
+                role: "USER",
+                teams: [],
+            },
+            isAdmin: false,
+            availableMenuGroups: [],
+        });
+
+        render(<DashboardSidebar />);
+
+        expect(screen.getByText("ยังไม่กำหนดทีม")).toBeInTheDocument();
+        expect(screen.queryByText("USER")).not.toBeInTheDocument();
+        expect(screen.queryByText("ผู้ใช้งาน")).not.toBeInTheDocument();
     });
 });

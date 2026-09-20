@@ -56,7 +56,6 @@ export function GrantList({
                         <GrantItem
                             key={`${grant.capabilityKey}:${grant.scope}`}
                             grant={grant}
-                            source={source}
                             busy={busy}
                             onRemove={() => setRemoveTarget(grant)}
                         />
@@ -67,7 +66,6 @@ export function GrantList({
                 open={removeTarget !== null}
                 title="นำสิทธิ์ออกหรือไม่?"
                 description={removeTarget ? removalDescription(removeTarget, sourceLabel) : ""}
-                technicalDetails={removeTarget ? <TechnicalGrantDetails grant={removeTarget} source={source} /> : null}
                 confirmLabel="นำสิทธิ์ออก"
                 destructive
                 busy={busy}
@@ -84,12 +82,10 @@ export function GrantList({
 
 function GrantItem({
     grant,
-    source,
     busy,
     onRemove,
 }: {
     readonly grant: AuthorizationAdministrationGrantProjectionData;
-    readonly source: GrantSource;
     readonly busy: boolean;
     readonly onRemove: () => void;
 }): React.ReactElement {
@@ -111,7 +107,7 @@ function GrantItem({
                             {grant.validation.status === "VALID" ? "พร้อมใช้งาน" : "ต้องตรวจสอบ"}
                         </AuthorizationStatus>
                     </div>
-                    <p className="mt-1 text-sm leading-6 text-content-secondary">{presentation?.description ?? (grant.validation.status === "INVALID" ? grant.validation.reason : "ระบบยังไม่มีคำอธิบายสิทธิ์นี้")}</p>
+                    <p className="mt-1 text-sm leading-6 text-content-secondary">{presentation?.description ?? (grant.validation.status === "INVALID" ? "ข้อมูลสิทธิ์นี้ต้องตรวจสอบก่อนจึงจะนำไปใช้งานได้" : "ระบบยังไม่มีคำอธิบายสิทธิ์นี้")}</p>
                     <p className="mt-2 text-xs text-content-secondary">หมวดงาน: {domain?.label ?? "ต้องตรวจสอบ"}</p>
                 </div>
                 <Button
@@ -132,10 +128,6 @@ function GrantItem({
                 <p className="mt-1 text-xs leading-5 text-content-secondary">{scope.description}</p>
             </div>
             {grant.validation.status === "INVALID" ? <p className="mt-3 text-sm leading-6 text-status-danger-strong">ข้อมูลสิทธิ์นี้ต้องตรวจสอบก่อนจึงจะนำออกได้</p> : null}
-            <details className="mt-3 text-xs">
-                <summary className="cursor-pointer font-semibold text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
-                <TechnicalGrantDetails grant={grant} source={source} />
-            </details>
         </article>
     );
 }
@@ -147,21 +139,4 @@ function removalDescription(
     const presentation = getCapabilityPresentation(grant.capabilityKey);
     const scope = getAuthorizationScopePresentation(grant.scope, grant.capabilityKey);
     return `นำสิทธิ์ "${presentation?.actionLabel ?? "ที่ต้องตรวจสอบ"} · ${scope.label}" ออกจาก${sourceLabel}หรือไม่? สิทธิ์พื้นฐานของระบบหรือสิทธิ์จากแหล่งอื่นอาจยังคงอยู่หลังนำสิทธิ์เพิ่มเติมนี้ออก`;
-}
-
-function TechnicalGrantDetails({
-    grant,
-    source,
-}: {
-    readonly grant: AuthorizationAdministrationGrantProjectionData;
-    readonly source: GrantSource;
-}): React.ReactElement {
-    return (
-        <dl className="mt-2 grid gap-2 border-t border-border-subtle pt-2 text-xs sm:grid-cols-3">
-            <div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{grant.capabilityKey}</dd></div>
-            <div><dt className="font-semibold text-content-secondary">scope</dt><dd className="font-mono text-content-body">{grant.scope}</dd></div>
-            <div><dt className="font-semibold text-content-secondary">source</dt><dd className="font-mono text-content-body">{source}</dd></div>
-            {grant.validation.status === "INVALID" ? <div className="sm:col-span-3"><dt className="font-semibold text-content-secondary">validation</dt><dd className="font-mono text-content-body">{grant.validation.code}</dd></div> : null}
-        </dl>
-    );
 }

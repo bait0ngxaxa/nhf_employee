@@ -21,6 +21,17 @@ const grant = {
     validation: { status: "VALID" },
 } satisfies AuthorizationAdministrationGrantProjectionData;
 
+const invalidGrant = {
+    capabilityKey: "legacy.permission",
+    scope: "LEGACY",
+    capability: null,
+    validation: {
+        status: "INVALID",
+        code: "UNKNOWN_PERSISTED_CAPABILITY",
+        reason: "raw resolver details must stay out of the administration UI",
+    },
+} satisfies AuthorizationAdministrationGrantProjectionData;
+
 describe("GrantList", () => {
     it("uses business removal copy and preserves the exact grant payload", async () => {
         const onRemove = vi.fn(async () => undefined);
@@ -42,10 +53,28 @@ describe("GrantList", () => {
         fireEvent.click(screen.getByRole("button", { name: /นำสิทธิ์ ดูบันทึกการใช้งานระบบ ออกจากรายการ/ }));
         const dialog = await screen.findByRole("alertdialog");
         expect(within(dialog).getByText(/สิทธิ์พื้นฐานของระบบหรือสิทธิ์จากแหล่งอื่นอาจยังคงอยู่/)).toBeInTheDocument();
-        expect(within(dialog).getByText("audit.read").closest("details")).not.toHaveAttribute("open");
+        expect(within(dialog).queryByText("audit.read")).not.toBeInTheDocument();
 
         fireEvent.click(within(dialog).getByRole("button", { name: "นำสิทธิ์ออก" }));
 
         await vi.waitFor(() => expect(onRemove).toHaveBeenCalledWith(grant));
+    });
+
+    it("keeps invalid grant diagnostics human-readable", () => {
+        render(
+            <GrantList
+                title="สิทธิ์ของทีม"
+                description="สิทธิ์เพิ่มเติมของทีม"
+                source="TEAM"
+                grants={[invalidGrant]}
+                busy={false}
+                onAdd={vi.fn()}
+                onRemove={vi.fn(async () => undefined)}
+            />,
+        );
+
+        expect(screen.getByText("ข้อมูลสิทธิ์นี้ต้องตรวจสอบก่อนจึงจะนำไปใช้งานได้")).toBeInTheDocument();
+        expect(screen.queryByText(invalidGrant.validation.reason)).not.toBeInTheDocument();
+        expect(screen.queryByText("UNKNOWN_PERSISTED_CAPABILITY")).not.toBeInTheDocument();
     });
 });

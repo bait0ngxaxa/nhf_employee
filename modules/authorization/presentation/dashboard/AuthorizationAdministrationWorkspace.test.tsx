@@ -36,7 +36,7 @@ const overview = {
 } satisfies AuthorizationAdministrationOverviewData;
 
 describe("AuthorizationAdministrationWorkspace", () => {
-    it("presents task-oriented navigation and keeps the system view advanced", () => {
+    it("presents the simplified Team and User workspace without the technical registry", () => {
         useAuthorizationAdministrationData.mockReturnValue({
             overview,
             overviewError: undefined,
@@ -59,12 +59,13 @@ describe("AuthorizationAdministrationWorkspace", () => {
         render(<AuthorizationAdministrationWorkspace initialOverview={overview} />);
 
         expect(screen.getByRole("heading", { name: "การจัดการสิทธิ์" })).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "กลุ่มและบทบาท" })).toHaveAttribute("aria-current", "page");
-        expect(screen.getByRole("button", { name: "ผู้ใช้และสิทธิ์" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ทีม" })).toHaveAttribute("aria-current", "page");
+        expect(screen.getByRole("button", { name: "ผู้ใช้งาน" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ขั้นสูง" })).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "ขั้นสูง" }));
+        fireEvent.click(screen.getByRole("button", { name: "ผู้ใช้งาน" }));
 
-        expect(screen.getByRole("heading", { name: "ข้อมูลสิทธิ์ของระบบ" })).toBeInTheDocument();
-        expect(screen.getByText("employee.read").closest("details")).not.toHaveAttribute("open");
+        expect(screen.getByRole("heading", { name: "ค้นหาผู้ใช้งาน" })).toBeInTheDocument();
+        expect(screen.queryByText("ข้อมูลสิทธิ์ของระบบ")).not.toBeInTheDocument();
     });
 });

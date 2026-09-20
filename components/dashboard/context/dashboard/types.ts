@@ -8,6 +8,7 @@ import type { DepartmentPresentationCapabilities } from "@/modules/department";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 import type { NotificationPresentationCapabilities } from "@/modules/notification/client";
 import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { UserTeamPresentation } from "@/shared/identity/team-presentation";
 
 export interface DashboardUser {
     id?: string;
@@ -16,6 +17,7 @@ export interface DashboardUser {
     email?: string | null;
     role?: string;
     department?: string;
+    teams?: readonly UserTeamPresentation[];
     isManager?: boolean;
     canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;

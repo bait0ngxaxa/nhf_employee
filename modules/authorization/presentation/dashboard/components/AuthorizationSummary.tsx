@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { ActiveStatus } from "./AuthorizationStatus";
-import { formatAuthorizationDate } from "../display";
 import type { AuthorizationAdministrationOverviewData } from "../types";
 
 type TeamFilter = "ALL" | "ACTIVE" | "INACTIVE";
@@ -54,7 +53,7 @@ export function AuthorizationSummary({
         return (
             <ErrorState
                 title="โหลดภาพรวมสิทธิ์ไม่สำเร็จ"
-                description="ไม่สามารถอ่านกลุ่มผู้ใช้งานและรายการสิทธิ์ได้ในขณะนี้"
+                description="ไม่สามารถอ่านทีมและรายการสิทธิ์ได้ในขณะนี้"
                 action={{ label: "ลองใหม่", onClick: onRefresh, icon: <RefreshCw aria-hidden="true" /> }}
             />
         );
@@ -63,13 +62,6 @@ export function AuthorizationSummary({
 
     return (
         <div className="space-y-5">
-            <section aria-label="สรุปการจัดการสิทธิ์" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <SummaryMetric label="สิทธิ์ในระบบ" value={overview.summary.registeredCapabilityCount} detail="รายการที่ระบบรองรับ" />
-                <SummaryMetric label="สิทธิ์ที่เพิ่มได้" value={overview.summary.administrativelyGrantableCapabilityCount} detail="พร้อมกำหนดให้กลุ่มหรือบุคคล" tone="positive" />
-                <SummaryMetric label="รอตรวจสอบ" value={overview.summary.policyActivationRequiredCapabilityCount} detail="ยังไม่พร้อมให้จัดการ" tone="warning" />
-                <SummaryMetric label="ยังไม่เปิดให้จัดการ" value={overview.summary.deferredCapabilityCount} detail="แสดงในข้อมูลขั้นสูง" />
-                <SummaryMetric label="กลุ่มที่ใช้งาน" value={`${overview.summary.activeTeamCount}/${overview.summary.teamCount}`} detail="ใช้งานอยู่ / ทั้งหมด" tone="primary" />
-            </section>
             {error ? (
                 <div role="alert" className="flex flex-col gap-3 rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm text-status-warning-strong sm:flex-row sm:items-center sm:justify-between">
                     <span>ข้อมูลภาพรวมอาจไม่ใช่ข้อมูลล่าสุด กรุณาโหลดใหม่ก่อนตรวจสอบการเปลี่ยนแปลง</span>
@@ -80,8 +72,8 @@ export function AuthorizationSummary({
             <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
                 <div className="flex flex-col gap-4 border-b border-border-subtle px-4 py-4 lg:flex-row lg:items-end lg:justify-between sm:px-5">
                     <div>
-                        <h2 className="text-base font-semibold text-content-heading">กลุ่มผู้ใช้งาน</h2>
-                        <p className="mt-1 text-sm leading-6 text-content-secondary">รวมผู้ใช้ที่ควรได้รับสิทธิ์ร่วมกัน และแยกบทบาทตามหน้าที่การทำงาน</p>
+                        <h2 className="text-base font-semibold text-content-heading">ทีม</h2>
+                        <p className="mt-1 text-sm leading-6 text-content-secondary">{overview.summary.teamCount} ทีม · {overview.summary.activeTeamCount} ทีมใช้งานอยู่</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={loading} aria-busy={loading}>
@@ -90,16 +82,16 @@ export function AuthorizationSummary({
                         </Button>
                         <Button type="button" size="sm" onClick={onCreateTeam}>
                             <Plus aria-hidden="true" />
-                            สร้างกลุ่มผู้ใช้งาน
+                            สร้างทีม
                         </Button>
                     </div>
                 </div>
                 <div className="flex flex-col gap-3 border-b border-border-subtle bg-surface-subtle/60 px-4 py-3 sm:flex-row sm:items-end sm:px-5">
                     <div className="min-w-0 flex-1 space-y-2">
-                        <Label htmlFor="authorization-team-search">ค้นหากลุ่ม</Label>
+                        <Label htmlFor="authorization-team-search">ค้นหาทีม</Label>
                         <div className="relative">
                             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" aria-hidden="true" />
-                            <Input id="authorization-team-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ชื่อกลุ่ม" className="pl-9" />
+                            <Input id="authorization-team-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ชื่อทีม" className="pl-9" />
                         </div>
                     </div>
                     <div className="space-y-2 sm:w-48">
@@ -115,9 +107,9 @@ export function AuthorizationSummary({
                     <EmptyState
                         compact
                         className="m-4 border-dashed"
-                        title={overview.teams.length === 0 ? "ยังไม่มีกลุ่มผู้ใช้งาน" : "ไม่พบกลุ่มที่ตรงกับตัวกรอง"}
-                        description={overview.teams.length === 0 ? "เริ่มต้นโดย 1) สร้างกลุ่มตามหน้าที่การทำงาน 2) เพิ่มสมาชิก 3) สร้างบทบาทหากหน้าที่ต่างกัน 4) เพิ่มสิทธิ์ที่จำเป็น" : "ลองเปลี่ยนคำค้นหาหรือสถานะที่เลือก"}
-                        action={overview.teams.length === 0 ? { label: "สร้างกลุ่มผู้ใช้งาน", onClick: onCreateTeam, icon: <Plus aria-hidden="true" /> } : undefined}
+                        title={overview.teams.length === 0 ? "ยังไม่มีทีม" : "ไม่พบทีมที่ตรงกับตัวกรอง"}
+                        description={overview.teams.length === 0 ? "สร้างทีม เพิ่มสมาชิก และกำหนดหน้าที่ในทีมตามการทำงาน" : "ลองเปลี่ยนคำค้นหาหรือสถานะที่เลือก"}
+                        action={overview.teams.length === 0 ? { label: "สร้างทีม", onClick: onCreateTeam, icon: <Plus aria-hidden="true" /> } : undefined}
                     />
                 ) : (
                     <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3">
@@ -127,54 +119,20 @@ export function AuthorizationSummary({
                                     <div className="min-w-0">
                                         <button type="button" className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onSelectTeam(team.id)}>
                                             <span className="block break-words font-semibold text-content-heading">{team.name}</span>
-                                            <span className="mt-1 block text-sm leading-6 text-content-secondary">{team.description || "ยังไม่มีคำอธิบายกลุ่ม"}</span>
+                                            <span className="mt-1 block text-sm leading-6 text-content-secondary">{team.description || "ยังไม่มีคำอธิบายทีม"}</span>
                                         </button>
-                                        <details className="mt-2 text-xs">
-                                            <summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสทางเทคนิค</summary>
-                                            <span className="mt-1 block break-all font-mono text-content-muted">{team.key}</span>
-                                        </details>
                                     </div>
                                     <ActiveStatus isActive={team.isActive} />
                                 </div>
-                                <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-border-subtle pt-3 text-sm">
-                                    <div><dt className="text-xs text-content-secondary">บทบาท</dt><dd className="mt-1 font-semibold tabular-nums text-content-body">{team.roleCount}</dd></div>
-                                    <div><dt className="text-xs text-content-secondary">สมาชิก</dt><dd className="mt-1 font-semibold tabular-nums text-content-body">{team.membershipCount}</dd></div>
-                                    <div><dt className="text-xs text-content-secondary">สิทธิ์</dt><dd className="mt-1 font-semibold tabular-nums text-content-body">{team.teamGrantCount}</dd></div>
+                                <dl className="mt-4 border-t border-border-subtle pt-3 text-sm">
+                                    <div><dt className="sr-only">สมาชิกและหน้าที่ในทีม</dt><dd className="font-semibold text-content-body">{team.membershipCount} สมาชิก · {team.roleCount} หน้าที่</dd></div>
                                 </dl>
-                                <p className="mt-3 text-xs text-content-secondary">ปรับปรุงล่าสุด {formatAuthorizationDate(team.updatedAt)}</p>
-                                <Button type="button" variant="outline" size="sm" className="mt-4 w-full sm:w-auto" onClick={() => onSelectTeam(team.id)}>ดูรายละเอียด</Button>
+                                <Button type="button" variant="outline" size="sm" className="mt-4 w-full sm:w-auto" onClick={() => onSelectTeam(team.id)}>จัดการทีม</Button>
                             </article>
                         ))}
                     </div>
                 )}
             </section>
-        </div>
-    );
-}
-
-function SummaryMetric({
-    label,
-    value,
-    detail,
-    tone = "default",
-}: {
-    readonly label: string;
-    readonly value: number | string;
-    readonly detail: string;
-    readonly tone?: "default" | "positive" | "warning" | "primary";
-}): React.ReactElement {
-    const valueClass = tone === "warning"
-        ? "text-status-warning-strong"
-        : tone === "positive"
-            ? "text-status-success-strong"
-            : tone === "primary"
-                ? "text-action-primary-foreground"
-                : "text-content-heading";
-    return (
-        <div className="rounded-xl border border-border-subtle bg-surface-raised px-4 py-3">
-            <p className="text-xs font-medium text-content-secondary">{label}</p>
-            <p className={`mt-1 text-2xl font-semibold tabular-nums ${valueClass}`}>{value}</p>
-            <p className="mt-1 text-xs text-content-muted">{detail}</p>
         </div>
     );
 }

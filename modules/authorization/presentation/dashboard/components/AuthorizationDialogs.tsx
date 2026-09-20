@@ -24,6 +24,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogScrollArea, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { formatTeamSummary } from "@/shared/identity/team-presentation";
 
 import { LifecycleStatus } from "./AuthorizationStatus";
 import { getMutationErrorCopy, getRequestId } from "../display";
@@ -99,19 +100,16 @@ export function TeamFormDialog({
     }) => Promise<void>;
 }): React.ReactElement {
     const [key, setKey] = useState("");
-    const [initialKey, setInitialKey] = useState("");
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [error, setError] = useState<unknown>(null);
     const nameId = useId();
-    const keyId = useId();
     const descriptionId = useId();
 
     useEffect(() => {
         if (!open) return;
         const nextKey = team?.key ?? createAuthorizationTechnicalKey("team");
         setKey(nextKey);
-        setInitialKey(nextKey);
         setName(team?.name ?? "");
         setDescription(team?.description ?? "");
         setError(null);
@@ -119,7 +117,7 @@ export function TeamFormDialog({
 
     const initialName = team?.name ?? "";
     const initialDescription = team?.description ?? "";
-    const dirty = key !== initialKey || name !== initialName || description !== initialDescription;
+    const dirty = name !== initialName || description !== initialDescription;
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
@@ -142,7 +140,6 @@ export function TeamFormDialog({
             dirty={dirty}
             onClose={onClose}
             onDiscard={() => {
-                setKey(initialKey);
                 setName(initialName);
                 setDescription(initialDescription);
                 setError(null);
@@ -153,23 +150,23 @@ export function TeamFormDialog({
                     variant="ghost"
                     size="icon-sm"
                     className="absolute right-3 top-3 z-10"
-                    aria-label="ปิดแบบฟอร์มกลุ่มผู้ใช้งาน"
+                    aria-label="ปิดแบบฟอร์มทีม"
                 >
                     <X aria-hidden="true" />
                 </AsyncFormDialogClose>
                 <DialogHeader className="border-b border-border-subtle bg-surface-subtle px-5 py-4 pr-14 text-left">
                     <DialogTitle className="text-content-heading">
-                        {mode === "create" ? "สร้างกลุ่มผู้ใช้งาน" : "แก้ไขข้อมูลกลุ่ม"}
+                        {mode === "create" ? "สร้างทีม" : "แก้ไขข้อมูลทีม"}
                     </DialogTitle>
                     <DialogDescription className="leading-6 text-content-secondary">
                         {mode === "create"
-                            ? "กลุ่มผู้ใช้งานใช้รวมคนที่ควรได้รับสิทธิ์ร่วมกัน คุณสามารถเพิ่มบทบาทเพื่อแยกหน้าที่ได้"
-                            : "แก้ไขชื่อและคำอธิบายของกลุ่ม รหัสทางเทคนิคจะเปลี่ยนไม่ได้หลังสร้าง"}
+                            ? "สร้างทีมสำหรับสมาชิกที่ทำงานร่วมกัน แล้วกำหนดหน้าที่ในทีมตามต้องการ"
+                            : "แก้ไขชื่อและคำอธิบายของทีม"}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4 px-5 py-5">
                     <div className="space-y-2">
-                        <Label htmlFor={nameId}>ชื่อกลุ่ม</Label>
+                        <Label htmlFor={nameId}>ชื่อทีม</Label>
                         <Input
                             id={nameId}
                             value={name}
@@ -179,7 +176,7 @@ export function TeamFormDialog({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor={descriptionId}>คำอธิบายกลุ่ม (ไม่บังคับ)</Label>
+                        <Label htmlFor={descriptionId}>คำอธิบายทีม (ไม่บังคับ)</Label>
                         <Textarea
                             id={descriptionId}
                             value={description}
@@ -191,17 +188,9 @@ export function TeamFormDialog({
                     {error ? <FormError error={error} /> : null}
                     <DialogFooter className="pt-2">
                         <AsyncFormDialogClose variant="outline" disabled={busy}>ยกเลิก</AsyncFormDialogClose>
-                        <SubmitButton busy={busy} label={mode === "create" ? "สร้างกลุ่มผู้ใช้งาน" : "บันทึกข้อมูล"} />
+                        <SubmitButton busy={busy} label={mode === "create" ? "สร้างทีม" : "บันทึกข้อมูล"} />
                     </DialogFooter>
                 </form>
-                <details className="border-t border-border-subtle px-5 py-3 text-sm">
-                    <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">ขั้นสูง · รหัสทางเทคนิค</summary>
-                    <div className="mt-3 space-y-2">
-                        <Label htmlFor={keyId}>รหัสทางเทคนิค</Label>
-                        <Input id={keyId} value={key} onChange={(event) => setKey(event.target.value)} readOnly={mode === "edit"} aria-readonly={mode === "edit" || undefined} placeholder="new-team-..." maxLength={191} autoComplete="off" className={mode === "edit" ? "bg-surface-subtle font-mono" : "font-mono"} />
-                        <p className="text-xs leading-5 text-content-secondary">ใช้สำหรับอ้างอิงภายในระบบเท่านั้น ต้องไม่ใช้ชื่อกลุ่มเพื่อกำหนดสิทธิ์</p>
-                    </div>
-                </details>
             </AsyncFormDialogContent>
         </AsyncFormDialog>
     );
@@ -223,23 +212,20 @@ export function TeamRoleFormDialog({
     readonly onSubmit: (input: { readonly key?: string; readonly name: string }) => Promise<void>;
 }): React.ReactElement {
     const [key, setKey] = useState("");
-    const [initialKey, setInitialKey] = useState("");
     const [name, setName] = useState("");
     const [error, setError] = useState<unknown>(null);
-    const keyId = useId();
     const nameId = useId();
 
     useEffect(() => {
         if (!open) return;
         const nextKey = role?.key ?? createAuthorizationTechnicalKey("role");
         setKey(nextKey);
-        setInitialKey(nextKey);
         setName(role?.name ?? "");
         setError(null);
     }, [open, role]);
 
     const initialName = role?.name ?? "";
-    const dirty = key !== initialKey || name !== initialName;
+    const dirty = name !== initialName;
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
@@ -261,42 +247,33 @@ export function TeamRoleFormDialog({
             dirty={dirty}
             onClose={onClose}
             onDiscard={() => {
-                setKey(initialKey);
                 setName(initialName);
                 setError(null);
             }}
         >
             <AsyncFormDialogContent className="rounded-2xl p-0 sm:max-w-lg">
-                <AsyncFormDialogClose variant="ghost" size="icon-sm" className="absolute right-3 top-3 z-10" aria-label="ปิดแบบฟอร์มบทบาทในกลุ่ม">
+                <AsyncFormDialogClose variant="ghost" size="icon-sm" className="absolute right-3 top-3 z-10" aria-label="ปิดแบบฟอร์มหน้าที่ในทีม">
                     <X aria-hidden="true" />
                 </AsyncFormDialogClose>
                 <DialogHeader className="border-b border-border-subtle bg-surface-subtle px-5 py-4 pr-14 text-left">
                     <DialogTitle className="text-content-heading">
-                        {mode === "create" ? "สร้างบทบาทในกลุ่ม" : "แก้ไขบทบาทในกลุ่ม"}
+                        {mode === "create" ? "เพิ่มหน้าที่ในทีม" : "แก้ไขหน้าที่ในทีม"}
                     </DialogTitle>
                     <DialogDescription className="leading-6 text-content-secondary">
-                        บทบาทในกลุ่มช่วยแยกหน้าที่ของสมาชิก สิทธิ์จะเกิดขึ้นเมื่อกำหนดสิทธิ์ให้บทบาทนี้
+                        หน้าที่ในทีมช่วยแยกความรับผิดชอบของสมาชิก และกำหนดสิทธิ์ให้แต่ละหน้าที่ได้
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4 px-5 py-5">
                     <div className="space-y-2">
-                        <Label htmlFor={nameId}>ชื่อบทบาท</Label>
+                        <Label htmlFor={nameId}>ชื่อหน้าที่</Label>
                         <Input id={nameId} value={name} onChange={(event) => setName(event.target.value)} maxLength={191} required />
                     </div>
                     {error ? <FormError error={error} /> : null}
                     <DialogFooter className="pt-2">
                         <AsyncFormDialogClose variant="outline" disabled={busy}>ยกเลิก</AsyncFormDialogClose>
-                        <SubmitButton busy={busy} label={mode === "create" ? "สร้างบทบาท" : "บันทึกข้อมูล"} />
+                        <SubmitButton busy={busy} label={mode === "create" ? "เพิ่มหน้าที่" : "บันทึกข้อมูล"} />
                     </DialogFooter>
                 </form>
-                <details className="border-t border-border-subtle px-5 py-3 text-sm">
-                    <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">ขั้นสูง · รหัสทางเทคนิค</summary>
-                    <div className="mt-3 space-y-2">
-                        <Label htmlFor={keyId}>รหัสทางเทคนิค</Label>
-                        <Input id={keyId} value={key} onChange={(event) => setKey(event.target.value)} readOnly={mode === "edit"} aria-readonly={mode === "edit" || undefined} placeholder="new-role-..." maxLength={191} autoComplete="off" className={mode === "edit" ? "bg-surface-subtle font-mono" : "font-mono"} />
-                        <p className="text-xs leading-5 text-content-secondary">ใช้สำหรับอ้างอิงภายในระบบเท่านั้น และเปลี่ยนไม่ได้หลังสร้าง</p>
-                    </div>
-                </details>
             </AsyncFormDialogContent>
         </AsyncFormDialog>
     );
@@ -378,7 +355,7 @@ export function AddMemberDialog({
                 </AsyncFormDialogClose>
                 <DialogHeader className="border-b border-border-subtle bg-surface-subtle px-5 py-4 pr-14 text-left">
                     <DialogTitle className="text-content-heading">เพิ่มสมาชิกใน {team.name}</DialogTitle>
-                    <DialogDescription className="leading-6 text-content-secondary">ค้นหาผู้ใช้ที่จะอยู่ในกลุ่มนี้ แล้วเลือกบทบาทในกลุ่มได้ตามต้องการ ระบบจะไม่กำหนดบทบาทจากแผนกหรือตำแหน่งให้อัตโนมัติ</DialogDescription>
+                    <DialogDescription className="leading-6 text-content-secondary">ค้นหาผู้ใช้ที่จะอยู่ในทีมนี้ แล้วเลือกหน้าที่ในทีมได้ตามต้องการ ระบบจะไม่กำหนดหน้าที่จากแผนกหรือตำแหน่งให้อัตโนมัติ</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4 px-5 py-5">
                     <div className="space-y-2">
@@ -410,13 +387,10 @@ export function AddMemberDialog({
                                                 <span className="block truncate text-sm font-semibold text-content-heading">{user.name}</span>
                                                 <span className="block truncate text-xs text-content-secondary">{user.email}</span>
                                                 {user.employee ? <span className="block truncate text-xs text-content-muted">พนักงาน: {user.employee.displayName}</span> : null}
+                                                <span className="block truncate text-xs text-content-secondary">{formatTeamSummary(user.teams)}</span>
                                             </span>
                                             <LifecycleStatus isActive={user.isActive} deletedAt={user.deletedAt} />
                                         </button>
-                                        <details className="px-3 pb-2 text-xs">
-                                            <summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
-                                            <span className="mt-1 block font-mono text-content-muted">userId: {user.id}</span>
-                                        </details>
                                     </div>
                                 ))}
                             </div>
@@ -429,16 +403,16 @@ export function AddMemberDialog({
                         </div>
                     ) : null}
                     <div className="space-y-2">
-                        <Label htmlFor={roleId}>บทบาทในกลุ่ม (ไม่บังคับ)</Label>
+                        <Label htmlFor={roleId}>หน้าที่ในทีม (ไม่บังคับ)</Label>
                         <select id={roleId} value={teamRoleId} onChange={(event) => setTeamRoleId(event.target.value)} className="h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-                            <option value="">ไม่กำหนดบทบาท</option>
+                            <option value="">ไม่มีหน้าที่เฉพาะ</option>
                             {activeRoles.map((role) => (
                                 <option key={role.id} value={role.id} disabled={!role.isActive}>
                                     {role.name}{role.isActive ? "" : " — ปิดใช้งาน"}
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs leading-5 text-content-secondary">แสดงเฉพาะบทบาทของกลุ่มนี้ และไม่อนุมานจากตำแหน่งหรือหน่วยงาน</p>
+                        <p className="text-xs leading-5 text-content-secondary">แสดงเฉพาะหน้าที่ของทีมนี้ และไม่อนุมานจากตำแหน่งหรือหน่วยงาน</p>
                     </div>
                     {error ? <FormError error={error} /> : null}
                     <DialogFooter className="pt-2">
@@ -542,15 +516,15 @@ export function GrantFormDialog({
     }, [scope, supportedScopes]);
 
     const sourceLabel = source === "TEAM"
-        ? "กลุ่มผู้ใช้งาน"
+        ? "ทีม"
         : source === "TEAM_ROLE"
-            ? "บทบาทในกลุ่ม"
+            ? "หน้าที่ในทีม"
             : "ผู้ใช้รายนี้";
     const sourceDescription = source === "USER"
-        ? "นี่คือสิทธิ์เฉพาะบุคคล ใช้เป็นข้อยกเว้นเมื่อผู้ใช้ต้องทำงานเพิ่มเติม โดยปกติควรจัดสิทธิ์ผ่านกลุ่มหรือบทบาท"
+        ? "นี่คือสิทธิ์เฉพาะบุคคล ใช้เป็นข้อยกเว้นเมื่อผู้ใช้ต้องทำงานเพิ่มเติม โดยทั่วไปควรจัดสิทธิ์ผ่านทีมหรือหน้าที่ในทีม"
         : source === "TEAM"
-            ? "สมาชิกทุกคนในกลุ่มจะได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ"
-            : "สมาชิกที่มีบทบาทนี้จะได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ";
+            ? "สมาชิกทุกคนในทีมจะได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ"
+            : "สมาชิกที่มีหน้าที่นี้จะได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ";
     const dirty = query.length > 0 || capabilityKey.length > 0 || scope.length > 0 || step === "review";
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
@@ -666,11 +640,6 @@ export function GrantFormDialog({
                                         ) : <div className="rounded-lg border border-dashed border-border-subtle px-4 py-6 text-sm leading-6 text-content-secondary">เลือกสิทธิ์จากรายการเพื่อดูขอบเขตการเข้าถึง</div>}
                                     </div>
                                 </div>
-                                <details className="rounded-lg border border-border-subtle px-3 py-2 text-sm">
-                                    <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
-                                    <p className="mt-2 text-xs leading-5 text-content-secondary">แสดงรหัสทางเทคนิคของรายการที่เลือกเพื่อช่วยตรวจสอบปัญหา</p>
-                                    {selectedCapability ? <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{selectedCapability.key}</dd></div><div><dt className="font-semibold text-content-secondary">supported channels</dt><dd className="font-mono text-content-body">{selectedCapability.supportedChannels.join(", ")}</dd></div></dl> : null}
-                                </details>
                             </>
                         ) : (
                             <div className="space-y-4">
@@ -683,10 +652,6 @@ export function GrantFormDialog({
                                     </dl>
                                 </div>
                                 <p className="text-sm leading-6 text-content-secondary">หลังบันทึก ระบบจะคำนวณสิทธิ์ที่ใช้งานได้ใหม่ และโหลดข้อมูลล่าสุดให้อัตโนมัติ การทำรายการจริงยังขึ้นอยู่กับเจ้าของข้อมูล ผู้รับผิดชอบ สถานะรายการ และขั้นตอนการทำงาน</p>
-                                <details className="rounded-lg border border-border-subtle px-3 py-2 text-sm">
-                                    <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
-                                    <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-3"><div><dt className="font-semibold text-content-secondary">capability key</dt><dd className="break-all font-mono text-content-body">{capabilityKey}</dd></div><div><dt className="font-semibold text-content-secondary">scope</dt><dd className="font-mono text-content-body">{scope}</dd></div><div><dt className="font-semibold text-content-secondary">source</dt><dd className="font-mono text-content-body">{source}</dd></div></dl>
-                                </details>
                             </div>
                         )}
                         {error ? <FormError error={error} /> : null}
@@ -706,7 +671,6 @@ export function ConfirmAuthorizationAction({
     open,
     title,
     description,
-    technicalDetails,
     confirmLabel,
     destructive = false,
     busy,
@@ -716,7 +680,6 @@ export function ConfirmAuthorizationAction({
     readonly open: boolean;
     readonly title: string;
     readonly description: string;
-    readonly technicalDetails?: React.ReactNode;
     readonly confirmLabel: string;
     readonly destructive?: boolean;
     readonly busy: boolean;
@@ -745,12 +708,6 @@ export function ConfirmAuthorizationAction({
                     <AlertDialogTitle>{title}</AlertDialogTitle>
                     <AlertDialogDescription>{description}</AlertDialogDescription>
                 </AlertDialogHeader>
-                {technicalDetails ? (
-                    <details className="rounded-lg border border-border-subtle px-3 py-2 text-sm">
-                        <summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary>
-                        {technicalDetails}
-                    </details>
-                ) : null}
                 {error ? <FormError error={error} /> : null}
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={busy}>ยกเลิก</AlertDialogCancel>

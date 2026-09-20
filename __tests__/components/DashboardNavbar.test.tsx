@@ -40,6 +40,7 @@ function mockNavbarContext(mobileNavOpen: boolean): void {
             email: "somchai@example.com",
             role: "EMPLOYEE",
             department: "IT",
+            teams: [{ id: 1, name: "IT" }],
         },
         isAdmin: false,
         availableMenuGroups: [],
@@ -133,6 +134,50 @@ describe("DashboardNavbar mobile navigation", () => {
 
         expect(screen.queryByRole("button", { name: "การแจ้งเตือน" })).not.toBeInTheDocument();
         expect(notificationDropdownMock).not.toHaveBeenCalled();
+    });
+
+    it("shows Team context without exposing the internal system role", () => {
+        mockNavbarContext(false);
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: {
+                id: "employee-1",
+                name: "สมชาย ใจดี",
+                email: "somchai@example.com",
+                role: "ADMIN",
+                teams: [{ id: 1, name: "IT" }],
+            },
+            isAdmin: true,
+            availableMenuGroups: [],
+        });
+
+        render(<DashboardNavbar />);
+
+        expect(screen.getAllByText("ทีม IT").length).toBeGreaterThan(0);
+        expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
+        expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
+        expect(screen.queryByText("บทบาทระบบ")).not.toBeInTheDocument();
+    });
+
+    it("uses the neutral no-Team fallback", () => {
+        mockNavbarContext(false);
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: {
+                id: "employee-1",
+                name: "สมชาย ใจดี",
+                email: "somchai@example.com",
+                role: "USER",
+                teams: [],
+            },
+            isAdmin: false,
+            availableMenuGroups: [],
+        });
+        render(<DashboardNavbar />);
+
+        expect(screen.getAllByText("ยังไม่กำหนดทีม").length).toBeGreaterThan(0);
+        expect(screen.queryByText("USER")).not.toBeInTheDocument();
+        expect(screen.queryByText("ผู้ใช้งาน")).not.toBeInTheDocument();
     });
 
     it("passes independent read-only Notification update state to the dropdown", () => {

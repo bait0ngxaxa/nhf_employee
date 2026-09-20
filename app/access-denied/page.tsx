@@ -25,8 +25,8 @@ export default function AccessDenied() {
         <CardContent className="space-y-4">
           <div className="text-center text-content-neutral-secondary">
             <p>
-              ส่วนนี้เป็นของผู้ดูแลระบบเท่านั้น หากคุณคิดว่านี่เป็นข้อผิดพลาด 
-              กรุณาติดต่อผู้ดูแลระบบ
+              คุณยังไม่มีสิทธิ์เข้าถึงส่วนนี้ หากคิดว่าสิทธิ์ของคุณไม่ถูกต้อง
+              กรุณาติดต่อผู้รับผิดชอบระบบ
             </p>
           </div>
           

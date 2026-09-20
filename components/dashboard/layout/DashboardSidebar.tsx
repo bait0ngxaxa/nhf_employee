@@ -10,7 +10,7 @@ import {
     useExpandedSidebarGroups,
 } from "@/components/dashboard/layout/DashboardSidebarPrimitives";
 import { cn } from "@/lib/ui/utils";
-import { getRoleLabelThai } from "@/lib/ssot/permissions";
+import { formatTeamSummary } from "@/shared/identity/team-presentation";
 
 type DashboardSidebarProps = {
     variant?: "desktop" | "mobile";
@@ -29,7 +29,7 @@ export function DashboardSidebar({
     const { expandedGroups, toggleGroup } =
         useExpandedSidebarGroups(availableMenuGroups);
     const displayName = user?.name?.trim() || "ผู้ใช้งาน";
-    const roleLabel = getRoleLabelThai(user?.role);
+    const teamSummary = formatTeamSummary(user?.teams);
     const sidebarOpen = variant === "mobile" || !desktopSidebarCollapsed;
 
     return (
@@ -62,7 +62,7 @@ export function DashboardSidebar({
             <SidebarFooter
                 sidebarOpen={sidebarOpen}
                 name={displayName}
-                role={roleLabel}
+                secondaryText={teamSummary}
             />
         </aside>
     );

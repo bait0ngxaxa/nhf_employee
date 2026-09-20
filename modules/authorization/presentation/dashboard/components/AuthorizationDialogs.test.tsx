@@ -64,7 +64,11 @@ const team = {
 
 describe("Authorization Administration dialogs", () => {
     it("submits the Team creation payload and does not add a local row", async () => {
-        const onSubmit = vi.fn(async () => undefined);
+        const onSubmit = vi.fn(async (_input: {
+            readonly key?: string;
+            readonly name: string;
+            readonly description: string | null;
+        }) => undefined);
         render(
             <TeamFormDialog
                 open
@@ -75,16 +79,18 @@ describe("Authorization Administration dialogs", () => {
             />,
         );
 
-        fireEvent.change(screen.getByLabelText("รหัสทางเทคนิค"), { target: { value: "operations" } });
-        fireEvent.change(screen.getByLabelText("ชื่อกลุ่ม"), { target: { value: "Operations" } });
-        fireEvent.change(screen.getByLabelText("คำอธิบายกลุ่ม (ไม่บังคับ)"), { target: { value: "ทีมปฏิบัติการ" } });
-        fireEvent.click(screen.getByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" }));
+        fireEvent.change(screen.getByLabelText("ชื่อทีม"), { target: { value: "Operations" } });
+        fireEvent.change(screen.getByLabelText("คำอธิบายทีม (ไม่บังคับ)"), { target: { value: "ทีมปฏิบัติการ" } });
+        expect(screen.queryByLabelText("รหัสทางเทคนิค")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "สร้างทีม" }));
 
-        await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
-            key: "operations",
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+        const submitted = onSubmit.mock.calls[0]?.[0];
+        expect(submitted).toMatchObject({
             name: "Operations",
             description: "ทีมปฏิบัติการ",
-        }));
+        });
+        expect(submitted?.key).toMatch(/^new-team-/);
     });
 
     it("generates a fresh technical key for each new Team form session", async () => {
@@ -102,8 +108,8 @@ describe("Authorization Administration dialogs", () => {
             />,
         );
 
-        fireEvent.change(screen.getByLabelText("ชื่อกลุ่ม"), { target: { value: "กลุ่มแรก" } });
-        fireEvent.click(screen.getByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" }));
+        fireEvent.change(screen.getByLabelText("ชื่อทีม"), { target: { value: "ทีมแรก" } });
+        fireEvent.click(screen.getByRole("button", { name: "สร้างทีม" }));
         await waitFor(() => expect(submittedKeys).toHaveLength(1));
 
         view.rerender(
@@ -125,8 +131,8 @@ describe("Authorization Administration dialogs", () => {
             />,
         );
 
-        fireEvent.change(screen.getByLabelText("ชื่อกลุ่ม"), { target: { value: "กลุ่มที่สอง" } });
-        fireEvent.click(screen.getByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" }));
+        fireEvent.change(screen.getByLabelText("ชื่อทีม"), { target: { value: "ทีมที่สอง" } });
+        fireEvent.click(screen.getByRole("button", { name: "สร้างทีม" }));
         await waitFor(() => expect(submittedKeys).toHaveLength(2));
 
         expect(submittedKeys[0]).toMatch(/^new-team-/);
@@ -134,7 +140,7 @@ describe("Authorization Administration dialogs", () => {
         expect(submittedKeys[1]).not.toBe(submittedKeys[0]);
     });
 
-    it("keeps a Team key read-only in the metadata editor", () => {
+    it("keeps technical Team keys out of the metadata editor", () => {
         render(
             <TeamFormDialog
                 open
@@ -146,9 +152,7 @@ describe("Authorization Administration dialogs", () => {
             />,
         );
 
-        const keyInput = screen.getByLabelText("รหัสทางเทคนิค");
-        expect(keyInput).toHaveValue("operations");
-        expect(keyInput).toHaveAttribute("readonly");
+        expect(screen.queryByLabelText("รหัสทางเทคนิค")).not.toBeInTheDocument();
     });
 
     it("groups business abilities, hides non-grantable items, and excludes TEAM scope for direct User grants", async () => {
@@ -171,7 +175,7 @@ describe("Authorization Administration dialogs", () => {
 
         fireEvent.click(screen.getByRole("button", { name: /ดูข้อมูลพนักงาน/ }));
 
-        expect(screen.queryByRole("radio", { name: /ภายในกลุ่มนี้/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole("radio", { name: /ภายในทีมนี้/ })).not.toBeInTheDocument();
         expect(screen.getByRole("radio", { name: /ทั้งหมด/ })).toBeChecked();
 
         fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" }));

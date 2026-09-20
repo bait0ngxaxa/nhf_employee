@@ -125,6 +125,7 @@ export interface AuthorizationAdministrationAccountIdentity {
         readonly status: EmployeeStatus;
         readonly deletedAt: Date | null;
     } | null;
+    readonly teams?: readonly AuthorizationAdministrationUserTeamSummary[];
 }
 
 /**
@@ -133,6 +134,12 @@ export interface AuthorizationAdministrationAccountIdentity {
  */
 export type AuthorizationAdministrationUserSummary =
     AuthorizationAdministrationAccountIdentity;
+
+export interface AuthorizationAdministrationUserTeamSummary {
+    readonly id: number;
+    readonly name: string;
+    readonly isActive: boolean;
+}
 
 export const AUTHORIZATION_ADMINISTRATION_USER_SEARCH_MAX_LENGTH = 100;
 export const AUTHORIZATION_ADMINISTRATION_USER_SEARCH_LIMIT = 25;
@@ -152,6 +159,9 @@ export interface AuthorizationAdministrationRawUserIdentity {
         readonly status: EmployeeStatus;
         readonly deletedAt: Date | null;
     } | null;
+    readonly teamMemberships?: readonly {
+        readonly team: AuthorizationAdministrationUserTeamSummary;
+    }[];
 }
 
 export interface AuthorizationAdministrationTeamMembership {

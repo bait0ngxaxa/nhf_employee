@@ -67,7 +67,7 @@ describe("AuthorizationSummary", () => {
         expect(screen.queryByText("Active Team")).not.toBeInTheDocument();
         expect(screen.getByText("Legacy Team")).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
+        fireEvent.click(screen.getByRole("button", { name: "จัดการทีม" }));
         expect(onSelectTeam).toHaveBeenCalledWith(2);
     });
 
@@ -85,7 +85,7 @@ describe("AuthorizationSummary", () => {
             />,
         );
 
-        const createButtons = screen.getAllByRole("button", { name: "สร้างกลุ่มผู้ใช้งาน" });
+        const createButtons = screen.getAllByRole("button", { name: "สร้างทีม" });
         expect(createButtons.length).toBeGreaterThan(0);
         fireEvent.click(createButtons[0] as HTMLElement);
         expect(onCreateTeam).toHaveBeenCalledTimes(1);

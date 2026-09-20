@@ -6,6 +6,7 @@ import type { DepartmentPresentationCapabilities } from "@/modules/department";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 import type { NotificationPresentationCapabilities } from "@/modules/notification/client";
 import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { UserTeamPresentation } from "@/shared/identity/team-presentation";
 
 export interface AuthenticatedUser {
     id: string;
@@ -14,6 +15,7 @@ export interface AuthenticatedUser {
     email?: string | null;
     name?: string | null;
     department?: string;
+    teams?: readonly UserTeamPresentation[];
     isManager?: boolean;
     canApproveLeave?: boolean;
     canViewLeaveReports?: boolean;

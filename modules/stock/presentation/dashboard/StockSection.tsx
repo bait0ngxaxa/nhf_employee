@@ -15,7 +15,7 @@ import { StockAdminRequests } from "./components/StockAdminRequests";
 import { StockAdminReports } from "./components/StockAdminReports";
 
 function StockContent() {
-    const { isAdmin, stockCapabilities } = useStockDataContext();
+    const { stockCapabilities } = useStockDataContext();
     const { activeTab, setActiveTab } = useStockUIContext();
 
     const canReadCatalog = stockCapabilities.canReadCatalog;
@@ -47,7 +47,7 @@ function StockContent() {
             value: "inventory",
             label: "จัดการสต็อก",
             group: "admin",
-            groupLabel: "ผู้ดูแล",
+            groupLabel: "จัดการ",
             content: <StockAdminInventory />,
             visible: canReadCatalog && canManageInventory,
         },
@@ -72,8 +72,6 @@ function StockContent() {
             <SectionHeader
                 title="NHF Stock"
                 subtitle="เบิกจ่ายวัสดุสำนักงาน"
-                roleBadge={isAdmin ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน"}
-                badgeColor="bg-module-stock-badge-surface text-module-stock-badge-foreground border-module-stock-badge-border"
             />
             {hasUsableTab ? (
                 <SectionTabs

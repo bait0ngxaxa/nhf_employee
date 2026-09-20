@@ -41,7 +41,10 @@ import {
 import { NotificationDropdown } from "@/modules/notification/client";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
-import { getRoleLabelThai } from "@/lib/ssot/permissions";
+import {
+    NO_TEAM_PRESENTATION,
+    formatTeamSummary,
+} from "@/shared/identity/team-presentation";
 
 const DESKTOP_MEDIA_QUERY = "(min-width: 1024px)";
 
@@ -53,6 +56,10 @@ export function DashboardNavbar(): ReactElement {
         handleMenuClick,
     } = useDashboardUIContext();
     const { user } = useDashboardDataContext();
+    const teamSummary = formatTeamSummary(user?.teams);
+    const teamNames = user?.teams
+        ?.map((team) => team.name.trim())
+        .filter(Boolean) ?? [];
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [logoutError, setLogoutError] = useState("");
@@ -176,11 +183,11 @@ export function DashboardNavbar(): ReactElement {
                                     <User className="h-5 w-5 text-content-on-brand" />
                                 </div>
                                 <div className="flex flex-col items-start text-left">
-                                    <span className="text-sm font-black tracking-tight text-content-primary">
+                                    <span className="text-sm font-semibold text-content-primary">
                                         {user?.name || "ผู้ใช้"}
                                     </span>
-                                    <span className="text-xs font-bold uppercase leading-none tracking-widest text-brand-foreground">
-                                        {getRoleLabelThai(user?.role)}
+                                    <span className="text-xs font-medium leading-5 text-content-secondary">
+                                        {teamSummary}
                                     </span>
                                 </div>
                                 <ChevronDown className="h-3 w-3 text-content-subtle transition-colors group-hover:text-brand-foreground" />
@@ -190,21 +197,25 @@ export function DashboardNavbar(): ReactElement {
                             align="end"
                             className="w-64 rounded-2xl border-border-muted bg-surface-raised p-2 shadow-lg"
                         >
-                            <div className="mb-2 rounded-xl border border-brand-border/50 bg-brand-surface/50 px-4 py-4">
-                                <p className="mb-1 text-sm font-black leading-none text-content-primary">
+                            <div className="mb-2 border-b border-border-subtle px-3 pb-3 pt-2">
+                                <p className="text-sm font-semibold leading-5 text-content-primary">
                                     {user?.name}
                                 </p>
-                                <p className="truncate text-xs font-bold uppercase tracking-widest text-content-subtle">
+                                <p className="mt-1 truncate text-xs text-content-secondary">
                                     {user?.email}
                                 </p>
-                                <div className="mt-3 flex items-center justify-between border-t border-brand-border/30 pt-3">
-                                    <span className="text-xs font-black uppercase tracking-widest text-brand-foreground">
-                                        {user?.department}
-                                    </span>
-                                    <span className="rounded-full bg-brand-solid px-2 py-0.5 text-xs font-black uppercase tracking-widest text-content-on-brand">
-                                        {getRoleLabelThai(user?.role)}
-                                    </span>
-                                </div>
+                                <dl className="mt-3 space-y-2 text-xs">
+                                    <div>
+                                        <dt className="text-content-muted">หน่วยงาน</dt>
+                                        <dd className="mt-0.5 text-content-body">{user?.department || "ไม่ระบุหน่วยงาน"}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-content-muted">ทีม</dt>
+                                        <dd className="mt-0.5 text-content-body">
+                                            {teamNames.length > 0 ? teamNames.join(" · ") : NO_TEAM_PRESENTATION}
+                                        </dd>
+                                    </div>
+                                </dl>
                             </div>
 
                             <DropdownMenuItem
@@ -249,6 +260,11 @@ export function DashboardNavbar(): ReactElement {
                             align="end"
                             className="w-56 rounded-2xl border-border-muted p-2"
                         >
+                            <div className="border-b border-border-subtle px-3 pb-3 pt-2">
+                                <p className="truncate text-sm font-semibold text-content-primary">{user?.name || "ผู้ใช้"}</p>
+                                <p className="mt-1 truncate text-xs text-content-secondary">{user?.email || "ไม่ระบุอีเมล"}</p>
+                                <p className="mt-2 text-xs text-content-secondary">{teamSummary}</p>
+                            </div>
                             <DropdownMenuItem
                                 onClick={() => handleMenuClick("sessions")}
                                 className="h-11 rounded-xl focus:bg-brand-surface"

@@ -97,8 +97,8 @@ export const authorizationScopePresentation: Readonly<
         description: "รายการที่ผู้ใช้นี้ได้รับมอบหมายหรือรับผิดชอบ",
     },
     TEAM: {
-        label: "ภายในกลุ่มนี้",
-        description: "รายการภายในกลุ่มผู้ใช้งานที่เกี่ยวข้อง",
+        label: "ภายในทีมนี้",
+        description: "รายการภายในทีมที่เกี่ยวข้อง",
     },
     ALL: {
         label: "ทั้งหมด",
@@ -124,9 +124,9 @@ export const authorizationChannelPresentation: Readonly<
 });
 
 /**
- * Business copy for trusted inspection contexts. The context key and the
- * original domain label remain technical evidence; this catalog only changes
- * how a context is introduced to an administrator.
+ * Business copy for trusted inspection contexts. The catalog gives the
+ * administrator a task-oriented description without exposing the internal
+ * context key or domain label.
  */
 export const authorizationContextPresentation: Readonly<
     Record<string, AuthorizationContextPresentation>
@@ -165,7 +165,7 @@ export const authorizationContextPresentation: Readonly<
  * Operator-facing descriptions for limitation codes emitted by the current
  * Employee, Department, Notification, Routine, Stock, Leave, and Audit
  * effective-access providers. These values never make an authorization
- * decision and the original code/label remains in Technical details.
+ * decision; internal codes remain available to server diagnostics only.
  */
 export const authorizationLimitationPresentation: Readonly<
     Record<string, AuthorizationLimitationPresentation>
@@ -439,7 +439,7 @@ export function getAuthorizationContextPresentation(
 ): AuthorizationContextPresentation {
     return authorizationContextPresentation[contextKey] ?? {
         label: "บริบทการใช้งาน",
-        description: "การใช้งานในบริบทนี้ยังมีรายละเอียดเพิ่มเติมในข้อมูลทางเทคนิค",
+        description: "การใช้งานในบริบทนี้ยังมีเงื่อนไขเพิ่มเติม",
     };
 }
 
@@ -457,9 +457,9 @@ export function getAuthorizationSourceLabel(
 ): string {
     switch (source) {
         case "TEAM":
-            return "สิทธิ์ของกลุ่มผู้ใช้งาน";
+            return "สิทธิ์ของทีม";
         case "TEAM_ROLE":
-            return "สิทธิ์ของบทบาทในกลุ่ม";
+            return "สิทธิ์จากหน้าที่ในทีม";
         case "USER":
             return "สิทธิ์เฉพาะบุคคล";
     }
@@ -470,9 +470,9 @@ export function getAuthorizationSourceDescription(
 ): string {
     switch (source) {
         case "TEAM":
-            return "สมาชิกทุกคนในกลุ่มที่ใช้งานอยู่สามารถได้รับสิทธิ์นี้";
+            return "สมาชิกทุกคนในทีมที่ใช้งานอยู่สามารถได้รับสิทธิ์นี้";
         case "TEAM_ROLE":
-            return "เฉพาะสมาชิกที่มีบทบาทนี้ในกลุ่มจะได้รับสิทธิ์นี้";
+            return "เฉพาะสมาชิกที่มีหน้าที่นี้ในทีมจะได้รับสิทธิ์นี้";
         case "USER":
             return "ข้อยกเว้นที่เพิ่มให้ผู้ใช้รายนี้โดยเฉพาะ";
     }
