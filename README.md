@@ -135,8 +135,6 @@ openssl rand -base64 48
 | `SMTP_PORT` | ปกติ `587` สำหรับ STARTTLS หรือ `465` สำหรับ TLS |
 | `SMTP_SECURE` | `true` เมื่อใช้ implicit TLS; กรณี port 587 ใช้ `false` |
 | `SMTP_USER` / `SMTP_PASS` | บัญชี SMTP |
-| `EMAIL_REQUEST_INAPP_RECIPIENT_EMAILS` | email ผู้รับ in-app notification คั่นด้วย comma |
-
 ถ้าไม่ตั้ง `SMTP_USER` หรือ `SMTP_PASS` ระบบจะส่ง email ไม่ได้ และ event ที่ต้องส่ง email จะเข้า retry/dead ตาม policy ของ notification outbox; สำหรับ Routine production ต้องตั้งค่า SMTP ให้ครบ
 
 ### LINE

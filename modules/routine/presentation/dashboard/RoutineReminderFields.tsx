@@ -58,8 +58,8 @@ const REMINDER_SCOPE_OPTIONS: ReadonlyArray<{
     label: string;
 }> = [
     { value: "ASSIGNEES", label: "ผู้รับผิดชอบ" },
-    { value: "ADMINS", label: "ผู้ดูแลระบบ" },
-    { value: "ASSIGNEES_AND_ADMINS", label: "ผู้รับผิดชอบและผู้ดูแลระบบ" },
+    { value: "ALL_READERS", label: "ผู้ที่มีสิทธิ์ดูงานทั้งหมด" },
+    { value: "ASSIGNEES_AND_ALL_READERS", label: "ผู้รับผิดชอบและผู้ที่มีสิทธิ์ดูงานทั้งหมด" },
 ];
 
 function isRoutineReminderPreset(value: string): value is RoutineReminderPreset {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ROUTINE_SCHEDULE_TYPES, ROUTINE_BUSINESS_DAY_POLICIES } from "../../domain/schedule";
+import { ROUTINE_REMINDER_RECIPIENT_SCOPES } from "../../domain/reminder-recipients";
 
 import type { RoutineImportRow } from "./types";
 
@@ -43,7 +44,7 @@ const importRowSchema = z.object({
         daysBefore: z.number().int().min(0).max(365),
         sendHour: z.number().int().min(0).max(23),
         channel: z.literal("IN_APP"),
-        recipientScope: z.enum(["ASSIGNEES", "ADMINS", "ASSIGNEES_AND_ADMINS"]),
+        recipientScope: z.enum(ROUTINE_REMINDER_RECIPIENT_SCOPES),
         isActive: z.boolean(),
     })).max(20).optional(),
     scheduleText: z.string().nullable(),

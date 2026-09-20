@@ -16,6 +16,7 @@ import {
 import {
     ROUTINE_TIMING_STATUSES,
 } from "../domain/timing";
+import { ROUTINE_REMINDER_RECIPIENT_SCOPES } from "../domain/reminder-recipients";
 
 const emptyToUndefined = (value: unknown): unknown => {
     if (typeof value !== "string") return value;
@@ -116,11 +117,7 @@ export const routineReminderRuleSchema = z.object({
         z.coerce.number().int().min(0).max(23),
     ),
     channel: z.literal("IN_APP"),
-    recipientScope: z.enum([
-        "ASSIGNEES",
-        "ADMINS",
-        "ASSIGNEES_AND_ADMINS",
-    ]),
+    recipientScope: z.enum(ROUTINE_REMINDER_RECIPIENT_SCOPES),
     isActive: z.boolean().default(true),
 });
 
@@ -448,9 +445,11 @@ export const routineReminderEmailOutboxPayloadSchema = z.object({
     daysBefore: z.number().int().nonnegative(),
     actionUrl: z.string().min(1).max(2048),
     occurrenceId: z.number().int().positive(),
+    taskId: z.number().int().positive().optional(),
     ruleId: z.number().int().positive(),
     userId: z.number().int().positive(),
     reminderVersion: z.number().int().positive(),
+    isAssignee: z.boolean().optional(),
 });
 
 export const routineReminderLineOutboxPayloadSchema = z.object({
@@ -509,6 +508,7 @@ export type RoutineOccurrenceOverrideInput = z.infer<
     typeof routineOccurrenceOverrideSchema
 >;
 export type RoutineReminderRuleInput = z.infer<typeof routineReminderRuleSchema>;
+export type { RoutineReminderRecipientScope } from "../domain/reminder-recipients";
 export type RoutineReminderOutboxPayload = z.infer<
     typeof routineReminderOutboxPayloadSchema
 >;

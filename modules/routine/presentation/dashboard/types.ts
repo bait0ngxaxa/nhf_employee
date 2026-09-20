@@ -2,15 +2,13 @@ import type { RoutineTimingStatus } from "../../domain/timing";
 import type { RoutineScheduleType } from "../../domain/schedule";
 import type { RoutineAssigneeRole } from "../../domain/assignees";
 import type { RoutineTaskCapabilities } from "../../domain/capabilities";
+import type { RoutineReminderRecipientScope } from "../../domain/reminder-recipients";
 
 export type { RoutineTimingStatus } from "../../domain/timing";
 export type { RoutineAssigneeRole } from "../../domain/assignees";
 export type { RoutineTaskCapabilities } from "../../domain/capabilities";
 
-export type RoutineReminderRecipientScope =
-    | "ASSIGNEES"
-    | "ADMINS"
-    | "ASSIGNEES_AND_ADMINS";
+export type { RoutineReminderRecipientScope } from "../../domain/reminder-recipients";
 
 export interface RoutineReminderRule {
     id: number;

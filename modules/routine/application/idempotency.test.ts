@@ -180,7 +180,7 @@ describe("Routine task create idempotency", () => {
                 daysBefore: 1,
                 sendHour: 9,
                 channel: "IN_APP" as const,
-                recipientScope: "ADMINS" as const,
+                recipientScope: "ALL_READERS" as const,
                 isActive: true,
             }],
         };
@@ -267,7 +267,7 @@ describe("Routine task create idempotency", () => {
                 daysBefore: 1,
                 sendHour: 9,
                 channel: "IN_APP" as const,
-                recipientScope: "ADMINS" as const,
+                recipientScope: "ALL_READERS" as const,
                 isActive: true,
             }],
         };

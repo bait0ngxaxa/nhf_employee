@@ -22,7 +22,7 @@ import {
     buildVariantLabel,
     enqueueStockRequestResultLine,
     enqueueStockRequestResultEmail,
-    notifyAdminsStockRequestCancelledByRequester,
+    notifyStockRequestProcessorsRequestCancelledByRequester,
     notifyStockRequestResult,
     persistLowStockNotifications,
 } from "../../infrastructure/notifications/notifications";
@@ -522,7 +522,7 @@ export async function cancelRequest(
             cancelledAt,
         );
         if (notificationMode === "REQUESTER") {
-            await notifyAdminsStockRequestCancelledByRequester(
+            await notifyStockRequestProcessorsRequestCancelledByRequester(
                 requestId,
                 getUserDisplayName(request.requester),
                 tx,

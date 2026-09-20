@@ -6,7 +6,7 @@ import { createStockCommandAudit } from "../../infrastructure/persistence/comman
 import {
     buildVariantLabel,
     enqueueLineNewStockRequest,
-    notifyAdminsNewStockRequest,
+    notifyStockRequestProcessorsNewRequest,
 } from "../../infrastructure/notifications/notifications";
 import {
     buildRequestInclude,
@@ -270,7 +270,7 @@ async function persistRequest(
             },
         }),
     );
-    await notifyAdminsNewStockRequest(
+    await notifyStockRequestProcessorsNewRequest(
         request.id,
         getUserDisplayName(request.requester),
         request.projectCode,

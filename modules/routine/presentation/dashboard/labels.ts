@@ -22,8 +22,8 @@ export const ROUTINE_REMINDER_RECIPIENT_SCOPE_LABELS: Record<
     string
 > = {
     ASSIGNEES: "ผู้รับผิดชอบ",
-    ADMINS: "ผู้ดูแลระบบ",
-    ASSIGNEES_AND_ADMINS: "ผู้รับผิดชอบและผู้ดูแลระบบ",
+    ALL_READERS: "ผู้ที่มีสิทธิ์ดูงานทั้งหมด",
+    ASSIGNEES_AND_ALL_READERS: "ผู้รับผิดชอบและผู้ที่มีสิทธิ์ดูงานทั้งหมด",
 };
 
 export function formatRoutineAssigneeName(assignee: RoutineAssignee): string {

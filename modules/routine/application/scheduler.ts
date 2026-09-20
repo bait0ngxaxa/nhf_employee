@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { hasPrismaErrorCode } from "@/lib/db/transaction";
+import { findActiveUsersWithConfiguredCapabilityScope } from "@/modules/authorization";
 import {
     calendarDateToDate,
     getCurrentBangkokDate,
@@ -14,6 +15,11 @@ import {
     buildRoutineReminderEventKey,
     ROUTINE_REMINDER_OUTBOX_TYPE,
 } from "./reminders";
+import {
+    includesRoutineAllReaders,
+    includesRoutineAssignees,
+    type RoutineReminderRecipientScope,
+} from "../domain/reminder-recipients";
 
 export interface RoutineSchedulerResult {
     occurrencesCreated: number;
@@ -28,11 +34,6 @@ export interface RoutineSchedulerResult {
     contractNoRecipientSkipped: number;
     errors: number;
 }
-
-type RoutineReminderRecipientScope =
-    | "ASSIGNEES"
-    | "ADMINS"
-    | "ASSIGNEES_AND_ADMINS";
 
 type RoutineSchedulerOccurrence = {
     id: number;
@@ -100,14 +101,14 @@ function resolveAssigneeUserIds(
 function resolveRecipientUserIds(
     occurrence: RoutineSchedulerOccurrence,
     scope: RoutineReminderRecipientScope,
-    adminUserIds: readonly number[],
+    allReaderUserIds: readonly number[],
 ): number[] {
     const userIds = new Set<number>();
-    if (scope === "ASSIGNEES" || scope === "ASSIGNEES_AND_ADMINS") {
+    if (includesRoutineAssignees(scope)) {
         resolveAssigneeUserIds(occurrence).forEach((userId) => userIds.add(userId));
     }
-    if (scope === "ADMINS" || scope === "ASSIGNEES_AND_ADMINS") {
-        adminUserIds.forEach((userId) => userIds.add(userId));
+    if (includesRoutineAllReaders(scope)) {
+        allReaderUserIds.forEach((userId) => userIds.add(userId));
     }
     return [...userIds];
 }
@@ -263,14 +264,20 @@ export async function runRoutineScheduler(
 
     await generateRoutineOccurrencesForScheduler(now, result);
 
-    const [occurrences, admins] = await Promise.all([
-        findSchedulerOccurrences(now),
-        prisma.user.findMany({
-            where: { role: "ADMIN", isActive: true, deletedAt: null },
-            select: { id: true },
-        }),
-    ]);
-    const adminUserIds = admins.map((admin) => admin.id);
+    const occurrences = await findSchedulerOccurrences(now);
+    const hasAllReaderRule = occurrences.some((occurrence) =>
+        occurrence.task.reminderRules.some((rule) =>
+            rule.isActive
+            && rule.channel === "IN_APP"
+            && includesRoutineAllReaders(rule.recipientScope),
+        ),
+    );
+    const allReaderUserIds = hasAllReaderRule
+        ? await findActiveUsersWithConfiguredCapabilityScope({
+            capability: "routine.task.read",
+            scope: "ALL",
+        })
+        : [];
     for (const occurrence of occurrences) {
         if (!occurrence.task.isActive) {
             result.inactiveSkipped += 1;
@@ -291,7 +298,7 @@ export async function runRoutineScheduler(
             const recipientUserIds = resolveRecipientUserIds(
                 occurrence,
                 rule.recipientScope,
-                adminUserIds,
+                allReaderUserIds,
             );
             if (recipientUserIds.length === 0) {
                 result.noRecipientSkipped += 1;

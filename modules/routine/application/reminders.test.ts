@@ -10,7 +10,11 @@ import {
     dispatchRoutineReminderOutbox,
 } from "./reminders";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
-import { routineReminderEmailOutboxPayloadSchema } from "../schemas/routine";
+import {
+    routineReminderEmailOutboxPayloadSchema,
+    type RoutineReminderEmailOutboxPayload,
+} from "../schemas/routine";
+import type { RoutineReminderEmailData } from "./notifications/notification-types";
 
 const createInAppNotificationOnceMock = vi.hoisted(() => vi.fn());
 const sendRoutineReminderNotificationMock = vi.hoisted(() => vi.fn());
@@ -99,7 +103,9 @@ function buildPayload(overrides: Record<string, unknown> = {}) {
     };
 }
 
-function buildEmailPayload(overrides: Record<string, unknown> = {}) {
+function buildEmailPayload(
+    overrides: Partial<RoutineReminderEmailData> = {},
+): RoutineReminderEmailData {
     return {
         to: "somchai@example.com",
         recipientName: "สมชาย ใจดี",
@@ -110,6 +116,7 @@ function buildEmailPayload(overrides: Record<string, unknown> = {}) {
         daysBefore: 2,
         actionUrl: "/dashboard/routine?taskId=71&occurrenceId=91",
         occurrenceId: 91,
+        taskId: 71,
         ruleId: 31,
         userId: 17,
         reminderVersion: 2,
@@ -117,7 +124,7 @@ function buildEmailPayload(overrides: Record<string, unknown> = {}) {
     };
 }
 
-function buildEmailNotification(payload: ReturnType<typeof buildEmailPayload>): NotificationOutbox {
+function buildEmailNotification(payload: RoutineReminderEmailOutboxPayload): NotificationOutbox {
     return {
         id: 502,
         type: "ROUTINE_REMINDER_EMAIL",
@@ -301,6 +308,7 @@ describe("Routine reminder dispatch", () => {
                 eventKey: "routine:91:rule:31:user:17:version:2:email",
                 payload: JSON.stringify(buildEmailPayload({
                     recipientName: "สมชาย ใจดี (ชาย)",
+                    isAssignee: true,
                 })),
             }],
             skipDuplicates: true,
@@ -782,22 +790,22 @@ describe("Routine reminder dispatch", () => {
         );
     });
 
-    it("resolves administrator recipients from current active users", async () => {
+    it("resolves ALL_READERS recipients from current configured capability users", async () => {
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence({
                 task: {
                     ...buildOccurrence().task,
                     reminderRules: [{
                         ...buildOccurrence().task.reminderRules[0],
-                        recipientScope: "ADMINS",
+                        recipientScope: "ALL_READERS",
                     }],
                 },
             })),
         );
         prismaMock.user.findMany.mockResolvedValue(asNever([{
             id: 99,
-            name: "ผู้ดูแลระบบ",
-            email: "admin@example.com",
+            name: "ผู้อ่านทั้งหมด",
+            email: "reader@example.com",
         }]));
 
         const result = await dispatchRoutineReminderOutbox(
@@ -813,22 +821,22 @@ describe("Routine reminder dispatch", () => {
         );
     });
 
-    it("deduplicates assignee and administrator recipients for both channels", async () => {
+    it("deduplicates assignee and ALL_READERS recipients for both channels", async () => {
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence({
                 assignees: [
                     buildOccurrence().assignees[0],
                     {
                         employee: {
-                            firstName: "ผู้ดูแล",
+                            firstName: "ผู้อ่าน",
                             lastName: "ร่วม",
                             nickname: null,
                             status: "ACTIVE",
                             deletedAt: null,
                             user: {
                                 id: 99,
-                                name: "ผู้ดูแลร่วม",
-                                email: "admin@example.com",
+                                name: "ผู้อ่านร่วม",
+                                email: "reader@example.com",
                                 isActive: true,
                                 deletedAt: null,
                             },
@@ -839,14 +847,14 @@ describe("Routine reminder dispatch", () => {
                     ...buildOccurrence().task,
                     reminderRules: [{
                         ...buildOccurrence().task.reminderRules[0],
-                        recipientScope: "ASSIGNEES_AND_ADMINS",
+                        recipientScope: "ASSIGNEES_AND_ALL_READERS",
                     }],
                 },
             })),
         );
         prismaMock.user.findMany.mockResolvedValue(asNever([
-            { id: 99, name: "ผู้ดูแลร่วม", email: "admin@example.com" },
-            { id: 100, name: "ผู้ดูแลระบบ", email: "admin2@example.com" },
+            { id: 99, name: "ผู้อ่านร่วม", email: "reader@example.com" },
+            { id: 100, name: "ผู้อ่านทั้งหมด", email: "reader2@example.com" },
         ]));
 
         const result = await dispatchRoutineReminderOutbox(
@@ -953,6 +961,9 @@ describe("Routine reminder dispatch", () => {
 
     it("retries a failed Routine email independently for its recipient", async () => {
         const payload = buildEmailPayload();
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence()),
+        );
         sendRoutineReminderNotificationMock.mockResolvedValue(false);
 
         await expect(
@@ -965,6 +976,37 @@ describe("Routine reminder dispatch", () => {
         expect(sendRoutineReminderNotificationMock).toHaveBeenCalledTimes(1);
         expect(sendRoutineReminderNotificationMock).toHaveBeenCalledWith(payload);
         expect(createInAppNotificationOnceMock).not.toHaveBeenCalled();
+    });
+
+    it("supersedes an ALL_READERS email child when capability is revoked before dispatch", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        recipientScope: "ALL_READERS",
+                    }],
+                },
+            })),
+        );
+        prismaMock.user.findMany.mockResolvedValue(asNever([]));
+
+        const payload = buildEmailPayload({ userId: 99, isAssignee: false });
+        const result = await dispatchRoutineReminderOutbox(
+            buildEmailNotification(payload),
+            payload,
+        );
+
+        expect(result).toBe("SUPERSEDED");
+        expect(sendRoutineReminderNotificationMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 502, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded stale Routine reminder email recipient state",
+            },
+        });
     });
 
     it("does not retry an invalid payload", async () => {
@@ -1097,23 +1139,36 @@ describe("Routine reminder dispatch", () => {
         );
     });
 
-    it("uses the Dashboard action for an admin-only LINE recipient", async () => {
+    it("uses the Dashboard action for an ALL_READERS LINE recipient", async () => {
         vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp-token");
         vi.stubEnv("PUBLIC_APPROVE_URL", "https://employee.example.com");
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
-            asNever(buildOccurrence()),
+            asNever(buildOccurrence({
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        recipientScope: "ALL_READERS",
+                    }],
+                },
+            })),
         );
-        prismaMock.user.findUnique.mockResolvedValue(
-            asNever({
+        prismaMock.user.findMany.mockResolvedValue(
+            asNever([{
                 id: 99,
-                role: "ADMIN",
-                employeeId: null,
+                name: "ผู้อ่านทั้งหมด",
+                email: "reader@example.com",
                 isActive: true,
                 deletedAt: null,
                 employee: null,
-                lineAccountLink: { lineUserId: "U-admin" },
-            }),
+            }]),
         );
+        prismaMock.user.findUnique.mockResolvedValue(asNever({
+            isActive: true,
+            deletedAt: null,
+            employeeId: null,
+            employee: null,
+        }));
         prismaMock.lineAccountLink.findUnique.mockResolvedValue(asNever({
             lineUserId: "U-admin",
         }));
@@ -1131,6 +1186,38 @@ describe("Routine reminder dispatch", () => {
             "https://employee.example.com/dashboard/routine?taskId=71&occurrenceId=91",
         );
         expect(JSON.stringify(message)).not.toContain("liff.line.me");
+    });
+
+    it("supersedes an ALL_READERS LINE child when capability is revoked before dispatch", async () => {
+        prismaMock.routineOccurrence.findUnique.mockResolvedValue(
+            asNever(buildOccurrence({
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        recipientScope: "ALL_READERS",
+                    }],
+                },
+            })),
+        );
+        prismaMock.user.findMany.mockResolvedValue(asNever([]));
+
+        const payload = buildLinePayload({ userId: 99, isAssignee: false });
+        const result = await dispatchRoutineReminderOutbox(
+            buildLineNotification(payload),
+            payload,
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result).toBe("SUPERSEDED");
+        expect(sendLineAppMessageMock).not.toHaveBeenCalled();
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+            where: { id: 503, status: "PROCESSING" },
+            data: {
+                status: "SUPERSEDED",
+                lastError: "Superseded Routine reminder LINE delivery for unavailable recipient",
+            },
+        });
     });
 
     it("supersedes a LINE child when its mapping disappears before dispatch", async () => {

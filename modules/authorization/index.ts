@@ -67,8 +67,19 @@ export type {
     AuthorizationResolutionRepository,
     AuthorizationResolutionRequest,
     AuthorizationPersistenceContext,
+    AuthorizationRecipientLookupRequest,
+    AuthorizationRecipientRepository,
     EffectiveAuthorizationGrant,
 } from "./application/types";
+export {
+    authorizationRecipientLookup,
+    createAuthorizationRecipientLookup,
+    findActiveUsersWithConfiguredCapabilityScope,
+} from "./application/recipient-lookup";
+export type {
+    AuthorizationRecipientLookup,
+    AuthorizationRecipientLookupDependencies,
+} from "./application/recipient-lookup";
 export { composeAuthorizationAuthority } from "./application/composition";
 export type {
     ComposedAuthorizationAuthority,

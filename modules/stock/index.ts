@@ -161,8 +161,8 @@ export {
     sendStockRequestResultNotification,
 } from "./infrastructure/notifications/email";
 export {
-    notifyAdminsLowStockInApp,
-    notifyAdminsStockRequestLineInApp,
+    notifyInventoryManagersLowStockInApp,
+    notifyStockRequestProcessorsLineInApp,
 } from "./infrastructure/notifications/notifications";
 export {
     parseStockRequestResultEmailPayload,

@@ -8,9 +8,11 @@ export interface RoutineReminderEmailData {
     daysBefore: number;
     actionUrl: string;
     occurrenceId: number;
+    taskId: number;
     ruleId: number;
     userId: number;
     reminderVersion: number;
+    isAssignee?: boolean;
 }
 
 export interface RoutineContractExpiryEmailData {

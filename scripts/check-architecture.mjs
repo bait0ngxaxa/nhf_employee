@@ -2652,6 +2652,33 @@ function relativeFilePath(filePath, rootPath) {
     return relative(rootPath, filePath).split(sep).join("/");
 }
 
+const capabilityRecipientPolicyFiles = Object.freeze([
+    "modules/routine/application/recipients.ts",
+    "modules/routine/application/scheduler.ts",
+    "modules/routine/application/reminders.ts",
+    "modules/stock/infrastructure/notifications/notifications.ts",
+    "modules/stock/infrastructure/notifications/outbox.ts",
+    "lib/services/email-request/notifications.ts",
+]);
+
+function getCapabilityRecipientRoleViolations(rootPath, sourceFiles) {
+    const forbiddenRolePatterns = [
+        /\bRole\.ADMIN\b/,
+        /\brole\s*===\s*["']ADMIN["']/,
+        /\brole\s*:\s*["']ADMIN["']/,
+    ];
+
+    return capabilityRecipientPolicyFiles.flatMap((relativePath) => {
+        const filePath = resolve(rootPath, relativePath);
+        if (!sourceFiles.includes(filePath)) return [];
+
+        const source = readFileSync(filePath, "utf8");
+        return forbiddenRolePatterns.some((pattern) => pattern.test(source))
+            ? [`${relativePath} must not use User.role ADMIN for business notification recipient policy.`]
+            : [];
+    });
+}
+
 function describeViolation(filePath, rootPath, importRecord, message) {
     return `${relativeFilePath(filePath, rootPath)}:${importRecord.line} imports "${importRecord.moduleSpecifier}": ${message}`;
 }
@@ -3257,6 +3284,7 @@ function checkArchitecture(options = {}) {
         }
     }
 
+    violations.push(...getCapabilityRecipientRoleViolations(rootPath, sourceFiles));
     violations.push(...getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getAuditApiRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getAuditDashboardRouteCompositionViolations(rootPath, sourceFiles));

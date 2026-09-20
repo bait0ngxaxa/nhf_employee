@@ -8,8 +8,8 @@ import {
     sendStockRequestNotification,
 } from "./line-notifications";
 import {
-    notifyAdminsLowStockInApp,
-    notifyAdminsStockRequestLineInApp,
+    notifyInventoryManagersLowStockInApp,
+    notifyStockRequestProcessorsLineInApp,
 } from "./notifications";
 import {
     parseStockLowLinePayload,
@@ -60,7 +60,7 @@ export async function dispatchStockOutbox(
     switch (notification.type) {
         case "STOCK_REQUEST_LINE": {
             const parsedPayload = parseStockRequestLinePayload(payload);
-            await notifyAdminsStockRequestLineInApp(parsedPayload);
+            await notifyStockRequestProcessorsLineInApp(parsedPayload);
             if (!(await sendStockRequestNotification(
                 parsedPayload,
                 createOutboxLineRetryKey(notification.type, notification.id),
@@ -71,7 +71,7 @@ export async function dispatchStockOutbox(
         }
         case "STOCK_LOW_LINE": {
             const parsedPayload = parseStockLowLinePayload(payload);
-            await notifyAdminsLowStockInApp(parsedPayload);
+            await notifyInventoryManagersLowStockInApp(parsedPayload);
             if (!(await sendStockLowNotification(
                 parsedPayload,
                 createOutboxLineRetryKey(notification.type, notification.id),

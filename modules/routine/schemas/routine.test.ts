@@ -111,6 +111,47 @@ describe("NHF Routine validation", () => {
         });
         expect(task.success).toBe(true);
 
+        for (const recipientScope of [
+            "ALL_READERS",
+            "ASSIGNEES_AND_ALL_READERS",
+        ] as const) {
+            const migratedScope = routineTaskCreateSchema.safeParse({
+                unitId: 1,
+                categoryId: 1,
+                title: "งานประจำ",
+                scheduleType: "MONTHLY_DAY",
+                scheduleConfig: { day: 10, monthOffset: 0 },
+                assignees: [{ employeeId: 11, role: "OWNER" }],
+                reminderRules: [{
+                    daysBefore: 1,
+                    sendHour: 9,
+                    channel: "IN_APP",
+                    recipientScope,
+                    isActive: true,
+                }],
+            });
+            expect(migratedScope.success).toBe(true);
+            if (migratedScope.success) {
+                expect(migratedScope.data.reminderRules?.[0]?.recipientScope)
+                    .toBe(recipientScope);
+            }
+        }
+        expect(routineTaskCreateSchema.safeParse({
+            unitId: 1,
+            categoryId: 1,
+            title: "งานประจำ",
+            scheduleType: "MONTHLY_DAY",
+            scheduleConfig: { day: 10, monthOffset: 0 },
+            assignees: [{ employeeId: 11, role: "OWNER" }],
+            reminderRules: [{
+                daysBefore: 1,
+                sendHour: 9,
+                channel: "IN_APP",
+                recipientScope: "ADMINS",
+                isActive: true,
+            }],
+        }).success).toBe(false);
+
         const validPayload = routineReminderOutboxPayloadSchema.safeParse({
             occurrenceId: 1,
             taskId: 2,

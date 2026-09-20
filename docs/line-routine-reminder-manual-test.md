@@ -30,8 +30,8 @@
 4. ตรวจสอบว่า in-app และ email ยังส่งตามปกติ
 5. ตรวจสอบว่าไม่มี `ROUTINE_REMINDER_LINE` child outbox สำหรับผู้รับคนนั้น
 
-## กรณี admin-only
+## กรณีผู้ที่มีสิทธิ์ดูงานทั้งหมด
 
-ทดสอบ reminder scope `ADMINS` กับ admin ที่ไม่ได้เป็น assignee และตรวจสอบว่าปุ่มเปิดงานพาไป Dashboard Routine ไม่ใช่ LIFF My Routine
+ทดสอบ reminder scope `ALL_READERS` กับผู้ใช้ที่มี `routine.task.read / ALL` แต่ไม่ได้เป็นผู้รับผิดชอบ และตรวจสอบว่าปุ่มเปิดงานพาไป Dashboard Routine ไม่ใช่ LIFF My Routine
 
 หมายเหตุ: LINE API ตอบรับสำเร็จไม่ได้รับประกันว่าผู้ใช้เห็นข้อความ หากผู้ใช้บล็อก Official Account หรือยังไม่ได้เพิ่มเป็นเพื่อน

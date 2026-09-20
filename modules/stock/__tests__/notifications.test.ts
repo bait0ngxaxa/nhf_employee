@@ -5,9 +5,9 @@ import { prisma } from "@/lib/db/prisma";
 import {
     enqueueLineLowStockReached,
     enqueueLineNewStockRequest,
-    notifyAdminsNewStockRequest,
-    notifyAdminsStockRequestCancelledByRequester,
-    notifyAdminsLowStockInApp,
+    notifyStockRequestProcessorsNewRequest,
+    notifyStockRequestProcessorsRequestCancelledByRequester,
+    notifyInventoryManagersLowStockInApp,
     notifyStockRequestResult,
 } from "../infrastructure/notifications/notifications";
 
@@ -27,6 +27,24 @@ vi.mock("@/modules/notification", () => notificationMocks);
 
 function asNever<T>(value: T): never {
     return value as unknown as never;
+}
+
+function expectCapabilityLookup(capability: string): void {
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({
+            isActive: true,
+            deletedAt: null,
+            OR: expect.arrayContaining([
+                expect.objectContaining({
+                    userCapabilityGrants: {
+                        some: { capabilityKey: capability, scope: "ALL" },
+                    },
+                }),
+            ]),
+        }),
+        select: { id: true },
+        orderBy: { id: "asc" },
+    }));
 }
 
 describe("Stock Notifications", () => {
@@ -172,7 +190,7 @@ describe("Stock Notifications", () => {
     it("should include variant identity in the in-app low stock message", async () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }]));
 
-        await notifyAdminsLowStockInApp({
+        await notifyInventoryManagersLowStockInApp({
             alertedAt: "2026-07-22T03:00:00.000Z",
             itemCount: 1,
             items: [{
@@ -187,14 +205,7 @@ describe("Stock Notifications", () => {
             }],
         });
 
-        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-            where: {
-                role: "ADMIN",
-                isActive: true,
-                deletedAt: null,
-            },
-            select: { id: true },
-        });
+        expectCapabilityLookup("stock.inventory.manage");
         expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: 7,
@@ -205,19 +216,12 @@ describe("Stock Notifications", () => {
         );
     });
 
-    it("keeps new-request admin eligibility and user-specific dedupe keys in Stock", async () => {
+    it("uses Stock request-process capability eligibility and user-specific dedupe keys", async () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }, { id: 8 }]));
 
-        await notifyAdminsNewStockRequest(42, "สมชาย", "PRJ-42", prismaMock);
+        await notifyStockRequestProcessorsNewRequest(42, "สมชาย", "PRJ-42", prismaMock);
 
-        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-            where: {
-                role: "ADMIN",
-                isActive: true,
-                deletedAt: null,
-            },
-            select: { id: true },
-        });
+        expectCapabilityLookup("stock.request.process");
         expect(notificationMocks.createForUserOnce).toHaveBeenNthCalledWith(
             1,
             expect.objectContaining({
@@ -236,15 +240,12 @@ describe("Stock Notifications", () => {
         );
     });
 
-    it("keeps requester-cancellation admin eligibility and strict batch semantics", async () => {
+    it("uses Stock request-process capability eligibility for requester cancellation", async () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }, { id: 8 }]));
 
-        await notifyAdminsStockRequestCancelledByRequester(42, "สมชาย", prismaMock);
+        await notifyStockRequestProcessorsRequestCancelledByRequester(42, "สมชาย", prismaMock);
 
-        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-            where: { role: "ADMIN" },
-            select: { id: true },
-        });
+        expectCapabilityLookup("stock.request.process");
         expect(notificationMocks.createForUsers).toHaveBeenCalledWith(
             [
                 expect.objectContaining({ userId: 7, type: "STOCK_CANCELLED" }),

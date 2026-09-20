@@ -142,6 +142,45 @@ describe("Routine scheduler", () => {
         });
     });
 
+    it("looks up configured routine ALL readers before enqueueing a broad reminder", async () => {
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            buildOccurrence({
+                task: {
+                    ...buildOccurrence().task,
+                    reminderRules: [{
+                        ...buildOccurrence().task.reminderRules[0],
+                        recipientScope: "ALL_READERS",
+                    }],
+                },
+            }),
+        ]));
+        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 99 }]));
+
+        const result = await runRoutineScheduler(
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result.outboxEnqueued).toBe(1);
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                isActive: true,
+                deletedAt: null,
+                OR: expect.arrayContaining([
+                    expect.objectContaining({
+                        userCapabilityGrants: {
+                            some: {
+                                capabilityKey: "routine.task.read",
+                                scope: "ALL",
+                            },
+                        },
+                    }),
+                ]),
+            }),
+            select: { id: true },
+            orderBy: { id: "asc" },
+        }));
+    });
+
     it("counts a duplicate event key instead of creating another outbox row", async () => {
         prismaMock.notificationOutbox.create.mockRejectedValue({
             code: "P2002",

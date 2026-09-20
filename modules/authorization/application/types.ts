@@ -4,6 +4,7 @@ import type { AuthorizationScope, CapabilityKey } from "../contracts";
 
 export type AuthorizationPersistenceContext = Pick<
     Prisma.TransactionClient,
+    | "user"
     | "team"
     | "teamRole"
     | "teamMembership"
@@ -154,4 +155,23 @@ export interface AuthorizationResolutionRepository {
     loadMany(
         request: AuthorizationResolutionManyRequest,
     ): Promise<AuthorizationResolutionData>;
+}
+
+/**
+ * Identifies a configured capability audience without evaluating any domain
+ * default policy or resource relationship.
+ *
+ * This contract is intentionally narrower than ordinary authorization
+ * resolution: callers receive only users with an explicit persisted grant
+ * for the requested capability/scope.
+ */
+export interface AuthorizationRecipientLookupRequest {
+    readonly capability: string;
+    readonly scope: AuthorizationScope;
+}
+
+export interface AuthorizationRecipientRepository {
+    findActiveUsersWithConfiguredCapabilityScope(
+        request: AuthorizationRecipientLookupRequest,
+    ): Promise<readonly number[]>;
 }

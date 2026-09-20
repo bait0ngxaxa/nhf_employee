@@ -1605,9 +1605,11 @@ its menu visibility, page/API guards, `requireDashboardAuthorizationAdministrati
 `assertAuthorizationAdministrationAccess()`, administration APIs, and ADMIN
 bootstrap assignment remain unchanged. Identity labels such as
 `ผู้ดูแลระบบ`/`ผู้ใช้งาน`, Stock role badges, authentication/lifecycle ADMIN
-branches, and historical provenance are not business grants. Routine and Stock
-`Role.ADMIN` notification recipient selection remains a separate recipient
-policy and was intentionally unchanged.
+branches, and historical provenance are not business grants. At the Phase 12H
+closure point, Routine and Stock `Role.ADMIN` notification recipient selection
+remained a separate recipient policy and was intentionally unchanged. Phase
+13A subsequently migrated those audiences to configured business capabilities;
+see [notification-capability-recipient-migration.md](notification-capability-recipient-migration.md).
 
 The final semantic search classified remaining direct role matches as follows:
 
@@ -1616,7 +1618,7 @@ The final semantic search classified remaining direct role matches as follows:
 | `CONTROL_PLANE_KEEP` | Authorization Administration guards/APIs, administration menu, `requireAdminSession`, `isAdminRole` control-plane checks | Retained; permission administration is not a business capability surface |
 | `AUTHENTICATION_LIFECYCLE_KEEP` | Bootstrap ADMIN assignment, workforce-or-admin helper, narrow Routine/Stock account-lifecycle branches | Retained for lifecycle compatibility; broad caller audit belongs to 12H-G |
 | `PRESENTATION_IDENTITY_ONLY` | Dashboard/Stock identity labels and role badges | Retained because they display identity and grant no authority |
-| `DOMAIN_RECIPIENT_POLICY` | Routine/Stock `Role.ADMIN` notification audiences | Retained; recipient policy is not caller authorization |
+| `DOMAIN_RECIPIENT_POLICY` | Routine/Stock `Role.ADMIN` notification audiences | Retained at the historical 12H closure point; migrated by Phase 13A |
 | `COMPATIBILITY_DEBT_12H_G_OR_I` | Legacy ADMIN business-authority compatibility seam and Stock compatibility semantics | Retained until the enforcement/cutover phases |
 | Explicitly deferred domain policy | Leave private-attachment participant ADMIN bypass | Not remapped; requires separately approved policy |
 
@@ -1739,3 +1741,11 @@ Phase 12H-I is **CLOSED**. The final model is:
 
 The implementation and regression evidence are recorded in
 [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
+
+## Phase 13A current closure
+
+Phase 13A aligns business notification audiences with configured capability
+authority. Routine, Stock, and Email Request no longer use `User.role` or an
+environment email allowlist for the migrated audiences. The Authorization
+recipient lookup remains deliberately limited to explicit configured grants and
+does not replace domain authorization or Default Domain Policy evaluation.

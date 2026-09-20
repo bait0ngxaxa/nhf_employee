@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
     NotificationOutbox,
     NotificationOutboxType,
@@ -14,7 +14,6 @@ import {
     processOutbox,
 } from "@/lib/services/outbox/processor";
 import { createOutboxLineRetryKey } from "@/lib/services/outbox/provider-key";
-import { EMAIL_REQUEST_INAPP_RECIPIENTS_ENV } from "@/lib/services/email-request/notifications";
 import {
     dispatchCurrentLeaveAction,
     sendLeaveCancellationRequestedNotifications,
@@ -70,19 +69,6 @@ vi.mock("@/lib/line", () => ({
 const prismaMock = prisma as unknown as ReturnType<
     typeof mockDeep<PrismaClient>
 >;
-
-const originalEmailRequestInAppRecipients =
-    process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV];
-
-function restoreEmailRequestInAppRecipients(): void {
-    if (originalEmailRequestInAppRecipients === undefined) {
-        delete process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV];
-        return;
-    }
-
-    process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV] =
-        originalEmailRequestInAppRecipients;
-}
 
 function buildNotification(
     id: number,
@@ -166,7 +152,6 @@ function buildStockRequestResultPayload(
 
 describe("processOutbox", () => {
     beforeEach(() => {
-        delete process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV];
         mockReset(prismaMock);
         vi.clearAllMocks();
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
@@ -181,10 +166,6 @@ describe("processOutbox", () => {
         prismaMock.$transaction.mockImplementation((async (
             callback: (tx: typeof prismaMock) => Promise<unknown>,
         ) => callback(prismaMock)) as never);
-    });
-
-    afterEach(() => {
-        restoreEmailRequestInAppRecipients();
     });
 
     it("returns early when no pending notifications", async () => {
@@ -411,9 +392,7 @@ describe("processOutbox", () => {
         }
     });
 
-    it("creates email request in-app notification only for configured recipients before failed LINE delivery", async () => {
-        process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV] =
-            "it-admin@example.com,helpdesk@example.com";
+    it("creates email request in-app notification for configured readers before failed LINE delivery", async () => {
         vi.mocked(
             lineNotificationService.sendEmailRequestNotification,
         ).mockResolvedValue(false);
@@ -440,19 +419,24 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 1 });
-        expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-            where: {
-                email: {
-                    in: ["it-admin@example.com", "helpdesk@example.com"],
-                },
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
                 isActive: true,
                 deletedAt: null,
-            },
+                OR: expect.arrayContaining([
+                    expect.objectContaining({
+                        userCapabilityGrants: {
+                            some: {
+                                capabilityKey: "email.request.read",
+                                scope: "ALL",
+                            },
+                        },
+                    }),
+                ]),
+            }),
             select: { id: true },
-        });
-        expect(prismaMock.user.findMany).not.toHaveBeenCalledWith(
-            expect.objectContaining({ where: { role: "ADMIN" } }),
-        );
+            orderBy: { id: "asc" },
+        }));
         expect(prismaMock.notification.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 userId: 10,

@@ -1,52 +1,15 @@
-import { prisma } from "@/lib/db/prisma";
 import { createInAppNotificationOnce } from "@/lib/services/notifications/in-app";
+import { findActiveUsersWithConfiguredCapabilityScope } from "@/modules/authorization";
 import type { EmailRequestData } from "@/types/api";
 import { APP_DASHBOARD_TABS, toDashboardMenuPath } from "@/lib/ssot/routes";
-
-export const EMAIL_REQUEST_INAPP_RECIPIENTS_ENV =
-    "EMAIL_REQUEST_INAPP_RECIPIENT_EMAILS";
-
-function parseRecipientEmails(value: string | undefined): string[] {
-    if (!value) {
-        return [];
-    }
-
-    const recipientEmails = new Set<string>();
-    for (const email of value.split(",")) {
-        const trimmedEmail = email.trim();
-        if (trimmedEmail) {
-            recipientEmails.add(trimmedEmail);
-        }
-    }
-
-    return [...recipientEmails];
-}
-
-async function getEmailRequestRecipientUserIds(): Promise<number[]> {
-    const recipientEmails = parseRecipientEmails(
-        process.env[EMAIL_REQUEST_INAPP_RECIPIENTS_ENV],
-    );
-
-    if (recipientEmails.length === 0) {
-        return [];
-    }
-
-    const recipients = await prisma.user.findMany({
-        where: {
-            email: { in: recipientEmails },
-            isActive: true,
-            deletedAt: null,
-        },
-        select: { id: true },
-    });
-
-    return recipients.map((recipient) => recipient.id);
-}
 
 export async function createEmailRequestInAppNotification(
     payload: EmailRequestData,
 ): Promise<void> {
-    const recipientUserIds = await getEmailRequestRecipientUserIds();
+    const recipientUserIds = await findActiveUsersWithConfiguredCapabilityScope({
+        capability: "email.request.read",
+        scope: "ALL",
+    });
 
     await Promise.all(
         recipientUserIds.map((userId) =>

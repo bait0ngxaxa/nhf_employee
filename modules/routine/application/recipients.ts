@@ -1,6 +1,9 @@
-import { Role, type Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import {
+    findActiveUsersWithConfiguredCapabilityScope,
+    type AuthorizationPersistenceContext,
+} from "@/modules/authorization";
 import {
     type EmployeeDisplayNameSource,
 } from "@/modules/employee";
@@ -9,6 +12,11 @@ import {
     type LineAccountLinkReadClient,
 } from "@/modules/line";
 import { getUserDisplayName } from "@/shared/identity/display";
+import {
+    includesRoutineAllReaders,
+    includesRoutineAssignees,
+    type RoutineReminderRecipientScope,
+} from "../domain/reminder-recipients";
 
 export type RoutineNotificationRecipient = {
     userId: number;
@@ -83,8 +91,8 @@ export function resolveActiveRoutineAssigneeUserIds(
 }
 
 export async function resolveRoutineNotificationRecipients(
-    tx: Pick<Prisma.TransactionClient, "user">,
-    scope: "ASSIGNEES" | "ADMINS" | "ASSIGNEES_AND_ADMINS",
+    tx: AuthorizationPersistenceContext,
+    scope: RoutineReminderRecipientScope,
     assignees: readonly RoutineAssigneeSnapshot[],
 ): Promise<RoutineNotificationRecipients> {
     const recipients = new Map<number, RoutineNotificationRecipient>();
@@ -105,7 +113,7 @@ export async function resolveRoutineNotificationRecipients(
         });
     };
 
-    if (scope === "ASSIGNEES" || scope === "ASSIGNEES_AND_ADMINS") {
+    if (includesRoutineAssignees(scope)) {
         assignees.forEach(({ employee }) => {
             if (
                 !isActiveRoutineEmployee(employee)
@@ -117,23 +125,37 @@ export async function resolveRoutineNotificationRecipients(
             addRecipient(employee.user, true, employee);
         });
     }
-    if (scope === "ADMINS" || scope === "ASSIGNEES_AND_ADMINS") {
-        const admins = await tx.user.findMany({
-            where: { role: Role.ADMIN, isActive: true, deletedAt: null },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                employee: {
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        nickname: true,
+    if (includesRoutineAllReaders(scope)) {
+        const allReaderUserIds = await findActiveUsersWithConfiguredCapabilityScope(
+            {
+                capability: "routine.task.read",
+                scope: "ALL",
+            },
+            tx,
+        );
+        const allReaders = allReaderUserIds.length === 0
+            ? []
+            : await tx.user.findMany({
+                where: {
+                    id: { in: [...allReaderUserIds] },
+                    isActive: true,
+                    deletedAt: null,
+                },
+                select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    employee: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            nickname: true,
+                        },
                     },
                 },
-            },
-        });
-        admins.forEach((admin) => addRecipient(admin, false, admin.employee));
+                orderBy: { id: "asc" },
+            });
+        allReaders.forEach((reader) => addRecipient(reader, false, reader.employee));
     }
 
     const activeRecipients = [...recipients.values()];

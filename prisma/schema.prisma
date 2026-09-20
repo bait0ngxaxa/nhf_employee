@@ -1050,8 +1050,8 @@ enum RoutineReminderChannel {
 
 enum RoutineReminderRecipientScope {
   ASSIGNEES
-  ADMINS
-  ASSIGNEES_AND_ADMINS
+  ALL_READERS
+  ASSIGNEES_AND_ALL_READERS
 }
 
 enum RoutineImportStatus {

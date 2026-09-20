@@ -1,7 +1,11 @@
-import { type Prisma, Role } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
 import { getUserDisplayName } from "@/shared/identity/display";
+import {
+    findActiveUsersWithConfiguredCapabilityScope,
+    type AuthorizationPersistenceContext,
+} from "@/modules/authorization";
 import {
     createForUser,
     createForUserOnce,
@@ -28,8 +32,8 @@ import type { LowStockAlertCandidate } from "../../domain/types";
 
 type StockNotificationClient = Pick<
     Prisma.TransactionClient,
-    "notificationOutbox" | "user"
-> & NotificationPersistenceContext;
+    "notificationOutbox"
+> & NotificationPersistenceContext & AuthorizationPersistenceContext;
 
 type StockRequestLineSource = {
     id: number;
@@ -89,26 +93,33 @@ export async function notifyStockRequestResult(
     }, client);
 }
 
-async function createForActiveAdmins(
+async function findStockCapabilityRecipients(
+    capability: "stock.request.process" | "stock.inventory.manage",
+    client: StockNotificationClient,
+): Promise<readonly number[]> {
+    return findActiveUsersWithConfiguredCapabilityScope(
+        { capability, scope: "ALL" },
+        client,
+    );
+}
+
+async function createForCapabilityRecipients(
     input: Omit<NotificationCreateInput, "userId" | "dedupeKey">,
+    capability: "stock.request.process" | "stock.inventory.manage",
     dedupeKeyPrefix: string,
     client: StockNotificationClient,
 ): Promise<void> {
-    const admins = await client.user.findMany({
-        where: {
-            role: Role.ADMIN,
-            isActive: true,
-            deletedAt: null,
-        },
-        select: { id: true },
-    });
+    const recipientUserIds = await findStockCapabilityRecipients(
+        capability,
+        client,
+    );
 
     await Promise.all(
-        admins.map((admin) =>
+        recipientUserIds.map((userId) =>
             createForUserOnce({
                 ...input,
-                userId: admin.id,
-                dedupeKey: `${dedupeKeyPrefix}:${admin.id}`,
+                userId,
+                dedupeKey: `${dedupeKeyPrefix}:${userId}`,
             }, client),
         ),
     );
@@ -152,21 +163,21 @@ export async function enqueueStockRequestResultLine(
 }
 
 /**
- * Notify all admins when a new stock request is created
+ * Notify configured Stock request processors when a new request is created.
  */
-export async function notifyAdminsNewStockRequest(
+export async function notifyStockRequestProcessorsNewRequest(
     requestId: number,
     requesterName: string,
     projectCode: string,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await createForActiveAdmins({
+    await createForCapabilityRecipients({
         type: "STOCK_REQUEST_NEW",
         title: "คำขอเบิกวัสดุใหม่",
         message: `${requesterName} ส่งคำขอเบิกวัสดุ #${requestId} (${projectCode})`,
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(requestId),
-    }, `stock:${requestId}:STOCK_REQUEST_NEW`, client);
+    }, "stock.request.process", `stock:${requestId}:STOCK_REQUEST_NEW`, client);
 }
 
 export { buildVariantLabel } from "./notification-payloads";
@@ -215,7 +226,7 @@ export async function notifyLineNewStockRequest(
 ): Promise<void> {
     const payload = buildStockRequestLinePayload(stockRequest);
 
-    await notifyAdminsStockRequestLineInApp(payload);
+    await notifyStockRequestProcessorsLineInApp(payload);
     const isSent = await sendStockRequestNotification(payload);
 
     if (!isSent) {
@@ -260,7 +271,7 @@ export async function notifyLineLowStockReached(
 
     const payload = buildLowStockLinePayload(alerts);
 
-    await notifyAdminsLowStockInApp(payload);
+    await notifyInventoryManagersLowStockInApp(payload);
     const isSent = await sendStockLowNotification(payload);
 
     if (!isSent) {
@@ -268,17 +279,17 @@ export async function notifyLineLowStockReached(
     }
 }
 
-export async function notifyAdminsStockRequestLineInApp(
+export async function notifyStockRequestProcessorsLineInApp(
     payload: StockRequestLineData,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await createForActiveAdmins({
+    await createForCapabilityRecipients({
         type: "STOCK_REQUEST_NEW",
         title: "คำขอเบิกวัสดุใหม่",
         message: `${payload.requesterName} ส่งคำขอเบิกวัสดุ #${payload.requestId} (${payload.projectCode})`,
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(payload.requestId),
-    }, `stock:${payload.requestId}:STOCK_REQUEST_NEW`, client);
+    }, "stock.request.process", `stock:${payload.requestId}:STOCK_REQUEST_NEW`, client);
 }
 
 function buildLowStockMessage(payload: StockLowLineData): string {
@@ -295,11 +306,11 @@ function buildLowStockMessage(payload: StockLowLineData): string {
     return `วัสดุ ${payload.itemCount} รายการถึงหรือต่ำกว่าจุดแจ้งเตือน${preview ? `: ${preview}` : ""}`;
 }
 
-export async function notifyAdminsLowStockInApp(
+export async function notifyInventoryManagersLowStockInApp(
     payload: StockLowLineData,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    await createForActiveAdmins({
+    await createForCapabilityRecipients({
         type: "SYSTEM_ALERT",
         title: "วัสดุใกล้หมดสต็อก",
         message: buildLowStockMessage(payload),
@@ -309,7 +320,7 @@ export async function notifyAdminsLowStockInApp(
                 ? payload.items[0].variantSku
                 : payload.items[0].sku)
             : payload.alertedAt,
-    }, `stock-low:${payload.alertedAt}`, client);
+    }, "stock.inventory.manage", `stock-low:${payload.alertedAt}`, client);
 }
 
 export async function persistLowStockNotifications(
@@ -320,7 +331,7 @@ export async function persistLowStockNotifications(
 
     const payload = buildLowStockLinePayload(alerts);
 
-    await notifyAdminsLowStockInApp(payload, client);
+    await notifyInventoryManagersLowStockInApp(payload, client);
     await client.notificationOutbox.create({
         data: {
             type: "STOCK_LOW_LINE",
@@ -329,20 +340,20 @@ export async function persistLowStockNotifications(
     });
 }
 
-export async function notifyAdminsStockRequestCancelledByRequester(
+export async function notifyStockRequestProcessorsRequestCancelledByRequester(
     requestId: number,
     requesterName: string,
     client: StockNotificationClient = prisma,
 ): Promise<void> {
-    const admins = await client.user.findMany({
-        where: { role: Role.ADMIN },
-        select: { id: true },
-    });
+    const recipientUserIds = await findStockCapabilityRecipients(
+        "stock.request.process",
+        client,
+    );
 
-    if (admins.length === 0) return;
+    if (recipientUserIds.length === 0) return;
 
-    const inputs: NotificationCreateInput[] = admins.map((admin) => ({
-            userId: admin.id,
+    const inputs: NotificationCreateInput[] = recipientUserIds.map((userId) => ({
+            userId,
             type: "STOCK_CANCELLED",
             title: "คำขอเบิกถูกผู้ใช้ยกเลิก",
             message: `${requesterName} ยกเลิกคำขอเบิก #${requestId} แล้ว`,
