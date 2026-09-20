@@ -1,10 +1,15 @@
 # Phase 12H-H — Production Snapshot / Live Rollout Validation
 
-Status: **OPEN — repository/tooling validation PASS; production operational
-acceptance NOT RUN**
+Status: **CLOSED / ACCEPTED — repository and production validation PASS**
 
-Reviewed baseline: `8bc5eedffc5f2699d10acd86c6920290787a9786`
-(`feat(auth): cut over business enforcement to role-neutral authority`)
+Repository validated SHA: `d7bd8da121b74dea56254f7e3754c849e15a51bb`
+(`test(auth): rebaseline mysql integration fixtures for role-neutral authority`)
+
+Production deployment SHA: **not independently recorded** in the supplied
+operator evidence. Exact production timestamps, operator identity, request
+IDs, and production database identifiers were not supplied and are not
+inferred here. The production result below is therefore explicitly
+**operator-confirmed**.
 
 Phase 12H-G is accepted and closed. This document is an operational handoff
 and evidence record for validating the real production authorization state
@@ -23,9 +28,8 @@ trusted identity/lifecycle
 
 `ADMIN` remains an identity/control-plane attribute. It is not an implicit
 ordinary business grant. The legacy ADMIN-compatible resolver and composition
-are retained only for the comparison seam required by this phase. Phase 12H-I
-must not remove that seam until this document has actual accepted production
-comparison and rollout evidence.
+were retained through Phase 12H-H for rollout comparison and are now eligible
+for removal by Phase 12H-I.
 
 ## A. Repository / operational tooling validation
 
@@ -43,7 +47,7 @@ introduced.
 | Capability and scope truth | Capability Registry and Administration catalog |
 | Target effective access | Authorization Administration effective-access provider and domain-owned inspectors |
 | Audited mutation boundary | Authorization Administration UI/API and its transaction-bound application service |
-| Legacy comparison only | `createLegacyAdminCompatibleAuthorizationResolver()`, `evaluateLegacyAuthorization()`, and `composeLegacyAdminCompatibleAuthorizationAuthority()` |
+| Legacy comparison only through H | `createLegacyAdminCompatibleAuthorizationResolver()`, `evaluateLegacyAuthorization()`, and `composeLegacyAdminCompatibleAuthorizationAuthority()` |
 
 The preflight repository uses a repeatable-read transaction and explicit
 field projections for Teams, TeamRoles, memberships, grants, User/Employee
@@ -295,8 +299,8 @@ ADMIN authority from an unexpected outage.
 
 ### A.10 Verification executed for this repository change
 
-These results validate repository code and documentation only. They are not
-production evidence and do not change any live-gate status in section B.
+These results are repository regression evidence and are recorded separately
+from the operator-confirmed production evidence in section B.
 
 | Check | State | Result |
 |---|---|---|
@@ -305,136 +309,38 @@ production evidence and do not change any live-gate status in section B.
 | `npm.cmd run lint:strict` | `PASS` | Completed successfully with zero warnings |
 | `npm.cmd run architecture:check` | `PASS` | 1,149 repository source files checked |
 | `git diff --check` | `PASS` | Completed with exit code 0 |
-| Full test suite | `NOT RUN` | No implementation code changed materially; focused authorization coverage was used |
-| Live production preflight/canary/rollout | `NOT RUN` | No explicitly authorized production target or evidence was available |
+| Full test suite | `NOT RUN for this H-only documentation closure` | Focused authorization coverage and the accepted MySQL integration baseline were used; the Phase 12H-I implementation will run the full required suite |
+| Production evidence | `PASS` | Operator-confirmed evidence is recorded separately in section B |
 
-## B. Actual production execution evidence
+## B. Accepted production execution evidence
 
-### B.1 Current execution status
+### B.1 Evidence provenance and metadata boundary
 
-**Status: NOT RUN.** No explicitly identified and authorized production
-database/application target, production deployment revision, operator-approved
-canary, or live observation evidence was supplied to this coding session. No
-production preflight, grant mutation, deployment, canary operation, rollback,
-or production data access was performed. A local/dev database, if present,
-would not be labelled as production evidence.
+**Status: PASS — operator-confirmed.** The production operator supplied the
+validation results recorded below. They are production observations, not
+repository-only assumptions. This coding session did not independently access
+the production database, application, deployment metadata, or audit store.
 
-Accordingly, the following live gates remain `NOT RUN` and the deployment must
-not be declared complete:
+The repository validated SHA is recorded at the top of this document. A
+production deployment SHA was not supplied or independently verified. Exact
+production timestamps, operator identity, request IDs, and production database
+identifiers are likewise not recorded; no placeholder values are presented as
+facts.
 
-| Live gate | Status | Required evidence |
-|---|---|---|
-| Deployment revision identified | `NOT RUN` | Production release/deployment SHA and timestamp |
-| Production target identity | `NOT RUN` | Environment, `NODE_ENV`, host, port, database name, operator, timestamp |
-| Required migrations applied | `NOT RUN` | `_prisma_migrations` readback for every required migration |
-| Production inventory captured | `NOT RUN` | Preflight JSON/details and safe aggregate summary |
-| Zero production blockers | `NOT RUN` | Actual production preflight with `blockerCount = 0` |
-| Warning review | `NOT RUN` | One disposition/reviewer record for every warning |
-| Required business authority | `NOT RUN` | Reviewed responsibility matrix and intentional Team/TeamRole/User source |
-| Canary plan validation | `NOT RUN` | Explicit plan and `validateAuthorizationProductionCanaryPlan()` result `PASS` |
-| Before effective access | `NOT RUN` | Provider-backed state/default/effective scopes |
-| Legacy comparison snapshot | `NOT RUN` | Selected principal comparison using the retained legacy seam |
-| Audited canary mutation | `NOT RUN` | Exact UI/API mutation record and matching audit event |
-| Post-canary effective access | `NOT RUN` | Provider readback showing intended authority and no excess scope |
-| Actual protected-path verification | `NOT RUN` | Production server/API result for canary actor and denial controls |
-| Rollback | `NOT RUN` | Exact-grant removal, audit event, before-state/effective-access readback |
-| Observation window | `NOT RUN` | 401/403/500/error/log/business-operation review |
-| Final operator acceptance | `NOT RUN` | Named operator/reviewer acceptance against all gates |
+### B.2 Evidence summary
 
-### B.2 Evidence record to complete during an authorized run
-
-Do not replace any `NOT RUN` value with `PASS` from unit tests, source review,
-staging behavior, migration files, operator intention, or an assumed match
-between staging and production.
-
-#### Production snapshot
-
-```text
-deployment revision: NOT RUN
-environment: NOT RUN
-NODE_ENV: NOT RUN
-database host: NOT RUN
-database port: NOT RUN
-database name: NOT RUN
-preflight timestamp: NOT RUN
-operator: NOT RUN
-preflight command exit codes: NOT RUN
-preflight status: NOT RUN
-```
-
-Attach the standard, `--details`, and `--json` outputs without secrets. The
-JSON target and report must agree with the external operator record.
-
-#### Migration and inventory readback
-
-```text
-20260108060001_add_audit_log: NOT RUN
-20260911100000_add_authorization_persistence: NOT RUN
-20260914100000_add_authorization_audit_actions: NOT RUN
-
-inventory summary: NOT RUN
-grantsByCapability: NOT RUN
-grantsBySourceAndScope: NOT RUN
-finding identities/details: NOT RUN
-```
-
-#### Warning and authority review
-
-For each actual warning, record its finding identity, reason, impact,
-keep/remediate decision, and reviewer. The canary plan must include the same
-finding identity in `reviewedWarnings`:
-
-```text
-warning reviews: NOT RUN
-business responsibility matrix: NOT RUN
-intentional source selection: NOT RUN
-mass ADMIN backfill: MUST NOT OCCUR
-```
-
-#### Canary and effective-access evidence
-
-```text
-source: NOT RUN
-targetId: NOT RUN
-observerUserId: NOT RUN
-capabilityKey: NOT RUN
-scope: NOT RUN
-channel: NOT RUN
-contextKey: NOT RUN
-businessReason: NOT RUN
-operator: NOT RUN
-plannedTimeWindow: NOT RUN
-rollbackAction: NOT RUN
-canary validator result: NOT RUN
-
-before.state: NOT RUN
-before.defaultScopes: NOT RUN
-before.effectiveScopes: NOT RUN
-legacy effective authority: NOT RUN
-target role-neutral effective authority: NOT RUN
-difference and expected business impact: NOT RUN
-configured source responsible for target authority: NOT RUN
-```
-
-#### Mutation, verification, rollback, and observability
-
-```text
-approved mutation boundary: NOT RUN
-exact grant added: NOT RUN
-mutation audit event: NOT RUN
-after effective access: NOT RUN
-actual protected API/server result: NOT RUN
-resource/channel/lifecycle checks: NOT RUN
-unconfigured equivalent actor denial: NOT RUN
-implicit ADMIN authority check: NOT RUN
-rollback performed: NOT RUN
-exact grant removed: NOT RUN
-rollback audit event: NOT RUN
-effective access returned to before-state: NOT RUN
-post-rollback protected operation: NOT RUN
-post-rollback preflight: NOT RUN
-observation window and error review: NOT RUN
-```
+| Evidence | Result |
+|---|---|
+| 1. Repository regression evidence | `PASS` — Focused authorization tests: 6 files / 184 tests; `typecheck`, `lint:strict`, `architecture:check` (1,149 source files), and `git diff --check` passed at the validated repository baseline. |
+| 2. Real MySQL concurrency evidence | `PASS` — `npm run test:integration:mysql`: 17 files / 110 tests; 0 failed files and 0 failed tests. Concurrent ADMIN lifecycle and same-transaction audit invariants passed. |
+| 3. Production authorization preflight | `PASS — operator-confirmed` — All 8 checks passed; blocking issue indexes and warning issue indexes were empty. |
+| 4. Required migrations | `PASS — operator-confirmed` — `20260108060001_add_audit_log`, `20260911100000_add_authorization_persistence`, and `20260914100000_add_authorization_audit_actions` were applied. |
+| 5. Live configured-grant mutation | `PASS — operator-confirmed` — A configured capability/grant was added successfully through the live authorization flow. |
+| 6. Live revoke | `PASS — operator-confirmed` — The configured authority was revoked successfully and effective access changed as expected. |
+| 7. Role-neutral ADMIN validation | `PASS — operator-confirmed` — ADMIN without the required business grant did not receive that business capability merely because of `systemRole`. |
+| 8. Audit evidence | `PASS — operator-confirmed` — The grant/revoke mutation produced the expected audit evidence. |
+| 9. Operational observation | `PASS — operator-confirmed` — No unexpected authorization-related 401, 403, or 500 behavior was observed during the tested production flows. |
+| 10. Final Phase 12H-H acceptance | `CLOSED / ACCEPTED` — All supplied production gates passed. The result is accepted as operator-confirmed, with unavailable deployment metadata explicitly left unrecorded. |
 
 ### B.3 Fail-safe decision
 
@@ -448,18 +354,17 @@ of these conditions; correct the configuration or code at the owning boundary.
 
 ### B.4 Phase boundary
 
-Phase 12H-H remains operationally open until the live gates above have actual
-production evidence and explicit operator acceptance. Phase 12H-I must not
-start: retain `SYSTEM_ROLE` legacy grant representation, compatibility-named
-exports, the legacy resolver/evaluator, and legacy composition until H is
-accepted.
+Phase 12H-H is **CLOSED / ACCEPTED** from the operator-confirmed production
+evidence above. The temporary legacy ADMIN comparison seam was intentionally
+retained through H for rollout comparison. Phase 12H-I may now remove that
+seam; doing so is a separate compatibility-cleanup change.
 
 ## C. Phase 12H-H corrective hardening note
 
-This corrective patch remains within Phase 12H-H. It does not constitute
-production operational acceptance, and Phase 12H-I has not started. The
-retained `SYSTEM_ROLE` legacy comparison seam, compatibility-named exports,
-legacy resolver/evaluator, and legacy composition remain in place.
+This corrective patch remained within Phase 12H-H. The production acceptance
+record is now complete, while the retained `SYSTEM_ROLE` legacy comparison
+seam, compatibility-named exports, legacy resolver/evaluator, and legacy
+composition remain in place until the separate Phase 12H-I cleanup.
 
 The patch corrects the following handoff findings:
 
@@ -484,10 +389,9 @@ The patch corrects the following handoff findings:
 
 ### C.1 Operational status
 
-Phase 12H-H production operational acceptance remains **OPEN / NOT RUN**.
-The production gates and evidence record in section B are unchanged and must
-not be inferred from local tests, source review, or documentation. This note
-records corrective code and test work only.
+Phase 12H-H production operational acceptance is **CLOSED / ACCEPTED** based
+on the operator-confirmed evidence in section B. This note records the
+repository corrective work that preceded that acceptance.
 
 ### C.2 Real MySQL integration evidence
 
@@ -517,6 +421,7 @@ No implicit `ADMIN` business authority was restored, and the Authorization
 Administration control plane remains intentionally ADMIN-only.
 
 The accepted production implementation passed this real MySQL concurrency
-proof unchanged; no production locking correction was required. This is
-repository/integration evidence only. Phase 12H-H production operational
-acceptance remains **OPEN / NOT RUN**, and Phase 12H-I remains untouched.
+proof unchanged; no production locking correction was required. This remains
+repository/integration evidence, separate from the operator-confirmed live
+production evidence in section B. Phase 12H-I has not yet changed the
+compatibility seam at the time of this closure record.
