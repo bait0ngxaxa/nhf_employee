@@ -129,24 +129,10 @@ type RoutineReminderRuleRecord = {
     isActive: boolean;
 };
 
-/**
- * Historical audit/provenance classification only. This must never affect
- * whether a mutation is allowed; production authority is resolved before
- * this metadata is written.
- */
-function hasHistoricalAdminProvenance(
-    authorization: RoutineCapabilityAuthorization,
-): boolean {
-    return authorization.decision.grants.some(
-        (grant) => grant.source.type === "SYSTEM_ROLE",
-    );
-}
-
 function routineOwnershipMode(
     authorization: RoutineCapabilityAuthorization,
     broadOperation = false,
-): "ADMIN" | "BROAD_AUTHORITY" | "SELF_SERVICE" {
-    if (hasHistoricalAdminProvenance(authorization)) return "ADMIN";
+): "BROAD_AUTHORITY" | "SELF_SERVICE" {
     if (authorization.hasBroadAuthority || broadOperation) {
         return "BROAD_AUTHORITY";
     }
@@ -741,15 +727,13 @@ export async function updateRoutineTask(
             && current.assignees.some(
                 (assignee) => assignee.employeeId === actorAuthorization.employeeId,
             );
-        const authorizationSource = hasHistoricalAdminProvenance(capabilityAuthorization)
-            ? "ADMIN"
-            : capabilityAuthorization.hasBroadAuthority
-                ? "BROAD_AUTHORITY"
-                : current.createdById === actor.id
-                    ? "CREATOR"
-                    : isAssigned
-                        ? "ASSIGNEE"
-                        : "CAPABILITY";
+        const authorizationSource = capabilityAuthorization.hasBroadAuthority
+            ? "BROAD_AUTHORITY"
+            : current.createdById === actor.id
+                ? "CREATOR"
+                : isAssigned
+                    ? "ASSIGNEE"
+                    : "CAPABILITY";
         const normalizedInput = normalizeRoutineTaskUpdateInput(
             input,
             capabilityAuthorization,

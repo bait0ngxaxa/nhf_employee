@@ -146,7 +146,7 @@ describe("Email Request authorization adapter", () => {
         ).rejects.toBeInstanceOf(EmailRequestCapabilityDeniedError);
     });
 
-    it("propagates resolver/configuration failures and preserves transitional ADMIN compatibility", async () => {
+    it("propagates resolver/configuration failures and accepts configured ADMIN authority", async () => {
         const resolverError = new Error("invalid persisted authorization");
         mocks.resolve.mockRejectedValueOnce(resolverError);
         await expect(
@@ -161,8 +161,8 @@ describe("Email Request authorization adapter", () => {
                 "email.request.create",
                 ["ALL"],
                 [grant("email.request.create", "ALL", {
-                    type: "SYSTEM_ROLE",
-                    role: "ADMIN",
+                    type: "USER",
+                    userId: 7,
                 })],
             ),
         );
@@ -220,13 +220,13 @@ describe("Email Request authorization adapter", () => {
         );
     });
 
-    it("keeps ADMIN compatibility in the projection through resolved capability grants", async () => {
+    it("projects configured ADMIN authority through resolved capability grants", async () => {
         mocks.resolveMany.mockResolvedValue(new Map([
             ["email.request.read", decision("email.request.read", ["ALL"], [
-                grant("email.request.read", "ALL", { type: "SYSTEM_ROLE", role: "ADMIN" }),
+                grant("email.request.read", "ALL", { type: "USER", userId: 7 }),
             ])],
             ["email.request.create", decision("email.request.create", ["ALL"], [
-                grant("email.request.create", "ALL", { type: "SYSTEM_ROLE", role: "ADMIN" }),
+                grant("email.request.create", "ALL", { type: "USER", userId: 7 }),
             ])],
         ]));
 

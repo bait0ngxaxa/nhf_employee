@@ -31,10 +31,10 @@ export const AUTHORIZATION_PRODUCTION_REQUIRED_MIGRATIONS = Object.freeze([
 ] as const);
 
 export const AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL =
-    "ROLE_NEUTRAL_TARGET" as const;
+    "DEFAULT_PLUS_CONFIGURED" as const;
 
 export const AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL_NOTICE =
-    "This report evaluates readiness for the target role-neutral authority model. Current production runtime may still use the temporary ADMIN compatibility seam.";
+    "This report evaluates Default Domain Policy plus configured Team, TeamRole, and User authority for active workforce identities. systemRole is not a business grant source.";
 
 export type AuthorizationProductionAuthorityModel =
     typeof AUTHORIZATION_PRODUCTION_AUTHORITY_MODEL;

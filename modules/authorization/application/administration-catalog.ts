@@ -37,12 +37,10 @@ const CENTRAL_WITH_DEFAULT_POLICY: CapabilityAdministrationMetadata = Object.fre
  * scopes, and channels remain exclusively owned by CAPABILITY_REGISTRY.
  *
  * CENTRAL_WITH_DEFAULT_POLICY is assigned where the audited domain adapter
- * composes a permanent normal-user default with central configured authority.
- * CENTRAL_WITH_COMPATIBILITY remains as a historical/future-safe contract for
- * adapters that may translate NO_APPLICABLE_GRANT through temporary migration
- * mechanics; the current registry has no entry using it after Phase 12D. A
- * legacy ADMIN-only branch does not qualify: Phase 12H-G production
- * resolution is role-neutral, so this metadata describes only policy shape.
+ * composes a permanent domain default with central configured authority.
+ * CENTRAL_WITH_COMPATIBILITY remains a future-safe catalog value for a domain
+ * adapter that explicitly owns a temporary policy bridge; the current
+ * registry has no entry using it. It is never a system-role grant source.
  *
  * Keep this map exhaustive: a newly registered capability must receive an
  * explicit administration decision before it can be presented as grantable.

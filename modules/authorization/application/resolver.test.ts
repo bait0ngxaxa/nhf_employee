@@ -4,14 +4,12 @@ import {
     AuthorizationConfigurationError,
     AuthorizationDeniedError,
     createAuthorizationResolver,
-    createLegacyAdminCompatibleAuthorizationResolver,
     createCapabilityRegistry,
 } from "@/modules/authorization";
 import {
     evaluateConfiguredAuthorization,
     normalizeAuthorizationScopes,
 } from "./evaluator";
-import { evaluateLegacyAuthorization } from "./legacy-admin-business-authority-compatibility";
 import type {
     AuthorizationActor,
     AuthorizationPersistenceContext,
@@ -406,66 +404,6 @@ describe("authorization evaluator", () => {
         ]);
     });
 
-    it("uses ADMIN semantics without persisted grants", () => {
-        const decision = evaluateLegacyAuthorization(
-            actor({ systemRole: "ADMIN" }),
-            CAPABILITY,
-            resolution({
-                userGrants: [userGrant("CREATED")],
-            }),
-        );
-
-        expect(decision).toMatchObject({
-            allowed: true,
-            scopes: ["ALL"],
-            grants: [{
-                capability: CAPABILITY,
-                scope: "ALL",
-                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-            }],
-        });
-    });
-
-    it("returns valid non-Team scopes for ADMIN when ALL is unavailable", () => {
-        const definition: CapabilityDefinition = {
-            key: "leave.request.approve",
-            domain: "leave",
-            description: "Synthetic approval capability.",
-            scopes: ["ASSIGNED"],
-            channels: ["DASHBOARD"],
-        };
-        const registry = createCapabilityRegistry([definition]);
-        const decision = evaluateLegacyAuthorization(
-            actor({ systemRole: "ADMIN" }),
-            definition.key,
-            resolution(),
-            registry,
-        );
-
-        expect(decision).toMatchObject({
-            allowed: true,
-            scopes: ["ASSIGNED"],
-            grants: [{
-                scope: "ASSIGNED",
-                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-            }],
-        });
-    });
-
-    it("fails closed for an ADMIN-only origin-bound TEAM capability", () => {
-        expect(() => evaluateLegacyAuthorization(
-            actor({ systemRole: "ADMIN" }),
-            CAPABILITY,
-            resolution(),
-            teamRegistry(["TEAM"]),
-        )).toThrowError(
-            expect.objectContaining({
-                name: "AuthorizationConfigurationError",
-                code: "UNSUPPORTED_ADMIN_TEAM_SCOPE",
-            }),
-        );
-    });
-
     it("does not give a role authority without a persisted role grant", () => {
         const decision = evaluateAuthorization(
             actor(),
@@ -610,11 +548,6 @@ describe("role-neutral configured authorization evaluator", () => {
         );
 
         expect(adminDecision).toEqual(userDecision);
-        expect(adminDecision.grants).not.toEqual(
-            expect.arrayContaining([
-                { source: { type: "SYSTEM_ROLE", role: "ADMIN" } },
-            ]),
-        );
     });
 
     it("returns NO_APPLICABLE_GRANT for both system roles without configured grants", () => {
@@ -916,29 +849,6 @@ describe("authorization public resolver API", () => {
         expect(load).toHaveBeenCalledTimes(1);
     });
 
-    it("keeps malformed persisted ADMIN rows ignored on the legacy comparison path", async () => {
-        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
-            async () => resolution({
-                userGrants: [userGrant("OWN")],
-            }),
-        );
-        const resolver = createLegacyAdminCompatibleAuthorizationResolver({
-            repository: {
-                load,
-                loadMany: async () => resolution(),
-            },
-        });
-
-        await expect(
-            resolver.resolve(actor({ systemRole: "ADMIN" }), CAPABILITY),
-        ).resolves.toMatchObject({
-            allowed: true,
-            scopes: ["ALL"],
-            grants: [{ source: { type: "SYSTEM_ROLE", role: "ADMIN" } }],
-        });
-        expect(load).not.toHaveBeenCalled();
-    });
-
     it("resolves USER grants through the supplied transaction context", async () => {
         const userGrantFindMany = vi.fn().mockResolvedValue([
             userGrant("CREATED"),
@@ -1016,13 +926,6 @@ describe("production resolver target path", () => {
             expect(decision.grants).toEqual(
                 expect.arrayContaining([
                     expect.objectContaining({ source }),
-                ]),
-            );
-            expect(decision.grants).not.toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-                    }),
                 ]),
             );
         }
@@ -1181,7 +1084,7 @@ describe("production resolver target path", () => {
         expect(loadMany).toHaveBeenCalledTimes(0);
     });
 
-    it("fails closed on malformed ADMIN target persistence instead of using legacy authority", async () => {
+    it("fails closed on malformed ADMIN target persistence", async () => {
         const resolver = createAuthorizationResolver({
             repository: {
                 load: async () => resolution({

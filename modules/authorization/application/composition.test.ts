@@ -18,10 +18,6 @@ import type {
 } from "@/modules/authorization";
 import { CAPABILITY_REGISTRY } from "../registry";
 import { evaluateConfiguredAuthorization } from "./evaluator";
-import {
-    composeLegacyAdminCompatibleAuthorizationAuthority,
-    evaluateLegacyAuthorization,
-} from "./legacy-admin-business-authority-compatibility";
 
 const evaluateAuthorization = evaluateConfiguredAuthorization;
 
@@ -675,34 +671,6 @@ describe("composeAuthorizationAuthority", () => {
                 code: "UNSUPPORTED_DEFAULT_SCOPE",
             }),
         );
-    });
-
-    it("keeps legacy ADMIN default projection at the explicit compatibility seam", () => {
-        const adminActor = actor({ systemRole: "ADMIN" });
-        const configuredDecision = evaluateLegacyAuthorization(
-            adminActor,
-            CAPABILITY,
-            resolution(),
-            teamRegistry(),
-        );
-
-        const composed = composeLegacyAdminCompatibleAuthorizationAuthority(
-            adminActor,
-            CAPABILITY,
-            ["OWN"],
-            configuredDecision,
-            teamRegistry(),
-        );
-
-        expect(composed.scopes).toEqual(["ALL"]);
-        expect(composed.defaultScopes).toEqual([]);
-        expect(composed.configuredGrants).toEqual([
-            {
-                capability: CAPABILITY,
-                scope: "ALL",
-                source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-            },
-        ]);
     });
 
     it("keeps ADMIN structural channel denial denied", () => {

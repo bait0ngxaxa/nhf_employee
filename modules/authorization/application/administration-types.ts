@@ -210,10 +210,6 @@ export interface AuthorizationAdministrationUserTeamMembership {
 
 export type AuthorizationAdministrationSourceExplanation =
     | {
-        readonly type: "SYSTEM_ROLE";
-        readonly role: "ADMIN";
-    }
-    | {
         readonly type: "TEAM";
         readonly teamId: number;
         readonly team: AuthorizationAdministrationTeamReference | null;

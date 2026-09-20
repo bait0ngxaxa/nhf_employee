@@ -84,11 +84,11 @@ const userSummary = {
     employee: null,
 } satisfies AuthorizationAdministrationUserSummaryData;
 
-const systemGrant = {
+const configuredAdminGrant = {
     capability: "audit.read",
     scope: "ALL",
-    source: { type: "SYSTEM_ROLE", role: "ADMIN" },
-    origin: { type: "SYSTEM_ROLE", role: "ADMIN" },
+    source: { type: "USER", userId: 7 },
+    origin: { type: "USER", userId: 7 },
 } as const;
 
 const teamGrant = {
@@ -161,14 +161,14 @@ const adminUser = {
         capability: auditCapability,
         allowed: true,
         scopes: ["ALL"],
-        grants: [systemGrant, teamGrant, roleGrant, directGrant],
+        grants: [configuredAdminGrant, teamGrant, roleGrant, directGrant],
     }],
     effectiveAccessStatus: { status: "RESOLVED" },
     effectiveAccess: [{
         capability: auditCapability,
         context: { key: "dashboard", label: "Dashboard", channel: "DASHBOARD" },
         defaultAuthority: { scopes: [] },
-        additionalAuthority: { scopes: ["ALL"], grants: [systemGrant] },
+        additionalAuthority: { scopes: ["ALL"], grants: [configuredAdminGrant] },
         effectiveAuthority: { state: "AVAILABLE", scopes: ["ALL"], redundant: false },
         limitations: [{ code: "audit.server_resource", label: "Audit query rules ยังทำงานแยกต่างหาก" }],
     }, {
@@ -327,7 +327,8 @@ describe("User Access presentation", () => {
         expect(screen.getAllByText("สิทธิ์พื้นฐาน").length).toBeGreaterThan(0);
         expect(screen.getAllByText("สิทธิ์ที่เพิ่มให้").length).toBeGreaterThan(0);
         expect(screen.getAllByText("สิทธิ์ที่ใช้งานได้").length).toBeGreaterThan(0);
-        expect(screen.getAllByText("SYSTEM_ROLE").length).toBeGreaterThan(0);
+        expect(screen.queryByText("สิทธิ์ระดับผู้ดูแลระบบ")).not.toBeInTheDocument();
+        expect(screen.getAllByText("สิทธิ์เฉพาะบุคคล").length).toBeGreaterThan(0);
         expect(screen.getAllByText("ที่มาของสิทธิ์").length).toBeGreaterThan(0);
         expect(screen.getAllByText("ยังไม่เปิดให้จัดการ").length).toBeGreaterThan(0);
         expect(screen.queryByText("มี Compatibility Policy")).not.toBeInTheDocument();

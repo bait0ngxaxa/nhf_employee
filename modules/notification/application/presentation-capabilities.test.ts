@@ -161,13 +161,13 @@ describe("Notification presentation capability projection", () => {
         ).resolves.toEqual({ canReadInbox: true, canUpdateInbox: true });
     });
 
-    it("projects the ADMIN central decision and default policy for each capability", async () => {
+    it("projects configured ADMIN authority and default policy for each capability", async () => {
         mockDecisions((capability) => decision(
             capability,
             true,
             ["OWN"],
             undefined,
-            [grant(capability, { type: "SYSTEM_ROLE", role: "ADMIN" })],
+            [grant(capability, { type: "USER", userId: 7 })],
         ));
 
         await expect(

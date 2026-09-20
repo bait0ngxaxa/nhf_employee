@@ -680,7 +680,7 @@ describe("authorization production readiness", () => {
         );
     });
 
-    it("proves role-neutral Default Domain Policy parity and central-only denial", async () => {
+    it("proves Default Domain Policy parity and central-only denial", async () => {
         const emptyResolution = {
             userGrants: [],
             memberships: [],
@@ -707,9 +707,6 @@ describe("authorization production readiness", () => {
                 channel: "DASHBOARD" as const,
             };
             const decisions = await resolver.resolveMany(actor, capabilityKeys);
-            expect([...decisions.values()].every((decision) =>
-                decision.grants.every((grant) => grant.source.type !== "SYSTEM_ROLE"),
-            )).toBe(true);
             for (const capabilityKey of centralOnlyCapabilityKeys) {
                 expect(decisions.get(capabilityKey)).toMatchObject({
                     allowed: false,
@@ -1144,15 +1141,9 @@ describe("authorization production readiness", () => {
         }));
     });
 
-    it("uses a target canary resolver without SYSTEM_ROLE grants", async () => {
-        const observedSources: string[] = [];
+    it("uses the configured authority resolver for canary validation", async () => {
         const effectiveAccessProvider: AuthorizationProductionCanaryValidationDependencies["effectiveAccessProvider"] = {
             async inspect(input) {
-                for (const decision of input.dashboardDecisions.values()) {
-                    for (const grant of decision.grants) {
-                        observedSources.push(grant.source.type);
-                    }
-                }
                 return authorizationAdministrationEffectiveAccessProvider.inspect(input);
             },
         };
@@ -1167,7 +1158,6 @@ describe("authorization production readiness", () => {
         );
 
         expect(result).toMatchObject({ status: "PASS", issues: [] });
-        expect(observedSources).not.toContain("SYSTEM_ROLE");
     });
 
     it("rejects an ADMIN direct canary when Default Domain Policy already supplies the target authority", async () => {

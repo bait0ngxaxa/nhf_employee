@@ -85,14 +85,14 @@ function userGrant(
     };
 }
 
-function systemRoleGrant(
+function configuredAdminGrant(
     capability: string,
     scope: AuthorizationScope = "ALL",
 ): EffectiveAuthorizationGrant {
     return {
         capability: capability as EffectiveAuthorizationGrant["capability"],
         scope,
-        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+        source: { type: "USER", userId: 7 },
     };
 }
 
@@ -190,14 +190,14 @@ describe("Leave authorization adapter", () => {
         },
     );
 
-    it("uses central SYSTEM_ROLE authority for Dashboard ADMIN without Leave defaults", async () => {
+    it("uses configured authority for Dashboard ADMIN without Leave defaults", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "leave.approver.manage",
                 true,
                 ["ALL"],
                 undefined,
-                [systemRoleGrant("leave.approver.manage")],
+                [configuredAdminGrant("leave.approver.manage")],
             ),
         );
 
@@ -209,7 +209,7 @@ describe("Leave authorization adapter", () => {
         expect(manage.scopes).toEqual(["ALL"]);
         expect(manage.defaultScopes).toEqual([]);
         expect(manage.decision.grants).toEqual([
-            systemRoleGrant("leave.approver.manage"),
+            configuredAdminGrant("leave.approver.manage"),
         ]);
 
         mocks.resolve.mockResolvedValue(
@@ -218,7 +218,7 @@ describe("Leave authorization adapter", () => {
                 true,
                 ["ALL"],
                 undefined,
-                [systemRoleGrant("leave.recovery.manage")],
+                [configuredAdminGrant("leave.recovery.manage")],
             ),
         );
         const recovery = await resolveLeaveCapability(
@@ -385,7 +385,7 @@ describe("Leave authorization adapter", () => {
                 ["ALL"],
                 undefined,
                 [
-                    systemRoleGrant("leave.recovery.manage", "ALL"),
+                    configuredAdminGrant("leave.recovery.manage", "ALL"),
                 ],
             ),
         );
@@ -540,7 +540,7 @@ describe("Leave authorization adapter", () => {
                     true,
                     ["ALL"],
                     undefined,
-                    [systemRoleGrant("leave.approver.manage")],
+                    [configuredAdminGrant("leave.approver.manage")],
                 )
                 : decision(
                     "leave.approver.manage",

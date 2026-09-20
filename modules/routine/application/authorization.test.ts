@@ -85,13 +85,13 @@ function userGrant(
     };
 }
 
-function systemRoleGrant(
+function configuredAdminGrant(
     capability: RoutineCapability,
 ): EffectiveAuthorizationGrant {
     return {
         capability,
         scope: "ALL",
-        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+        source: { type: "USER", userId: 7 },
     };
 }
 
@@ -171,24 +171,13 @@ describe("Routine authorization adapter", () => {
             },
         } as unknown as Prisma.TransactionClient & AuthorizationPersistenceContext;
         const routeActor = actor({ role: "ADMIN" });
-        mocks.resolveInTransaction.mockImplementation(
-            async (
-                authorizationActor: AuthorizationActor,
-            ): Promise<AuthorizationDecision> =>
-                authorizationActor.systemRole === "ADMIN"
-                    ? decision(
-                        "routine.occurrence.override",
-                        true,
-                        ["ALL"],
-                        undefined,
-                        [systemRoleGrant("routine.occurrence.override")],
-                    )
-                    : decision(
-                        "routine.occurrence.override",
-                        false,
-                        [],
-                        "NO_APPLICABLE_GRANT",
-                    ),
+        mocks.resolveInTransaction.mockResolvedValue(
+            decision(
+                "routine.occurrence.override",
+                false,
+                [],
+                "NO_APPLICABLE_GRANT",
+            ),
         );
 
         const activeActor = await assertActiveRoutineActorInTransaction(
@@ -620,14 +609,14 @@ describe("Routine authorization adapter", () => {
         expect(result.hasBroadAuthority).toBe(true);
     });
 
-    it("clamps a LIFF ADMIN system-role result to Routine self-service scopes", async () => {
+    it("clamps a LIFF ADMIN configured grant to Routine self-service scopes", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "routine.task.update",
                 true,
                 ["ALL"],
                 undefined,
-                [systemRoleGrant("routine.task.update")],
+                [configuredAdminGrant("routine.task.update")],
             ),
         );
 
@@ -707,14 +696,14 @@ describe("Routine authorization adapter", () => {
         });
     });
 
-    it("keeps Dashboard ADMIN system-role authorization administrative", async () => {
+    it("keeps Dashboard ADMIN configured broad authority available", async () => {
         mocks.resolve.mockResolvedValue(
             decision(
                 "routine.occurrence.override",
                 true,
                 ["ALL"],
                 undefined,
-                [systemRoleGrant("routine.occurrence.override")],
+                [configuredAdminGrant("routine.occurrence.override")],
             ),
         );
 
@@ -735,7 +724,7 @@ describe("Routine authorization adapter", () => {
                 true,
                 ["ALL"],
                 undefined,
-                [systemRoleGrant("routine.task.export")],
+                [configuredAdminGrant("routine.task.export")],
             ),
         );
 

@@ -95,8 +95,8 @@ function buildAuditCapabilityAuthorization(
         );
     }
 
-    // ADMIN authority and explicit USER grants are both produced by the
-    // central resolver. There is no role-based compatibility bypass here.
+    // Configured grants are produced by the central resolver. There is no
+    // role-based business-authority bypass here.
     return Object.freeze({
         actor,
         capability,

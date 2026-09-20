@@ -70,6 +70,18 @@ const ACTIVE_EMPLOYEE = {
     },
 };
 
+function configuredUserId(actor: unknown): number {
+    if (
+        typeof actor === "object"
+        && actor !== null
+        && "userId" in actor
+        && typeof actor.userId === "number"
+    ) {
+        return actor.userId;
+    }
+    return 0;
+}
+
 function authorizationDecision(actor: unknown, capability: string) {
     const isAdmin = typeof actor === "object"
         && actor !== null
@@ -83,7 +95,7 @@ function authorizationDecision(actor: unknown, capability: string) {
             grants: [{
                 capability,
                 scope: "ALL" as const,
-                source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+                source: { type: "USER" as const, userId: configuredUserId(actor) },
             }],
         }
         : {

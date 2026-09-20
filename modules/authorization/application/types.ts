@@ -62,10 +62,6 @@ export interface AuthorizationSeedConfiguration {
 
 export type AuthorizationGrantSource =
     | {
-        readonly type: "SYSTEM_ROLE";
-        readonly role: "ADMIN";
-    }
-    | {
         readonly type: "TEAM";
         readonly teamId: number;
     }

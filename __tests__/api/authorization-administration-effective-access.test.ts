@@ -201,12 +201,12 @@ describe("Authorization Administration effective-access composition", () => {
         dashboardDecisions.set("audit.read", directAuditRead);
 
         const resolveMany = vi.fn(async (
-            actor: AuthorizationActor,
+            _actor: AuthorizationActor,
             capabilityKeys: readonly CapabilityKey[],
         ) => new Map(capabilityKeys.map((key) => [
             key,
-            actor.systemRole === "ADMIN" && key === "stock.request.process"
-                ? allowedDecision(key, "ALL", { type: "SYSTEM_ROLE", role: "ADMIN" })
+            key === "stock.request.process"
+                ? allowedDecision(key, "ALL", { type: "USER", userId: 7 })
                 : noGrantDecision(key),
         ])));
 
@@ -232,7 +232,7 @@ describe("Authorization Administration effective-access composition", () => {
         const adminStockProcess = allowedDecision(
             "stock.request.process",
             "ALL",
-            { type: "SYSTEM_ROLE", role: "ADMIN" },
+            { type: "USER", userId: 7 },
         );
         adminDashboardDecisions.set("stock.request.process", adminStockProcess);
         const adminRows = await authorizationAdministrationEffectiveAccessProvider.inspect({
@@ -251,7 +251,7 @@ describe("Authorization Administration effective-access composition", () => {
             configuredDecision: {
                 allowed: true,
                 scopes: ["ALL"],
-                grants: [{ source: { type: "SYSTEM_ROLE", role: "ADMIN" } }],
+                grants: [{ source: { type: "USER", userId: 7 } }],
             },
             effectiveScopes: ["ALL"],
             state: "AVAILABLE",

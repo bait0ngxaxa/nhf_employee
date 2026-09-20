@@ -1,15 +1,33 @@
 # NHF Employee — Current Authorization State
 
-> **Current repository state (Phase 12H-H):** production business
-> authorization is role-neutral and configured-grant based. The normal
-> `authorization` singleton and `createAuthorizationResolver()` load
-> persistence for USER and ADMIN alike; `SYSTEM_ROLE / ADMIN` is not a
-> business grant. The older Phase 12H-B through 12H-F boundary notes below
-> remain historical records of behavior at those phase boundaries. The full
-> cutover and regression record is in
-> [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
-> Production snapshot/live rollout evidence is tracked separately in
-> [authorization-phase-12hh-production-snapshot-live-rollout-validation.md](authorization-phase-12hh-production-snapshot-live-rollout-validation.md).
+> **Current repository state (Phase 12H-I):** ADMIN is an Auth/control-plane
+> role only. Business authorization is the domain Default Domain Policy plus
+> configured Team, TeamRole, and exceptional direct User grants. The normal
+> `authorization` singleton and `createAuthorizationResolver()` load and
+> evaluate configured persistence for USER and ADMIN alike; `systemRole` is
+> not a business grant source. Phase 12H-H production validation is
+> **CLOSED / ACCEPTED** from operator-confirmed evidence. Phase 12H-I
+> compatibility-debt removal is recorded in
+> [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
+> The older Phase 12H-B through 12H-H boundary notes below remain historical
+> records of behavior at those phase boundaries.
+
+## Current final authorization model
+
+The current production source of truth after Phase 12H-I is:
+
+| Concern | Final rule |
+|---|---|
+| Account/control plane | `User.role` / `Role.ADMIN` remains the Auth system role for authentication, Authorization Administration, bootstrap, role management, and last-eligible-ADMIN protection. |
+| Business authority | Domain-owned Default Domain Policy plus configured `TEAM`, `TEAM_ROLE`, and exceptional direct `USER` grants. |
+| Resolver | `createAuthorizationResolver()` is the canonical constructor; USER and ADMIN load configured persistence equally. `systemRole` never creates a business grant. |
+| Administration presentation | Account/system role is shown separately from business grant sources. Business explanations contain only Team, TeamRole, and direct User origins. |
+| Routine provenance | Future mutation classification uses effective business authority; historical `ownershipMode: "ADMIN"` audit JSON remains readable and is not rewritten. |
+| Fail-closed behavior | Unknown, inactive, revoked, malformed, unsupported, or structurally invalid configured sources remain denied or surface the existing configuration error. |
+
+The detailed matrices and phase notes below include historical evidence from
+before this final cleanup. They are retained for traceability and must not be
+read as current permission behavior.
 
 Phase 12A status: CLOSED — additive policy contract and current capability
 inventory only. See
@@ -27,63 +45,21 @@ its final closure correction on baseline `14a300d03a8bd9803afcf0bce8258ae7bd08e4
 Phase 12G-B — First Production Capability Deployment Readiness is now
 implementation-complete on baseline `c49caec5f14569655d1e385c1706dc7e9e22c0a8`.
 Phase 12H-G — role-neutral production business enforcement cutover and full
-security regression is now CLOSED. Phase 12H-H is the current operational
-handoff and awaits actual production snapshot/live rollout evidence. No
-production authorization rollout has been performed.
+security regression is closed as a historical phase record. Phase 12H-H and
+Phase 12H-I are closed in the current repository state; their evidence is
+linked in the current-state summary above.
 
-Phase 12H-A — Role-Neutral Business Authorization Contract & Inventory is now
-**COMPLETE as a documentation/inventory phase only**. The authoritative target
-contract and exhaustive ledger are in
-[authorization-phase-12ha-role-neutral-contract.md](authorization-phase-12ha-role-neutral-contract.md).
-Phase 12H-B — Role-Neutral Resolver / Composition Core is now **COMPLETE**.
-The role-neutral configured evaluator and composition primitive are implemented
-and tested, but the production-facing resolver singleton remains on the
-temporary legacy ADMIN compatibility strategy. `ADMIN` therefore still
-receives central `SYSTEM_ROLE` business authority in current production paths,
-and domain default-policy rebaseline had not yet begun at the Phase 12H-B
-boundary.
-Phase 12H-A supersedes both Phase 12A's long-term `ADMIN`
-business-authority target and the selected legacy USER-default permanence that
-12H-A explicitly narrows, especially Routine broad `task.read`, `summary.read`,
-and `task.export` authority. The historical Phase 12A statements remain
-historical evidence at that phase boundary. **Role-neutral core:
-IMPLEMENTED; role-neutral domain defaults: REBASELINED; role-neutral
-production enforcement: NOT CUT OVER; legacy ADMIN business compatibility:
-TEMPORARILY ACTIVE.** Phase 12H-C — Domain Default Policy Rebaseline is now
-**COMPLETE**. The historical next handoff from that closure was Phase 12H-D;
-the current live status is recorded below. See
-[authorization-phase-12hc-domain-default-policy-rebaseline.md](authorization-phase-12hc-domain-default-policy-rebaseline.md)
-and [authorization-phase-12hb-role-neutral-core.md](authorization-phase-12hb-role-neutral-core.md).
+Phase 12H-A through Phase 12H-F are retained below as historical phase
+records. Their target contract, implementation boundaries, and verification
+records remain linked from those sections; none is the current source of
+truth for the final role-neutral production model.
 
-Phase 12H-D — Missing / Deferred Business Capability Completion is now
-**COMPLETE** against baseline `2380d23e867d2d4a124bce8623dd06003c789da2`.
-The role-neutral configured core remains **IMPLEMENTED**, the domain defaults
-remain **REBASELINED**, and the two registered Email Request capabilities plus
-the reviewed `leave.recovery.manage` capability are now real centralized
-authorization surfaces. Registered `DEFERRED` capabilities: **0**. The
-production `authorization` singleton is still **NOT CUT OVER** to the
-role-neutral resolver, legacy ADMIN business compatibility remains
-**TEMPORARILY ACTIVE**, and the remaining Dashboard presentation/route role
-gates are intentionally deferred to Phase 12H-F.
-
-Phase 12H-E — Production Team/grant preparation and effective-access
-reconciliation is now **COMPLETE** against baseline
-`0ac8d1bcb30e23b96c413c5166bb833954a3484b`.
-Production-readiness reconciliation is now explicitly labeled
-`ROLE_NEUTRAL_TARGET`: active USER and ADMIN accounts use the same configured
-Team, TeamRole, and direct User source rules; hypothetical canaries use the
-role-neutral resolver; and generic business canary eligibility requires an
-active linked Employee for both roles. The production `authorization`
-singleton and current ADMIN compatibility seam remain active, no production
-authorization data was mutated, and all production operational/live rollout
-gates remain **NOT RUN**. The recorded next handoff was Phase 12H-F —
-Presentation/route role-authority removal. Phase 12H-F is now closed in the
-current repository state; production enforcement cutover remains Phase 12H-G.
-
-สถานะ: Phase 12F Full Authorization Regression / Security Matrix — CLOSED; Phase 12G-A Authorization Administration UX Simplification — CLOSED; Phase 12G-B First Production Capability Deployment Readiness — implementation complete / awaiting production operational acceptance; production authorization rollout — NOT RUN; Phase 12H-D Missing/deferred capability completion — CLOSED; Phase 12H-E Production Team/grant preparation and effective-access reconciliation — CLOSED for repository target readiness; Phase 12E Authorization Administration effective-access UX completion — CLOSED; Phase 12D Routine deferred-capability additive migration — CLOSED; Phase 12C.5 Leave additive default policy migration — CLOSED; Phase 12C.4 Stock additive default policy migration — CLOSED; Phase 12C.3 Routine enforced additive policy — CLOSED; Phase 12C.2 — CLOSED; Phase 12C.1 — CLOSED; Phase 11A — CLOSED; Phase 11B — CLOSED; Phase 11C — CLOSED; Phase 11D — CLOSED; Phase 11 — CLOSED for the current approved authorization policy; Phase 10A — CLOSED; Phase 10B — CLOSED; Phase 10C Authorization Administration operator UI — CLOSED; Phase 10D — CLOSED; Phase 10 — CLOSED; Authorization Administration tooling is production-ready within the approved model; Phase 9A remaining server authorization migration — CLOSED; Phase 9B remaining presentation authorization integration — CLOSED; Phase 9C complete authorization surface audit — CLOSED; Phase 9 — CLOSED; scope qualifier: current migrated production authorization surfaces only; Employee server authorization migration — CLOSED; Employee presentation Phase 8B — CLOSED; Employee complete-surface audit Phase 8C — CLOSED; Employee authorization migration — CLOSED; Leave authorization migration — CLOSED; Stock additive migration — CLOSED; Email Request capability migration — CLOSED in Phase 12H-D; future IT module — OUT OF SCOPE<br>
-Phase 12H-E — **เสร็จสิ้นในขอบเขต repository target readiness**; authority model ของ preflight — **ROLE_NEUTRAL_TARGET**; configured authority ของ USER/ADMIN — **reconciled ด้วยกติกาเดียวกัน**; hypothetical canary — **role-neutral resolver**; production enforcement แบบ role-neutral — **ยังไม่ cut over**; legacy ADMIN business compatibility — **ยังทำงานชั่วคราว**; production operational/live gates — **NOT RUN**; Phase 12H-F — Presentation/route role-authority removal — **CLOSED**; ขั้นถัดไป Phase 12H-G — production enforcement cutover<br>
-สถานะปัจจุบัน Phase 12H-H: **OPEN ในขอบเขต repository/tooling validation**; Phase 12H-G — **CLOSED**; production snapshot/live rollout, migration readback, canary, rollback และ observation evidence — **NOT RUN**; production rollout — **ยังไม่ complete**; Phase 12H-I — **ยังไม่เริ่ม**
-วันที่สำรวจ: 2026-09-19<br>
+สถานะรวม: Phase 12A–12G — historical closure records; Phase 12H-H —
+**CLOSED / ACCEPTED จาก operator-confirmed production evidence**; Phase 12H-I
+— **CLOSED**; ADMIN ยังคงเป็น system/control-plane role แต่ไม่ใช่ business
+permission source; business grant sources มีเฉพาะ `TEAM`, `TEAM_ROLE`, `USER`
+ร่วมกับ Default Domain Policy; Authorization Administration ยังคง ADMIN-only<br>
+วันที่สำรวจ: 2026-09-20<br>
 ขอบเขต: พฤติกรรมจาก source code, callers, Prisma/query scopes, routes, presentation projections และ tests ที่มีอยู่ใน repository ปัจจุบัน
 
 หมายเหตุ Phase 12H-A: target ระยะยาวเป็น role-neutral business authorization
@@ -331,7 +307,7 @@ getLiffCapabilities() คืนค่า:
 
 ค่าเหล่านี้ใช้ home/UI projection; Leave own/assigned data requests ต้องผ่าน field read และ relationship hint ที่เกี่ยวข้อง และ route ที่ทำ mutation ยังตรวจ session, capability, relationship และ workflow เอง
 
-## 4. Current Authorization Matrix
+## 4. Historical Authorization Matrix (pre-Phase 12H-I)
 
 ตารางต่อไปนี้ใช้ field เดียวกันทุก domain โดย `Channel` ในตารางหมายถึง entry-point / transport surface ของ current implementation; ไม่ใช่ future `AuthorizationActor.channel`:
 
@@ -448,7 +424,7 @@ Employee current authorization detail:
 | Leave attachment cleanup | SYSTEM | POST /api/leave/attachments/cleanup | Orphaned attachment files | x-cleanup-secret shared secret | Secret/config only | Shared secret and dry-run validation | None | Orphan relation/storage cleanup | ALL orphan candidates | None | app/api/leave/attachments/cleanup/route.ts | None | Missing config 503; wrong secret 403; invalid dry-run 400 | __tests__/api/leave-attachment-cleanup-route.test.ts | System retention boundary |
 | LINE webhook | SYSTEM | POST /api/line/webhook | LINE platform event | HMAC signature/channel secret | LINE configuration only | Signature verification; no User role | None | Platform event identity, not current User session | System event scope | None | app/api/line/webhook/route.ts, signature verifier | None | Missing/invalid signature 401; missing config 500 | __tests__/api/line-webhook-route.test.ts | Authentication/integration boundary, out of authorization migration |
 
-## 5. Authorization Decision Inventory
+## 5. Historical Authorization Decision Inventory (pre-Phase 12H-I)
 
 ### 5.1 System-level role checks
 
@@ -1420,7 +1396,13 @@ Routine narrowing is enforced at the authorization/query boundary. A requested t
 
 The phase intentionally preserves active-account/workforce checks, ownership and relationship predicates, query pagination/filtering, resource and lifecycle rules, transactions/locks, validation, idempotency, notifications, audit behavior, export limits and data minimization. Department remains reference data and does not infer Team, TeamRole, or capability authority.
 
-Current production behavior is intentionally mixed during the rollout. Normal USER paths now use the rebaselined defaults, including the Routine narrowing above. Current Dashboard ADMIN business authority may still differ because the production adapters continue to call `composeLegacyAdminCompatibleAuthorizationAuthority()`, which preserves the central `SYSTEM_ROLE / ADMIN` decision. `SYSTEM_ROLE` support, the production `authorization` singleton, and account-only ADMIN lifecycle/recovery seams remain unchanged. This difference is compatibility behavior, not a difference in the target Default Domain Policy.
+At the Phase 12H-C boundary, production behavior was intentionally mixed
+during the rollout: normal USER paths used the rebaselined defaults while
+Dashboard ADMIN paths still used the temporary comparison seam. That historical
+behavior is superseded by the Phase 12H-G cutover and Phase 12H-I cleanup
+recorded below. The Auth control-plane role and the domain-owned
+recipient/lifecycle policies remain separate from business capability
+authority.
 
 Explicitly deferred: `leave.recovery.manage`, Email Request completion, grant/readiness data changes, schema/migration/seed/backfill work, broad presentation and route ADMIN-gate migration, and final role-neutral production enforcement cutover. Those belong to Phase 12H-D, 12H-F, 12H-E/readiness work, and 12H-G as applicable. Historical sections 9.4, 9.7, and earlier phase closure documents retain the behavior recorded at their boundaries; this section supersedes their selected Routine broad-default claims for the current target.
 
@@ -1698,7 +1680,7 @@ Phase 0 ไม่ได้ทำและไม่ควรตีความว
 
 ข้อเสนอข้างต้นเป็นขอบเขตสำหรับการออกแบบ Phase 1 เท่านั้น เอกสารนี้ไม่ได้เริ่ม implementation ของ Phase 1
 
-## Phase 12H-G current closure
+## Phase 12H-G historical closure
 
 Phase 12H-G cuts over the repository's normal production business path to
 role-neutral configured authority. `authorization` and
@@ -1707,40 +1689,53 @@ for both USER and ADMIN. Equivalent trusted contexts therefore receive the
 same Default Domain Policy, and ADMIN without configured authority is denied
 the catalog's central-only capabilities.
 
-Normal domain adapters use `composeAuthorizationAuthority()`; the legacy
-resolver/evaluator and composition wrapper remain only for the explicitly
-named Phase 12H-H snapshot-comparison seam. The old mixed workforce helper is
-retired, and Routine, Stock, Leave approver management, and private Leave
-attachment access now require the same active workforce/participant context
-for both roles. Stock cancellation notification mode is relationship-based,
-while Routine/Stock ADMIN recipient policies remain separate domain policies.
+Normal domain adapters use `composeAuthorizationAuthority()`; at the H-G
+boundary the legacy resolver/evaluator and composition wrapper were retained
+only for the explicitly named Phase 12H-H snapshot-comparison seam. The old
+mixed workforce helper was retired, and Routine, Stock, Leave approver
+management, and private Leave attachment access required the same active
+workforce/participant context for both roles. Stock cancellation notification
+mode was relationship-based, while Routine/Stock ADMIN recipient policies
+remained separate domain policies.
 
 Authorization Administration, bootstrap/last-ADMIN lifecycle, identity and
-audit provenance, and approved recipient policies remain ADMIN/system-role
-uses. None is an ordinary business ALLOW/DENY source. Production/live rollout
-is **NOT RUN**. The detailed closure and verification record is in
+audit provenance, and approved recipient policies remained ADMIN/system-role
+uses. None was an ordinary business ALLOW/DENY source at that boundary. The
+detailed historical closure and verification record is in
 [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
 
-## Phase 12H-H current operational status
+## Phase 12H-H historical operational status
 
-Phase 12H-H is **OPEN — repository/tooling validation only** against baseline
-`8bc5eedffc5f2699d10acd86c6920290787a9786`. The existing read-only production
-preflight, production-readiness evaluator, safe persistence projection,
-Administration effective-access provider, audited Authorization Administration
-mutation boundary, and canary-plan validator are reused. No second scanner,
-capability evaluator, direct SQL/Prisma production mutation path, automatic
-ADMIN backfill, seed, or repair path was introduced.
-
-The operator runbook and evidence record are in
+Phase 12H-H is **CLOSED / ACCEPTED** from the operator-confirmed evidence in
 [authorization-phase-12hh-production-snapshot-live-rollout-validation.md](authorization-phase-12hh-production-snapshot-live-rollout-validation.md).
-No explicitly authorized production target, production deployment revision,
-live preflight, migration readback, inventory snapshot, warning disposition,
-canary mutation, rollback, or observation-window evidence was supplied or
-executed in this repository task. Therefore every live H gate is **NOT RUN**;
-production rollout is not complete and Phase 12H-H operational acceptance
-remains open.
+The existing read-only production preflight, production-readiness evaluator,
+safe persistence projection, Administration effective-access provider, audited
+Authorization Administration mutation boundary, and canary-plan validator were
+reused. No second scanner, capability evaluator, direct SQL/Prisma production
+mutation path, automatic ADMIN backfill, seed, or repair path was introduced.
 
-The retained legacy resolver/evaluator/composition seam remains comparison-only
-for H. Phase 12H-I has not started and must not remove the compatibility seam
-or the legacy `SYSTEM_ROLE` representation before H receives actual accepted
-production evidence.
+The H record distinguishes repository evidence, real MySQL concurrency
+evidence, and live operator observations. Production deployment SHA and exact
+operator metadata were not independently recorded.
+
+The retained legacy resolver/evaluator/composition seam was intentionally
+comparison-only through H. Phase 12H-I subsequently removed that business
+authority compatibility seam; the H record preserves the historical boundary
+and evidence provenance.
+
+## Phase 12H-I current closure
+
+Phase 12H-I is **CLOSED**. The final model is:
+
+- `Role.ADMIN` and `User.role` remain Auth/control-plane identity and remain
+  authoritative for Authorization Administration access, bootstrap, role
+  management, and last-eligible-ADMIN protections.
+- Business authority is the domain Default Domain Policy plus configured
+  `TEAM`, `TEAM_ROLE`, and exceptional `USER` grants.
+- The canonical resolver loads configured persistence for USER and ADMIN
+  equally and never creates a business grant from `systemRole`.
+- Administration presents the account/system role separately from business
+  grant sources; historical Audit JSON is readable without rewriting it.
+
+The implementation and regression evidence are recorded in
+[authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).

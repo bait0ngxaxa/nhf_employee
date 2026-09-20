@@ -28,8 +28,8 @@ trusted identity/lifecycle
 
 `ADMIN` remains an identity/control-plane attribute. It is not an implicit
 ordinary business grant. The legacy ADMIN-compatible resolver and composition
-were retained through Phase 12H-H for rollout comparison and are now eligible
-for removal by Phase 12H-I.
+were retained through Phase 12H-H for rollout comparison and were removed by
+the separate Phase 12H-I compatibility-cleanup change.
 
 ## A. Repository / operational tooling validation
 
@@ -47,7 +47,7 @@ introduced.
 | Capability and scope truth | Capability Registry and Administration catalog |
 | Target effective access | Authorization Administration effective-access provider and domain-owned inspectors |
 | Audited mutation boundary | Authorization Administration UI/API and its transaction-bound application service |
-| Legacy comparison only through H | `createLegacyAdminCompatibleAuthorizationResolver()`, `evaluateLegacyAuthorization()`, and `composeLegacyAdminCompatibleAuthorizationAuthority()` |
+| Historical H-only comparison seam (removed by I) | `createLegacyAdminCompatibleAuthorizationResolver()`, `evaluateLegacyAuthorization()`, and `composeLegacyAdminCompatibleAuthorizationAuthority()` |
 
 The preflight repository uses a repeatable-read transaction and explicit
 field projections for Teams, TeamRoles, memberships, grants, User/Employee
@@ -362,9 +362,10 @@ seam; doing so is a separate compatibility-cleanup change.
 ## C. Phase 12H-H corrective hardening note
 
 This corrective patch remained within Phase 12H-H. The production acceptance
-record is now complete, while the retained `SYSTEM_ROLE` legacy comparison
+record is complete. At the H boundary, the `SYSTEM_ROLE` legacy comparison
 seam, compatibility-named exports, legacy resolver/evaluator, and legacy
-composition remain in place until the separate Phase 12H-I cleanup.
+composition were still retained; the separate Phase 12H-I cleanup has since
+removed them.
 
 The patch corrects the following handoff findings:
 
@@ -423,5 +424,6 @@ Administration control plane remains intentionally ADMIN-only.
 The accepted production implementation passed this real MySQL concurrency
 proof unchanged; no production locking correction was required. This remains
 repository/integration evidence, separate from the operator-confirmed live
-production evidence in section B. Phase 12H-I has not yet changed the
-compatibility seam at the time of this closure record.
+production evidence in section B. The H record preserves the fact that Phase
+12H-I had not yet changed the compatibility seam at the H closure boundary;
+the current removal is recorded separately in the Phase 12H-I closure.

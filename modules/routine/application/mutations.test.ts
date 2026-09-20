@@ -904,13 +904,13 @@ describe("NHF Routine mutations", () => {
         });
     });
 
-    it("keeps legacy ADMIN compatibility from writing import provenance through task creation", async () => {
+    it("keeps broad task authority from writing import provenance through task creation", async () => {
         const createdTask = {
             id: 73,
             version: 1,
             unitId: 1,
             categoryId: 1,
-            title: "งานจากความเข้ากันได้เดิม",
+            title: "งานจากสิทธิ์แบบกว้าง",
         };
         prismaMock.user.findUnique.mockResolvedValue(
             asNever(activeUser("ADMIN", 99)),
@@ -926,14 +926,14 @@ describe("NHF Routine mutations", () => {
             {
                 unitId: 1,
                 categoryId: 1,
-                title: "งานจากความเข้ากันได้เดิม",
+                title: "งานจากสิทธิ์แบบกว้าง",
                 scheduleType: "MONTHLY_DAY",
                 scheduleConfig: { day: 10, monthOffset: 0 },
                 businessDayPolicy: "NONE",
                 isActive: true,
                 assignees: [{ employeeId: 11, role: "OWNER" }],
-                sourceFileName: "legacy-spoof.xlsx",
-                sourceSheet: "Legacy",
+                sourceFileName: "spoofed-import.xlsx",
+                sourceSheet: "Import",
                 sourceRow: 13,
                 reminderRules: [{
                     daysBefore: 1,

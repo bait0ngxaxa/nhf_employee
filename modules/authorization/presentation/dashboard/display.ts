@@ -154,11 +154,6 @@ export function getMutationErrorCopy(error: unknown): {
                 title: "สิทธิ์เฉพาะบุคคลใช้ขอบเขตภายในกลุ่มไม่ได้",
                 description: "หากต้องการให้สิทธิ์กับทั้งกลุ่ม ให้เพิ่มสิทธิ์ที่กลุ่มหรือบทบาทในกลุ่ม",
             };
-        case "UNSUPPORTED_ADMIN_TEAM_SCOPE":
-            return {
-                title: "ขอบเขตของกลุ่มนี้ยังไม่รองรับ",
-                description: "เลือกขอบเขตที่ระบบแสดงสำหรับสิทธิ์นี้ แล้วลองอีกครั้ง",
-            };
         case "CAPABILITY_POLICY_ACTIVATION_REQUIRED":
             return {
                 title: "สิทธิ์นี้ยังไม่พร้อมให้จัดการ",

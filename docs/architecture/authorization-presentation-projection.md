@@ -1,16 +1,17 @@
 # Authorization presentation capability projections
 
-> **Current repository state (Phase 12H-G):** normal presentation and
-> effective-access projections use the same role-neutral configured resolver
-> and domain composition as server enforcement. An ADMIN identity alone does
-> not create business presentation capabilities. The older phase sections
-> below remain historical boundary records; the current cutover evidence is in
-> [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
+> **Current repository state (Phase 12H-I):** normal presentation and
+> effective-access projections use the same configured resolver and domain
+> composition as server enforcement. An ADMIN identity alone does not create
+> business presentation capabilities. The account/system role is displayed in
+> its separate control-plane section; business source explanations contain
+> only Team, TeamRole, and direct User grants. The older phase sections below
+> remain historical boundary records. Current cleanup evidence is in
+> [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
 
-Phase 12H-A target note: these projection records describe current/historical
-presentation behavior and do not make the role-neutral target runtime live.
-Presentation visibility is never authority. The future ADMIN target and
-migration ledger are authoritative in
+Phase 12H-A target note: these projection records include historical boundary
+evidence. Presentation visibility is never authority. The final role-neutral
+runtime model and migration ledger are authoritative in
 [authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
 
 Status: Routine Phase 5C and Stock Phase 6B/6C closed; Leave Phase 7A/7B/7C
@@ -20,9 +21,9 @@ Phase 12C.3 Routine, Phase 12C.4 Stock, Phase 12C.5 Leave, and Phase 12D
 Routine deferred-capability additive policy migrations closed; Phase 12E
 effective-access Administration UX is closed; Phase 12F full authorization
 regression/security matrix is closed; Phase 12G-B First Production Capability
-Deployment Readiness is implementation-complete and awaits production
-operational acceptance; Phase 12H-F presentation/route role-authority removal
-is closed, while production enforcement cutover remains Phase 12H-G.
+Deployment Readiness, Phase 12H-F, and Phase 12H-G are historical closed
+records; Phase 12H-H is operator-confirmed CLOSED / ACCEPTED and Phase 12H-I
+is the current compatibility-debt closure.
 
 This record defines the server-derived presentation contracts added for the
 Routine, Stock, Leave, and Employee authorization migrations. These projections do not
@@ -40,7 +41,7 @@ recorded in
 The Authorization Administration User detail now includes a bounded,
 server-derived effective-access projection in addition to the unchanged raw
 central resolver evidence. Each row is domain/context/channel aware and
-separates Default Domain Policy, Additional resolver/system authority, and
+separates Default Domain Policy, Additional configured authority, and
 Effective composed capability authority. The result is not a final resource,
 relationship, lifecycle, or workflow decision.
 
@@ -523,8 +524,9 @@ Leave Default Domain Policy. For an eligible normal USER with no configured
 grant, the projection remains read-own, assigned-approval, create-own,
 cancel-own, approve-assigned, Dashboard cancellation-decision,
 own/assigned-not-taken, and no approver-management eligibility. A configured
-grant can add scopes but cannot remove those defaults; ADMIN defaults remain
-empty and central `SYSTEM_ROLE` authority is used.
+grant can add scopes but cannot remove those defaults. The older Phase 12C.5
+boundary recorded empty ADMIN defaults plus central system-role authority; the
+current projection resolves configured grants identically for USER and ADMIN.
 
 `leave.cancellation.decide` remains registered for `DASHBOARD` only. The LIFF
 projection therefore keeps `canDecideAssignedCancellations` false and does not
@@ -561,9 +563,11 @@ interface EmployeePresentationCapabilities {
 `composeAuthorizationAuthority()` path used by Phase 12C.2 server
 authorization. The permanent default gives an eligible normal USER
 read/stats/export and gives no default authority to create/update/delete/import;
-an ADMIN gets all seven from the central `SYSTEM_ROLE / ADMIN` decision; and
-an explicit USER grant enables only its matching mutation field while never
-narrowing the read baseline. Expected denials project to `false`; unknown
+the current ADMIN projection receives the same defaults and configured-grant
+rules as USER; and an explicit User grant enables only its matching mutation
+field while never narrowing the read baseline. The older Phase 12C.2 boundary
+recorded central `SYSTEM_ROLE / ADMIN` authority. Expected denials project to
+`false`; unknown
 capabilities, omitted decisions, invalid configuration and resolver or
 persistence failures propagate rather than becoming a misleading ordinary
 denial. The returned object is frozen.
@@ -639,7 +643,7 @@ historical boundary. Phase 12H-F now records its capability-based presentation
 closure, while Phase 12C.3 records the permanent Routine presentation
 composition.
 
-## Phase 12H-G current projection semantics
+## Phase 12H-G / 12H-I current projection semantics
 
 The earlier phase sections remain historical records. Current normal
 presentation/effective-access projections resolve through the production
@@ -652,3 +656,5 @@ remain domain recipient policy rather than current-actor authority.
 
 The full projection, route, lifecycle, and security regression record is in
 [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
+Compatibility-debt removal and the final source projection are recorded in
+[authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).

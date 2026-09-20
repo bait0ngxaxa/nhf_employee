@@ -80,7 +80,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
-function systemRoleDecision(capability: string) {
+function configuredAuthorityDecision(capability: string) {
     return {
         capability,
         allowed: true,
@@ -88,7 +88,7 @@ function systemRoleDecision(capability: string) {
         grants: [{
             capability,
             scope: "ALL" as const,
-            source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+            source: { type: "USER" as const, userId: 1 },
         }],
     };
 }
@@ -268,7 +268,7 @@ describe("leave request and manager reassignment serialization", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         authorizationMocks.resolveInTransaction.mockImplementation(
-            async (_actor: unknown, capability: string) => systemRoleDecision(capability),
+            async (_actor: unknown, capability: string) => configuredAuthorityDecision(capability),
         );
     });
 

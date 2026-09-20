@@ -563,7 +563,6 @@ function TechnicalErrorDetails({ error }: { readonly error: object }): ReactElem
 
 function getSourceOriginLabel(origin: AuthorizationAdministrationUserDetailData["resolverEffectivePermissions"][number]["grants"][number]["origin"]): string {
     switch (origin.type) {
-        case "SYSTEM_ROLE": return getAuthorizationSourceLabel("SYSTEM_ROLE");
         case "TEAM": return `${getAuthorizationSourceLabel("TEAM")}: ${origin.team?.name ?? "กลุ่มที่ต้องตรวจสอบ"}`;
         case "TEAM_ROLE": return `${getAuthorizationSourceLabel("TEAM_ROLE")}: ${origin.teamRole?.name ?? "บทบาทที่ต้องตรวจสอบ"}`;
         case "USER": return getAuthorizationSourceLabel("USER");
@@ -572,7 +571,6 @@ function getSourceOriginLabel(origin: AuthorizationAdministrationUserDetailData[
 
 function formatTechnicalOrigin(origin: AuthorizationAdministrationUserDetailData["resolverEffectivePermissions"][number]["grants"][number]["origin"]): string {
     switch (origin.type) {
-        case "SYSTEM_ROLE": return `role: ${origin.role}`;
         case "TEAM": return `teamId: ${origin.teamId}`;
         case "TEAM_ROLE": return `teamId: ${origin.teamId} · teamRoleId: ${origin.teamRoleId}`;
         case "USER": return `userId: ${origin.userId}`;

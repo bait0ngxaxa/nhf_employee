@@ -453,11 +453,9 @@ export function getAuthorizationLimitationPresentation(
 }
 
 export function getAuthorizationSourceLabel(
-    source: "SYSTEM_ROLE" | "TEAM" | "TEAM_ROLE" | "USER",
+    source: "TEAM" | "TEAM_ROLE" | "USER",
 ): string {
     switch (source) {
-        case "SYSTEM_ROLE":
-            return "สิทธิ์ระดับผู้ดูแลระบบ";
         case "TEAM":
             return "สิทธิ์ของกลุ่มผู้ใช้งาน";
         case "TEAM_ROLE":
@@ -468,11 +466,9 @@ export function getAuthorizationSourceLabel(
 }
 
 export function getAuthorizationSourceDescription(
-    source: "SYSTEM_ROLE" | "TEAM" | "TEAM_ROLE" | "USER",
+    source: "TEAM" | "TEAM_ROLE" | "USER",
 ): string {
     switch (source) {
-        case "SYSTEM_ROLE":
-            return "ได้รับจากระดับผู้ดูแลระบบของบัญชีนี้";
         case "TEAM":
             return "สมาชิกทุกคนในกลุ่มที่ใช้งานอยู่สามารถได้รับสิทธิ์นี้";
         case "TEAM_ROLE":

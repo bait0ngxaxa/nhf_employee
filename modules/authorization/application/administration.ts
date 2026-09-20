@@ -441,11 +441,6 @@ function buildSourceExplanation(
     memberships: readonly AuthorizationAdministrationUserTeamMembership[],
 ): AuthorizationAdministrationSourceExplanation {
     switch (source.type) {
-        case "SYSTEM_ROLE":
-            return Object.freeze({
-                type: "SYSTEM_ROLE",
-                role: source.role,
-            });
         case "USER":
             return Object.freeze({
                 type: "USER",
@@ -479,8 +474,6 @@ function buildSourceExplanation(
 
 function cloneGrantSource(source: AuthorizationGrantSource): AuthorizationGrantSource {
     switch (source.type) {
-        case "SYSTEM_ROLE":
-            return Object.freeze({ type: "SYSTEM_ROLE", role: source.role });
         case "TEAM":
             return Object.freeze({ type: "TEAM", teamId: source.teamId });
         case "TEAM_ROLE":

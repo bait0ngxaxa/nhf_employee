@@ -142,8 +142,7 @@ function buildStockCapabilityAuthorization(
         decision: authority.configuredDecision,
         defaultScopes: authority.defaultScopes,
         scopes: authority.scopes,
-        // The legacy ADMIN/SystemRole projection is comparison-only. Normal
-        // production authority never derives this metadata from identity.
+        // This metadata is intentionally not inferred from systemRole.
         isAdministrative: false,
     });
 }

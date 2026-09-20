@@ -1,32 +1,25 @@
 # NHF Employee — Centralized Authorization Resolver
 
-> **Current repository state (Phase 12H-G):** the normal resolver factory and
-> `authorization` singleton use the role-neutral configured strategy. USER and
-> ADMIN load the same direct User, Team, and TeamRole persistence; ADMIN does
-> not manufacture ordinary business authority. The legacy resolver/evaluator
-> and composition wrapper are retained only for Phase 12H-H comparison and
-> Phase 12H-I deletion. Earlier current-target notes in this historical
-> document describe their original phase boundary and are not the live
-> enforcement state.
+> **Current repository state (Phase 12H-I):** the canonical resolver factory
+> and `authorization` singleton use one configured-grant resolution model.
+> USER and ADMIN load the same direct User, Team, and TeamRole persistence;
+> ADMIN does not manufacture ordinary business authority. The temporary H
+> comparison seam has been removed. Earlier phase-boundary notes in this
+> document are historical and are not the live enforcement state.
 
-Current-target note: Phase 12H-B implemented the role-neutral configured
-evaluator and composition primitive, and Phase 12H-C rebaselined the covered
-domain Default Domain Policies. The production-facing resolver singleton
-remains on the temporary pre-12H `SYSTEM_ROLE / ADMIN` compatibility strategy;
-the role-neutral target factory is application-internal and is not the
-production enforcement path yet. See
+Current-model note: Phase 12H-B implemented the configured evaluator and
+composition primitive, Phase 12H-C rebaselined the covered domain Default
+Domain Policies, Phase 12H-G cut over normal production enforcement, and Phase
+12H-I removed the temporary comparison seam. See
 [authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md),
 [authorization-phase-12hb-role-neutral-core.md](./authorization-phase-12hb-role-neutral-core.md),
-and
-[authorization-phase-12hc-domain-default-policy-rebaseline.md](./authorization-phase-12hc-domain-default-policy-rebaseline.md).
+ [authorization-phase-12hc-domain-default-policy-rebaseline.md](./authorization-phase-12hc-domain-default-policy-rebaseline.md),
+and [authorization-phase-12hi-compatibility-debt-removal.md](./authorization-phase-12hi-compatibility-debt-removal.md).
 
-Phase 12H-D completed the registered deferred business capabilities without
-changing the production enforcement target: `leave.recovery.manage` is a
-Dashboard-only centralized recovery-entry capability, and Email Request now
-uses centralized configured `OWN`/`ALL` read and `ALL` create decisions. The
-production singleton still retains temporary legacy ADMIN compatibility, and
-the remaining presentation/route role gates are intentionally scheduled for
-Phase 12H-F. The completion record is in
+Phase 12H-D completed the registered deferred business capabilities:
+`leave.recovery.manage` is a Dashboard-only centralized recovery-entry
+capability, and Email Request uses centralized configured `OWN`/`ALL` read and
+`ALL` create decisions. The completion record is in
 [authorization-phase-12hd-missing-deferred-capability-completion.md](./authorization-phase-12hd-missing-deferred-capability-completion.md).
 
 Status: Phase 3 complete. This document describes the resolver introduced
@@ -45,18 +38,15 @@ contract are in
 The current pure application-layer composition seam described by that contract
 is in
 [authorization-phase-12b-additive-composition-core.md](./authorization-phase-12b-additive-composition-core.md).
-Phase 12H-B now makes that composition primitive role-neutral and adds
-`createRoleNeutralAuthorizationResolver()` beside the legacy production
-factory; the default resolver-level production semantics remain unchanged.
-Phase 12C.1 uses that seam for Department and Notification, Phase 12C.2 uses
+Phase 12H-B made that composition primitive role-neutral. Phase 12C.1 uses
+that seam for Department and Notification, Phase 12C.2 uses
 it for Employee, Phase 12C.3 uses it for the enforced Routine capabilities,
 Phase 12C.4 uses it for the complete Stock surface, Phase 12C.5 uses it for
 the complete registered Leave surface, and Phase 12D uses it for the three
 remaining Routine capabilities. Phase 12H-C now rebaselines the domain
 defaults, including the Routine task-read, summary, export, reference, and
-LIFF narrowing rules. The remaining compatibility-backed migration set is now
-empty, but the legacy ADMIN compatibility seam remains active until the
-documented later cutover lifecycle.
+LIFF narrowing rules. The compatibility-backed migration set is now empty, and
+Phase 12H-I has removed the temporary ADMIN business-authority comparison seam.
 
 Phase 3 made authorization resolution operational and independently testable.
 The historical Phase 4 Routine pilot established the server-side seam; current
@@ -102,8 +92,7 @@ const authority = composeAuthorizationAuthority(
 Department, request, resource, workflow, or system-role dependency. It validates
 default scopes against the supplied code-owned registry, returns normalized
 effective scopes, and preserves configured grants separately from Default Domain
-Policy. The legacy composition wrapper remains available only to the explicit
-Phase 12H-H comparison path and is scheduled for Phase 12H-I deletion.
+Policy. There is no alternate business-authority composition path.
 
 These methods use the same authoritative resolution implementation.
 `require()` returns the successful `AuthorizationDecision`; on denial it
@@ -113,13 +102,11 @@ configuration or an unsupported resolver contract and is allowed to propagate
 from detailed resolution.
 
 `resolveMany()` returns a read-only map of decisions keyed by the requested
-capability. The normal production factory loads one shared resolution snapshot
-for both USER and ADMIN through `repository.loadMany()` and evaluates each
-capability against the relevant slice of that snapshot. Unknown capabilities
-and channel denials do not trigger persistence reads. The explicitly named
-legacy comparison factory retains the old ADMIN no-persistence behavior only
-for Phase 12H-H snapshots. Both paths preserve single-capability evaluator
-validation by isolating persisted grants per capability before evaluation.
+capability. The canonical factory loads one shared resolution snapshot for both
+USER and ADMIN through `repository.loadMany()` and evaluates each capability
+against the relevant slice of that snapshot. Unknown capabilities and channel
+denials do not trigger persistence reads. Single-capability resolution uses the
+same configured evaluator and persistence contract.
 
 For transaction-sensitive mutations, the public resolver also exposes
 `resolveInTransaction(actor, capability, persistenceContext)`. It uses the
@@ -129,12 +116,9 @@ The context is a narrow composition seam; the raw evaluator and persistence
 adapter remain private.
 
 The module exposes `createAuthorizationResolver()` and the `authorization`
-singleton for the production role-neutral registry/persistence-port seam.
-`createRoleNeutralAuthorizationResolver()` remains an explicit alias, while
-`createLegacyAdminCompatibleAuthorizationResolver()` is comparison-only and
-scheduled for Phase 12H-I deletion. The default instance uses the code-owned
-`CAPABILITY_REGISTRY` and the internal Prisma resolution adapter. Raw Prisma
-delegates and the adapter are not part of the public module API.
+singleton as the only resolver construction path. The instance uses the
+code-owned `CAPABILITY_REGISTRY` and the internal Prisma resolution adapter.
+Raw Prisma delegates and the adapter are not part of the public module API.
 
 ## Decision and grant contracts
 
@@ -172,7 +156,6 @@ Sources are stable identity records, not display names:
 
 ```ts
 type AuthorizationGrantSource =
-    | { type: "SYSTEM_ROLE"; role: "ADMIN" }
     | { type: "TEAM"; teamId: number }
     | { type: "TEAM_ROLE"; teamId: number; teamRoleId: number }
     | { type: "USER"; userId: number };
@@ -195,18 +178,12 @@ Resolution proceeds in this order:
 2. Check the actor's `DASHBOARD`, `LIFF_SELF_SERVICE`, or `SYSTEM` channel
    against the registered capability. A mismatch returns deny with
    `CHANNEL_NOT_SUPPORTED`, for both `USER` and `ADMIN`.
-3. On the role-neutral target path, load authorization configuration for the
-   actor and requested capability for both `USER` and `ADMIN`.
+3. Load authorization configuration for the actor and requested capability for
+   both `USER` and `ADMIN`.
 4. Validate each applicable persisted grant against the registry and form the
    additive union of Team, TeamRole, and direct User sources.
 5. Sort grants by source type and stable numeric IDs, normalize scopes, and
    default to deny when no valid applicable grant remains.
-
-The current production-compatible path is an explicit exception to steps 3–4:
-it preserves the pre-12H ADMIN system-role decision and no-persistence behavior
-until enforcement cutover. That exception is isolated in
-`legacy-admin-business-authority-compatibility.ts`; it is not part of the
-role-neutral evaluator.
 
 The resolver never performs authentication or account/workforce lifecycle
 checks. Its caller must provide an `AuthorizationActor` after the appropriate
@@ -237,16 +214,13 @@ For Employee, the permanent default is `ALL` for `employee.read`,
 `employee.stats.read`, and `employee.export`, and empty for
 `employee.create`, `employee.update`, `employee.delete`, and `employee.import`.
 The Employee adapter uses this same composition after both the regular
-resolver and `resolveInTransaction()`; ADMIN remains the resolver's
-`SYSTEM_ROLE / ADMIN` authority. Routine adds a context-sensitive default policy
+resolver and `resolveInTransaction()`. Routine adds a context-sensitive default policy
 and a post-composition LIFF self-service channel policy while keeping this
 resolver contract unchanged. Stock adds its permanent requester/catalog
 defaults without the Routine LIFF ADMIN clamp. Leave adds its permanent
-request/approval/cancellation/not-taken defaults without changing the
-resolver's system-role or channel semantics. The next runtime handoff is
-Phase 12H-D — Missing/deferred capability completion; production enforcement
-still intentionally remains on the legacy compatibility path until Phase
-12H-G.
+request/approval/cancellation/not-taken defaults without changing channel
+semantics. System-role checks remain owned by Auth and Authorization
+Administration, not by business capability resolution.
 
 ## USER semantics and lifecycle filtering
 
@@ -271,18 +245,11 @@ contributes only rows in `TeamRoleCapabilityGrant`.
 
 ## ADMIN semantics
 
-On the role-neutral target path, ADMIN has no implicit configured authority.
-With no applicable persisted grant it receives `NO_APPLICABLE_GRANT`; with the
-same trusted identity/resource context and persisted data as USER it receives
-the same decision and source provenance. A target ADMIN decision never contains
-a `SYSTEM_ROLE` grant.
-
-The existing `SYSTEM_ROLE / ADMIN` decision, including its registered-scope
-calculation and `UNSUPPORTED_ADMIN_TEAM_SCOPE` validation, is retained only in
-the explicitly named temporary compatibility seam. It remains authority only
-within the current production path and does not bypass authentication,
-account/workforce lifecycle, channel restrictions, resource relationships,
-workflow state, domain validation, transactions, or concurrency rules.
+ADMIN has no implicit configured authority. With no applicable persisted grant
+it receives `NO_APPLICABLE_GRANT`; with the same trusted identity/resource
+context and persisted data as USER it receives the same decision and source
+provenance. Business grant sources are only Team, TeamRole, and direct User
+configuration; system role remains separate control-plane identity.
 
 ## Scope normalization and TEAM origin
 
@@ -383,7 +350,7 @@ Routine deferred capability migration is recorded in
 [authorization-phase-12d-routine-deferred-migration.md](./authorization-phase-12d-routine-deferred-migration.md);
 the pilot remains the historical record of the earlier deferred boundaries.
 
-## Phase 12H-G production cutover
+## Phase 12H-G / 12H-I production model
 
 The previous phase-boundary notes in this document are historical. The live
 repository semantics are now:
@@ -392,13 +359,12 @@ repository semantics are now:
   configured evaluator and load persistence for USER and ADMIN alike;
 - normal adapters use `composeAuthorizationAuthority()` and retain default
   policy, configured source, Team origin, channel, and fail-closed semantics;
-- `createLegacyAdminCompatibleAuthorizationResolver()`,
-  `evaluateLegacyAuthorization()`, and
-  `composeLegacyAdminCompatibleAuthorizationAuthority()` are comparison-only
-  Phase 12H-H debt scheduled for Phase 12H-I deletion; and
+- the Phase 12H-H comparison-only resolver, evaluator, and composition seam
+  have been deleted after operator-confirmed H acceptance; and
 - the resolver does not infer authority from `systemRole`, Team name, Role
   name, Department, or an implicit ADMIN bundle.
 
-The production resolver/evaluator/composition regression and the remaining
-comparison debt are recorded in
-[authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).
+The production resolver/evaluator/composition regression is recorded in
+[authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md),
+and the compatibility-debt removal is recorded in
+[authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).

@@ -11,10 +11,6 @@ import {
     evaluateConfiguredAuthorization,
     getAuthorizationEvaluationContext,
 } from "./evaluator";
-import {
-    evaluateLegacyAuthorization,
-    shouldLoadLegacyAuthorizationPersistence,
-} from "./legacy-admin-business-authority-compatibility";
 import type {
     AuthorizationDecision,
     AuthorizationPersistenceContext,
@@ -59,52 +55,6 @@ export interface AuthorizationResolver {
     ): Promise<readonly AuthorizationScope[]>;
 }
 
-type AuthorizationEvaluationFunction = (
-    actor: AuthorizationActor,
-    capability: string,
-    resolutionData: AuthorizationResolutionData | undefined,
-    registry: CapabilityRegistry,
-) => AuthorizationDecision;
-
-interface AuthorizationResolutionStrategy {
-    readonly shouldLoadConfiguredResolution: (
-        actor: AuthorizationActor,
-    ) => boolean;
-    readonly evaluate: AuthorizationEvaluationFunction;
-}
-
-const ROLE_NEUTRAL_CONFIGURED_RESOLUTION: AuthorizationResolutionStrategy =
-    Object.freeze({
-        shouldLoadConfiguredResolution: (): boolean => true,
-        evaluate: (
-            actor: AuthorizationActor,
-            capability: string,
-            resolutionData: AuthorizationResolutionData | undefined,
-            registry: CapabilityRegistry,
-        ): AuthorizationDecision => evaluateConfiguredAuthorization(
-            actor,
-            capability,
-            resolutionData,
-            registry,
-        ),
-    });
-
-const LEGACY_ADMIN_BUSINESS_AUTHORITY_COMPATIBILITY:
-    AuthorizationResolutionStrategy = Object.freeze({
-        shouldLoadConfiguredResolution: shouldLoadLegacyAuthorizationPersistence,
-        evaluate: (
-            actor: AuthorizationActor,
-            capability: string,
-            resolutionData: AuthorizationResolutionData | undefined,
-            registry: CapabilityRegistry,
-        ): AuthorizationDecision => evaluateLegacyAuthorization(
-            actor,
-            capability,
-            resolutionData,
-            registry,
-        ),
-    });
-
 function selectResolutionDataForCapability(
     resolutionData: AuthorizationResolutionData,
     capability: string,
@@ -128,45 +78,6 @@ function selectResolutionDataForCapability(
 export function createAuthorizationResolver(
     dependencies: AuthorizationResolverDependencies = {},
 ): AuthorizationResolver {
-    return createAuthorizationResolverWithStrategy(
-        dependencies,
-        ROLE_NEUTRAL_CONFIGURED_RESOLUTION,
-    );
-}
-
-/**
- * Explicit role-neutral alias for callers that want to name the authority
- * model in migration and regression tests.
- */
-export function createRoleNeutralAuthorizationResolver(
-    dependencies: AuthorizationResolverDependencies = {},
-): AuthorizationResolver {
-    return createAuthorizationResolverWithStrategy(
-        dependencies,
-        ROLE_NEUTRAL_CONFIGURED_RESOLUTION,
-    );
-}
-
-/**
- * Phase 12H-H comparison-only compatibility resolver.
- *
- * This factory is not a production business authorization path. It preserves
- * the pre-cutover ADMIN/SystemRole semantics solely for snapshot comparison
- * and rollout validation until Phase 12H-I removes the compatibility seam.
- */
-export function createLegacyAdminCompatibleAuthorizationResolver(
-    dependencies: AuthorizationResolverDependencies = {},
-): AuthorizationResolver {
-    return createAuthorizationResolverWithStrategy(
-        dependencies,
-        LEGACY_ADMIN_BUSINESS_AUTHORITY_COMPATIBILITY,
-    );
-}
-
-function createAuthorizationResolverWithStrategy(
-    dependencies: AuthorizationResolverDependencies,
-    strategy: AuthorizationResolutionStrategy,
-): AuthorizationResolver {
     const registry = dependencies.registry ?? CAPABILITY_REGISTRY;
     const repository =
         dependencies.repository ?? authorizationResolutionRepository;
@@ -185,15 +96,11 @@ function createAuthorizationResolverWithStrategy(
             return context.decision;
         }
 
-        if (!strategy.shouldLoadConfiguredResolution(actor)) {
-            return strategy.evaluate(actor, capability, undefined, registry);
-        }
-
         const resolutionData = await resolutionRepository.load({
             userId: actor.userId,
             capabilityKey: context.definition.key,
         });
-        return strategy.evaluate(
+        return evaluateConfiguredAuthorization(
             actor,
             capability,
             resolutionData,
@@ -228,19 +135,6 @@ function createAuthorizationResolverWithStrategy(
                 continue;
             }
 
-            if (!strategy.shouldLoadConfiguredResolution(actor)) {
-                decisions.set(
-                    capability,
-                    strategy.evaluate(
-                        actor,
-                        capability,
-                        undefined,
-                        registry,
-                    ),
-                );
-                continue;
-            }
-
             capabilitiesToResolve.push({
                 capability,
                 definitionKey: context.definition.key,
@@ -259,7 +153,7 @@ function createAuthorizationResolverWithStrategy(
         for (const { capability, definitionKey } of capabilitiesToResolve) {
             decisions.set(
                 capability,
-                strategy.evaluate(
+                evaluateConfiguredAuthorization(
                     actor,
                     capability,
                     selectResolutionDataForCapability(

@@ -1849,7 +1849,7 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("keeps LIFF ADMIN task detail inside the self-service resource envelope", async () => {
+    it("keeps LIFF ADMIN configured authority inside the self-service resource envelope", async () => {
         const authorizationActor = {
             userId: 99,
             employeeId: 42,
@@ -1867,7 +1867,7 @@ describe("NHF Routine query authorization", () => {
                     grants: [{
                         capability: "routine.task.read",
                         scope: "ALL",
-                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                        source: { type: "USER", userId: 99 },
                     }],
                 },
                 defaultScopes: [],
@@ -1885,7 +1885,7 @@ describe("NHF Routine query authorization", () => {
                     grants: [{
                         capability: "routine.task.update",
                         scope: "ALL",
-                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                        source: { type: "USER", userId: 99 },
                     }],
                 },
                 defaultScopes: [],
@@ -1903,7 +1903,7 @@ describe("NHF Routine query authorization", () => {
                     grants: [{
                         capability: "routine.task.delete",
                         scope: "ALL",
-                        source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                        source: { type: "USER", userId: 99 },
                     }],
                 },
                 defaultScopes: [],

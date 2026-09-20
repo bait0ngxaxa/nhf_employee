@@ -48,7 +48,6 @@ export type {
 export {
     authorization,
     createAuthorizationResolver,
-    createLegacyAdminCompatibleAuthorizationResolver,
 } from "./application/resolver";
 export type {
     AuthorizationResolver,
@@ -71,13 +70,6 @@ export type {
     EffectiveAuthorizationGrant,
 } from "./application/types";
 export { composeAuthorizationAuthority } from "./application/composition";
-/**
- * Phase 12H-H comparison-only compatibility seam. It has no production
- * business callers and is scheduled for deletion in Phase 12H-I.
- */
-export {
-    composeLegacyAdminCompatibleAuthorizationAuthority,
-} from "./application/legacy-admin-business-authority-compatibility";
 export type {
     ComposedAuthorizationAuthority,
 } from "./application/composition";

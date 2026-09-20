@@ -215,7 +215,7 @@ describe("Employee authorization adapter", () => {
                 [{
                     capability: capability as EffectiveAuthorizationGrant["capability"],
                     scope: "ALL",
-                    source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                    source: { type: "USER", userId: 7 },
                 }],
             ),
         );
@@ -228,8 +228,8 @@ describe("Employee authorization adapter", () => {
         expect(result.defaultScopes).toEqual([]);
         expect(result.scopes).toEqual(["ALL"]);
         expect(result.decision.grants[0]?.source).toEqual({
-            type: "SYSTEM_ROLE",
-            role: "ADMIN",
+            type: "USER",
+            userId: 7,
         });
     });
 
@@ -455,7 +455,7 @@ describe("Employee authorization adapter", () => {
                 [{
                     capability: "employee.delete",
                     scope: "ALL",
-                    source: { type: "SYSTEM_ROLE", role: "ADMIN" },
+                    source: { type: "USER", userId: 7 },
                 }],
             ),
         );

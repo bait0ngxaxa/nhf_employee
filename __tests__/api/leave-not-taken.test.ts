@@ -101,7 +101,7 @@ function isAdminAuthorizationActor(actor: unknown): boolean {
         && actor.systemRole === "ADMIN";
 }
 
-function systemRoleScopes(capability: string): readonly TestAuthorizationScope[] {
+function configuredAdminScopes(capability: string): readonly TestAuthorizationScope[] {
     switch (capability) {
         case "leave.approver.manage":
             return ["ALL"];
@@ -116,6 +116,18 @@ function systemRoleScopes(capability: string): readonly TestAuthorizationScope[]
         default:
             return ["OWN"];
     }
+}
+
+function configuredUserId(actor: unknown): number {
+    if (
+        typeof actor === "object"
+        && actor !== null
+        && "userId" in actor
+        && typeof actor.userId === "number"
+    ) {
+        return actor.userId;
+    }
+    return 0;
 }
 
 function configuredRecoveryUserId(actor: unknown): number | null {
@@ -161,7 +173,7 @@ function authorizationDecision(actor: unknown, capability: string) {
         };
     }
 
-    const scopes = systemRoleScopes(capability);
+    const scopes = configuredAdminScopes(capability);
     return {
         capability,
         allowed: true,
@@ -169,7 +181,7 @@ function authorizationDecision(actor: unknown, capability: string) {
         grants: scopes.map((scope) => ({
             capability,
             scope,
-            source: { type: "SYSTEM_ROLE" as const, role: "ADMIN" as const },
+            source: { type: "USER" as const, userId: configuredUserId(actor) },
         })),
     };
 }

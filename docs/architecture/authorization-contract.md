@@ -6,9 +6,11 @@ Phase 12A additive policy lock: see
 
 Phase 12H-A target supersession: see
 [authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
-This Phase 1 document remains a historical vocabulary/registry record. It does
-not define the current long-term ADMIN business-authority target, and the
-runtime remains pre-12H until later implementation phases.
+Phase 12H-I current-model closure: see
+[authorization-phase-12hi-compatibility-debt-removal.md](./authorization-phase-12hi-compatibility-debt-removal.md).
+This Phase 1 document remains a historical vocabulary/registry record, but its
+current source-of-truth boundary is now the final role-neutral model: ADMIN is
+an Auth/control-plane role, not a business grant source.
 
 This document defines the code-level authorization vocabulary for the next
 authorization phases. It does not replace or rewrite the current behavior
@@ -38,11 +40,14 @@ distinct from the final domain decision until Phase 12B composes these layers.
 authentication, workforce lifecycle, resource relationships, workflow state,
 validation, transactions, channel restrictions, or concurrency rules.
 
-Phase 12H-A supersedes that historical target in two respects: ADMIN has no
+Phase 12H-A superseded that historical target in two respects: ADMIN has no
 implicit business capability authority, and selected legacy USER defaults are
-explicitly narrowed. In particular, Routine broad `routine.task.read`,
-`routine.summary.read`, and `routine.task.export` authority is not an automatic
-target default. See the Phase 12H-A contract for the role-neutral replacements.
+explicitly narrowed. Phase 12H-I now makes that model canonical in runtime:
+business grant sources are only Team, TeamRole, and exceptional direct User
+grants, combined with domain-owned Default Domain Policy. In particular,
+Routine broad `routine.task.read`, `routine.summary.read`, and
+`routine.task.export` authority is not an automatic target default. See the
+Phase 12H-A contract and Phase 12H-I closure for the final replacements.
 
 The existing role source of truth remains
 [`lib/ssot/permissions.ts`](../../lib/ssot/permissions.ts). The authorization
@@ -231,9 +236,9 @@ contract values.
 | `routine.occurrence.reassign` | `ALL` | `DASHBOARD` | Occurrence reassignment; active target and concurrency checks remain Routine-owned. |
 | `routine.occurrence.change_due_date` | `ALL` | `DASHBOARD` | Explicit occurrence due-date change; date, reminder, lock, and audit behavior remain Routine-owned. |
 | `routine.import.manage` | `ALL` | `DASHBOARD` | Import preview, staging, row, apply, and cancel operations; current Admin-only behavior is `CURRENT_COMPATIBILITY`. |
-| `routine.task.export` | `ALL` | `DASHBOARD` | Centrally enforced broad active Routine export; eligible normal Dashboard USER default is `ALL`, while Dashboard ADMIN uses central `SYSTEM_ROLE / ADMIN`. |
+| `routine.task.export` | `ALL` | `DASHBOARD` | Centrally enforced broad active Routine export; no-grant actors use the approved domain default, while broader access requires configured authority. |
 | `routine.summary.read` | `ASSIGNED`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Centrally enforced context-sensitive KPI read: Dashboard `mine` is `ASSIGNED`, Dashboard `all` is `ALL`, and LIFF is self-service `ASSIGNED`. |
-| `routine.reference.read` | `OWN`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Centrally enforced reference read: normal Dashboard USER default is `OWN`, Dashboard ADMIN/configured `ALL` may expand active Employee references, and LIFF retains the no-Employee-list response contract. |
+| `routine.reference.read` | `OWN`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Centrally enforced reference read: the Dashboard default is `OWN`, configured `ALL` may expand active Employee references, and LIFF retains the no-Employee-list response contract. |
 
 ### 5.4 Stock
 

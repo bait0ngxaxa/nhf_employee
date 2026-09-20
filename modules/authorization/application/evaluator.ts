@@ -113,11 +113,6 @@ export function evaluateConfiguredAuthorization(
     );
 }
 
-/**
- * Compatibility name for internal callers. It intentionally points to the
- * role-neutral configured evaluator; legacy ADMIN behavior lives elsewhere.
- */
-export const evaluateAuthorization = evaluateConfiguredAuthorization;
 
 function evaluateConfiguredGrants(
     actor: AuthorizationActor,
