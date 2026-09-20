@@ -28,7 +28,11 @@ import type {
     RoutineTaskFilters,
 } from "../schemas/routine";
 
-import { RoutineNotFoundError, RoutineValidationError } from "./errors";
+import {
+    RoutineForbiddenError,
+    RoutineNotFoundError,
+    RoutineValidationError,
+} from "./errors";
 import {
     buildRoutineOccurrenceScope,
     buildRoutineTaskAccessScope,
@@ -879,6 +883,15 @@ export async function getRoutineTaskWorkItems(
             requestedScope: filters.scope,
         },
     );
+    if (
+        filters.scope === "all"
+        && capabilityAuthorization.actor.channel === "DASHBOARD"
+        && !capabilityAuthorization.scopes.includes("ALL")
+    ) {
+        throw new RoutineForbiddenError(
+            "คุณไม่มีสิทธิ์ดูรายการ Routine ทั้งหมด",
+        );
+    }
     const mutationAuthorizations = await resolveTaskMutationCapabilities(
         queryActor,
         employeeId,
@@ -1225,11 +1238,15 @@ export async function getRoutineSummary(
         "routine.summary.read",
         { summaryView: scope },
     );
-    const queryScope = scope === "all"
-        && authorization.actor.channel === "DASHBOARD"
-        && authorization.scopes.includes("ALL")
-        ? "all"
-        : "mine";
+    if (
+        scope === "all"
+        && !authorization.scopes.includes("ALL")
+    ) {
+        throw new RoutineForbiddenError(
+            "คุณไม่มีสิทธิ์ดูสรุป Routine ทั้งหมด",
+        );
+    }
+    const queryScope = scope;
     const today = getCurrentBangkokDate();
     const nextThirtyDays = addCalendarDays(today, 30);
 

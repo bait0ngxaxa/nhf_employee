@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 
-import { addUserGrant, removeUserGrant } from "../api";
+import { addUserGrant, changeUserSystemRole, removeUserGrant } from "../api";
 import {
     getAuthorizationChannelLabel,
     getAuthorizationDomainLabel,
@@ -32,6 +32,7 @@ import type {
     AuthorizationAdministrationUserDetailData,
     AuthorizationAdministrationUserSummaryData,
     AuthorizationCapabilityGrantInput,
+    SystemRole,
 } from "../types";
 import { ConfirmAuthorizationAction, GrantFormDialog } from "./AuthorizationDialogs";
 import { AuthorizationStatus, LifecycleStatus } from "./AuthorizationStatus";
@@ -83,6 +84,7 @@ export function UserAccessPanel({
     readonly onRefresh: () => Promise<void>;
 }): ReactElement {
     const [grantDialogOpen, setGrantDialogOpen] = useState(false);
+    const [systemRoleTarget, setSystemRoleTarget] = useState<SystemRole | null>(null);
     const [pending, setPending] = useState<string | null>(null);
     const inspectionInvalid = user ? isAuthorizationInspectionInvalid(user) : false;
 
@@ -134,6 +136,26 @@ export function UserAccessPanel({
         }
     };
 
+    const changeRole = async (nextRole: SystemRole): Promise<void> => {
+        if (!user) return;
+        setPending(`system-role:${nextRole}`);
+        try {
+            try {
+                await changeUserSystemRole(user.user.id, { systemRole: nextRole });
+            } catch (operationError) {
+                await revalidate();
+                throw operationError;
+            }
+            const refreshed = await revalidate();
+            toast.success(nextRole === "ADMIN" ? "แต่งตั้งผู้ดูแลระบบแล้ว" : "ยกเลิกบทบาทผู้ดูแลระบบแล้ว", refreshed ? undefined : {
+                description: "บันทึกสำเร็จแล้ว แต่โหลดข้อมูลผู้ใช้ล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่",
+            });
+            setSystemRoleTarget(null);
+        } finally {
+            setPending(null);
+        }
+    };
+
     return (
         <div className="space-y-5">
             <UserDirectorySearch
@@ -151,7 +173,14 @@ export function UserAccessPanel({
             {user ? (
                 <div className="space-y-5">
                     {error ? <p role="alert" className="text-sm text-status-warning-strong">ข้อมูลผู้ใช้อาจไม่ใช่ข้อมูลล่าสุด กรุณากดโหลดใหม่</p> : null}
-                    <UserIdentityPanel user={user} />
+                    <section className="space-y-4 rounded-xl border border-border-subtle bg-surface-subtle/45 p-3 sm:p-4" aria-labelledby="authorization-account-system-role-heading">
+                        <div>
+                            <h2 id="authorization-account-system-role-heading" className="text-base font-semibold text-content-heading">บัญชีและบทบาทระบบ</h2>
+                            <p className="mt-1 text-sm leading-6 text-content-secondary">ตรวจสอบตัวตน สถานะบัญชี และบทบาทที่ใช้เข้าสู่พื้นที่ควบคุมสิทธิ์ของระบบ</p>
+                        </div>
+                        <UserIdentityPanel user={user} />
+                        <SystemRoleControl user={user} busy={pending?.startsWith("system-role:") === true} onRequestChange={setSystemRoleTarget} />
+                    </section>
                     <ConfigurationIssues issues={user.configurationIssues} />
                     <EffectiveAccessInspector
                         user={user}
@@ -170,6 +199,21 @@ export function UserAccessPanel({
                         busy={pending?.startsWith("user-grant-add:") ?? false}
                         onClose={() => setGrantDialogOpen(false)}
                         onSubmit={addGrant}
+                    />
+                    <ConfirmAuthorizationAction
+                        open={systemRoleTarget !== null}
+                        title={systemRoleTarget === "ADMIN" ? "แต่งตั้งเป็นผู้ดูแลระบบหรือไม่?" : "ยกเลิกบทบาทผู้ดูแลระบบหรือไม่?"}
+                        description={systemRoleTarget === "ADMIN"
+                            ? "บทบาทนี้เป็นสิทธิ์ระดับสูงสำหรับเข้าถึงพื้นที่จัดการสิทธิ์ของระบบ ไม่ได้เพิ่มสิทธิ์การทำงานของโมดูลต่าง ๆ และบัญชีเป้าหมายต้องพร้อมใช้งานในปัจจุบัน"
+                            : "การยกเลิกบทบาทนี้จะไม่ลบสมาชิก Team, TeamRole หรือสิทธิ์เฉพาะบุคคล สิทธิ์การทำงานของผู้ใช้จะยังคงคำนวณจากแหล่งสิทธิ์เดิม"
+                        }
+                        confirmLabel={systemRoleTarget === "ADMIN" ? "ยืนยันแต่งตั้งเป็นผู้ดูแลระบบ" : "ยืนยันยกเลิกบทบาทผู้ดูแลระบบ"}
+                        destructive={systemRoleTarget === "USER"}
+                        busy={pending?.startsWith("system-role:") === true}
+                        onClose={() => setSystemRoleTarget(null)}
+                        onConfirm={async () => {
+                            if (systemRoleTarget) await changeRole(systemRoleTarget);
+                        }}
                     />
                 </div>
             ) : null}
@@ -208,10 +252,50 @@ function UserIdentityPanel({ user }: { readonly user: AuthorizationAdministratio
     const identity = user.user;
     return (
         <section className="rounded-xl border border-border-subtle bg-surface-raised">
-            <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold text-content-heading">{identity.name}</h2><LifecycleStatus isActive={identity.isActive} deletedAt={identity.deletedAt} />{user.systemRole === "ADMIN" ? <AuthorizationStatus tone="warning">ผู้ดูแลระบบ</AuthorizationStatus> : null}</div><p className="mt-1 text-sm text-content-secondary">{identity.email}</p></div><details className="text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสผู้ใช้</summary><span className="mt-1 block font-mono text-content-muted">{identity.id}</span></details></div>
+            <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-semibold text-content-heading">{identity.name}</h3><LifecycleStatus isActive={identity.isActive} deletedAt={identity.deletedAt} />{user.systemRole === "ADMIN" ? <AuthorizationStatus tone="warning">ผู้ดูแลระบบ</AuthorizationStatus> : null}</div><p className="mt-1 text-sm text-content-secondary">{identity.email}</p></div><details className="text-xs"><summary className="cursor-pointer text-content-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รหัสผู้ใช้</summary><span className="mt-1 block font-mono text-content-muted">{identity.id}</span></details></div>
             {!identity.isActive || identity.deletedAt !== null ? <div className="border-b border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong sm:px-5">บัญชีนี้ไม่พร้อมใช้งาน การมีสิทธิ์ในระบบไม่ได้ทำให้ผ่านการตรวจสอบสถานะบัญชีหรือพนักงาน</div> : null}
             <dl className="grid gap-4 px-4 py-4 text-sm sm:grid-cols-2 lg:grid-cols-4 sm:px-5"><IdentityField label="บทบาทระบบ" value={user.systemRole === "ADMIN" ? "ผู้ดูแลระบบ" : "ผู้ใช้งานทั่วไป"} /><IdentityField label="สถานะบัญชี" value={identity.deletedAt !== null ? "ถูกลบ / ใช้งานไม่ได้" : identity.isActive ? "ใช้งานอยู่" : "ปิดใช้งาน"} /><IdentityField label="พนักงาน" value={identity.employee?.displayName ?? "ไม่เชื่อมกับข้อมูลพนักงาน"} /><IdentityField label="สถานะพนักงาน" value={identity.employee ? getEmployeeStatusLabel(identity.employee.status, identity.employee.deletedAt) : "—"} /></dl>
             <details className="border-t border-border-subtle px-4 py-3 text-sm sm:px-5"><summary className="cursor-pointer font-semibold text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">รายละเอียดทางเทคนิค</summary><dl className="mt-2 grid gap-2 text-xs sm:grid-cols-2"><div><dt className="font-semibold text-content-secondary">system role</dt><dd className="font-mono text-content-body">{user.systemRole}</dd></div><div><dt className="font-semibold text-content-secondary">account id</dt><dd className="font-mono text-content-body">{identity.id}</dd></div></dl></details>
+        </section>
+    );
+}
+
+function SystemRoleControl({
+    user,
+    busy,
+    onRequestChange,
+}: {
+    readonly user: AuthorizationAdministrationUserDetailData;
+    readonly busy: boolean;
+    readonly onRequestChange: (nextRole: SystemRole) => void;
+}): ReactElement {
+    const isAdmin = user.systemRole === "ADMIN";
+    return (
+        <section className="rounded-xl border border-border-subtle bg-surface-raised" aria-labelledby="authorization-system-role-heading">
+            <div className="border-b border-border-subtle px-4 py-4 sm:px-5">
+                <h3 id="authorization-system-role-heading" className="text-base font-semibold text-content-heading">บทบาทผู้ดูแลระบบ</h3>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-content-secondary">ผู้ดูแลระบบสามารถเข้าถึงพื้นที่จัดการสิทธิ์ของระบบ</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-content-secondary">บทบาทนี้ไม่ได้เพิ่มสิทธิ์การทำงานของโมดูลต่าง ๆ</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-content-secondary">สิทธิ์งานยังมาจากกลุ่ม บทบาทในกลุ่ม หรือสิทธิ์เฉพาะบุคคล</p>
+            </div>
+            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div>
+                    <p className="text-xs font-semibold text-content-secondary">บทบาทปัจจุบัน</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-content-heading">{isAdmin ? "ผู้ดูแลระบบ" : "ผู้ใช้งานทั่วไป"}</p>
+                        <AuthorizationStatus tone={isAdmin ? "warning" : "neutral"}>{isAdmin ? "ADMIN" : "USER"}</AuthorizationStatus>
+                    </div>
+                </div>
+                <Button
+                    type="button"
+                    variant={isAdmin ? "destructive" : "default"}
+                    size="sm"
+                    onClick={() => onRequestChange(isAdmin ? "USER" : "ADMIN")}
+                    disabled={busy}
+                >
+                    {isAdmin ? "ยกเลิกบทบาทผู้ดูแลระบบ" : "แต่งตั้งเป็นผู้ดูแลระบบ"}
+                </Button>
+            </div>
         </section>
     );
 }
@@ -272,7 +356,7 @@ function EffectiveAccessInspector({
             {rawStatus.status === "INVALID_CONFIGURATION" ? <InvalidResolutionState error={rawStatus.error} /> : effectiveStatus.status === "INVALID_CONFIGURATION" ? <InvalidEffectiveAccessState error={effectiveStatus.error} /> : <>
                 <EffectiveAccessSummary summary={user.effectiveAccessSummary} />
                 <div className="grid gap-3 border-b border-border-subtle bg-surface-subtle/60 px-4 py-3 md:grid-cols-[12rem_15rem] sm:px-5"><div><Label htmlFor="authorization-effective-filter">สถานะสิทธิ์</Label><select id="authorization-effective-filter" value={filter} onChange={(event) => setFilter(event.target.value as EffectiveFilter)} className="mt-2 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="ALL">ทั้งหมด</option><option value="AVAILABLE">ใช้งานได้</option><option value="UNAVAILABLE">ยังไม่มีสิทธิ์</option><option value="UNSUPPORTED">ช่องทางนี้ไม่รองรับ</option><option value="DEFERRED">ยังไม่เปิดให้จัดการ</option></select></div><div><Label htmlFor="authorization-effective-domain">หมวดงาน</Label><select id="authorization-effective-domain" value={domain} onChange={(event) => setDomain(event.target.value)} className="mt-2 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-sm text-content-body focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><option value="ALL">ทุกหมวดงาน</option>{domains.map((item) => <option key={item} value={item}>{getAuthorizationDomainLabel(item)}</option>)}</select></div></div>
-                {groups.length === 0 ? <p className="px-4 py-8 text-center text-sm text-content-secondary sm:px-5">ไม่พบสิทธิ์ตามตัวกรองนี้</p> : <div className="divide-y divide-border-subtle">{domainGroups.map((domainGroup) => <section key={domainGroup.domain} aria-labelledby={`effective-capability-domain-${domainGroup.domain}`}><h4 id={`effective-capability-domain-${domainGroup.domain}`} className="bg-surface-subtle/60 px-4 py-3 text-sm font-semibold text-content-heading sm:px-5">{getAuthorizationDomainLabel(domainGroup.domain)}</h4><div className="divide-y divide-border-subtle">{domainGroup.capabilities.map((group) => <div key={group.capability.key} className="px-4 py-4 sm:px-5"><EffectiveAccessCapabilityCard group={group} directGrants={user.directGrants.filter((grant) => grant.capabilityKey === group.capability.key)} pending={pending} onAddGrant={onAddGrant} onRemoveGrant={onRemoveGrant} /></div>)}</div></section>)}</div>}
+                {groups.length === 0 ? <p className="px-4 py-8 text-center text-sm text-content-secondary sm:px-5">ไม่พบสิทธิ์ตามตัวกรองนี้</p> : <div className="grid gap-4 px-3 py-4 sm:px-4">{domainGroups.map((domainGroup) => <section key={domainGroup.domain} aria-labelledby={`effective-capability-domain-${domainGroup.domain}`} className="rounded-xl border border-border-subtle bg-surface-subtle/60 p-2 sm:p-3"><div className="flex items-center justify-between gap-3 px-2 pb-2"><h4 id={`effective-capability-domain-${domainGroup.domain}`} className="text-sm font-semibold text-content-heading">{getAuthorizationDomainLabel(domainGroup.domain)}</h4><span className="shrink-0 text-xs text-content-secondary">{domainGroup.capabilities.length} ความสามารถ</span></div><div className="space-y-3">{domainGroup.capabilities.map((group) => <EffectiveAccessCapabilityCard key={group.capability.key} group={group} directGrants={user.directGrants.filter((grant) => grant.capabilityKey === group.capability.key)} pending={pending} onAddGrant={onAddGrant} onRemoveGrant={onRemoveGrant} />)}</div></section>)}</div>}
             </>}
             <RawResolverEvidence permissions={user.resolverEffectivePermissions} directGrants={user.directGrants} />
         </section>
@@ -309,7 +393,7 @@ function EffectiveAccessCapabilityCard({
     const presentation = getCapabilityPresentation(group.capability.key);
     const isGrantable = group.capability.administrativelyGrantable;
     return (
-        <article className="rounded-xl border border-border-subtle bg-surface-raised shadow-sm" aria-labelledby={`effective-capability-${group.capability.key}`} data-testid={`effective-capability-card-${group.capability.key}`}>
+        <article className="rounded-xl border border-border-subtle bg-surface-raised" aria-labelledby={`effective-capability-${group.capability.key}`} data-testid={`effective-capability-card-${group.capability.key}`}>
             <div className="flex flex-col gap-3 border-b border-border-subtle px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h5 id={`effective-capability-${group.capability.key}`} className="text-base font-semibold text-content-heading">{presentation?.actionLabel ?? "สิทธิ์ที่ต้องตรวจสอบ"}</h5><AuthorizationStatus tone="neutral">{group.rows.length} บริบทการใช้งาน</AuthorizationStatus></div><p className="mt-1 text-sm leading-6 text-content-secondary">{presentation?.description ?? group.capability.description}</p></div>
                 {isGrantable ? <span className="text-xs leading-5 text-content-muted">ปรับสิทธิ์เฉพาะบุคคลได้จากการ์ดนี้</span> : <span className="text-xs leading-5 text-content-muted">{group.capability.administrativeStatus === "DEFERRED" ? "สิทธิ์นี้ยังไม่เปิดให้จัดการ" : "สิทธิ์นี้ยังไม่เปิดให้ผู้ดูแลปรับเอง"}</span>}

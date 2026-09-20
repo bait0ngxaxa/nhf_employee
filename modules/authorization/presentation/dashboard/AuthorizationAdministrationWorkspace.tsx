@@ -43,19 +43,20 @@ export function AuthorizationAdministrationWorkspace({
         userSearchQuery: directoryQuery,
     });
     const overview = data.overview;
-    const { refreshOverview, refreshTeam, refreshUser } = data;
+    const { refreshDirectory, refreshOverview, refreshTeam, refreshUser } = data;
 
     const refreshRelevant = useCallback(async (
         affectedUserId?: number,
         includeOverview = true,
     ): Promise<void> => {
         const refreshes: Promise<unknown>[] = includeOverview ? [refreshOverview()] : [];
+        if (affectedUserId !== undefined) refreshes.push(refreshDirectory());
         if (selectedTeamId !== null) refreshes.push(refreshTeam());
         if (selectedUserId !== null && (affectedUserId === undefined || affectedUserId === selectedUserId)) {
             refreshes.push(refreshUser());
         }
         await Promise.all(refreshes);
-    }, [refreshOverview, refreshTeam, refreshUser, selectedTeamId, selectedUserId]);
+    }, [refreshDirectory, refreshOverview, refreshTeam, refreshUser, selectedTeamId, selectedUserId]);
 
     const handleCreateTeam = async (input: CreateAuthorizationTeamInput): Promise<void> => {
         setCreateTeamBusy(true);

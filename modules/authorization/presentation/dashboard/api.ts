@@ -17,10 +17,12 @@ import type {
     AuthorizationAdministrationMutationTeamRoleGrantData,
     AuthorizationAdministrationMutationUserGrantData,
     AuthorizationAdministrationOverviewData,
+    AuthorizationAdministrationSystemRoleData,
     AuthorizationAdministrationTeamDetailData,
     AuthorizationAdministrationUserDetailData,
     AuthorizationAdministrationUserSummaryData,
     AuthorizationCapabilityGrantInput,
+    ChangeSystemRoleInput,
     ChangeAuthorizationTeamMemberRoleInput,
     CreateAuthorizationTeamInput,
     CreateAuthorizationTeamRoleInput,
@@ -95,6 +97,16 @@ export async function fetchUser(
         readonly user: AuthorizationAdministrationUserDetailData;
     }>(API_ROUTES.authorizationAdministration.userById(userId));
     return (await readEnvelope(response)).user;
+}
+
+export async function changeUserSystemRole(
+    userId: number,
+    input: ChangeSystemRoleInput,
+): Promise<AuthorizationAdministrationSystemRoleData> {
+    const response = await apiPatch<{
+        readonly result: AuthorizationAdministrationSystemRoleData;
+    }>(API_ROUTES.authorizationAdministration.userSystemRoleById(userId), input);
+    return (await readEnvelope(response)).result;
 }
 
 export async function createTeam(

@@ -382,6 +382,8 @@ export const API_ROUTES = {
             `/api/authorization/administration/teams/${teamId}/roles/${roleId}/grants`,
         userById: (id: number | string): string =>
             `/api/authorization/administration/users/${id}`,
+        userSystemRoleById: (id: number | string): string =>
+            `/api/authorization/administration/users/${id}/system-role`,
         userGrants: (userId: number | string): string =>
             `/api/authorization/administration/users/${userId}/grants`,
     },

@@ -52,6 +52,7 @@ const allRoutineCapabilities = {
     canManageImports: true,
     canExportTasks: true,
     canReadSummary: true,
+    canReadAllSummary: true,
     canReadReference: true,
     canReadAllReferences: true,
 } satisfies RoutinePresentationCapabilities;
@@ -63,6 +64,7 @@ const userRoutineCapabilities = {
     canUpdateAllTasks: false,
     canDeleteAllTasks: false,
     canReadAllReferences: false,
+    canReadAllSummary: false,
     canManageImports: false,
 } satisfies RoutinePresentationCapabilities;
 
@@ -231,14 +233,14 @@ describe("RoutineSection tabs", () => {
         vi.unstubAllGlobals();
     });
 
-    it("does not expose import tools without import capability", () => {
+    it("does not expose the all-task tab without task.read/ALL", () => {
         mockRoutineUser("USER");
 
         render(<RoutineSection />);
 
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
         expect(screen.getByText("จัดการงาน")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "รายการทั้งหมด" })).not.toBeInTheDocument();
         expect(screen.queryByText("ตั้งค่างานประจำ")).not.toBeInTheDocument();
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
         expect(mocks.useSWR).toHaveBeenCalledWith(
@@ -249,6 +251,11 @@ describe("RoutineSection tabs", () => {
         expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/reference",
             expect.any(Function),
+        );
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks",
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
         );
     });
 
@@ -273,40 +280,73 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByRole("combobox", { name: "หมวดหมู่งาน" })).toBeDisabled();
     });
 
-    it("lets a regular user open the all-task view and summary", async () => {
+    it("keeps a regular user in the mine view without task.read/ALL", async () => {
         mockRoutineUser("USER");
+
+        render(<RoutineSection />);
+
+        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/summary?scope=mine",
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
+        ));
+        expect(screen.queryByRole("button", { name: "รายการทั้งหมด" })).not.toBeInTheDocument();
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks",
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
+        );
+        expect(mocks.useSWR).not.toHaveBeenCalledWith(
+            expect.stringContaining("scope=all"),
+            expect.any(Function),
+            expect.anything(),
+        );
+    });
+
+    it("falls back to mine for a direct all-tab URL without task.read/ALL", async () => {
+        mockRoutineUser("USER");
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=all&taskId=71&occurrenceId=91"));
+
+        render(<RoutineSection />);
+
+        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/summary?scope=mine",
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
+        ));
+        expect(screen.queryByRole("button", { name: "รายการทั้งหมด" })).not.toBeInTheDocument();
+        expect(mocks.useSWR).toHaveBeenCalledWith(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&taskId=71&occurrenceId=91",
+            expect.any(Function),
+            expect.objectContaining({ keepPreviousData: true }),
+        );
+        expect(mocks.useSWR).not.toHaveBeenCalledWith(
+            expect.stringContaining("scope=all"),
+            expect.any(Function),
+            expect.anything(),
+        );
+    });
+
+    it("does not request a broad KPI without summary.read/ALL", async () => {
+        mockRoutineUser("USER", {
+            ...allRoutineCapabilities,
+            canReadAllSummary: false,
+        });
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
 
         await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
-            "/api/routines/summary?scope=all",
-            expect.any(Function),
-            expect.objectContaining({ keepPreviousData: true }),
-        ));
-        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/occurrences?scope=all&page=1&limit=12&view=tasks",
             expect.any(Function),
             expect.objectContaining({ keepPreviousData: true }),
         ));
-    });
-
-    it("accepts a direct all-tab URL for a regular user", async () => {
-        mockRoutineUser("USER");
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=all"));
-
-        render(<RoutineSection />);
-
-        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
+        expect(mocks.useSWR).not.toHaveBeenCalledWith(
             "/api/routines/summary?scope=all",
             expect.any(Function),
-            expect.objectContaining({ keepPreviousData: true }),
-        ));
-        await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
-            "/api/routines/occurrences?scope=all&page=1&limit=12&view=tasks",
-            expect.any(Function),
-            expect.objectContaining({ keepPreviousData: true }),
-        ));
+            expect.anything(),
+        );
+        expect(screen.queryByTestId("routine-kpi-grid")).not.toBeInTheDocument();
     });
 
     it("offers an all-task Excel export to every workforce user", () => {
@@ -349,11 +389,28 @@ describe("RoutineSection tabs", () => {
         render(<RoutineSection />);
 
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "รายการทั้งหมด" })).not.toBeInTheDocument();
         expect(screen.queryByText("จัดการงาน")).not.toBeInTheDocument();
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "สร้างแม่แบบงานทดสอบ" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "แก้ไข Routine ทดสอบ" })).not.toBeInTheDocument();
+    });
+
+    it("keeps management and import tabs independently capability-driven", () => {
+        mockRoutineUser("USER", {
+            ...readOnlyRoutineCapabilities,
+            canReadTasks: false,
+            canManageImports: true,
+            canCreateTasks: true,
+        });
+
+        render(<RoutineSection />);
+
+        expect(screen.queryByRole("button", { name: "รายการของฉัน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "รายการทั้งหมด" })).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "จัดการงาน" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "นำเข้าจาก Excel" })).toBeInTheDocument();
+        expect(mocks.useSWR).toHaveBeenCalledWith(null, expect.any(Function), expect.objectContaining({ keepPreviousData: true }));
     });
 
     it("lets a configured USER with broad capabilities use Routine actions", () => {
@@ -368,6 +425,18 @@ describe("RoutineSection tabs", () => {
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
         expect(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" })).toBeInTheDocument();
     });
+
+    it.each(["USER", "ADMIN"] as const)(
+        "keeps configured %s presentation role-neutral when grants are identical",
+        (role) => {
+            mockRoutineUser(role, allRoutineCapabilities);
+
+            render(<RoutineSection />);
+
+            expect(screen.getByRole("button", { name: "รายการของฉัน" })).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
+        },
+    );
 
     it("falls back from a stale import tab URL when import capability is absent", () => {
         mockRoutineUser("USER");

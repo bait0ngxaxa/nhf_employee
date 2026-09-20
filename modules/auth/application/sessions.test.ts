@@ -3,15 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
     buildRefreshTokenRecordMock,
+    findAccountForResolutionMock,
     findRefreshTokenByHashMock,
+    hasActiveSessionFamilyMock,
     hashRefreshTokenMock,
     issueAccessTokenMock,
     rotateRefreshTokenAtomicallyMock,
+    verifyAccessTokenMock,
 } = vi.hoisted(() => ({
     buildRefreshTokenRecordMock: vi.fn(),
+    findAccountForResolutionMock: vi.fn(),
     findRefreshTokenByHashMock: vi.fn(),
+    hasActiveSessionFamilyMock: vi.fn(),
     hashRefreshTokenMock: vi.fn(),
     issueAccessTokenMock: vi.fn(),
+    verifyAccessTokenMock: vi.fn(),
     rotateRefreshTokenAtomicallyMock: vi.fn(),
 }));
 
@@ -19,12 +25,12 @@ vi.mock("@/lib/auth/hybrid/tokens", () => ({
     buildRefreshTokenRecord: buildRefreshTokenRecordMock,
     hashRefreshToken: hashRefreshTokenMock,
     issueAccessToken: issueAccessTokenMock,
-    verifyAccessToken: vi.fn(),
+    verifyAccessToken: verifyAccessTokenMock,
 }));
 
 vi.mock("../infrastructure/persistence/account-repository", () => ({
     findAccountForLogout: vi.fn(),
-    findAccountForResolution: vi.fn(),
+    findAccountForResolution: findAccountForResolutionMock,
 }));
 
 vi.mock("../infrastructure/persistence/refresh-token-repository", () => ({
@@ -32,7 +38,7 @@ vi.mock("../infrastructure/persistence/refresh-token-repository", () => ({
     findActiveOwnedRefreshToken: vi.fn(),
     findRefreshTokenByHash: findRefreshTokenByHashMock,
     findRefreshTokenFamily: vi.fn(),
-    hasActiveSessionFamily: vi.fn(),
+    hasActiveSessionFamily: hasActiveSessionFamilyMock,
     listActiveRefreshSessions: vi.fn(),
     revokeAllRefreshTokensForUser: vi.fn(),
     revokeCurrentRefreshToken: vi.fn(),
@@ -40,7 +46,7 @@ vi.mock("../infrastructure/persistence/refresh-token-repository", () => ({
     rotateRefreshTokenAtomically: rotateRefreshTokenAtomicallyMock,
 }));
 
-import { refreshHybridSession } from "./sessions";
+import { refreshHybridSession, resolveAuthenticatedAccount } from "./sessions";
 
 function createRefreshToken() {
     return {
@@ -89,6 +95,7 @@ describe("refresh session state-machine outcomes", () => {
             status: "rotated",
             account: { role: "ADMIN", tokenVersion: 9 },
         });
+        hasActiveSessionFamilyMock.mockResolvedValue(true);
     });
 
     it("issues the successor using the account state from the atomic rotation", async () => {
@@ -171,5 +178,30 @@ describe("refresh session state-machine outcomes", () => {
             rawRefreshToken: "source-raw-token",
             metadata: {},
         })).resolves.toEqual({ status: "unauthorized" });
+    });
+
+    it("uses the persisted role when an access token carries a stale ADMIN claim", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "7",
+            sessionId: "family-7",
+            tokenVersion: 4,
+            role: "ADMIN",
+        });
+        findAccountForResolutionMock.mockResolvedValue({
+            email: "session-test@thainhf.org",
+            name: "Session Test",
+            role: "USER",
+            isActive: true,
+            deletedAt: null,
+            tokenVersion: 4,
+            employee: { status: "ACTIVE", deletedAt: null },
+        });
+
+        await expect(resolveAuthenticatedAccount("access-token")).resolves.toMatchObject({
+            userId: 7,
+            role: "USER",
+            sessionFamilyId: "family-7",
+        });
+        expect(findAccountForResolutionMock).toHaveBeenCalledWith(7);
     });
 });

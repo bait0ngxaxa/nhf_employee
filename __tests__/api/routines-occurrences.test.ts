@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoutineForbiddenError } from "@/modules/routine";
 
 const mocks = vi.hoisted(() => ({
     requireSession: vi.fn(),
@@ -100,5 +101,21 @@ describe("GET /api/routines/occurrences", () => {
             expect.objectContaining({ employeeId: 21 }),
         );
         expect(mocks.getOccurrences).not.toHaveBeenCalled();
+    });
+
+    it("returns forbidden for a direct all-task request without task.read/ALL", async () => {
+        mocks.getTaskWorkItems.mockRejectedValueOnce(
+            new RoutineForbiddenError("คุณไม่มีสิทธิ์ดูรายการ Routine ทั้งหมด"),
+        );
+
+        const response = await GET(new NextRequest(
+            "http://localhost/api/routines/occurrences?view=tasks&scope=all",
+        ));
+
+        expect(response.status).toBe(403);
+        expect(mocks.getTaskWorkItems).toHaveBeenCalledWith(
+            expect.objectContaining({ scope: "all" }),
+            expect.objectContaining({ actor: expect.objectContaining({ id: 5 }) }),
+        );
     });
 });

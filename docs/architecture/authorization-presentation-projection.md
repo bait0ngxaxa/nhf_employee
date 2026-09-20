@@ -68,6 +68,7 @@ configuration remains fail-closed. Full phase evidence is in
 ```ts
 interface RoutinePresentationCapabilities {
     canReadTasks: boolean;
+    canReadAllTasks: boolean;
     canCreateTasks: boolean;
     canUpdateTasks: boolean;
     canDeleteTasks: boolean;
@@ -78,6 +79,7 @@ interface RoutinePresentationCapabilities {
     canManageImports: boolean;
     canExportTasks: boolean;
     canReadSummary: boolean;
+    canReadAllSummary: boolean;
     canReadReference: boolean;
 }
 ```

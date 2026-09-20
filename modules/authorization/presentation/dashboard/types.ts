@@ -51,6 +51,15 @@ export type AuthorizationAdministrationUserDetailData = Clientize<
 export type AuthorizationAdministrationUserSummaryData = Clientize<
     AuthorizationAdministrationUserSummary
 >;
+export type SystemRole = "USER" | "ADMIN";
+export interface ChangeSystemRoleInput {
+    readonly systemRole: SystemRole;
+}
+export interface AuthorizationAdministrationSystemRoleData {
+    readonly userId: number;
+    readonly before: SystemRole;
+    readonly after: SystemRole;
+}
 export type AuthorizationAdministrationAccountIdentityData = Clientize<
     AuthorizationAdministrationAccountIdentity
 >;

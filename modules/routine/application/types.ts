@@ -32,6 +32,7 @@ export interface RoutinePresentationCapabilities {
     readonly canManageImports: boolean;
     readonly canExportTasks: boolean;
     readonly canReadSummary: boolean;
+    readonly canReadAllSummary: boolean;
     readonly canReadReference: boolean;
     readonly canReadAllReferences: boolean;
 }

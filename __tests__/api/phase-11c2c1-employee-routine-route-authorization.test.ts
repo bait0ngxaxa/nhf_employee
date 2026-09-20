@@ -450,41 +450,15 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
         );
     });
 
-    it("constrains requested all task work-items to created or assigned relationships", async () => {
-        mocks.prisma.routineOccurrence.findUnique.mockResolvedValue({
-            taskId: 71,
-            task: { isActive: true },
-        });
-        mocks.prisma.routineOccurrence.findFirst.mockResolvedValueOnce({
-            id: 91,
-            taskId: 71,
-        });
-
+    it("rejects requested all task work-items without effective task.read/ALL", async () => {
         const response = await getRoutineOccurrences(request(
             "/api/routines/occurrences?view=tasks&scope=all&taskId=71&occurrenceId=91",
         ));
 
-        expect(response.status).toBe(200);
-        await expect(response.json()).resolves.toMatchObject({
-            tasks: [],
-            pagination: { total: 0 },
-        });
+        expect(response.status).toBe(403);
         expectDashboardAuthorization("routine.task.read");
-        const taskQuery = mocks.prisma.routineTask.findMany.mock.calls[0]?.[0];
-        expect(taskQuery).toEqual(expect.objectContaining({
-            where: expect.objectContaining({
-                id: 71,
-                isActive: true,
-                OR: expect.arrayContaining([
-                    { createdById: USER.id },
-                    {
-                        assignees: {
-                            some: expect.objectContaining({ employeeId: 21 }),
-                        },
-                    },
-                ]),
-            }),
-        }));
+        expect(mocks.prisma.routineTask.findMany).not.toHaveBeenCalled();
+        expect(mocks.prisma.routineOccurrence.findFirst).not.toHaveBeenCalled();
     });
 
     it("LEDGER-ROU-08 denies an unrelated actor through GET /api/routines/occurrences/:id", async () => {

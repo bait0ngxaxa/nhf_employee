@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoutineForbiddenError } from "@/modules/routine";
 
 const mocks = vi.hoisted(() => ({
     requireSession: vi.fn(),
@@ -74,10 +75,14 @@ describe("GET /api/routines/summary", () => {
         }));
     });
 
-    it("allows a regular user's request for the all scope", async () => {
+    it("returns forbidden for a regular user's request for the all scope", async () => {
+        mocks.getSummary.mockRejectedValueOnce(
+            new RoutineForbiddenError("คุณไม่มีสิทธิ์ดูสรุป Routine ทั้งหมด"),
+        );
+
         const response = await GET(new NextRequest("http://localhost/api/routines/summary?scope=all"));
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(403);
         expect(mocks.getSummary).toHaveBeenCalledWith(expect.objectContaining({
             scope: "all",
             employeeId: 21,

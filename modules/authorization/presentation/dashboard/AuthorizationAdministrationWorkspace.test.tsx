@@ -53,6 +53,7 @@ describe("AuthorizationAdministrationWorkspace", () => {
             directoryUsers: [],
             directoryError: undefined,
             directoryLoading: false,
+            refreshDirectory: vi.fn(async () => undefined),
         });
 
         render(<AuthorizationAdministrationWorkspace initialOverview={overview} />);

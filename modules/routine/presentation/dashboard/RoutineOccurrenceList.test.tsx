@@ -25,6 +25,7 @@ const allRoutineCapabilities = {
     canManageImports: true,
     canExportTasks: true,
     canReadSummary: true,
+    canReadAllSummary: true,
     canReadReference: true,
     canReadAllReferences: true,
 } satisfies RoutinePresentationCapabilities;

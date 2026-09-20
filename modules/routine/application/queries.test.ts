@@ -499,8 +499,8 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("constrains a regular user's requested all-task summary without ALL", async () => {
-        await getRoutineSummary({
+    it("rejects a regular user's requested all-task summary without ALL", async () => {
+        await expect(getRoutineSummary({
             actor: {
                 id: 5,
                 email: "user@example.com",
@@ -508,17 +508,9 @@ describe("NHF Routine query authorization", () => {
             },
             employeeId: 21,
             scope: "all",
-        });
+        })).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
 
-        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: {
-                    isActive: true,
-                    assignees: { some: { employeeId: 21 } },
-                },
-                select: { id: true },
-            }),
-        );
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
         expect(resolveRoutineCapabilityMock).toHaveBeenCalledWith(
             expect.objectContaining({ id: 5, role: "USER" }),
             21,
@@ -561,6 +553,40 @@ describe("NHF Routine query authorization", () => {
         expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
             expect.objectContaining({ where: { isActive: true } }),
         );
+    });
+
+    it("fails closed instead of converting a LIFF all-summary request to mine", async () => {
+        resolveRoutineCapabilityMock.mockResolvedValueOnce({
+            actor: {
+                userId: 5,
+                employeeId: 21,
+                systemRole: "USER",
+                channel: "LIFF_SELF_SERVICE",
+            },
+            capability: "routine.summary.read",
+            decision: {
+                capability: "routine.summary.read",
+                allowed: true,
+                scopes: ["ALL"],
+                grants: [],
+            },
+            defaultScopes: ["ASSIGNED"],
+            scopes: ["ASSIGNED"],
+            hasBroadAuthority: false,
+            liffSelfServicePolicyApplied: true,
+        });
+
+        await expect(getRoutineSummary({
+            actor: {
+                id: 5,
+                email: "user@example.com",
+                role: "USER",
+                mode: "LIFF_SELF_SERVICE",
+            },
+            employeeId: 21,
+            scope: "all",
+        })).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 
     it("does not turn a structural summary authorization failure into a query", async () => {
@@ -688,66 +714,28 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("keeps a regular user's requested all-task scope relationship-constrained", async () => {
-        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
-            taskRow(71, 42, 5),
-            taskRow(72, 21, 99),
-            taskRow(73, 42, 99),
-        ]));
-        prismaMock.routineTask.count.mockResolvedValue(3);
-        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([]));
-
-        const result = await getRoutineTaskWorkItems(
+    it("rejects a regular user's requested all-task work-item scope without ALL", async () => {
+        await expect(getRoutineTaskWorkItems(
             { scope: "all", page: 1, limit: 20 },
             { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
-        );
+        )).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
 
-        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: {
-                    isActive: true,
-                    OR: [
-                        { createdById: 5 },
-                        { assignees: { some: { employeeId: 21 } } },
-                    ],
-                },
-            }),
-        );
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
         expect(resolveRoutineCapabilityMock).toHaveBeenCalledWith(
             expect.objectContaining({ id: 5, role: "USER" }),
             21,
             "routine.task.read",
             { taskReadView: "work-item", requestedScope: "all" },
         );
-        expect(result.tasks.map((task) => ({ id: task.id, canEdit: task.canEdit }))).toEqual([
-            { id: 71, canEdit: true },
-            { id: 72, canEdit: true },
-            { id: 73, canEdit: false },
-        ]);
     });
 
-    it("preserves an assignee filter when relationship-constraining requested all-task scope", async () => {
-        await getRoutineTaskWorkItems(
+    it("rejects an all-task scope with an assignee filter without ALL", async () => {
+        await expect(getRoutineTaskWorkItems(
             { scope: "all", assigneeId: 999, page: 1, limit: 20 },
             { actor: { id: 5, email: "user@example.com", role: "USER" }, employeeId: 21 },
-        );
+        )).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
 
-        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: {
-                    isActive: true,
-                    AND: [
-                        {
-                            OR: [
-                                { createdById: 5 },
-                                { assignees: { some: { employeeId: 21 } } },
-                            ],
-                        },
-                        { assignees: { some: { employeeId: 999 } } },
-                    ],
-                },
-            }),
-        );
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 
     it("preserves an assignee filter when configured ALL broadens a Dashboard task query", async () => {
@@ -971,7 +959,7 @@ describe("NHF Routine query authorization", () => {
         expect(result.tasks[0]?.id).toBe(71);
     });
 
-    it("allows an active occurrence-only assignee to open the focused Task", async () => {
+    it("rejects a regular user's all-scope focus before resource predicates", async () => {
         const today = getCurrentBangkokDate();
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(asNever({
             taskId: 71,
@@ -988,7 +976,7 @@ describe("NHF Routine query authorization", () => {
             occurrenceRow(99, 71, addCalendarDays(today, 4)),
         ]));
 
-        const result = await getRoutineTaskWorkItems(
+        await expect(getRoutineTaskWorkItems(
             {
                 scope: "all",
                 taskId: 71,
@@ -1000,17 +988,8 @@ describe("NHF Routine query authorization", () => {
                 actor: { id: 5, email: "user@example.com", role: "USER" },
                 employeeId: 42,
             },
-        );
-
-        expect(result.tasks).toHaveLength(1);
-        expect(result.tasks[0]?.id).toBe(71);
-        expect(result.tasks[0]?.relevantOccurrence?.id).toBe(99);
-        expect(result.tasks[0]).toMatchObject({ canEdit: false, canDelete: false });
-        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: expect.objectContaining({ id: 71 }),
-            }),
-        );
+        )).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 
     it("preserves occurrence-only access for a regular user's mine focus", async () => {
@@ -1109,7 +1088,7 @@ describe("NHF Routine query authorization", () => {
         prismaMock.routineOccurrence.findMany.mockResolvedValue([] as never);
         prismaMock.routineTask.findFirst.mockResolvedValue(null);
 
-        const result = await getRoutineTaskWorkItems(
+        await expect(getRoutineTaskWorkItems(
             {
                 scope: "all",
                 taskId: 71,
@@ -1121,12 +1100,8 @@ describe("NHF Routine query authorization", () => {
                 actor: { id: 5, email: "user@example.com", role: "USER" },
                 employeeId: 42,
             },
-        );
-
-        expect(result).toEqual({
-            tasks: [],
-            pagination: { page: 1, limit: 20, total: 0, pages: 0 },
-        });
+        )).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+        expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 
     it("fails closed when the focused occurrence belongs to another Task", async () => {
@@ -1135,7 +1110,7 @@ describe("NHF Routine query authorization", () => {
             task: { isActive: true },
         }));
 
-        const result = await getRoutineTaskWorkItems(
+        await expect(getRoutineTaskWorkItems(
             {
                 scope: "all",
                 taskId: 71,
@@ -1147,12 +1122,7 @@ describe("NHF Routine query authorization", () => {
                 actor: { id: 5, email: "user@example.com", role: "USER" },
                 employeeId: 42,
             },
-        );
-
-        expect(result).toEqual({
-            tasks: [],
-            pagination: { page: 1, limit: 20, total: 0, pages: 0 },
-        });
+        )).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
         expect(prismaMock.routineTask.findMany).not.toHaveBeenCalled();
     });
 

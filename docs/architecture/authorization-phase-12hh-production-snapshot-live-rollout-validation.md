@@ -453,3 +453,38 @@ production evidence and explicit operator acceptance. Phase 12H-I must not
 start: retain `SYSTEM_ROLE` legacy grant representation, compatibility-named
 exports, the legacy resolver/evaluator, and legacy composition until H is
 accepted.
+
+## C. Phase 12H-H corrective hardening note
+
+This corrective patch remains within Phase 12H-H. It does not constitute
+production operational acceptance, and Phase 12H-I has not started. The
+retained `SYSTEM_ROLE` legacy comparison seam, compatibility-named exports,
+legacy resolver/evaluator, and legacy composition remain in place.
+
+The patch corrects the following handoff findings:
+
+- Routine all-scope presentation and server semantics now agree. Dashboard
+  `scope=all` requires effective `routine.task.read / ALL`, while broad KPI
+  summary authority is projected and enforced separately through
+  `routine.summary.read / ALL`. Unauthorized deep links remain in the
+  authorized mine view.
+- Authorization Administration can intentionally assign or remove the
+  system `ADMIN` role through an Auth-owned system-role operation. The change
+  does not create Team, TeamRole, User grants, business capabilities, or a
+  Default Domain Policy change.
+- System-admin lifecycle checks use the same eligible active control-plane
+  definition for promotion, demotion, and employee offboarding. Serializable
+  locking, deterministic eligible-admin locking, self-demotion protection,
+  last-eligible-admin protection, and same-transaction `USER_ROLE_CHANGE`
+  audit are covered by focused regression tests.
+- Authorization Administration now separates account/system role,
+  effective access, and memberships visually. Effective-access domains are
+  bounded tonal blocks, and Team permission areas use the same quiet-frame
+  hierarchy without changing the existing tab model.
+
+### C.1 Operational status
+
+Phase 12H-H production operational acceptance remains **OPEN / NOT RUN**.
+The production gates and evidence record in section B are unchanged and must
+not be inferred from local tests, source review, or documentation. This note
+records corrective code and test work only.

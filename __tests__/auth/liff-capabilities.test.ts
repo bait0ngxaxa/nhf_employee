@@ -67,6 +67,7 @@ const ROUTINE_CAPABILITIES = {
     canManageImports: false,
     canExportTasks: false,
     canReadSummary: true,
+    canReadAllSummary: false,
     canReadReference: true,
 };
 

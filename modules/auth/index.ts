@@ -33,6 +33,20 @@ export {
     EmployeeAccountLifecycleError,
 } from "./application/employee-account-lifecycle";
 export {
+    assertEligibleSystemAdminRemovalSafe,
+    changeSystemRole,
+    isEligibleActiveControlPlaneAccount,
+    isEligibleActiveSystemAdmin,
+    SystemRoleChangeError,
+    systemRoleChangeSchema,
+} from "./application/system-role";
+export type {
+    SystemRoleChangeActor,
+    SystemRoleChangeErrorCode,
+    SystemRoleChangeInput,
+    SystemRoleChangeResult,
+} from "./application/system-role";
+export {
     AUDIT_FAMILY_CORRELATION_LENGTH,
     getAuditFamilyCorrelation,
 } from "./application/audit-correlation";

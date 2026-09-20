@@ -98,6 +98,7 @@ describe("Routine presentation capability projection", () => {
             canManageImports: true,
             canExportTasks: true,
             canReadSummary: true,
+            canReadAllSummary: true,
             canReadReference: true,
             canReadAllReferences: true,
         });
@@ -146,6 +147,7 @@ describe("Routine presentation capability projection", () => {
             canManageImports: true,
             canExportTasks: false,
             canReadSummary: true,
+            canReadAllSummary: false,
             canReadReference: true,
             canReadAllReferences: false,
         });
@@ -220,6 +222,7 @@ describe("Routine presentation capability projection", () => {
             canManageImports: true,
             canExportTasks: true,
             canReadSummary: true,
+            canReadAllSummary: true,
             canReadReference: true,
             canReadAllReferences: true,
         });
@@ -268,6 +271,7 @@ describe("Routine presentation capability projection", () => {
             canManageImports: false,
             canExportTasks: false,
             canReadSummary: true,
+            canReadAllSummary: false,
             canReadReference: true,
         });
     });
@@ -299,6 +303,7 @@ describe("Routine presentation capability projection", () => {
             canManageImports: false,
             canExportTasks: false,
             canReadSummary: false,
+            canReadAllSummary: false,
             canReadReference: false,
             canReadAllReferences: false,
         });
@@ -371,6 +376,7 @@ describe("Routine presentation capability projection", () => {
             canManageImports: false,
             canExportTasks: false,
             canReadSummary: true,
+            canReadAllSummary: false,
             canReadReference: true,
             canReadAllReferences: false,
         });

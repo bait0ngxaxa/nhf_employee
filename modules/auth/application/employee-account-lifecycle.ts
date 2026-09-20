@@ -6,6 +6,10 @@ import type {
 } from "@/modules/employee";
 import { lockUserRows } from "@/lib/db/row-locks";
 import {
+    assertEligibleSystemAdminRemovalSafe,
+    SystemRoleChangeError,
+} from "./system-role";
+import {
     synchronizeAccountIdentity,
     updateAccountForEmployeeLifecycle,
 } from "../infrastructure/persistence/account-repository";
@@ -40,17 +44,16 @@ export async function assertEmployeeAccountCanDeactivate(
         );
     }
     if (account.role !== "ADMIN" || !account.isActive || account.deletedAt) return;
-
-    const activeAdmins = await tx.user.findMany({
-        where: { role: "ADMIN", isActive: true, deletedAt: null },
-        select: { id: true },
-    });
-    await lockUserRows(tx, activeAdmins.map((admin) => admin.id));
-    if (activeAdmins.length <= 1) {
-        throw new EmployeeAccountLifecycleError(
-            "ไม่สามารถปิดใช้งานผู้ดูแลระบบคนสุดท้ายได้",
-            409,
-        );
+    try {
+        await assertEligibleSystemAdminRemovalSafe(tx, account.id);
+    } catch (error) {
+        if (error instanceof SystemRoleChangeError && error.code === "LAST_ELIGIBLE_ADMIN") {
+            throw new EmployeeAccountLifecycleError(
+                "ไม่สามารถปิดใช้งานผู้ดูแลระบบคนสุดท้ายที่ใช้งานได้",
+                409,
+            );
+        }
+        throw error;
     }
 }
 

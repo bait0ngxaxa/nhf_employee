@@ -16,6 +16,7 @@ vi.mock("@/lib/client/api-client", () => ({
 }));
 
 import {
+    changeUserSystemRole,
     removeTeamGrant,
     removeTeamRoleGrant,
     removeUserGrant,
@@ -58,6 +59,25 @@ describe("Authorization Administration presentation API adapter", () => {
         expect(mocks.apiRequest).toHaveBeenCalledWith(
             "/api/authorization/administration/users/7/grants",
             { method: "DELETE", data: grant },
+        );
+    });
+
+    it("uses the dedicated system-role route", async () => {
+        mocks.apiPatch.mockResolvedValue({
+            success: true,
+            data: { result: { userId: 7, before: "USER", after: "ADMIN" } },
+            status: 200,
+            requestId: "req-role-test",
+        });
+
+        await expect(changeUserSystemRole(7, { systemRole: "ADMIN" })).resolves.toEqual({
+            userId: 7,
+            before: "USER",
+            after: "ADMIN",
+        });
+        expect(mocks.apiPatch).toHaveBeenCalledWith(
+            "/api/authorization/administration/users/7/system-role",
+            { systemRole: "ADMIN" },
         );
     });
 });

@@ -33,6 +33,7 @@ export interface AuthorizationAdministrationDataState {
     readonly directoryUsers: readonly AuthorizationAdministrationUserSummaryData[] | undefined;
     readonly directoryError: Error | undefined;
     readonly directoryLoading: boolean;
+    readonly refreshDirectory: KeyedMutator<readonly AuthorizationAdministrationUserSummaryData[]>;
 }
 
 export function useAuthorizationAdministrationData({
@@ -123,5 +124,6 @@ export function useAuthorizationAdministrationData({
         directoryUsers: directoryState.data,
         directoryError: directoryState.error,
         directoryLoading: directoryState.isLoading,
+        refreshDirectory: directoryState.mutate,
     };
 }

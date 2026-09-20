@@ -706,6 +706,7 @@ export async function getRoutinePresentationCapabilities(
     const taskCreateScopes = getScopes("routine.task.create");
     const taskUpdateScopes = getScopes("routine.task.update");
     const taskDeleteScopes = getScopes("routine.task.delete");
+    const summaryReadScopes = getScopes("routine.summary.read");
     const referenceReadScopes = getScopes("routine.reference.read");
 
     const hasScope = (
@@ -731,7 +732,8 @@ export async function getRoutinePresentationCapabilities(
         ) !== null,
         canManageImports: getScopes("routine.import.manage") !== null,
         canExportTasks: getScopes("routine.task.export") !== null,
-        canReadSummary: getScopes("routine.summary.read") !== null,
+        canReadSummary: summaryReadScopes !== null,
+        canReadAllSummary: summaryReadScopes?.includes("ALL") === true,
         canReadReference: referenceReadScopes !== null,
         canReadAllReferences: hasScope(referenceReadScopes, "ALL"),
     });

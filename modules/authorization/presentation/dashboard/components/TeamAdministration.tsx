@@ -349,38 +349,44 @@ function PermissionsPanel({
 }): ReactElement {
     const selectedRole = team.roles.find((role) => role.id === selectedRoleId) ?? null;
     return (
-        <div className="space-y-5">
-            <GrantList
-                title="สิทธิ์ของกลุ่ม"
-                description="สมาชิกทุกคนในกลุ่มนี้ได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ"
-                source="TEAM"
-                grants={team.teamGrants}
-                busy={busy}
-                onAdd={onAddTeamGrant}
-                onRemove={onRemoveTeamGrant}
-            />
-            <RolesPanel
-                team={team}
-                selectedRoleId={selectedRoleId}
-                busy={busy}
-                onCreate={onCreateRole}
-                onEdit={onEditRole}
-                onLifecycle={onLifecycleRole}
-                onSelect={onSelectedRoleIdChange}
-            />
-            {selectedRole ? (
-                <RoleGrantsPanel
+        <section className="space-y-4 rounded-xl border border-border-subtle bg-surface-subtle/60 p-3 sm:p-4" aria-labelledby="authorization-team-permissions-heading">
+            <header>
+                <h2 id="authorization-team-permissions-heading" className="text-base font-semibold text-content-heading">สิทธิ์ของกลุ่มและบทบาท</h2>
+                <p className="mt-1 text-sm leading-6 text-content-secondary">แยกดูสิทธิ์ของกลุ่ม บทบาทในกลุ่ม และสิทธิ์ของบทบาทที่กำลังเลือก</p>
+            </header>
+            <div className="space-y-4">
+                <GrantList
+                    title="สิทธิ์ของกลุ่ม"
+                    description="สมาชิกทุกคนในกลุ่มนี้ได้รับสิทธิ์เพิ่มเติมนี้ตามสถานะและกฎของระบบ"
+                    source="TEAM"
+                    grants={team.teamGrants}
+                    busy={busy}
+                    onAdd={onAddTeamGrant}
+                    onRemove={onRemoveTeamGrant}
+                />
+                <RolesPanel
                     team={team}
                     selectedRoleId={selectedRoleId}
-                    onSelectedRoleIdChange={onSelectedRoleIdChange}
                     busy={busy}
-                    onAdd={onAddRoleGrant}
-                    onRemove={onRemoveRoleGrant}
+                    onCreate={onCreateRole}
+                    onEdit={onEditRole}
+                    onLifecycle={onLifecycleRole}
+                    onSelect={onSelectedRoleIdChange}
                 />
-            ) : (
-                <EmptyState title="เลือกบทบาทเพื่อดูสิทธิ์" description="เลือกบทบาทจากรายการด้านบนเพื่อดูหรือจัดการสิทธิ์ของบทบาทนั้นในบริบทเดียวกัน" />
-            )}
-        </div>
+                {selectedRole ? (
+                    <RoleGrantsPanel
+                        team={team}
+                        selectedRoleId={selectedRoleId}
+                        onSelectedRoleIdChange={onSelectedRoleIdChange}
+                        busy={busy}
+                        onAdd={onAddRoleGrant}
+                        onRemove={onRemoveRoleGrant}
+                    />
+                ) : (
+                    <EmptyState title="เลือกบทบาทเพื่อดูสิทธิ์" description="เลือกบทบาทจากรายการด้านบนเพื่อดูหรือจัดการสิทธิ์ของบทบาทนั้นในบริบทเดียวกัน" />
+                )}
+            </div>
+        </section>
     );
 }
 

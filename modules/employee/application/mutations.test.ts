@@ -805,6 +805,19 @@ describe("Employee Mutations", () => {
                 status: 409,
                 error: expect.stringContaining("คนสุดท้าย"),
             });
+            expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+                where: expect.objectContaining({
+                    role: "ADMIN",
+                    isActive: true,
+                    deletedAt: null,
+                    employee: {
+                        is: {
+                            status: "ACTIVE",
+                            deletedAt: null,
+                        },
+                    },
+                }),
+            }));
             expect(prismaMock.employee.update).not.toHaveBeenCalled();
         });
 

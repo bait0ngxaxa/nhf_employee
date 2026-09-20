@@ -145,6 +145,7 @@ const ROUTINE = {
     canManageImports: true,
     canExportTasks: true,
     canReadSummary: true,
+    canReadAllSummary: true,
     canReadReference: true,
     canReadAllReferences: true,
 };

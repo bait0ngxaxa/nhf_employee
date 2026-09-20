@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const grantApi = vi.hoisted(() => ({
     addUserGrant: vi.fn(),
+    changeUserSystemRole: vi.fn(),
     removeUserGrant: vi.fn(),
 }));
 
@@ -481,6 +482,45 @@ describe("User Access presentation", () => {
         expect(screen.getByText("พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ")).toBeInTheDocument();
         expect(screen.getByText("UNKNOWN_PERSISTED_CAPABILITY")).toBeInTheDocument();
         expectInvalidConfigurationSurfaceToBeReadOnly();
+    });
+
+    it("keeps system-role promotion separate from business capability grants", async () => {
+        grantApi.changeUserSystemRole.mockResolvedValue({ userId: 7, before: "USER", after: "ADMIN" });
+        const onRefresh = vi.fn(async () => undefined);
+        renderPanel(normalUser, onRefresh);
+
+        expect(screen.getByRole("heading", { name: "บัญชีและบทบาทระบบ" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "บทบาทผู้ดูแลระบบ" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "แต่งตั้งเป็นผู้ดูแลระบบ" }));
+
+        const dialog = await screen.findByRole("alertdialog");
+        expect(within(dialog).getByRole("heading", { name: "แต่งตั้งเป็นผู้ดูแลระบบหรือไม่?" })).toBeInTheDocument();
+        expect(within(dialog).getByText(/ไม่ได้เพิ่มสิทธิ์การทำงานของโมดูลต่าง ๆ/)).toBeInTheDocument();
+        expect(grantApi.changeUserSystemRole).not.toHaveBeenCalled();
+
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยืนยันแต่งตั้งเป็นผู้ดูแลระบบ" }));
+        await vi.waitFor(() => {
+            expect(grantApi.changeUserSystemRole).toHaveBeenCalledWith(7, { systemRole: "ADMIN" });
+        });
+        expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("requires confirmation for ADMIN demotion and explains that business grants remain", async () => {
+        grantApi.changeUserSystemRole.mockResolvedValue({ userId: 7, before: "ADMIN", after: "USER" });
+        const onRefresh = vi.fn(async () => undefined);
+        renderPanel(adminUser, onRefresh);
+
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิกบทบาทผู้ดูแลระบบ" }));
+        const dialog = await screen.findByRole("alertdialog");
+        expect(within(dialog).getByRole("heading", { name: "ยกเลิกบทบาทผู้ดูแลระบบหรือไม่?" })).toBeInTheDocument();
+        expect(within(dialog).getByText(/จะไม่ลบสมาชิก Team, TeamRole หรือสิทธิ์เฉพาะบุคคล/)).toBeInTheDocument();
+        expect(grantApi.changeUserSystemRole).not.toHaveBeenCalled();
+
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยืนยันยกเลิกบทบาทผู้ดูแลระบบ" }));
+        await vi.waitFor(() => {
+            expect(grantApi.changeUserSystemRole).toHaveBeenCalledWith(7, { systemRole: "USER" });
+        });
+        expect(onRefresh).toHaveBeenCalledTimes(1);
     });
 
     it("keeps the domain and effective-state filters usable", () => {

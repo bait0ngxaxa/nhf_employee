@@ -41,6 +41,7 @@ const routineUser = {
         canManageImports: false,
         canExportTasks: true,
         canReadSummary: true,
+        canReadAllSummary: false,
         canReadReference: true,
         canReadAllReferences: false,
     },

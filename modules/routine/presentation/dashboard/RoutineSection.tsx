@@ -82,6 +82,9 @@ function RoutineOccurrencePanel({
     const timingFilterId = useId();
     const referenceErrorId = useId();
     const canReadReference = routineCapabilities?.canReadReference === true;
+    const canReadSummaryForScope = scope === "all"
+        ? routineCapabilities?.canReadAllSummary === true
+        : routineCapabilities?.canReadSummary === true;
     const key = useMemo(() => {
         const params = new URLSearchParams({
             scope,
@@ -150,8 +153,8 @@ function RoutineOccurrencePanel({
                 <h2 className="text-xl font-semibold tracking-tight text-brand-strong">ติดตามรายการตามกำหนด</h2>
                 <p className="max-w-prose text-sm leading-6 text-content-secondary">ค้นหารายการ ตรวจสถานะ และปรับเฉพาะรอบที่ต้องการได้จากหน้านี้</p>
             </div>
-            <RoutineKpiGrid summary={summary} isLoading={summaryLoading && !summary} />
-            {summaryError ? (
+            {canReadSummaryForScope ? <RoutineKpiGrid summary={summary} isLoading={summaryLoading && !summary} /> : null}
+            {canReadSummaryForScope && summaryError ? (
                 <p className="text-sm text-status-danger-foreground" role="alert">
                     โหลดสรุปรายการไม่สำเร็จ: {summaryError.message}
                 </p>
@@ -495,6 +498,7 @@ export function RoutineSection() {
     const { user } = useDashboardDataContext();
     const routineCapabilities = user?.routineCapabilities;
     const canReadTasks = routineCapabilities?.canReadTasks === true;
+    const canReadAllTasks = routineCapabilities?.canReadAllTasks === true;
     const canExportTasks = routineCapabilities?.canExportTasks === true;
     const canReadSummary = routineCapabilities?.canReadSummary === true;
     const canManageImports = routineCapabilities?.canManageImports === true;
@@ -511,32 +515,31 @@ export function RoutineSection() {
         ? occurrenceIdValue
         : null;
     const [activeTab, setActiveTab] = useState("mine");
-    const [summaryScope, setSummaryScope] = useState<"mine" | "all">("mine");
     const visibleRoutineTabs = useMemo<ReadonlySet<string>>(
         () => new Set(
-            canReadTasks
-                ? [
-                      "mine",
-                      "all",
-                      ...(canManageTasks ? ["manage"] : []),
-                      ...(canManageImports ? ["import"] : []),
-                  ]
-                : [],
+            [
+                ...(canReadTasks ? ["mine"] : []),
+                ...(canReadTasks && canReadAllTasks ? ["all"] : []),
+                ...(canManageTasks ? ["manage"] : []),
+                ...(canManageImports ? ["import"] : []),
+            ],
         ),
-        [canManageImports, canManageTasks, canReadTasks],
+        [canManageImports, canManageTasks, canReadAllTasks, canReadTasks],
     );
-    const safeTab = visibleRoutineTabs.has(activeTab) ? activeTab : "mine";
-    useEffect(() => {
-        setSummaryScope(safeTab === "all" ? "all" : "mine");
-    }, [safeTab]);
+    const firstVisibleTab = ["mine", "all", "manage", "import"].find((tab) => visibleRoutineTabs.has(tab)) ?? "mine";
+    const safeTab = visibleRoutineTabs.has(activeTab) ? activeTab : firstVisibleTab;
+    const summaryScope = safeTab === "all" ? "all" : "mine";
     const summaryKey = `${API_ROUTES.routines.summary}?scope=${summaryScope}`;
+    const canReadSummaryForScope = summaryScope === "all"
+        ? routineCapabilities?.canReadAllSummary === true
+        : canReadSummary;
     const {
         data: summaryData,
         error: summaryError,
         isLoading: summaryLoading,
         mutate: mutateSummary,
     } = useSWR<RoutineSummaryResponse, Error>(
-        canReadTasks && canReadSummary ? summaryKey : null,
+        canReadTasks && canReadSummaryForScope ? summaryKey : null,
         fetchRoutine,
         {
             keepPreviousData: true,
@@ -550,10 +553,14 @@ export function RoutineSection() {
     }, [activeTab, safeTab]);
 
     useEffect(() => {
-        if (canReadTasks && (taskId !== null || occurrenceId !== null)) {
+        if (
+            canReadTasks
+            && canReadAllTasks
+            && (taskId !== null || occurrenceId !== null)
+        ) {
             setActiveTab("all");
         }
-    }, [canReadTasks, occurrenceId, taskId]);
+    }, [canReadAllTasks, canReadTasks, occurrenceId, taskId]);
 
     useEffect(() => {
         const requestedTab = searchParams.get("routineTab");
@@ -562,7 +569,7 @@ export function RoutineSection() {
         }
     }, [searchParams, visibleRoutineTabs]);
 
-    if (!canReadTasks) {
+    if (visibleRoutineTabs.size === 0) {
         return null;
     }
 
@@ -579,14 +586,14 @@ export function RoutineSection() {
             group: "work",
             groupLabel: "รายการงาน",
             visible: visibleRoutineTabs.has("mine"),
-            content: <RoutineOccurrencePanel scope="mine" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
+            content: <RoutineOccurrencePanel scope="mine" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryScope === "mine" ? summaryData?.summary : undefined} summaryError={summaryScope === "mine" ? summaryError : undefined} summaryLoading={summaryScope === "mine" ? summaryLoading : false} />,
         },
         {
             value: "all",
             label: "รายการทั้งหมด",
             group: "work",
             visible: visibleRoutineTabs.has("all"),
-            content: <RoutineOccurrencePanel scope="all" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryData?.summary} summaryError={summaryError} summaryLoading={summaryLoading} />,
+            content: <RoutineOccurrencePanel scope="all" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryScope === "all" ? summaryData?.summary : undefined} summaryError={summaryScope === "all" ? summaryError : undefined} summaryLoading={summaryScope === "all" ? summaryLoading : false} />,
         },
         {
             value: "manage",
