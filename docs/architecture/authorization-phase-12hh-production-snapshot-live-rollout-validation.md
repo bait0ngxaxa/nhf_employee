@@ -488,3 +488,26 @@ Phase 12H-H production operational acceptance remains **OPEN / NOT RUN**.
 The production gates and evidence record in section B are unchanged and must
 not be inferred from local tests, source review, or documentation. This note
 records corrective code and test work only.
+
+### C.2 Real MySQL integration evidence
+
+The dedicated MySQL integration database was migrated through the repository's
+normal integration convention, then the real Auth and Employee application
+paths were exercised without mocking `runSerializableTransaction()`,
+`lockUserRows()`, Prisma persistence, or Audit persistence.
+
+| Evidence | State | Result |
+|---|---|---|
+| Real system-role integration file | `PASS` | `__tests__/integration/system-role-lifecycle.integration.test.ts`: 1 file / 6 tests passed |
+| Full repository MySQL integration invocation | `NOT PASS — unrelated existing fixtures` | `npm run test:integration:mysql`: 12 files / 66 tests passed; 5 files / 44 tests failed in existing Stock/Routine/Auth-session integration fixtures that still assume implicit ADMIN business authority or stale lifecycle setup; the focused system-role file passed again after this run |
+| Concurrent ADMIN demotion | `PASS` | Two eligible ADMIN accounts were demoted concurrently; exactly one mutation succeeded, one returned `LAST_ELIGIBLE_ADMIN`, and the committed database retained exactly one eligible ADMIN |
+| Cross-path role/lifecycle race | `PASS` | Both demotion-versus-Employee-offboarding target directions passed; one path won safely and the final database retained one eligible ADMIN |
+| Real `USER_ROLE_CHANGE` audit | `PASS` | Promotion persisted `User.role` and the same-transaction Audit row with actor, before/after role, and target metadata |
+| Role-neutral business authority | `PASS` | Promotion created no business grants; demotion preserved the target's Team membership, Team grant, TeamRole grant, and direct User grant |
+| Eligible-admin definition | `PASS` | Inactive/deleted/unlinked/inactive-Employee/suspended-Employee/deleted-Employee ADMIN rows did not count; removing the only usable ADMIN was rejected |
+| Same-transaction Audit failure rollback | `UNIT LEVEL` | The existing mocked dependency test remains the rollback proof; no artificial production failure hook was introduced solely for integration testing |
+
+The accepted production implementation passed this real MySQL concurrency
+proof unchanged; no production locking correction was required. This is
+repository/integration evidence only. Phase 12H-H production operational
+acceptance remains **OPEN / NOT RUN**, and Phase 12H-I remains untouched.
