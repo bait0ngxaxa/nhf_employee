@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { ROUTINE_SCHEDULE_TYPES, ROUTINE_BUSINESS_DAY_POLICIES } from "../../domain/schedule";
 import { ROUTINE_REMINDER_RECIPIENT_SCOPES } from "../../domain/reminder-recipients";
+import {
+    LEGACY_ROUTINE_REMINDER_RECIPIENT_SCOPES,
+    normalizeRoutineReminderRecipientScope,
+} from "../recipient-scope-compatibility";
 
 import type { RoutineImportRow } from "./types";
 
@@ -21,6 +25,12 @@ const proposedActivationSchema = z.preprocess(
     (value: unknown) => value === "INACTIVE" || value === "HISTORY_ONLY" ? "ACTIVE" : value,
     z.literal("ACTIVE"),
 );
+const persistedRecipientScopeSchema = z
+    .enum([
+        ...ROUTINE_REMINDER_RECIPIENT_SCOPES,
+        ...LEGACY_ROUTINE_REMINDER_RECIPIENT_SCOPES,
+    ])
+    .transform(normalizeRoutineReminderRecipientScope);
 const importRowSchema = z.object({
     sourceFileName: z.string().min(1).max(255),
     sourceSheet: z.string().min(1).max(255),
@@ -44,7 +54,7 @@ const importRowSchema = z.object({
         daysBefore: z.number().int().min(0).max(365),
         sendHour: z.number().int().min(0).max(23),
         channel: z.literal("IN_APP"),
-        recipientScope: z.enum(ROUTINE_REMINDER_RECIPIENT_SCOPES),
+        recipientScope: persistedRecipientScopeSchema,
         isActive: z.boolean(),
     })).max(20).optional(),
     scheduleText: z.string().nullable(),

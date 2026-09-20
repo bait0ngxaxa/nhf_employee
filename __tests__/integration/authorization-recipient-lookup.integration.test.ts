@@ -70,7 +70,7 @@ describe.sequential("Phase 13A configured notification recipient lookup", () => 
         await prisma.$disconnect();
     });
 
-    it("leaves the Routine recipient enum in its role-neutral migrated form", async () => {
+    it("keeps old and canonical Routine recipient enum values during expansion", async () => {
         const columns = await prisma.$queryRaw<Array<{ COLUMN_TYPE: string }>>`
             SELECT COLUMN_TYPE
             FROM INFORMATION_SCHEMA.COLUMNS
@@ -79,9 +79,71 @@ describe.sequential("Phase 13A configured notification recipient lookup", () => 
               AND COLUMN_NAME = 'recipientScope'
         `;
 
+        expect(columns[0]?.COLUMN_TYPE).toContain("ADMINS");
+        expect(columns[0]?.COLUMN_TYPE).toContain("ASSIGNEES_AND_ADMINS");
         expect(columns[0]?.COLUMN_TYPE).toContain("ALL_READERS");
         expect(columns[0]?.COLUMN_TYPE).toContain("ASSIGNEES_AND_ALL_READERS");
-        expect(columns[0]?.COLUMN_TYPE).not.toContain("ADMINS");
+    });
+
+    it("accepts and reads both legacy and canonical Routine enum values", async () => {
+        const label = `routine-enum-${Date.now()}`;
+        const user = await createUser(label);
+        const unit = await prisma.routineUnit.create({
+            data: {
+                code: `${TEST_PREFIX}-${label}`,
+                name: `Phase 13A ${label}`,
+            },
+        });
+        const category = await prisma.routineCategory.create({
+            data: {
+                name: `Phase 13A ${label}`,
+            },
+        });
+        const task = await prisma.routineTask.create({
+            data: {
+                unitId: unit.id,
+                categoryId: category.id,
+                title: `Phase 13A ${label}`,
+                scheduleType: "MONTHLY_DAY",
+                scheduleConfig: { day: 1, monthOffset: 0 },
+                createdById: user.id,
+                updatedById: user.id,
+            },
+        });
+
+        try {
+            await prisma.routineReminderRule.createMany({
+                data: [
+                    {
+                        taskId: task.id,
+                        daysBefore: 1,
+                        sendHour: 9,
+                        recipientScope: "ADMINS",
+                    },
+                    {
+                        taskId: task.id,
+                        daysBefore: 2,
+                        sendHour: 9,
+                        recipientScope: "ALL_READERS",
+                    },
+                ],
+            });
+
+            const rules = await prisma.routineReminderRule.findMany({
+                where: { taskId: task.id },
+                orderBy: { daysBefore: "asc" },
+                select: { recipientScope: true },
+            });
+            expect(rules.map((rule) => rule.recipientScope)).toEqual([
+                "ADMINS",
+                "ALL_READERS",
+            ]);
+        } finally {
+            await prisma.routineTask.delete({ where: { id: task.id } });
+            await prisma.routineCategory.delete({ where: { id: category.id } });
+            await prisma.routineUnit.delete({ where: { id: unit.id } });
+            await prisma.user.delete({ where: { id: user.id } });
+        }
     });
 
     it("resolves only active configured authority from Team, TeamRole, and User grants", async () => {
@@ -101,6 +163,8 @@ describe.sequential("Phase 13A configured notification recipient lookup", () => 
         const emailOwnUser = await createUser("email-own");
         const routineAllReaderUser = await createUser("routine-all-reader");
         const routineDefaultUser = await createUser("routine-default");
+        const malformedMixedUser = await createUser("malformed-mixed");
+        const malformedDirectTeamUser = await createUser("malformed-direct-team");
 
         const team = await prisma.team.create({
             data: {
@@ -248,6 +312,21 @@ describe.sequential("Phase 13A configured notification recipient lookup", () => 
                     capabilityKey: "routine.task.read",
                     scope: "ALL",
                 },
+                {
+                    userId: malformedMixedUser.id,
+                    capabilityKey: "stock.request.process",
+                    scope: "ALL",
+                },
+                {
+                    userId: malformedMixedUser.id,
+                    capabilityKey: "stock.request.process",
+                    scope: "OWN",
+                },
+                {
+                    userId: malformedDirectTeamUser.id,
+                    capabilityKey: "stock.request.process",
+                    scope: "TEAM",
+                },
             ],
         });
         await prisma.user.update({
@@ -287,6 +366,8 @@ describe.sequential("Phase 13A configured notification recipient lookup", () => 
         expect(recipientIds).not.toContain(deletedUser.id);
         expect(recipientIds).not.toContain(wrongScopeUser.id);
         expect(recipientIds).not.toContain(wrongCapabilityUser.id);
+        expect(recipientIds).not.toContain(malformedMixedUser.id);
+        expect(recipientIds).not.toContain(malformedDirectTeamUser.id);
 
         const emailReaderIds = await authorizationRecipientLookup
             .findActiveUsersWithConfiguredCapabilityScope({

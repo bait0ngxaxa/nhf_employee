@@ -37,6 +37,10 @@ import {
     type RoutineCapabilityAuthorization,
 } from "./authorization";
 import {
+    normalizeRoutineReminderRecipientScope,
+    normalizeRoutineReminderTask,
+} from "./recipient-scope-compatibility";
+import {
     assertMatchingRoutineTaskIdempotency,
     createRoutineTaskRequestHash,
 } from "./idempotency";
@@ -229,7 +233,9 @@ function normalizeReminderRules(
         daysBefore: rule.daysBefore,
         sendHour: rule.sendHour,
         channel: rule.channel as PrismaRoutineReminderChannel,
-        recipientScope: rule.recipientScope as PrismaRoutineReminderRecipientScope,
+        recipientScope: normalizeRoutineReminderRecipientScope(
+            rule.recipientScope,
+        ) as PrismaRoutineReminderRecipientScope,
         isActive: rule.isActive,
     }));
 }
@@ -245,7 +251,7 @@ function areReminderRulesEqual(
             rule.daysBefore,
             rule.sendHour,
             rule.channel,
-            rule.recipientScope,
+            normalizeRoutineReminderRecipientScope(rule.recipientScope),
             rule.isActive,
         ].join(":");
 
@@ -470,10 +476,11 @@ export async function createRoutineTaskInTransaction(
         generationOptions,
     );
 
-    return tx.routineTask.findUniqueOrThrow({
+    const createdTask = await tx.routineTask.findUniqueOrThrow({
         where: { id: task.id },
         include: ROUTINE_TASK_INCLUDE,
     });
+    return normalizeRoutineReminderTask(createdTask);
 }
 
 export async function createRoutineTask(
@@ -526,7 +533,10 @@ export async function createRoutineTask(
                         "ไม่พบผลลัพธ์ของคำขอสร้าง Routine เดิม",
                     );
                 }
-                return { task, replayed: true };
+                return {
+                    task: normalizeRoutineReminderTask(task),
+                    replayed: true,
+                };
             }
 
             const task = await createRoutineTaskInTransaction(
@@ -574,7 +584,10 @@ export async function createRoutineTask(
                 "ไม่พบผลลัพธ์ของคำขอสร้าง Routine เดิม",
             );
         }
-        return { task, replayed: true };
+        return {
+            task: normalizeRoutineReminderTask(task),
+            replayed: true,
+        };
     }
 }
 
@@ -893,7 +906,7 @@ export async function updateRoutineTask(
             previousAssignees: assigneesChanged ? current.assignees : undefined,
         });
 
-        return updatedTask;
+        return normalizeRoutineReminderTask(updatedTask);
     });
 }
 

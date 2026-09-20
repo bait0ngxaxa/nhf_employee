@@ -155,6 +155,8 @@ describe("processOutbox", () => {
         mockReset(prismaMock);
         vi.clearAllMocks();
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         prismaMock.notificationOutbox.updateMany.mockResolvedValue(
             asNever({ count: 1 }),
         );
@@ -397,6 +399,10 @@ describe("processOutbox", () => {
             lineNotificationService.sendEmailRequestNotification,
         ).mockResolvedValue(false);
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 10 }, { id: 11 }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([
+            { userId: 10, capabilityKey: "email.request.read", scope: "ALL" },
+            { userId: 11, capabilityKey: "email.request.read", scope: "ALL" },
+        ]));
         prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
@@ -750,6 +756,11 @@ describe("processOutbox", () => {
     it("creates stock request in-app notification before failed LINE delivery", async () => {
         vi.mocked(sendStockLineBroadcast).mockResolvedValue(false);
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 1,
+            capabilityKey: "stock.request.process",
+            scope: "ALL",
+        }]));
         prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
@@ -881,6 +892,11 @@ describe("processOutbox", () => {
     it("creates low stock in-app notification before failed LINE delivery", async () => {
         vi.mocked(sendStockLineBroadcast).mockResolvedValue(false);
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 1 }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 1,
+            capabilityKey: "stock.inventory.manage",
+            scope: "ALL",
+        }]));
         prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
@@ -1660,4 +1676,3 @@ describe("processOutbox", () => {
         expect(sendLeaveCancelledNotifications).toHaveBeenCalledTimes(1);
     });
 });
-

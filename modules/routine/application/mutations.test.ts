@@ -843,6 +843,7 @@ describe("NHF Routine mutations", () => {
             unitId: 1,
             categoryId: 1,
             title: "งานของฉัน",
+            reminderRules: [],
         };
         prismaMock.user.findUnique.mockResolvedValue(
             asNever(activeUser("USER", 11)),
@@ -911,6 +912,7 @@ describe("NHF Routine mutations", () => {
             unitId: 1,
             categoryId: 1,
             title: "งานจากสิทธิ์แบบกว้าง",
+            reminderRules: [],
         };
         prismaMock.user.findUnique.mockResolvedValue(
             asNever(activeUser("ADMIN", 99)),
@@ -972,6 +974,7 @@ describe("NHF Routine mutations", () => {
             unitId: 1,
             categoryId: 1,
             title: "งานจากการนำเข้า",
+            reminderRules: [],
         };
         prismaMock.user.findUnique.mockResolvedValue(
             asNever(activeUser("USER", 11)),

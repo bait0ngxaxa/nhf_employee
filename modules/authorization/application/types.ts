@@ -170,8 +170,13 @@ export interface AuthorizationRecipientLookupRequest {
     readonly scope: AuthorizationScope;
 }
 
+export interface AuthorizationRecipientCandidate {
+    readonly userId: number;
+    readonly resolutionData: AuthorizationResolutionData;
+}
+
 export interface AuthorizationRecipientRepository {
-    findActiveUsersWithConfiguredCapabilityScope(
-        request: AuthorizationRecipientLookupRequest,
-    ): Promise<readonly number[]>;
+    loadActiveUsersWithConfiguredCapability(
+        request: Pick<AuthorizationRecipientLookupRequest, "capability" | "scope">,
+    ): Promise<readonly AuthorizationRecipientCandidate[]>;
 }

@@ -34,6 +34,15 @@ describe("Routine reminder recipients", () => {
             }]);
         const context = {
             user: { findMany },
+            userCapabilityGrant: {
+                findMany: vi.fn().mockResolvedValue([{
+                    userId: 17,
+                    capabilityKey: "routine.task.read",
+                    scope: "ALL",
+                }]),
+            },
+            teamMembership: { findMany: vi.fn().mockResolvedValue([]) },
+            teamRoleCapabilityGrant: { findMany: vi.fn().mockResolvedValue([]) },
         } as unknown as AuthorizationPersistenceContext;
 
         const recipients = await resolveRoutineNotificationRecipients(
@@ -63,6 +72,8 @@ describe("Routine reminder recipients", () => {
                     }),
                 ]),
             }),
+            select: { id: true },
+            orderBy: { id: "asc" },
         }));
     });
 
@@ -70,6 +81,9 @@ describe("Routine reminder recipients", () => {
         const findMany = vi.fn().mockResolvedValue([]);
         const context = {
             user: { findMany },
+            userCapabilityGrant: { findMany: vi.fn().mockResolvedValue([]) },
+            teamMembership: { findMany: vi.fn().mockResolvedValue([]) },
+            teamRoleCapabilityGrant: { findMany: vi.fn().mockResolvedValue([]) },
         } as unknown as AuthorizationPersistenceContext;
 
         await expect(resolveRoutineNotificationRecipients(
@@ -89,6 +103,22 @@ describe("Routine reminder recipients", () => {
             .mockResolvedValueOnce([]);
         const context = {
             user: { findMany },
+            userCapabilityGrant: {
+                findMany: vi.fn().mockResolvedValue([
+                    {
+                        userId: 18,
+                        capabilityKey: "routine.task.read",
+                        scope: "ALL",
+                    },
+                    {
+                        userId: 19,
+                        capabilityKey: "routine.task.read",
+                        scope: "ALL",
+                    },
+                ]),
+            },
+            teamMembership: { findMany: vi.fn().mockResolvedValue([]) },
+            teamRoleCapabilityGrant: { findMany: vi.fn().mockResolvedValue([]) },
         } as unknown as AuthorizationPersistenceContext;
 
         await expect(resolveRoutineNotificationRecipients(

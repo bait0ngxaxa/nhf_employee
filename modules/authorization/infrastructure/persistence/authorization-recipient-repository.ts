@@ -2,26 +2,28 @@ import { prisma } from "@/lib/db/prisma";
 
 import type {
     AuthorizationPersistenceContext,
+    AuthorizationRecipientCandidate,
     AuthorizationRecipientLookupRequest,
     AuthorizationRecipientRepository,
 } from "../../application/types";
+import { loadAuthorizationResolutionsForUsers } from "./authorization-resolution-repository";
 
 /**
- * Enumerate only explicit configured capability authority.
+ * Load only explicit configured capability authority.
  *
  * This query deliberately does not compose a domain default policy. The
- * recipient audiences that use it require an explicit ALL grant, so using it
- * for a general "who can perform this capability" question would be wrong.
+ * recipient audiences that use it require an explicit ALL grant, so the
+ * application layer must still evaluate the returned resolution data before
+ * selecting a recipient.
  */
-async function findActiveUsersWithConfiguredCapabilityScope(
+async function loadActiveUsersWithConfiguredCapability(
     context: AuthorizationPersistenceContext,
-    request: AuthorizationRecipientLookupRequest,
-): Promise<readonly number[]> {
+    request: Pick<AuthorizationRecipientLookupRequest, "capability" | "scope">,
+): Promise<readonly AuthorizationRecipientCandidate[]> {
     const grant = {
         capabilityKey: request.capability,
         scope: request.scope,
     };
-
     const users = await context.user.findMany({
         where: {
             isActive: true,
@@ -80,15 +82,49 @@ async function findActiveUsersWithConfiguredCapabilityScope(
         orderBy: { id: "asc" },
     });
 
-    return [...new Set(users.map((user) => user.id))].sort((left, right) => left - right);
+    const userIds = [...new Set(users.map((user) => user.id))].sort(
+        (left, right) => left - right,
+    );
+    const resolutions = await loadAuthorizationResolutionsForUsers(context, {
+        userIds,
+        capability: request.capability,
+    });
+
+    return userIds.flatMap((userId) => {
+        const resolutionData = resolutions.get(userId);
+        if (!resolutionData || !hasConfiguredGrant(resolutionData)) return [];
+        return [{ userId, resolutionData }];
+    });
+}
+
+function hasConfiguredGrant(
+    resolutionData: AuthorizationRecipientCandidate["resolutionData"],
+): boolean {
+    if (resolutionData.userGrants.length > 0) return true;
+
+    const activeRoleIds = new Set(
+        resolutionData.memberships.flatMap((membership) =>
+            membership.teamRole !== null
+            && membership.teamRoleId !== null
+            && membership.teamRole.isActive
+                ? [membership.teamRole.id]
+                : [],
+        ),
+    );
+
+    return resolutionData.memberships.some(
+        (membership) => membership.teamGrants.length > 0,
+    ) || resolutionData.teamRoleGrants.some(
+        (grant) => activeRoleIds.has(grant.teamRoleId),
+    );
 }
 
 export function createAuthorizationRecipientRepository(
     context: AuthorizationPersistenceContext = prisma,
 ): AuthorizationRecipientRepository {
     return {
-        findActiveUsersWithConfiguredCapabilityScope(request) {
-            return findActiveUsersWithConfiguredCapabilityScope(context, request);
+        loadActiveUsersWithConfiguredCapability(request) {
+            return loadActiveUsersWithConfiguredCapability(context, request);
         },
     };
 }

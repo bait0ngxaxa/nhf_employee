@@ -1742,10 +1742,20 @@ Phase 12H-I is **CLOSED**. The final model is:
 The implementation and regression evidence are recorded in
 [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
 
-## Phase 13A current closure
+## Phase 13A / 13A.1 current state
 
 Phase 13A aligns business notification audiences with configured capability
 authority. Routine, Stock, and Email Request no longer use `User.role` or an
 environment email allowlist for the migrated audiences. The Authorization
 recipient lookup remains deliberately limited to explicit configured grants and
-does not replace domain authorization or Default Domain Policy evaluation.
+does not replace domain authorization or Default Domain Policy evaluation. The
+lookup now evaluates each candidate through the canonical configured evaluator
+and excludes principals whose persisted configuration is malformed.
+
+Phase 13A.1 leaves the Routine recipient database enum expanded for rollout
+compatibility. Legacy `ADMINS` and `ASSIGNEES_AND_ADMINS` values are accepted
+only at persistence boundaries and normalize to `ALL_READERS` and
+`ASSIGNEES_AND_ALL_READERS`. New writes remain canonical. Enum backfill and
+contraction require a separately controlled Phase 13A.2 release after old
+application versions are retired; this current-state record does not claim
+that production contraction is safe.

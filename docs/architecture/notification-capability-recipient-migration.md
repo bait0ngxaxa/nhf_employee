@@ -1,7 +1,13 @@
-# Phase 13A — Capability-Based Notification Recipient Policy Migration
+# Phase 13A / 13A.1 — Capability-Based Notification Recipient Policy Migration
 
-Phase 13A closes the remaining mismatch between the post-12H role-neutral
-business authorization model and notification recipient selection.
+Phase 13A aligns notification audiences with the post-12H role-neutral business
+authorization model. Phase 13A.1 hardens that implementation for production
+rollout and malformed persisted authorization configuration.
+
+The business recipient migration is implemented. Routine enum contraction is
+intentionally deferred to a follow-up release because the production database
+and all deployed application versions cannot be proven from this repository to
+be ready for contraction.
 
 ## Why this changed
 
@@ -39,8 +45,14 @@ configured grants from:
 
 The lookup also requires an active, non-deleted User, validates the capability
 against the registered capability catalog, validates the requested scope, and
-returns deterministic, deduplicated User IDs. The composite TeamRole relation
-continues to fail closed for an invalid cross-Team membership.
+returns deterministic, deduplicated User IDs. The repository loads configured
+resolution data in a bounded set-based operation; the application lookup then
+evaluates each principal with `evaluateConfiguredAuthorization`, including
+scope normalization and persisted-origin validation. A principal whose
+configured state raises `AuthorizationConfigurationError` is excluded and a
+warning records the capability, user, and error code. Other valid principals
+remain eligible. The composite TeamRole relation continues to fail closed for
+an invalid cross-Team membership.
 
 This is not a generic “who can perform this capability?” API. It intentionally
 does not evaluate Default Domain Policy, resource relationships, or the
@@ -55,7 +67,7 @@ behavior.
 
 ## Routine vocabulary and lifecycle
 
-The persisted and public Routine enum is now:
+The canonical public/business Routine enum remains:
 
 ```text
 ASSIGNEES
@@ -63,9 +75,43 @@ ALL_READERS
 ASSIGNEES_AND_ALL_READERS
 ```
 
-The MySQL migration expands the enum, remaps existing `ADMINS` and
-`ASSIGNEES_AND_ADMINS` rows, then contracts the enum. It does not delete or
-recreate tasks, occurrences, or reminder rules.
+During Phase 13A.1 the Prisma/MySQL persistence enum intentionally accepts both
+the canonical values and the two legacy persisted values:
+
+```text
+ADMINS
+ASSIGNEES_AND_ADMINS
+```
+
+The expand migration only widens the MySQL enum. It does not rewrite rows and
+does not contract the enum. Prisma Client temporarily includes both sets of
+members so transition code can read old rows safely. New create/update/import
+boundaries accept canonical values only and therefore write only canonical
+values.
+
+At the persistence boundary, legacy values normalize immediately:
+
+```text
+ADMINS                  → ALL_READERS
+ASSIGNEES_AND_ADMINS    → ASSIGNEES_AND_ALL_READERS
+```
+
+Routine scheduler, reminder dispatch, query serialization, and persisted
+import-row parsing operate on the canonical values after normalization. The
+legacy token is never interpreted as `User.role === ADMIN`.
+
+The later `Phase 13A.2 — Routine Recipient Enum Contract` must, in an
+explicitly controlled rollout, verify that no old process remains, backfill
+remaining legacy rows, verify zero legacy rows, and only then contract the
+MySQL/Prisma enum. It must not delete or recreate tasks, occurrences, or
+reminder rules.
+
+Rollback implication: the expanded database is compatible with the old client
+while persisted rows remain legacy. Once a canonical-only application writes a
+canonical value, rollback to an old client that knows only the legacy enum is
+not supported. Deployment must therefore expand the database first, drain old
+processes before canonical writes, and treat post-write rollback as a forward
+compatibility decision rather than an automatic old-binary rollback.
 
 Routine resolves the configured broad audience at enqueue time. Email and LINE
 child deliveries re-check the current recipient condition inside the existing
@@ -91,23 +137,32 @@ The architecture check scans only the production recipient-policy surfaces for
 reintroduction of `Role.ADMIN`, `role === "ADMIN"`, or `role: "ADMIN"`; other
 authentication/control-plane role usage remains allowed.
 
-Phase 13A verification covers the Authorization lookup, Stock audience and
-dedupe behavior, Routine enum/recipient/dispatch behavior, Email Request
-capability audience, and the existing outbox processor. MySQL integration
-coverage exercises Team, TeamRole, direct User, lifecycle, invalid relationship,
-scope, capability, ADMIN-without-grant, and duplicate-origin cases when the
+Phase 13A.1 adds coverage for legacy scope normalization, canonical writes,
+expanded enum state, mixed valid/malformed grants, invalid direct `TEAM` scope,
+and valid peers surviving an isolated malformed principal. MySQL integration
+coverage exercises actual legacy/canonical enum writes and reads, Team,
+TeamRole, direct User, lifecycle, invalid relationship, scope, capability,
+ADMIN-without-grant, duplicate-origin, and malformed-grant cases when the
 dedicated integration database is available.
 
 Executed evidence for this closure:
 
-- focused recipient/Stock/Routine/Email/outbox tests: **137 tests passed**;
-- repository suite: **334 files / 3,144 tests passed**;
-- MySQL migration + integration suite: **18 files / 112 tests passed**;
+- focused Authorization/Routine tests: **11 files / 169 tests passed**;
+- focused Stock/outbox regression tests: **6 files / 108 tests passed**;
+- repository suite: **335 files / 3,153 tests passed**;
+- MySQL migration + integration suite: **18 files / 113 tests passed**;
 - `npm.cmd run lint:strict`: passed;
 - `npm.cmd run typecheck`: passed;
-- `npm.cmd run architecture:check`: passed, 1,161 source files checked;
+- `npm.cmd run architecture:check`: passed, 1,163 source files checked;
 - `npx.cmd prisma generate` and `npx.cmd prisma validate`: passed;
 - `git diff --check`: passed.
+
+The original Phase 13A migration was found in the current repository history,
+but no production migration table, deployment pipeline record, or production
+database access is present in the repository. Production deployment therefore
+cannot be identified from repository evidence. The migration is kept in the
+expand-only state in this release; contraction is explicitly deferred rather
+than claimed safe.
 
 Intentional role-based behavior remains only in authentication and
 Authorization Administration/control-plane flows. Requester-owned Stock result

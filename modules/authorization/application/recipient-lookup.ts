@@ -1,6 +1,7 @@
 import type { CapabilityRegistry } from "../contracts";
 import { CAPABILITY_REGISTRY } from "../registry";
 import { AuthorizationConfigurationError } from "./errors";
+import { evaluateConfiguredAuthorization } from "./evaluator";
 import type {
     AuthorizationPersistenceContext,
     AuthorizationRecipientLookupRequest,
@@ -66,10 +67,57 @@ export function createAuthorizationRecipientLookup(
         async findActiveUsersWithConfiguredCapabilityScope(
             request: AuthorizationRecipientLookupRequest,
         ): Promise<readonly number[]> {
-            const userIds = await repository.findActiveUsersWithConfiguredCapabilityScope(
-                validateLookupRequest(request, registry),
-            );
-            return [...new Set(userIds)].sort((left, right) => left - right);
+            const validatedRequest = validateLookupRequest(request, registry);
+            const definition = registry.get(validatedRequest.capability);
+            if (!definition) {
+                throw new AuthorizationConfigurationError(
+                    "UNKNOWN_PERSISTED_CAPABILITY",
+                    `Unknown authorization recipient capability: ${validatedRequest.capability}`,
+                    { capabilityKey: validatedRequest.capability },
+                );
+            }
+
+            const candidates = await repository.loadActiveUsersWithConfiguredCapability({
+                capability: validatedRequest.capability,
+                scope: validatedRequest.scope,
+            });
+            const recipientIds: number[] = [];
+            for (const candidate of candidates) {
+                try {
+                    const decision = evaluateConfiguredAuthorization(
+                        {
+                            userId: candidate.userId,
+                            employeeId: null,
+                            systemRole: "USER",
+                            channel: definition.channels[0],
+                        },
+                        validatedRequest.capability,
+                        candidate.resolutionData,
+                        registry,
+                    );
+                    if (
+                        decision.allowed
+                        && decision.scopes.includes(validatedRequest.scope)
+                    ) {
+                        recipientIds.push(candidate.userId);
+                    }
+                } catch (error) {
+                    if (!(error instanceof AuthorizationConfigurationError)) {
+                        throw error;
+                    }
+
+                    console.warn(
+                        "Excluded notification recipient with invalid authorization configuration",
+                        {
+                            userId: candidate.userId,
+                            capability: validatedRequest.capability,
+                            errorCode: error.code,
+                        },
+                    );
+                }
+            }
+
+            return [...new Set(recipientIds)].sort((left, right) => left - right);
         },
     });
 }

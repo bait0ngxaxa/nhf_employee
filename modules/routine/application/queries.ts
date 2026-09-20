@@ -16,6 +16,7 @@ import {
     getRoutineTimingStatus,
     type RoutineTimingStatus,
 } from "../domain/timing";
+import type { RoutineReminderRecipientScope } from "../domain/reminder-recipients";
 import { isRoutineNotificationReady } from "../domain/notification-readiness";
 import {
     resolveRoutineTaskCapabilities,
@@ -33,6 +34,7 @@ import {
     RoutineNotFoundError,
     RoutineValidationError,
 } from "./errors";
+import { normalizeRoutineReminderRules } from "./recipient-scope-compatibility";
 import {
     buildRoutineOccurrenceScope,
     buildRoutineTaskAccessScope,
@@ -155,6 +157,15 @@ type RoutineTaskRow = Prisma.RoutineTaskGetPayload<{
     select: typeof ROUTINE_TASK_SELECT;
 }>;
 
+type CanonicalRoutineReminderRule = Omit<
+    RoutineTaskRow["reminderRules"][number],
+    "recipientScope"
+> & {
+    recipientScope: RoutineReminderRecipientScope;
+};
+
+type CanonicalRoutineReminderRules = CanonicalRoutineReminderRule[];
+
 type RoutineTaskListRow = RoutineTaskRow & RoutineTaskCapabilities;
 
 type RoutineTaskDetailRow = RoutineTaskRow & {
@@ -163,12 +174,18 @@ type RoutineTaskDetailRow = RoutineTaskRow & {
 
 type RoutineTaskDetailResultBase = Omit<
     RoutineTaskDetailRow,
-    "contractStartDate" | "contractEndDate" | "createdAt" | "updatedAt" | "occurrences"
+    | "contractStartDate"
+    | "contractEndDate"
+    | "createdAt"
+    | "updatedAt"
+    | "occurrences"
+    | "reminderRules"
 > & {
     contractStartDate: string | null;
     contractEndDate: string | null;
     createdAt: string;
     updatedAt: string;
+    reminderRules: CanonicalRoutineReminderRules;
     occurrences: SerializedRoutineOccurrence[];
 };
 
@@ -209,7 +226,7 @@ export interface SerializedRoutineTaskWorkItem {
     unit: { id: number; code: string; name: string };
     category: { id: number; name: string };
     assignees: SerializedRoutineAssignee[];
-    reminderRules: RoutineTaskRow["reminderRules"];
+    reminderRules: CanonicalRoutineReminderRules;
     relevantOccurrence: SerializedRoutineTaskOccurrence | null;
 }
 
@@ -788,7 +805,7 @@ function serializeRoutineTaskFields(
             name: task.category.name,
         },
         assignees: task.assignees.map(serializeAssignee),
-        reminderRules: task.reminderRules,
+        reminderRules: normalizeRoutineReminderRules(task.reminderRules),
         relevantOccurrence: serializedOccurrence
             ? {
                   id: serializedOccurrence.id,
@@ -1406,6 +1423,7 @@ async function findRoutineTaskDetail(
     if (!task) throw new RoutineNotFoundError();
     return {
         ...task,
+        reminderRules: normalizeRoutineReminderRules(task.reminderRules),
         contractStartDate: task.contractStartDate
             ? toBangkokCalendarDate(task.contractStartDate)
             : null,

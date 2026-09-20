@@ -34,17 +34,15 @@ function expectCapabilityLookup(capability: string): void {
         where: expect.objectContaining({
             isActive: true,
             deletedAt: null,
-            OR: expect.arrayContaining([
-                expect.objectContaining({
-                    userCapabilityGrants: {
-                        some: { capabilityKey: capability, scope: "ALL" },
-                    },
-                }),
-            ]),
         }),
         select: { id: true },
         orderBy: { id: "asc" },
     }));
+    expect(prismaMock.userCapabilityGrant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+            where: expect.objectContaining({ capabilityKey: capability }),
+        }),
+    );
 }
 
 describe("Stock Notifications", () => {
@@ -62,6 +60,7 @@ describe("Stock Notifications", () => {
                 updatedAt: new Date(),
             }),
         );
+        prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         vi.clearAllMocks();
         notificationMocks.createForUser.mockResolvedValue(undefined);
         notificationMocks.createForUserOnce.mockResolvedValue(undefined);
@@ -189,6 +188,11 @@ describe("Stock Notifications", () => {
 
     it("should include variant identity in the in-app low stock message", async () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 7,
+            capabilityKey: "stock.inventory.manage",
+            scope: "ALL",
+        }]));
 
         await notifyInventoryManagersLowStockInApp({
             alertedAt: "2026-07-22T03:00:00.000Z",
@@ -218,6 +222,10 @@ describe("Stock Notifications", () => {
 
     it("uses Stock request-process capability eligibility and user-specific dedupe keys", async () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }, { id: 8 }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([
+            { userId: 7, capabilityKey: "stock.request.process", scope: "ALL" },
+            { userId: 8, capabilityKey: "stock.request.process", scope: "ALL" },
+        ]));
 
         await notifyStockRequestProcessorsNewRequest(42, "สมชาย", "PRJ-42", prismaMock);
 
@@ -242,6 +250,10 @@ describe("Stock Notifications", () => {
 
     it("uses Stock request-process capability eligibility for requester cancellation", async () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 7 }, { id: 8 }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([
+            { userId: 7, capabilityKey: "stock.request.process", scope: "ALL" },
+            { userId: 8, capabilityKey: "stock.request.process", scope: "ALL" },
+        ]));
 
         await notifyStockRequestProcessorsRequestCancelledByRequester(42, "สมชาย", prismaMock);
 

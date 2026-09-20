@@ -77,6 +77,9 @@ describe("Routine scheduler", () => {
             asNever([buildOccurrence()]),
         );
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
+        prismaMock.teamRoleCapabilityGrant.findMany.mockResolvedValue(asNever([]));
         prismaMock.notificationOutbox.create.mockResolvedValue(
             asNever({ id: 501 }),
         );
@@ -155,6 +158,11 @@ describe("Routine scheduler", () => {
             }),
         ]));
         prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 99 }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 99,
+            capabilityKey: "routine.task.read",
+            scope: "ALL",
+        }]));
 
         const result = await runRoutineScheduler(
             new Date("2026-08-03T02:00:00.000Z"),
@@ -179,6 +187,14 @@ describe("Routine scheduler", () => {
             select: { id: true },
             orderBy: { id: "asc" },
         }));
+        expect(prismaMock.userCapabilityGrant.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    userId: 99,
+                    capabilityKey: "routine.task.read",
+                },
+            }),
+        );
     });
 
     it("counts a duplicate event key instead of creating another outbox row", async () => {

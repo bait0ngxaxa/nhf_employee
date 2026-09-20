@@ -39,4 +39,26 @@ describe("routine import row compatibility", () => {
             expect(parseRoutineImportRow(makeLegacyRow(proposedActivation)).proposedActivation).toBe("ACTIVE");
         },
     );
+
+    it.each([
+        ["ADMINS", "ALL_READERS"],
+        ["ASSIGNEES_AND_ADMINS", "ASSIGNEES_AND_ALL_READERS"],
+    ] as const)("normalizes persisted legacy reminder scope %s", (legacy, canonical) => {
+        const row = makeLegacyRow("ACTIVE");
+        row.reminderRules = [{
+            daysBefore: 1,
+            sendHour: 9,
+            channel: "IN_APP",
+            recipientScope: legacy,
+            isActive: true,
+        }];
+
+        expect(parseRoutineImportRow(row).reminderRules).toEqual([{
+            daysBefore: 1,
+            sendHour: 9,
+            channel: "IN_APP",
+            recipientScope: canonical,
+            isActive: true,
+        }]);
+    });
 });

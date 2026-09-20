@@ -1050,6 +1050,10 @@ enum RoutineReminderChannel {
 
 enum RoutineReminderRecipientScope {
   ASSIGNEES
+  // Transitional persistence compatibility; application code normalizes these
+  // values to the role-neutral scopes before business evaluation.
+  ADMINS
+  ASSIGNEES_AND_ADMINS
   ALL_READERS
   ASSIGNEES_AND_ALL_READERS
 }

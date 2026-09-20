@@ -66,6 +66,7 @@ const task = {
     unitId: 1,
     categoryId: 1,
     title: "ตรวจสอบระบบ",
+    reminderRules: [],
 };
 
 describe("Routine task create idempotency", () => {

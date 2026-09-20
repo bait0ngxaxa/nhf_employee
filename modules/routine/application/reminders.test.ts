@@ -275,6 +275,9 @@ describe("Routine reminder dispatch", () => {
                 lineUserId: where.userId === 99 ? "U-admin" : "U-assignee",
             }),
         );
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
+        prismaMock.teamRoleCapabilityGrant.findMany.mockResolvedValue(asNever([]));
         sendRoutineReminderNotificationMock.mockResolvedValue(true);
         sendLineAppMessageMock.mockResolvedValue(true);
     });
@@ -790,14 +793,14 @@ describe("Routine reminder dispatch", () => {
         );
     });
 
-    it("resolves ALL_READERS recipients from current configured capability users", async () => {
+    it("normalizes a legacy persisted broad scope to configured ALL readers", async () => {
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence({
                 task: {
                     ...buildOccurrence().task,
                     reminderRules: [{
                         ...buildOccurrence().task.reminderRules[0],
-                        recipientScope: "ALL_READERS",
+                        recipientScope: "ADMINS",
                     }],
                 },
             })),
@@ -806,6 +809,11 @@ describe("Routine reminder dispatch", () => {
             id: 99,
             name: "ผู้อ่านทั้งหมด",
             email: "reader@example.com",
+        }]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 99,
+            capabilityKey: "routine.task.read",
+            scope: "ALL",
         }]));
 
         const result = await dispatchRoutineReminderOutbox(
@@ -855,6 +863,18 @@ describe("Routine reminder dispatch", () => {
         prismaMock.user.findMany.mockResolvedValue(asNever([
             { id: 99, name: "ผู้อ่านร่วม", email: "reader@example.com" },
             { id: 100, name: "ผู้อ่านทั้งหมด", email: "reader2@example.com" },
+        ]));
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([
+            {
+                userId: 99,
+                capabilityKey: "routine.task.read",
+                scope: "ALL",
+            },
+            {
+                userId: 100,
+                capabilityKey: "routine.task.read",
+                scope: "ALL",
+            },
         ]));
 
         const result = await dispatchRoutineReminderOutbox(
@@ -1163,6 +1183,11 @@ describe("Routine reminder dispatch", () => {
                 employee: null,
             }]),
         );
+        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([{
+            userId: 99,
+            capabilityKey: "routine.task.read",
+            scope: "ALL",
+        }]));
         prismaMock.user.findUnique.mockResolvedValue(asNever({
             isActive: true,
             deletedAt: null,

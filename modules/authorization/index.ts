@@ -67,6 +67,7 @@ export type {
     AuthorizationResolutionRepository,
     AuthorizationResolutionRequest,
     AuthorizationPersistenceContext,
+    AuthorizationRecipientCandidate,
     AuthorizationRecipientLookupRequest,
     AuthorizationRecipientRepository,
     EffectiveAuthorizationGrant,

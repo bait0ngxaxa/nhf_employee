@@ -137,18 +137,41 @@ describe("Stock Service Mutations", () => {
         prismaMock.userCapabilityGrant.findMany.mockImplementation(
             (args?: Prisma.UserCapabilityGrantFindManyArgs) => {
                 const where = args?.where;
-                const userId = typeof where?.userId === "number"
-                    ? where.userId
-                    : null;
+                const userIds = typeof where?.userId === "number"
+                    ? [where.userId]
+                    : typeof where?.userId === "object"
+                        && where.userId !== null
+                        && "in" in where.userId
+                        && Array.isArray(where.userId.in)
+                        ? where.userId.in
+                        : [];
                 const capabilityKey = typeof where?.capabilityKey === "string"
                     ? where.capabilityKey
                     : null;
-                if (
-                    testActorRoles.get(userId ?? -1) !== "ADMIN"
-                    || capabilityKey === null
-                ) {
+                if (capabilityKey === null) {
                     return asNever([]);
                 }
+                if (typeof where?.userId === "object" && where.userId !== null) {
+                    return asNever(userIds.map((userId) => ({
+                        userId,
+                        capabilityKey,
+                        scope: "ALL",
+                    })));
+                }
+                const userId = userIds[0] ?? -1;
+                if (
+                    userIds.length === 1
+                    && (capabilityKey === "stock.request.process"
+                        || capabilityKey === "stock.inventory.manage")
+                    && userId === 1
+                ) {
+                    return asNever([{
+                        userId,
+                        capabilityKey,
+                        scope: "ALL",
+                    }]);
+                }
+                if (testActorRoles.get(userId) !== "ADMIN") return asNever([]);
                 const scope = capabilityKey === "stock.request.read"
                     || capabilityKey === "stock.request.create"
                     || capabilityKey === "stock.request.cancel"
