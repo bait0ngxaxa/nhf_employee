@@ -21,9 +21,8 @@ preserved in [runtime-hardening.md](./runtime-hardening.md).
 | Audited source baseline subject | feat(ui): simplify role-free team-centric authorization administration |
 | Audited source baseline date | 2026-09-20 16:45:12 +07:00 |
 | Repository | bait0ngxaxa/nhf_employee |
-| H0 documentation/closure SHA | c2f0374216f560ddf18c560cc4c73f23a54aaee5 |
-| Relationship | H0 closure is one documentation-only commit ahead of the audited application/source baseline |
-| Changes between the two SHAs | No runtime source, schema, migration, dependency, or test behavior changed |
+| Initial H0 baseline documentation commit | c2f0374216f560ddf18c560cc4c73f23a54aaee5 |
+| Relationship | H0 implementation and follow-up corrections after the audited source baseline are documentation-only; the audited runtime/application source remains bb61c03bdf93453b3e92ebee61c41637c3e5a477 |
 | Previous purported L7 SHA | 6032381072cf589578f46188a4af2dbe50287fec |
 | What that SHA actually is | Commit subject is chore: close L6 compatibility residue cleanup; it is not a separately evidenced L7 re-audit commit |
 | Last runtime-hardening documentation commit | 5f903df3cf57f56eb2d34b7e4904d81823c21b4d |
@@ -892,13 +891,12 @@ module was changed.
 
 ## 10. Final repository verification record
 
-The final gate was executed for the audited source baseline and its
-documentation-only H0 closure. The metadata and ledger correction in this
-working tree is documentation-only and does not invalidate that verification.
-Windows
-PowerShell blocked the npm.ps1 shim because of the local execution policy, so
-the equivalent npm.cmd/npx.cmd entry points were used. The scripts and
-results were:
+The final gate was executed for the audited source baseline and the initial
+H0 baseline documentation commit. Subsequent H0 metadata and ledger
+corrections were documentation-only and do not invalidate the recorded
+verification. On Windows, PowerShell blocked the npm.ps1 shim because of the
+local execution policy, so the equivalent npm.cmd/npx.cmd entry points were
+used. The scripts and results were:
 
 | Command | Result |
 | --- | --- |
