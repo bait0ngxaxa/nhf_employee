@@ -274,6 +274,8 @@ export function RoutineImportRowEditor({
         setDiscardConfirmOpen(false);
     }, [row]);
 
+    // Keep the initial form snapshot in a ref so edit state can change independently.
+    /* eslint-disable react-hooks/refs -- This intentional snapshot is reviewed outside L1. */
     const isDirty = initialSnapshotRef.current !== null
         && currentSnapshot !== initialSnapshotRef.current;
 
@@ -285,6 +287,7 @@ export function RoutineImportRowEditor({
         }
         onOpenChange(false);
     }
+    /* eslint-enable react-hooks/refs */
 
     function discardChanges(): void {
         setDiscardConfirmOpen(false);

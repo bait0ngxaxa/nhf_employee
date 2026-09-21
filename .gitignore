@@ -44,7 +44,3 @@ next-env.d.ts
 /lib/generated/prisma
 /.uploads/
 /graphify-out
-
-
-# next-agents-md
-.next-docs/

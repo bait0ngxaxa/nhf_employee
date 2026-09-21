@@ -286,6 +286,8 @@ export const LiffRoutineTaskForm = forwardRef<
         () => routineFormSnapshot(form),
         [form],
     );
+    // Keep the initial form snapshot in a ref so edit state can change independently.
+    // eslint-disable-next-line react-hooks/refs -- This intentional snapshot is reviewed outside L1.
     const isDirty = currentSnapshot !== initialSnapshotRef.current;
     const controlsDisabled = !canSubmit || isSubmitting || isReloadingLatest;
 

@@ -70,6 +70,8 @@ async function fetchCurrentUser(
 export function HybridAuthProvider({ children }: HybridAuthProviderProps) {
     const pathname = usePathname();
     const shouldLoadCurrentUser = shouldBootstrapAuth(pathname);
+    // This baseline is intentionally captured once to measure visibility refresh age.
+    // eslint-disable-next-line react-hooks/purity -- The timestamp is not render output.
     const lastRefreshAtRef = useRef(Date.now());
     const { data, isLoading, mutate } = useSWR<AuthenticatedUser | null>(
         shouldLoadCurrentUser ? API_ROUTES.auth.me : null,

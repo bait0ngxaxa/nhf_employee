@@ -503,7 +503,7 @@ export function LiffLeaveApp(): ReactElement {
     const canReadAssignedApprovals = leaveCapabilities?.canReadAssignedApprovals === true;
     const canCreateOwnRequests = leaveCapabilities?.canCreateOwnRequests === true;
     const showApprovalTab = canReadAssignedApprovals
-        && (hasApprovalRelationshipRef.current || hadApprovalWork || approvals.hasActionableWork);
+        && (hadApprovalWork || approvals.hasActionableWork);
     const hasMineTab = canReadOwnRequests && profile !== null;
     const effectiveActiveTab = activeTab === "approvals" && showApprovalTab
         ? "approvals"

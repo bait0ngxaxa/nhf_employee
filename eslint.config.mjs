@@ -61,8 +61,6 @@ const eslintConfig = defineConfig([
             // refactors as part of this framework-only migration.
             "react-hooks/incompatible-library": "off",
             "react-hooks/preserve-manual-memoization": "off",
-            "react-hooks/purity": "off",
-            "react-hooks/refs": "off",
             "react-hooks/set-state-in-effect": "off",
 
             // Code Quality
