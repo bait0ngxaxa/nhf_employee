@@ -366,3 +366,46 @@ git diff
 ~~~
 
 ไฟล์ที่เปลี่ยนจาก audit นี้ควรมีเพียง docs/architecture/next16-react-lint-debt-audit.md
+
+## L2A Remediation Result
+
+ตรวจทาน B candidates ทั้ง 18 รายการตาม implementation และ focused tests แล้ว โดยแก้เฉพาะกรณีที่ย้าย ownership หรือใช้ effective value แล้วพิสูจน์ behavior เทียบเท่าได้
+
+- B candidates reviewed: 18
+- fixed: 4
+- deferred: 14
+- remaining B diagnostics: 14
+
+### Fixed locations
+
+- `modules/audit/presentation/dashboard/AuditLogsProvider.tsx:60` — ลบ effect reset pagination และห่อ `setActionFilter`/`setEntityTypeFilter` ที่ expose ผ่าน context ให้เป็น action ที่เปลี่ยน filter และ reset page ใน transition เดียวกัน จึงยังครอบคลุมการเรียกจาก consumer ภายนอก
+- `modules/authorization/presentation/dashboard/components/AuthorizationDialogs.tsx:514` — derive `effectiveScope` จาก scope ที่ยังรองรับ และใช้ค่าเดียวกันกับ radio state, review presentation และ mutation payload โดยไม่เปลี่ยน capability หรือ authorization contract
+- `modules/authorization/presentation/dashboard/components/UserAccessPanel.tsx:461` — derive `effectiveSelectedScope` จาก available scopes และใช้ค่าเดียวกันกับ radio state และการสร้าง review scope ก่อน submit โดยไม่เปลี่ยน grant rules
+- `modules/leave/presentation/dashboard/hooks/useApproverManagementModel.ts:81` — derive `effectiveCurrentPage` และใช้กับรายการที่ slice, page ที่ expose, page-change handler และ Previous/Next handlers เพื่อไม่ให้ state page ที่เกินขอบเขตเลี้ยง consumer คนละค่า
+
+### Deferred locations
+
+- `components/dashboard/layout/DashboardSidebarPrimitives.tsx:178` — DEFER — effect รวมกลุ่มเมนูที่พร้อมใช้งานใหม่เข้ากับ expanded state ที่ผู้ใช้ควบคุมอยู่ การ derive ตรงจาก available groups จะทำลายการยุบ/ขยายของผู้ใช้
+- `modules/leave/presentation/dashboard/LeaveManagementSection.tsx:40` — DEFER — `defaultTab` เปลี่ยนได้จาก deep link/navigation ระหว่าง mount จึงไม่เทียบเท่ากับ constructor-only initial state หรือ handler ภายใน component
+- `modules/routine/presentation/dashboard/RoutineScheduleFields.tsx:149` — DEFER — auto-open contract fields เมื่อ data/error ปรากฏต้องคงความต่างระหว่างเปิดครั้งหนึ่งกับการบังคับเปิดตลอดเวลา ซึ่งการ derive อาจทำให้ผู้ใช้ยุบไม่ได้
+- `modules/routine/presentation/dashboard/RoutineSection.tsx:130` — DEFER — page reset ผูกกับ filter และ task/occurrence deep-link inputs ที่เปลี่ยนจากภายนอกได้ จึงยังพิสูจน์ handler-only reset ไม่ได้
+- `modules/routine/presentation/dashboard/RoutineSection.tsx:551` — DEFER — safe tab normalization ผูกกับ capability visibility และ local tab state การลบ effect ต้องพิสูจน์ fallback และ lifecycle ของ tab ที่กลับมาใช้งานได้อีกครั้ง
+- `modules/routine/presentation/dashboard/RoutineSection.tsx:561` — DEFER — task/occurrence deep link สามารถบังคับไป tab `all` จากภายนอก ไม่ใช่ transition ที่ handler ภายในเป็นเจ้าของทั้งหมด
+- `modules/routine/presentation/dashboard/RoutineSection.tsx:568` — DEFER — เป็น URL `routineTab` → local tab synchronization ซึ่ง browser navigation และ deep link เปลี่ยน URL ได้อิสระ
+- `modules/routine/presentation/liff/LiffRoutineTaskForm.tsx:280` — DEFER — extra-details disclosure ต้อง auto-open เมื่อ data/error ปรากฏ แต่ยังให้ผู้ใช้ยุบเองได้ จึงไม่เปลี่ยนเป็น derived boolean โดยไม่มีหลักฐาน interaction contract
+- `modules/stock/presentation/dashboard/context/StockProvider.tsx:117` — DEFER — URL tab → state synchronization; การย้ายออกต้อง redesign canonical source และตรวจ browser back/forward
+- `modules/stock/presentation/dashboard/context/StockProvider.tsx:124` — DEFER — request page รับค่าจาก URL ซึ่งเปลี่ยนจาก navigation ภายนอกได้
+- `modules/stock/presentation/dashboard/context/StockProvider.tsx:133` — DEFER — browse/inventory page, search และ category state เป็น bidirectional URL synchronization ที่มี tab-specific page keys
+- `modules/stock/presentation/dashboard/context/StockProvider.tsx:421` — DEFER — items pagination clamp ผูกกับ data total, active tab, URL write-back และ SWR query key จึงยังไม่ย้ายโดยไม่สร้าง source-of-truth divergence
+- `modules/stock/presentation/dashboard/context/StockProvider.tsx:429` — DEFER — request pagination clamp ผูกกับ data total และ URL synchronization ของ request page
+- `modules/stock/presentation/liff/components/LiffStockApp.tsx:784` — DEFER — safe active tab ผูกกับ capability changes และ mutation/deep-link flows; derive อย่างเดียวอาจปล่อย stale state ให้กลับมาเมื่อ capability เปลี่ยน
+
+### Verification record
+
+- Targeted tests: `npm.cmd run test:run -- modules/audit/presentation/dashboard/AuditLogsSection.test.tsx modules/authorization/presentation/dashboard/components/AuthorizationDialogs.test.tsx modules/authorization/presentation/dashboard/components/UserAccessPanel.test.tsx modules/leave/presentation/dashboard/hooks/useApproverManagementModel.test.ts` — passed, 4 files / 27 tests
+- Candidate lint override: `react-hooks/set-state-in-effect:error` — fixed B locations no longer report; remaining diagnostics in the candidate files are the documented D sites only
+- `npm.cmd run lint:strict` — passed
+- `npm.cmd run typecheck` — passed
+- `git diff --check` — passed
+- ไม่รัน `npm.cmd run test:full:serial` และไม่รัน `npm.cmd run build`
+- ไม่แก้ 43 D findings, ไม่เพิ่ม eslint suppression และ `react-hooks/set-state-in-effect` ยังคง globally disabled

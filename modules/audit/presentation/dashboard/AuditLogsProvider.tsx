@@ -4,7 +4,6 @@ import {
     useState,
     useCallback,
     useMemo,
-    useEffect,
     type ReactNode,
 } from "react";
 import useSWR from "swr";
@@ -56,11 +55,17 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
     const totalPages = data?.pagination?.pages || 1;
     const error = swrError ? swrError.message || "เกิดข้อผิดพลาด" : "";
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [actionFilter, entityTypeFilter]);
-
     const filteredLogs = useMemo(() => auditLogs, [auditLogs]);
+
+    const handleActionFilterChange = useCallback((filter: string): void => {
+        setActionFilter(filter);
+        setCurrentPage(1);
+    }, []);
+
+    const handleEntityTypeFilterChange = useCallback((filter: string): void => {
+        setEntityTypeFilter(filter);
+        setCurrentPage(1);
+    }, []);
 
     const handleSearchTermChange = useCallback((term: string) => {
         setSearchTerm(term);
@@ -89,9 +94,9 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
             setCurrentPage,
             totalPages,
             actionFilter,
-            setActionFilter,
+            setActionFilter: handleActionFilterChange,
             entityTypeFilter,
-            setEntityTypeFilter,
+            setEntityTypeFilter: handleEntityTypeFilterChange,
             searchTerm,
             setSearchTerm: handleSearchTermChange,
             refresh,
@@ -107,9 +112,9 @@ export function AuditLogsProvider({ children }: AuditLogsProviderProps) {
             setCurrentPage,
             totalPages,
             actionFilter,
-            setActionFilter,
+            handleActionFilterChange,
             entityTypeFilter,
-            setEntityTypeFilter,
+            handleEntityTypeFilterChange,
             searchTerm,
             handleSearchTermChange,
             refresh,

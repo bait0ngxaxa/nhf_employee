@@ -508,12 +508,9 @@ export function GrantFormDialog({
         () => selectedCapability?.supportedScopes.filter((value) => source !== "USER" || value !== "TEAM") ?? [],
         [selectedCapability, source],
     );
-
-    useEffect(() => {
-        if (!supportedScopes.some((value) => value === scope)) {
-            setScope(supportedScopes[0] ?? "");
-        }
-    }, [scope, supportedScopes]);
+    const effectiveScope = supportedScopes.some((value) => value === scope)
+        ? scope
+        : supportedScopes[0] ?? "";
 
     const sourceLabel = source === "TEAM"
         ? "ทีม"
@@ -529,14 +526,14 @@ export function GrantFormDialog({
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
-        if (!selectedCapability?.administrativelyGrantable || !scope) return;
+        if (!selectedCapability?.administrativelyGrantable || !effectiveScope) return;
         if (step === "choose") {
             setStep("review");
             return;
         }
         setError(null);
         try {
-            await onSubmit({ capabilityKey, scope });
+            await onSubmit({ capabilityKey, scope: effectiveScope });
         } catch (submitError) {
             setError(submitError);
         }
@@ -629,8 +626,8 @@ export function GrantFormDialog({
                                                     {supportedScopes.length === 0 ? <p className="text-sm text-status-danger-strong">สิทธิ์นี้ยังไม่มีขอบเขตที่ใช้ได้กับแหล่งที่มา</p> : supportedScopes.map((value) => {
                                                         const presentation = getAuthorizationScopePresentation(value, selectedCapability.key);
                                                         return (
-                                                            <label key={value} className={`flex cursor-pointer gap-3 rounded-md border px-3 py-2 transition-colors ${scope === value ? "border-action-primary-solid bg-surface-raised" : "border-border-subtle bg-surface-raised/70"}`}>
-                                                                <input type="radio" name="authorization-scope" value={value} checked={scope === value} onChange={() => setScope(value)} className="mt-1 h-4 w-4 accent-action-primary-solid" />
+                                                            <label key={value} className={`flex cursor-pointer gap-3 rounded-md border px-3 py-2 transition-colors ${effectiveScope === value ? "border-action-primary-solid bg-surface-raised" : "border-border-subtle bg-surface-raised/70"}`}>
+                                                                <input type="radio" name="authorization-scope" value={value} checked={effectiveScope === value} onChange={() => setScope(value)} className="mt-1 h-4 w-4 accent-action-primary-solid" />
                                                                 <span><span className="block text-sm font-semibold text-content-heading">{presentation.label}</span><span className="block text-xs leading-5 text-content-secondary">{presentation.description}</span></span>
                                                             </label>
                                                         );
@@ -648,7 +645,7 @@ export function GrantFormDialog({
                                     <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                                         <div><dt className="text-content-secondary">ให้กับ</dt><dd className="mt-1 font-semibold text-content-heading">{sourceLabel}</dd></div>
                                         <div><dt className="text-content-secondary">สิทธิ์</dt><dd className="mt-1 font-semibold text-content-heading">{selectedPresentation?.actionLabel ?? "สิทธิ์ที่ต้องตรวจสอบ"}</dd></div>
-                                        <div className="sm:col-span-2"><dt className="text-content-secondary">ขอบเขต</dt><dd className="mt-1 font-semibold text-content-heading">{getAuthorizationScopePresentation(scope, selectedCapability?.key).label}</dd><dd className="mt-1 text-xs leading-5 text-content-secondary">{getAuthorizationScopePresentation(scope, selectedCapability?.key).description}</dd></div>
+                                        <div className="sm:col-span-2"><dt className="text-content-secondary">ขอบเขต</dt><dd className="mt-1 font-semibold text-content-heading">{getAuthorizationScopePresentation(effectiveScope, selectedCapability?.key).label}</dd><dd className="mt-1 text-xs leading-5 text-content-secondary">{getAuthorizationScopePresentation(effectiveScope, selectedCapability?.key).description}</dd></div>
                                     </dl>
                                 </div>
                                 <p className="text-sm leading-6 text-content-secondary">หลังบันทึก ระบบจะคำนวณสิทธิ์ที่ใช้งานได้ใหม่ และโหลดข้อมูลล่าสุดให้อัตโนมัติ การทำรายการจริงยังขึ้นอยู่กับเจ้าของข้อมูล ผู้รับผิดชอบ สถานะรายการ และขั้นตอนการทำงาน</p>
