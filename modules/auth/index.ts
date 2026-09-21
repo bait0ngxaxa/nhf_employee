@@ -72,7 +72,7 @@ export type {
 } from "./application/types";
 export type { AuthAccountIdentity } from "./infrastructure/persistence/account-repository";
 
-// These token primitives remain a compatibility seam for middleware and the
+// These token primitives remain a compatibility seam for Proxy and the
 // existing hybrid-token tests. They contain no persistence and are not a
 // browser entry; all authoritative route use cases call the application above.
 export {

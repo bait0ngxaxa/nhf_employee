@@ -25,7 +25,7 @@ vi.mock("@/lib/db/prisma", () => ({
     prisma: prismaMock,
 }));
 
-import middleware from "@/middleware";
+import proxy from "@/proxy";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
 import { issueAccessToken } from "@/lib/auth/hybrid/tokens";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
@@ -71,8 +71,8 @@ describe("Hybrid critical flow", () => {
             headers: { cookie: `${HYBRID_ACCESS_COOKIE_NAME}=${accessToken}` },
         });
 
-        const middlewareResponse = await middleware(dashboardRequest);
-        expect(middlewareResponse.status).toBe(200);
+        const proxyResponse = await proxy(dashboardRequest);
+        expect(proxyResponse.status).toBe(200);
     });
 
     it("logout-all then protected route must redirect to /login", async () => {
@@ -92,8 +92,8 @@ describe("Hybrid critical flow", () => {
         expect(logoutAllResponse.status).toBe(200);
 
         const protectedRequest = new NextRequest("http://localhost/dashboard");
-        const middlewareResponse = await middleware(protectedRequest);
-        expect(middlewareResponse.status).toBe(307);
-        expect(middlewareResponse.headers.get("location")).toBe("http://localhost/login");
+        const proxyResponse = await proxy(protectedRequest);
+        expect(proxyResponse.status).toBe(307);
+        expect(proxyResponse.headers.get("location")).toBe("http://localhost/login");
     });
 });

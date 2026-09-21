@@ -174,7 +174,7 @@ describe("RoutineTaskDialog", () => {
         fireEvent.click(screen.getByRole("button", { name: "กลับไปแก้ไข" }));
 
         await waitForDismissLayer();
-        fireBackdropPointerDown();
+        fireBackdropClick();
         expect(screen.getByRole("alertdialog", { name: "มีข้อมูลที่ยังไม่ได้บันทึก" })).toBeInTheDocument();
         expect(onClose).not.toHaveBeenCalled();
 
@@ -235,12 +235,13 @@ function RoutineTaskDialogHarness({
     );
 }
 
-function fireBackdropPointerDown(): void {
+function fireBackdropClick(): void {
     const overlay = document.querySelector('[data-slot="dialog-overlay"]');
     if (!(overlay instanceof HTMLElement)) {
         throw new Error("Dialog overlay not found");
     }
     fireEvent.pointerDown(overlay, { button: 0, pointerType: "mouse" });
+    fireEvent.click(overlay);
 }
 
 async function waitForDismissLayer(): Promise<void> {

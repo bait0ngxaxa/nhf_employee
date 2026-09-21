@@ -15,7 +15,7 @@
 
 ## Technology Stack
 
-- Next.js 15 (App Router), React 19 และ TypeScript
+- Next.js 16.3.3 (App Router), React 19.2 และ TypeScript
 - Tailwind CSS 4
 - MySQL 8 และ Prisma ORM 6
 - Nodemailer, LINE Messaging API และ Sharp
@@ -23,7 +23,7 @@
 
 ## ข้อกำหนดก่อนเริ่ม
 
-- Node.js 20 LTS หรือใหม่กว่า
+- Node.js >= 20.9.0
 - npm (ใช้ lockfile ของโปรเจกต์ผ่าน `npm ci`)
 - Docker Engine และ Docker Compose plugin สำหรับ MySQL
 - OpenSSL หรือเครื่องมือสร้าง random secret ที่ปลอดภัย

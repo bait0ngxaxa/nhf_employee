@@ -46,7 +46,7 @@ function buildRefreshSessionUrl(
     return refreshUrl;
 }
 
-export default async function middleware(request: NextRequest): Promise<NextResponse> {
+export default async function proxy(request: NextRequest): Promise<NextResponse> {
     const { pathname } = request.nextUrl;
     const isPublicRoute = PUBLIC_ROUTES.has(pathname) || isLiffAppPath(pathname);
 

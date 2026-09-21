@@ -95,7 +95,7 @@ The relevant current implementation and tests were then inspected under:
 | Area | Current control | Remaining observation |
 | --- | --- | --- |
 | Auth refresh | Opaque random refresh token; SHA-256 hash at rest; family ID; unique rotatedFromId; conditional rotation update inside a Prisma transaction | The application-level pre-read and family-revocation paths are not coordinated with every concurrent logout/revocation path. |
-| Access authorization | Access-token signature/claims plus database family, User, tokenVersion, and Employee-state checks in server account resolution | Middleware validates the JWT shape/claims without replacing the server resolver. |
+| Access authorization | Access-token signature/claims plus database family, User, tokenVersion, and Employee-state checks in server account resolution | Proxy validates the JWT shape/claims without replacing the server resolver. |
 | Password reset | One-time conditional token claim and serializable transaction; password version increment and refresh-family revocation are in the same reset transaction | There is no equivalent real-MySQL concurrency test for refresh versus reset/lifecycle/logout. |
 | Browser refresh | One in-flight browser refresh; generic 401 retry of the original RequestInit | The generic transport does not restrict the replay to GET/HEAD or an explicit endpoint opt-in. |
 | LIFF transport | Recovery may replay only GET/HEAD; a recovered mutation returns the original unauthorized result | LIFF issuance uses a signed JWT containing userId and employeeId, not a link version or revocation handle. |

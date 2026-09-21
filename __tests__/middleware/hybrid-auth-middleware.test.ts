@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-import middleware from "@/middleware";
+import proxy from "@/proxy";
 import { issueAccessToken } from "@/lib/auth/hybrid/tokens";
 import {
     HYBRID_ACCESS_COOKIE_NAME,
@@ -16,14 +16,14 @@ function buildRequest(url: string, cookie?: string): NextRequest {
     });
 }
 
-describe("hybrid auth middleware", () => {
+describe("hybrid auth proxy", () => {
     afterEach(() => {
         vi.unstubAllEnvs();
     });
 
     it("redirects unauthenticated user from protected route to /login", async () => {
         const request = buildRequest("http://localhost/dashboard");
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         expect(response.headers.get("location")).toBe("http://localhost/login");
@@ -33,7 +33,7 @@ describe("hybrid auth middleware", () => {
         const request = buildRequest(
             "http://localhost/dashboard?tab=stock&stockTab=browse",
         );
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         expect(response.headers.get("location")).toBe("http://localhost/login");
@@ -41,7 +41,7 @@ describe("hybrid auth middleware", () => {
 
     it("redirects protected route with only refresh cookie to refresh bridge", async () => {
         const request = buildRequest("http://localhost/dashboard", `${HYBRID_REFRESH_COOKIE_NAME}=present`);
-        const response = await middleware(request);
+        const response = await proxy(request);
         const location = response.headers.get("location");
 
         expect(response.status).toBe(307);
@@ -53,7 +53,7 @@ describe("hybrid auth middleware", () => {
             "http://localhost/dashboard?tab=stock&stockTab=browse",
             `${HYBRID_REFRESH_COOKIE_NAME}=present`,
         );
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         expect(response.headers.get("location")).toBe(
@@ -63,7 +63,7 @@ describe("hybrid auth middleware", () => {
 
     it("allows access to public route without authentication", async () => {
         const request = buildRequest("http://localhost/login");
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(200);
     });
@@ -72,7 +72,7 @@ describe("hybrid auth middleware", () => {
         const request = buildRequest(
             `http://localhost${APP_ROUTES.line.routine}`,
         );
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(200);
         expect(response.headers.get("location")).toBeNull();
@@ -82,7 +82,7 @@ describe("hybrid auth middleware", () => {
         APP_ROUTES.line.root,
         `${APP_ROUTES.line.root}/future-module`,
     ])("allows the global LIFF boundary %s without hybrid authentication", async (path) => {
-        const response = await middleware(buildRequest(`http://localhost${path}`));
+        const response = await proxy(buildRequest(`http://localhost${path}`));
 
         expect(response.status).toBe(200);
         expect(response.headers.get("location")).toBeNull();
@@ -92,7 +92,7 @@ describe("hybrid auth middleware", () => {
         const request = buildRequest(
             `http://localhost${APP_ROUTES.line.routine}?taskId=71&occurrenceId=91`,
         );
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(200);
         expect(response.headers.get("location")).toBeNull();
@@ -100,7 +100,7 @@ describe("hybrid auth middleware", () => {
 
     it("redirects root route with only refresh cookie to refresh bridge for dashboard", async () => {
         const request = buildRequest("http://localhost/", `${HYBRID_REFRESH_COOKIE_NAME}=present`);
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         expect(response.headers.get("location")).toBe(
@@ -118,7 +118,7 @@ describe("hybrid auth middleware", () => {
         });
 
         const request = buildRequest("http://localhost/dashboard", `${HYBRID_ACCESS_COOKIE_NAME}=${token}`);
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(200);
     });
@@ -136,7 +136,7 @@ describe("hybrid auth middleware", () => {
             "http://localhost/dashboard?tab=stock&stockTab=admin-requests",
             `${HYBRID_ACCESS_COOKIE_NAME}=${token}`,
         );
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(200);
     });
@@ -151,7 +151,7 @@ describe("hybrid auth middleware", () => {
         });
 
         const request = buildRequest("http://localhost/login", `${HYBRID_ACCESS_COOKIE_NAME}=${token}`);
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         expect(response.headers.get("location")).toBe("http://localhost/dashboard");
@@ -162,7 +162,7 @@ describe("hybrid auth middleware", () => {
         vi.stubEnv("PUBLIC_APPROVE_URL", "https://approve.example.com");
 
         const request = buildRequest("http://localhost:3000/dashboard");
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         expect(response.headers.get("location")).toBe("https://approve.example.com/login");
@@ -178,7 +178,7 @@ describe("hybrid auth middleware", () => {
                 "x-forwarded-proto": "https",
             },
         });
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         expect(response.headers.get("location")).toBe("https://approve.example.com/login");

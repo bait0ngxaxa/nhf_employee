@@ -86,7 +86,7 @@ Primary evidence includes:
 | `docs/architecture/employee-migration.md` | The completed Employee ownership decision and its narrow Auth/workforce/signup contracts. |
 | `docs/architecture/audit-migration.md` | The completed Audit persistence boundary and deferred Auth producer seam. |
 | `docs/architecture/leave-migration.md` | Leave capability ownership and the public predicates currently consumed by Auth. |
-| `components/auth/**`, `lib/client/**`, `middleware.ts` | Browser state, refresh/retry, redirect, and client/server responsibilities. |
+| `components/auth/**`, `lib/client/**`, `proxy.ts` | Browser state, refresh/retry, redirect, and client/server responsibilities. |
 | `lib/line/**`, `lib/auth/liff.ts`, `app/api/line/**` | LINE identity, account-link, LIFF session, and messaging behavior. |
 | `__tests__/**` and migrated-module tests | Security, concurrency, API, UI, and integration contracts. |
 
@@ -100,7 +100,7 @@ browser components.
 The observed web flow is:
 
 ```text
-Browser / middleware
+Browser / Proxy
     -> app/api/auth/** or app pages
     -> lib/auth/** compatibility and application helpers
     -> Prisma User / AuthRefreshToken / PasswordResetToken
@@ -227,7 +227,7 @@ The current implementation is in
 | Subject | `sub` is the decimal User id string. Parsing accepts only a positive integer. |
 | Claims | `role`, `sid` (refresh family id), and `ver` (User `tokenVersion`), plus `iat` and `exp`. Required-claim validation requires non-empty `sub`, `role`, `sid`, and an integer non-negative `ver`. |
 | Default lifetime | 15 minutes (`900` seconds), configurable only by the positive-integer `AUTH_ACCESS_TOKEN_TTL_SECONDS`. |
-| Role authority | The JWT contains `role`, but the server current-user projection reads the current User role from the database. Middleware validates only signature/required claims; it is not the authoritative account/session check. |
+| Role authority | The JWT contains `role`, but the server current-user projection reads the current User role from the database. Proxy validates only signature/required claims; it is not the authoritative account/session check. |
 | Version authority | Web API resolution compares `claims.ver` to the current User `tokenVersion`. |
 | Failure behavior | Verification/parsing/database/projection failures collapse to unauthenticated in the relevant helper; routes return their existing 401/403/500 contracts. |
 
@@ -784,7 +784,7 @@ The existing no-unnecessary-ID-token-persistence rule remains explicit.
 | `lib/server/request-body.ts`, LINE request guards | Request-size protection | Shared HTTP/platform or LINE integration boundary. |
 | `console.error` and request metadata | Operational diagnostics and actor/request context | Platform logging; Auth/Audit producers decide meaningful metadata. |
 
-`middleware.ts` is a delivery redirect optimization. It verifies only the access
+`proxy.ts` is a delivery redirect optimization. It verifies only the access
 JWT shape/signature and refresh-cookie presence for page routing. API and server
 route helpers remain authoritative for account, family, Employee, and token
 version validity.
@@ -796,7 +796,7 @@ version validity.
 The direct Auth routes are the eleven paths in section 4.2. The active page and
 delivery consumers are:
 
-- `middleware.ts` for public/protected redirect and refresh-bridge routing;
+- `proxy.ts` for public/protected redirect and refresh-bridge routing;
 - `app/auth/refresh/page.tsx` and `components/auth/RefreshSessionBridge.tsx`
   for refresh-then-return behavior;
 - `app/page.tsx` for home redirect;
@@ -1078,7 +1078,7 @@ The following are migration invariants, not implementation suggestions:
   transaction timing remain semantically unchanged until J3 migrates the
   producer seam.
 - Audit failures remain non-fatal where they are currently best effort.
-- Server authorization remains authoritative; UI visibility, middleware page
+- Server authorization remains authoritative; UI visibility, Proxy page
   redirects, role claims alone, and client fields are not security boundaries.
 - Dashboard, login/signup/recovery, session-management, and LIFF presentation
   behavior remains unchanged until the relevant later phase.
@@ -1094,7 +1094,7 @@ These are recorded risks, not J0 fixes:
    eligibility projection before issuing the next access token. Downstream
    resolution rejects some such tokens; the distinction must be preserved and
    intentionally addressed only with an approved compatibility analysis.
-3. Middleware validates JWT signature/claims but not DB family revocation,
+3. Proxy validates JWT signature/claims but not DB family revocation,
    token version, or account state. It is only a page-routing optimization;
    server APIs must remain authoritative.
 4. `resolveCurrentSessionFamilyId()` trusts a matching verified access claim for
@@ -1550,7 +1550,7 @@ Active compatibility/adaptation paths remain for the broad `/me` projection,
 cookie/request adapters, generic Auth API/workforce consumers, token constants
 and edge-safe routing concerns, browser presentation, and deferred Audit
 composition. `lib/auth/hybrid/tokens.ts` remains a small token primitive seam;
-it contains no Auth token persistence, and middleware continues to use its
+it contains no Auth token persistence, and Proxy continues to use its
 edge-compatible JWT routing path without a Prisma/password/refresh dependency.
 No compatibility path retains direct production `AuthRefreshToken` or
 `PasswordResetToken` persistence.
@@ -1614,7 +1614,7 @@ was changed.
 J1 intentionally leaves the recorded differences intact: login may accept a
 User without an Employee, `resolveAuthenticatedUserId` permits that case,
 `getApiAuthSession()` requires an Employee, refresh prevalidation does not
-perform the complete `/me` Employee/deleted-state check, and middleware JWT
+perform the complete `/me` Employee/deleted-state check, and Proxy JWT
 verification is not authoritative for DB account/session state. The documented
 concurrent refresh loser may revoke the winning successor's family. These are
 compatibility behaviors, not J1 fixes.

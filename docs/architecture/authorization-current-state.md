@@ -182,8 +182,8 @@ web access cookie / LIFF session / system secret
 | Employee | ตัวตนพนักงานที่เชื่อมกับ User และมีสถานะการทำงาน | เป็นเงื่อนไข workforce ของหลาย API/ธุรกรรม และเป็นเจ้าของ manager/participant relationship บางส่วน |
 | Department | โครงสร้าง HR/องค์กร ใช้แสดงผล, filter, statistics และ reference data | ไม่พบการใช้ Department เป็นตัวอนุมาน authorization |
 | ADMIN / USER | ค่า role ระบบจาก lib/ssot/permissions.ts และ User.role | ADMIN เป็น highest system role แต่ไม่ bypass domain invariants |
-| DASHBOARD | Browser web route และ Dashboard API | Web middleware/route guards กับ API guards เป็นคนละชั้น |
-| API | /api/** ที่ใช้ hybrid access cookie | middleware.ts ไม่ครอบ /api; route ต้องเรียก server guard เอง |
+| DASHBOARD | Browser web route และ Dashboard API | Web Proxy/route guards กับ API guards เป็นคนละชั้น |
+| API | /api/** ที่ใช้ hybrid access cookie | proxy.ts ไม่ครอบ /api; route ต้องเรียก server guard เอง |
 | LIFF_SELF_SERVICE | LINE/LIFF route ที่ใช้ LIFF session cookie และ linked LINE identity | บาง domain โดยเฉพาะ Routine/Leave มี channel-specific restriction |
 | SYSTEM | Cron, cleanup, webhook หรือ infrastructure endpoint | ใช้ shared secret/HMAC ไม่ได้ใช้ User role |
 
@@ -279,7 +279,7 @@ Mutation ที่มีผลต่อข้อมูลสำคัญยั�
 
 ### 3.3 Dashboard
 
-- middleware.ts ตรวจ hybrid access token เฉพาะ web route เพราะ matcher ไม่ครอบ /api; ทำหน้าที่ authentication/routing ไม่ใช่ domain authorization
+- proxy.ts ตรวจ hybrid access token เฉพาะ web route เพราะ matcher ไม่ครอบ /api; ทำหน้าที่ authentication/routing ไม่ใช่ domain authorization
 - app/dashboard/layout.tsx เรียก getCurrentUserProjection; ถ้าไม่มี current active Employee projection จะ redirect ไป login
 - `requireDashboardEmailRequestAccess()` เป็น capability-aware redirect guard ของ Email Request; Audit ใช้ `requireDashboardAuditCapability()` และ Authorization Administration ยังคงใช้ ADMIN-only guard แยกต่างหาก
 - DashboardProvider, constants/dashboard.ts และ DashboardSidebar กรอง menu/requiredRole/feature flag ฝั่ง client
@@ -444,7 +444,7 @@ Employee current authorization detail:
 
 ### 5.2 Dashboard guards and projections
 
-- Authentication/routing: middleware.ts
+- Authentication/routing: proxy.ts
 - Current workforce projection: app/_lib/auth/current-user.ts:getCurrentUserProjection
 - Page access guards: app/dashboard/_lib/route-access.ts:requireDashboardAuditCapability, requireDashboardEmployeeCapability และ `requireDashboardEmailRequestAccess`; Authorization Administration ใช้ ADMIN-only guard; `/dashboard/employees` ใช้ `canAccessEmployeeDashboard()` จาก trusted projection
 - Role/feature navigation: constants/dashboard.ts:getAvailableMenuGroups, components/dashboard/context/dashboard/DashboardProvider.tsx:handleMenuClick
@@ -556,7 +556,7 @@ Query and persistence scopes found include:
 
 | Decision point | Classification |
 |---|---|
-| middleware.ts hybrid token check | AUTHENTICATION และ routing; ไม่ใช่ AUTHORIZATION ของ domain |
+| proxy.ts hybrid token check | AUTHENTICATION และ routing; ไม่ใช่ AUTHORIZATION ของ domain |
 | resolveAuthenticatedAccount และ getApiAuthSession | AUTHENTICATION + ACCOUNT_LIFECYCLE |
 | requireApiSession | AUTHENTICATION + ACCOUNT_LIFECYCLE |
 | requireAdminSession และ isAdminRole | AUTHENTICATION + ACCOUNT_LIFECYCLE + AUTHORIZATION |

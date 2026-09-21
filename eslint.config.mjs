@@ -1,29 +1,21 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextTs from "eslint-config-next/typescript";
+import nextVitals from "eslint-config-next/core-web-vitals";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-});
-
-const eslintConfig = [
-    ...compat.extends("next/core-web-vitals", "next/typescript"),
-    {
-        ignores: [
-            ".next/**",
-            "out/**",
-            "build/**",
-            "dist/**",
-            "node_modules/**",
-            "next-env.d.ts",
-            "lib/generated/**",
-            "*.config.js",
-            "*.config.ts",
-        ],
-    },
+const eslintConfig = defineConfig([
+    ...nextVitals,
+    ...nextTs,
+    globalIgnores([
+        ".next/**",
+        "out/**",
+        "build/**",
+        "dist/**",
+        "node_modules/**",
+        "next-env.d.ts",
+        "lib/generated/**",
+        "*.config.js",
+        "*.config.ts",
+    ]),
     {
         rules: {
             // TypeScript - Strict Mode
@@ -56,11 +48,22 @@ const eslintConfig = [
             // Next.js
             "@next/next/no-html-link-for-pages": ["error", "app"],
             "@next/next/no-img-element": "error",
+            // This warning is new in Next.js 16; preserve the existing error
+            // page navigation contract during the framework-only migration.
+            "@next/next/no-location-assign-relative-destination": "off",
 
             // React Best Practices
             "react/self-closing-comp": "warn",
             "react-hooks/rules-of-hooks": "error",
             "react-hooks/exhaustive-deps": "warn",
+            // Next.js 16's React Hooks plugin enables Compiler-oriented rules.
+            // Keep the existing React lint contract without adopting Compiler
+            // refactors as part of this framework-only migration.
+            "react-hooks/incompatible-library": "off",
+            "react-hooks/preserve-manual-memoization": "off",
+            "react-hooks/purity": "off",
+            "react-hooks/refs": "off",
+            "react-hooks/set-state-in-effect": "off",
 
             // Code Quality
             "no-console": ["warn", { allow: ["warn", "error"] }],
@@ -94,6 +97,6 @@ const eslintConfig = [
             ],
         },
     },
-];
+]);
 
 export default eslintConfig;

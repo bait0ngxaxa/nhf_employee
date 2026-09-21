@@ -329,7 +329,7 @@ describe("LeaveRequestForm", () => {
         });
 
         await waitForDismissLayer();
-        fireBackdropPointerDown();
+        fireBackdropClick();
 
         expect(
             screen.getByRole("alertdialog", {
@@ -369,7 +369,7 @@ describe("LeaveRequestForm", () => {
         ).toBeDisabled();
 
         fireEvent.keyDown(document, { key: "Escape" });
-        fireBackdropPointerDown();
+        fireBackdropClick();
         fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
 
         expect(onCancel).not.toHaveBeenCalled();
@@ -411,13 +411,14 @@ function LeaveRequestFormHarness(): ReactElement {
     );
 }
 
-function fireBackdropPointerDown(): void {
+function fireBackdropClick(): void {
     const overlay = document.querySelector('[data-slot="dialog-overlay"]');
     if (!(overlay instanceof HTMLElement)) {
         throw new Error("Dialog overlay not found");
     }
 
     fireEvent.pointerDown(overlay, { button: 0, pointerType: "mouse" });
+    fireEvent.click(overlay);
 }
 
 async function waitForDismissLayer(): Promise<void> {
