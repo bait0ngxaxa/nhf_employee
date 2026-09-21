@@ -1,8 +1,8 @@
 # K0 — Final Repository Audit and Deferred-Boundary Inventory
 
 Historical status: K0 audit record
-Current status: K1 closed; L7 repository gate passed; production deployment
-acceptance pending
+Current status: K1 closed; H0 current-HEAD baseline recorded; historical L7
+claim superseded; production deployment acceptance pending
 Repository: bait0ngxaxa/nhf_employee
 Scope: discovery, classification, and documentation only
 
@@ -16,9 +16,10 @@ two differ.
 Sections before the K1 closure below preserve the original K0 discovery
 snapshot. Their findings, “current” descriptions, and deferred roadmap are
 historical unless a later closure section explicitly updates them. The current
-repository state after K1 and L6 is synchronized below; the final L-series
-runtime/security/reliability gate is authoritative in
-[runtime-hardening.md](./runtime-hardening.md).
+repository state after K1 and L6 is synchronized below; the historical
+L-series runtime/security/reliability record is preserved in
+[runtime-hardening.md](./runtime-hardening.md). Current HEAD is authoritative
+in the [H0 baseline](./pre-it-hardening-h0-baseline.md).
 
 The audit treats tests, fixtures, generated output, Prisma migrations, and
 operator tooling as non-production surfaces unless they affect a production
@@ -512,10 +513,14 @@ deployment variables, Cloudflare/LINE Console configuration, and external
 operator consumers were not accessible from this repository, so the retained
 outbound contract must not be removed based on repository-local unused status.
 
-## L7 current-state synchronization
+## Historical L7 synchronization note (superseded by H0)
 
-The L7 repository re-audit at commit `6032381072cf589578f46188a4af2dbe50287fec`
-confirmed the current architecture and did not reopen modular-monolith work:
+The previous document recorded an L7 repository re-audit at commit
+`6032381072cf589578f46188a4af2dbe50287fec`. H0 verified that this SHA is
+the L6 compatibility-cleanup commit, not a separately evidenced L7
+re-audit, and that no Section 24 was recorded. The historical claims below
+are retained for traceability only; they do not establish the current HEAD
+state and must not be used as a current L7 pass statement:
 
 - the modular monolith remains structurally complete; K1 is closed and no K2
   phase is currently justified;
@@ -535,8 +540,7 @@ confirmed the current architecture and did not reopen modular-monolith work:
   SMTP, environment, and production-database evidence remained unavailable;
   therefore live production acceptance is pending operator verification.
 
-The complete invariant matrix, deployment acceptance matrix, residual-risk
-register, and operator checklist are maintained in
-[runtime-hardening.md](./runtime-hardening.md) Section 24. This section is a
-current synchronization note; the K0 findings and historical roadmap above
-remain preserved as historical evidence.
+The current invariant matrix, finding ledger, deployment-assumption inventory,
+and H-series handoff are maintained in the
+[H0 baseline](./pre-it-hardening-h0-baseline.md). The K0 findings and
+historical roadmap above remain preserved as historical evidence.

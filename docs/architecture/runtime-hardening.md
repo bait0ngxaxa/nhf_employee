@@ -1,9 +1,17 @@
 # Runtime Security and Reliability Hardening Baseline
 
-Status: L7 repository gate passed — production deployment acceptance pending
+Status: Historical L1-L6 repository hardening record; current HEAD is superseded by the H0 baseline
 Track: L-series runtime/security/reliability hardening
-Evidence date: 2026-09-10
-Authority: This document is the authoritative baseline for L1-L7.
+Evidence date: 2026-09-10 (historical L6 documentation record)
+Authority: Historical baseline for L1-L6. The current-HEAD source of truth is
+[pre-it-hardening-h0-baseline.md](./pre-it-hardening-h0-baseline.md).
+
+> **Current-state note (H0, 2026-09-21):** This document preserves the
+> historical L0-L6 records. It does not contain a Section 24, and the
+> repository history inspected for H0 does not establish a completed L7
+> re-audit. Any older reference below to a final L7 result or Section 24 is
+> superseded by the current-HEAD evidence in
+> [pre-it-hardening-h0-baseline.md](./pre-it-hardening-h0-baseline.md).
 
 This is a source-backed discovery record. It does not authorize or implement
 runtime hardening, schema changes, migrations, API-contract changes, or
@@ -45,7 +53,8 @@ in section 15.
 > observed before L1-L6. Phrases such as “current control” and “remaining
 > observation” in this section mean “current at L0”; they are not claims about
 > the final implementation. The post-L1-L6 current state is recorded in
-> Sections 18–23 and the final L7 re-audit is in Section 24.
+> Sections 18–23 are the historical L-series closure records. An expected
+> Section 24 was not recorded; current-HEAD verification is in the H0 baseline.
 
 ### 2.1 Architecture baseline
 
@@ -191,7 +200,8 @@ being reachable only through the trusted proxy/tunnel configuration.
 
 > The scenarios below preserve the L0 threat model. Their “can” and “does
 > not” statements describe the pre-hardening behavior used to justify L1-L6;
-> compare the current closure sections and Section 24 for the final result.
+> compare the historical closure sections with the current-HEAD H0 baseline
+> for the final result.
 
 The detailed finding cards below are the authoritative per-finding model. The
 principal application-specific sequences are:
@@ -1301,8 +1311,8 @@ acceptance/evidence requirements, not inflated severity labels.
 ## 14. Accepted design tradeoffs at L0 (historical record)
 
 The following was the L0 decision context. It is retained as historical
-evidence; the final accepted tradeoffs are restated in Section 24 and should
-be used for current decisions:
+evidence; the current accepted tradeoffs are restated in the H0 baseline and
+should be used for current decisions:
 
 1. Refresh-family revocation on confirmed/reported token reuse was a security
    containment tradeoff. L1 later bounded same-client completion without
@@ -3046,5 +3056,7 @@ must be confirmed before any future removal; the latter is not a supported
 package/deployment contract based on the inspected repository evidence, but
 cannot be proven absent outside the workspace.
 
-L6 was ready to hand off to L7. Section 24 records the subsequent final
-re-audit and current L7 disposition.
+The historical L6 record was ready to hand off to L7, but no Section 24
+re-audit record was recorded in this document or the inspected repository
+history. The current HEAD is therefore evaluated in the H0 baseline linked
+above; the historical L6 text is not a current L7 pass statement.

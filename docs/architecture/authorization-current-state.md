@@ -11,6 +11,10 @@
 > [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
 > The older Phase 12H-B through 12H-H boundary notes below remain historical
 > records of behavior at those phase boundaries.
+>
+> The current-HEAD pre-IT hardening baseline and its remaining transition
+> evidence are recorded in
+> [pre-it-hardening-h0-baseline.md](pre-it-hardening-h0-baseline.md).
 
 ## Current final authorization model
 
