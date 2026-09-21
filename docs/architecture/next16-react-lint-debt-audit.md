@@ -372,16 +372,15 @@ git diff
 ตรวจทาน B candidates ทั้ง 18 รายการตาม implementation และ focused tests แล้ว โดยแก้เฉพาะกรณีที่ย้าย ownership หรือใช้ effective value แล้วพิสูจน์ behavior เทียบเท่าได้
 
 - B candidates reviewed: 18
-- fixed: 4
-- deferred: 14
-- remaining B diagnostics: 14
+- fixed: 3
+- deferred: 15
+- remaining B diagnostics: 15
 
 ### Fixed locations
 
 - `modules/audit/presentation/dashboard/AuditLogsProvider.tsx:60` — ลบ effect reset pagination และห่อ `setActionFilter`/`setEntityTypeFilter` ที่ expose ผ่าน context ให้เป็น action ที่เปลี่ยน filter และ reset page ใน transition เดียวกัน จึงยังครอบคลุมการเรียกจาก consumer ภายนอก
 - `modules/authorization/presentation/dashboard/components/AuthorizationDialogs.tsx:514` — derive `effectiveScope` จาก scope ที่ยังรองรับ และใช้ค่าเดียวกันกับ radio state, review presentation และ mutation payload โดยไม่เปลี่ยน capability หรือ authorization contract
 - `modules/authorization/presentation/dashboard/components/UserAccessPanel.tsx:461` — derive `effectiveSelectedScope` จาก available scopes และใช้ค่าเดียวกันกับ radio state และการสร้าง review scope ก่อน submit โดยไม่เปลี่ยน grant rules
-- `modules/leave/presentation/dashboard/hooks/useApproverManagementModel.ts:81` — derive `effectiveCurrentPage` และใช้กับรายการที่ slice, page ที่ expose, page-change handler และ Previous/Next handlers เพื่อไม่ให้ state page ที่เกินขอบเขตเลี้ยง consumer คนละค่า
 
 ### Deferred locations
 
@@ -399,11 +398,12 @@ git diff
 - `modules/stock/presentation/dashboard/context/StockProvider.tsx:421` — DEFER — items pagination clamp ผูกกับ data total, active tab, URL write-back และ SWR query key จึงยังไม่ย้ายโดยไม่สร้าง source-of-truth divergence
 - `modules/stock/presentation/dashboard/context/StockProvider.tsx:429` — DEFER — request pagination clamp ผูกกับ data total และ URL synchronization ของ request page
 - `modules/stock/presentation/liff/components/LiffStockApp.tsx:784` — DEFER — safe active tab ผูกกับ capability changes และ mutation/deep-link flows; derive อย่างเดียวอาจปล่อย stale state ให้กลับมาเมื่อ capability เปลี่ยน
+- `modules/leave/presentation/dashboard/hooks/useApproverManagementModel.ts:81` — DEFER — pagination clamping reacts to independently changing SWR data. A derived effective page leaves stale internal page state that can reappear if `totalPages` grows again; removing the effect requires a stronger pagination ownership redesign.
 
 ### Verification record
 
 - Targeted tests: `npm.cmd run test:run -- modules/audit/presentation/dashboard/AuditLogsSection.test.tsx modules/authorization/presentation/dashboard/components/AuthorizationDialogs.test.tsx modules/authorization/presentation/dashboard/components/UserAccessPanel.test.tsx modules/leave/presentation/dashboard/hooks/useApproverManagementModel.test.ts` — passed, 4 files / 27 tests
-- Candidate lint override: `react-hooks/set-state-in-effect:error` — fixed B locations no longer report; remaining diagnostics in the candidate files are the documented D sites only
+- Candidate lint override: `react-hooks/set-state-in-effect:error` — fixed B locations no longer report; remaining diagnostics in the candidate files are the documented deferred B and D sites
 - `npm.cmd run lint:strict` — passed
 - `npm.cmd run typecheck` — passed
 - `git diff --check` — passed

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { getEmployeeDisplayName } from "@/modules/employee/client";
@@ -71,15 +71,14 @@ export function useApproverManagementModel() {
         () => Math.max(1, Math.ceil(filteredEmployees.length / APPROVER_ITEMS_PER_PAGE)),
         [filteredEmployees.length],
     );
-    const effectiveCurrentPage = Math.min(currentPage, totalPages);
 
     const pagedEmployees = useMemo(() => {
-        const startIndex = (effectiveCurrentPage - 1) * APPROVER_ITEMS_PER_PAGE;
+        const startIndex = (currentPage - 1) * APPROVER_ITEMS_PER_PAGE;
         return filteredEmployees.slice(startIndex, startIndex + APPROVER_ITEMS_PER_PAGE);
-    }, [effectiveCurrentPage, filteredEmployees]);
+    }, [currentPage, filteredEmployees]);
 
-    const handlePageChange = useCallback((page: number): void => {
-        setCurrentPage(Math.min(Math.max(page, 1), totalPages));
+    useEffect(() => {
+        setCurrentPage((prev) => Math.min(prev, totalPages));
     }, [totalPages]);
 
     const handleSearchChange = useCallback((value: string) => {
@@ -93,11 +92,11 @@ export function useApproverManagementModel() {
     }, []);
 
     const handlePreviousPage = useCallback(() => {
-        setCurrentPage((prev) => Math.max(1, Math.min(prev, totalPages) - 1));
-    }, [totalPages]);
+        setCurrentPage((prev) => Math.max(1, prev - 1));
+    }, []);
 
     const handleNextPage = useCallback(() => {
-        setCurrentPage((prev) => Math.min(totalPages, Math.min(prev, totalPages) + 1));
+        setCurrentPage((prev) => Math.min(totalPages, prev + 1));
     }, [totalPages]);
 
     const handleAssign = (employeeId: number, rawValue: string): void => {
@@ -153,7 +152,7 @@ export function useApproverManagementModel() {
         filteredEmployees,
         pagedEmployees,
         unassignedCount,
-        currentPage: effectiveCurrentPage,
+        currentPage,
         totalPages,
         itemsPerPage: APPROVER_ITEMS_PER_PAGE,
         assignments,
@@ -165,7 +164,7 @@ export function useApproverManagementModel() {
         saveMsg,
         setSearch: handleSearchChange,
         setFilterApprover: handleFilterApproverChange,
-        setCurrentPage: handlePageChange,
+        setCurrentPage,
         handlePreviousPage,
         handleNextPage,
         handleAssign,
