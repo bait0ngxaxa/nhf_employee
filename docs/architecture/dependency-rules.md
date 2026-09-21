@@ -472,11 +472,12 @@ validated direct, transitive, deep-import, self-barrel, and persistence-leak
 regression classes without introducing false positives for legitimate support
 or test code.
 
-The check is fast and is included at the start of `npm run check`. Scanning
-legacy feature directories does not migrate them: the checker only evaluates
-imports that resolve into `modules/**`. Existing legacy files without such
-imports remain compatible, and migrated module code is covered by the same
-owner-aware rules.
+`npm run architecture:check` is fast and should be run separately when module
+boundaries may be affected. It is intentionally not part of an umbrella
+repository-wide verification command. Scanning legacy feature directories does
+not migrate them: the checker only evaluates imports that resolve into
+`modules/**`. Existing legacy files without such imports remain compatible, and
+migrated module code is covered by the same owner-aware rules.
 
 ## Legacy compatibility
 

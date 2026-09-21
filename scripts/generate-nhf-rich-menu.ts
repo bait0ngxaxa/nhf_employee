@@ -3,7 +3,7 @@ import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 
 import {
     NHF_RICH_MENU_HEIGHT,
@@ -62,7 +62,7 @@ function thaiText(
     text: string,
     fontSize: number,
     color: string,
-): sharp.OverlayOptions {
+): OverlayOptions {
     return {
         input: {
             text: {
@@ -79,7 +79,7 @@ function englishText(
     text: string,
     fontSize: number,
     color: string,
-): sharp.OverlayOptions {
+): OverlayOptions {
     return {
         input: {
             text: {
@@ -92,7 +92,7 @@ function englishText(
     };
 }
 
-function supportingText(text: string): sharp.OverlayOptions {
+function supportingText(text: string): OverlayOptions {
     return {
         input: {
             text: {

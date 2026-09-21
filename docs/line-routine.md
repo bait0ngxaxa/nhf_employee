@@ -452,7 +452,10 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 5. เตรียม persistent `.uploads/private/leave` และตรวจ permission/non-root process
 6. Backup database และ private attachment storage ตาม policy
 7. ติดตั้ง dependencies ด้วย `npm ci` และ generate Prisma client ด้วย `npx prisma generate`
-8. รัน `npm run check`
+8. รัน `npm run architecture:check`, `npm run lint:strict`, `npm run typecheck` และ
+   targeted tests ที่เกี่ยวข้องกับ release; ถ้าเป็น high-risk release ที่ต้องการ
+   full-suite evidence ให้รัน `npm run test:full:serial` หลัง checks เหล่านี้ผ่านและ
+   diff คงที่แล้ว
 9. รัน `npm run build` ด้วย non-secret/local configuration ที่สอดคล้องกับ production; หาก build local ใช้ production-only credential ไม่ได้ ให้ gate ไว้เป็น pre-deploy operator check
 10. Apply migrations ด้วย `npx prisma migrate deploy` หลัง backup; migration นี้เพิ่มเฉพาะ enum ของ personal LINE child outbox
 11. Deploy artifact/source ที่ตรงกับ commit SHA
@@ -583,7 +586,12 @@ Implementation agent ของ Phase 5B ต้องไม่:
 ## 14. Repository commands และ references
 
 ```bash
-npm run check
+npm run architecture:check
+npm run lint:strict
+npm run typecheck
+npm run test:run -- path/to/relevant.test.ts
+# ใช้เฉพาะเมื่อจำเป็นต้องยืนยัน full suite
+npm run test:full:serial
 npm run build
 npm run line:richmenu:status
 npm run line:richmenu:provision

@@ -107,12 +107,75 @@ UI → Hooks → Services → Data Layer
 
 ## 9. Testing and Verification
 
-Run only checks relevant to the change:
+Use staged, proportional verification. Do not automatically run every command when a narrower check is sufficient.
 
-1. Lint
-2. Typecheck
-3. Targeted tests
-4. Broader test suites when regression risk is high
+### Normal iteration
+
+Run only checks proportional to the change. Typical order:
+
+1. relevant targeted test(s)
+2. `architecture:check` when module boundaries may be affected
+3. `lint:strict` when source/config changed
+4. `typecheck` when TypeScript/runtime contracts changed
+
+Examples:
+
+```bash
+npm run test:run -- path/to/changed-feature.test.ts
+npm run architecture:check
+npm run lint:strict
+npm run typecheck
+```
+
+`test:run` is intended for explicitly scoped targeted tests. Agents MUST NOT run `npm run test:run` without an explicit test path during routine implementation iterations. An unscoped `npm run test:run` is a full repository suite, not an iterative debugging loop.
+
+### Full-suite rule
+
+If a full repository test suite is genuinely justified by broad regression risk, use only:
+
+```bash
+npm run test:full:serial
+```
+
+This command disables Vitest file parallelism and is the standard full-suite command for constrained development machines. Do not use it during normal edit/fix iterations. Normally run it no more than once near task completion, only after implementation is complete, targeted tests are green, lint is green, typecheck is green, architecture checks are green where applicable, and the diff is stable.
+
+Do not replace `test:run` with an umbrella command that runs the complete repository suite.
+
+### Failure handling
+
+If the full serialized suite exposes failures:
+
+1. identify and group the failures by root cause;
+2. reproduce each relevant failure with targeted test commands;
+3. fix the root cause;
+4. rerun only the affected targeted tests;
+5. rerun lint, typecheck, or architecture checks only when the fix affects them;
+6. do not immediately rerun the complete suite after every small edit;
+7. perform another full serialized confirmation only when the corrective diff is stable and the additional full run is justified.
+
+Do not use this loop:
+
+```text
+full suite
+→ one failure
+→ tiny edit
+→ full suite
+→ another tiny edit
+→ full suite
+→ repeat
+```
+
+### Flaky/resource-sensitive failures
+
+A timeout, worker termination, resource exhaustion, or isolated failure from a broad run must not automatically be treated as a product defect. Reproduce the affected test in isolation first, for example:
+
+```bash
+npm run test:run -- path/to/failing.test.ts
+```
+
+If the focused test passes consistently and there is evidence of machine or resource contention, classify the broad-run failure separately from a deterministic application regression. Do not modify production code or weaken tests merely to make a resource-sensitive broad suite pass.
+
+### Other checks
 
 * Prefer scripts defined by the repository.
 * Do not build or run the development server unless explicitly requested, required to reproduce an issue, or there is no other reasonable verification method.
@@ -122,6 +185,10 @@ Run only checks relevant to the change:
 * Use E2E tests for critical user flows, including both happy paths and error paths.
 * Do not modify tests merely to make them pass without verifying that the expected behavior is still correct.
 * If a command cannot be run, state the command, the reason, and what remains unverified.
+
+### Build policy
+
+Production builds are expensive and must only be used when justified. Run `npm run build` for framework upgrades, bundler or Next.js configuration changes, routing convention changes, build-time environment behavior, deployment/runtime compatibility, or changes where only a production build can reasonably verify correctness. Do not run a production build repeatedly during normal implementation.
 
 ## 10. Git and Delivery
 

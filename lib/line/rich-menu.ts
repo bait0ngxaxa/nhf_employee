@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
 import {
@@ -537,7 +537,7 @@ export async function validateRoutineRichMenuImage(
         );
     }
 
-    let metadata: sharp.Metadata;
+    let metadata: Metadata;
     try {
         metadata = await sharp(imagePath).metadata();
     } catch {
