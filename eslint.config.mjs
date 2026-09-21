@@ -48,9 +48,6 @@ const eslintConfig = defineConfig([
             // Next.js
             "@next/next/no-html-link-for-pages": ["error", "app"],
             "@next/next/no-img-element": "error",
-            // This warning is new in Next.js 16; preserve the existing error
-            // page navigation contract during the framework-only migration.
-            "@next/next/no-location-assign-relative-destination": "off",
 
             // React Best Practices
             "react/self-closing-comp": "warn",

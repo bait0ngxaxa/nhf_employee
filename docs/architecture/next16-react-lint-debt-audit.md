@@ -409,3 +409,29 @@ git diff
 - `git diff --check` — passed
 - ไม่รัน `npm.cmd run test:full:serial` และไม่รัน `npm.cmd run build`
 - ไม่แก้ 43 D findings, ไม่เพิ่ม eslint suppression และ `react-hooks/set-state-in-effect` ยังคง globally disabled
+
+## L3 Remediation Result
+
+ตรวจสอบ finding `@next/next/no-location-assign-relative-destination` ใน `app/error.tsx` แล้ว โดยไม่พบหลักฐานจาก source, tests, architecture docs หรือ git history ว่าปุ่ม Home ต้องทำ full-document reload, clear auth/session state, clear global browser state หรือ bypass App Router
+
+- original findings: 1
+- fixed: 1
+- deferred: 0
+- remaining findings: 0
+
+### Navigation decision
+
+- เดิม: `window.location.href = "/"` ทำ full-document navigation จาก error UI
+- ใหม่: `useRouter().push("/")` ใน Client Component เพื่อใช้ App Router navigation contract ตาม Next.js 16
+- `ลองใหม่อีกครั้ง` ยังคงเรียก `reset()` และ error logging, development-only error detail รวมถึงข้อความและ styling ภาษาไทยยังเหมือนเดิม
+- ไม่แก้ navigation ของ Auth/LIFF หรือ `window.location.assign(...)` อื่นที่ rule นี้ไม่ได้รายงาน
+
+### Verification record
+
+- Focused test: `npm.cmd run test:run -- __tests__/app-error.test.tsx` — ผ่าน 1 ไฟล์ / 2 tests
+- Explicit rule check: `npx.cmd eslint app/error.tsx --rule "@next/next/no-location-assign-relative-destination:error"` — ผ่าน
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `git diff --check` — ผ่าน
+- ไม่รัน `npm.cmd run test:full:serial`, unscoped `npm.cmd run test:run` หรือ `npm.cmd run build`
+- หลัง L3 กฎ migration ที่ยัง globally disabled มีเฉพาะ `react-hooks/set-state-in-effect`, `react-hooks/preserve-manual-memoization` และ `react-hooks/incompatible-library`

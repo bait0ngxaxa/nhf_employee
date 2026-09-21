@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface ErrorProps {
     error: Error & { digest?: string };
@@ -11,6 +12,8 @@ interface ErrorProps {
 }
 
 export default function GlobalError({ error, reset }: ErrorProps) {
+    const router = useRouter();
+
     useEffect(() => {
         // Log error to monitoring service (e.g., Sentry)
         console.error("Application Error:", {
@@ -54,7 +57,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
                         </Button>
                         <Button
                             variant="outline"
-                            onClick={() => (window.location.href = "/")}
+                            onClick={() => router.push("/")}
                             className="flex items-center gap-2"
                         >
                             <Home className="w-4 h-4" />
