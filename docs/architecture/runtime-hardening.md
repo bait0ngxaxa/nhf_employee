@@ -1,16 +1,18 @@
 # Runtime Security and Reliability Hardening Baseline
 
-Status: Historical L1-L6 repository hardening record; current HEAD is superseded by the H0 baseline
+Status: Historical L1-L6 repository hardening record; the audited source
+baseline is documented by H0 and the H0 closure is documentation-only
 Track: L-series runtime/security/reliability hardening
 Evidence date: 2026-09-10 (historical L6 documentation record)
-Authority: Historical baseline for L1-L6. The current-HEAD source of truth is
+Authority: Historical baseline for L1-L6. The audited-source baseline and H0
+closure metadata are recorded in
 [pre-it-hardening-h0-baseline.md](./pre-it-hardening-h0-baseline.md).
 
 > **Current-state note (H0, 2026-09-21):** This document preserves the
 > historical L0-L6 records. It does not contain a Section 24, and the
 > repository history inspected for H0 does not establish a completed L7
 > re-audit. Any older reference below to a final L7 result or Section 24 is
-> superseded by the current-HEAD evidence in
+> superseded by the audited-source evidence and H0 closure metadata in
 > [pre-it-hardening-h0-baseline.md](./pre-it-hardening-h0-baseline.md).
 
 This is a source-backed discovery record. It does not authorize or implement
@@ -54,7 +56,7 @@ in section 15.
 > observation” in this section mean “current at L0”; they are not claims about
 > the final implementation. The post-L1-L6 current state is recorded in
 > Sections 18–23 are the historical L-series closure records. An expected
-> Section 24 was not recorded; current-HEAD verification is in the H0 baseline.
+> Section 24 was not recorded; audited-source verification is in the H0 baseline.
 
 ### 2.1 Architecture baseline
 
@@ -200,7 +202,7 @@ being reachable only through the trusted proxy/tunnel configuration.
 
 > The scenarios below preserve the L0 threat model. Their “can” and “does
 > not” statements describe the pre-hardening behavior used to justify L1-L6;
-> compare the historical closure sections with the current-HEAD H0 baseline
+> compare the historical closure sections with the audited-source H0 baseline
 > for the final result.
 
 The detailed finding cards below are the authoritative per-finding model. The
@@ -3058,5 +3060,6 @@ cannot be proven absent outside the workspace.
 
 The historical L6 record was ready to hand off to L7, but no Section 24
 re-audit record was recorded in this document or the inspected repository
-history. The current HEAD is therefore evaluated in the H0 baseline linked
-above; the historical L6 text is not a current L7 pass statement.
+history. The audited source baseline is therefore evaluated in the H0
+baseline linked above; the historical L6 text is not a current L7 pass
+statement.

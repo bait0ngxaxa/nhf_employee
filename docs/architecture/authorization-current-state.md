@@ -12,7 +12,7 @@
 > The older Phase 12H-B through 12H-H boundary notes below remain historical
 > records of behavior at those phase boundaries.
 >
-> The current-HEAD pre-IT hardening baseline and its remaining transition
+> The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
 > [pre-it-hardening-h0-baseline.md](pre-it-hardening-h0-baseline.md).
 

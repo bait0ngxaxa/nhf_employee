@@ -1,8 +1,9 @@
 # K0 — Final Repository Audit and Deferred-Boundary Inventory
 
 Historical status: K0 audit record
-Current status: K1 closed; H0 current-HEAD baseline recorded; historical L7
-claim superseded; production deployment acceptance pending
+Current status: K1 closed; H0 audited-source baseline and documentation
+closure recorded; historical L7 claim superseded; production deployment
+acceptance pending
 Repository: bait0ngxaxa/nhf_employee
 Scope: discovery, classification, and documentation only
 
@@ -18,8 +19,9 @@ snapshot. Their findings, “current” descriptions, and deferred roadmap are
 historical unless a later closure section explicitly updates them. The current
 repository state after K1 and L6 is synchronized below; the historical
 L-series runtime/security/reliability record is preserved in
-[runtime-hardening.md](./runtime-hardening.md). Current HEAD is authoritative
-in the [H0 baseline](./pre-it-hardening-h0-baseline.md).
+[runtime-hardening.md](./runtime-hardening.md). The audited source baseline
+and H0 closure metadata are authoritative in the
+[H0 baseline](./pre-it-hardening-h0-baseline.md).
 
 The audit treats tests, fixtures, generated output, Prisma migrations, and
 operator tooling as non-production surfaces unless they affect a production
@@ -519,8 +521,9 @@ The previous document recorded an L7 repository re-audit at commit
 `6032381072cf589578f46188a4af2dbe50287fec`. H0 verified that this SHA is
 the L6 compatibility-cleanup commit, not a separately evidenced L7
 re-audit, and that no Section 24 was recorded. The historical claims below
-are retained for traceability only; they do not establish the current HEAD
-state and must not be used as a current L7 pass statement:
+are retained for traceability only; they do not establish the audited source
+baseline or H0 closure state and must not be used as a current L7 pass
+statement:
 
 - the modular monolith remains structurally complete; K1 is closed and no K2
   phase is currently justified;

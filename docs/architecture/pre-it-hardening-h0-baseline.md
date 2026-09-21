@@ -1,11 +1,11 @@
-# H0 — Pre-IT Hardening Fresh HEAD Baseline
+# H0 — Pre-IT Hardening Audited Source Baseline
 
 Status: H0 complete — repository verification green; production acceptance
 remains operator-pending.
 
 Repository: bait0ngxaxa/nhf_employee
 Audit date: 2026-09-21 (Asia/Bangkok)
-Scope: current-HEAD discovery, verification, source-of-truth repair, and
+Scope: audited-source discovery, verification, source-of-truth repair, and
 handoff for the remaining H-series
 
 This document is the authoritative current-state baseline for the pre-IT
@@ -17,21 +17,24 @@ preserved in [runtime-hardening.md](./runtime-hardening.md).
 
 | Item | Evidence |
 | --- | --- |
-| Current HEAD | bb61c03bdf93453b3e92ebee61c41637c3e5a477 |
-| HEAD subject | feat(ui): simplify role-free team-centric authorization administration |
-| HEAD date | 2026-09-20 16:45:12 +07:00 |
+| Audited source baseline SHA | bb61c03bdf93453b3e92ebee61c41637c3e5a477 |
+| Audited source baseline subject | feat(ui): simplify role-free team-centric authorization administration |
+| Audited source baseline date | 2026-09-20 16:45:12 +07:00 |
 | Repository | bait0ngxaxa/nhf_employee |
+| H0 documentation/closure SHA | c2f0374216f560ddf18c560cc4c73f23a54aaee5 |
+| Relationship | H0 closure is one documentation-only commit ahead of the audited application/source baseline |
+| Changes between the two SHAs | No runtime source, schema, migration, dependency, or test behavior changed |
 | Previous purported L7 SHA | 6032381072cf589578f46188a4af2dbe50287fec |
 | What that SHA actually is | Commit subject is chore: close L6 compatibility residue cleanup; it is not a separately evidenced L7 re-audit commit |
 | Last runtime-hardening documentation commit | 5f903df3cf57f56eb2d34b7e4904d81823c21b4d |
-| Distance from purported L7 SHA | 112 commits to HEAD |
-| Distance from last runtime-hardening documentation commit | 111 commits to HEAD |
-| Change magnitude from purported L7 SHA | 644 files changed; approximately 77,172 insertions and 3,882 deletions |
+| Distance from purported L7 SHA | 112 commits to the audited source baseline |
+| Distance from last runtime-hardening documentation commit | 111 commits to the audited source baseline |
+| Change magnitude from purported L7 SHA | 644 files changed; approximately 77,172 insertions and 3,882 deletions to the audited source baseline |
 | Current migration count | 68 migration directories; latest is 20260920100000_migrate_routine_reminder_recipient_scope |
 | Initial worktree state | Clean before H0 documentation edits |
 
-The old L7 result cannot legitimately describe current HEAD. The repository
-contains substantial post-baseline work in role-neutral authorization,
+The old L7 result cannot legitimately describe the audited source baseline.
+The repository contains substantial post-baseline work in role-neutral authorization,
 authorization administration, capability-based recipient policy, Routine
 compatibility, Stock default-variant rollout, presentation, routes, schema,
 migrations, and tests.
@@ -240,22 +243,22 @@ evidence into PASS.
 | --- | --- | --- | --- | --- | --- |
 | 1 | Stale L7 PASS and missing Section 24 source-of-truth | Medium | CONFIRMED_DEFECT | Fixed in H0 documentation | Closed by H0 |
 | 2 | Authorization Administration actor is not revalidated inside its mutation transaction | Medium | HARDENING_GAP | Open; documented only | H7 |
-| 3 | Authorization Administration mutations lack the shared trusted-mutation gate | Low | HARDENING_GAP | Deferred | H7 |
-| 4 | Access-token signing secret has no minimum strength validation | Low | HARDENING_GAP | Deferred | H7 |
-| 5 | Some security-sensitive request bodies are parsed before application-level size checks | Low | HARDENING_GAP | Deferred | H7/ops |
-| 6 | Runtime logs/events are distributed and lack a centralized operational contract | Medium | HARDENING_GAP | Deferred | H3 |
+| 3 | Runtime logs/events are distributed and lack a centralized operational contract | Medium | HARDENING_GAP | Deferred | H3 |
+| 4 | Authorization Administration mutations lack the shared trusted-mutation gate | Low | HARDENING_GAP | Deferred | H7 |
+| 5 | Access-token signing secret has no minimum strength validation | Low | HARDENING_GAP | Deferred | H7 |
+| 6 | Some security-sensitive request bodies are parsed before application-level size checks | Low | HARDENING_GAP | Deferred | H7/ops |
 | 7 | No liveness/readiness endpoint contract | Low | HARDENING_GAP | Deferred | H4 |
 | 8 | No true browser E2E regression layer | Low | HARDENING_GAP | Deferred | H5 |
-| 9 | Production acceptance, backup/restore, and external-worker evidence is unverified | Informational | OPERATIONAL_ACCEPTANCE | Deferred | H6 |
-| 10 | Routine recipient enum remains in expand-only compatibility state | Informational | TRANSITIONAL_DEBT | Intentionally retained | H2 |
-| 11 | Stock explicit default remains dual-read with legacy fallback | Informational | TRANSITIONAL_DEBT | Intentionally retained | H2 |
-| 12 | Process-local rate limits rely on single-process topology | Informational | INTENTIONAL_TRADEOFF | Accepted with deployment invariant | H6/H7 |
-| 13 | Local persistent upload storage relies on backup and topology invariants | Informational | INTENTIONAL_TRADEOFF | Accepted with operational controls | H6 |
-| 14 | Outbox/provider delivery is at-least-once | Informational | INTENTIONAL_TRADEOFF | Accepted and documented | H3/H6 |
-| 15 | Best-effort Audit persistence remains on non-transactional paths | Informational | INTENTIONAL_TRADEOFF | Accepted and documented | H3/H6 |
-| 16 | Retained LINE compatibility surface has no repository-local consumer proof | Informational | INTENTIONAL_TRADEOFF | Retained; do not remove | H7/ops confirmation |
-| 17 | Public-entry cycles and incomplete generic persistence guards reduce regression detection | Low | HARDENING_GAP | Deferred | H7 or focused maintenance |
-| 18 | Unused Stock presentation isAdmin field can invite future role-based UI logic | Low | OBSOLETE_CANDIDATE | Deferred cleanup | Focused maintenance |
+| 9 | Public-entry cycles and incomplete generic persistence guards reduce regression detection | Low | HARDENING_GAP | Deferred | H7 or focused maintenance |
+| 10 | Unused Stock presentation isAdmin field can invite future role-based UI logic | Low | OBSOLETE_CANDIDATE | Deferred cleanup | Focused maintenance |
+| 11 | Production acceptance, backup/restore, and external-worker evidence is unverified | Informational | OPERATIONAL_ACCEPTANCE | Deferred | H6 |
+| 12 | Routine recipient enum remains in expand-only compatibility state | Informational | TRANSITIONAL_DEBT | Intentionally retained | H2 |
+| 13 | Stock explicit default remains dual-read with legacy fallback | Informational | TRANSITIONAL_DEBT | Intentionally retained | H2 |
+| 14 | Process-local rate limits rely on single-process topology | Informational | INTENTIONAL_TRADEOFF | Accepted with deployment invariant | H6/H7 |
+| 15 | Local persistent upload storage relies on backup and topology invariants | Informational | INTENTIONAL_TRADEOFF | Accepted with operational controls | H6 |
+| 16 | Outbox/provider delivery is at-least-once | Informational | INTENTIONAL_TRADEOFF | Accepted and documented | H3/H6 |
+| 17 | Best-effort Audit persistence remains on non-transactional paths | Informational | INTENTIONAL_TRADEOFF | Accepted and documented | H3/H6 |
+| 18 | Retained LINE compatibility surface has no repository-local consumer proof | Informational | INTENTIONAL_TRADEOFF | Retained; do not remove | H7/ops confirmation |
 | 19 | Email Request remains outside modules/ by design | Informational | INTENTIONAL_TRADEOFF | No action in H0 | Future IT decision |
 
 ### Finding H0-DOC-01 — stale L7 and missing Section 24
@@ -268,16 +271,16 @@ Evidence: runtime-hardening.md claimed L7 and Section 24 at its top and
 multiple historical references. Its actual final heading was Section 23.
 final-repository-audit.md linked the purported L7 result to
 6032381072cf589578f46188a4af2dbe50287fec, which is an L6 cleanup commit.
-HEAD is 112 commits beyond that SHA.
+The audited source baseline is 112 commits beyond that SHA.
 
 Affected paths: docs/architecture/runtime-hardening.md and
 docs/architecture/final-repository-audit.md.
 
-Failure scenario: a reviewer or release operator could treat current HEAD as
-L7-passed and skip rechecking authorization, recipient policy, migration, and
-route changes made after the old record.
+Failure scenario: a reviewer or release operator could treat the audited
+source baseline as L7-passed and skip rechecking authorization, recipient
+policy, migration, and route changes made after the old record.
 
-Current mitigation: H0 created this current-HEAD baseline, changed the old
+Current mitigation: H0 created this audited-source baseline, changed the old
 documents' current-status wording, and linked all current-state references to
 this document while preserving historical L0-L6/L7 wording as superseded
 history.
@@ -805,7 +808,8 @@ is authorized by H0.
 
 ### Accepted tradeoffs summary
 
-The following are still true on current HEAD and are intentionally accepted:
+The following are still true on the audited source baseline and H0 closure;
+the closure commit changed documentation only:
 
 - Notification/provider delivery is at-least-once. Outbox claim/retry/stale
   recovery and LINE retry keys reduce duplicates, but SMTP Message-ID is not
@@ -838,7 +842,7 @@ Request migration.
 
 | Phase | Status / recommended scope |
 | --- | --- |
-| H0 — Fresh HEAD Baseline & SSOT Repair | Completed by this record and the linked documentation repair |
+| H0 — Fresh Source Baseline & SSOT Repair | Completed by this record and the linked documentation repair |
 | H1 — CI / Merge Quality Gate | DEFERRED — owner decision |
 | H2 — Transitional Persistence Closure | Routine enum contraction evidence and Stock explicit-default rollout closure |
 | H3 — Runtime Observability / Structured Logging | Central event schema, logger ownership, counters, alerts, and correlation propagation |
@@ -854,7 +858,7 @@ H0 handoff, and future IT remains deferred.
 
 H0 made documentation-only corrections:
 
-- added this current-HEAD baseline;
+- added this audited-source baseline;
 - changed runtime-hardening.md from a current L7 authority claim to a
   historical L1-L6 record linked to H0;
 - repaired final-repository-audit.md so the old purported L7 SHA and missing
@@ -872,7 +876,8 @@ module was changed.
   repository was accessible.
 - Production acceptance rows remain NOT RUN and were not converted to PASS.
 - No browser automation was introduced or executed.
-- A Codex Security standard scan was started against this HEAD, but the
+- A Codex Security standard scan was started against the audited source
+  baseline, but the
   advisory Daybreak program was not granted and the scan remained in its
   running threat-model phase during this audit. Its incomplete state is not
   treated as a no-findings result; the source-backed audit and repository
@@ -887,7 +892,10 @@ module was changed.
 
 ## 10. Final repository verification record
 
-The final gate was executed after the documentation diff was stable. Windows
+The final gate was executed for the audited source baseline and its
+documentation-only H0 closure. The metadata and ledger correction in this
+working tree is documentation-only and does not invalidate that verification.
+Windows
 PowerShell blocked the npm.ps1 shim because of the local execution policy, so
 the equivalent npm.cmd/npx.cmd entry points were used. The scripts and
 results were:
