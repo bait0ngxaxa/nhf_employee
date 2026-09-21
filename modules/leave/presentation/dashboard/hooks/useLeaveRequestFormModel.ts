@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useForm, type UseFormReturn } from "react-hook-form";
+import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { leaveRequestSchema, type LeaveRequestValues } from "../../../schemas/leave";
@@ -136,10 +136,22 @@ export function useLeaveRequestFormModel({
     });
     const isDirty = form.formState.isDirty || attachments.length > 0;
 
-    const leaveType = form.watch("leaveType");
-    const startDateValue = form.watch("startDate");
-    const endDateValue = form.watch("endDate");
-    const periodValue = form.watch("period");
+    const leaveType = useWatch({
+        control: form.control,
+        name: "leaveType",
+    });
+    const startDateValue = useWatch({
+        control: form.control,
+        name: "startDate",
+    });
+    const endDateValue = useWatch({
+        control: form.control,
+        name: "endDate",
+    });
+    const periodValue = useWatch({
+        control: form.control,
+        name: "period",
+    });
 
     const quota = quotas.find((item) => item.leaveType === leaveType);
     const remainingQuota = quota?.remainingDays ?? 0;

@@ -44,6 +44,12 @@ export function DashboardProvider({
     const router = useRouter();
     const pathname = usePathname();
     const user = authUser ?? initialUser;
+    const signOutUserId =
+        typeof user?.id === "string"
+            ? user.id.trim()
+            : typeof user?.id === "number"
+              ? String(user.id)
+              : "";
     const isAdmin = isAdminRole(user?.role);
     const effectiveStatus =
         status === "authenticated" || initialUser
@@ -179,16 +185,9 @@ export function DashboardProvider({
     );
 
     const handleSignOut = useCallback(async (): Promise<void> => {
-        const userId =
-            typeof user?.id === "string"
-                ? user.id.trim()
-                : typeof user?.id === "number"
-                  ? String(user.id)
-                  : "";
-
-        clearStockBrowseCart(userId);
+        clearStockBrowseCart(signOutUserId);
         await signOut();
-    }, [signOut, user?.id]);
+    }, [signOut, signOutUserId]);
 
     const dataValue = useMemo<DashboardDataContextValue>(
         () => ({

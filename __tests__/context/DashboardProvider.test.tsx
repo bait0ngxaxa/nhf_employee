@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardProvider } from "@/components/dashboard/context/dashboard/DashboardProvider";
@@ -8,6 +8,11 @@ import {
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import type { AuthenticatedUser } from "@/modules/auth/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
+import { clearStockBrowseCart } from "@/modules/stock/client";
+
+type DashboardTestUser = Omit<AuthenticatedUser, "id"> & {
+    id: string | number;
+};
 
 const navigationMocks = vi.hoisted(() => ({
     pathname: "/dashboard",
@@ -19,7 +24,8 @@ const navigationMocks = vi.hoisted(() => ({
         id: "employee-1",
         name: "สมชาย ใจดี",
         role: "EMPLOYEE",
-    } as AuthenticatedUser,
+    } as DashboardTestUser,
+    signOut: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -35,7 +41,7 @@ vi.mock("@/modules/auth/client", () => ({
     useAuth: () => ({
         user: navigationMocks.user,
         status: "authenticated",
-        signOut: vi.fn(),
+        signOut: navigationMocks.signOut,
     }),
 }));
 
@@ -131,10 +137,23 @@ function DashboardMenuState(): ReactElement {
     return <output data-testid="available-menu-ids">{menuIds.join(",")}</output>;
 }
 
+function SignOutProbe(): ReactElement {
+    const { handleSignOut } = useDashboardUIContext();
+
+    return (
+        <button type="button" onClick={() => void handleSignOut()}>
+            Sign out
+        </button>
+    );
+}
+
 describe("DashboardProvider navigation state", () => {
     beforeEach(() => {
         navigationMocks.router.push.mockReset();
         navigationMocks.router.replace.mockReset();
+        navigationMocks.signOut.mockReset();
+        navigationMocks.signOut.mockResolvedValue(undefined);
+        vi.mocked(clearStockBrowseCart).mockReset();
         navigationMocks.pathname = "/dashboard";
         navigationMocks.user = {
             id: "employee-1",
@@ -176,6 +195,55 @@ describe("DashboardProvider navigation state", () => {
             "import-employee",
         );
         expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+    });
+
+    it("clears the user cart before signing out", async () => {
+        const callOrder: string[] = [];
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            id: 123,
+        };
+        vi.mocked(clearStockBrowseCart).mockImplementation(() => {
+            callOrder.push("clear-cart");
+        });
+        navigationMocks.signOut.mockImplementation(async () => {
+            callOrder.push("sign-out");
+        });
+
+        render(
+            <DashboardProvider>
+                <SignOutProbe />
+            </DashboardProvider>,
+        );
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+            await Promise.resolve();
+        });
+
+        expect(clearStockBrowseCart).toHaveBeenCalledWith("123");
+        expect(navigationMocks.signOut).toHaveBeenCalledTimes(1);
+        expect(callOrder).toEqual(["clear-cart", "sign-out"]);
+    });
+
+    it("trims string user IDs before clearing the user cart", async () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            id: "  employee-123  ",
+        };
+
+        render(
+            <DashboardProvider>
+                <SignOutProbe />
+            </DashboardProvider>,
+        );
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+            await Promise.resolve();
+        });
+
+        expect(clearStockBrowseCart).toHaveBeenCalledWith("employee-123");
     });
 
     it("navigates menu clicks to canonical paths", () => {

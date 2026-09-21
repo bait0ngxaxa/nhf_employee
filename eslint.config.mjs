@@ -56,8 +56,6 @@ const eslintConfig = defineConfig([
             // Next.js 16's React Hooks plugin enables Compiler-oriented rules.
             // Keep the existing React lint contract without adopting Compiler
             // refactors as part of this framework-only migration.
-            "react-hooks/incompatible-library": "off",
-            "react-hooks/preserve-manual-memoization": "off",
             "react-hooks/set-state-in-effect": "off",
 
             // Code Quality

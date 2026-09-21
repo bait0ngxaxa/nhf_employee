@@ -435,3 +435,44 @@ git diff
 - `git diff --check` — ผ่าน
 - ไม่รัน `npm.cmd run test:full:serial`, unscoped `npm.cmd run test:run` หรือ `npm.cmd run build`
 - หลัง L3 กฎ migration ที่ยัง globally disabled มีเฉพาะ `react-hooks/set-state-in-effect`, `react-hooks/preserve-manual-memoization` และ `react-hooks/incompatible-library`
+
+## L4 Remediation Result
+
+ตรวจสอบ compiler-readiness diagnostics ทั้งสองรายการ โดยยืนยันว่า React Compiler ยังไม่ได้เปิดใน `next.config.ts` และไม่เพิ่ม compiler configuration หรือ dependency ใด ๆ
+
+### `react-hooks/preserve-manual-memoization`
+
+- original findings: 1
+- fixed: 1
+- deferred: 0
+- remaining findings: 0
+- `DashboardProvider` ย้ายการ normalize user ID ออกมาเป็น primitive `signOutUserId` ก่อน callback และให้ `handleSignOut` จับเฉพาะ `signOut` กับ normalized ID จึงรักษา cart-clear-before-signout และ memoization boundary เดิมโดยไม่ผูกกับ user object ทั้งก้อน
+
+### `react-hooks/incompatible-library`
+
+- original findings: 1
+- fixed: 1
+- deferred: 0
+- remaining findings: 0
+- `useLeaveRequestFormModel` เปลี่ยน field subscriptions จาก `form.watch()` เป็น `useWatch({ control: form.control, name })` โดยคง quota, date, period, validation, submission และ idempotency logic เดิม
+
+### L4 summary
+
+- original findings: 2
+- fixed: 2
+- deferred: 0
+- remaining findings: 0
+- React Compiler ยังคง disabled
+- ทั้งสอง rule ถูก re-enable globally หลัง repository-wide explicit checks ไม่พบ diagnostics เพิ่มเติม
+- `react-hooks/set-state-in-effect` ยังคง globally disabled และเป็น migration rule เดียวที่เหลืออยู่
+
+### Verification record
+
+- Baseline explicit checks ก่อนแก้: พบ 1 diagnostic ต่อ rule ตาม audit
+- Focused tests: `npm.cmd run test:run -- __tests__/context/DashboardProvider.test.tsx modules/leave/presentation/dashboard/hooks/useLeaveRequestFormModel.test.ts` — ผ่านทั้ง 2 ไฟล์ / 35 tests
+- Repository-wide `react-hooks/preserve-manual-memoization:error` check — ผ่าน ไม่พบ findings
+- Repository-wide `react-hooks/incompatible-library:error` check — ผ่าน ไม่พบ findings
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `git diff --check` — ผ่าน
+- ไม่รัน `npm.cmd run test:full:serial` และไม่รัน `npm.cmd run build`
