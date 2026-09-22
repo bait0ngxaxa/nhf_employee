@@ -7,6 +7,7 @@ import {
     useStockItemsQuery,
     useStockRequestsQuery,
 } from "./hooks";
+import type { StockItemsResponse, StockRequestsResponse } from "./hooks";
 import { StockProvider } from "./StockProvider";
 import { useStockUIContext } from "./StockContext";
 import { LIVE_SEARCH_DEBOUNCE_MS } from "@/constants/ui";
@@ -42,6 +43,8 @@ function StockSearchProbe() {
         searchQuery,
         setRequestSearchQuery,
         setSearchQuery,
+        activeTab,
+        setActiveTab,
         itemsPage,
         requestsPage,
     } = useStockUIContext();
@@ -60,6 +63,9 @@ function StockSearchProbe() {
             />
             <output data-testid="items-page">{itemsPage}</output>
             <output data-testid="requests-page">{requestsPage}</output>
+            <output data-testid="active-tab">{activeTab}</output>
+            <button type="button" onClick={() => setActiveTab("browse")}>browse tab</button>
+            <button type="button" onClick={() => setActiveTab("inventory")}>inventory tab</button>
         </>
     );
 }
@@ -68,6 +74,26 @@ function capturedQueries(mock: ReturnType<typeof vi.fn>): string[] {
     return mock.mock.calls
         .map(([query]) => query)
         .filter((query): query is string => typeof query === "string");
+}
+
+function latestCapturedQuery(mock: ReturnType<typeof vi.fn>): string {
+    const query = capturedQueries(mock).at(-1);
+    if (!query) {
+        throw new Error("Expected a Stock query");
+    }
+    return query;
+}
+
+function getQuerySuccess<TData>(
+    calls: Array<[unknown, unknown]>,
+    query: string,
+): (data: TData, key: string) => void {
+    const call = calls.find(([calledQuery]) => calledQuery === query);
+    const callback = call?.[1];
+    if (typeof callback !== "function") {
+        throw new Error(`Expected a success callback for ${query}`);
+    }
+    return callback as (data: TData, key: string) => void;
 }
 
 const stockCapabilities = {
@@ -254,6 +280,121 @@ describe("StockProvider live search", () => {
         );
     });
 
+    it("clamps item pagination from the current response and keeps the clamp after growth", () => {
+        navigationMocks.searchParams = new URLSearchParams(
+            "stockTab=browse&stockItemsPage=5",
+        );
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        expect(screen.getByTestId("items-page")).toHaveTextContent("5");
+        const pageFiveQuery = latestCapturedQuery(vi.mocked(useStockItemsQuery));
+        const pageFiveSuccess = getQuerySuccess<StockItemsResponse>(
+            vi.mocked(useStockItemsQuery).mock.calls as unknown as Array<[unknown, unknown]>,
+            pageFiveQuery,
+        );
+
+        act(() => {
+            pageFiveSuccess({ items: [], total: 13 }, pageFiveQuery);
+        });
+
+        expect(screen.getByTestId("items-page")).toHaveTextContent("2");
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            expect.stringContaining("stockItemsPage=2"),
+            { scroll: false },
+        );
+
+        const pageTwoQuery = latestCapturedQuery(vi.mocked(useStockItemsQuery));
+        const pageTwoSuccess = getQuerySuccess<StockItemsResponse>(
+            vi.mocked(useStockItemsQuery).mock.calls as unknown as Array<[unknown, unknown]>,
+            pageTwoQuery,
+        );
+        act(() => {
+            pageTwoSuccess({ items: [], total: 60 }, pageTwoQuery);
+        });
+
+        expect(screen.getByTestId("items-page")).toHaveTextContent("2");
+    });
+
+    it("keeps browse and inventory pages independent and rejects a stale browse response", () => {
+        navigationMocks.searchParams = new URLSearchParams(
+            "stockTab=browse&stockItemsPage=4&stockInventoryPage=2",
+        );
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        const browseQuery = latestCapturedQuery(vi.mocked(useStockItemsQuery));
+
+        fireEvent.click(screen.getByRole("button", { name: "inventory tab" }));
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
+        expect(screen.getByTestId("items-page")).toHaveTextContent("2");
+        const inventoryQuery = latestCapturedQuery(vi.mocked(useStockItemsQuery));
+        expect(inventoryQuery).toContain("limit=10");
+
+        const inventorySuccess = getQuerySuccess<StockItemsResponse>(
+            vi.mocked(useStockItemsQuery).mock.calls as unknown as Array<[unknown, unknown]>,
+            inventoryQuery,
+        );
+        act(() => {
+            inventorySuccess({ items: [], total: 0 }, browseQuery);
+        });
+        expect(screen.getByTestId("items-page")).toHaveTextContent("2");
+
+        act(() => {
+            inventorySuccess({ items: [], total: 1 }, inventoryQuery);
+        });
+        expect(screen.getByTestId("items-page")).toHaveTextContent("1");
+
+        fireEvent.click(screen.getByRole("button", { name: "browse tab" }));
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("browse");
+        expect(screen.getByTestId("items-page")).toHaveTextContent("4");
+    });
+
+    it("clamps request pagination through the request URL contract and keeps it after growth", () => {
+        navigationMocks.searchParams = new URLSearchParams(
+            "stockTab=my-requests&stockRequestsPage=5",
+        );
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("5");
+        const pageFiveQuery = latestCapturedQuery(vi.mocked(useStockRequestsQuery));
+        const pageFiveSuccess = getQuerySuccess<StockRequestsResponse>(
+            vi.mocked(useStockRequestsQuery).mock.calls as unknown as Array<[unknown, unknown]>,
+            pageFiveQuery,
+        );
+
+        act(() => {
+            pageFiveSuccess({ requests: [], total: 11 }, pageFiveQuery);
+        });
+
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("2");
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            expect.stringContaining("stockRequestsPage=2"),
+            { scroll: false },
+        );
+
+        const pageTwoQuery = latestCapturedQuery(vi.mocked(useStockRequestsQuery));
+        const pageTwoSuccess = getQuerySuccess<StockRequestsResponse>(
+            vi.mocked(useStockRequestsQuery).mock.calls as unknown as Array<[unknown, unknown]>,
+            pageTwoQuery,
+        );
+        act(() => {
+            pageTwoSuccess({ requests: [], total: 50 }, pageTwoQuery);
+        });
+
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("2");
+    });
+
     it("normalizes an unauthorized stale tab before building data queries", () => {
         navigationMocks.searchParams = new URLSearchParams(
             "stockTab=inventory",
@@ -283,7 +424,10 @@ describe("StockProvider live search", () => {
             </StockProvider>,
         );
 
-        expect(vi.mocked(useStockItemsQuery)).toHaveBeenCalledWith(null);
+        expect(vi.mocked(useStockItemsQuery)).toHaveBeenCalledWith(
+            null,
+            expect.any(Function),
+        );
         expect(vi.mocked(useStockCategoriesQuery)).toHaveBeenCalledWith(false);
         expect(capturedQueries(vi.mocked(useStockRequestsQuery))).toEqual(
             expect.arrayContaining([expect.stringContaining("scope=mine")]),
@@ -321,8 +465,14 @@ describe("StockProvider live search", () => {
             </StockProvider>,
         );
 
-        expect(vi.mocked(useStockItemsQuery)).toHaveBeenCalledWith(null);
-        expect(vi.mocked(useStockRequestsQuery)).toHaveBeenCalledWith(null);
+        expect(vi.mocked(useStockItemsQuery)).toHaveBeenCalledWith(
+            null,
+            expect.any(Function),
+        );
+        expect(vi.mocked(useStockRequestsQuery)).toHaveBeenCalledWith(
+            null,
+            expect.any(Function),
+        );
         expect(vi.mocked(useStockCategoriesQuery)).toHaveBeenCalledWith(false);
     });
 });

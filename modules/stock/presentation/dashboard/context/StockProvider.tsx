@@ -18,6 +18,8 @@ import {
     useStockCategoriesQuery,
     useStockItemsQuery,
     useStockRequestsQuery,
+    type StockItemsResponse,
+    type StockRequestsResponse,
 } from "./hooks";
 import {
     buildStockItemsQuery,
@@ -353,6 +355,43 @@ export function StockProvider({ children }: StockProviderProps) {
         ],
     );
 
+    const itemsQueryKey = shouldFetchItems ? itemsQuery : null;
+    const requestsQueryKey = shouldFetchRequests ? requestsQuery : null;
+
+    const reconcileItemsPage = useCallback(
+        (response: StockItemsResponse, responseKey: string): void => {
+            if (responseKey !== itemsQueryKey) {
+                return;
+            }
+
+            const totalPages = Math.max(
+                1,
+                Math.ceil((response.total ?? 0) / getStockItemsLimit(activeTab)),
+            );
+            if (itemsPage > totalPages) {
+                setItemsPage(totalPages);
+            }
+        },
+        [activeTab, itemsPage, itemsQueryKey, setItemsPage],
+    );
+
+    const reconcileRequestsPage = useCallback(
+        (response: StockRequestsResponse, responseKey: string): void => {
+            if (responseKey !== requestsQueryKey) {
+                return;
+            }
+
+            const totalPages = Math.max(
+                1,
+                Math.ceil((response.total ?? 0) / STOCK_REQUESTS_LIMIT),
+            );
+            if (requestsPage > totalPages) {
+                setRequestsPage(totalPages);
+            }
+        },
+        [requestsPage, requestsQueryKey, setRequestsPage],
+    );
+
     const {
         data: categoriesData,
         isLoading: isCategoriesLoading,
@@ -362,12 +401,12 @@ export function StockProvider({ children }: StockProviderProps) {
         data: itemsData,
         isLoading: isItemsLoading,
         mutate: mutateItems,
-    } = useStockItemsQuery(shouldFetchItems ? itemsQuery : null);
+    } = useStockItemsQuery(itemsQueryKey, reconcileItemsPage);
     const {
         data: requestsData,
         isLoading: isRequestsLoading,
         mutate: mutateRequests,
-    } = useStockRequestsQuery(shouldFetchRequests ? requestsQuery : null);
+    } = useStockRequestsQuery(requestsQueryKey, reconcileRequestsPage);
 
     const refreshCategories = useCallback((): void => {
         void mutateCategories();
@@ -407,28 +446,6 @@ export function StockProvider({ children }: StockProviderProps) {
             scroll: false,
         });
     }, [pathname, requestSearchQuery, router, statusFilter]);
-
-    useEffect(() => {
-        if (!shouldFetchItems || !itemsData) {
-            return;
-        }
-
-        const totalPages = Math.max(
-            1,
-            Math.ceil((itemsData.total ?? 0) / getStockItemsLimit(activeTab)),
-        );
-        if (itemsPage > totalPages) {
-            setItemsPage(totalPages);
-        }
-    }, [activeTab, itemsData, itemsPage, setItemsPage, shouldFetchItems]);
-
-    useEffect(() => {
-        const totalRequests = requestsData?.total ?? 0;
-        const totalPages = Math.max(1, Math.ceil(totalRequests / STOCK_REQUESTS_LIMIT));
-        if (requestsPage > totalPages) {
-            void setRequestsPage(totalPages);
-        }
-    }, [requestsData?.total, requestsPage, setRequestsPage]);
 
     const categories = useMemo(
         () => categoriesData?.categories ?? [],

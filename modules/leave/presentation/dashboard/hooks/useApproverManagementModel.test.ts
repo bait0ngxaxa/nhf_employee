@@ -48,6 +48,20 @@ describe("useApproverManagementModel", () => {
         },
     ];
 
+    function createEmployees(count: number) {
+        return Array.from({ length: count }, (_, index) => ({
+            id: index + 1,
+            firstName: `Employee ${index + 1}`,
+            lastName: "Test",
+            nickname: null,
+            email: `employee-${index + 1}@example.com`,
+            position: "Staff",
+            canApproveLeave: true,
+            managerId: index % 2 === 0 ? null : 2,
+            dept: { name: "IT" },
+        }));
+    }
+
     beforeEach(() => {
         vi.clearAllMocks();
         (useSWR as unknown as { mockReturnValue: (value: unknown) => void }).mockReturnValue({
@@ -130,6 +144,90 @@ describe("useApproverManagementModel", () => {
         expect(toast.error).toHaveBeenCalledWith(message);
         expect(result.current.assignments).toEqual(new Map([[1, null]]));
         expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it("clamps durable pagination when the dataset shrinks and keeps the clamp after growth", () => {
+        let currentEmployees = createEmployees(75);
+        vi.mocked(useSWR).mockImplementation(() => ({
+            data: currentEmployees,
+            error: null,
+            isLoading: false,
+            mutate,
+        }) as never);
+
+        const { result, rerender } = renderHook(() => useApproverManagementModel());
+
+        act(() => result.current.setCurrentPage(3));
+        expect(result.current.currentPage).toBe(3);
+
+        currentEmployees = createEmployees(30);
+        rerender();
+
+        expect(result.current.currentPage).toBe(2);
+        expect(result.current.pagedEmployees.map((employee) => employee.id)).toEqual([
+            26,
+            27,
+            28,
+            29,
+            30,
+        ]);
+
+        currentEmployees = createEmployees(75);
+        rerender();
+
+        expect(result.current.currentPage).toBe(2);
+        expect(result.current.pagedEmployees[0]?.id).toBe(26);
+    });
+
+    it("keeps search and approver filter transitions explicitly on page one", () => {
+        const currentEmployees = createEmployees(75);
+        vi.mocked(useSWR).mockImplementation(() => ({
+            data: currentEmployees,
+            error: null,
+            isLoading: false,
+            mutate,
+        }) as never);
+
+        const { result } = renderHook(() => useApproverManagementModel());
+
+        act(() => result.current.setCurrentPage(3));
+        act(() => result.current.setSearch("Employee 7"));
+        expect(result.current.currentPage).toBe(1);
+
+        act(() => result.current.setSearch(""));
+        act(() => result.current.setCurrentPage(3));
+        act(() => result.current.setFilterApprover("unassigned"));
+        expect(result.current.currentPage).toBe(1);
+    });
+
+    it("clamps after a save refresh shrinks the dataset without restoring the old page", async () => {
+        let currentEmployees = createEmployees(75);
+        const refreshMutate = vi.fn(async () => {
+            currentEmployees = createEmployees(30);
+        });
+        vi.mocked(useSWR).mockImplementation(() => ({
+            data: currentEmployees,
+            error: null,
+            isLoading: false,
+            mutate: refreshMutate,
+        }) as never);
+
+        const { result, rerender } = renderHook(() => useApproverManagementModel());
+
+        act(() => {
+            result.current.setCurrentPage(3);
+            result.current.handleAssign(1, "2");
+        });
+        await act(async () => {
+            await result.current.handleSave();
+        });
+
+        expect(refreshMutate).toHaveBeenCalledTimes(1);
+        expect(result.current.currentPage).toBe(2);
+
+        currentEmployees = createEmployees(75);
+        rerender();
+        expect(result.current.currentPage).toBe(2);
     });
 });
 

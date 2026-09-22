@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, Edit3, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
@@ -76,6 +76,22 @@ function RoutineOccurrencePanel({
     const [categoryId, setCategoryId] = useState("");
     const [timingStatus, setTimingStatus] = useState<RoutineTimingStatus | "">("");
     const [page, setPage] = useState(1);
+    const queryIdentity = JSON.stringify([
+        scope,
+        taskId,
+        occurrenceId,
+        debouncedSearch,
+        unitId,
+        categoryId,
+        timingStatus,
+    ]);
+    const [paginationQueryIdentity, setPaginationQueryIdentity] = useState(queryIdentity);
+    if (paginationQueryIdentity !== queryIdentity) {
+        setPaginationQueryIdentity(queryIdentity);
+        if (page !== 1) {
+            setPage(1);
+        }
+    }
     const searchInputId = useId();
     const unitFilterId = useId();
     const categoryFilterId = useId();
@@ -100,10 +116,26 @@ function RoutineOccurrencePanel({
         if (categoryId) params.set("categoryId", categoryId);
         return `${API_ROUTES.routines.occurrences}?${params.toString()}`;
     }, [categoryId, debouncedSearch, occurrenceId, page, scope, taskId, timingStatus, unitId]);
+    const reconcilePage = useCallback(
+        (response: PaginatedRoutineTaskWorkItemsResponse, responseKey: string): void => {
+            if (responseKey !== key) {
+                return;
+            }
+
+            const maxPage = Math.max(1, response.pagination.pages);
+            if (page > maxPage) {
+                setPage(maxPage);
+            }
+        },
+        [key, page],
+    );
     const { data, error, isLoading, mutate } = useSWR<PaginatedRoutineTaskWorkItemsResponse, Error>(
         key,
         fetchRoutine,
-        { keepPreviousData: true },
+        {
+            keepPreviousData: true,
+            onSuccess: reconcilePage,
+        },
     );
     const {
         data: reference,
@@ -114,10 +146,6 @@ function RoutineOccurrencePanel({
         canReadReference ? API_ROUTES.routines.reference : null,
         fetchRoutine,
     );
-    useEffect(() => {
-        setPage(1);
-    }, [categoryId, debouncedSearch, occurrenceId, scope, taskId, timingStatus, unitId]);
-
     const filterUnits = uniqueRoutineUnits(reference?.units ?? []);
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
 

@@ -4,7 +4,10 @@ import { useState, type ReactNode } from "react";
 
 import { RoutineSection } from "./RoutineSection";
 import type { RoutinePresentationCapabilities } from "../../application/types";
-import type { RoutineTaskWorkItem } from "./types";
+import type {
+    PaginatedRoutineTaskWorkItemsResponse,
+    RoutineTaskWorkItem,
+} from "./types";
 
 const mocks = vi.hoisted(() => ({
     useDashboardDataContext: vi.fn(),
@@ -19,6 +22,53 @@ const mocks = vi.hoisted(() => ({
         mutate: vi.fn(),
     })),
 }));
+
+type RoutineResponseSuccess = (
+    data: PaginatedRoutineTaskWorkItemsResponse,
+    key: string,
+) => void;
+
+function isOnSuccessConfig(value: unknown): value is { onSuccess: unknown } {
+    return typeof value === "object"
+        && value !== null
+        && "onSuccess" in value;
+}
+
+function getOccurrenceKeys(): string[] {
+    return (mocks.useSWR.mock.calls as unknown as Array<[unknown]>)
+        .map(([key]) => typeof key === "string" ? key : "")
+        .filter((key) => key.includes("/api/routines/occurrences"));
+}
+
+function getLatestOccurrenceKey(): string {
+    const key = getOccurrenceKeys().at(-1);
+    if (!key) {
+        throw new Error("Expected an operational Routine query key");
+    }
+    return key;
+}
+
+function getOccurrenceSuccess(key: string): RoutineResponseSuccess {
+    const call = (mocks.useSWR.mock.calls as unknown as Array<[unknown, unknown, unknown]>)
+        .find(([calledKey]) => calledKey === key);
+    const config = call?.[2];
+    if (!isOnSuccessConfig(config) || typeof config.onSuccess !== "function") {
+        throw new Error(`Expected an onSuccess callback for ${key}`);
+    }
+    return config.onSuccess as RoutineResponseSuccess;
+}
+
+function routineResponse(pages: number): PaginatedRoutineTaskWorkItemsResponse {
+    return {
+        tasks: [],
+        pagination: {
+            page: Math.min(3, pages),
+            limit: 12,
+            total: pages * 12,
+            pages,
+        },
+    };
+}
 
 const routineReference = {
     units: [
@@ -661,6 +711,74 @@ describe("RoutineSection tabs", () => {
             expect.any(Function),
             expect.objectContaining({ keepPreviousData: true }),
         ));
+    });
+
+    it("resets the operational page when an external scope changes while mounted", async () => {
+        mockRoutineUser("ADMIN");
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=mine"));
+
+        const view = render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
+        expect(getLatestOccurrenceKey()).toContain("scope=mine&page=2");
+
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=all"));
+        view.rerender(<RoutineSection />);
+
+        await waitFor(() => expect(getOccurrenceKeys()).toContain(
+            "/api/routines/occurrences?scope=all&page=1&limit=12&view=tasks",
+        ));
+    });
+
+    it("resets deep-link identity to page one and rejects stale previous-query responses", () => {
+        mockRoutineUser("USER");
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams("taskId=71"));
+
+        const view = render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
+        const previousQueryKey = getLatestOccurrenceKey();
+        expect(previousQueryKey).toContain("page=2&limit=12&view=tasks&taskId=71");
+
+        mocks.useSearchParams.mockReturnValue(new URLSearchParams("taskId=72"));
+        view.rerender(<RoutineSection />);
+        expect(getLatestOccurrenceKey()).toBe(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&taskId=72",
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
+        const currentQueryKey = getLatestOccurrenceKey();
+        const currentQuerySuccess = getOccurrenceSuccess(currentQueryKey);
+        expect(currentQueryKey).toContain("page=2&limit=12&view=tasks&taskId=72");
+
+        act(() => {
+            currentQuerySuccess(routineResponse(1), previousQueryKey);
+        });
+
+        expect(getLatestOccurrenceKey()).toBe(currentQueryKey);
+    });
+
+    it("clamps an authoritative empty page and keeps the clamped page after growth", () => {
+        mockRoutineUser("USER");
+        render(<RoutineSection />);
+
+        fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
+        const pageTwoQueryKey = getLatestOccurrenceKey();
+        const pageTwoSuccess = getOccurrenceSuccess(pageTwoQueryKey);
+
+        act(() => {
+            pageTwoSuccess(routineResponse(1), pageTwoQueryKey);
+        });
+
+        const pageOneQueryKey = getLatestOccurrenceKey();
+        expect(pageOneQueryKey).toBe(
+            "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks",
+        );
+        const pageOneSuccess = getOccurrenceSuccess(pageOneQueryKey);
+
+        act(() => {
+            pageOneSuccess(routineResponse(3), pageOneQueryKey);
+        });
+
+        expect(getLatestOccurrenceKey()).toBe(pageOneQueryKey);
     });
 
     it("combines operational filters and resets pagination when each filter changes", () => {

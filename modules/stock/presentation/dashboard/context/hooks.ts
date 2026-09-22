@@ -13,15 +13,17 @@ type StockCategoriesResponse = {
     categories?: StockCategory[];
 };
 
-type StockItemsResponse = {
+export type StockItemsResponse = {
     items?: StockItem[];
     total?: number;
 };
 
-type StockRequestsResponse = {
+export type StockRequestsResponse = {
     requests?: StockRequest[];
     total?: number;
 };
+
+export type StockQuerySuccess<TData> = (data: TData, key: string) => void;
 
 const DEFAULT_SWR_OPTIONS = {
     keepPreviousData: true,
@@ -49,16 +51,24 @@ export function useStockCategoriesQuery(enabled = true) {
     );
 }
 
-export function useStockItemsQuery(query: string | null) {
+export function useStockItemsQuery(
+    query: string | null,
+    onSuccess?: StockQuerySuccess<StockItemsResponse>,
+) {
     return useSWR<StockItemsResponse>(query, apiGetFetcher, {
         ...DEFAULT_SWR_OPTIONS,
         dedupingInterval: 10_000,
+        onSuccess,
     });
 }
 
-export function useStockRequestsQuery(query: string | null) {
+export function useStockRequestsQuery(
+    query: string | null,
+    onSuccess?: StockQuerySuccess<StockRequestsResponse>,
+) {
     return useSWR<StockRequestsResponse>(query, apiGetFetcher, {
         ...DEFAULT_SWR_OPTIONS,
         dedupingInterval: 10_000,
+        onSuccess,
     });
 }

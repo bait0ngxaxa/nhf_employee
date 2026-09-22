@@ -763,3 +763,46 @@ npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json
 ```
 
 `SSE-007` และ `SSE-047` ไม่เหลือ diagnostic; ไม่ได้แก้ 19 รายการที่เหลือแบบ opportunistic. ไม่ได้เริ่ม `L5I` หรือ phase ถัดไป และไม่ได้แตะ pagination, URL/deep-link, async bootstrap, authorization, API contract, schema, migration, lint suppression หรือ timing workaround
+
+## Phase L5I Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-015`, `SSE-029`, `SSE-051`, `SSE-052`
+
+รูปแบบ ownership ที่ใช้:
+
+- `SSE-015` — Approver ใช้ guarded render-time reconciliation โดยเก็บ `totalPages` baseline และแก้ `currentPage` ที่เป็น durable state เมื่อ filtered dataset หดตัว; `pagedEmployees` จึง render ด้วย page ที่ clamp แล้วก่อน children commit
+- `SSE-015` — search และ approver-filter ยัง reset page ผ่าน event handlers เดิม; save/mutate refresh ที่ทำให้จำนวนพนักงานลดลงจะ clamp page และเมื่อ dataset โตกลับ page ที่ถูก clamp จะไม่ rebound ไปหน้าก่อนหน้า
+- `SSE-029` — Routine operational query identity ประกอบด้วย `scope`, `taskId`, `occurrenceId`, `debouncedSearch`, `unitId`, `categoryId` และ `timingStatus`; identity baseline reset เฉพาะ durable page เป็น 1 โดยไม่ remount หรือล้าง filter state อื่น
+- `SSE-029` — local filter events ยังคง reset page อย่าง explicit ส่วน scope/deep-link และ external identity changes ใช้ render-time identity reconciliation; remote response ที่ยืนยัน `pagination.pages` จะ clamp empty/invalid page ผ่าน `onSuccess`
+- `SSE-029` — `onSuccess` ตรวจ resolved query key กับ callback ของ current key ก่อนเปลี่ยน page จึงไม่ใช้ data ที่ `keepPreviousData` ค้างจาก query ก่อนหน้า; shrink → clamp → grow คง page ที่ clamp แล้ว
+- `SSE-051` — Stock item pagination ใช้ `onSuccess` ของ query hook เป็น owner ของ remote total; browse และ inventory ใช้ durable state, limit และ URL key แยกกัน (`stockItemsPage` / `stockInventoryPage`)
+- `SSE-051` — current response เท่านั้นที่ clamp page และเรียก setter เดิมเพื่อเขียน URL; browse/inventory ไม่ mutate ข้ามกัน และการ grow หลัง clamp ไม่คืน page เก่า
+- `SSE-052` — Stock request pagination ใช้ request query identity และ `onSuccess` แยกจาก item pagination; total shrink clamp durable `requestsPage` พร้อม URL write-back และ total grow ไม่ rebound
+- `SSE-052` — request search/filter reset และ debounce contract เดิมยังคงอยู่; ไม่ได้เปลี่ยน push/replace policy หรือ URL canonicalization ของ L5J
+
+การป้องกัน stale response:
+
+- Routine และ Stock รับ resolved SWR key จาก `onSuccess` และยอม reconcile เมื่อ key ตรงกับ query owner ปัจจุบันเท่านั้น; tests ครอบคลุม response key เก่าที่มาถึง callback ปัจจุบัน
+- ไม่ใช้ `effectivePage`, timeout, microtask, animation frame หรือ synchronization effect ใหม่เพื่อซ่อน stale durable page
+
+Focused verification:
+
+- `npm.cmd run test:run -- modules/leave/presentation/dashboard/hooks/useApproverManagementModel.test.ts` — **1 file, 8 tests ผ่าน**
+- `npm.cmd run test:run -- modules/stock/presentation/dashboard/context/StockProvider.test.tsx` — **1 file, 10 tests ผ่าน**
+- `npm.cmd run test:run -- modules/stock/presentation/dashboard/context/provider.shared.test.ts` — **1 file, 7 tests ผ่าน**
+- `npm.cmd run test:run -- modules/routine/presentation/dashboard/RoutineSection.test.tsx` — **1 file, 31 tests ผ่าน**
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `git diff --check` — ผ่าน
+- `npm.cmd run architecture:check` — ไม่รัน เพราะไม่มีการเปลี่ยน module boundary หรือ import layer
+
+Repository-wide explicit inventory:
+
+```text
+npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json
+→ 19 -> 15 diagnostics
+```
+
+`SSE-015`, `SSE-029`, `SSE-051` และ `SSE-052` ไม่เหลือ diagnostic; ไม่ได้แก้ findings ของ L5J หรือ L5K แบบ opportunistic และ **ไม่ได้เริ่ม L5J หรือ phase ถัดไป**. API/server pagination contracts, authorization, debounce semantics และ URL history semantics เดิมยังคงเดิม

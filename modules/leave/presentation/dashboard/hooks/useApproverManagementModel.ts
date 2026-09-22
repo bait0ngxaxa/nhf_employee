@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { getEmployeeDisplayName } from "@/modules/employee/client";
@@ -72,14 +72,18 @@ export function useApproverManagementModel() {
         [filteredEmployees.length],
     );
 
+    const [paginationTotalPages, setPaginationTotalPages] = useState(totalPages);
+    if (paginationTotalPages !== totalPages) {
+        setPaginationTotalPages(totalPages);
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }
+
     const pagedEmployees = useMemo(() => {
         const startIndex = (currentPage - 1) * APPROVER_ITEMS_PER_PAGE;
         return filteredEmployees.slice(startIndex, startIndex + APPROVER_ITEMS_PER_PAGE);
     }, [currentPage, filteredEmployees]);
-
-    useEffect(() => {
-        setCurrentPage((prev) => Math.min(prev, totalPages));
-    }, [totalPages]);
 
     const handleSearchChange = useCallback((value: string) => {
         setSearch(value);
