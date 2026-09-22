@@ -1111,6 +1111,31 @@ describe("LIFF Stock app orchestration", () => {
 
     it("rejects malformed deep links without calling the detail API", async () => {
         mocks.search = "requestId=../71&action=issue";
+        const view = render(<LiffStockApp />);
+
+        expect(await screen.findByText(
+            "ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ",
+        )).toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+
+        view.rerender(<LiffStockApp />);
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+
+        mocks.search = "";
+        view.rerender(<LiffStockApp />);
+        expect(screen.queryByText("ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ"))
+            .not.toBeInTheDocument();
+
+        mocks.search = "requestId=../71&action=issue";
+        view.rerender(<LiffStockApp />);
+        expect(await screen.findByText(
+            "ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ",
+        )).toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+    });
+
+    it("rejects unsafe integer Stock deep links without opening detail", async () => {
+        mocks.search = "requestId=9007199254740992&action=review";
         render(<LiffStockApp />);
 
         expect(await screen.findByText(

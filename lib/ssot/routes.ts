@@ -122,6 +122,11 @@ export const STOCK_DASHBOARD_TABS = {
 export type StockDashboardTab =
     (typeof STOCK_DASHBOARD_TABS)[keyof typeof STOCK_DASHBOARD_TABS];
 
+export function toDashboardLeaveTabPath(leaveTab: string): string {
+    const params = new URLSearchParams({ leaveTab });
+    return `${APP_ROUTES.dashboardLeave}?${params.toString()}`;
+}
+
 export function toDashboardStockTabPath(
     stockTab: StockDashboardTab,
 ): string {

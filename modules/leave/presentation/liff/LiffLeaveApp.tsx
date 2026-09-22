@@ -71,6 +71,50 @@ const EMPTY_APPROVALS: LiffLeaveApprovalsResponse = {
 
 const DEEP_LINK_ACTIONS = new Set(["approve", "review", "cancel", "not-taken"]);
 
+type LeaveDeepLinkAction = "approve" | "review" | "cancel" | "not-taken";
+
+export type LeaveDeepLinkIntent =
+    | { kind: "none" }
+    | {
+        kind: "invalid";
+        key: string;
+        message: string;
+    }
+    | {
+        kind: "detail";
+        key: string;
+        requestId: string;
+        actionIntent: LeaveDeepLinkAction | null;
+    };
+
+export function parseLiffLeaveDeepLink(searchParams: Pick<URLSearchParams, "get">): LeaveDeepLinkIntent {
+    const requestId = searchParams.get("requestId");
+    if (!requestId) {
+        return { kind: "none" };
+    }
+
+    const rawActionIntent = searchParams.get("action");
+    const actionIntent = rawActionIntent && DEEP_LINK_ACTIONS.has(rawActionIntent)
+        ? rawActionIntent as LeaveDeepLinkAction
+        : null;
+    const key = `${requestId}:${rawActionIntent ?? ""}`;
+
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(requestId)) {
+        return {
+            kind: "invalid",
+            key,
+            message: "ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ",
+        };
+    }
+
+    return {
+        kind: "detail",
+        key,
+        requestId,
+        actionIntent,
+    };
+}
+
 export function canUseLiffLeaveAction(
     action: EmployeeLeaveAction | ApproverLeaveAction,
     capabilities: LeavePresentationCapabilities | null,
@@ -102,10 +146,15 @@ function getViewError(error: unknown): string {
 
 export function LiffLeaveApp(): ReactElement {
     const searchParams = useSearchParams();
-    const deepLinkRequestId = searchParams.get("requestId");
-    const rawActionIntent = searchParams.get("action");
-    const actionIntent = rawActionIntent && DEEP_LINK_ACTIONS.has(rawActionIntent)
-        ? rawActionIntent
+    const deepLinkIntent = parseLiffLeaveDeepLink(searchParams);
+    const deepLinkIntentKey = deepLinkIntent.kind === "none"
+        ? null
+        : deepLinkIntent.key;
+    const deepLinkRequestId = deepLinkIntent.kind === "detail"
+        ? deepLinkIntent.requestId
+        : null;
+    const actionIntent = deepLinkIntent.kind === "detail"
+        ? deepLinkIntent.actionIntent
         : null;
     const deepLinkHandledRef = useRef<string | null>(null);
     const [state, setState] = useState<LeaveViewState>("LOADING");
@@ -292,18 +341,17 @@ export function LiffLeaveApp(): ReactElement {
         void loadInitialData();
     }, [loadInitialData]);
 
-    const openDetail = useCallback(async (
+    const resolveDetail = useCallback(async (
         requestId: string,
-        intent: string | null = null,
+        intent: string | null,
+        requestSequence: number,
     ): Promise<void> => {
-        const requestSequence = ++detailRequestSequenceRef.current;
-        setFocusNotice(null);
-        setSelectedDetail(null);
-        setSelectedDetailActionIntent(intent);
         try {
             const detail = await fetchLiffLeaveRequest(requestId);
             if (requestSequence !== detailRequestSequenceRef.current) return;
+            setFocusNotice(null);
             setSelectedDetail(detail);
+            setSelectedDetailActionIntent(intent);
             if (detail.viewerRole === "APPROVER" && detail.availableActions.length > 0) {
                 hasApprovalRelationshipRef.current = true;
                 setHadApprovalWork(true);
@@ -323,23 +371,47 @@ export function LiffLeaveApp(): ReactElement {
         }
     }, []);
 
+    const openDetail = useCallback(async (
+        requestId: string,
+        intent: string | null = null,
+    ): Promise<void> => {
+        const requestSequence = ++detailRequestSequenceRef.current;
+        setFocusNotice(null);
+        setSelectedDetail(null);
+        setSelectedDetailActionIntent(intent);
+        await resolveDetail(requestId, intent, requestSequence);
+    }, [resolveDetail]);
+
+    const openDeepLinkDetail = useCallback(async (
+        requestId: string,
+        intent: string | null,
+    ): Promise<void> => {
+        const requestSequence = ++detailRequestSequenceRef.current;
+        await resolveDetail(requestId, intent, requestSequence);
+    }, [resolveDetail]);
+
     useEffect(() => {
-        if (
-            state !== "READY"
-            || !deepLinkRequestId
-        ) {
-            if (!deepLinkRequestId) deepLinkHandledRef.current = null;
+        if (deepLinkIntentKey === null) {
+            deepLinkHandledRef.current = null;
             return;
         }
-        const deepLinkKey = `${deepLinkRequestId}:${actionIntent ?? ""}`;
-        if (deepLinkHandledRef.current === deepLinkKey) return;
-        deepLinkHandledRef.current = deepLinkKey;
-        if (!/^[A-Za-z0-9_-]{1,64}$/.test(deepLinkRequestId)) {
-            setFocusNotice("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ");
+        if (state !== "READY" || deepLinkHandledRef.current === deepLinkIntentKey) {
             return;
         }
-        void openDetail(deepLinkRequestId, actionIntent);
-    }, [actionIntent, deepLinkRequestId, openDetail, state]);
+
+        deepLinkHandledRef.current = deepLinkIntentKey;
+        if (deepLinkIntent.kind === "invalid" || deepLinkRequestId === null) {
+            return;
+        }
+        void openDeepLinkDetail(deepLinkRequestId, actionIntent);
+    }, [
+        actionIntent,
+        deepLinkIntent,
+        deepLinkIntentKey,
+        deepLinkRequestId,
+        openDeepLinkDetail,
+        state,
+    ]);
 
     const refreshProfile = useCallback(async (
         page: number = profilePage,
@@ -519,9 +591,12 @@ export function LiffLeaveApp(): ReactElement {
             className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
         >
             <div className="mx-auto w-full max-w-lg space-y-5">
-                {focusNotice ? (
+                {focusNotice || deepLinkIntent.kind === "invalid" ? (
                     <div role="status" className="rounded-xl border border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong">
-                        {focusNotice}
+                        {focusNotice
+                            ?? (deepLinkIntent.kind === "invalid"
+                                ? deepLinkIntent.message
+                                : null)}
                     </div>
                 ) : null}
                 {hasMineTab || showApprovalTab ? (

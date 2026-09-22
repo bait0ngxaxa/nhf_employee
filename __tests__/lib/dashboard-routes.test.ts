@@ -6,6 +6,7 @@ import {
     API_ROUTES,
     getDashboardMenuIdFromPathname,
     resolveLegacyDashboardRedirect,
+    toDashboardLeaveTabPath,
     toDashboardMenuPath,
     toDashboardRoutineTaskPath,
     toDashboardStockTabPath,
@@ -27,6 +28,9 @@ describe("dashboard route SSOT", () => {
         );
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.employeeManagement)).toBe(
             APP_ROUTES.dashboardEmployees,
+        );
+        expect(toDashboardLeaveTabPath("reports")).toBe(
+            "/dashboard/leave?leaveTab=reports",
         );
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.addEmployee)).toBe(
             APP_ROUTES.dashboardEmployeeNew,

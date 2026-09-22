@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { EmployeeLeaveDashboard } from "./EmployeeLeaveDashboard";
 import { ManagerApprovalDashboard } from "./ManagerApprovalDashboard";
@@ -16,12 +16,14 @@ import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
 import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
 import type { LeavePresentationCapabilities } from "../../application/types";
+import { toDashboardLeaveTabPath } from "@/lib/ssot/routes";
 
 interface LeaveManagementSectionProps {
-    defaultTab?: string;
+    routeTab?: string;
 }
 
-export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagementSectionProps) {
+export function LeaveManagementSection({ routeTab = "my-leave" }: LeaveManagementSectionProps) {
+    const router = useRouter();
     const { user } = useDashboardDataContext();
     const leaveCapabilities = user?.leaveCapabilities;
     const hasApprovalRelationship = user?.canApproveLeave === true;
@@ -31,25 +33,28 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
         canViewLeaveReports: user?.canViewLeaveReports,
     });
 
-    const [activeTab, setActiveTab] = useState(defaultTab);
-
-    // Ensure the tab changes if the user clicks a deep link while already on this page
-    useEffect(() => {
-        if (defaultTab) {
-            setActiveTab(defaultTab);
-        }
-    }, [defaultTab]);
-
     const tabs = getLeaveTabs({
         leaveCapabilities,
         tabVisibility,
         hasApprovalRelationship,
     });
     const hasTabs = tabs.some((tab) => tab.visible !== false);
-    const activeTabIsVisible = tabs.some((tab) => tab.value === activeTab && tab.visible !== false);
+    const activeTabIsVisible = tabs.some((tab) => tab.value === routeTab && tab.visible !== false);
     const safeActiveTab = activeTabIsVisible
-        ? activeTab
+        ? routeTab
         : tabs.find((tab) => tab.visible !== false)?.value ?? "my-leave";
+
+    function handleTabChange(value: string): void {
+        if (!tabs.some((tab) => tab.value === value && tab.visible !== false)) {
+            return;
+        }
+
+        if (value === routeTab) {
+            return;
+        }
+
+        router.push(toDashboardLeaveTabPath(value), { scroll: false });
+    }
 
     return (
         <SectionShell className="border-border-subtle/70 bg-surface">
@@ -60,7 +65,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
             {hasTabs ? (
                 <SectionTabs
                     value={safeActiveTab}
-                    onValueChange={setActiveTab}
+                    onValueChange={handleTabChange}
                     tabs={tabs}
                     activeColor={LEAVE_THEME_COLOR}
                     ariaLabel="แท็บระบบลางาน"

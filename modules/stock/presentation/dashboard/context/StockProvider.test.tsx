@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+} from "@testing-library/react";
+import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "@/modules/auth/client";
@@ -12,14 +18,51 @@ import { StockProvider } from "./StockProvider";
 import { useStockUIContext } from "./StockContext";
 import { LIVE_SEARCH_DEBOUNCE_MS } from "@/constants/ui";
 
-const navigationMocks = vi.hoisted(() => ({
-    pathname: "/dashboard/stock",
-    router: {
-        push: vi.fn(),
-        replace: vi.fn(),
-    },
-    searchParams: new URLSearchParams(),
-}));
+const navigationMocks = vi.hoisted(() => {
+    let currentSearchParams = new URLSearchParams();
+    const listeners = new Set<() => void>();
+
+    const notify = () => {
+        for (const listener of listeners) {
+            listener();
+        }
+    };
+
+    const setSearchParams = (
+        value: string | URLSearchParams,
+        shouldNotify = true,
+    ) => {
+        currentSearchParams = new URLSearchParams(value);
+        if (shouldNotify) {
+            notify();
+        }
+    };
+
+    const navigate = (url: string, _options?: { scroll?: boolean }) => {
+        setSearchParams(new URL(url, "http://localhost").searchParams);
+    };
+
+    return {
+        pathname: "/dashboard/stock",
+        router: {
+            push: vi.fn(navigate),
+            replace: vi.fn(navigate),
+        },
+        get searchParams() {
+            return currentSearchParams;
+        },
+        set searchParams(value: string | URLSearchParams) {
+            setSearchParams(value, false);
+        },
+        setExternalSearchParams(value: string | URLSearchParams) {
+            setSearchParams(value);
+        },
+        subscribe(listener: () => void) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+        },
+    };
+});
 
 vi.mock("@/modules/auth/client", () => ({
     useAuth: vi.fn(),
@@ -34,7 +77,12 @@ vi.mock("./hooks", () => ({
 vi.mock("next/navigation", () => ({
     usePathname: () => navigationMocks.pathname,
     useRouter: () => navigationMocks.router,
-    useSearchParams: () => navigationMocks.searchParams,
+    useSearchParams: () =>
+        useSyncExternalStore(
+            navigationMocks.subscribe,
+            () => navigationMocks.searchParams,
+            () => navigationMocks.searchParams,
+        ),
 }));
 
 function StockSearchProbe() {
@@ -47,6 +95,8 @@ function StockSearchProbe() {
         setActiveTab,
         itemsPage,
         requestsPage,
+        selectedCategoryId,
+        setSelectedCategoryId,
     } = useStockUIContext();
 
     return (
@@ -64,8 +114,10 @@ function StockSearchProbe() {
             <output data-testid="items-page">{itemsPage}</output>
             <output data-testid="requests-page">{requestsPage}</output>
             <output data-testid="active-tab">{activeTab}</output>
+            <output data-testid="category-id">{selectedCategoryId ?? "none"}</output>
             <button type="button" onClick={() => setActiveTab("browse")}>browse tab</button>
             <button type="button" onClick={() => setActiveTab("inventory")}>inventory tab</button>
+            <button type="button" onClick={() => setSelectedCategoryId(3)}>category three</button>
         </>
     );
 }
@@ -175,13 +227,160 @@ describe("StockProvider live search", () => {
 
         const searchQueries = capturedQueries(vi.mocked(useStockItemsQuery))
             .filter((query) => query.includes("search="));
-        expect(searchQueries).toHaveLength(1);
-        expect(searchQueries[0]).toContain("search=key");
+        const uniqueSearchQueries = [...new Set(searchQueries)];
+        expect(uniqueSearchQueries).toHaveLength(1);
+        expect(uniqueSearchQueries[0]).toContain("search=key");
+        expect(uniqueSearchQueries[0]).toContain("page=1");
         expect(navigationMocks.router.replace).toHaveBeenCalledTimes(1);
         expect(navigationMocks.router.replace).toHaveBeenCalledWith(
             expect.stringContaining("stockSearch=key"),
             { scroll: false },
         );
+    });
+
+    it("restores the canonical Stock tab from external URL changes while mounted", () => {
+        navigationMocks.searchParams = new URLSearchParams("stockTab=browse");
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("browse");
+
+        act(() => {
+            navigationMocks.setExternalSearchParams("stockTab=inventory");
+        });
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
+
+        act(() => {
+            navigationMocks.setExternalSearchParams("stockTab=browse");
+        });
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("browse");
+    });
+
+    it("keeps browse, inventory, and request pages on independent URL keys", () => {
+        navigationMocks.searchParams = new URLSearchParams(
+            "stockTab=browse&stockItemsPage=4&stockInventoryPage=2&stockRequestsPage=5",
+        );
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        expect(screen.getByTestId("items-page")).toHaveTextContent("4");
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("5");
+
+        act(() => {
+            navigationMocks.setExternalSearchParams(
+                "stockTab=inventory&stockItemsPage=4&stockInventoryPage=2&stockRequestsPage=5",
+            );
+        });
+        expect(screen.getByTestId("items-page")).toHaveTextContent("2");
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("5");
+
+        act(() => {
+            navigationMocks.setExternalSearchParams(
+                "stockTab=my-requests&stockItemsPage=4&stockInventoryPage=2&stockRequestsPage=3",
+            );
+        });
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("3");
+
+        act(() => {
+            navigationMocks.setExternalSearchParams(
+                "stockTab=browse&stockItemsPage=6&stockInventoryPage=2&stockRequestsPage=3",
+            );
+        });
+        expect(screen.getByTestId("items-page")).toHaveTextContent("6");
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("3");
+    });
+
+    it("reconciles the search draft from Back and Forward without losing immediate editing", () => {
+        navigationMocks.searchParams = new URLSearchParams(
+            "stockSearch=paper&stockItemsPage=4",
+        );
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        const input = screen.getByRole("textbox", { name: "item search" });
+        expect(input).toHaveValue("paper");
+        fireEvent.change(input, { target: { value: "pen" } });
+        expect(input).toHaveValue("pen");
+
+        act(() => {
+            vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
+        });
+        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+            expect.stringContaining("stockSearch=pen"),
+            { scroll: false },
+        );
+
+        act(() => {
+            navigationMocks.setExternalSearchParams(
+                "stockSearch=paper&stockItemsPage=4&stockTab=browse",
+            );
+        });
+        expect(input).toHaveValue("paper");
+
+        act(() => {
+            navigationMocks.setExternalSearchParams(
+                "stockSearch=pen&stockItemsPage=1&stockTab=browse",
+            );
+        });
+        expect(input).toHaveValue("pen");
+    });
+
+    it("keeps an in-progress search draft across unrelated URL changes", () => {
+        navigationMocks.searchParams = new URLSearchParams("stockItemsPage=5");
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        const input = screen.getByRole("textbox", { name: "item search" });
+        fireEvent.change(input, { target: { value: "pen" } });
+
+        act(() => {
+            navigationMocks.setExternalSearchParams(
+                "stockTab=inventory&stockItemsPage=2",
+            );
+        });
+        expect(input).toHaveValue("pen");
+    });
+
+    it("updates category through replace without resetting request pagination", () => {
+        navigationMocks.searchParams = new URLSearchParams(
+            "stockTab=browse&stockCategoryId=2&stockItemsPage=4&stockRequestsPage=6",
+        );
+        render(
+            <StockProvider>
+                <StockSearchProbe />
+            </StockProvider>,
+        );
+
+        expect(screen.getByTestId("category-id")).toHaveTextContent("2");
+        fireEvent.click(screen.getByRole("button", { name: "category three" }));
+
+        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+            expect.stringContaining("stockCategoryId=3"),
+            { scroll: false },
+        );
+        expect(screen.getByTestId("category-id")).toHaveTextContent("3");
+        expect(screen.getByTestId("items-page")).toHaveTextContent("1");
+        expect(screen.getByTestId("requests-page")).toHaveTextContent("6");
+
+        act(() => {
+            navigationMocks.setExternalSearchParams(
+                "stockTab=browse&stockCategoryId=2&stockItemsPage=4&stockRequestsPage=6",
+            );
+        });
+        expect(screen.getByTestId("category-id")).toHaveTextContent("2");
+        expect(screen.getByTestId("items-page")).toHaveTextContent("4");
     });
 
     it.each(["my-requests", "admin-requests"])(
@@ -428,6 +627,7 @@ describe("StockProvider live search", () => {
             null,
             expect.any(Function),
         );
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("my-requests");
         expect(vi.mocked(useStockCategoriesQuery)).toHaveBeenCalledWith(false);
         expect(capturedQueries(vi.mocked(useStockRequestsQuery))).toEqual(
             expect.arrayContaining([expect.stringContaining("scope=mine")]),

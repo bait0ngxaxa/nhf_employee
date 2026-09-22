@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, Edit3, Plus, X } from "lucide-react";
 import { toast } from "sonner";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import type { KeyedMutator } from "swr";
 
@@ -14,7 +14,7 @@ import { SectionTabs, type SectionTabItem } from "@/components/ui/section-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { API_ROUTES } from "@/lib/ssot/routes";
+import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { triggerDownload } from "@/lib/helpers/download";
 import type { RoutineTaskStatusFilter } from "../../schemas/routine";
 
@@ -642,22 +642,31 @@ function RoutineTaskEditCapabilitySession({
     );
 }
 
-function routineTabLifetimeKey(
-    routineCapabilities: RoutinePresentationCapabilities | undefined,
-): string {
-    return [
-        routineCapabilities?.canReadTasks === true ? "mine" : null,
-        routineCapabilities?.canReadTasks === true
-            && routineCapabilities.canReadAllTasks === true
-            ? "all"
-            : null,
-        routineCapabilities?.canCreateTasks === true
-            || routineCapabilities?.canUpdateTasks === true
-            || routineCapabilities?.canDeleteTasks === true
-            ? "manage"
-            : null,
-        routineCapabilities?.canManageImports === true ? "import" : null,
-    ].filter((tab): tab is string => tab !== null).join("|") || "none";
+const ROUTINE_TAB_ORDER = ["mine", "all", "manage", "import"] as const;
+
+export function resolveRoutineActiveTab({
+    requestedTab,
+    taskId,
+    occurrenceId,
+    visibleTabs,
+}: {
+    requestedTab: string | null;
+    taskId: number | null;
+    occurrenceId: number | null;
+    visibleTabs: ReadonlySet<string>;
+}): string {
+    if (
+        visibleTabs.has("all")
+        && (taskId !== null || occurrenceId !== null)
+    ) {
+        return "all";
+    }
+
+    if (requestedTab !== null && visibleTabs.has(requestedTab)) {
+        return requestedTab;
+    }
+
+    return ROUTINE_TAB_ORDER.find((tab) => visibleTabs.has(tab)) ?? "mine";
 }
 
 export function RoutineSection() {
@@ -675,6 +684,7 @@ function RoutineSectionCapabilitySurface() {
     const canManageTasks = routineCapabilities?.canCreateTasks === true
         || routineCapabilities?.canUpdateTasks === true
         || routineCapabilities?.canDeleteTasks === true;
+    const router = useRouter();
     const searchParams = useSearchParams();
     const taskIdValue = Number(searchParams.get("taskId"));
     const taskId = Number.isInteger(taskIdValue) && taskIdValue > 0
@@ -695,22 +705,16 @@ function RoutineSectionCapabilitySurface() {
         ),
         [canManageImports, canManageTasks, canReadAllTasks, canReadTasks],
     );
-    const firstVisibleTab = ["mine", "all", "manage", "import"].find((tab) => visibleRoutineTabs.has(tab)) ?? "mine";
-    const visibleTabKey = routineTabLifetimeKey(routineCapabilities);
-    const [tabState, setTabState] = useState({
-        activeTab: firstVisibleTab,
-        visibleTabKey,
+    const requestedTab = searchParams.get("routineTab");
+    const activeTab = resolveRoutineActiveTab({
+        requestedTab,
+        taskId,
+        occurrenceId,
+        visibleTabs: visibleRoutineTabs,
     });
-    if (tabState.visibleTabKey !== visibleTabKey) {
-        setTabState({
-            activeTab: visibleRoutineTabs.has(tabState.activeTab)
-                ? tabState.activeTab
-                : firstVisibleTab,
-            visibleTabKey,
-        });
-    }
-    const activeTab = tabState.activeTab;
-    const safeTab = visibleRoutineTabs.has(activeTab) ? activeTab : firstVisibleTab;
+    const safeTab = visibleRoutineTabs.has(activeTab)
+        ? activeTab
+        : ROUTINE_TAB_ORDER.find((tab) => visibleRoutineTabs.has(tab)) ?? "mine";
     const summaryScope = safeTab === "all" ? "all" : "mine";
     const summaryKey = `${API_ROUTES.routines.summary}?scope=${summaryScope}`;
     const canReadSummaryForScope = summaryScope === "all"
@@ -731,29 +735,39 @@ function RoutineSectionCapabilitySurface() {
 
     useEffect(() => {
         if (
-            canReadTasks
-            && canReadAllTasks
-            && (taskId !== null || occurrenceId !== null)
+            requestedTab === null
+            || requestedTab === activeTab
+            || !visibleRoutineTabs.size
         ) {
-            setTabState((currentState) => ({ ...currentState, activeTab: "all" }));
+            return;
         }
-    }, [canReadAllTasks, canReadTasks, occurrenceId, taskId]);
 
-    useEffect(() => {
-        const requestedTab = searchParams.get("routineTab");
-        if (requestedTab !== null && visibleRoutineTabs.has(requestedTab)) {
-            setTabState((currentState) => ({ ...currentState, activeTab: requestedTab }));
-        }
-    }, [searchParams, visibleRoutineTabs]);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("routineTab", activeTab);
+        router.replace(`${APP_ROUTES.dashboardRoutine}?${params.toString()}`, {
+            scroll: false,
+        });
+    }, [activeTab, requestedTab, router, searchParams, visibleRoutineTabs]);
 
     if (visibleRoutineTabs.size === 0) {
         return null;
     }
 
     function handleTabChange(value: string): void {
-        if (visibleRoutineTabs.has(value)) {
-            setTabState((currentState) => ({ ...currentState, activeTab: value }));
+        if (!visibleRoutineTabs.has(value) || value === activeTab) {
+            return;
         }
+
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("routineTab", value);
+        if (value !== "all") {
+            params.delete("taskId");
+            params.delete("occurrenceId");
+        }
+
+        router.push(`${APP_ROUTES.dashboardRoutine}?${params.toString()}`, {
+            scroll: false,
+        });
     }
 
     const tabs: SectionTabItem[] = [

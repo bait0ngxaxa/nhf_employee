@@ -449,10 +449,12 @@ describe("LIFF Leave app orchestration", () => {
             availableActions: ["APPROVE", "REJECT"],
         });
 
-        render(<LiffLeaveApp />);
+        const view = render(<LiffLeaveApp />);
 
         expect(await screen.findByText("รายละเอียด leave_1 intent approve"))
             .toBeInTheDocument();
+        view.rerender(<LiffLeaveApp />);
+        expect(mocks.fetchRequest).toHaveBeenCalledTimes(1);
         expect(mocks.fetchRequest).toHaveBeenCalledWith("leave_1");
         expect(mocks.fetchApprovals).not.toHaveBeenCalled();
         expect(screen.getByRole("tab", { name: /รอพิจารณา/ })).toBeInTheDocument();
@@ -539,8 +541,22 @@ describe("LIFF Leave app orchestration", () => {
     it("rejects malformed deep-link IDs without calling the detail API", async () => {
         mocks.search = "requestId=..%2Fprivate&action=approve";
 
-        render(<LiffLeaveApp />);
+        const view = render(<LiffLeaveApp />);
 
+        expect(await screen.findByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
+            .toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+
+        view.rerender(<LiffLeaveApp />);
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+
+        mocks.search = "";
+        view.rerender(<LiffLeaveApp />);
+        expect(screen.queryByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
+            .not.toBeInTheDocument();
+
+        mocks.search = "requestId=..%2Fprivate&action=approve";
+        view.rerender(<LiffLeaveApp />);
         expect(await screen.findByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).not.toHaveBeenCalled();

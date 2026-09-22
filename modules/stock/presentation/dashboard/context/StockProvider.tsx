@@ -58,6 +58,27 @@ const EMPTY_STOCK_CAPABILITIES: StockPresentationCapabilities = Object.freeze({
     canExportReports: false,
 });
 
+interface StockSearchDraftState {
+    canonicalValue: string;
+    value: string;
+    urlSyncRevision: number;
+}
+
+function parseSearchUrlSyncInput(value: string): {
+    query: string;
+    revision: number;
+} {
+    const separatorIndex = value.indexOf("\u0000");
+    if (separatorIndex < 0) {
+        return { query: "", revision: 0 };
+    }
+
+    return {
+        query: value.slice(separatorIndex + 1),
+        revision: Number(value.slice(0, separatorIndex)),
+    };
+}
+
 interface StockProviderProps {
     children: ReactNode;
 }
@@ -75,94 +96,88 @@ export function StockProvider({ children }: StockProviderProps) {
         stockCapabilities,
     );
 
-    const [activeTab, setActiveTabState] = useState(tabFromUrl);
-    const [browseItemsPage, setBrowseItemsPageState] = useState(
-        parsePositivePage(searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)),
+    const browseItemsPage = parsePositivePage(
+        searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
     );
-    const [inventoryItemsPage, setInventoryItemsPageState] = useState(
-        parsePositivePage(
-            searchParams.get(STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY)
-            ?? (tabFromUrl === "inventory"
-                ? searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)
-                : null),
-        ),
+    const inventoryItemsPage = parsePositivePage(
+        searchParams.get(STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY)
+        ?? (tabFromUrl === "inventory"
+            ? searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)
+            : null),
     );
-    const [requestsPage, setRequestsPageState] = useState(
-        parsePositivePage(searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY)),
+    const requestsPage = parsePositivePage(
+        searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY),
     );
     const [requestSearchQuery, setRequestSearchQuery] = useState("");
     const debouncedRequestSearchQuery = useDebouncedValue(requestSearchQuery);
-    const [searchQuery, setSearchQueryState] = useState(
-        searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "",
-    );
+    const canonicalSearchQuery = searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "";
+    const [searchDraft, setSearchDraft] = useState<StockSearchDraftState>(() => ({
+        canonicalValue: canonicalSearchQuery,
+        value: canonicalSearchQuery,
+        urlSyncRevision: 0,
+    }));
+    if (searchDraft.canonicalValue !== canonicalSearchQuery) {
+        setSearchDraft({
+            canonicalValue: canonicalSearchQuery,
+            value: canonicalSearchQuery,
+            urlSyncRevision: 0,
+        });
+    }
+    const effectiveSearchDraft = searchDraft.canonicalValue === canonicalSearchQuery
+        ? searchDraft
+        : {
+            canonicalValue: canonicalSearchQuery,
+            value: canonicalSearchQuery,
+            urlSyncRevision: 0,
+        };
+    const searchQuery = effectiveSearchDraft.value;
+    const searchUrlSyncRevision = effectiveSearchDraft.urlSyncRevision;
     const debouncedSearchQuery = useDebouncedValue(searchQuery);
-    const [searchUrlSyncRevision, setSearchUrlSyncRevision] = useState(0);
-    const debouncedSearchUrlSyncRevision = useDebouncedValue(
-        searchUrlSyncRevision,
+    const debouncedSearchUrlSyncInput = useDebouncedValue(
+        `${searchUrlSyncRevision}\u0000${searchQuery}`,
     );
-    const [selectedCategoryId, setSelectedCategoryIdState] = useState<
-        number | undefined
-    >(parseOptionalPositiveInteger(searchParams.get(STOCK_ITEMS_CATEGORY_QUERY_KEY)));
+    const {
+        query: debouncedSearchQueryForUrl,
+        revision: debouncedSearchUrlSyncRevision,
+    } = parseSearchUrlSyncInput(debouncedSearchUrlSyncInput);
+    const selectedCategoryId = parseOptionalPositiveInteger(
+        searchParams.get(STOCK_ITEMS_CATEGORY_QUERY_KEY),
+    );
     const [statusFilter, setStatusFilter] = useState<
         StockRequestStatus | undefined
     >();
-    const hasInitializedStatusFilterRef = useRef(false);
-    const hasInitializedSearchUrlSyncRef = useRef(false);
+    const previousRequestFilterKeyRef = useRef<string | null>(null);
+    const activeTab = tabFromUrl;
     const itemsPage =
-        activeTab === "inventory" ? inventoryItemsPage : browseItemsPage;
+        searchUrlSyncRevision > 0
+            ? 1
+            : activeTab === "inventory" ? inventoryItemsPage : browseItemsPage;
 
     useEffect(() => {
         latestSearchParamsRef.current = searchParams;
     }, [searchParams]);
 
     useEffect(() => {
-        setActiveTabState((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
-    }, [tabFromUrl]);
+        const rawTab = searchParams.get(STOCK_TAB_QUERY_KEY);
+        if (
+            !isStockDashboardRoute(pathname)
+            || rawTab === null
+            || rawTab === tabFromUrl
+            || !tabFromUrl
+        ) {
+            return;
+        }
 
-    useEffect(() => {
-        const pageFromUrl = parsePositivePage(
-            searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY),
-        );
-        setRequestsPageState((prev) =>
-            prev === pageFromUrl ? prev : pageFromUrl,
-        );
-    }, [searchParams]);
-
-    useEffect(() => {
-        const browsePageFromUrl = parsePositivePage(
-            searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
-        );
-        setBrowseItemsPageState((prev) =>
-            prev === browsePageFromUrl ? prev : browsePageFromUrl,
-        );
-
-        const inventoryPageFromUrl = parsePositivePage(
-            searchParams.get(STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY)
-            ?? (tabFromUrl === "inventory"
-                ? searchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY)
-                : null),
-        );
-        setInventoryItemsPageState((prev) =>
-            prev === inventoryPageFromUrl ? prev : inventoryPageFromUrl,
-        );
-
-        const searchFromUrl = searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "";
-        setSearchQueryState((prev) =>
-            prev === searchFromUrl ? prev : searchFromUrl,
-        );
-
-        const categoryFromUrl = parseOptionalPositiveInteger(
-            searchParams.get(STOCK_ITEMS_CATEGORY_QUERY_KEY),
-        );
-        setSelectedCategoryIdState((prev) =>
-            prev === categoryFromUrl ? prev : categoryFromUrl,
-        );
-    }, [searchParams, tabFromUrl]);
+        router.replace(createStockDashboardUrl(searchParams, {
+            [STOCK_TAB_QUERY_KEY]: tabFromUrl,
+        }), {
+            scroll: false,
+        });
+    }, [pathname, router, searchParams, tabFromUrl]);
 
     const setActiveTab = useCallback(
         (tab: string) => {
             const nextTab = normalizeStockTab(tab, stockCapabilities);
-            setActiveTabState(nextTab);
 
             if (!nextTab) {
                 return;
@@ -188,7 +203,6 @@ export function StockProvider({ children }: StockProviderProps) {
     const setRequestsPage = useCallback(
         (page: number) => {
             const nextPage = normalizePositivePage(page);
-            setRequestsPageState(nextPage);
 
             if (!isStockDashboardRoute(pathname)) {
                 return;
@@ -213,12 +227,6 @@ export function StockProvider({ children }: StockProviderProps) {
             const nextPage = normalizePositivePage(page);
             const pageQueryKey = getStockItemsPageQueryKey(activeTab);
 
-            if (activeTab === "inventory") {
-                setInventoryItemsPageState(nextPage);
-            } else {
-                setBrowseItemsPageState(nextPage);
-            }
-
             if (!isStockDashboardRoute(pathname)) {
                 return;
             }
@@ -239,17 +247,20 @@ export function StockProvider({ children }: StockProviderProps) {
 
     const setSearchQuery = useCallback(
         (value: string) => {
-            setSearchQueryState(value);
-            setBrowseItemsPageState(1);
-            setInventoryItemsPageState(1);
-            setSearchUrlSyncRevision((revision) => revision + 1);
+            setSearchDraft((currentDraft) => ({
+                canonicalValue: canonicalSearchQuery,
+                value,
+                urlSyncRevision:
+                    currentDraft.canonicalValue === canonicalSearchQuery
+                        ? currentDraft.urlSyncRevision + 1
+                        : 1,
+            }));
         },
-        [],
+        [canonicalSearchQuery],
     );
 
     useEffect(() => {
-        if (!hasInitializedSearchUrlSyncRef.current) {
-            hasInitializedSearchUrlSyncRef.current = true;
+        if (debouncedSearchUrlSyncRevision === 0) {
             return;
         }
 
@@ -259,7 +270,7 @@ export function StockProvider({ children }: StockProviderProps) {
             return;
         }
 
-        const nextSearch = debouncedSearchQuery.trim();
+        const nextSearch = debouncedSearchQueryForUrl.trim();
         const currentSearch = latestSearchParams.get(
             STOCK_ITEMS_SEARCH_QUERY_KEY,
         ) ?? "";
@@ -286,7 +297,7 @@ export function StockProvider({ children }: StockProviderProps) {
             scroll: false,
         });
     }, [
-        debouncedSearchQuery,
+        debouncedSearchQueryForUrl,
         debouncedSearchUrlSyncRevision,
         pathname,
         router,
@@ -294,10 +305,6 @@ export function StockProvider({ children }: StockProviderProps) {
 
     const setSelectedCategoryId = useCallback(
         (categoryId: number | undefined) => {
-            setSelectedCategoryIdState(categoryId);
-            setBrowseItemsPageState(1);
-            setInventoryItemsPageState(1);
-
             if (!isStockDashboardRoute(pathname)) {
                 return;
             }
@@ -420,32 +427,19 @@ export function StockProvider({ children }: StockProviderProps) {
         void mutateRequests();
     }, [mutateRequests]);
 
+    const requestFilterKey = `${requestSearchQuery}\u0000${statusFilter ?? ""}`;
+
     useEffect(() => {
-        if (!hasInitializedStatusFilterRef.current) {
-            hasInitializedStatusFilterRef.current = true;
+        if (previousRequestFilterKeyRef.current === null) {
+            previousRequestFilterKeyRef.current = requestFilterKey;
             return;
         }
-        setRequestsPageState(1);
-
-        const latestSearchParams = latestSearchParamsRef.current;
-
-        if (!isStockDashboardRoute(pathname)) {
+        if (previousRequestFilterKeyRef.current === requestFilterKey) {
             return;
         }
-
-        const currentPage = parsePositivePage(
-            latestSearchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY),
-        );
-        if (currentPage === 1) {
-            return;
-        }
-
-        router.push(createStockDashboardUrl(latestSearchParams, {
-            [STOCK_REQUESTS_PAGE_QUERY_KEY]: "1",
-        }), {
-            scroll: false,
-        });
-    }, [pathname, requestSearchQuery, router, statusFilter]);
+        previousRequestFilterKeyRef.current = requestFilterKey;
+        setRequestsPage(1);
+    }, [requestFilterKey, setRequestsPage]);
 
     const categories = useMemo(
         () => categoriesData?.categories ?? [],

@@ -86,6 +86,52 @@ const REQUEST_PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 const DEEP_LINK_ACTIONS = new Set(["issue", "review"]);
 
+type StockDeepLinkAction = "issue" | "review";
+
+export type StockDeepLinkIntent =
+    | { kind: "none" }
+    | {
+        kind: "invalid";
+        key: string;
+        message: string;
+    }
+    | {
+        kind: "detail";
+        key: string;
+        requestId: number;
+        actionIntent: StockDeepLinkAction | null;
+    };
+
+export function parseLiffStockDeepLink(searchParams: Pick<URLSearchParams, "get">): StockDeepLinkIntent {
+    const requestIdValue = searchParams.get("requestId");
+    if (!requestIdValue) {
+        return { kind: "none" };
+    }
+
+    const rawActionIntent = searchParams.get("action");
+    const actionIntent = rawActionIntent && DEEP_LINK_ACTIONS.has(rawActionIntent)
+        ? rawActionIntent as StockDeepLinkAction
+        : null;
+    const key = `${requestIdValue}:${rawActionIntent ?? ""}`;
+    const invalidMessage = "ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ";
+
+    if (!/^[1-9]\d*$/.test(requestIdValue)) {
+        return { kind: "invalid", key, message: invalidMessage };
+    }
+
+    const requestId = Number(requestIdValue);
+    if (!Number.isSafeInteger(requestId)) {
+        return { kind: "invalid", key, message: invalidMessage };
+    }
+
+    return {
+        kind: "detail",
+        key,
+        requestId,
+        actionIntent,
+    };
+}
+
 const EMPTY_CATALOG: LiffStockCatalogResponse = {
     items: [],
     total: 0,
@@ -136,6 +182,10 @@ function notifyCartAvailabilityReconciliation(
 export function LiffStockApp(): ReactElement {
     const workforce = useLiffWorkforce();
     const searchParams = useSearchParams();
+    const deepLinkIntent = parseLiffStockDeepLink(searchParams);
+    const deepLinkIntentKey = deepLinkIntent.kind === "none"
+        ? null
+        : deepLinkIntent.key;
     const deepLinkHandledRef = useRef<string | null>(null);
     const catalogRequestSequenceRef = useRef(0);
     const requestHistorySequenceRef = useRef(0);
@@ -174,13 +224,6 @@ export function LiffStockApp(): ReactElement {
         detailRequestSequenceRef.current += 1;
         availabilityRequestSequenceRef.current += 1;
     }, []);
-
-    const deepLinkRequestId = searchParams.get("requestId");
-    const rawActionIntent = searchParams.get("action");
-    const deepLinkActionIntent = rawActionIntent
-        && DEEP_LINK_ACTIONS.has(rawActionIntent)
-        ? rawActionIntent
-        : null;
 
     const [activeTab, setActiveTab] = useState<StockTab>("browse");
     const [createUiSessionId, setCreateUiSessionId] = useState(0);
@@ -479,44 +522,35 @@ export function LiffStockApp(): ReactElement {
     ]);
 
     useEffect(() => {
-        if (!deepLinkRequestId) {
+        if (deepLinkIntentKey === null) {
             deepLinkHandledRef.current = null;
             return;
         }
-        const deepLinkKey = `${deepLinkRequestId}:${deepLinkActionIntent ?? ""}`;
-        if (deepLinkHandledRef.current === deepLinkKey) return;
-        if (!/^[1-9]\d*$/.test(deepLinkRequestId)) {
-            deepLinkHandledRef.current = deepLinkKey;
-            setFocusNotice("ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ");
+        if (deepLinkHandledRef.current === deepLinkIntentKey) return;
+        if (deepLinkIntent.kind === "invalid") {
+            deepLinkHandledRef.current = deepLinkIntentKey;
             return;
         }
-        const requestId = Number(deepLinkRequestId);
-        if (!Number.isSafeInteger(requestId)) {
-            deepLinkHandledRef.current = deepLinkKey;
-            setFocusNotice("ลิงก์คำขอเบิกไม่ถูกต้อง กำลังแสดง Stock ตามปกติ");
+        if (deepLinkIntent.kind !== "detail") {
             return;
         }
         const capabilities = stockCapabilitiesRef.current;
         if (!capabilities) return;
-        const isProcessorIntent = deepLinkActionIntent === "issue"
-            || deepLinkActionIntent === "review";
+        const isProcessorIntent = deepLinkIntent.actionIntent === "issue"
+            || deepLinkIntent.actionIntent === "review";
         const canReadRequest = capabilities.canReadOwnRequests
             || capabilities.canReadAllRequests;
         if (!canReadRequest) {
-            deepLinkHandledRef.current = deepLinkKey;
-            setFocusNotice("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้");
+            deepLinkHandledRef.current = deepLinkIntentKey;
             return;
         }
         if (isProcessorIntent && !capabilities.canProcessRequests) {
-            deepLinkHandledRef.current = deepLinkKey;
-            setFocusNotice(
-                "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้",
-            );
+            deepLinkHandledRef.current = deepLinkIntentKey;
             return;
         }
-        deepLinkHandledRef.current = deepLinkKey;
-        void openDetail(requestId, deepLinkActionIntent);
-    }, [deepLinkActionIntent, deepLinkRequestId, openDetail, stockCapabilities]);
+        deepLinkHandledRef.current = deepLinkIntentKey;
+        void openDetail(deepLinkIntent.requestId, deepLinkIntent.actionIntent);
+    }, [deepLinkIntent, deepLinkIntentKey, openDetail, stockCapabilities]);
 
     const {
         cartCount,
@@ -787,6 +821,18 @@ export function LiffStockApp(): ReactElement {
     const safeActiveTab = visibleTabs.includes(activeTab)
         ? activeTab
         : firstVisibleTab;
+    const deepLinkNotice = deepLinkIntent.kind === "invalid"
+        ? deepLinkIntent.message
+        : deepLinkIntent.kind === "detail" && stockCapabilities
+            ? stockCapabilities.canReadOwnRequests || stockCapabilities.canReadAllRequests
+                ? deepLinkIntent.actionIntent === "issue"
+                    || deepLinkIntent.actionIntent === "review"
+                    ? stockCapabilities.canProcessRequests
+                        ? null
+                        : "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"
+                    : null
+                : "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้"
+            : null;
 
     if (stockHomeLoading && !stockCapabilities) {
         return (
@@ -841,12 +887,12 @@ export function LiffStockApp(): ReactElement {
             className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
         >
             <div className="mx-auto w-full max-w-lg space-y-4">
-                {focusNotice ? (
+                {focusNotice ?? deepLinkNotice ? (
                     <div
                         role="status"
                         className="border-y border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong"
                     >
-                        {focusNotice}
+                        {focusNotice ?? deepLinkNotice}
                     </div>
                 ) : null}
 

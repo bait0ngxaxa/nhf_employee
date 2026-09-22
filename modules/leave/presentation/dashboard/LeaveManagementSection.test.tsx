@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,17 +8,29 @@ import { LeaveManagementSection } from "./LeaveManagementSection";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import type { LeavePresentationCapabilities } from "../../application/types";
 
+const navigationMocks = vi.hoisted(() => ({
+    router: {
+        push: vi.fn(),
+    },
+}));
+
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
     useDashboardDataContext: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+    useRouter: () => navigationMocks.router,
 }));
 
 vi.mock("@/components/ui/section-tabs", () => ({
     SectionTabs: ({
         value,
         tabs,
+        onValueChange,
     }: {
         value: string;
         tabs: Array<{ value: string; label: string; visible?: boolean; content: ReactNode }>;
+        onValueChange: (value: string) => void;
     }) => (
         <div
             data-testid="leave-tabs"
@@ -30,7 +42,15 @@ vi.mock("@/components/ui/section-tabs", () => ({
         >
             {tabs
                 .filter((tab) => tab.visible !== false)
-                .map((tab) => <button key={tab.value} type="button">{tab.label}</button>)}
+                .map((tab) => (
+                    <button
+                        key={tab.value}
+                        type="button"
+                        onClick={() => onValueChange(tab.value)}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
         </div>
     ),
 }));
@@ -121,7 +141,7 @@ describe("LeaveManagementSection permissions", () => {
             },
         });
 
-        render(<LeaveManagementSection defaultTab="my-leave" />);
+        render(<LeaveManagementSection routeTab="my-leave" />);
 
         const tabs = screen.getByTestId("leave-tabs");
         expect(tabs).toHaveAttribute("data-active-tab", "recovery");
@@ -139,7 +159,7 @@ describe("LeaveManagementSection permissions", () => {
             canViewLeaveReports: true,
         });
 
-        render(<LeaveManagementSection defaultTab="reports" />);
+        render(<LeaveManagementSection routeTab="reports" />);
 
         expect(screen.getByTestId("leave-tabs")).toHaveAttribute(
             "data-active-tab",
@@ -155,7 +175,7 @@ describe("LeaveManagementSection permissions", () => {
             canViewLeaveReports: true,
         });
 
-        const element = <LeaveManagementSection defaultTab="reports" />;
+        const element = <LeaveManagementSection routeTab="reports" />;
         const serverMarkup = renderToString(element);
         const container = document.createElement("div");
         container.innerHTML = serverMarkup;
@@ -176,6 +196,89 @@ describe("LeaveManagementSection permissions", () => {
 
         root.unmount();
         consoleError.mockRestore();
+    });
+
+    it("follows a route-tab change while the section remains mounted", () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: true,
+            canApproveLeave: true,
+            canViewLeaveReports: true,
+        });
+
+        const view = render(<LeaveManagementSection routeTab="my-leave" />);
+        expect(screen.getByTestId("leave-tabs")).toHaveAttribute(
+            "data-active-tab",
+            "my-leave",
+        );
+
+        view.rerender(<LeaveManagementSection routeTab="reports" />);
+
+        expect(screen.getByTestId("leave-tabs")).toHaveAttribute(
+            "data-active-tab",
+            "reports",
+        );
+    });
+
+    it("restores Leave tabs from Back and Forward route states while mounted", () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: true,
+            canApproveLeave: true,
+            canViewLeaveReports: true,
+        });
+
+        const view = render(<LeaveManagementSection routeTab="my-leave" />);
+        fireEvent.click(screen.getByRole("button", { name: "รีพอร์ต" }));
+        view.rerender(<LeaveManagementSection routeTab="my-leave" />);
+        expect(screen.getByTestId("leave-tabs")).toHaveAttribute(
+            "data-active-tab",
+            "my-leave",
+        );
+
+        view.rerender(<LeaveManagementSection routeTab="reports" />);
+        expect(screen.getByTestId("leave-tabs")).toHaveAttribute(
+            "data-active-tab",
+            "reports",
+        );
+    });
+
+    it("writes a visible user tab selection to the Leave route", () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: true,
+            canApproveLeave: true,
+            canViewLeaveReports: true,
+        });
+
+        render(<LeaveManagementSection routeTab="my-leave" />);
+
+        fireEvent.click(screen.getByRole("button", { name: "รีพอร์ต" }));
+
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/leave?leaveTab=reports",
+            { scroll: false },
+        );
+    });
+
+    it("keeps a hidden route tab from exposing forbidden content", () => {
+        mockDashboardUser({
+            role: "USER",
+            canApproveLeave: false,
+            canViewLeaveReports: false,
+            leaveCapabilities: {
+                ...DEFAULT_LEAVE_CAPABILITIES,
+                canReadOwnRequests: true,
+            },
+        });
+
+        render(<LeaveManagementSection routeTab="reports" />);
+
+        expect(screen.getByTestId("leave-tabs")).toHaveAttribute(
+            "data-active-tab",
+            "my-leave",
+        );
+        expect(screen.queryByTestId("leave-reports")).not.toBeInTheDocument();
     });
 
     it("shows approval and reports for an organizational manager", async () => {

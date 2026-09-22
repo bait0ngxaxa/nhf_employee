@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { RoutineSection } from "./RoutineSection";
 import type { RoutinePresentationCapabilities } from "../../application/types";
@@ -9,9 +9,29 @@ import type {
     RoutineTaskWorkItem,
 } from "./types";
 
+const navigationMocks = vi.hoisted(() => {
+    const state = {
+        searchParams: new URLSearchParams(),
+    };
+    const listeners = new Set<() => void>();
+    const navigate = (href: string): void => {
+        state.searchParams = new URL(href, "http://routine.test").searchParams;
+        listeners.forEach((listener) => listener());
+    };
+
+    return {
+        state,
+        listeners,
+        router: {
+            push: vi.fn(navigate),
+            replace: vi.fn(navigate),
+        },
+    };
+});
+
 const mocks = vi.hoisted(() => ({
     useDashboardDataContext: vi.fn(),
-    useSearchParams: vi.fn(() => new URLSearchParams()),
+    useSearchParams: vi.fn(),
     mutateSummary: vi.fn(),
     mutateTasks: vi.fn(),
     triggerDownload: vi.fn(),
@@ -22,6 +42,25 @@ const mocks = vi.hoisted(() => ({
         mutate: vi.fn(),
     })),
 }));
+
+const EMPTY_SEARCH_PARAMS = new URLSearchParams();
+
+function useMockSearchParams(): URLSearchParams {
+    useSyncExternalStore(
+        (listener) => {
+            navigationMocks.listeners.add(listener);
+            return () => navigationMocks.listeners.delete(listener);
+        },
+        () => navigationMocks.state.searchParams,
+        () => EMPTY_SEARCH_PARAMS,
+    );
+    return navigationMocks.state.searchParams;
+}
+
+function setRoutineSearchParams(query: string): void {
+    navigationMocks.state.searchParams = new URLSearchParams(query);
+    navigationMocks.listeners.forEach((listener) => listener());
+}
 
 type RoutineResponseSuccess = (
     data: PaginatedRoutineTaskWorkItemsResponse,
@@ -146,6 +185,7 @@ vi.mock("swr", () => ({ default: mocks.useSWR }));
 
 vi.mock("next/navigation", () => ({
     useSearchParams: mocks.useSearchParams,
+    useRouter: () => navigationMocks.router,
 }));
 
 vi.mock("@/lib/helpers/download", () => ({
@@ -174,7 +214,7 @@ vi.mock("@/components/ui/section-tabs", async () => {
                 ? managementTab ? [managementTab] : []
                 : [activeTab];
             return (
-            <div>
+            <div data-testid="routine-active-tab" data-active-tab={value}>
                 {tabs
                     .filter((tab) => tab.visible !== false)
                     .map((tab) => (
@@ -273,7 +313,9 @@ vi.mock("./RoutineTaskList", () => ({
 describe("RoutineSection tabs", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+        navigationMocks.state.searchParams = new URLSearchParams();
+        navigationMocks.listeners.clear();
+        mocks.useSearchParams.mockImplementation(useMockSearchParams);
         mocks.useSWR.mockImplementation((key: unknown) => ({
             data: key === "/api/routines/reference" ? routineReference : undefined,
             error: undefined,
@@ -362,7 +404,7 @@ describe("RoutineSection tabs", () => {
 
     it("falls back to mine for a direct all-tab URL without task.read/ALL", async () => {
         mockRoutineUser("USER");
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=all&taskId=71&occurrenceId=91"));
+        setRoutineSearchParams("routineTab=all&taskId=71&occurrenceId=91");
 
         render(<RoutineSection />);
 
@@ -497,12 +539,73 @@ describe("RoutineSection tabs", () => {
 
     it("falls back from a stale import tab URL when import capability is absent", () => {
         mockRoutineUser("USER");
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=import"));
+        setRoutineSearchParams("routineTab=import");
 
         render(<RoutineSection />);
 
         expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
         expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
+        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+            "/dashboard/routine?routineTab=mine",
+            { scroll: false },
+        );
+    });
+
+    it("prioritizes authorized focus over a conflicting tab and lets the user leave it", () => {
+        mockRoutineUser("ADMIN");
+        setRoutineSearchParams("routineTab=mine&taskId=71&occurrenceId=91");
+
+        render(<RoutineSection />);
+
+        expect(screen.getByTestId("routine-active-tab")).toHaveAttribute(
+            "data-active-tab",
+            "all",
+        );
+        expect(getLatestOccurrenceKey()).toContain(
+            "scope=all&page=1&limit=12&view=tasks&taskId=71&occurrenceId=91",
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "รายการของฉัน" }));
+
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/routine?routineTab=mine",
+            { scroll: false },
+        );
+        expect(screen.getByTestId("routine-active-tab")).toHaveAttribute(
+            "data-active-tab",
+            "mine",
+        );
+        expect(getLatestOccurrenceKey()).toContain("scope=mine&page=1");
+    });
+
+    it("restores routine tabs from Back and Forward URL changes while mounted", () => {
+        mockRoutineUser("ADMIN");
+        act(() => {
+            setRoutineSearchParams("routineTab=mine");
+        });
+
+        render(<RoutineSection />);
+        fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
+        expect(screen.getByTestId("routine-active-tab")).toHaveAttribute(
+            "data-active-tab",
+            "all",
+        );
+
+        act(() => {
+            setRoutineSearchParams("routineTab=mine");
+        });
+        expect(screen.getByTestId("routine-active-tab")).toHaveAttribute(
+            "data-active-tab",
+            "mine",
+        );
+
+        act(() => {
+            setRoutineSearchParams("routineTab=all");
+        });
+        expect(screen.getByTestId("routine-active-tab")).toHaveAttribute(
+            "data-active-tab",
+            "all",
+        );
     });
 
     it("fails closed without the Routine module-entry capability", () => {
@@ -697,7 +800,7 @@ describe("RoutineSection tabs", () => {
 
     it("opens an admin deep link with the all-scope KPI", async () => {
         mockRoutineUser("ADMIN");
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("taskId=71&occurrenceId=91"));
+        setRoutineSearchParams("taskId=71&occurrenceId=91");
 
         render(<RoutineSection />);
 
@@ -715,13 +818,13 @@ describe("RoutineSection tabs", () => {
 
     it("resets the operational page when an external scope changes while mounted", async () => {
         mockRoutineUser("ADMIN");
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=mine"));
+        setRoutineSearchParams("routineTab=mine");
 
         const view = render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
         expect(getLatestOccurrenceKey()).toContain("scope=mine&page=2");
 
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("routineTab=all"));
+        setRoutineSearchParams("routineTab=all");
         view.rerender(<RoutineSection />);
 
         await waitFor(() => expect(getOccurrenceKeys()).toContain(
@@ -731,14 +834,14 @@ describe("RoutineSection tabs", () => {
 
     it("resets deep-link identity to page one and rejects stale previous-query responses", () => {
         mockRoutineUser("USER");
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("taskId=71"));
+        setRoutineSearchParams("taskId=71");
 
         const view = render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "ไปหน้ารายการ Routine ถัดไป" }));
         const previousQueryKey = getLatestOccurrenceKey();
         expect(previousQueryKey).toContain("page=2&limit=12&view=tasks&taskId=71");
 
-        mocks.useSearchParams.mockReturnValue(new URLSearchParams("taskId=72"));
+        setRoutineSearchParams("taskId=72");
         view.rerender(<RoutineSection />);
         expect(getLatestOccurrenceKey()).toBe(
             "/api/routines/occurrences?scope=mine&page=1&limit=12&view=tasks&taskId=72",

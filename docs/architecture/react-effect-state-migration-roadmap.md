@@ -806,3 +806,38 @@ npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json
 ```
 
 `SSE-015`, `SSE-029`, `SSE-051` และ `SSE-052` ไม่เหลือ diagnostic; ไม่ได้แก้ findings ของ L5J หรือ L5K แบบ opportunistic และ **ไม่ได้เริ่ม L5J หรือ phase ถัดไป**. API/server pagination contracts, authorization, debounce semantics และ URL history semantics เดิมยังคงเดิม
+
+## Phase L5J Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-018`, `SSE-021`, `SSE-033`, `SSE-034`, `SSE-048`, `SSE-049`, `SSE-050`, `SSE-055`
+
+รูปแบบ ownership และ navigation ที่ใช้:
+
+- Leave dashboard ใช้ `routeTab` ที่ผ่าน `normalizeLeaveDashboardTab(...)` จาก server เป็น canonical tab owner; client ไม่เก็บสำเนา tab ถาวร และ user tab action ใช้ `router.push(...)` ผ่าน `toDashboardLeaveTabPath(...)`
+- Leave คง push semantics สำหรับ tab ที่ user เลือก, Back/Forward เปลี่ยน rendered tab ตาม route prop ที่เปลี่ยน และ server capability normalization กับ client defense-in-depth ยังคง fail closed
+- Routine ใช้ `resolveRoutineActiveTab(...)` ตัวเดียว โดยลำดับคือ authorized task/occurrence focus → valid visible `routineTab` → first visible tab; focus ที่ไม่มี `all` capability ไม่ขยาย scope
+- Routine user tab action เขียน `routineTab` ด้วย `push`; การออกจาก focused deep link จะลบ `taskId`/`occurrenceId` เมื่อเลือก tab อื่นที่ไม่ใช่ `all`; stale/hidden tab normalization ใช้ `replace` และไม่วนลูป
+- Routine Back/Forward อ่าน `useSearchParams()` ขณะ component เดิมยัง mounted และคง L5I pagination query identity, stale-response guard และ remote clamp behavior
+- Stock dashboard derive tab, browse page, inventory page, request page และ category จาก canonical URL projection; page keys ยังคงแยกกัน (`stockItemsPage`, `stockInventoryPage`, `stockRequestsPage`)
+- Stock tab/page user navigation ใช้ `push`; category และ debounced search canonicalization ใช้ `replace`; hidden/invalid capability tab fallback ไม่พึ่ง local stale state และไม่เพิ่มสิทธิ์จาก URL
+- Stock search แยก transient editable draft ออกจาก canonical `stockSearch`; input เปลี่ยนทันที, API/URL debounce ยังคงอยู่, committed search ใช้ page 1 ตั้งแต่ query แรก และการกลับไปค่าเดิมยัง reset page 1
+- Stock search draft reconcile เฉพาะเมื่อ canonical search เปลี่ยน จึงรองรับ Back/Forward โดยไม่ทำลาย draft จาก query อื่นที่ไม่เกี่ยวข้อง; L5I remote item/request clamp ยังคงเขียน canonical page และไม่ rebound เมื่อข้อมูลโต
+- LIFF Leave แยก pure `parseLiffLeaveDeepLink(...)` (string ID, allowed actions และความยาวเดิม) ออกจาก one-shot lifecycle; invalid notice เป็น URL projection, ไม่ fetch detail, ล้างตาม URL และ intent เดิมไม่ทำซ้ำ
+- LIFF Stock แยก pure `parseLiffStockDeepLink(...)` (positive decimal safe integer เท่านั้น) ออกจาก lifecycle; capability notice แยกจาก operational notice และยังบังคับ read capability กับ process capability ก่อนเปิด detail
+- Notice precedence กำหนดให้ operational notice แสดงก่อน URL deep-link notice; URL-owned invalid/capability projection ไม่ค้างหลัง query ถูกล้าง และการใส่ intent ใหม่ทำงานได้อีกครั้ง
+- API/server authorization, domain authorization, schema, database, workforce identity และ capability definitions ไม่ถูกเปลี่ยน; client checks เป็น presentation safety เท่านั้น
+
+Focused verification:
+
+- `npm.cmd run test:run -- modules/leave/presentation/dashboard/LeaveManagementSection.test.tsx __tests__/dashboard-leave-page.test.tsx __tests__/lib/dashboard-routes.test.ts modules/leave/presentation/liff/LiffLeaveApp.test.tsx modules/routine/presentation/dashboard/RoutineSection.test.tsx modules/stock/presentation/dashboard/context/StockProvider.test.tsx modules/stock/presentation/dashboard/context/provider.shared.test.ts modules/stock/__tests__/liff-app.test.tsx` — **8 files, 136 tests ผ่าน**
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `npm.cmd run architecture:check` — ผ่าน (ตรวจ 1,180 source files)
+- `git diff --check` — ผ่าน
+- explicit diagnostic inventory: **15 -> 7 diagnostics**; เหลือเฉพาะ 7 findings ที่ defer ไป L5K
+- ตรวจ Thai/UTF-8 และ diff แล้ว ไม่พบ mojibake หรือไฟล์ generated/vendor ที่ถูกแก้
+- ไม่รัน `npm run build` และไม่รัน full repository suite เพราะ focused route/hydration/deep-link/Back-Forward/pagination tests พร้อม lint, typecheck และ architecture check ครอบคลุมขอบเขต L5J
+
+L5K ยังไม่ได้เริ่ม และ findings `SSE-003`, `SSE-006`, `SSE-020`, `SSE-024`, `SSE-025`, `SSE-037`, `SSE-053` ยังคงถูก defer ตามขอบเขต phase

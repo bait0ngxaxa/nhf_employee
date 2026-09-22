@@ -52,9 +52,9 @@ const user = {
     email: "account@test.com",
 };
 
-function getRenderedLeaveSectionProps(page: ReactElement): { defaultTab?: string } {
+function getRenderedLeaveSectionProps(page: ReactElement): { routeTab?: string } {
     const suspenseProps = page.props as {
-        children: ReactElement<{ defaultTab?: string }>;
+        children: ReactElement<{ routeTab?: string }>;
     };
     return suspenseProps.children.props;
 }
@@ -122,7 +122,7 @@ describe("Leave Dashboard route access", () => {
     it("renders the own Leave surface for a normal compatible workforce user", async () => {
         const page = await LeaveDashboardPage({ searchParams: Promise.resolve({}) });
 
-        expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("my-leave");
+        expect(getRenderedLeaveSectionProps(page).routeTab).toBe("my-leave");
         expect(mocks.redirect).not.toHaveBeenCalled();
         expect(mocks.getCurrentUserProjection).toHaveBeenCalledTimes(1);
     });
@@ -138,7 +138,7 @@ describe("Leave Dashboard route access", () => {
             searchParams: Promise.resolve({ leaveTab: "approvals" }),
         });
 
-        expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("approvals");
+        expect(getRenderedLeaveSectionProps(page).routeTab).toBe("approvals");
     });
 
     it("allows a report-only deferred Leave surface", async () => {
@@ -152,7 +152,7 @@ describe("Leave Dashboard route access", () => {
             searchParams: Promise.resolve({ leaveTab: "reports" }),
         });
 
-        expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("reports");
+        expect(getRenderedLeaveSectionProps(page).routeTab).toBe("reports");
     });
 
     it("renders recovery from the explicit capability projection", async () => {
@@ -171,7 +171,7 @@ describe("Leave Dashboard route access", () => {
             searchParams: Promise.resolve({ leaveTab: "recovery" }),
         });
 
-        expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("recovery");
+        expect(getRenderedLeaveSectionProps(page).routeTab).toBe("recovery");
     });
 
     it("does not expose recovery from the ADMIN role without recovery capability", async () => {
@@ -202,7 +202,7 @@ describe("Leave Dashboard route access", () => {
             searchParams: Promise.resolve({ leaveTab: "recovery" }),
         });
 
-        expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("approver-settings");
+        expect(getRenderedLeaveSectionProps(page).routeTab).toBe("approver-settings");
     });
 
     it("normalizes a valid but unavailable tab before rendering", async () => {
@@ -210,6 +210,6 @@ describe("Leave Dashboard route access", () => {
             searchParams: Promise.resolve({ leaveTab: "approvals" }),
         });
 
-        expect(getRenderedLeaveSectionProps(page).defaultTab).toBe("my-leave");
+        expect(getRenderedLeaveSectionProps(page).routeTab).toBe("my-leave");
     });
 });

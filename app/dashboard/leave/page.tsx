@@ -44,14 +44,14 @@ export default async function LeaveDashboardPage({
 
     const params = await searchParams;
     const requestedTab = params.leaveTab;
-    const defaultTab = normalizeLeaveDashboardTab(
+    const routeTab = normalizeLeaveDashboardTab(
         typeof requestedTab === "string" ? requestedTab : undefined,
         leaveAvailability,
     );
 
     return (
         <Suspense fallback={<LeaveManagementSectionSkeleton />}>
-            <LeaveManagementSection defaultTab={defaultTab} />
+            <LeaveManagementSection routeTab={routeTab} />
         </Suspense>
     );
 }
