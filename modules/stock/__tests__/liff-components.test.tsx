@@ -2,9 +2,11 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { LiffStockCart } from "../presentation/liff/components/LiffStockCart";
+import { LiffStockDecisionSheet } from "../presentation/liff/components/LiffStockDecisionSheet";
 import { LiffStockItemCard } from "../presentation/liff/components/LiffStockItemCard";
 import { LiffStockRequestCard } from "../presentation/liff/components/LiffStockRequestCard";
 import { LiffStockVariantPicker } from "../presentation/liff/components/LiffStockVariantPicker";
+import type { LiffStockRequestSummary } from "../contracts/liff";
 
 const MULTI_VARIANT_ITEM = {
     id: 10,
@@ -44,6 +46,29 @@ const MULTI_VARIANT_ITEM = {
         },
     ],
 };
+
+const DECISION_REQUEST = {
+    id: 71,
+    projectCode: "NHF-2569",
+    status: "PENDING_ISSUE",
+    note: null,
+    cancelReason: null,
+    issuedAt: null,
+    cancelledAt: null,
+    createdAt: "2026-08-30T03:00:00.000Z",
+    items: [{
+        itemName: "เสื้อกิจกรรม",
+        itemSku: "SHIRT",
+        variantSku: "SHIRT-S",
+        variantLabel: "ขนาด: S",
+        unit: "ตัว",
+        quantity: 1,
+        imageUrl: null,
+        currentQuantity: 2,
+        isAvailableForIssue: true,
+    }],
+    availableActions: ["ISSUE", "CANCEL"],
+} satisfies LiffStockRequestSummary;
 
 describe("LIFF Stock mobile components", () => {
     it("routes a multi-variant card through the picker and respects availability", () => {
@@ -194,5 +219,168 @@ describe("LIFF Stock mobile components", () => {
             .not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "จ่ายวัสดุ" }))
             .toBeEnabled();
+    });
+
+    it("resets the Stock decision reason at action, request, actor, and close boundaries", () => {
+        const employeeCancelIntent = {
+            action: "CANCEL" as const,
+            request: DECISION_REQUEST,
+            actorMode: "employee" as const,
+        };
+        const { rerender } = render(
+            <LiffStockDecisionSheet
+                intent={employeeCancelIntent}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("เหตุผล (ถ้ามี)"), {
+            target: { value: "เหตุผลเดิม" },
+        });
+        rerender(
+            <LiffStockDecisionSheet
+                intent={{
+                    ...employeeCancelIntent,
+                    request: { ...DECISION_REQUEST },
+                }}
+                busy
+                error="ลองใหม่อีกครั้ง"
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByLabelText("เหตุผล (ถ้ามี)"))
+            .toHaveValue("เหตุผลเดิม");
+
+        rerender(
+            <LiffStockDecisionSheet
+                intent={{ ...employeeCancelIntent, action: "ISSUE" }}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.queryByLabelText("เหตุผล (ถ้ามี)"))
+            .not.toBeInTheDocument();
+
+        rerender(
+            <LiffStockDecisionSheet
+                intent={employeeCancelIntent}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByLabelText("เหตุผล (ถ้ามี)"))
+            .toHaveValue("");
+
+        fireEvent.change(screen.getByLabelText("เหตุผล (ถ้ามี)"), {
+            target: { value: "เหตุผลคำขอเดิม" },
+        });
+        rerender(
+            <LiffStockDecisionSheet
+                intent={{
+                    ...employeeCancelIntent,
+                    request: { ...DECISION_REQUEST, id: 72 },
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByLabelText("เหตุผล (ถ้ามี)"))
+            .toHaveValue("");
+
+        fireEvent.change(screen.getByLabelText("เหตุผล (ถ้ามี)"), {
+            target: { value: "เหตุผลโหมดเดิม" },
+        });
+        rerender(
+            <LiffStockDecisionSheet
+                intent={{
+                    ...employeeCancelIntent,
+                    request: { ...DECISION_REQUEST, id: 72 },
+                    actorMode: "processor",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByRole("heading", { name: "ยืนยันไม่ดำเนินการ" }))
+            .toBeInTheDocument();
+        expect(screen.getByLabelText("เหตุผล (ถ้ามี)"))
+            .toHaveValue("");
+
+        rerender(
+            <LiffStockDecisionSheet
+                intent={null}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.queryByLabelText("เหตุผล (ถ้ามี)"))
+            .not.toBeInTheDocument();
+        rerender(
+            <LiffStockDecisionSheet
+                intent={{
+                    ...employeeCancelIntent,
+                    request: { ...DECISION_REQUEST, id: 72 },
+                    actorMode: "processor",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByLabelText("เหตุผล (ถ้ามี)"))
+            .toHaveValue("");
+    });
+
+    it("keeps ISSUE reasonless and submits a trimmed Stock cancellation reason", () => {
+        const onConfirm = vi.fn();
+        const cancelIntent = {
+            action: "CANCEL" as const,
+            request: DECISION_REQUEST,
+            actorMode: "employee" as const,
+        };
+        const { rerender } = render(
+            <LiffStockDecisionSheet
+                intent={cancelIntent}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("เหตุผล (ถ้ามี)"), {
+            target: { value: "  ผู้เบิกไม่ต้องการแล้ว  " },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันยกเลิกคำขอ" }));
+        expect(onConfirm).toHaveBeenCalledWith("ผู้เบิกไม่ต้องการแล้ว");
+
+        rerender(
+            <LiffStockDecisionSheet
+                intent={{ ...cancelIntent, action: "ISSUE" }}
+                busy={false}
+                error={null}
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+            />,
+        );
+        expect(screen.queryByLabelText("เหตุผล (ถ้ามี)"))
+            .not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
+        expect(onConfirm).toHaveBeenLastCalledWith(undefined);
     });
 });

@@ -64,6 +64,7 @@ vi.mock("./api", () => ({
 }));
 
 import { LiffRoutineApp } from "./LiffRoutineApp";
+import { LiffRoutineTaskDetail as LiffRoutineTaskDetailView } from "./LiffRoutineTaskDetail";
 import type {
     LiffRoutineTaskDetail,
     LiffRoutineTaskWorkItem,
@@ -1325,6 +1326,53 @@ describe("LiffRoutineApp", () => {
             screen.queryByRole("heading", { name: "แก้ไขงาน Routine" }),
         ).not.toBeInTheDocument());
         expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1);
+    });
+
+    it("destroys delete confirmation when capability or detail session changes", async () => {
+        const props = {
+            open: true,
+            detail: DETAIL,
+            loading: false,
+            error: null,
+            deleting: false,
+            deleteError: null,
+            canUpdateTasks: true,
+            canDeleteTasks: true,
+            focusedOccurrenceId: null,
+            onOpenChange: vi.fn(),
+            onRetry: vi.fn(),
+            onEdit: vi.fn(),
+            onDelete: vi.fn(),
+        };
+        const { rerender } = render(<LiffRoutineTaskDetailView {...props} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "ลบงานนี้" }));
+        expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+
+        rerender(<LiffRoutineTaskDetailView {...props} canDeleteTasks={false} />);
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+        rerender(<LiffRoutineTaskDetailView {...props} />);
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ลบงานนี้" }));
+        expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+
+        const otherDetail = { ...DETAIL, id: 72, title: "งานที่สอง" };
+        rerender(<LiffRoutineTaskDetailView {...props} detail={otherDetail} />);
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ลบงานนี้" }));
+        expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+        expect(screen.getByText(
+            "งาน “งานที่สอง” จะถูกลบและไม่แสดงในรายการของคุณอีก การดำเนินการนี้ย้อนกลับไม่ได้",
+        )).toBeInTheDocument();
+
+        rerender(<LiffRoutineTaskDetailView {...props} open={false} detail={null} />);
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+        rerender(<LiffRoutineTaskDetailView {...props} detail={otherDetail} />);
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
 
     it("requires delete confirmation and refreshes after one successful delete", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, type ReactElement } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,23 +19,29 @@ type StockRequestCancelDialogProps = {
     onConfirm: (requestId: number, cancelReason?: string) => Promise<void>;
 };
 
-export function StockRequestCancelDialog({
+type StockRequestCancelSessionProps = Omit<StockRequestCancelDialogProps, "request"> & {
+    request: StockRequest;
+};
+
+export function StockRequestCancelDialog({ request, ...props }: StockRequestCancelDialogProps): ReactElement | null {
+    if (!request) return null;
+
+    return (
+        <StockRequestCancelSession
+            key={request.id}
+            request={request}
+            {...props}
+        />
+    );
+}
+
+function StockRequestCancelSession({
     request,
     loading,
     onClose,
     onConfirm,
-}: StockRequestCancelDialogProps) {
+}: StockRequestCancelSessionProps): ReactElement {
     const [reason, setReason] = useState("");
-
-    useEffect(() => {
-        if (!request) {
-            setReason("");
-        }
-    }, [request]);
-
-    if (!request) {
-        return null;
-    }
 
     return (
         <Dialog

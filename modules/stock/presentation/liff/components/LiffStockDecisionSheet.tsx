@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, PackageCheck, ShieldAlert } from "lucide-react";
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,20 +32,30 @@ interface LiffStockDecisionSheetProps {
     onConfirm: (reason?: string) => void;
 }
 
-export function LiffStockDecisionSheet({
+type LiffStockDecisionSessionProps = Omit<LiffStockDecisionSheetProps, "intent"> & {
+    intent: LiffStockDecisionIntent;
+};
+
+export function LiffStockDecisionSheet({ intent, ...props }: LiffStockDecisionSheetProps): ReactElement | null {
+    if (!intent) return null;
+
+    return (
+        <LiffStockDecisionSession
+            key={`${intent.request.id}:${intent.action}:${intent.actorMode}`}
+            intent={intent}
+            {...props}
+        />
+    );
+}
+
+function LiffStockDecisionSession({
     intent,
     busy,
     error,
     onOpenChange,
     onConfirm,
-}: LiffStockDecisionSheetProps): ReactElement | null {
+}: LiffStockDecisionSessionProps): ReactElement {
     const [reason, setReason] = useState("");
-
-    useEffect(() => {
-        if (intent) setReason("");
-    }, [intent]);
-
-    if (!intent) return null;
 
     const issuing = intent.action === "ISSUE";
     const processorCancellation = intent.actorMode === "processor" && !issuing;

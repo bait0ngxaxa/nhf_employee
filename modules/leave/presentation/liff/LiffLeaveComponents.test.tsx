@@ -193,7 +193,96 @@ describe("LIFF Leave mobile components", () => {
                 onConfirm={onConfirm}
             />,
         );
+        expect(screen.getByPlaceholderText("ระบุเหตุผลให้พนักงานทราบ"))
+            .toHaveValue("ไม่");
         expect(screen.getByRole("button", { name: "กำลังดำเนินการ…" })).toBeDisabled();
+    });
+
+    it("resets the reason when the leave decision session changes or closes", () => {
+        const onOpenChange = vi.fn();
+        const { rerender } = render(
+            <LiffLeaveDecisionSheet
+                intent={{
+                    requestId: "leave_1",
+                    action: "REJECT",
+                    title: "ลาป่วย",
+                    summary: "1 ก.ย. 2569",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={onOpenChange}
+                onConfirm={vi.fn()}
+            />,
+        );
+
+        fireEvent.change(screen.getByPlaceholderText("ระบุเหตุผลให้พนักงานทราบ"), {
+            target: { value: "เหตุผลเดิม" },
+        });
+
+        rerender(
+            <LiffLeaveDecisionSheet
+                intent={{
+                    requestId: "leave_1",
+                    action: "REQUEST_CANCELLATION",
+                    title: "ลาป่วย",
+                    summary: "1 ก.ย. 2569",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={onOpenChange}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByPlaceholderText("ระบุเหตุผลที่ต้องการยกเลิก"))
+            .toHaveValue("");
+
+        fireEvent.change(screen.getByPlaceholderText("ระบุเหตุผลที่ต้องการยกเลิก"), {
+            target: { value: "เหตุผลคำขอใหม่" },
+        });
+        rerender(
+            <LiffLeaveDecisionSheet
+                intent={{
+                    requestId: "leave_2",
+                    action: "REQUEST_CANCELLATION",
+                    title: "ลากิจ",
+                    summary: "2 ก.ย. 2569",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={onOpenChange}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByPlaceholderText("ระบุเหตุผลที่ต้องการยกเลิก"))
+            .toHaveValue("");
+
+        fireEvent.click(screen.getByRole("button", { name: "กลับ" }));
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        rerender(
+            <LiffLeaveDecisionSheet
+                intent={null}
+                busy={false}
+                error={null}
+                onOpenChange={onOpenChange}
+                onConfirm={vi.fn()}
+            />,
+        );
+        rerender(
+            <LiffLeaveDecisionSheet
+                intent={{
+                    requestId: "leave_2",
+                    action: "REQUEST_CANCELLATION",
+                    title: "ลากิจ",
+                    summary: "2 ก.ย. 2569",
+                }}
+                busy={false}
+                error={null}
+                onOpenChange={onOpenChange}
+                onConfirm={vi.fn()}
+            />,
+        );
+        expect(screen.getByPlaceholderText("ระบุเหตุผลที่ต้องการยกเลิก"))
+            .toHaveValue("");
     });
 
     it("validates an optional cancellation request reason only when provided", () => {

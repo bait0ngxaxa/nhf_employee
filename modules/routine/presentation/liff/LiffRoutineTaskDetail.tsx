@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactElement, type ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import { CalendarClock, Loader2, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -109,6 +109,56 @@ function OptionalSection({
     );
 }
 
+function LiffRoutineDeleteSession({
+    task,
+    busy,
+    error,
+    showTrigger,
+    onDelete,
+    children,
+}: {
+    task: LiffRoutineTaskDetailData;
+    busy: boolean;
+    error: string | null;
+    showTrigger: boolean;
+    onDelete: (task: LiffRoutineTaskDetailData) => void;
+    children?: ReactNode;
+}): ReactElement {
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+    return (
+        <>
+            {showTrigger || children ? (
+                <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
+                    <div className="mx-auto grid max-w-2xl gap-2">
+                        {children}
+                        {showTrigger ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="min-h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface"
+                                onClick={() => setDeleteConfirmOpen(true)}
+                                disabled={busy}
+                            >
+                                <Trash2 className="size-4" aria-hidden="true" />
+                                ลบงานนี้
+                            </Button>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
+            <LiffRoutineDeleteConfirm
+                open={deleteConfirmOpen}
+                taskTitle={task.title}
+                busy={busy}
+                error={error}
+                onOpenChange={setDeleteConfirmOpen}
+                onConfirm={() => onDelete(task)}
+            />
+        </>
+    );
+}
+
 export function LiffRoutineTaskDetail({
     open,
     detail,
@@ -124,14 +174,9 @@ export function LiffRoutineTaskDetail({
     onEdit,
     onDelete,
 }: LiffRoutineTaskDetailProps): ReactElement {
-    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const canEdit = canUpdateTasks && detail?.canEdit === true;
     const canDelete = canDeleteTasks && detail?.canDelete === true;
     const timing = detail ? currentOccurrence(detail, focusedOccurrenceId) : null;
-
-    useEffect(() => {
-        setDeleteConfirmOpen(false);
-    }, [canDelete, detail?.id]);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -337,54 +382,41 @@ export function LiffRoutineTaskDetail({
                     </div>
                 </SheetScrollArea>
 
-                {(canEdit || canDelete) && !loading && !error ? (
-                    <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
-                        <div className="mx-auto grid max-w-2xl gap-2">
-                            {canEdit ? (
-                                <Button
-                                    type="button"
-                                    className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
-                                    onClick={() => {
-                                        if (canEdit) onEdit(detail);
-                                    }}
-                                    disabled={deleting}
-                                >
-                                    <Pencil className="size-4" aria-hidden="true" />
-                                    แก้ไขงาน
-                                </Button>
-                            ) : null}
-                            {canDelete ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="min-h-11 border-status-danger-border text-status-danger-foreground hover:bg-status-danger-surface"
-                                    onClick={() => {
-                                        if (canDelete) setDeleteConfirmOpen(true);
-                                    }}
-                                    disabled={deleting}
-                                >
-                                    <Trash2 className="size-4" aria-hidden="true" />
-                                    ลบงานนี้
-                                </Button>
-                            ) : null}
-                        </div>
-                    </div>
-                ) : null}
-
-                {detail ? (
-                    <LiffRoutineDeleteConfirm
-                        open={canDelete && deleteConfirmOpen}
-                        taskTitle={detail.title}
+                {canDelete && detail ? (
+                    <LiffRoutineDeleteSession
+                        key={detail.id}
+                        task={detail}
                         busy={deleting}
                         error={deleteError}
-                        onOpenChange={(nextOpen) => {
-                            if (nextOpen && !canDelete) return;
-                            setDeleteConfirmOpen(nextOpen);
-                        }}
-                        onConfirm={() => {
-                            if (canDelete) onDelete(detail);
-                        }}
-                    />
+                        showTrigger={!loading && !error}
+                        onDelete={onDelete}
+                    >
+                        {canEdit && !loading && !error ? (
+                            <Button
+                                type="button"
+                                className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
+                                onClick={() => onEdit(detail)}
+                                disabled={deleting}
+                            >
+                                <Pencil className="size-4" aria-hidden="true" />
+                                แก้ไขงาน
+                            </Button>
+                        ) : null}
+                    </LiffRoutineDeleteSession>
+                ) : canEdit && !loading && !error ? (
+                    <div className="shrink-0 border-t border-border-subtle bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6">
+                        <div className="mx-auto grid max-w-2xl gap-2">
+                            <Button
+                                type="button"
+                                className="min-h-12 bg-brand-solid font-bold text-content-on-brand hover:bg-brand-solid-hover"
+                                onClick={() => onEdit(detail)}
+                                disabled={deleting}
+                            >
+                                <Pencil className="size-4" aria-hidden="true" />
+                                แก้ไขงาน
+                            </Button>
+                        </div>
+                    </div>
                 ) : null}
             </SheetContent>
         </Sheet>

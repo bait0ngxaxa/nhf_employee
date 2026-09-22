@@ -477,3 +477,36 @@ The final policy remains global rule ON.
 ```text
 docs/architecture/react-effect-state-migration-roadmap.md
 ```
+
+## Phase L5B Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว:
+
+- `SSE-022` — Leave decision reason session
+- `SSE-038` — Routine delete confirmation session
+- `SSE-045` — Dashboard Stock cancellation reason session
+- `SSE-057` — LIFF Stock decision reason session
+
+Baseline ก่อน L5B: **58** diagnostics
+Baseline หลัง L5B: **54** diagnostics
+Reduction: **4**
+
+รูปแบบสถาปัตยกรรมที่ใช้คือ conditional session subtree ที่มี state transient เป็นเจ้าของภายใน และใช้ key จาก session identity จริง: `requestId + action` สำหรับ Leave, `detail.id` ภายใต้ `canDelete && detail` สำหรับ Routine, `request.id` สำหรับ Dashboard Stock และ `request.id + action + actorMode` สำหรับ LIFF Stock การปิด session ทำให้ subtree unmount; การ rerender ของ session เดิมจึงไม่ล้างค่าที่ผู้ใช้กรอก
+
+Focused verification ที่ผ่าน:
+
+- `npm.cmd run test:run -- modules/leave/presentation/liff/LiffLeaveComponents.test.tsx` — 11 tests ผ่าน
+- `npm.cmd run test:run -- modules/routine/presentation/liff/LiffRoutine.test.tsx` — 39 tests ผ่าน
+- `npm.cmd run test:run -- modules/stock/__tests__/liff-components.test.tsx modules/stock/presentation/dashboard/components/StockRequestCancelDialog.test.tsx` — 6 tests ผ่าน
+- targeted `react-hooks/set-state-in-effect:error` check ของ source ที่แก้ — 0 diagnostics
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- explicit repository-wide rule inventory ด้วย `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json` — **54 diagnostics**; 4 ไฟล์ L5B มี 0 diagnostics
+
+ไม่มี deviation ด้าน business rule, API, schema, authorization หรือ lint policy และไม่ได้แก้ L5C–L5K. เป้าหมายสุดท้ายยังคงเป็น:
+
+```text
+react-hooks/set-state-in-effect = globally enabled
+```

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -122,7 +122,19 @@ function getReasonValidationMessage(
     return null;
 }
 
-export function LiffLeaveDecisionSheet({
+export function LiffLeaveDecisionSheet({ intent, ...props }: LiffLeaveDecisionSheetProps): ReactElement | null {
+    if (!intent) return null;
+
+    return (
+        <LiffLeaveDecisionSession
+            key={`${intent.requestId}:${intent.action}`}
+            intent={intent}
+            {...props}
+        />
+    );
+}
+
+function LiffLeaveDecisionSession({
     intent,
     busy,
     error,
@@ -131,10 +143,6 @@ export function LiffLeaveDecisionSheet({
 }: LiffLeaveDecisionSheetProps): ReactElement {
     const [reason, setReason] = useState("");
     const content = intent ? ACTION_CONTENT[intent.action] : null;
-
-    useEffect(() => {
-        if (intent) setReason("");
-    }, [intent]);
 
     const reasonValidationMessage = getReasonValidationMessage(
         content?.reasonRule ?? "NONE",
