@@ -658,3 +658,26 @@ Scope audit: ไม่แตะ L5F (`SSE-028`, `SSE-039`), hydration, external-
 ```text
 react-hooks/set-state-in-effect = globally enabled
 ```
+
+## Phase L5F Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-028`, `SSE-039`
+
+รูปแบบ ownership ที่ใช้:
+
+- `SSE-028` — `LiffRoutineTaskForm` เป็นเจ้าของ `contractOpen` โดยเริ่มจาก contract data ของ edit/session, เปิดจาก user contract-field transition, local/server validation result และ explicit `applyLatestTask()`; `RoutineScheduleFields` รับค่า disclosure แบบ controlled และส่งต่อเฉพาะ user toggle จึงไม่ synchronize จาก data/error ระหว่าง rerender
+- `SSE-039` — `LiffRoutineTaskForm` เป็นเจ้าของ `extraDetailsOpen` โดยเริ่มจาก `extraDetails` ของ session, เปิดจาก local/server field-error result และ explicit latest-task application; field editing และ `<details>` toggle ไม่ derive openness จากค่าฟอร์มอย่างต่อเนื่อง
+
+คง invariants ของ disclosure ไว้ครบถ้วน: auto-open เป็น one-shot transition, ผู้ใช้ยุบ section ได้และ rerender ด้วย data/error เดิมไม่เปิดกลับ, validation submit ครั้งใหม่เปิดได้อีกครั้ง, initial edit data ยังคงเปิด และ `focusFirstRoutineInvalidField(...)` ทำงานหลังเปิด disclosure เพื่อให้ field ที่ผิดมองเห็นและโฟกัสได้
+
+Focused verification ที่ผ่าน:
+
+- `npm.cmd run test:run -- modules/routine/presentation/dashboard/RoutineTaskForm.test.tsx modules/routine/presentation/liff/LiffRoutine.test.tsx` — 2 files, **53 tests ผ่าน**
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `git diff --check` — ผ่าน
+- explicit inventory ด้วย `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json` — **26 → 24 diagnostics**; `SSE-028` และ `SSE-039` ไม่เหลือ diagnostic และไม่มี diagnostic ของ rule ใน changed production/test files
+
+ไม่มีการแก้ schema, API contract, database, authorization, hydration, pagination, URL, async bootstrap หรือการใช้ lint suppression/timing workaround และ **ไม่ได้เริ่ม L5G**

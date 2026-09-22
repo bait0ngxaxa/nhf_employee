@@ -110,6 +110,20 @@ interface TaskFormState {
     reminderRules: RoutineReminderRuleForm[];
 }
 
+function hasContractData(
+    form: Pick<TaskFormState, "contractStartDate" | "contractEndDate" | "contractText">,
+): boolean {
+    return Boolean(form.contractStartDate || form.contractEndDate || form.contractText);
+}
+
+function hasContractError(errors: Record<string, string>): boolean {
+    return Boolean(
+        errors.contractStartDate
+        || errors.contractEndDate
+        || errors.contractText,
+    );
+}
+
 const STALE_CONFLICT_MESSAGE =
     "งาน Routine นี้ถูกเปลี่ยนแปลงแล้ว ระบบโหลดข้อมูลล่าสุดให้แล้ว กรุณาตรวจสอบก่อนบันทึกอีกครั้ง";
 
@@ -253,11 +267,12 @@ export const LiffRoutineTaskForm = forwardRef<
     const canSubmit = mode === "CREATE"
         ? canCreateTasks
         : canUpdateTasks && task?.canEdit === true;
+    const initialForm = taskToForm(formTask);
     const units = useMemo(
         () => uniqueRoutineUnits(reference.units),
         [reference.units],
     );
-    const [form, setForm] = useState<TaskFormState>(() => taskToForm(formTask));
+    const [form, setForm] = useState<TaskFormState>(() => initialForm);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isReloadingLatest, setIsReloadingLatest] = useState(false);
     const [reminderPreset, setReminderPreset] = useState<RoutineReminderPreset | "">("");
@@ -266,8 +281,9 @@ export const LiffRoutineTaskForm = forwardRef<
     const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
     const [hasConflict, setHasConflict] = useState(false);
     const [latestConflictTask, setLatestConflictTask] = useState<LiffRoutineTaskDetail | null>(null);
-    const [extraDetailsOpen, setExtraDetailsOpen] = useState(Boolean(form.extraDetails));
-    const initialSnapshotRef = useRef(routineFormSnapshot(taskToForm(formTask)));
+    const [contractOpen, setContractOpen] = useState(() => hasContractData(initialForm));
+    const [extraDetailsOpen, setExtraDetailsOpen] = useState(Boolean(initialForm.extraDetails));
+    const initialSnapshotRef = useRef(routineFormSnapshot(initialForm));
     const versionRef = useRef<number | null>(formTask?.version ?? null);
     const canSubmitRef = useRef(canSubmit);
 
@@ -276,9 +292,6 @@ export const LiffRoutineTaskForm = forwardRef<
         if (!canSubmit && !isSubmitting) onCancel();
     }, [canSubmit, isSubmitting, onCancel]);
 
-    useEffect(() => {
-        if (form.extraDetails || fieldErrors.extraDetails) setExtraDetailsOpen(true);
-    }, [fieldErrors.extraDetails, form.extraDetails]);
     const submitLockRef = useRef(false);
     const createIdempotencyKeyRef = useRef<string | null>(null);
 
@@ -308,6 +321,19 @@ export const LiffRoutineTaskForm = forwardRef<
     ): void => {
         setForm((current) => ({ ...current, [key]: value }));
     }, []);
+
+    const updateContractField = useCallback((
+        key: "contractStartDate" | "contractEndDate" | "contractText",
+        value: string,
+    ): void => {
+        updateField(key, value);
+        if (value) setContractOpen(true);
+    }, [updateField]);
+
+    function openDisclosureForErrors(nextErrors: Record<string, string>): void {
+        if (hasContractError(nextErrors)) setContractOpen(true);
+        if (nextErrors.extraDetails) setExtraDetailsOpen(true);
+    }
 
     const addReminderRule = useCallback((daysBefore = 1): void => {
         setReminderPreset("");
@@ -390,6 +416,8 @@ export const LiffRoutineTaskForm = forwardRef<
         if (!latestConflictTask) return;
         const nextForm = taskToForm(latestConflictTask);
         setForm(nextForm);
+        if (hasContractData(nextForm)) setContractOpen(true);
+        if (nextForm.extraDetails) setExtraDetailsOpen(true);
         versionRef.current = latestConflictTask.version;
         initialSnapshotRef.current = routineFormSnapshot(nextForm);
         setLatestConflictTask(null);
@@ -443,6 +471,7 @@ export const LiffRoutineTaskForm = forwardRef<
             );
             setFieldErrors(nextErrors);
             setError("กรุณาตรวจสอบข้อมูลในช่องที่มีเครื่องหมายเตือน");
+            openDisclosureForErrors(nextErrors);
             focusFirstRoutineInvalidField(nextErrors);
             submitLockRef.current = false;
             return;
@@ -468,6 +497,7 @@ export const LiffRoutineTaskForm = forwardRef<
             const serverErrors = getErrorFieldMessages(submitError);
             if (Object.keys(serverErrors).length > 0) {
                 setFieldErrors(serverErrors);
+                openDisclosureForErrors(serverErrors);
                 focusFirstRoutineInvalidField(serverErrors);
             }
 
@@ -693,13 +723,15 @@ export const LiffRoutineTaskForm = forwardRef<
                         onScheduleTypeChange={(value) => updateField("scheduleType", value)}
                         onScheduleConfigChange={(value) => updateField("scheduleConfig", value)}
                         onBusinessDayPolicyChange={(value) => updateField("businessDayPolicy", value)}
-                        onContractStartDateChange={(value) => updateField("contractStartDate", value)}
-                        onContractEndDateChange={(value) => updateField("contractEndDate", value)}
-                        onContractTextChange={(value) => updateField("contractText", value)}
+                        onContractStartDateChange={(value) => updateContractField("contractStartDate", value)}
+                        onContractEndDateChange={(value) => updateContractField("contractEndDate", value)}
+                        onContractTextChange={(value) => updateContractField("contractText", value)}
                         errors={fieldErrors}
                         disabled={controlsDisabled}
                         allowManual
                         collapsibleContract
+                        contractOpen={contractOpen}
+                        onContractOpenChange={setContractOpen}
                         variant="embedded"
                     />
 

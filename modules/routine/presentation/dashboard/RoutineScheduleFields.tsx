@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type ReactElement } from "react";
+import {
+    useState,
+    type ChangeEvent,
+    type ReactElement,
+    type SyntheticEvent,
+} from "react";
 
 import {
     ROUTINE_BUSINESS_DAY_POLICIES,
@@ -34,6 +39,8 @@ interface RoutineScheduleFieldsProps {
     disabled?: boolean;
     allowManual?: boolean;
     collapsibleContract?: boolean;
+    contractOpen?: boolean;
+    onContractOpenChange?: (open: boolean) => void;
     variant?: "default" | "embedded";
 }
 
@@ -78,6 +85,8 @@ export function RoutineScheduleFields({
     disabled = false,
     allowManual = true,
     collapsibleContract = false,
+    contractOpen,
+    onContractOpenChange,
     variant = "default",
 }: RoutineScheduleFieldsProps): ReactElement {
     function updateNumber(
@@ -143,11 +152,15 @@ export function RoutineScheduleFields({
         || contractError("contractEndDate")
         || contractError("contractText"),
     );
-    const [contractOpen, setContractOpen] = useState(hasContractData || hasContractErrors);
+    const [internalContractOpen, setInternalContractOpen] = useState(
+        hasContractData || hasContractErrors,
+    );
 
-    useEffect(() => {
-        if (hasContractData || hasContractErrors) setContractOpen(true);
-    }, [hasContractData, hasContractErrors]);
+    function handleContractToggle(event: SyntheticEvent<HTMLDetailsElement>): void {
+        const nextOpen = event.currentTarget.open;
+        setInternalContractOpen(nextOpen);
+        onContractOpenChange?.(nextOpen);
+    }
 
     const contractBody = (
         <>
@@ -290,8 +303,8 @@ export function RoutineScheduleFields({
             {collapsibleContract ? (
                 <details
                     className="border-t border-border-subtle pt-3"
-                    open={contractOpen}
-                    onToggle={(event) => setContractOpen(event.currentTarget.open)}
+                    open={contractOpen ?? internalContractOpen}
+                    onToggle={handleContractToggle}
                 >
                     <summary className="cursor-pointer text-base font-semibold text-content-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40">
                         ช่วงสัญญา

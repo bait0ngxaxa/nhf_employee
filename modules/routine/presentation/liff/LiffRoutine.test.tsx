@@ -6,17 +6,20 @@ const mocks = vi.hoisted(() => {
         readonly status: number | undefined;
         readonly sessionRecovered: boolean;
         readonly unauthorizedRecovery: { recovered: boolean; replayed: boolean } | undefined;
+        readonly details: unknown;
 
         constructor(
             message: string,
             status?: number,
             unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
+            details?: unknown,
         ) {
             super(message);
             this.name = "LiffApiError";
             this.status = status;
             this.sessionRecovered = unauthorizedRecovery?.recovered === true;
             this.unauthorizedRecovery = unauthorizedRecovery;
+            this.details = details;
         }
     }
 
@@ -64,6 +67,7 @@ vi.mock("./api", () => ({
 }));
 
 import { LiffRoutineApp } from "./LiffRoutineApp";
+import { LiffRoutineTaskForm } from "./LiffRoutineTaskForm";
 import { LiffRoutineTaskDetail as LiffRoutineTaskDetailView } from "./LiffRoutineTaskDetail";
 import type {
     LiffRoutineTaskDetail,
@@ -238,6 +242,38 @@ function tasksResponse(
             pages,
         },
     };
+}
+
+function getDetailsBySummary(label: string): HTMLDetailsElement {
+    const summary = Array.from(document.querySelectorAll("summary"))
+        .find((element) => element.textContent?.includes(label));
+    if (!(summary?.parentElement instanceof HTMLDetailsElement)) {
+        throw new Error(`Expected a details disclosure for ${label}`);
+    }
+    return summary.parentElement;
+}
+
+function toggleDetails(details: HTMLDetailsElement): void {
+    const summary = details.querySelector("summary");
+    if (!(summary instanceof HTMLElement)) {
+        throw new Error("Expected the disclosure to have a summary");
+    }
+    fireEvent.click(summary);
+}
+
+function renderLiffTaskForm(task: LiffRoutineTaskDetail | null = null) {
+    const mode = task ? "EDIT" as const : "CREATE" as const;
+    return render(
+        <LiffRoutineTaskForm
+            mode={mode}
+            canCreateTasks
+            canUpdateTasks
+            reference={REFERENCE}
+            task={task}
+            onCancel={vi.fn()}
+            onSaved={vi.fn()}
+        />,
+    );
 }
 
 describe("LiffRoutineApp", () => {
@@ -752,6 +788,97 @@ describe("LiffRoutineApp", () => {
         expect(payload).not.toHaveProperty("sourceSheet");
         expect(payload).not.toHaveProperty("sourceRow");
         expect(mocks.fetchLiffRoutineReference).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens the contract disclosure for data and a new validation event without overriding collapse", async () => {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+            configurable: true,
+            value: vi.fn(),
+        });
+
+        renderLiffTaskForm();
+
+        const contractDetails = getDetailsBySummary("ช่วงสัญญา");
+        expect(contractDetails).not.toHaveProperty("open", true);
+
+        fireEvent.change(screen.getByLabelText("วันเริ่มสัญญา"), {
+            target: { value: "2026-12-31" },
+        });
+        expect(contractDetails).toHaveProperty("open", true);
+
+        const contractStartDate = screen.getByLabelText("วันเริ่มสัญญา");
+        const contractEndDate = screen.getByLabelText("วันสิ้นสุดสัญญา");
+        fireEvent.change(contractEndDate, { target: { value: "2026-01-01" } });
+        toggleDetails(contractDetails);
+        await waitFor(() => expect(contractDetails).toHaveProperty("open", false));
+
+        fireEvent.change(screen.getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "งานที่มีช่วงสัญญาไม่ถูกต้อง" },
+        });
+        expect(contractDetails).toHaveProperty("open", false);
+
+        fireEvent.change(screen.getByRole("combobox", { name: "หน่วยงาน" }), {
+            target: { value: "1" },
+        });
+        fireEvent.change(screen.getByRole("combobox", { name: "หมวดหมู่" }), {
+            target: { value: "2" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
+
+        await waitFor(() => {
+            expect(screen.getByText("วันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญา")).toBeInTheDocument();
+        });
+        expect(contractDetails).toHaveProperty("open", true);
+        await waitFor(() => expect(contractEndDate).toHaveFocus());
+        expect(contractStartDate).toHaveValue("2026-12-31");
+    });
+
+    it("keeps initial contract and extra-details disclosures open for an edit session", () => {
+        renderLiffTaskForm(DETAIL);
+
+        expect(getDetailsBySummary("ช่วงสัญญา")).toHaveProperty("open", true);
+        expect(getDetailsBySummary("รายละเอียดเพิ่มเติม")).toHaveProperty("open", true);
+    });
+
+    it("opens extra details for a server validation event, then allows collapse until the next submit", async () => {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+            configurable: true,
+            value: vi.fn(),
+        });
+        mocks.updateLiffRoutineTask.mockRejectedValue(
+            new mocks.MockLiffApiError(
+                "ข้อมูลรายละเอียดเพิ่มเติมไม่ถูกต้อง",
+                422,
+                undefined,
+                { extraDetails: ["กรุณาตรวจสอบรายละเอียดเพิ่มเติม"] },
+            ),
+        );
+
+        renderLiffTaskForm(DETAIL);
+
+        const extraDetails = getDetailsBySummary("รายละเอียดเพิ่มเติม");
+        expect(extraDetails).toHaveProperty("open", true);
+        toggleDetails(extraDetails);
+        await waitFor(() => expect(extraDetails).toHaveProperty("open", false));
+
+        fireEvent.change(screen.getByRole("textbox", { name: "ชื่องาน" }), {
+            target: { value: "แก้ไขโดยยังคงปิดรายละเอียดเพิ่มเติม" },
+        });
+        expect(extraDetails).toHaveProperty("open", false);
+
+        const submit = screen.getByRole("button", { name: "บันทึกการแก้ไข" });
+        fireEvent.click(submit);
+        await waitFor(() => {
+            expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(1);
+            expect(screen.getByText("กรุณาตรวจสอบรายละเอียดเพิ่มเติม")).toBeInTheDocument();
+        });
+        expect(extraDetails).toHaveProperty("open", true);
+
+        toggleDetails(extraDetails);
+        expect(extraDetails).toHaveProperty("open", false);
+        fireEvent.click(submit);
+        await waitFor(() => expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(2));
+        expect(extraDetails).toHaveProperty("open", true);
     });
 
     it("keeps one create idempotency key when the same logical submission is retried", async () => {
