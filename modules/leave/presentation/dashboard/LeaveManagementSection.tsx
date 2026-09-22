@@ -32,7 +32,6 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
     });
 
     const [activeTab, setActiveTab] = useState(defaultTab);
-    const [isMounted, setIsMounted] = useState(false);
 
     // Ensure the tab changes if the user clicks a deep link while already on this page
     useEffect(() => {
@@ -40,10 +39,6 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
             setActiveTab(defaultTab);
         }
     }, [defaultTab]);
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
 
     const tabs = getLeaveTabs({
         leaveCapabilities,
@@ -62,7 +57,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
                 title="NHF Leave"
                 subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"
             />
-            {isMounted && hasTabs ? (
+            {hasTabs ? (
                 <SectionTabs
                     value={safeActiveTab}
                     onValueChange={setActiveTab}
@@ -71,7 +66,7 @@ export function LeaveManagementSection({ defaultTab = "my-leave" }: LeaveManagem
                     ariaLabel="แท็บระบบลางาน"
                 />
             ) : (
-                <EmployeeLeaveDashboard leaveCapabilities={leaveCapabilities} />
+                null
             )}
         </SectionShell>
     );

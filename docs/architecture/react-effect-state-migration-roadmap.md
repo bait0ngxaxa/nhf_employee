@@ -681,3 +681,42 @@ Focused verification ที่ผ่าน:
 - explicit inventory ด้วย `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json` — **26 → 24 diagnostics**; `SSE-028` และ `SSE-039` ไม่เหลือ diagnostic และไม่มี diagnostic ของ rule ใน changed production/test files
 
 ไม่มีการแก้ schema, API contract, database, authorization, hydration, pagination, URL, async bootstrap หรือการใช้ lint suppression/timing workaround และ **ไม่ได้เริ่ม L5G**
+
+## Phase L5G Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-002`, `SSE-004`, `SSE-019`
+
+รูปแบบ ownership ที่ใช้:
+
+- `SSE-002` — greeting ที่ขึ้นกับ wall clock ถูกย้ายไปยัง client-only `next/dynamic({ ssr: false })` boundary โดยใช้ `สวัสดี` เป็น fallback ที่ deterministic; client-ready component ใช้ classifier เดิมครบ 4 ช่วงเวลาใน `Asia/Bangkok` และไม่ใช้ lazy state หรือ effect เพื่อเลือก greeting
+- `SSE-004` — `ThemeSelector` แยก deterministic fallback ที่มี `value=""`, radio ทั้งหมด disabled และไม่มี mutation handler ออกจาก client-only content ที่อ่าน `useTheme()`; ค่าที่ไม่ใช่ `system`/`light`/`dark` ไม่ถูกทำเป็น checked state และการเปลี่ยน theme ยังเรียก `setTheme()` ด้วยค่าที่ validate แล้ว
+- `SSE-019` — ลบ `isMounted` readiness state/effect และ render capability-filtered `SectionTabs` ตั้งแต่ server/initial client render เพราะ `SectionTabs`/Radix Tabs ที่ติดตั้งสร้างโครงสร้างจาก props และอ่าน `matchMedia` เฉพาะใน effect; fallback `EmployeeLeaveDashboard` ไม่ถูกใช้เพื่อหลบ hydration อีกต่อไป และกรณีไม่มี visible tab จะ fail closed ด้วย `null`
+
+Mount gate ของ Leave ถูก **ลบออก** ไม่ได้แทนด้วย mounted helper หรือ timing workaround: server และ initial client ใช้ `tabs`, `safeActiveTab` และ capability projection ชุดเดียวกัน จึงไม่ต้อง mount dashboard ชั่วคราวแล้วทิ้งเพื่อแสดง tabs และไม่สร้าง child dashboard ซ้ำโดยไม่จำเป็น
+
+Invariants ที่ทดสอบ:
+
+- Dashboard server markup และ initial hydration ใช้ greeting fallback เดียวกันโดยไม่มี hydration mismatch; client-ready render เปลี่ยนเป็น greeting ตามเวลาประเทศไทย และ boundary `04:59`, `05:00`, `11:59`, `12:00`, `16:59`, `17:00`, `21:59`, `22:00` ยังถูกต้อง
+- Theme fallback ไม่มี checked theme และกดแล้วไม่ mutate `next-themes`; เมื่อพร้อมแล้ว `light`, `dark`, `system` ทำงานครบ และค่า undefined/invalid ไม่สร้าง selection ปลอม
+- Leave server markup และ initial client markup มี capability-filtered tab structure ตรงกัน; ครอบคลุมพนักงานปกติ, หลาย tabs, กรณีไม่มี `my-leave` แต่มี tab อื่น และ active/default tab ที่มองเห็นได้
+- `html suppressHydrationWarning` เดิมใน `app/layout.tsx` คงอยู่ และไม่มี local `suppressHydrationWarning` เพิ่ม
+
+Focused verification ที่ผ่าน:
+
+- `npm.cmd run test:run -- __tests__/components/DashboardHomeSection.test.tsx __tests__/components/ThemeSelector.test.tsx modules/leave/presentation/dashboard/LeaveManagementSection.test.tsx` — **3 files, 29 tests ผ่าน**
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `git diff --check` — ผ่าน
+- `architecture:check` — ไม่รัน เพราะไม่มีการเปลี่ยน module/import boundary หรือ shared cross-layer hydration utility
+- ไม่รัน `npm run build` และไม่รัน full repository suite เพราะ focused hydration tests, lint และ typecheck เพียงพอกับขอบเขต L5G
+
+Repository-wide explicit inventory:
+
+```text
+npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json
+→ 24 -> 21 diagnostics
+```
+
+`SSE-002`, `SSE-004` และ `SSE-019` ไม่เหลือ diagnostic; `SSE-018` ยังเหลือโดยตั้งใจและถูก deferred ไป L5J. ไม่ได้แก้ findings อื่นแบบ opportunistic และ **ไม่ได้เริ่ม L5H หรือ phase ถัดไป**

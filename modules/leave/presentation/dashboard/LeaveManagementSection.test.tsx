@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LeaveManagementSection } from "./LeaveManagementSection";
@@ -12,11 +14,20 @@ vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
 
 vi.mock("@/components/ui/section-tabs", () => ({
     SectionTabs: ({
+        value,
         tabs,
     }: {
+        value: string;
         tabs: Array<{ value: string; label: string; visible?: boolean; content: ReactNode }>;
     }) => (
-        <div data-testid="leave-tabs">
+        <div
+            data-testid="leave-tabs"
+            data-active-tab={value}
+            data-visible-tabs={tabs
+                .filter((tab) => tab.visible !== false)
+                .map((tab) => tab.value)
+                .join(",")}
+        >
             {tabs
                 .filter((tab) => tab.visible !== false)
                 .map((tab) => <button key={tab.value} type="button">{tab.label}</button>)}
@@ -96,6 +107,75 @@ describe("LeaveManagementSection permissions", () => {
         expect(screen.queryByRole("button", { name: "อนุมัติการลา" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "กู้คืนรายการลา" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "รีพอร์ต" })).not.toBeInTheDocument();
+    });
+
+    it("renders the capability-filtered tabs when my-leave is unavailable", () => {
+        mockDashboardUser({
+            role: "ADMIN",
+            canApproveLeave: false,
+            canViewLeaveReports: true,
+            leaveCapabilities: {
+                ...DEFAULT_LEAVE_CAPABILITIES,
+                canReadOwnRequests: false,
+                canManageRecovery: true,
+            },
+        });
+
+        render(<LeaveManagementSection defaultTab="my-leave" />);
+
+        const tabs = screen.getByTestId("leave-tabs");
+        expect(tabs).toHaveAttribute("data-active-tab", "recovery");
+        expect(tabs).toHaveAttribute("data-visible-tabs", "recovery,reports");
+        expect(screen.queryByTestId("my-leave")).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "กู้คืนรายการลา" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "รีพอร์ต" })).toBeInTheDocument();
+    });
+
+    it("keeps a visible default tab active without changing deep-link ownership", () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: true,
+            canApproveLeave: true,
+            canViewLeaveReports: true,
+        });
+
+        render(<LeaveManagementSection defaultTab="reports" />);
+
+        expect(screen.getByTestId("leave-tabs")).toHaveAttribute(
+            "data-active-tab",
+            "reports",
+        );
+    });
+
+    it("keeps the server tab structure identical during initial hydration", async () => {
+        mockDashboardUser({
+            role: "USER",
+            isManager: true,
+            canApproveLeave: true,
+            canViewLeaveReports: true,
+        });
+
+        const element = <LeaveManagementSection defaultTab="reports" />;
+        const serverMarkup = renderToString(element);
+        const container = document.createElement("div");
+        container.innerHTML = serverMarkup;
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const root = hydrateRoot(container, element);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        const hydrationErrors = consoleError.mock.calls.filter((call) =>
+            call.some((value) => /hydration|did not match/i.test(String(value))),
+        );
+        expect(hydrationErrors).toHaveLength(0);
+        expect(container.innerHTML).toBe(serverMarkup);
+        expect(container.querySelector("[data-testid='leave-tabs']"))
+            .toHaveAttribute("data-active-tab", "reports");
+
+        root.unmount();
+        consoleError.mockRestore();
     });
 
     it("shows approval and reports for an organizational manager", async () => {

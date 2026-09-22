@@ -4,7 +4,8 @@
 
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { Fragment } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 import {
@@ -13,6 +14,15 @@ import {
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { LineAddFriendCard } from "@/components/dashboard/line/LineAddFriendCard";
 import { formatTeamSummary } from "@/shared/identity/team-presentation";
+import { DashboardGreetingFallback } from "./DashboardGreeting";
+
+const ClientDashboardGreeting = dynamic(
+    () => import("./DashboardGreeting"),
+    {
+        loading: () => <DashboardGreetingFallback />,
+        ssr: false,
+    },
+);
 
 const MENU_ITEM_CONFIG: Record<
     string,
@@ -97,14 +107,6 @@ const MENU_ITEM_CONFIG: Record<
 const DEFAULT_MENU_CONFIG = {
     text: "text-content-primary",
 };
-
-function getGreeting(): string {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return "อรุณสวัสดิ์";
-    if (hour >= 12 && hour < 17) return "สวัสดียามบ่าย";
-    if (hour >= 17 && hour < 22) return "สวัสดีตอนเย็น";
-    return "ราตรีสวัสดิ์";
-}
 
 function getDisplayText(value: string | null | undefined, fallback: string): string {
     const trimmedValue = value?.trim();
@@ -271,11 +273,6 @@ function getFeaturedRank(id: string): number {
 export function DashboardHomeSection() {
     const { user, availableMenuGroups } = useDashboardDataContext();
     const { handleMenuClick } = useDashboardUIContext();
-    const [greeting, setGreeting] = useState("สวัสดี");
-
-    useEffect(() => {
-        setGreeting(getGreeting());
-    }, []);
 
     const allMenuItems = [
         ...availableMenuGroups.flatMap((group) => group.items),
@@ -330,7 +327,7 @@ export function DashboardHomeSection() {
                                 tabIndex={-1}
                                 className="max-w-[22ch] text-3xl font-bold leading-[1.12] tracking-[-0.03em] text-content-heading [overflow-wrap:anywhere] sm:text-4xl @3xl:text-[2.75rem]"
                             >
-                                <span>{greeting},</span>{" "}
+                                <span><ClientDashboardGreeting />,</span>{" "}
                                 <span className="text-brand-foreground">
                                     {primaryName}
                                 </span>
