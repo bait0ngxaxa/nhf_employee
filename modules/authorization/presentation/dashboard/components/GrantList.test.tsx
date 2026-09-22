@@ -32,6 +32,17 @@ const invalidGrant = {
     },
 } satisfies AuthorizationAdministrationGrantProjectionData;
 
+const secondGrant = {
+    ...grant,
+    capabilityKey: "employee.create",
+    capability: {
+        ...grant.capability,
+        key: "employee.create",
+        domain: "employee",
+        description: "สร้างข้อมูลพนักงาน",
+    },
+} satisfies AuthorizationAdministrationGrantProjectionData;
+
 describe("GrantList", () => {
     it("uses business removal copy and preserves the exact grant payload", async () => {
         const onRemove = vi.fn(async () => undefined);
@@ -76,5 +87,39 @@ describe("GrantList", () => {
         expect(screen.getByText("ข้อมูลสิทธิ์นี้ต้องตรวจสอบก่อนจึงจะนำไปใช้งานได้")).toBeInTheDocument();
         expect(screen.queryByText(invalidGrant.validation.reason)).not.toBeInTheDocument();
         expect(screen.queryByText("UNKNOWN_PERSISTED_CAPABILITY")).not.toBeInTheDocument();
+    });
+
+    it("keeps a failed confirmation error in-session and isolates the next target", async () => {
+        const onRemove = vi.fn(async () => {
+            throw new Error("request failed");
+        });
+        render(
+            <GrantList
+                title="สิทธิ์ของทีม"
+                description="สิทธิ์เพิ่มเติมของทีม"
+                source="TEAM"
+                grants={[grant, secondGrant]}
+                busy={false}
+                onAdd={vi.fn()}
+                onRemove={onRemove}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: /นำสิทธิ์ ดูบันทึกการใช้งานระบบ ออกจากรายการ/ }));
+        let dialog = await screen.findByRole("alertdialog");
+        fireEvent.click(within(dialog).getByRole("button", { name: "นำสิทธิ์ออก" }));
+        await vi.waitFor(() => expect(within(dialog).getByText("ดำเนินการไม่สำเร็จ")).toBeInTheDocument());
+
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยกเลิก" }));
+        await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+        fireEvent.click(screen.getByRole("button", { name: /นำสิทธิ์ ดูบันทึกการใช้งานระบบ ออกจากรายการ/ }));
+        dialog = await screen.findByRole("alertdialog");
+        expect(within(dialog).queryByText("ดำเนินการไม่สำเร็จ")).not.toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยกเลิก" }));
+        await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+
+        fireEvent.click(screen.getByRole("button", { name: /นำสิทธิ์ เพิ่มพนักงาน ออกจากรายการ/ }));
+        dialog = await screen.findByRole("alertdialog");
+        expect(within(dialog).queryByText("ดำเนินการไม่สำเร็จ")).not.toBeInTheDocument();
     });
 });

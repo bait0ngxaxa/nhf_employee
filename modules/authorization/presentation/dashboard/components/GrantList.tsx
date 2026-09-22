@@ -35,6 +35,7 @@ export function GrantList({
     readonly onRemove: (grant: AuthorizationAdministrationGrantProjectionData) => Promise<void>;
 }): React.ReactElement {
     const [removeTarget, setRemoveTarget] = useState<AuthorizationAdministrationGrantProjectionData | null>(null);
+    const [confirmationSessionId, setConfirmationSessionId] = useState(0);
     const sourceLabel = getAuthorizationSourceLabel(source);
 
     return (
@@ -57,12 +58,16 @@ export function GrantList({
                             key={`${grant.capabilityKey}:${grant.scope}`}
                             grant={grant}
                             busy={busy}
-                            onRemove={() => setRemoveTarget(grant)}
+                            onRemove={() => {
+                                setConfirmationSessionId((current) => current + 1);
+                                setRemoveTarget(grant);
+                            }}
                         />
                     ))}
                 </div>
             )}
             <ConfirmAuthorizationAction
+                sessionId={`grant-remove:${source}:${removeTarget?.capabilityKey ?? "closed"}:${removeTarget?.scope ?? "closed"}:${confirmationSessionId}`}
                 open={removeTarget !== null}
                 title="นำสิทธิ์ออกหรือไม่?"
                 description={removeTarget ? removalDescription(removeTarget, sourceLabel) : ""}

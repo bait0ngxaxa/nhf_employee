@@ -40,6 +40,41 @@ export function LeaveAttachmentViewerDialog({
     attachments,
     onOpenChange,
 }: LeaveAttachmentViewerDialogProps): React.JSX.Element | null {
+    if (!attachments[0]) {
+        return null;
+    }
+
+    const attachmentIdentity = JSON.stringify(
+        attachments.map((attachment) => [attachment.id, attachment.viewUrl]),
+    );
+    const sessionKey = `${open ? "open" : "closed"}:${attachmentIdentity}`;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent
+                forceMount
+                showCloseButton={false}
+                scrollMode="area"
+                className="flex flex-col gap-4 overflow-hidden rounded-xl p-0 sm:max-w-4xl"
+            >
+                {open ? (
+                    <LeaveAttachmentViewerSession
+                        key={sessionKey}
+                        attachments={attachments}
+                    />
+                ) : (
+                    <DialogTitle className="sr-only">ไฟล์แนบคำขอลา</DialogTitle>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function LeaveAttachmentViewerSession({
+    attachments,
+}: {
+    readonly attachments: LeaveAttachmentSummary[];
+}): React.JSX.Element | null {
     const [activeIndex, setActiveIndex] = useState(0);
     const [imageStates, setImageStates] = useState<Record<string, PrivateImageState>>({});
     const imageStatesRef = useRef<Record<string, PrivateImageState>>({});
@@ -60,17 +95,10 @@ export function LeaveAttachmentViewerDialog({
         activeLoadState === "loaded" ? activeImageState?.objectUrl : undefined;
 
     useEffect(() => {
-        if (!open) {
-            return undefined;
-        }
-
         const controller = new AbortController();
         const pendingLoads = pendingLoadsRef.current;
         const objectUrls = objectUrlsRef.current;
         loadControllerRef.current = controller;
-        pendingLoads.clear();
-        imageStatesRef.current = {};
-        setImageStates({});
 
         return () => {
             controller.abort();
@@ -84,11 +112,11 @@ export function LeaveAttachmentViewerDialog({
             objectUrls.clear();
             imageStatesRef.current = {};
         };
-    }, [attachments, open]);
+    }, []);
 
     useEffect(() => {
         const controller = loadControllerRef.current;
-        if (!open || !controller || attachmentCount === 0) {
+        if (!controller || attachmentCount === 0) {
             return;
         }
 
@@ -160,10 +188,10 @@ export function LeaveAttachmentViewerDialog({
                 }
             })();
         }
-    }, [attachmentCount, attachments, open, safeActiveIndex]);
+    }, [attachmentCount, attachments, safeActiveIndex]);
 
     useEffect(() => {
-        if (!open || attachmentCount <= 1) {
+        if (attachmentCount <= 1) {
             return undefined;
         }
 
@@ -182,7 +210,7 @@ export function LeaveAttachmentViewerDialog({
 
         document.addEventListener("keydown", handleKeyDown);
         return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [attachmentCount, open]);
+    }, [attachmentCount]);
 
     if (!activeAttachment) {
         return null;
@@ -194,31 +222,16 @@ export function LeaveAttachmentViewerDialog({
         );
     }
 
-    function handleOpenChange(nextOpen: boolean): void {
-        if (!nextOpen) {
-            loadControllerRef.current?.abort();
-            setActiveIndex(0);
-            imageStatesRef.current = {};
-            setImageStates({});
-        }
-        onOpenChange(nextOpen);
-    }
-
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent
-                showCloseButton={false}
-                scrollMode="area"
-                className="flex flex-col gap-4 overflow-hidden rounded-xl p-0 sm:max-w-4xl"
-            >
-                <DialogHeader className="border-b border-border-subtle px-5 py-4 pr-14 text-left">
-                    <DialogTitle className="text-lg/7 text-content-heading">
-                        ไฟล์แนบคำขอลา
-                    </DialogTitle>
-                    <DialogDescription className="text-sm/6 text-content-secondary">
-                        รูปที่ {safeActiveIndex + 1} จาก {attachmentCount}
-                    </DialogDescription>
-                </DialogHeader>
+        <>
+            <DialogHeader className="border-b border-border-subtle px-5 py-4 pr-14 text-left">
+                <DialogTitle className="text-lg/7 text-content-heading">
+                    ไฟล์แนบคำขอลา
+                </DialogTitle>
+                <DialogDescription className="text-sm/6 text-content-secondary">
+                    รูปที่ {safeActiveIndex + 1} จาก {attachmentCount}
+                </DialogDescription>
+            </DialogHeader>
 
                 <DialogClose asChild>
                     <Button
@@ -362,7 +375,6 @@ export function LeaveAttachmentViewerDialog({
                         )}
                     </div>
                 </div>
-            </DialogContent>
-        </Dialog>
+        </>
     );
 }

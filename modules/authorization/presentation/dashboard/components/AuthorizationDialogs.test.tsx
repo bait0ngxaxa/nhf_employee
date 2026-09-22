@@ -1,10 +1,12 @@
+import { useState, type ReactElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { GrantFormDialog, TeamFormDialog } from "./AuthorizationDialogs";
+import { AddMemberDialog, GrantFormDialog, TeamFormDialog } from "./AuthorizationDialogs";
 import type {
     AuthorizationAdministrationOverviewData,
     AuthorizationAdministrationTeamDetailData,
+    AuthorizationAdministrationUserSummaryData,
 } from "../types";
 
 const capabilities = [
@@ -61,6 +63,118 @@ const team = {
     teamRoleGrants: [],
     configurationIssues: [],
 } satisfies AuthorizationAdministrationTeamDetailData;
+
+const memberTeam = {
+    ...team,
+    roles: [{
+        id: 21,
+        teamId: 11,
+        key: "operator",
+        name: "Operator",
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+        membershipCount: 0,
+        grantCount: 0,
+    }],
+} satisfies AuthorizationAdministrationTeamDetailData;
+
+const memberUser = {
+    id: 7,
+    name: "สมชาย ใจดี",
+    email: "somchai@example.com",
+    role: "USER",
+    isActive: true,
+    deletedAt: null,
+    employee: null,
+    teams: [],
+} satisfies AuthorizationAdministrationUserSummaryData;
+
+function AddMemberSessionHarness({
+    onQueryChange,
+    onSubmit,
+}: {
+    readonly onQueryChange: (query: string) => void;
+    readonly onSubmit: (input: { readonly userId: number; readonly teamRoleId: number | null }) => Promise<void>;
+}): ReactElement {
+    const [open, setOpen] = useState(false);
+    const [sessionId, setSessionId] = useState(0);
+    const [query, setQuery] = useState("");
+    const [, setParentRender] = useState(0);
+
+    const updateQuery = (nextQuery: string): void => {
+        onQueryChange(nextQuery);
+        setQuery(nextQuery);
+    };
+    const close = (): void => {
+        updateQuery("");
+        setOpen(false);
+    };
+
+    return (
+        <>
+            <button type="button" onClick={() => { updateQuery(""); setSessionId((current) => current + 1); setOpen(true); }}>
+                เปิด Add Member
+            </button>
+            <button type="button" onClick={() => setParentRender((current) => current + 1)}>
+                parent rerender
+            </button>
+            <button type="button" onClick={close}>ปิด Add Member</button>
+            <AddMemberDialog
+                key={sessionId}
+                open={open}
+                team={memberTeam}
+                users={[memberUser]}
+                roles={memberTeam.roles}
+                query={query}
+                usersLoading={false}
+                usersError={undefined}
+                busy={false}
+                onQueryChange={updateQuery}
+                onClose={close}
+                onSubmit={onSubmit}
+            />
+        </>
+    );
+}
+
+function GrantSessionHarness({
+    onSubmit,
+}: {
+    readonly onSubmit: (input: { readonly capabilityKey: string; readonly scope: string }) => Promise<void>;
+}): ReactElement {
+    const [open, setOpen] = useState(false);
+    const [sessionId, setSessionId] = useState(0);
+    const [source, setSource] = useState<"TEAM" | "TEAM_ROLE">("TEAM");
+    const [, setParentRender] = useState(0);
+
+    const openSession = (): void => {
+        setSessionId((current) => current + 1);
+        setOpen(true);
+    };
+
+    return (
+        <>
+            <button type="button" onClick={openSession}>เปิด Grant</button>
+            <button type="button" onClick={() => setParentRender((current) => current + 1)}>
+                parent grant rerender
+            </button>
+            <button type="button" onClick={() => setOpen(false)}>ปิด Grant</button>
+            <button type="button" onClick={() => { setSource("TEAM_ROLE"); openSession(); }}>
+                เปลี่ยนเป็น TeamRole session
+            </button>
+            <GrantFormDialog
+                key={`${source}:${sessionId}`}
+                open={open}
+                source={source}
+                capabilities={capabilities}
+                busy={false}
+                onClose={() => setOpen(false)}
+                onSubmit={onSubmit}
+            />
+        </>
+    );
+}
 
 describe("Authorization Administration dialogs", () => {
     it("submits the Team creation payload and does not add a local row", async () => {
@@ -188,6 +302,72 @@ describe("Authorization Administration dialogs", () => {
             capabilityKey: "employee.read",
             scope: "ALL",
         }));
+    });
+
+    it("keeps Add Member state in one parent-owned session and clears it for the next session", async () => {
+        const queryChanges: string[] = [];
+        const onSubmit = vi.fn(async () => undefined);
+        render(
+            <AddMemberSessionHarness
+                onQueryChange={(query) => queryChanges.push(query)}
+                onSubmit={onSubmit}
+            />,
+        );
+
+        fireEvent.click(screen.getByText("เปิด Add Member"));
+        fireEvent.change(screen.getByLabelText("ค้นหาผู้ใช้"), { target: { value: "som" } });
+        fireEvent.click(screen.getByRole("button", { name: /สมชาย ใจดี/ }));
+        fireEvent.change(screen.getByLabelText("หน้าที่ในทีม (ไม่บังคับ)"), { target: { value: "21" } });
+        fireEvent.click(screen.getByText("parent rerender"));
+
+        expect(screen.getByLabelText("ค้นหาผู้ใช้")).toHaveValue("som");
+        expect(screen.getByText("เลือก สมชาย ใจดี")).toBeInTheDocument();
+        expect(screen.getByLabelText("หน้าที่ในทีม (ไม่บังคับ)")).toHaveValue("21");
+
+        fireEvent.click(screen.getByText("ปิด Add Member"));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        fireEvent.click(screen.getByText("เปิด Add Member"));
+
+        expect(screen.getByLabelText("ค้นหาผู้ใช้")).toHaveValue("");
+        expect(screen.getByLabelText("หน้าที่ในทีม (ไม่บังคับ)")).toHaveValue("");
+        expect(screen.queryByText("เลือก สมชาย ใจดี")).not.toBeInTheDocument();
+        expect(screen.getByText("พิมพ์คำค้นเพื่อค้นหาผู้ใช้ที่ต้องการ")).toBeInTheDocument();
+        expect(queryChanges).toContain("");
+
+        fireEvent.change(screen.getByLabelText("ค้นหาผู้ใช้"), { target: { value: "som" } });
+        fireEvent.click(screen.getByRole("button", { name: /สมชาย ใจดี/ }));
+        fireEvent.change(screen.getByLabelText("หน้าที่ในทีม (ไม่บังคับ)"), { target: { value: "21" } });
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มสมาชิก" }));
+
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ userId: 7, teamRoleId: 21 }));
+    });
+
+    it("preserves a Grant wizard during rerenders and starts a new source session clean", () => {
+        render(<GrantSessionHarness onSubmit={vi.fn(async () => undefined)} />);
+
+        fireEvent.click(screen.getByText("เปิด Grant"));
+        fireEvent.change(screen.getByLabelText("ค้นหาสิทธิ์"), { target: { value: "พนักงาน" } });
+        const capabilityButton = screen.getByRole("button", { name: /ดูข้อมูลพนักงาน/ });
+        fireEvent.click(capabilityButton);
+        fireEvent.click(screen.getByRole("radio", { name: /ทั้งหมด/ }));
+        fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" }));
+        expect(screen.getByText("ตรวจสอบสิ่งที่จะเปลี่ยน")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText("parent grant rerender"));
+        fireEvent.click(screen.getByRole("button", { name: "ย้อนกลับ" }));
+        expect(screen.getByLabelText("ค้นหาสิทธิ์")).toHaveValue("พนักงาน");
+        expect(screen.getByRole("button", { name: /ดูข้อมูลพนักงาน/ })).toHaveAttribute("aria-pressed", "true");
+        expect(screen.getByRole("radio", { name: /ทั้งหมด/ })).toBeChecked();
+
+        fireEvent.click(screen.getByText("ปิด Grant"));
+        fireEvent.click(screen.getByText("เปิด Grant"));
+        expect(screen.getByLabelText("ค้นหาสิทธิ์")).toHaveValue("");
+        expect(screen.getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" })).toBeInTheDocument();
+        expect(screen.queryByText("ตรวจสอบสิ่งที่จะเปลี่ยน")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByText("เปลี่ยนเป็น TeamRole session"));
+        expect(screen.getByLabelText("ค้นหาสิทธิ์")).toHaveValue("");
+        expect(screen.getByText(/หน้าที่นี้จะได้รับสิทธิ์เพิ่มเติม/)).toBeInTheDocument();
     });
 
     it("keeps the permission form body scrollable while the action footer stays persistent", () => {

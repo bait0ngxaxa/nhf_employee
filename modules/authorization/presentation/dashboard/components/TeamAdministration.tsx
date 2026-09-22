@@ -39,6 +39,16 @@ import type {
 } from "../types";
 
 type TeamDetailTab = "details" | "members" | "permissions";
+type LifecycleTarget = {
+    readonly kind: "team" | "role";
+    readonly id: number;
+    readonly name: string;
+    readonly nextActive: boolean;
+};
+type RemoveMemberTarget = {
+    readonly userId: number;
+    readonly name: string;
+};
 
 export function TeamAdministration({
     team,
@@ -68,23 +78,38 @@ export function TeamAdministration({
     const [tab, setTab] = useState<TeamDetailTab>("details");
     const [teamEditorOpen, setTeamEditorOpen] = useState(false);
     const [memberDialogOpen, setMemberDialogOpen] = useState(false);
+    const [memberDialogSessionId, setMemberDialogSessionId] = useState(0);
     const [roleEditor, setRoleEditor] = useState<{
         readonly mode: "create" | "edit";
         readonly role?: AuthorizationAdministrationTeamDetailData["roles"][number];
     } | null>(null);
     const [grantSource, setGrantSource] = useState<"TEAM" | "TEAM_ROLE" | null>(null);
     const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
-    const [lifecycleTarget, setLifecycleTarget] = useState<{
-        readonly kind: "team" | "role";
-        readonly id: number;
-        readonly name: string;
-        readonly nextActive: boolean;
-    } | null>(null);
-    const [removeMemberTarget, setRemoveMemberTarget] = useState<{
-        readonly userId: number;
-        readonly name: string;
-    } | null>(null);
+    const [lifecycleTarget, setLifecycleTarget] = useState<LifecycleTarget | null>(null);
+    const [removeMemberTarget, setRemoveMemberTarget] = useState<RemoveMemberTarget | null>(null);
+    const [confirmationSessionId, setConfirmationSessionId] = useState(0);
     const [pendingKey, setPendingKey] = useState<string | null>(null);
+
+    const openMemberDialog = (): void => {
+        onDirectoryQueryChange("");
+        setMemberDialogSessionId((current) => current + 1);
+        setMemberDialogOpen(true);
+    };
+
+    const closeMemberDialog = (): void => {
+        onDirectoryQueryChange("");
+        setMemberDialogOpen(false);
+    };
+
+    const openLifecycleConfirmation = (target: LifecycleTarget): void => {
+        setConfirmationSessionId((current) => current + 1);
+        setLifecycleTarget(target);
+    };
+
+    const openRemoveMemberConfirmation = (target: RemoveMemberTarget): void => {
+        setConfirmationSessionId((current) => current + 1);
+        setRemoveMemberTarget(target);
+    };
 
     const revalidate = useCallback(async (affectedUserId?: number): Promise<boolean> => {
         try {
@@ -165,7 +190,7 @@ export function TeamAdministration({
                         <Button type="button" variant="outline" size="sm" onClick={() => setTeamEditorOpen(true)} disabled={isBusy}>
                             <Edit3 aria-hidden="true" />แก้ไขข้อมูล
                         </Button>
-                        <Button type="button" variant={team.isActive ? "destructive" : "default"} size="sm" onClick={() => setLifecycleTarget({ kind: "team", id: team.id, name: team.name, nextActive: !team.isActive })} disabled={isBusy}>
+                        <Button type="button" variant={team.isActive ? "destructive" : "default"} size="sm" onClick={() => openLifecycleConfirmation({ kind: "team", id: team.id, name: team.name, nextActive: !team.isActive })} disabled={isBusy}>
                             {team.isActive ? "ปิดใช้งานทีม" : "เปิดใช้งานทีม"}
                         </Button>
                     </div>
@@ -192,10 +217,10 @@ export function TeamAdministration({
                 <MembersPanel
                     team={team}
                     busy={isBusy}
-                    onAdd={() => setMemberDialogOpen(true)}
+                    onAdd={openMemberDialog}
                     onSelectUser={onSelectUser}
                     onChangeRole={(userId, teamRoleId) => void runInlineMutation(`member-role:${userId}`, async () => { await changeMemberRole(team.id, userId, { teamRoleId }); }, userId, "เปลี่ยนหน้าที่ในทีมแล้ว")}
-                    onRemove={(userId, name) => setRemoveMemberTarget({ userId, name })}
+                    onRemove={(userId, name) => openRemoveMemberConfirmation({ userId, name })}
                 />
             ) : null}
             {tab === "permissions" ? (
@@ -210,7 +235,7 @@ export function TeamAdministration({
                      onRemoveRoleGrant={(grant) => selectedRole ? runMutation(`role-grant-remove:${grant.capabilityKey}:${grant.scope}`, async () => { await removeTeamRoleGrant(team.id, selectedRole.id, { capabilityKey: grant.capabilityKey, scope: grant.scope }); }, "นำสิทธิ์ของหน้าที่ในทีมออกแล้ว") : Promise.resolve()}
                     onCreateRole={() => setRoleEditor({ mode: "create" })}
                     onEditRole={(role) => setRoleEditor({ mode: "edit", role })}
-                    onLifecycleRole={(role) => setLifecycleTarget({ kind: "role", id: role.id, name: role.name, nextActive: !role.isActive })}
+                    onLifecycleRole={(role) => openLifecycleConfirmation({ kind: "role", id: role.id, name: role.name, nextActive: !role.isActive })}
                 />
             ) : null}
 
@@ -245,6 +270,7 @@ export function TeamAdministration({
                 }}
             />
             <AddMemberDialog
+                key={`${team.id}:${memberDialogSessionId}`}
                 open={memberDialogOpen}
                 team={team}
                 users={directoryUsers}
@@ -254,14 +280,15 @@ export function TeamAdministration({
                 usersError={directoryError}
                 busy={pendingKey === "member-add"}
                 onQueryChange={onDirectoryQueryChange}
-                onClose={() => setMemberDialogOpen(false)}
+                onClose={closeMemberDialog}
                 onSubmit={async (input) => {
                     await runMutation("member-add", async () => { await addMember(team.id, input); }, "เพิ่มสมาชิกในทีมแล้ว", input.userId);
-                    setMemberDialogOpen(false);
+                    closeMemberDialog();
                 }}
             />
             {grantSource ? (
                 <GrantFormDialog
+                    key={`${team.id}:${grantSource}:${grantSource === "TEAM_ROLE" ? selectedRole?.id ?? "none" : "team"}`}
                     open
                     source={grantSource}
                     capabilities={overview.capabilities}
@@ -279,6 +306,7 @@ export function TeamAdministration({
             ) : null}
             <ConfirmAuthorizationAction
                 open={lifecycleTarget !== null}
+                sessionId={`lifecycle:${lifecycleTarget?.kind ?? "closed"}:${lifecycleTarget?.id ?? "closed"}:${lifecycleTarget?.nextActive ?? "closed"}:${confirmationSessionId}`}
                 title={lifecycleTarget?.nextActive ? `เปิดใช้งาน ${lifecycleTarget.name}` : `ปิดใช้งาน ${lifecycleTarget?.name ?? "รายการ"}`}
                 description={lifecycleTarget?.kind === "team" && lifecycleTarget.nextActive === false
                     ? "สมาชิกและสิทธิ์ที่ตั้งค่าไว้จะไม่ถูกลบ แต่การเข้าถึงจากทีมจะหยุดใช้งานจนกว่าจะเปิดทีมอีกครั้ง"
@@ -301,6 +329,7 @@ export function TeamAdministration({
             />
             <ConfirmAuthorizationAction
                 open={removeMemberTarget !== null}
+                sessionId={`member-remove:${removeMemberTarget?.userId ?? "closed"}:${confirmationSessionId}`}
                  title="นำสมาชิกออกจากทีม?"
                  description={removeMemberTarget ? `นำ ${removeMemberTarget.name} ออกจาก ${team.name} หรือไม่ สิทธิ์ที่มาจากทีมอาจหายไป แต่บัญชีผู้ใช้จะไม่ถูกลบ` : ""}
                  confirmLabel="นำออกจากทีม"

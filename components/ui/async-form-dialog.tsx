@@ -2,9 +2,11 @@
 
 import {
   createContext,
+  forwardRef,
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type ComponentProps,
@@ -55,6 +57,63 @@ const AsyncFormDialogContext =
 const FOCUSABLE_ELEMENT_SELECTOR =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
+interface DiscardConfirmationHandle {
+  open: () => void
+}
+
+interface DiscardConfirmationProps {
+  discardDescription: string
+  discardTitle: string
+  onClose: () => void
+  onDiscard: () => void
+}
+
+const DiscardConfirmation = forwardRef<
+  DiscardConfirmationHandle,
+  DiscardConfirmationProps
+>(function DiscardConfirmation(
+  { discardDescription, discardTitle, onClose, onDiscard },
+  ref
+): ReactElement {
+  const [open, setOpen] = useState(false)
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      open: () => setOpen(true),
+    }),
+    []
+  )
+
+  const discardAndClose = useCallback((): void => {
+    setOpen(false)
+    onDiscard()
+    onClose()
+  }, [onClose, onDiscard])
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{discardTitle}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {discardDescription}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>แก้ไขต่อ</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={discardAndClose}
+          >
+            ทิ้งข้อมูล
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+})
+
 export function AsyncFormDialog({
   busy,
   children,
@@ -65,33 +124,27 @@ export function AsyncFormDialog({
   onDiscard,
   open,
 }: AsyncFormDialogProps): ReactElement {
-  const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false)
+  const discardConfirmationRef =
+    useRef<DiscardConfirmationHandle | null>(null)
   const restoreFocusElementRef = useRef<HTMLElement | null>(null)
 
   const discardAndClose = useCallback((): void => {
-    setDiscardConfirmationOpen(false)
     onDiscard()
     onClose()
   }, [onClose, onDiscard])
 
   const requestClose = useCallback((): void => {
-    if (busy) {
+    if (!open || busy) {
       return
     }
 
     if (dirty) {
-      setDiscardConfirmationOpen(true)
+      discardConfirmationRef.current?.open()
       return
     }
 
     discardAndClose()
-  }, [busy, dirty, discardAndClose])
-
-  useEffect(() => {
-    if (!open) {
-      setDiscardConfirmationOpen(false)
-    }
-  }, [open])
+  }, [busy, dirty, discardAndClose, open])
 
   useEffect(() => {
     if (open) {
@@ -142,29 +195,15 @@ export function AsyncFormDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         {children}
       </Dialog>
-
-      <AlertDialog
-        open={open && discardConfirmationOpen}
-        onOpenChange={setDiscardConfirmationOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{discardTitle}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {discardDescription}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>แก้ไขต่อ</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={discardAndClose}
-            >
-              ทิ้งข้อมูล
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {open ? (
+        <DiscardConfirmation
+          ref={discardConfirmationRef}
+          discardDescription={discardDescription}
+          discardTitle={discardTitle}
+          onClose={onClose}
+          onDiscard={onDiscard}
+        />
+      ) : null}
     </AsyncFormDialogContext.Provider>
   )
 }

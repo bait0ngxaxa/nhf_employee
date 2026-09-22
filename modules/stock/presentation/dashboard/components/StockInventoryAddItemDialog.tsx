@@ -1,7 +1,19 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+    forwardRef,
+    useImperativeHandle,
+    useRef,
+    useState,
+    type FormEvent,
+    type ReactElement,
+} from "react";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -24,10 +36,15 @@ type CategoryOption = { id: number; name: string };
 
 type AddItemDialogProps = {
     open: boolean;
+    sessionId: number;
     onClose: () => void;
     categories: CategoryOption[];
     canManageInventory: boolean;
     onSuccess: () => void;
+};
+
+type AddItemDialogSessionHandle = {
+    isBusy: () => boolean;
 };
 
 function getTrimmedFormText(
@@ -40,28 +57,75 @@ function getTrimmedFormText(
 
 export function AddItemDialog({
     open,
+    sessionId,
     onClose,
     categories,
     canManageInventory,
     onSuccess,
-}: AddItemDialogProps) {
+}: AddItemDialogProps): ReactElement {
+    const sessionRef = useRef<AddItemDialogSessionHandle | null>(null);
+
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                if (!nextOpen && !sessionRef.current?.isBusy()) {
+                    onClose();
+                }
+            }}
+        >
+            <DialogContent
+                forceMount
+                scrollMode="area"
+                className="flex flex-col overflow-hidden p-0 sm:max-w-[760px]"
+            >
+                <div className="shrink-0 border-b border-border-neutral-muted bg-surface-subtle/50 px-5 py-4 sm:px-6">
+                    <DialogTitle className="text-lg font-semibold text-content-strong">
+                        {STOCK_ADMIN_TEXT.addNewItem}
+                    </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        กรอกข้อมูลวัสดุใหม่และรายการย่อย
+                    </DialogDescription>
+                </div>
+                {open ? (
+                    <AddItemDialogSession
+                        key={sessionId}
+                        ref={sessionRef}
+                        categories={categories}
+                        canManageInventory={canManageInventory}
+                        onClose={onClose}
+                        onSuccess={onSuccess}
+                    />
+                ) : null}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+const AddItemDialogSession = forwardRef<
+    AddItemDialogSessionHandle,
+    Omit<AddItemDialogProps, "open" | "sessionId">
+>(function AddItemDialogSession(
+    {
+        onClose,
+        categories,
+        canManageInventory,
+        onSuccess,
+    },
+    ref,
+): ReactElement {
     const [loading, setLoading] = useState(false);
     const [selectedCategoryId, setSelectedCategoryId] = useState("");
     const [itemImageUrl, setItemImageUrl] = useState("");
     const [variants, setVariants] = useState<VariantDraft[]>([createEmptyVariant()]);
 
-    useEffect(() => {
-        if (!open) {
-            setSelectedCategoryId("");
-            setItemImageUrl("");
-            setVariants([createEmptyVariant()]);
-            return;
-        }
-
-        setVariants((current) =>
-            current.length > 0 ? current : [createEmptyVariant()],
-        );
-    }, [open]);
+    useImperativeHandle(
+        ref,
+        () => ({
+            isBusy: () => loading,
+        }),
+        [loading],
+    );
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -100,32 +164,18 @@ export function AddItemDialog({
             );
 
             toast.success(STOCK_ADMIN_TEXT.itemAdded);
+            setLoading(false);
             onSuccess();
         } catch (error: unknown) {
             const message =
                 error instanceof Error ? error.message : STOCK_ADMIN_TEXT.genericError;
             toast.error(message);
-        } finally {
             setLoading(false);
         }
     }
 
     return (
-        <Dialog
-            open={open}
-            onOpenChange={(nextOpen) => {
-                if (!nextOpen && !loading) {
-                    onClose();
-                }
-            }}
-        >
-            <DialogContent scrollMode="area" className="flex flex-col overflow-hidden p-0 sm:max-w-[760px]">
-                <div className="shrink-0 border-b border-border-neutral-muted bg-surface-subtle/50 px-5 py-4 sm:px-6">
-                    <DialogTitle className="text-lg font-semibold text-content-strong">
-                        {STOCK_ADMIN_TEXT.addNewItem}
-                    </DialogTitle>
-                </div>
-                <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                     <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
                         <BaseFields
                             categories={categories}
@@ -229,11 +279,9 @@ export function AddItemDialog({
                         onClose={onClose}
                         disabled={!canManageInventory}
                     />
-                </form>
-            </DialogContent>
-        </Dialog>
+        </form>
     );
-}
+});
 
 function BaseFields(props: {
     categories: CategoryOption[];

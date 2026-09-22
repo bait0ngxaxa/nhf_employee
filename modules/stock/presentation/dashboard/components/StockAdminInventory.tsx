@@ -37,6 +37,7 @@ export function StockAdminInventory() {
         setSelectedCategoryId,
     } = useStockUIContext();
     const [showAddItem, setShowAddItem] = useState(false);
+    const [addItemSessionId, setAddItemSessionId] = useState(0);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
     const [showAddCategory, setShowAddCategory] = useState(false);
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
@@ -55,7 +56,10 @@ export function StockAdminInventory() {
                 <Button
                     className="h-11 bg-action-primary-solid px-5 font-semibold text-content-on-brand shadow-sm transition-colors hover:bg-action-primary-solid-hover"
                     onClick={() => {
-                        if (canManageInventory) setShowAddItem(true);
+                        if (canManageInventory) {
+                            setAddItemSessionId((current) => current + 1);
+                            setShowAddItem(true);
+                        }
                     }}
                     disabled={!canManageInventory}
                 >
@@ -121,6 +125,7 @@ export function StockAdminInventory() {
 
             <AddItemDialog
                 open={showAddItem}
+                sessionId={addItemSessionId}
                 onClose={() => setShowAddItem(false)}
                 categories={categories}
                 canManageInventory={canManageInventory}

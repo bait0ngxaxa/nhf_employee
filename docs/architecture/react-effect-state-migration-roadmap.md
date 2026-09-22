@@ -510,3 +510,40 @@ Focused verification ที่ผ่าน:
 ```text
 react-hooks/set-state-in-effect = globally enabled
 ```
+
+## Phase L5C Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-005`, `SSE-010`, `SSE-011`, `SSE-012`, `SSE-014`, `SSE-043`
+
+Baseline ก่อน L5C: **54** diagnostics
+Baseline หลัง L5C: **48** diagnostics
+Reduction: **6**
+
+รูปแบบ ownership ที่ใช้:
+
+- `SSE-005` — `AsyncFormDialog` คง `Dialog` หลักและ focus lifecycle เดิมไว้; แยก discard confirmation เป็น child session ที่ mount เฉพาะตอน dialog เปิด และเปิดผ่าน ref เฉพาะกิจ
+- `SSE-010` — parent เป็นเจ้าของ `directoryQuery`; open/close boundary ล้าง query และเพิ่ม Add Member session identity; local selection/role/error อยู่ใน keyed dialog session
+- `SSE-011` — caller เป็นเจ้าของ grant-session identity; keyed wizard แยกตามทีม/source/TeamRole และ preserve draft ภายใน session เดิม
+- `SSE-012` — caller ส่ง stable confirmation session identity; child confirmation เป็นเจ้าของ error ขณะที่ `AlertDialog` root และ close/focus behavior คงเดิม
+- `SSE-014` — keyed viewer resource session เป็นเจ้าของ active index, cache, pending requests และ `AbortController`; cleanup aborts requests และ revokes object URLs
+- `SSE-043` — parent เพิ่ม Add Item session identity; keyed form subtree เป็นเจ้าของ controlled draft และ uncontrolled DOM fields จึงถูกทำลายพร้อม session
+
+Focused verification ที่ผ่าน:
+
+- `npm.cmd run test:run -- components/ui/async-form-dialog.test.tsx modules/leave/presentation/dashboard/LeaveRequestForm.test.tsx modules/authorization/presentation/dashboard/components/AuthorizationDialogs.test.tsx modules/authorization/presentation/dashboard/components/TeamAdministration.test.tsx modules/authorization/presentation/dashboard/components/GrantList.test.tsx modules/authorization/presentation/dashboard/components/UserAccessPanel.test.tsx modules/leave/presentation/dashboard/components/LeaveAttachmentViewerDialog.test.tsx modules/stock/presentation/dashboard/components/StockInventoryAddItemDialog.test.tsx modules/stock/presentation/dashboard/components/StockInventoryDialogs.test.tsx` — 55 tests ผ่าน
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- targeted `react-hooks/set-state-in-effect:error` check ของ source ที่แก้ — เหลือเฉพาะ `SSE-008`, `SSE-009`, `SSE-040` ซึ่งอยู่นอก L5C
+- `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json` — **48 diagnostics**; raw JSON ใช้ชั่วคราวนอก repository และไม่ถูก commit
+
+ไม่รัน `architecture:check` เพราะไม่มีการเปลี่ยน module boundary/import ownership และไม่รัน `npm run build` หรือ full-suite ตามขอบเขต verification ของ phase นี้
+
+Behavior invariants ที่ตรวจแล้ว: dirty-form discard protection, focus restoration, same-session draft preservation, new-session reset, effective-scope normalization, confirmation error isolation, attachment request abort, object URL revocation, stale attachment response isolation, Stock uncontrolled field reset และ one-variant minimum
+
+ไม่มีการแก้ API contract, schema, migration, authorization หรือ capability cleanup `SSE-040`. `SSE-008`/`SSE-009` และงาน L5D–L5K ยังคง intentionally untouched. เป้าหมายสุดท้ายยังคงเป็น:
+
+```text
+react-hooks/set-state-in-effect = globally enabled
+```

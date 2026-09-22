@@ -84,9 +84,22 @@ export function UserAccessPanel({
     readonly onRefresh: () => Promise<void>;
 }): ReactElement {
     const [grantDialogOpen, setGrantDialogOpen] = useState(false);
+    const [grantSessionId, setGrantSessionId] = useState(0);
     const [systemRoleTarget, setSystemRoleTarget] = useState<SystemRole | null>(null);
+    const [confirmationSessionId, setConfirmationSessionId] = useState(0);
     const [pending, setPending] = useState<string | null>(null);
     const inspectionInvalid = user ? isAuthorizationInspectionInvalid(user) : false;
+
+    const openGrantDialog = (): void => {
+        if (!user || inspectionInvalid) return;
+        setGrantSessionId((current) => current + 1);
+        setGrantDialogOpen(true);
+    };
+
+    const requestSystemRoleChange = (nextRole: SystemRole): void => {
+        setConfirmationSessionId((current) => current + 1);
+        setSystemRoleTarget(nextRole);
+    };
 
     const revalidate = async (): Promise<boolean> => {
         try {
@@ -179,7 +192,7 @@ export function UserAccessPanel({
                             <p className="mt-1 text-sm leading-6 text-content-secondary">ข้อมูลตัวตน สถานะบัญชี และข้อมูลพนักงานที่จำเป็นต่อการจัดการ</p>
                         </div>
                         <UserIdentityPanel user={user} />
-                        <SystemRoleControl user={user} busy={pending?.startsWith("system-role:") === true} onRequestChange={setSystemRoleTarget} />
+                        <SystemRoleControl user={user} busy={pending?.startsWith("system-role:") === true} onRequestChange={requestSystemRoleChange} />
                     </section>
                     <ConfigurationIssues issues={user.configurationIssues} />
                     <MembershipsPanel user={user} onSelectTeam={onSelectTeam} />
@@ -189,10 +202,11 @@ export function UserAccessPanel({
                         onAddGrant={addGrant}
                         onRemoveGrant={removeGrant}
                         onOpenFallbackAdd={() => {
-                            if (!isAuthorizationInspectionInvalid(user)) setGrantDialogOpen(true);
+                            openGrantDialog();
                         }}
                     />
                     <GrantFormDialog
+                        key={`${user.user.id}:${grantSessionId}`}
                         open={grantDialogOpen && !inspectionInvalid}
                         source="USER"
                         capabilities={overview.capabilities}
@@ -201,6 +215,7 @@ export function UserAccessPanel({
                         onSubmit={addGrant}
                     />
                     <ConfirmAuthorizationAction
+                        sessionId={`system-role:${systemRoleTarget ?? "closed"}:${confirmationSessionId}`}
                         open={systemRoleTarget !== null}
                         title={systemRoleTarget === "ADMIN" ? "อนุญาตให้จัดการสิทธิ์หรือไม่?" : "ยกเลิกการเข้าถึงการจัดการสิทธิ์หรือไม่?"}
                         description={systemRoleTarget === "ADMIN"
@@ -451,6 +466,7 @@ function InlineUserGrantEditor({
     const [selectedScope, setSelectedScope] = useState("");
     const [reviewScope, setReviewScope] = useState<string | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AuthorizationAdministrationGrantProjectionData | null>(null);
+    const [confirmationSessionId, setConfirmationSessionId] = useState(0);
     const [error, setError] = useState<unknown>(null);
     const validDirectGrants = useMemo(() => directGrants.filter((grant) => grant.validation.status === "VALID"), [directGrants]);
     const persistedScopes = useMemo(() => new Set(validDirectGrants.map((grant) => grant.scope)), [validDirectGrants]);
@@ -476,12 +492,12 @@ function InlineUserGrantEditor({
         <section id={`personal-grant-editor-${capability.key}`} className="rounded-xl border border-action-primary-solid/35 bg-action-primary-surface/45 px-3 py-3" aria-labelledby={`personal-grant-${capability.key}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><h6 id={`personal-grant-${capability.key}`} className="text-sm font-semibold text-content-heading">สิทธิ์เฉพาะบุคคล</h6><p className="mt-1 text-xs leading-5 text-content-secondary">ใช้เป็นข้อยกเว้นเฉพาะผู้ใช้นี้ โดยปกติควรจัดสิทธิ์ผ่านทีมหรือหน้าที่ในทีม</p></div><Button type="button" variant="ghost" size="xs" onClick={onClose} disabled={cardBusy}>ปิดการแก้ไข</Button></div>
             <div className="mt-3 rounded-lg border border-border-subtle bg-surface-raised px-3 py-3"><p className="text-xs font-semibold text-content-secondary">สิทธิ์ที่ใช้งานได้ตอนนี้</p><ul className="mt-2 grid gap-2 sm:grid-cols-2">{rows.map((row) => <li key={`${row.context.key}:${row.effectiveAuthority.state}`} className="text-sm"><p className="font-semibold text-content-heading">{getAuthorizationContextPresentation(row.context.key).label}</p><p className="text-xs leading-5 text-content-secondary">{row.effectiveAuthority.scopes.length === 0 ? "ยังไม่มีสิทธิ์ในบริบทนี้" : row.effectiveAuthority.scopes.map((scope) => getAuthorizationScopePresentation(scope, capability.key).label).join(" · ")}</p></li>)}</ul></div>
-            <div className="mt-3 rounded-lg border border-border-subtle bg-surface-raised px-3 py-3"><p className="text-xs font-semibold text-content-secondary">สิทธิ์เฉพาะบุคคลที่เพิ่มไว้</p>{validDirectGrants.length === 0 ? <p className="mt-2 text-sm text-content-secondary">ยังไม่มีสิทธิ์เฉพาะบุคคลสำหรับความสามารถนี้</p> : <ul className="mt-2 grid gap-2">{validDirectGrants.map((grant) => { const scope = getAuthorizationScopePresentation(grant.scope, capability.key); return <li key={`${grant.capabilityKey}:${grant.scope}`} className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface-subtle/45 px-3 py-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-content-heading">{scope.label}</p><p className="text-xs leading-5 text-content-secondary">ผู้ใช้รายนี้ได้รับสิทธิ์นี้โดยเฉพาะ</p></div><Button type="button" variant="outline" size="xs" onClick={() => { setError(null); setRemoveTarget(grant); }} disabled={cardBusy} aria-label={`นำสิทธิ์เฉพาะบุคคล ${actionLabel} ${scope.label} ออก`}><Trash2 aria-hidden="true" />นำออก</Button></li>; })}</ul>}</div>
+            <div className="mt-3 rounded-lg border border-border-subtle bg-surface-raised px-3 py-3"><p className="text-xs font-semibold text-content-secondary">สิทธิ์เฉพาะบุคคลที่เพิ่มไว้</p>{validDirectGrants.length === 0 ? <p className="mt-2 text-sm text-content-secondary">ยังไม่มีสิทธิ์เฉพาะบุคคลสำหรับความสามารถนี้</p> : <ul className="mt-2 grid gap-2">{validDirectGrants.map((grant) => { const scope = getAuthorizationScopePresentation(grant.scope, capability.key); return <li key={`${grant.capabilityKey}:${grant.scope}`} className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface-subtle/45 px-3 py-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-content-heading">{scope.label}</p><p className="text-xs leading-5 text-content-secondary">ผู้ใช้รายนี้ได้รับสิทธิ์นี้โดยเฉพาะ</p></div><Button type="button" variant="outline" size="xs" onClick={() => { setError(null); setConfirmationSessionId((current) => current + 1); setRemoveTarget(grant); }} disabled={cardBusy} aria-label={`นำสิทธิ์เฉพาะบุคคล ${actionLabel} ${scope.label} ออก`}><Trash2 aria-hidden="true" />นำออก</Button></li>; })}</ul>}</div>
             {availableScopes.length > 0 ? <fieldset className="mt-3 space-y-2"><legend className="text-xs font-semibold text-content-secondary">เพิ่มขอบเขต</legend>{availableScopes.map((scope) => { const presentation = getAuthorizationScopePresentation(scope, capability.key); return <label key={scope} className={`flex cursor-pointer gap-3 rounded-lg border bg-surface-raised px-3 py-2 transition-colors ${effectiveSelectedScope === scope ? "border-action-primary-solid ring-1 ring-action-primary-solid/30" : "border-border-subtle"}`}><input type="radio" name={`personal-scope-${capability.key}`} value={scope} checked={effectiveSelectedScope === scope} onChange={() => setSelectedScope(scope)} disabled={cardBusy} className="mt-1 h-4 w-4 accent-action-primary-solid" /><span><span className="block text-sm font-semibold text-content-heading">{presentation.label}</span><span className="block text-xs leading-5 text-content-secondary">{presentation.description}</span></span></label>; })}</fieldset> : <p className="mt-3 text-sm text-content-secondary">ไม่มีขอบเขตเพิ่มเติมที่พร้อมให้เพิ่มสำหรับผู้ใช้นี้</p>}
             {availableScopes.length > 0 && reviewScope === null ? <Button type="button" className="mt-3" size="sm" onClick={() => { setError(null); setReviewScope(effectiveSelectedScope); }} disabled={cardBusy || !effectiveSelectedScope}><Plus aria-hidden="true" />เพิ่มสิทธิ์</Button> : null}
             {reviewScope !== null ? <div className="mt-3 rounded-lg border border-action-primary-solid/45 bg-surface-raised px-3 py-3" aria-live="polite"><p className="text-sm font-semibold text-content-heading">กำลังเพิ่มสิทธิ์เฉพาะบุคคล</p><dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2"><div><dt className="text-content-secondary">ความสามารถ</dt><dd className="mt-1 font-semibold text-content-heading">{actionLabel}</dd></div><div><dt className="text-content-secondary">ขอบเขต</dt><dd className="mt-1 font-semibold text-content-heading">{getAuthorizationScopePresentation(reviewScope, capability.key).label}</dd></div></dl><div className="mt-3 flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => setReviewScope(null)} disabled={cardBusy}>ยกเลิก</Button><Button type="button" onClick={() => void confirmAdd()} disabled={cardBusy} aria-busy={cardBusy}>{cardBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}{cardBusy ? "กำลังบันทึก" : "ยืนยันเพิ่มสิทธิ์"}</Button></div></div> : null}
             {error ? <InlineMutationError error={error} /> : null}
-            <ConfirmAuthorizationAction open={removeTarget !== null} title="นำสิทธิ์เฉพาะบุคคลออกหรือไม่?" description={removeTarget ? removalDescription(removeTarget, actionLabel) : ""} confirmLabel="นำสิทธิ์ออก" destructive busy={cardBusy} onClose={() => setRemoveTarget(null)} onConfirm={async () => { if (!removeTarget) return; await onRemoveGrant(removeTarget); setRemoveTarget(null); }} />
+            <ConfirmAuthorizationAction sessionId={`user-grant-remove:${capability.key}:${removeTarget?.capabilityKey ?? "closed"}:${removeTarget?.scope ?? "closed"}:${confirmationSessionId}`} open={removeTarget !== null} title="นำสิทธิ์เฉพาะบุคคลออกหรือไม่?" description={removeTarget ? removalDescription(removeTarget, actionLabel) : ""} confirmLabel="นำสิทธิ์ออก" destructive busy={cardBusy} onClose={() => setRemoveTarget(null)} onConfirm={async () => { if (!removeTarget) return; await onRemoveGrant(removeTarget); setRemoveTarget(null); }} />
         </section>
     );
 }

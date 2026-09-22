@@ -310,14 +310,6 @@ export function AddMemberDialog({
     const queryId = useId();
     const roleId = useId();
 
-    useEffect(() => {
-        if (!open) return;
-        setSelectedUserId(null);
-        setTeamRoleId("");
-        setError(null);
-        onQueryChange("");
-    }, [open, onQueryChange]);
-
     const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
     const activeRoles = useMemo(() => roles.filter((role) => role.teamId === team.id), [roles, team.id]);
     const dirty = selectedUserId !== null || teamRoleId !== "" || query.trim().length > 0;
@@ -450,15 +442,6 @@ export function GrantFormDialog({
     const [error, setError] = useState<unknown>(null);
     const queryId = useId();
     const formId = useId();
-
-    useEffect(() => {
-        if (!open) return;
-        setQuery("");
-        setCapabilityKey("");
-        setScope("");
-        setStep("choose");
-        setError(null);
-    }, [open]);
 
     const grantableCapabilities = useMemo(
         () => capabilities
@@ -665,6 +648,7 @@ export function GrantFormDialog({
 }
 
 export function ConfirmAuthorizationAction({
+    sessionId,
     open,
     title,
     description,
@@ -674,6 +658,7 @@ export function ConfirmAuthorizationAction({
     onClose,
     onConfirm,
 }: {
+    readonly sessionId: string;
     readonly open: boolean;
     readonly title: string;
     readonly description: string;
@@ -683,11 +668,37 @@ export function ConfirmAuthorizationAction({
     readonly onClose: () => void;
     readonly onConfirm: () => Promise<void>;
 }): React.ReactElement {
-    const [error, setError] = useState<unknown>(null);
+    return (
+        <AlertDialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !busy) onClose(); }}>
+            <ConfirmAuthorizationActionSession
+                key={sessionId}
+                busy={busy}
+                confirmLabel={confirmLabel}
+                destructive={destructive}
+                description={description}
+                onConfirm={onConfirm}
+                title={title}
+            />
+        </AlertDialog>
+    );
+}
 
-    useEffect(() => {
-        if (open) setError(null);
-    }, [open]);
+function ConfirmAuthorizationActionSession({
+    title,
+    description,
+    confirmLabel,
+    destructive,
+    busy,
+    onConfirm,
+}: {
+    readonly title: string;
+    readonly description: string;
+    readonly confirmLabel: string;
+    readonly destructive: boolean;
+    readonly busy: boolean;
+    readonly onConfirm: () => Promise<void>;
+}): React.ReactElement {
+    const [error, setError] = useState<unknown>(null);
 
     const confirm = async (): Promise<void> => {
         setError(null);
@@ -699,21 +710,19 @@ export function ConfirmAuthorizationAction({
     };
 
     return (
-        <AlertDialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !busy) onClose(); }}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{title}</AlertDialogTitle>
-                    <AlertDialogDescription>{description}</AlertDialogDescription>
-                </AlertDialogHeader>
-                {error ? <FormError error={error} /> : null}
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={busy}>ยกเลิก</AlertDialogCancel>
-                    <AlertDialogAction variant={destructive ? "destructive" : "default"} disabled={busy} aria-busy={busy} onClick={(event) => { event.preventDefault(); void confirm(); }}>
-                        {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-                        {busy ? "กำลังดำเนินการ" : confirmLabel}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>{title}</AlertDialogTitle>
+                <AlertDialogDescription>{description}</AlertDialogDescription>
+            </AlertDialogHeader>
+            {error ? <FormError error={error} /> : null}
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={busy}>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction variant={destructive ? "destructive" : "default"} disabled={busy} aria-busy={busy} onClick={(event) => { event.preventDefault(); void confirm(); }}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                    {busy ? "กำลังดำเนินการ" : confirmLabel}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
     );
 }

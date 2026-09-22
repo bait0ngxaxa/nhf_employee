@@ -1,10 +1,31 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+const teamApi = vi.hoisted(() => ({
+    addMember: vi.fn(),
+    addTeamGrant: vi.fn(),
+    addTeamRoleGrant: vi.fn(),
+    changeMemberRole: vi.fn(),
+    createTeamRole: vi.fn(),
+    removeMember: vi.fn(),
+    removeTeamGrant: vi.fn(),
+    removeTeamRoleGrant: vi.fn(),
+    updateTeam: vi.fn(),
+    updateTeamRole: vi.fn(),
+}));
+
+vi.mock("../api", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationApiModule>();
+    return { ...actual, ...teamApi };
+});
+
 import { TeamAdministration } from "./TeamAdministration";
+import type * as AuthorizationApiModule from "../api";
 import type {
     AuthorizationAdministrationOverviewData,
     AuthorizationAdministrationTeamDetailData,
+    AuthorizationAdministrationUserSummaryData,
 } from "../types";
 
 const capability = {
@@ -85,6 +106,17 @@ const overview = {
     },
 } satisfies AuthorizationAdministrationOverviewData;
 
+const directoryUser = {
+    id: 8,
+    name: "สุดา ใจดี",
+    email: "suda@example.com",
+    role: "USER",
+    isActive: true,
+    deletedAt: null,
+    employee: null,
+    teams: [],
+} satisfies AuthorizationAdministrationUserSummaryData;
+
 function renderTeam() {
     return render(
         <TeamAdministration
@@ -101,6 +133,40 @@ function renderTeam() {
             onRefresh={vi.fn(async () => undefined)}
         />,
     );
+}
+
+function renderTeamWithDirectory() {
+    const onDirectoryQueryChange = vi.fn();
+    function DirectoryHarness() {
+        const [directoryQuery, setDirectoryQuery] = useState("stale query");
+        const [, setParentRender] = useState(0);
+
+        return (
+            <>
+                <button type="button" onClick={() => setParentRender((current) => current + 1)}>
+                    parent team rerender
+                </button>
+                <TeamAdministration
+                    team={team}
+                    loading={false}
+                    error={undefined}
+                    overview={overview}
+                    directoryQuery={directoryQuery}
+                    directoryUsers={[directoryUser]}
+                    directoryLoading={false}
+                    directoryError={undefined}
+                    onDirectoryQueryChange={(query) => {
+                        onDirectoryQueryChange(query);
+                        setDirectoryQuery(query);
+                    }}
+                    onSelectUser={vi.fn()}
+                    onRefresh={vi.fn(async () => undefined)}
+                />
+            </>
+        );
+    }
+
+    return { ...render(<DirectoryHarness />), onDirectoryQueryChange };
 }
 
 describe("TeamAdministration", () => {
@@ -126,5 +192,42 @@ describe("TeamAdministration", () => {
         expect(screen.getByText(/การเข้าถึงจากทีมจะหยุดใช้งาน/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
         expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("initializes and clears the parent-owned Add Member query at session boundaries", async () => {
+        const { onDirectoryQueryChange } = renderTeamWithDirectory();
+
+        fireEvent.click(screen.getByRole("button", { name: "สมาชิก" }));
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มสมาชิก" }));
+        expect(screen.getByLabelText("ค้นหาผู้ใช้")).toHaveValue("");
+        expect(onDirectoryQueryChange).toHaveBeenCalledWith("");
+
+        fireEvent.change(screen.getByLabelText("ค้นหาผู้ใช้"), { target: { value: "suda" } });
+        fireEvent.click(screen.getByText("parent team rerender"));
+        expect(screen.getByLabelText("ค้นหาผู้ใช้")).toHaveValue("suda");
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิดแบบฟอร์มเพิ่มสมาชิก" }));
+        const discardDialog = await screen.findByRole("alertdialog");
+        fireEvent.click(within(discardDialog).getByRole("button", { name: "ทิ้งข้อมูล" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มสมาชิก" }));
+        expect(screen.getByLabelText("ค้นหาผู้ใช้")).toHaveValue("");
+        expect(onDirectoryQueryChange).toHaveBeenLastCalledWith("");
+    });
+
+    it("keeps a failed Team confirmation error in-session and clears it for the next confirmation", async () => {
+        teamApi.updateTeam.mockRejectedValue(new Error("request failed"));
+        renderTeam();
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิดใช้งานทีม" }));
+        let confirmation = await screen.findByRole("alertdialog");
+        fireEvent.click(within(confirmation).getByRole("button", { name: "ปิดใช้งาน" }));
+        await waitFor(() => expect(within(confirmation).getByText("ดำเนินการไม่สำเร็จ")).toBeInTheDocument());
+
+        fireEvent.click(within(confirmation).getByRole("button", { name: "ยกเลิก" }));
+        fireEvent.click(screen.getByRole("button", { name: "ปิดใช้งานทีม" }));
+        confirmation = await screen.findByRole("alertdialog");
+        expect(within(confirmation).queryByText("ดำเนินการไม่สำเร็จ")).not.toBeInTheDocument();
     });
 });

@@ -7,9 +7,13 @@ const grantApi = vi.hoisted(() => ({
     removeUserGrant: vi.fn(),
 }));
 
-vi.mock("../api", () => grantApi);
+vi.mock("../api", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationApiModule>();
+    return { ...actual, ...grantApi };
+});
 
 import { UserAccessPanel } from "./UserAccessPanel";
+import type * as AuthorizationApiModule from "../api";
 import type {
     AuthorizationAdministrationGrantProjectionData,
     AuthorizationAdministrationOverviewData,
@@ -525,6 +529,22 @@ describe("User Access presentation", () => {
             expect(grantApi.changeUserSystemRole).toHaveBeenCalledWith(7, { systemRole: "USER" });
         });
         expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a failed system-role confirmation visible and clears it after close/reopen", async () => {
+        grantApi.changeUserSystemRole.mockRejectedValue(new Error("request failed"));
+        renderPanel(normalUser);
+
+        fireEvent.click(screen.getByRole("button", { name: "อนุญาตให้จัดการสิทธิ์" }));
+        let dialog = await screen.findByRole("alertdialog");
+        fireEvent.click(within(dialog).getByRole("button", { name: "อนุญาตให้จัดการสิทธิ์" }));
+        await vi.waitFor(() => expect(within(dialog).getByText("ดำเนินการไม่สำเร็จ")).toBeInTheDocument());
+
+        fireEvent.click(within(dialog).getByRole("button", { name: "ยกเลิก" }));
+        await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+        fireEvent.click(screen.getByRole("button", { name: "อนุญาตให้จัดการสิทธิ์" }));
+        dialog = await screen.findByRole("alertdialog");
+        expect(within(dialog).queryByText("ดำเนินการไม่สำเร็จ")).not.toBeInTheDocument();
     });
 
     it("keeps the domain and effective-state filters usable", () => {
