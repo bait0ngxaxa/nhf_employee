@@ -1,6 +1,13 @@
 "use client";
 
-import { useMemo, useState, type ReactElement } from "react";
+import {
+    forwardRef,
+    useImperativeHandle,
+    useMemo,
+    useRef,
+    useState,
+    type ReactElement,
+} from "react";
 import { AlertCircle, Info, Loader2, Plus, Search, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
@@ -56,6 +63,10 @@ function isAuthorizationInspectionInvalid(
         || user.effectiveAccessStatus.status === "INVALID_CONFIGURATION";
 }
 
+type GrantDialogSessionHandle = {
+    open: () => void;
+};
+
 export function UserAccessPanel({
     user,
     loading,
@@ -83,18 +94,11 @@ export function UserAccessPanel({
     readonly onSelectTeam: (teamId: number) => void;
     readonly onRefresh: () => Promise<void>;
 }): ReactElement {
-    const [grantDialogOpen, setGrantDialogOpen] = useState(false);
-    const [grantSessionId, setGrantSessionId] = useState(0);
+    const grantSessionRef = useRef<GrantDialogSessionHandle | null>(null);
     const [systemRoleTarget, setSystemRoleTarget] = useState<SystemRole | null>(null);
     const [confirmationSessionId, setConfirmationSessionId] = useState(0);
     const [pending, setPending] = useState<string | null>(null);
     const inspectionInvalid = user ? isAuthorizationInspectionInvalid(user) : false;
-
-    const openGrantDialog = (): void => {
-        if (!user || inspectionInvalid) return;
-        setGrantSessionId((current) => current + 1);
-        setGrantDialogOpen(true);
-    };
 
     const requestSystemRoleChange = (nextRole: SystemRole): void => {
         setConfirmationSessionId((current) => current + 1);
@@ -124,7 +128,6 @@ export function UserAccessPanel({
             toast.success("เพิ่มสิทธิ์เฉพาะบุคคลแล้ว", refreshed ? undefined : {
                 description: "บันทึกสำเร็จแล้ว แต่โหลดข้อมูลผู้ใช้ล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่",
             });
-            setGrantDialogOpen(false);
         } finally {
             setPending(null);
         }
@@ -201,19 +204,18 @@ export function UserAccessPanel({
                         pending={pending}
                         onAddGrant={addGrant}
                         onRemoveGrant={removeGrant}
-                        onOpenFallbackAdd={() => {
-                            openGrantDialog();
-                        }}
+                        onOpenFallbackAdd={() => grantSessionRef.current?.open()}
                     />
-                    <GrantFormDialog
-                        key={`${user.user.id}:${grantSessionId}`}
-                        open={grantDialogOpen && !inspectionInvalid}
-                        source="USER"
-                        capabilities={overview.capabilities}
-                        busy={pending?.startsWith("user-grant-add:") ?? false}
-                        onClose={() => setGrantDialogOpen(false)}
-                        onSubmit={addGrant}
-                    />
+                    {!inspectionInvalid ? (
+                        <UserGrantDialogSession
+                            key={user.user.id}
+                            ref={grantSessionRef}
+                            user={user}
+                            overview={overview}
+                            busy={pending?.startsWith("user-grant-add:") ?? false}
+                            onSubmit={addGrant}
+                        />
+                    ) : null}
                     <ConfirmAuthorizationAction
                         sessionId={`system-role:${systemRoleTarget ?? "closed"}:${confirmationSessionId}`}
                         open={systemRoleTarget !== null}
@@ -235,6 +237,45 @@ export function UserAccessPanel({
         </div>
     );
 }
+
+const UserGrantDialogSession = forwardRef<
+    GrantDialogSessionHandle,
+    {
+        readonly user: AuthorizationAdministrationUserDetailData;
+        readonly overview: AuthorizationAdministrationOverviewData;
+        readonly busy: boolean;
+        readonly onSubmit: (input: AuthorizationCapabilityGrantInput) => Promise<void>;
+    }
+>(function UserGrantDialogSession({ user, overview, busy, onSubmit }, ref): ReactElement {
+    const [grantDialogOpen, setGrantDialogOpen] = useState(false);
+    const [grantSessionId, setGrantSessionId] = useState(0);
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            open: () => {
+                setGrantSessionId((current) => current + 1);
+                setGrantDialogOpen(true);
+            },
+        }),
+        [],
+    );
+
+    return (
+        <GrantFormDialog
+            key={`${user.user.id}:${grantSessionId}`}
+            open={grantDialogOpen}
+            source="USER"
+            capabilities={overview.capabilities}
+            busy={busy}
+            onClose={() => setGrantDialogOpen(false)}
+            onSubmit={async (input) => {
+                await onSubmit(input);
+                setGrantDialogOpen(false);
+            }}
+        />
+    );
+});
 
 function UserDirectorySearch({
     query,

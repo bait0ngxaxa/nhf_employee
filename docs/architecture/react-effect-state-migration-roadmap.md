@@ -542,6 +542,10 @@ Focused verification ที่ผ่าน:
 
 Behavior invariants ที่ตรวจแล้ว: dirty-form discard protection, focus restoration, same-session draft preservation, new-session reset, effective-scope normalization, confirmation error isolation, attachment request abort, object URL revocation, stale attachment response isolation, Stock uncontrolled field reset และ one-variant minimum
 
+Follow-up hardening สำหรับ `SSE-011`: เมื่อ authorization inspection เป็น `INVALID_CONFIGURATION` Grant session subtree จะถูกถอดออกพร้อม session owner; เมื่อ inspection กลับมา valid dialog จะไม่เปิดเองและไม่ revive wizard state เดิม ต้องเปิด session ใหม่โดยผู้ใช้
+
+Regression verification: `UserAccessPanel.test.tsx` เพิ่มกรณี valid → เปิด Grant → invalid → valid → explicit reopen; targeted UserAccessPanel/AuthorizationDialogs tests **25 tests ผ่าน**, lint และ typecheck ผ่าน และ repository-wide explicit rule inventory ยังคง **48 diagnostics**
+
 ไม่มีการแก้ API contract, schema, migration, authorization หรือ capability cleanup `SSE-040`. `SSE-008`/`SSE-009` และงาน L5D–L5K ยังคง intentionally untouched. เป้าหมายสุดท้ายยังคงเป็น:
 
 ```text

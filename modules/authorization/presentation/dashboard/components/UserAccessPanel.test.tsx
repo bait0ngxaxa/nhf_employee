@@ -293,7 +293,14 @@ function renderPanel(
     user: AuthorizationAdministrationUserDetailData = adminUser,
     onRefresh: () => Promise<void> = vi.fn(async () => undefined),
 ) {
-    return render(
+    return render(createPanelElement(user, onRefresh));
+}
+
+function createPanelElement(
+    user: AuthorizationAdministrationUserDetailData,
+    onRefresh: () => Promise<void>,
+) {
+    return (
         <UserAccessPanel
             user={user}
             loading={false}
@@ -307,7 +314,7 @@ function renderPanel(
             onSelectUser={vi.fn()}
             onSelectTeam={vi.fn()}
             onRefresh={onRefresh}
-        />,
+        />
     );
 }
 
@@ -490,6 +497,45 @@ describe("User Access presentation", () => {
         expect(screen.getByText(/บางสิทธิ์ของผู้ใช้นี้ไม่สามารถนำมาใช้งานได้อย่างปลอดภัย/)).toBeInTheDocument();
         expect(screen.queryByText("UNKNOWN_PERSISTED_CAPABILITY")).not.toBeInTheDocument();
         expectInvalidConfigurationSurfaceToBeReadOnly();
+    });
+
+    it("terminates a Grant session when authorization inspection becomes invalid", () => {
+        const invalidUser = {
+            ...normalUser,
+            resolverEffectivePermissionStatus: {
+                status: "INVALID_CONFIGURATION" as const,
+                error: {
+                    code: "UNKNOWN_PERSISTED_CAPABILITY" as const,
+                    capabilityKey: "legacy.capability",
+                    teamId: 11,
+                },
+            },
+        } satisfies AuthorizationAdministrationUserDetailData;
+        const onRefresh = vi.fn(async () => undefined);
+        const rendered = renderPanel(normalUser, onRefresh);
+
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มสิทธิ์อื่น" }));
+        let dialog = screen.getByRole("dialog");
+        fireEvent.change(within(dialog).getByLabelText("ค้นหาสิทธิ์"), {
+            target: { value: "บันทึก" },
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: /ดูบันทึกการใช้งานระบบ/ }));
+        fireEvent.click(within(dialog).getByRole("radio", { name: /ทั้งหมด/ }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" }));
+        expect(screen.getByText("ตรวจสอบสิ่งที่จะเปลี่ยน")).toBeInTheDocument();
+
+        rendered.rerender(createPanelElement(invalidUser, onRefresh));
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+        rendered.rerender(createPanelElement(normalUser, onRefresh));
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มสิทธิ์อื่น" }));
+        dialog = screen.getByRole("dialog");
+        expect(within(dialog).getByLabelText("ค้นหาสิทธิ์")).toHaveValue("");
+        expect(within(dialog).getByRole("button", { name: "ตรวจสอบการเปลี่ยนแปลง" })).toBeInTheDocument();
+        expect(within(dialog).queryByText("ตรวจสอบสิ่งที่จะเปลี่ยน")).not.toBeInTheDocument();
+        expect(within(dialog).queryByRole("radio")).not.toBeInTheDocument();
     });
 
     it("keeps system-role promotion separate from business capability grants", async () => {
