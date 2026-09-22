@@ -9,8 +9,10 @@ import type { EmployeeListProps } from "./types";
 import { AlertCircle, SearchX, Sparkles, UsersRound } from "lucide-react";
 
 import { getEmployeeStatusLabel } from "./formatters";
+import { useCallback, useState } from "react";
 import { useEmployeeDataContext, useEmployeeUIContext } from "./context/EmployeeContext";
 import { EmployeeListSkeleton } from "./EmployeeSkeletons";
+import type { Employee } from "./types";
 
 export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
     const {
@@ -34,9 +36,9 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
         handlePreviousPage,
         handleNextPage,
         handleExportCSV,
-        handleEditEmployee,
     } = useEmployeeUIContext();
     const canReadEmployees = employeeCapabilities?.canReadEmployees === true;
+    const canUpdateEmployees = employeeCapabilities?.canUpdateEmployees === true;
 
     if (!canReadEmployees) {
         return null;
@@ -134,11 +136,14 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
                     onRetry={error ? triggerRefresh : undefined}
                 />
             ) : (
-                <EmployeeTable
-                    employees={currentEmployees}
-                    canUpdateEmployees={employeeCapabilities?.canUpdateEmployees === true}
-                    onEditEmployee={handleEditEmployee}
-                />
+                canUpdateEmployees ? (
+                    <EmployeeEditCapabilitySession employees={currentEmployees} />
+                ) : (
+                    <EmployeeTable
+                        employees={currentEmployees}
+                        canUpdateEmployees={false}
+                    />
+                )
             )}
 
             {/* Pagination Controls */}
@@ -151,9 +156,47 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
                 onNextPage={handleNextPage}
             />
 
-            {/* Modals */}
-            <EmployeeModals />
         </div>
+    );
+}
+
+function EmployeeEditCapabilitySession({
+    employees,
+}: {
+    employees: Employee[];
+}) {
+    const { handleEmployeeUpdate } = useEmployeeUIContext();
+    const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
+
+    const handleEditEmployee = useCallback((employee: Employee): void => {
+        setEmployeeToEdit(employee);
+    }, []);
+    const handleCloseEditForm = useCallback((): void => {
+        setEmployeeToEdit(null);
+    }, []);
+    const handleEditSuccess = useCallback((): void => {
+        if (!employeeToEdit) {
+            return;
+        }
+
+        handleEmployeeUpdate(employeeToEdit);
+        setEmployeeToEdit(null);
+    }, [employeeToEdit, handleEmployeeUpdate]);
+
+    return (
+        <>
+            <EmployeeTable
+                employees={employees}
+                canUpdateEmployees
+                onEditEmployee={handleEditEmployee}
+            />
+            <EmployeeModals
+                employee={employeeToEdit}
+                isOpen={employeeToEdit !== null}
+                onClose={handleCloseEditForm}
+                onSuccess={handleEditSuccess}
+            />
+        </>
     );
 }
 

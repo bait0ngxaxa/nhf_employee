@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Download, X } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Download, Edit3, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
+import type { KeyedMutator } from "swr";
 
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -75,7 +76,6 @@ function RoutineOccurrencePanel({
     const [categoryId, setCategoryId] = useState("");
     const [timingStatus, setTimingStatus] = useState<RoutineTimingStatus | "">("");
     const [page, setPage] = useState(1);
-    const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
     const searchInputId = useId();
     const unitFilterId = useId();
     const categoryFilterId = useId();
@@ -114,38 +114,12 @@ function RoutineOccurrencePanel({
         canReadReference ? API_ROUTES.routines.reference : null,
         fetchRoutine,
     );
-    const {
-        data: editingTaskData,
-        error: editingTaskError,
-        isLoading: editingTaskLoading,
-        mutate: mutateEditingTask,
-    } = useSWR<RoutineTaskByIdResponse, Error>(
-        editingTaskId !== null
-            ? API_ROUTES.routines.taskById(editingTaskId)
-            : null,
-        fetchRoutine,
-    );
-
     useEffect(() => {
         setPage(1);
     }, [categoryId, debouncedSearch, occurrenceId, scope, taskId, timingStatus, unitId]);
 
     const filterUnits = uniqueRoutineUnits(reference?.units ?? []);
-    const editingTask = editingTaskData?.task.id === editingTaskId
-        ? editingTaskData.task
-        : null;
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
-
-    useEffect(() => {
-        if (!canUpdateTasks && editingTaskId !== null) {
-            setEditingTaskId(null);
-        }
-    }, [canUpdateTasks, editingTaskId]);
-
-    function openTaskEdit(taskId: number): void {
-        if (!canUpdateTasks) return;
-        setEditingTaskId(taskId);
-    }
 
     return (
         <div className="space-y-5">
@@ -270,17 +244,78 @@ function RoutineOccurrencePanel({
                 focusOccurrenceId={occurrenceId}
                 onRetry={() => void mutate()}
                 onPageChange={setPage}
-                onEditTask={openTaskEdit}
+                onEditTask={() => undefined}
+                renderEditAction={canUpdateTasks ? (task) => (
+                    <RoutineOperationalEditCapabilitySession
+                        key={task.id}
+                        taskId={task.id}
+                        currentEmployeeId={currentEmployeeId}
+                        mutate={mutate}
+                        mutateReference={mutateReference}
+                        onTaskSaved={onTaskSaved}
+                        reference={reference}
+                        referenceError={referenceError}
+                        referenceLoading={referenceLoading}
+                        routineCapabilities={routineCapabilities}
+                    />
+                ) : undefined}
                 mutate={mutate}
                 employees={reference?.employees ?? []}
             />
+        </div>
+    );
+}
+
+function RoutineOperationalEditCapabilitySession({
+    taskId,
+    currentEmployeeId,
+    mutate,
+    mutateReference,
+    onTaskSaved,
+    reference,
+    referenceError,
+    referenceLoading,
+    routineCapabilities,
+}: {
+    taskId: number;
+    currentEmployeeId?: number;
+    mutate: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
+    mutateReference: KeyedMutator<RoutineReferenceData>;
+    onTaskSaved: () => void;
+    reference: RoutineReferenceData | undefined;
+    referenceError: Error | undefined;
+    referenceLoading: boolean;
+    routineCapabilities?: RoutinePresentationCapabilities;
+}) {
+    const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+    const {
+        data: editingTaskData,
+        error: editingTaskError,
+        isLoading: editingTaskLoading,
+        mutate: mutateEditingTask,
+    } = useSWR<RoutineTaskByIdResponse, Error>(
+        editingTaskId !== null
+            ? API_ROUTES.routines.taskById(editingTaskId)
+            : null,
+        fetchRoutine,
+    );
+    const editingTask = editingTaskData?.task.id === editingTaskId
+        ? editingTaskData.task
+        : null;
+
+    return (
+        <>
+            <Button type="button" variant="outline" size="sm" onClick={() => setEditingTaskId(taskId)}>
+                <Edit3 aria-hidden="true" />
+                แก้ไข Routine
+            </Button>
             <RoutineTaskDialog
                 open={editingTaskId !== null}
                 intent="edit"
                 allowBroadAssignment={routineCapabilities?.canUpdateAllTasks === true}
                 currentEmployeeId={currentEmployeeId}
-                canSubmit={canUpdateTasks && (editingTask === null || editingTask.canEdit === true)}
-                canChangeStatus={canUpdateTasks && editingTask?.canDelete === true}
+                canSubmit={editingTaskId !== null && (editingTask === null || editingTask.canEdit === true)}
+                canChangeStatus={editingTask?.canDelete === true}
                 reference={reference}
                 task={editingTask}
                 error={referenceError ?? editingTaskError}
@@ -297,7 +332,7 @@ function RoutineOccurrencePanel({
                     onTaskSaved();
                 }}
             />
-        </div>
+        </>
     );
 }
 
@@ -311,8 +346,6 @@ function RoutineTaskSettings({
     onTaskSaved: () => void;
 }) {
     const canReadReference = routineCapabilities?.canReadReference === true;
-    const [isCreating, setIsCreating] = useState(false);
-    const [editingTask, setEditingTask] = useState<RoutineTask | null>(null);
     const [taskPage, setTaskPage] = useState(1);
     const [taskSearch, setTaskSearch] = useState("");
     const [taskUnitId, setTaskUnitId] = useState("");
@@ -352,25 +385,6 @@ function RoutineTaskSettings({
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
     const canUpdateAllTasks = routineCapabilities?.canUpdateAllTasks === true;
     const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
-
-    useEffect(() => {
-        if (!canCreateTasks && isCreating) {
-            setIsCreating(false);
-        }
-        if (!canUpdateTasks && editingTask !== null) {
-            setEditingTask(null);
-        }
-    }, [canCreateTasks, canUpdateTasks, editingTask, isCreating]);
-
-    function openCreate(): void {
-        if (!canCreateTasks) return;
-        setIsCreating(true);
-    }
-
-    function openEdit(task: RoutineTask): void {
-        if (!canUpdateTasks || task.canEdit !== true) return;
-        setEditingTask(task);
-    }
 
     async function updateTaskActive(task: RoutineTask): Promise<void> {
         if (!canUpdateTasks || task.canDelete !== true) return;
@@ -434,8 +448,34 @@ function RoutineTaskSettings({
                 routineCapabilities={routineCapabilities}
                 isLoading={tasksLoading}
                 onRetry={() => void mutateTasks()}
-                onCreate={openCreate}
-                onEdit={openEdit}
+                onCreate={() => undefined}
+                onEdit={() => undefined}
+                createAction={canCreateTasks ? (
+                    <RoutineTaskCreateCapabilitySession
+                        allowBroadAssignment={canCreateTasksForOthers}
+                        currentEmployeeId={currentEmployeeId}
+                        reference={reference}
+                        referenceError={referenceError}
+                        referenceLoading={referenceLoading}
+                        mutateReference={mutateReference}
+                        mutateTasks={mutateTasks}
+                        onTaskSaved={onTaskSaved}
+                    />
+                ) : null}
+                renderEditAction={canUpdateTasks ? (task) => (
+                    <RoutineTaskEditCapabilitySession
+                        key={task.id}
+                        task={task}
+                        allowBroadAssignment={canUpdateAllTasks}
+                        currentEmployeeId={currentEmployeeId}
+                        reference={reference}
+                        referenceError={referenceError}
+                        referenceLoading={referenceLoading}
+                        mutateReference={mutateReference}
+                        mutateTasks={mutateTasks}
+                        onTaskSaved={onTaskSaved}
+                    />
+                ) : undefined}
                 onToggleActive={updateTaskActive}
                 onDelete={deleteTask}
                 pendingTaskId={pendingTaskId}
@@ -463,38 +503,140 @@ function RoutineTaskSettings({
                     setTaskPage(1);
                 }}
             />
-            <RoutineTaskDialog
-                open={isCreating || editingTask !== null}
-                intent={editingTask ? "edit" : "create"}
-                allowBroadAssignment={editingTask ? canUpdateAllTasks : canCreateTasksForOthers}
-                currentEmployeeId={currentEmployeeId}
-                canSubmit={editingTask
-                    ? canUpdateTasks && editingTask.canEdit === true
-                    : canCreateTasks}
-                canChangeStatus={editingTask === null
-                    ? canCreateTasks
-                    : canUpdateTasks && editingTask.canDelete === true}
-                reference={reference}
-                task={editingTask}
-                error={referenceError}
-                isLoading={referenceLoading || !reference}
-                onRetry={() => void mutateReference()}
-                onClose={() => {
-                    setIsCreating(false);
-                    setEditingTask(null);
-                }}
-                onSaved={() => {
-                    setIsCreating(false);
-                    setEditingTask(null);
-                    void mutateTasks();
-                    onTaskSaved();
-                }}
-            />
         </div>
     );
 }
 
+function RoutineTaskCreateCapabilitySession({
+    allowBroadAssignment,
+    currentEmployeeId,
+    reference,
+    referenceError,
+    referenceLoading,
+    mutateReference,
+    mutateTasks,
+    onTaskSaved,
+}: {
+    allowBroadAssignment: boolean;
+    currentEmployeeId?: number;
+    reference: RoutineReferenceData | undefined;
+    referenceError: Error | undefined;
+    referenceLoading: boolean;
+    mutateReference: KeyedMutator<RoutineReferenceData>;
+    mutateTasks: KeyedMutator<PaginatedTasksResponse>;
+    onTaskSaved: () => void;
+}): ReactNode {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <>
+            <Button type="button" size="sm" className="xl:justify-self-end" onClick={() => setIsOpen(true)}>
+                <Plus aria-hidden="true" />
+                สร้างแม่แบบงาน
+            </Button>
+            <RoutineTaskDialog
+                open={isOpen}
+                intent="create"
+                allowBroadAssignment={allowBroadAssignment}
+                currentEmployeeId={currentEmployeeId}
+                canSubmit
+                canChangeStatus
+                reference={reference}
+                task={null}
+                error={referenceError}
+                isLoading={referenceLoading || !reference}
+                onRetry={() => void mutateReference()}
+                onClose={() => setIsOpen(false)}
+                onSaved={() => {
+                    setIsOpen(false);
+                    void mutateTasks();
+                    onTaskSaved();
+                }}
+            />
+        </>
+    );
+}
+
+function RoutineTaskEditCapabilitySession({
+    task,
+    allowBroadAssignment,
+    currentEmployeeId,
+    reference,
+    referenceError,
+    referenceLoading,
+    mutateReference,
+    mutateTasks,
+    onTaskSaved,
+}: {
+    task: RoutineTask;
+    allowBroadAssignment: boolean;
+    currentEmployeeId?: number;
+    reference: RoutineReferenceData | undefined;
+    referenceError: Error | undefined;
+    referenceLoading: boolean;
+    mutateReference: KeyedMutator<RoutineReferenceData>;
+    mutateTasks: KeyedMutator<PaginatedTasksResponse>;
+    onTaskSaved: () => void;
+}): ReactNode {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsOpen(true)}
+            >
+                <Edit3 aria-hidden="true" />
+                แก้ไข
+            </Button>
+            <RoutineTaskDialog
+                open={isOpen}
+                intent="edit"
+                allowBroadAssignment={allowBroadAssignment}
+                currentEmployeeId={currentEmployeeId}
+                canSubmit
+                canChangeStatus={task.canDelete === true}
+                reference={reference}
+                task={task}
+                error={referenceError}
+                isLoading={referenceLoading || !reference}
+                onRetry={() => void mutateReference()}
+                onClose={() => setIsOpen(false)}
+                onSaved={() => {
+                    setIsOpen(false);
+                    void mutateTasks();
+                    onTaskSaved();
+                }}
+            />
+        </>
+    );
+}
+
+function routineTabLifetimeKey(
+    routineCapabilities: RoutinePresentationCapabilities | undefined,
+): string {
+    return [
+        routineCapabilities?.canReadTasks === true ? "mine" : null,
+        routineCapabilities?.canReadTasks === true
+            && routineCapabilities.canReadAllTasks === true
+            ? "all"
+            : null,
+        routineCapabilities?.canCreateTasks === true
+            || routineCapabilities?.canUpdateTasks === true
+            || routineCapabilities?.canDeleteTasks === true
+            ? "manage"
+            : null,
+        routineCapabilities?.canManageImports === true ? "import" : null,
+    ].filter((tab): tab is string => tab !== null).join("|") || "none";
+}
+
 export function RoutineSection() {
+    return <RoutineSectionCapabilitySurface />;
+}
+
+function RoutineSectionCapabilitySurface() {
     const { user } = useDashboardDataContext();
     const routineCapabilities = user?.routineCapabilities;
     const canReadTasks = routineCapabilities?.canReadTasks === true;
@@ -514,7 +656,6 @@ export function RoutineSection() {
     const occurrenceId = Number.isInteger(occurrenceIdValue) && occurrenceIdValue > 0
         ? occurrenceIdValue
         : null;
-    const [activeTab, setActiveTab] = useState("mine");
     const visibleRoutineTabs = useMemo<ReadonlySet<string>>(
         () => new Set(
             [
@@ -527,6 +668,20 @@ export function RoutineSection() {
         [canManageImports, canManageTasks, canReadAllTasks, canReadTasks],
     );
     const firstVisibleTab = ["mine", "all", "manage", "import"].find((tab) => visibleRoutineTabs.has(tab)) ?? "mine";
+    const visibleTabKey = routineTabLifetimeKey(routineCapabilities);
+    const [tabState, setTabState] = useState({
+        activeTab: firstVisibleTab,
+        visibleTabKey,
+    });
+    if (tabState.visibleTabKey !== visibleTabKey) {
+        setTabState({
+            activeTab: visibleRoutineTabs.has(tabState.activeTab)
+                ? tabState.activeTab
+                : firstVisibleTab,
+            visibleTabKey,
+        });
+    }
+    const activeTab = tabState.activeTab;
     const safeTab = visibleRoutineTabs.has(activeTab) ? activeTab : firstVisibleTab;
     const summaryScope = safeTab === "all" ? "all" : "mine";
     const summaryKey = `${API_ROUTES.routines.summary}?scope=${summaryScope}`;
@@ -547,25 +702,19 @@ export function RoutineSection() {
     );
 
     useEffect(() => {
-        if (safeTab !== activeTab) {
-            setActiveTab(safeTab);
-        }
-    }, [activeTab, safeTab]);
-
-    useEffect(() => {
         if (
             canReadTasks
             && canReadAllTasks
             && (taskId !== null || occurrenceId !== null)
         ) {
-            setActiveTab("all");
+            setTabState((currentState) => ({ ...currentState, activeTab: "all" }));
         }
     }, [canReadAllTasks, canReadTasks, occurrenceId, taskId]);
 
     useEffect(() => {
         const requestedTab = searchParams.get("routineTab");
         if (requestedTab !== null && visibleRoutineTabs.has(requestedTab)) {
-            setActiveTab(requestedTab);
+            setTabState((currentState) => ({ ...currentState, activeTab: requestedTab }));
         }
     }, [searchParams, visibleRoutineTabs]);
 
@@ -575,7 +724,7 @@ export function RoutineSection() {
 
     function handleTabChange(value: string): void {
         if (visibleRoutineTabs.has(value)) {
-            setActiveTab(value);
+            setTabState((currentState) => ({ ...currentState, activeTab: value }));
         }
     }
 

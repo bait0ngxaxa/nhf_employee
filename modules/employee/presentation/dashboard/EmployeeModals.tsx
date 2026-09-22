@@ -1,27 +1,33 @@
 "use client";
 
 import { EditEmployeeForm } from "./edit-employee";
-import { useEmployeeUIContext } from "./context/EmployeeContext";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
+import type { Employee } from "./types";
 
-export function EmployeeModals() {
+interface EmployeeModalsProps {
+    employee: Employee | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+export function EmployeeModals({
+    employee,
+    isOpen,
+    onClose,
+    onSuccess,
+}: EmployeeModalsProps) {
     const { user } = useDashboardDataContext();
-    const {
-        isEditFormOpen,
-        employeeToEdit,
-        handleCloseEditForm,
-        handleEmployeeUpdate,
-    } = useEmployeeUIContext();
 
     return (
         <>
             {/* Edit Employee Form */}
             <EditEmployeeForm
-                key={employeeToEdit?.id || "new"}
-                employee={employeeToEdit}
-                isOpen={isEditFormOpen}
-                onClose={handleCloseEditForm}
-                onSuccess={handleEmployeeUpdate}
+                key={employee?.id || "new"}
+                employee={employee}
+                isOpen={isOpen}
+                onClose={onClose}
+                onSuccess={onSuccess}
                 canReadDepartments={user?.departmentCapabilities?.canReadDepartments === true}
             />
         </>

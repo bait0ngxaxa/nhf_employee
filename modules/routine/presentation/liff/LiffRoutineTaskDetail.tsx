@@ -35,14 +35,16 @@ interface LiffRoutineTaskDetailProps {
     loading: boolean;
     error: string | null;
     deleting: boolean;
-    deleteError: string | null;
     canUpdateTasks: boolean;
     canDeleteTasks: boolean;
     focusedOccurrenceId?: number | null;
     onOpenChange: (open: boolean) => void;
     onRetry: () => void;
     onEdit: (task: LiffRoutineTaskDetailData) => void;
-    onDelete: (task: LiffRoutineTaskDetailData) => void;
+    onDelete: (
+        task: LiffRoutineTaskDetailData,
+        reportDeleteError: (message: string | null) => void,
+    ) => void;
 }
 
 function DetailRow({
@@ -112,19 +114,21 @@ function OptionalSection({
 function LiffRoutineDeleteSession({
     task,
     busy,
-    error,
     showTrigger,
     onDelete,
     children,
 }: {
     task: LiffRoutineTaskDetailData;
     busy: boolean;
-    error: string | null;
     showTrigger: boolean;
-    onDelete: (task: LiffRoutineTaskDetailData) => void;
+    onDelete: (
+        task: LiffRoutineTaskDetailData,
+        reportDeleteError: (message: string | null) => void,
+    ) => void;
     children?: ReactNode;
 }): ReactElement {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     return (
         <>
@@ -151,9 +155,9 @@ function LiffRoutineDeleteSession({
                 open={deleteConfirmOpen}
                 taskTitle={task.title}
                 busy={busy}
-                error={error}
+                error={deleteError}
                 onOpenChange={setDeleteConfirmOpen}
-                onConfirm={() => onDelete(task)}
+                onConfirm={() => onDelete(task, setDeleteError)}
             />
         </>
     );
@@ -165,7 +169,6 @@ export function LiffRoutineTaskDetail({
     loading,
     error,
     deleting,
-    deleteError,
     canUpdateTasks,
     canDeleteTasks,
     focusedOccurrenceId = null,
@@ -387,7 +390,6 @@ export function LiffRoutineTaskDetail({
                         key={detail.id}
                         task={detail}
                         busy={deleting}
-                        error={deleteError}
                         showTrigger={!loading && !error}
                         onDelete={onDelete}
                     >

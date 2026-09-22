@@ -68,7 +68,6 @@ export function EmployeeProvider({
 }: EmployeeProviderProps) {
     const canReadEmployees = employeeCapabilities?.canReadEmployees === true;
     const canReadStats = employeeCapabilities?.canReadStats === true;
-    const canUpdateEmployees = employeeCapabilities?.canUpdateEmployees === true;
     const canExportEmployees = employeeCapabilities?.canExportEmployees === true;
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -91,8 +90,6 @@ export function EmployeeProvider({
 
     // UI states
     const [isExporting, setIsExporting] = useState(false);
-    const [isEditFormOpen, setIsEditFormOpen] = useState(false);
-    const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const debouncedSearchTerm = useDebouncedValue(searchTerm);
@@ -227,33 +224,13 @@ export function EmployeeProvider({
         }
     }, [canExportEmployees, debouncedSearchTerm, pagination.total, statusFilter]);
 
-    const handleEditEmployee = useCallback((employee: Employee) => {
+    const handleEmployeeUpdate = useCallback((employee: Employee): void => {
+        const canUpdateEmployees = employeeCapabilities?.canUpdateEmployees === true;
         if (!canUpdateEmployees) {
             return;
         }
 
-        setEmployeeToEdit(employee);
-        setIsEditFormOpen(true);
-    }, [canUpdateEmployees]);
-
-    const handleCloseEditForm = useCallback(() => {
-        setIsEditFormOpen(false);
-        setEmployeeToEdit(null);
-    }, []);
-
-    const handleEmployeeUpdate = useCallback(() => {
-        if (!canUpdateEmployees) {
-            setIsEditFormOpen(false);
-            setEmployeeToEdit(null);
-            return;
-        }
-
-        const employeeName = employeeToEdit
-            ? getEmployeeDisplayName(employeeToEdit)
-            : "พนักงาน";
-
-        setIsEditFormOpen(false);
-        setEmployeeToEdit(null);
+        const employeeName = getEmployeeDisplayName(employee) || "พนักงาน";
 
         // Show toast notification instead of modal
         toast.success("อัปเดตข้อมูลสำเร็จ", {
@@ -268,18 +245,7 @@ export function EmployeeProvider({
             refreshes.push(mutateStatsRef.current());
         }
         void Promise.all(refreshes);
-    }, [canReadEmployees, canReadStats, canUpdateEmployees, employeeToEdit]);
-
-    useEffect(() => {
-        if (canUpdateEmployees) {
-            return;
-        }
-
-        if (isEditFormOpen || employeeToEdit !== null) {
-            setIsEditFormOpen(false);
-            setEmployeeToEdit(null);
-        }
-    }, [canUpdateEmployees, employeeToEdit, isEditFormOpen]);
+    }, [canReadEmployees, canReadStats, employeeCapabilities]);
 
     // Stable triggerRefresh that doesn't depend on mutate identity
     const triggerRefresh = useCallback(async () => {
@@ -323,8 +289,6 @@ export function EmployeeProvider({
             handlePreviousPage,
             handleNextPage,
             handleExportCSV,
-            handleEditEmployee,
-            handleCloseEditForm,
             handleEmployeeUpdate,
         }),
         [
@@ -334,8 +298,6 @@ export function EmployeeProvider({
             handlePreviousPage,
             handleNextPage,
             handleExportCSV,
-            handleEditEmployee,
-            handleCloseEditForm,
             handleEmployeeUpdate,
         ],
     );
@@ -354,10 +316,6 @@ export function EmployeeProvider({
             handleNextPage: uiHandlers.handleNextPage,
             isExporting,
             handleExportCSV: uiHandlers.handleExportCSV,
-            isEditFormOpen,
-            employeeToEdit,
-            handleEditEmployee: uiHandlers.handleEditEmployee,
-            handleCloseEditForm: uiHandlers.handleCloseEditForm,
             handleEmployeeUpdate: uiHandlers.handleEmployeeUpdate,
         }),
         [
@@ -367,8 +325,6 @@ export function EmployeeProvider({
             currentPage,
             itemsPerPage,
             isExporting,
-            isEditFormOpen,
-            employeeToEdit,
             uiHandlers,
         ],
     );

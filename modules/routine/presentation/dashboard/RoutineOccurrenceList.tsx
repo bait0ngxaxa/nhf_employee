@@ -1,5 +1,5 @@
 import { Eye, Pencil } from "lucide-react";
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import type { KeyedMutator } from "swr";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ interface RoutineOccurrenceListProps {
     mutate: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
     routineCapabilities?: RoutinePresentationCapabilities;
     onEditTask: (taskId: number) => void;
+    renderEditAction?: (task: RoutineTaskWorkItem) => ReactNode;
     onPageChange: (page: number) => void;
     onRetry: () => void;
 }
@@ -49,43 +50,35 @@ function formatDate(date: string): string {
     }).format(calendarDateToDate(date));
 }
 
-export function RoutineOccurrenceList({
+export function RoutineOccurrenceList(props: RoutineOccurrenceListProps): ReactElement {
+    return <RoutineOccurrenceListContent {...props} />;
+}
+
+type RoutineOccurrenceListContentProps = RoutineOccurrenceListProps;
+
+function RoutineOccurrenceListContent({
     data,
-    employees,
     error,
     focusOccurrenceId,
     focusTaskId,
     canReadImportMetadata,
     isLoading,
+    employees,
     mutate,
     onEditTask,
     onPageChange,
     onRetry,
     routineCapabilities,
-}: RoutineOccurrenceListProps): ReactElement {
+    renderEditAction,
+}: RoutineOccurrenceListContentProps): ReactElement {
     const [detailsTask, setDetailsTask] = useState<RoutineTaskWorkItem | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
-    const [occurrenceEditTask, setOccurrenceEditTask] = useState<RoutineTaskWorkItem | null>(null);
-    const [occurrenceEditOpen, setOccurrenceEditOpen] = useState(false);
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
     const canOverrideOccurrences = routineCapabilities?.canOverrideOccurrences === true;
-
-    useEffect(() => {
-        if (!canOverrideOccurrences && occurrenceEditTask !== null) {
-            setOccurrenceEditTask(null);
-            setOccurrenceEditOpen(false);
-        }
-    }, [canOverrideOccurrences, occurrenceEditTask]);
 
     function openDetails(task: RoutineTaskWorkItem): void {
         setDetailsTask(task);
         setDetailsOpen(true);
-    }
-
-    function openOccurrenceEdit(task: RoutineTaskWorkItem): void {
-        if (!canOverrideOccurrences || task.relevantOccurrence === null) return;
-        setOccurrenceEditTask(task);
-        setOccurrenceEditOpen(true);
     }
 
     if (isLoading && !data) return <RoutineOccurrenceListSkeleton />;
@@ -197,16 +190,20 @@ export function RoutineOccurrenceList({
                                 ดูรายละเอียด
                             </Button>
                             {canUpdateTasks && task.canEdit === true ? (
-                                <Button type="button" size="sm" variant="outline" onClick={() => onEditTask(task.id)}>
-                                    <Pencil aria-hidden="true" />
-                                    แก้ไข Routine
-                                </Button>
+                                renderEditAction ? renderEditAction(task) : (
+                                    <Button type="button" size="sm" variant="outline" onClick={() => onEditTask(task.id)}>
+                                        <Pencil aria-hidden="true" />
+                                        แก้ไข Routine
+                                    </Button>
+                                )
                             ) : null}
                             {canOverrideOccurrences && occurrence ? (
-                                <Button type="button" size="sm" variant="outline" onClick={() => openOccurrenceEdit(task)}>
-                                    <Pencil aria-hidden="true" />
-                                    ปรับเฉพาะรอบนี้
-                                </Button>
+                                <RoutineOccurrenceEditCapabilitySession
+                                    key={task.id}
+                                    task={task}
+                                    employees={employees}
+                                    mutate={mutate}
+                                />
                             ) : null}
                         </div>
                     </article>
@@ -229,16 +226,37 @@ export function RoutineOccurrenceList({
                 onOpenChange={setDetailsOpen}
                 canReadImportMetadata={canReadImportMetadata}
             />
+        </div>
+    );
+}
+
+function RoutineOccurrenceEditCapabilitySession({
+    task,
+    employees,
+    mutate,
+}: {
+    task: RoutineTaskWorkItem;
+    employees: RoutineEmployee[];
+    mutate: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
+}): ReactNode {
+    const [occurrenceEditOpen, setOccurrenceEditOpen] = useState(false);
+
+    return (
+        <>
+            <Button type="button" size="sm" variant="outline" onClick={() => setOccurrenceEditOpen(true)}>
+                <Pencil aria-hidden="true" />
+                ปรับเฉพาะรอบนี้
+            </Button>
             <RoutineOccurrenceEditDialog
-                task={occurrenceEditTask}
+                task={task}
                 open={occurrenceEditOpen}
-                canOverrideOccurrences={canOverrideOccurrences}
-                onOpenChange={setOccurrenceEditOpen}
+                canOverrideOccurrences
+                onOpenChange={(open) => setOccurrenceEditOpen(open)}
                 employees={employees}
                 onSaved={async () => {
                     await mutate();
                 }}
             />
-        </div>
+        </>
     );
 }

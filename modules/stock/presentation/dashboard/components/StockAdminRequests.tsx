@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { type StockRequestStatus } from "@prisma/client";
 import { CheckCircle, ClipboardList, Loader2, Search, X, XCircle } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
@@ -59,7 +59,6 @@ export function StockAdminRequests() {
         requestSearchQuery,
         setRequestSearchQuery,
     } = useStockUIContext();
-    const [cancelTarget, setCancelTarget] = useState<StockRequest | null>(null);
     const { processingRequestId, runCancelRequest, runIssueRequest } =
         useStockRequestActions({
             canCancelRequests: canCancelAnyRequests,
@@ -69,13 +68,7 @@ export function StockAdminRequests() {
                 refreshItems();
             },
             onCancelSuccess: refreshRequests,
-            onCancelSettled: () => setCancelTarget(null),
         });
-    useEffect(() => {
-        if (!canCancelAnyRequests) {
-            setCancelTarget(null);
-        }
-    }, [canCancelAnyRequests]);
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
@@ -199,16 +192,13 @@ export function StockAdminRequests() {
                                         </Button>
                                     ) : null}
                                     {canCancelAnyRequests ? (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
+                                        <StockAdminCancelAction
+                                            request={req}
+                                            loading={processingRequestId === req.id}
+                                            disabled={processingRequestId !== null}
+                                            onCancel={handleCancel}
                                             className="h-11 border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
-                                            disabled={processingRequestId === req.id}
-                                            onClick={() => setCancelTarget(req)}
-                                        >
-                                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                            ยกเลิก
-                                        </Button>
+                                        />
                                     ) : null}
                                 </>
                             ) : null
@@ -299,16 +289,15 @@ export function StockAdminRequests() {
                                                             <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
                                                             จ่ายแล้ว
                                                         </Button> : null}
-                                                        {canCancelAnyRequests ? <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
-                                                            disabled={processingRequestId === req.id}
-                                                            onClick={() => setCancelTarget(req)}
-                                                        >
-                                                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
-                                                            ยกเลิก
-                                                        </Button> : null}
+                                                        {canCancelAnyRequests ? (
+                                                            <StockAdminCancelAction
+                                                                request={req}
+                                                                loading={processingRequestId === req.id}
+                                                                disabled={processingRequestId !== null}
+                                                                onCancel={handleCancel}
+                                                                className="border-status-danger-border text-status-danger-foreground transition-colors hover:border-status-danger-border-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
+                                                            />
+                                                        ) : null}
                                                     </div>
                                                 ) : (
                                                     <StockRequestNote request={req} />
@@ -336,20 +325,60 @@ export function StockAdminRequests() {
                 </>
             )}
 
-            <CancelDialog
-                request={cancelTarget}
-                onClose={() => setCancelTarget(null)}
-                onCancel={handleCancel}
-                loading={processingRequestId !== null}
-            />
         </div>
+    );
+}
+
+type StockAdminCancelActionProps = {
+    request: StockRequest;
+    loading: boolean;
+    disabled: boolean;
+    onCancel: (id: number, reason: string) => Promise<void>;
+    className: string;
+};
+
+function StockAdminCancelAction({
+    request,
+    loading,
+    disabled,
+    onCancel,
+    className,
+}: StockAdminCancelActionProps) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    async function handleCancel(id: number, reason: string): Promise<void> {
+        await onCancel(id, reason);
+        setIsOpen(false);
+    }
+
+    return (
+        <>
+            <Button
+                size="sm"
+                variant="outline"
+                className={className}
+                disabled={disabled}
+                onClick={() => setIsOpen(true)}
+            >
+                <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                ยกเลิก
+            </Button>
+            {isOpen ? (
+                <CancelDialog
+                    request={request}
+                    onClose={() => setIsOpen(false)}
+                    onCancel={handleCancel}
+                    loading={loading}
+                />
+            ) : null}
+        </>
     );
 }
 
 interface CancelDialogProps {
     request: StockRequest | null;
     onClose: () => void;
-    onCancel: (id: number, reason: string) => void;
+    onCancel: (id: number, reason: string) => Promise<void>;
     loading: boolean;
 }
 
@@ -408,7 +437,7 @@ function CancelDialog({
                         <Button
                             variant="destructive"
                             disabled={loading}
-                            onClick={() => onCancel(request.id, reason.trim())}
+                            onClick={() => void onCancel(request.id, reason.trim())}
                             className="h-11 bg-status-danger-solid px-7 font-bold text-content-on-brand shadow-sm transition-colors hover:bg-status-danger-solid-hover"
                         >
                             {loading ? (

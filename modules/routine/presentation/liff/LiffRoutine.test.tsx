@@ -1335,7 +1335,6 @@ describe("LiffRoutineApp", () => {
             loading: false,
             error: null,
             deleting: false,
-            deleteError: null,
             canUpdateTasks: true,
             canDeleteTasks: true,
             focusedOccurrenceId: null,

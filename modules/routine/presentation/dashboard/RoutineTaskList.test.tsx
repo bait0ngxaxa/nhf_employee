@@ -220,6 +220,36 @@ describe("RoutineTaskList", () => {
         await waitFor(() => expect(props.onDelete).toHaveBeenCalledWith(task));
     });
 
+    it("destroys delete confirmation on capability or task eligibility loss", () => {
+        const props = makeProps();
+        const { rerender } = render(<RoutineTaskList {...props} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "ลบ" }));
+        expect(screen.getByRole("alertdialog", { name: "ยืนยันการลบ Routine" })).toBeInTheDocument();
+
+        rerender(
+            <RoutineTaskList
+                {...props}
+                routineCapabilities={{ ...allRoutineCapabilities, canDeleteTasks: false }}
+            />,
+        );
+        expect(screen.queryByRole("alertdialog", { name: "ยืนยันการลบ Routine" })).not.toBeInTheDocument();
+
+        rerender(<RoutineTaskList {...props} />);
+        expect(screen.queryByRole("alertdialog", { name: "ยืนยันการลบ Routine" })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ลบ" }));
+        expect(screen.getByRole("alertdialog", { name: "ยืนยันการลบ Routine" })).toBeInTheDocument();
+
+        rerender(
+            <RoutineTaskList
+                {...props}
+                data={{ ...props.data, tasks: [{ ...task, canDelete: false }] }}
+            />,
+        );
+        expect(screen.queryByRole("alertdialog", { name: "ยืนยันการลบ Routine" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลบ" })).not.toBeInTheDocument();
+    });
+
     it("keeps delete and lifecycle actions hidden for an assigned non-creator", () => {
         const assignedTask: RoutineTask = {
             ...task,

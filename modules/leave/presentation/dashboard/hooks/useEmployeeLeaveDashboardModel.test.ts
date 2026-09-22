@@ -115,26 +115,14 @@ describe("useEmployeeLeaveDashboardModel", () => {
         });
     });
 
-    it("opens and closes request form", () => {
+    it("refreshes the profile after a successful request callback", async () => {
         const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
-        expect(result.current.isRequestFormOpen).toBe(false);
-        act(() => result.current.openRequestForm());
-        expect(result.current.isRequestFormOpen).toBe(true);
-        act(() => result.current.closeRequestForm());
-        expect(result.current.isRequestFormOpen).toBe(false);
-    });
-
-    it("closes request form after successful submit callback", async () => {
-        const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
-
-        act(() => result.current.openRequestForm());
         await act(async () => {
             await result.current.onRequestSuccess();
         });
 
         expect(mutate).toHaveBeenCalledTimes(1);
-        expect(result.current.isRequestFormOpen).toBe(false);
     });
 
     it("resets employee history pagination when a filter changes", () => {
@@ -191,39 +179,31 @@ describe("useEmployeeLeaveDashboardModel", () => {
         vi.useRealTimers();
     });
 
-    it("confirms cancel leave and resets dialog state", async () => {
+    it("confirms cancel leave for the supplied workflow target", async () => {
         cancelLeave.mockResolvedValue(true);
         const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
-        act(() => result.current.openCancelDialog(pendingLeave));
         await act(async () => {
-            await result.current.confirmCancelLeave();
+            await result.current.confirmCancelLeave(pendingLeave, "");
         });
 
         expect(cancelLeave).toHaveBeenCalledWith("leave-2");
-        expect(result.current.cancelConfirmRequest).toBeNull();
         expect(toast.success).toHaveBeenCalledTimes(1);
     });
 
-    it("submits not-taken request and resets dialog state", async () => {
+    it("submits a not-taken request for the supplied workflow target", async () => {
         requestNotTaken.mockResolvedValue(true);
         const { result } = renderHook(() => useEmployeeLeaveDashboardModel(LEAVE_CAPABILITIES));
 
-        act(() => {
-            result.current.openNotTakenDialog("leave-3");
-            result.current.setNotTakenNote("ไม่ได้ลาเพราะมีงานด่วน");
-        });
-
         await act(async () => {
-            await result.current.confirmNotTakenRequest();
+            await result.current.confirmNotTakenRequest("leave-3", "ไม่ได้ลาเพราะมีงานด่วน");
         });
 
         expect(requestNotTaken).toHaveBeenCalledWith("leave-3", "ไม่ได้ลาเพราะมีงานด่วน");
-        expect(result.current.notTakenRequestId).toBeNull();
         expect(toast.success).toHaveBeenCalledTimes(1);
     });
 
-    it("does not load or open self-service controls without the relevant capabilities", () => {
+    it("does not load or submit self-service workflows without the relevant capabilities", async () => {
         const capabilities: LeavePresentationCapabilities = {
             ...LEAVE_CAPABILITIES,
             canReadOwnRequests: false,
@@ -238,18 +218,18 @@ describe("useEmployeeLeaveDashboardModel", () => {
             filters: {},
             enabled: false,
         });
-        act(() => {
-            result.current.openRequestForm();
-            result.current.openCancelDialog(pendingLeave);
-            result.current.openNotTakenDialog("leave-3");
+        await act(async () => {
+            await result.current.onRequestSuccess();
+            await result.current.confirmCancelLeave(pendingLeave, "");
+            await result.current.confirmNotTakenRequest("leave-3", "ไม่ได้ลาเพราะมีงานด่วน");
         });
 
-        expect(result.current.isRequestFormOpen).toBe(false);
-        expect(result.current.cancelConfirmRequest).toBeNull();
-        expect(result.current.notTakenRequestId).toBeNull();
+        expect(mutate).not.toHaveBeenCalled();
+        expect(cancelLeave).not.toHaveBeenCalled();
+        expect(requestNotTaken).not.toHaveBeenCalled();
     });
 
-    it("closes open self-service controls when a refreshed projection removes capability", () => {
+    it("preserves history state when self-service capabilities change", () => {
         const { result, rerender } = renderHook(
             ({ capabilities }: { capabilities: LeavePresentationCapabilities }) =>
                 useEmployeeLeaveDashboardModel(capabilities),
@@ -257,13 +237,9 @@ describe("useEmployeeLeaveDashboardModel", () => {
         );
 
         act(() => {
-            result.current.openRequestForm();
-            result.current.openCancelDialog(pendingLeave);
-            result.current.openNotTakenDialog("leave-3");
+            result.current.setHistoryQuery("ลาป่วย");
+            result.current.setPage(3);
         });
-        expect(result.current.isRequestFormOpen).toBe(true);
-        expect(result.current.cancelConfirmRequest).not.toBeNull();
-        expect(result.current.notTakenRequestId).toBe("leave-3");
 
         rerender({
             capabilities: {
@@ -274,9 +250,8 @@ describe("useEmployeeLeaveDashboardModel", () => {
             },
         });
 
-        expect(result.current.isRequestFormOpen).toBe(false);
-        expect(result.current.cancelConfirmRequest).toBeNull();
-        expect(result.current.notTakenRequestId).toBeNull();
+        expect(result.current.historyQuery).toBe("ลาป่วย");
+        expect(result.current.page).toBe(3);
     });
 });
 

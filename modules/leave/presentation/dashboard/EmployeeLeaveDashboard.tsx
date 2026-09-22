@@ -1,11 +1,15 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ALL_LEAVE_STATUSES } from "../../domain/constants";
 import { LeaveRequestForm } from "./LeaveRequestForm";
 import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
-import { useEmployeeLeaveDashboardModel } from "./hooks/useEmployeeLeaveDashboardModel";
+import {
+    useEmployeeLeaveDashboardModel,
+    type EmployeeLeaveDashboardModel,
+} from "./hooks/useEmployeeLeaveDashboardModel";
 import { LeaveQuotaCards } from "./components/LeaveQuotaCards";
 import { EmployeeLeaveHistoryList } from "./components/EmployeeLeaveHistoryList";
 import { LeaveHistoryFilters } from "./components/LeaveHistoryFilters";
@@ -13,6 +17,8 @@ import { CancelLeaveDialog } from "./components/CancelLeaveDialog";
 import { NotTakenRequestDialog } from "./components/NotTakenRequestDialog";
 import { EmployeeLeaveDashboardSkeleton } from "./LeaveSkeletons";
 import type { LeavePresentationCapabilities } from "../../application/types";
+import type { LeaveRequest } from "./hooks/useLeaveProfile";
+import { getEmployeeLeaveActions } from "../../domain/action-availability";
 
 interface EmployeeLeaveDashboardProps {
     leaveCapabilities?: LeavePresentationCapabilities;
@@ -51,19 +57,12 @@ export function EmployeeLeaveDashboard({
                     </p>
                 </div>
                 {model.canCreateOwnRequests ? (
-                    <Button className={LEAVE_THEME_BUTTON_CLASS} onClick={model.openRequestForm}>
-                        <Plus data-icon="inline-start" /> ยื่นคำขอลา
-                    </Button>
+                    <EmployeeLeaveRequestCapabilitySession
+                        quotas={model.quotas}
+                        onRequestSuccess={model.onRequestSuccess}
+                    />
                 ) : null}
             </div>
-
-            <LeaveRequestForm
-                open={model.isRequestFormOpen && model.canCreateOwnRequests}
-                onSuccess={model.onRequestSuccess}
-                onCancel={model.closeRequestForm}
-                quotas={model.quotas}
-                canCreateRequests={model.canCreateOwnRequests}
-            />
 
             <LeaveQuotaCards
                 sickQuota={model.sickQuota}
@@ -101,45 +100,258 @@ export function EmployeeLeaveDashboard({
                     onYearChange={model.setHistoryYear}
                     onReset={model.resetHistoryFilters}
                 />
-                <EmployeeLeaveHistoryList
-                    history={model.history}
-                    metadata={model.metadata}
-                    isFiltered={model.hasHistoryFilters}
-                    isSubmitting={model.isSubmitting}
-                    onCancelRequest={model.openCancelDialog}
-                    onNotTakenRequest={model.openNotTakenDialog}
-                    onPageChange={model.setPage}
-                    canCancelOwnRequests={model.canCancelOwnRequests}
-                    canRequestOwnNotTaken={model.canRequestOwnNotTaken}
-                />
+                <LeaveHistoryActionCapabilitySurface model={model} />
             </div>
-
-            <CancelLeaveDialog
-                open={model.cancelConfirmRequest !== null && model.canCancelOwnRequests}
-                isSubmitting={model.isSubmitting}
-                requiresApproval={model.cancelConfirmRequest?.status === "APPROVED"}
-                reason={model.cancelReason}
-                onReasonChange={model.setCancelReason}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        model.closeCancelDialog();
-                    }
-                }}
-                onConfirm={model.confirmCancelLeave}
-            />
-
-            <NotTakenRequestDialog
-                open={model.notTakenRequestId !== null && model.canRequestOwnNotTaken}
-                note={model.notTakenNote}
-                isSubmitting={model.isSubmitting}
-                onNoteChange={model.setNotTakenNote}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        model.closeNotTakenDialog();
-                    }
-                }}
-                onConfirm={model.confirmNotTakenRequest}
-            />
         </div>
     );
+}
+
+function EmployeeLeaveRequestCapabilitySession({
+    quotas,
+    onRequestSuccess,
+}: {
+    quotas: EmployeeLeaveDashboardModel["quotas"];
+    onRequestSuccess: () => Promise<void>;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    const handleSuccess = async (): Promise<void> => {
+        await onRequestSuccess();
+        setIsOpen(false);
+    };
+
+    return (
+        <>
+            <Button className={LEAVE_THEME_BUTTON_CLASS} onClick={() => setIsOpen(true)}>
+                <Plus data-icon="inline-start" /> ยื่นคำขอลา
+            </Button>
+            <LeaveRequestForm
+                open={isOpen}
+                onSuccess={handleSuccess}
+                onCancel={() => setIsOpen(false)}
+                quotas={quotas}
+                canCreateRequests
+            />
+        </>
+    );
+}
+
+interface CancelSessionRenderProps {
+    onCancelRequest: (request: LeaveRequest) => void;
+    dialog: ReactNode;
+}
+
+interface NotTakenSessionRenderProps {
+    onNotTakenRequest: (leaveId: string) => void;
+    dialog: ReactNode;
+}
+
+function LeaveHistoryActionCapabilitySurface({
+    model,
+}: {
+    model: EmployeeLeaveDashboardModel;
+}) {
+    const renderHistory = (
+        onCancelRequest: (request: LeaveRequest) => void,
+        onNotTakenRequest: (leaveId: string) => void,
+        dialogs: ReactNode,
+    ): ReactNode => (
+        <>
+            <EmployeeLeaveHistoryList
+                history={model.history}
+                metadata={model.metadata}
+                isFiltered={model.hasHistoryFilters}
+                isSubmitting={model.isSubmitting}
+                onCancelRequest={onCancelRequest}
+                onNotTakenRequest={onNotTakenRequest}
+                onPageChange={model.setPage}
+                canCancelOwnRequests={model.canCancelOwnRequests}
+                canRequestOwnNotTaken={model.canRequestOwnNotTaken}
+            />
+            {dialogs}
+        </>
+    );
+
+    return (
+        <LeaveCancelCapabilitySession
+            enabled={model.canCancelOwnRequests}
+            isSubmitting={model.isSubmitting}
+            onConfirm={model.confirmCancelLeave}
+        >
+            {({ onCancelRequest, dialog: cancelDialog }) => (
+                <LeaveNotTakenCapabilitySession
+                    enabled={model.canRequestOwnNotTaken}
+                    history={model.history}
+                    isSubmitting={model.isSubmitting}
+                    onConfirm={model.confirmNotTakenRequest}
+                >
+                    {({ onNotTakenRequest, dialog: notTakenDialog }) =>
+                        renderHistory(
+                            onCancelRequest,
+                            onNotTakenRequest,
+                            <>
+                                {cancelDialog}
+                                {notTakenDialog}
+                            </>,
+                        )}
+                </LeaveNotTakenCapabilitySession>
+            )}
+        </LeaveCancelCapabilitySession>
+    );
+}
+
+function LeaveCancelCapabilitySession({
+    enabled,
+    isSubmitting,
+    onConfirm,
+    children,
+}: {
+    enabled: boolean;
+    isSubmitting: boolean;
+    onConfirm: (request: LeaveRequest, reason: string) => Promise<void>;
+    children: (props: CancelSessionRenderProps) => ReactNode;
+}) {
+    const [session, setSession] = useState({
+        enabled,
+        cancelTarget: null as LeaveRequest | null,
+        cancelReason: "",
+    });
+    if (session.enabled !== enabled) {
+        setSession({
+            enabled,
+            cancelTarget: null,
+            cancelReason: "",
+        });
+    }
+    const cancelTarget = enabled && session.enabled ? session.cancelTarget : null;
+    const cancelReason = enabled && session.enabled ? session.cancelReason : "";
+
+    const openCancelDialog = (request: LeaveRequest): void => {
+        if (!enabled) return;
+        const availableActions = getEmployeeLeaveActions(request);
+        if (
+            (!availableActions.includes("CANCEL")
+                && !availableActions.includes("REQUEST_CANCELLATION"))
+        ) {
+            return;
+        }
+        setSession((current) => ({
+            ...current,
+            cancelTarget: request,
+            cancelReason: "",
+        }));
+    };
+
+    const closeCancelDialog = (): void => {
+        setSession((current) => ({
+            ...current,
+            cancelTarget: null,
+            cancelReason: "",
+        }));
+    };
+
+    const confirmCancelLeave = async (): Promise<void> => {
+        if (!cancelTarget) {
+            return;
+        }
+        await onConfirm(cancelTarget, cancelReason);
+        closeCancelDialog();
+    };
+
+    return children({
+        onCancelRequest: openCancelDialog,
+        dialog: (
+            <CancelLeaveDialog
+                open={cancelTarget !== null}
+                isSubmitting={isSubmitting}
+                requiresApproval={cancelTarget?.status === "APPROVED"}
+                reason={cancelReason}
+                onReasonChange={(reason) => setSession((current) => ({
+                    ...current,
+                    cancelReason: reason,
+                }))}
+                onOpenChange={(open) => {
+                    if (!open) closeCancelDialog();
+                }}
+                onConfirm={confirmCancelLeave}
+            />
+        ),
+    });
+}
+
+function LeaveNotTakenCapabilitySession({
+    enabled,
+    history,
+    isSubmitting,
+    onConfirm,
+    children,
+}: {
+    enabled: boolean;
+    history: LeaveRequest[];
+    isSubmitting: boolean;
+    onConfirm: (leaveId: string, note: string) => Promise<void>;
+    children: (props: NotTakenSessionRenderProps) => ReactNode;
+}) {
+    const [session, setSession] = useState({
+        enabled,
+        requestId: null as string | null,
+        note: "",
+    });
+    if (session.enabled !== enabled) {
+        setSession({
+            enabled,
+            requestId: null,
+            note: "",
+        });
+    }
+    const notTakenRequestId = enabled && session.enabled ? session.requestId : null;
+    const notTakenNote = enabled && session.enabled ? session.note : "";
+
+    const openNotTakenDialog = (leaveId: string): void => {
+        if (!enabled) return;
+        const request = history.find((item) => item.id === leaveId);
+        if (!request || !getEmployeeLeaveActions(request).includes("REQUEST_NOT_TAKEN")) {
+            return;
+        }
+        setSession((current) => ({
+            ...current,
+            requestId: leaveId,
+            note: "",
+        }));
+    };
+
+    const closeNotTakenDialog = (): void => {
+        setSession((current) => ({
+            ...current,
+            requestId: null,
+            note: "",
+        }));
+    };
+
+    const confirmNotTakenRequest = async (): Promise<void> => {
+        if (!notTakenRequestId) {
+            return;
+        }
+        await onConfirm(notTakenRequestId, notTakenNote);
+        closeNotTakenDialog();
+    };
+
+    return children({
+        onNotTakenRequest: openNotTakenDialog,
+        dialog: (
+            <NotTakenRequestDialog
+                open={notTakenRequestId !== null}
+                note={notTakenNote}
+                isSubmitting={isSubmitting}
+                onNoteChange={(note) => setSession((current) => ({
+                    ...current,
+                    note,
+                }))}
+                onOpenChange={(open) => {
+                    if (!open) closeNotTakenDialog();
+                }}
+                onConfirm={confirmNotTakenRequest}
+            />
+        ),
+    });
 }

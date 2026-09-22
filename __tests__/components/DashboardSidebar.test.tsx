@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import {
@@ -6,6 +6,7 @@ import {
     useDashboardUIContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { getAvailableMenuGroups } from "@/constants/dashboard";
+import { useExpandedSidebarGroups } from "@/components/dashboard/layout/DashboardSidebarPrimitives";
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
     useDashboardDataContext: vi.fn(),
@@ -83,6 +84,47 @@ describe("DashboardSidebar", () => {
         expect(
             screen.queryByRole("button", { name: "ข้อมูลพนักงาน" }),
         ).not.toBeInTheDocument();
+    });
+
+    it("keeps explicit group collapse separate from menu availability", () => {
+        const groupA = {
+            id: "group-a",
+            label: "กลุ่ม A",
+            icon: () => null,
+            items: [],
+        };
+        const groupB = {
+            id: "group-b",
+            label: "กลุ่ม B",
+            icon: () => null,
+            items: [],
+        };
+        const { result, rerender } = renderHook(
+            ({ groups }: { groups: typeof groupA[] }) =>
+                useExpandedSidebarGroups(groups),
+            { initialProps: { groups: [groupA] } },
+        );
+
+        expect(result.current.expandedGroups.has(groupA.id)).toBe(true);
+
+        act(() => result.current.toggleGroup(groupA.id));
+        expect(result.current.expandedGroups.has(groupA.id)).toBe(false);
+
+        rerender({ groups: [{ ...groupA }] });
+        expect(result.current.expandedGroups.has(groupA.id)).toBe(false);
+
+        rerender({ groups: [groupA, groupB] });
+        expect(result.current.expandedGroups.has(groupA.id)).toBe(false);
+        expect(result.current.expandedGroups.has(groupB.id)).toBe(true);
+
+        rerender({ groups: [groupB] });
+        expect(result.current.expandedGroups.has(groupA.id)).toBe(false);
+
+        rerender({ groups: [groupA, groupB] });
+        expect(result.current.expandedGroups.has(groupA.id)).toBe(false);
+
+        act(() => result.current.toggleGroup(groupA.id));
+        expect(result.current.expandedGroups.has(groupA.id)).toBe(true);
     });
 
     it("keeps icon-only menu items named when the sidebar is collapsed", () => {

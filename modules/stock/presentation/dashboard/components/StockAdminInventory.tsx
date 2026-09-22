@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { PackageSearch, PackagePlus, Plus } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useStockDataContext, useStockUIContext } from "../context";
 import { STOCK_ADMIN_ITEMS_LIMIT as ITEMS_PER_PAGE } from "../context/provider.shared";
-import type { StockItem } from "../context/types";
+import type { StockCategory, StockItem } from "../context/types";
 import { AddItemDialog } from "./StockInventoryAddItemDialog";
 import { AddCategoryDialog } from "./StockInventoryDialogs";
 import { EditItemDialog } from "./StockInventoryEditDialog";
@@ -36,22 +36,71 @@ export function StockAdminInventory() {
         selectedCategoryId,
         setSelectedCategoryId,
     } = useStockUIContext();
+    const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+    const isInitialLoading = isLoading && items.length === 0;
+
+    return (
+        <div className="space-y-4">
+            <StockBrowseFilters
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                selectedCategoryId={selectedCategoryId}
+                onCategoryChange={setSelectedCategoryId}
+                categories={categories}
+            />
+
+            <StockInventoryCapabilitySession
+                key={canManageInventory ? "can-manage-inventory" : "read-only-inventory"}
+                items={items}
+                categories={categories}
+                isInitialLoading={isInitialLoading}
+                canManageInventory={canManageInventory}
+                totalPages={totalPages}
+                itemsPage={itemsPage}
+                onPageChange={setItemsPage}
+                onPreviousPage={() => setItemsPage(Math.max(1, itemsPage - 1))}
+                onNextPage={() => setItemsPage(Math.min(totalPages, itemsPage + 1))}
+                refreshItems={refreshItems}
+                refreshCategories={refreshCategories}
+            />
+        </div>
+    );
+}
+
+type StockInventoryCapabilitySessionProps = {
+    items: StockItem[];
+    categories: StockCategory[];
+    isInitialLoading: boolean;
+    canManageInventory: boolean;
+    totalPages: number;
+    itemsPage: number;
+    onPageChange: (page: number) => void;
+    onPreviousPage: () => void;
+    onNextPage: () => void;
+    refreshItems: () => void;
+    refreshCategories: () => void;
+};
+
+function StockInventoryCapabilitySession({
+    items,
+    categories,
+    isInitialLoading,
+    canManageInventory,
+    totalPages,
+    itemsPage,
+    onPageChange,
+    onPreviousPage,
+    onNextPage,
+    refreshItems,
+    refreshCategories,
+}: StockInventoryCapabilitySessionProps) {
     const [showAddItem, setShowAddItem] = useState(false);
     const [addItemSessionId, setAddItemSessionId] = useState(0);
     const [editingItem, setEditingItem] = useState<StockItem | null>(null);
     const [showAddCategory, setShowAddCategory] = useState(false);
-    const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
-    const isInitialLoading = isLoading && items.length === 0;
-    useEffect(() => {
-        if (!canManageInventory) {
-            setShowAddItem(false);
-            setEditingItem(null);
-            setShowAddCategory(false);
-        }
-    }, [canManageInventory]);
 
     return (
-        <div className="space-y-4">
+        <>
             <div className="flex flex-wrap gap-3">
                 <Button
                     className="h-11 bg-action-primary-solid px-5 font-semibold text-content-on-brand shadow-sm transition-colors hover:bg-action-primary-solid-hover"
@@ -77,14 +126,6 @@ export function StockAdminInventory() {
                     {STOCK_ADMIN_TEXT.addCategory}
                 </Button>
             </div>
-
-            <StockBrowseFilters
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                selectedCategoryId={selectedCategoryId}
-                onCategoryChange={setSelectedCategoryId}
-                categories={categories}
-            />
 
             {isInitialLoading ? (
                 <StockInventorySkeleton />
@@ -114,11 +155,9 @@ export function StockAdminInventory() {
                         currentPage={itemsPage}
                         totalPages={totalPages}
                         itemsPerPage={ITEMS_PER_PAGE}
-                        onPageChange={setItemsPage}
-                        onPreviousPage={() => setItemsPage(Math.max(1, itemsPage - 1))}
-                        onNextPage={() =>
-                            setItemsPage(Math.min(totalPages, itemsPage + 1))
-                        }
+                        onPageChange={onPageChange}
+                        onPreviousPage={onPreviousPage}
+                        onNextPage={onNextPage}
                     />
                 </>
             )}
@@ -157,6 +196,6 @@ export function StockAdminInventory() {
                     setShowAddCategory(false);
                 }}
             />
-        </div>
+        </>
     );
 }

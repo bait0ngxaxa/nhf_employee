@@ -1,5 +1,5 @@
 import { Edit3, Eye, Power, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactElement } from "react";
+import { useId, useState, useRef, type ReactElement, type ReactNode } from "react";
 
 import {
     AlertDialog,
@@ -40,6 +40,8 @@ interface RoutineTaskListProps {
     onCreate: () => void;
     onDelete: (task: RoutineTask) => Promise<void>;
     onEdit: (task: RoutineTask) => void;
+    createAction?: ReactNode;
+    renderEditAction?: (task: RoutineTask) => ReactNode;
     onPageChange: (page: number) => void;
     onRetry: () => void;
     onSearchChange: (value: string) => void;
@@ -82,6 +84,8 @@ export function RoutineTaskList({
     onCreate,
     onDelete,
     onEdit,
+    createAction,
+    renderEditAction,
     onPageChange,
     onRetry,
     onSearchChange,
@@ -94,11 +98,8 @@ export function RoutineTaskList({
     unitId,
     units,
 }: RoutineTaskListProps): ReactElement {
-    const [deleteTask, setDeleteTask] = useState<RoutineTask | null>(null);
     const [detailsTask, setDetailsTask] = useState<RoutineTask | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const deleteLockRef = useRef(false);
     const filterId = useId();
     const today = getCurrentBangkokDate();
     const hasFilters = search.trim().length > 0
@@ -114,15 +115,6 @@ export function RoutineTaskList({
     const canCreateTasks = routineCapabilities?.canCreateTasks === true;
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
     const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
-
-    useEffect(() => {
-        if (
-            deleteTask !== null
-            && (!canDeleteTasks || deleteTask.canDelete !== true)
-        ) {
-            setDeleteTask(null);
-        }
-    }, [canDeleteTasks, deleteTask]);
 
     function openDetails(task: RoutineTask): void {
         setDetailsTask(task);
@@ -206,10 +198,12 @@ export function RoutineTaskList({
                     </select>
                 </label>
                 {canCreateTasks ? (
-                    <Button type="button" size="sm" className="xl:justify-self-end" onClick={() => onCreate()}>
-                        <Plus aria-hidden="true" />
-                        สร้างแม่แบบงาน
-                    </Button>
+                    createAction ?? (
+                        <Button type="button" size="sm" className="xl:justify-self-end" onClick={() => onCreate()}>
+                            <Plus aria-hidden="true" />
+                            สร้างแม่แบบงาน
+                        </Button>
+                    )
                 ) : null}
             </div>
 
@@ -285,10 +279,12 @@ export function RoutineTaskList({
                                                     ดูรายละเอียด
                                                 </Button>
                                                 {canUpdateTasks && task.canEdit === true ? (
-                                                    <Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}>
-                                                        <Edit3 aria-hidden="true" />
-                                                        แก้ไข
-                                                    </Button>
+                                                    renderEditAction ? renderEditAction(task) : (
+                                                        <Button type="button" variant="outline" size="sm" onClick={() => onEdit(task)} disabled={pendingTaskId === task.id}>
+                                                            <Edit3 aria-hidden="true" />
+                                                            แก้ไข
+                                                        </Button>
+                                                    )
                                                 ) : null}
                                                 {canUpdateTasks && task.canDelete === true ? (
                                                     <>
@@ -299,10 +295,11 @@ export function RoutineTaskList({
                                                     </>
                                                 ) : null}
                                                 {canDeleteTasks && task.canDelete === true ? (
-                                                    <Button type="button" variant="ghost" size="sm" className="text-status-danger-foreground" disabled={pendingTaskId === task.id} onClick={() => setDeleteTask(task)}>
-                                                        <Trash2 aria-hidden="true" />
-                                                        ลบ
-                                                    </Button>
+                                                    <RoutineTaskDeleteSession
+                                                        task={task}
+                                                        disabled={pendingTaskId === task.id}
+                                                        onDelete={onDelete}
+                                                    />
                                                 ) : null}
                                             </div>
                                         </td>
@@ -331,17 +328,47 @@ export function RoutineTaskList({
                 canReadImportMetadata={canReadImportMetadata}
             />
 
+        </div>
+    );
+}
+
+function RoutineTaskDeleteSession({
+    task,
+    disabled,
+    onDelete,
+}: {
+    task: RoutineTask;
+    disabled: boolean;
+    onDelete: (task: RoutineTask) => Promise<void>;
+}): ReactElement {
+    const [isOpen, setIsOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const deleteLockRef = useRef(false);
+
+    return (
+        <>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-status-danger-foreground"
+                disabled={disabled}
+                onClick={() => setIsOpen(true)}
+            >
+                <Trash2 aria-hidden="true" />
+                ลบ
+            </Button>
             <AlertDialog
-                open={deleteTask !== null}
+                open={isOpen}
                 onOpenChange={(open) => {
-                    if (!open && !isDeleting && !deleteLockRef.current) setDeleteTask(null);
+                    if (!open && !isDeleting && !deleteLockRef.current) setIsOpen(false);
                 }}
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>ยืนยันการลบ Routine</AlertDialogTitle>
                         <AlertDialogDescription>
-                            คุณกำลังจะลบ “{deleteTask?.title}” ข้อมูลรอบแจ้งเตือนและกฎแจ้งเตือนของรายการนี้จะถูกลบ และไม่สามารถกู้คืนได้
+                            คุณกำลังจะลบ “{task.title}” ข้อมูลรอบแจ้งเตือนและกฎแจ้งเตือนของรายการนี้จะถูกลบ และไม่สามารถกู้คืนได้
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -351,11 +378,11 @@ export function RoutineTaskList({
                             disabled={isDeleting}
                             onClick={(event) => {
                                 event.preventDefault();
-                                if (!deleteTask || isDeleting || deleteLockRef.current) return;
+                                if (isDeleting || deleteLockRef.current) return;
                                 deleteLockRef.current = true;
                                 setIsDeleting(true);
-                                void onDelete(deleteTask)
-                                    .then(() => setDeleteTask(null))
+                                void onDelete(task)
+                                    .then(() => setIsOpen(false))
                                     .catch(() => undefined)
                                     .finally(() => {
                                         setIsDeleting(false);
@@ -368,6 +395,6 @@ export function RoutineTaskList({
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </>
     );
 }

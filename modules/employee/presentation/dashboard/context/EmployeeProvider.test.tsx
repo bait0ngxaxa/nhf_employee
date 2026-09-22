@@ -127,14 +127,10 @@ function ProviderProbe(): ReactElement {
             <output data-testid="employee-count">{data.employees.length}</output>
             <output data-testid="stats-total">{data.employeeStats.total}</output>
             <output data-testid="is-loading">{String(data.isLoading)}</output>
-            <output data-testid="edit-open">{String(ui.isEditFormOpen)}</output>
             <button type="button" onClick={() => void ui.handleExportCSV()}>
                 export
             </button>
-            <button type="button" onClick={() => ui.handleEditEmployee(employee)}>
-                edit
-            </button>
-            <button type="button" onClick={ui.handleEmployeeUpdate}>
+            <button type="button" onClick={() => ui.handleEmployeeUpdate(employee)}>
                 update
             </button>
             <button type="button" onClick={() => void data.triggerRefresh()}>
@@ -214,40 +210,18 @@ describe("EmployeeProvider capability-aware presentation", () => {
         });
     });
 
-    it("does not open edit UI without update capability", () => {
+    it("does not refresh after an update without update capability", () => {
         renderProvider(listOnlyCapabilities);
 
-        fireEvent.click(screen.getByRole("button", { name: "edit" }));
+        fireEvent.click(screen.getByRole("button", { name: "update" }));
 
-        expect(screen.getByTestId("edit-open")).toHaveTextContent("false");
-    });
-
-    it("closes a stale edit surface when update capability is revoked", async () => {
-        const { rerender } = render(
-            <EmployeeProvider employeeCapabilities={updateListCapabilities}>
-                <ProviderProbe />
-            </EmployeeProvider>,
-        );
-
-        fireEvent.click(screen.getByRole("button", { name: "edit" }));
-        expect(screen.getByTestId("edit-open")).toHaveTextContent("true");
-
-        rerender(
-            <EmployeeProvider employeeCapabilities={listOnlyCapabilities}>
-                <ProviderProbe />
-            </EmployeeProvider>,
-        );
-
-        await waitFor(() => {
-            expect(screen.getByTestId("edit-open")).toHaveTextContent("false");
-        });
+        expect(mocks.listMutates.some((mutate) => mutate.mock.calls.length > 0))
+            .toBe(false);
     });
 
     it("refreshes only the permitted list resource after an update", async () => {
         renderProvider(updateListCapabilities);
 
-        fireEvent.click(screen.getByRole("button", { name: "edit" }));
-        expect(screen.getByTestId("edit-open")).toHaveTextContent("true");
         fireEvent.click(screen.getByRole("button", { name: "update" }));
 
         await waitFor(() => {

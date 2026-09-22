@@ -52,10 +52,6 @@ function renderControls(canExportEmployees: boolean) {
         handleNextPage: vi.fn(),
         isExporting: false,
         handleExportCSV: async () => undefined,
-        isEditFormOpen: false,
-        employeeToEdit: null,
-        handleEditEmployee: vi.fn(),
-        handleCloseEditForm: vi.fn(),
         handleEmployeeUpdate: vi.fn(),
     };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Package } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
@@ -14,6 +14,7 @@ import { StockBrowseGrid } from "./StockBrowseGrid";
 import { StockEmptyState } from "./StockLoadingState";
 import { StockBrowseSkeleton } from "./StockSkeletons";
 import { useStockBrowseCart } from "./useStockBrowseCart";
+import type { StockBrowseItem, StockBrowseVariant } from "./stockVariant.shared";
 
 const StockBrowseCartBar = dynamic(
     () => import("./StockBrowseCartBar").then((mod) => mod.StockBrowseCartBar),
@@ -47,7 +48,6 @@ export function StockBrowse() {
         itemsPage,
         setItemsPage,
     } = useStockUIContext();
-    const [variantPickerItem, setVariantPickerItem] = useState<StockItem | null>(null);
     const {
         cartCount,
         cartItems,
@@ -68,11 +68,6 @@ export function StockBrowse() {
         canCreateRequests,
         onSubmitted: refreshRequests,
     });
-    useEffect(() => {
-        if (!canCreateRequests) {
-            setVariantPickerItem(null);
-        }
-    }, [canCreateRequests]);
 
     if (!canReadCatalog) {
         return (
@@ -108,13 +103,14 @@ export function StockBrowse() {
             ) : items.length === 0 ? (
                 <EmptyState />
             ) : (
-                <StockBrowseGrid
+                <StockBrowseVariantCapabilitySession
+                    key={canCreateRequests ? "can-create-requests" : "read-only-catalog"}
                     items={items}
                     cartQuantityByItemId={cartQuantityByItemId}
                     onAddDirect={addDirectItem}
-                    onOpenVariantPicker={setVariantPickerItem}
                     recentlyAddedItemId={recentlyAddedItemId}
                     canCreateRequests={canCreateRequests}
+                    addVariantsToCart={addVariantsToCart}
                 />
             )}
 
@@ -144,6 +140,50 @@ export function StockBrowse() {
                 />
             )}
 
+        </div>
+    );
+}
+
+type StockBrowseVariantCapabilitySessionProps = {
+    items: StockItem[];
+    cartQuantityByItemId: Map<number, number>;
+    onAddDirect: (item: StockItem) => void;
+    recentlyAddedItemId: number | null;
+    canCreateRequests: boolean;
+    addVariantsToCart: (
+        item: StockBrowseItem,
+        variants: ReadonlyArray<{
+            variant: StockBrowseVariant;
+            quantity: number;
+        }>,
+    ) => void;
+};
+
+function StockBrowseVariantCapabilitySession({
+    items,
+    cartQuantityByItemId,
+    onAddDirect,
+    recentlyAddedItemId,
+    canCreateRequests,
+    addVariantsToCart,
+}: StockBrowseVariantCapabilitySessionProps) {
+    const [variantPickerItem, setVariantPickerItem] = useState<StockItem | null>(null);
+
+    return (
+        <>
+            <StockBrowseGrid
+                items={items}
+                cartQuantityByItemId={cartQuantityByItemId}
+                onAddDirect={onAddDirect}
+                onOpenVariantPicker={(item) => {
+                    if (canCreateRequests) {
+                        setVariantPickerItem(item);
+                    }
+                }}
+                recentlyAddedItemId={recentlyAddedItemId}
+                canCreateRequests={canCreateRequests}
+            />
+
             <StockVariantPickerDialog
                 item={variantPickerItem}
                 open={variantPickerItem !== null && canCreateRequests}
@@ -156,7 +196,7 @@ export function StockBrowse() {
                     setVariantPickerItem(null);
                 }}
             />
-        </div>
+        </>
     );
 }
 

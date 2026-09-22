@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { LeaveStatusValue as LeaveStatus, LeaveTypeValue as LeaveType } from "../../types";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -35,12 +35,7 @@ export interface UseManagerApprovalModelResult {
         cancellationPending: LeaveApprovalPaginationMetadata;
     };
     isLoading: boolean;
-    selectedLeave: PendingLeave | null;
-    approvalConfirmLeave: PendingLeave | null;
-    isRejectDialogOpen: boolean;
-    rejectReason: string;
     isProcessing: boolean;
-    setRejectReason: (value: string) => void;
     setPendingPage: (page: number) => void;
     setNotTakenPage: (page: number) => void;
     setHistoryPage: (page: number) => void;
@@ -56,15 +51,11 @@ export interface UseManagerApprovalModelResult {
     setHistoryStatus: (value: LeaveStatus | "") => void;
     setHistoryYear: (value: string) => void;
     resetHistoryFilters: () => void;
-    openRejectDialog: (leave: PendingLeave) => void;
-    closeRejectDialog: () => void;
-    approveLeave: (leave: PendingLeave) => Promise<void>;
-    closeApprovalConfirmDialog: () => void;
-    confirmApproveLeave: () => Promise<void>;
+    approveLeave: (leave: PendingLeave) => Promise<boolean>;
     confirmNotTaken: (leaveId: string, reason?: string) => Promise<boolean>;
     confirmCancellation: (leaveId: string, reason?: string) => Promise<boolean>;
     rejectCancellation: (leaveId: string, reason?: string) => Promise<boolean>;
-    rejectLeave: () => Promise<void>;
+    rejectLeave: (leave: PendingLeave, reason: string) => Promise<boolean>;
 }
 
 interface UseManagerApprovalModelOptions {
@@ -122,20 +113,7 @@ export function useManagerApprovalModel({
         historyFilters,
         enabled: canShowApprovalSurface,
     });
-    const [selectedLeave, setSelectedLeave] = useState<PendingLeave | null>(null);
-    const [approvalConfirmLeave, setApprovalConfirmLeave] = useState<PendingLeave | null>(null);
-    const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-    const [rejectReason, setRejectReason] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
-
-    useEffect(() => {
-        if (!canApproveAssignedRequests) {
-            setSelectedLeave(null);
-            setApprovalConfirmLeave(null);
-            setIsRejectDialogOpen(false);
-            setRejectReason("");
-        }
-    }, [canApproveAssignedRequests]);
 
     const handleHistoryQueryChange = (value: string): void => {
         setHistoryQuery(value);
@@ -165,12 +143,6 @@ export function useManagerApprovalModel({
         setHistoryPage(1);
     };
 
-    const resetRejectDialog = (): void => {
-        setIsRejectDialogOpen(false);
-        setRejectReason("");
-        setSelectedLeave(null);
-    };
-
     const refreshFirstPages = async (): Promise<void> => {
         setPendingPage(1);
         setNotTakenPage(1);
@@ -179,8 +151,12 @@ export function useManagerApprovalModel({
         await mutate();
     };
 
-    const executeAction = async (action: LeaveDecisionAction, leaveId: string, reason?: string): Promise<void> => {
-        if (!canApproveAssignedRequests) return;
+    const executeAction = async (
+        action: LeaveDecisionAction,
+        leaveId: string,
+        reason?: string,
+    ): Promise<boolean> => {
+        if (!canApproveAssignedRequests) return false;
         setIsProcessing(true);
         try {
             await submitLeaveDecision({ leaveId, action, reason });
@@ -190,36 +166,30 @@ export function useManagerApprovalModel({
             } else {
                 toast.success("ปฏิเสธคำขอลาเรียบร้อยแล้ว");
             }
-            resetRejectDialog();
+            return true;
         } catch (error: unknown) {
             toast.error(
                 error instanceof Error && error.message
                     ? error.message
                     : "เกิดข้อผิดพลาดในการดำเนินการ",
             );
+            return false;
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const approveLeave = async (leave: PendingLeave): Promise<void> => {
-        if (!canApproveAssignedRequests) return;
-        if (hasApprovalWarnings(leave)) {
-            setApprovalConfirmLeave(leave);
-            return;
-        }
-        await executeAction("APPROVE", leave.id);
+    const approveLeave = async (leave: PendingLeave): Promise<boolean> => {
+        if (!canApproveAssignedRequests) return false;
+        return executeAction("APPROVE", leave.id);
     };
 
-    const confirmApproveLeave = async (): Promise<void> => {
-        if (!canApproveAssignedRequests || !approvalConfirmLeave) {
-            if (!canApproveAssignedRequests) setApprovalConfirmLeave(null);
-            return;
-        }
-
-        const leaveId = approvalConfirmLeave.id;
-        setApprovalConfirmLeave(null);
-        await executeAction("APPROVE", leaveId);
+    const rejectLeave = async (
+        leave: PendingLeave,
+        reason: string,
+    ): Promise<boolean> => {
+        if (!canApproveAssignedRequests) return false;
+        return executeAction("REJECT", leave.id, reason);
     };
 
     const confirmNotTaken = async (leaveId: string, reason?: string): Promise<boolean> => {
@@ -295,12 +265,7 @@ export function useManagerApprovalModel({
         cancellationPending,
         metadata,
         isLoading,
-        selectedLeave,
-        approvalConfirmLeave,
-        isRejectDialogOpen,
-        rejectReason,
         isProcessing,
-        setRejectReason,
         setPendingPage,
         setNotTakenPage,
         setHistoryPage,
@@ -316,25 +281,14 @@ export function useManagerApprovalModel({
         setHistoryStatus: handleHistoryStatusChange,
         setHistoryYear: handleHistoryYearChange,
         resetHistoryFilters,
-        openRejectDialog: (leave: PendingLeave) => {
-            if (!canApproveAssignedRequests) return;
-            setSelectedLeave(leave);
-            setIsRejectDialogOpen(true);
-        },
-        closeRejectDialog: resetRejectDialog,
         approveLeave,
-        closeApprovalConfirmDialog: () => setApprovalConfirmLeave(null),
-        confirmApproveLeave,
         confirmNotTaken,
         confirmCancellation,
         rejectCancellation,
-        rejectLeave: async () => {
-            if (!canApproveAssignedRequests || !selectedLeave) return;
-            await executeAction("REJECT", selectedLeave.id, rejectReason);
-        },
+        rejectLeave,
     };
 }
 
-function hasApprovalWarnings(leave: PendingLeave): boolean {
+export function hasApprovalWarnings(leave: PendingLeave): boolean {
     return Boolean(leave.emergencyReason || leave.specialReason || leave.overQuotaDays > 0);
 }

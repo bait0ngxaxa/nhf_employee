@@ -44,12 +44,9 @@ export interface EmployeeUIContextValue {
     isExporting: boolean;
     handleExportCSV: () => Promise<void>;
 
-    // Edit Modal State & Actions
-    isEditFormOpen: boolean;
-    employeeToEdit: Employee | null;
-    handleEditEmployee: (employee: Employee) => void;
-    handleCloseEditForm: () => void;
-    handleEmployeeUpdate: () => void;
+    // Edit mutation action. The edit session itself is owned by the
+    // capability-scoped editor surface.
+    handleEmployeeUpdate: (employee: Employee) => void;
 }
 
 export interface EmployeeContextValue

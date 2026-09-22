@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import type { KeyedMutator } from "swr";
 
 import { RoutineOccurrenceList } from "./RoutineOccurrenceList";
@@ -290,6 +291,62 @@ describe("RoutineOccurrenceList", () => {
 
         await waitFor(() => expect(screen.queryByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument());
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("does not resurrect an occurrence editor after override capability loss", () => {
+        function CapabilityHarness() {
+            const [canOverrideOccurrences, setCanOverrideOccurrences] = useState(true);
+
+            return (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => setCanOverrideOccurrences(false)}
+                    >
+                        ถอนสิทธิ์ปรับรอบ
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setCanOverrideOccurrences(true)}
+                    >
+                        คืนสิทธิ์ปรับรอบ
+                    </button>
+                    <RoutineOccurrenceList
+                        data={taskData}
+                        error={undefined}
+                        isLoading={false}
+                        canReadImportMetadata={false}
+                        focusTaskId={null}
+                        focusOccurrenceId={null}
+                        onRetry={vi.fn()}
+                        onPageChange={vi.fn()}
+                        onEditTask={vi.fn()}
+                        mutate={vi.fn(async () => undefined)}
+                        routineCapabilities={{
+                            ...allRoutineCapabilities,
+                            canUpdateTasks: false,
+                            canOverrideOccurrences,
+                        }}
+                        employees={employees}
+                    />
+                </>
+            );
+        }
+
+        render(<CapabilityHarness />);
+        fireEvent.click(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" }));
+        expect(screen.getByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", {
+            name: "ถอนสิทธิ์ปรับรอบ",
+            hidden: true,
+        }));
+        expect(screen.queryByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "คืนสิทธิ์ปรับรอบ" }));
+        expect(screen.queryByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ปรับเฉพาะรอบนี้" }));
+        expect(screen.getByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).toBeInTheDocument();
     });
 
     it("saves an occurrence override with the existing atomic mutation and refreshes", async () => {

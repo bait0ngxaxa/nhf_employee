@@ -8,6 +8,7 @@ import {
     useRef,
     useState,
     type ReactElement,
+    type ReactNode,
 } from "react";
 import { toast } from "sonner";
 
@@ -16,6 +17,7 @@ import {
     type StockCartAvailabilityReconciliation,
     type StockCartVariantAvailability,
 } from "../../dashboard/components/useStockBrowseCart";
+import type { BrowseCartItem } from "../../dashboard/components/stockVariant.shared";
 import {
     isRecoveredLiffMutation,
     LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
@@ -39,6 +41,7 @@ import {
 } from "../api";
 import type {
     LiffStockCatalogItem,
+    LiffStockCatalogVariant,
     LiffStockCatalogResponse,
     LiffStockCategory,
     LiffStockRequestAction,
@@ -59,6 +62,18 @@ import { LiffStockRequestDetail as LiffStockRequestDetailSheet } from "./LiffSto
 import { LiffStockVariantPicker } from "./LiffStockVariantPicker";
 
 type StockTab = "browse" | "mine" | "processing";
+
+function getVisibleStockTabs(
+    capabilities: StockPresentationCapabilities | null,
+): StockTab[] {
+    if (!capabilities) return [];
+
+    return [
+        ...(capabilities.canReadCatalog ? ["browse" as const] : []),
+        ...(capabilities.canReadOwnRequests ? ["mine" as const] : []),
+        ...(capabilities.canProcessRequests ? ["processing" as const] : []),
+    ];
+}
 
 type CatalogLoadInput = {
     page: number;
@@ -168,6 +183,7 @@ export function LiffStockApp(): ReactElement {
         : null;
 
     const [activeTab, setActiveTab] = useState<StockTab>("browse");
+    const [createUiSessionId, setCreateUiSessionId] = useState(0);
     const [catalog, setCatalog] = useState<LiffStockCatalogResponse>(EMPTY_CATALOG);
     const [categories, setCategories] = useState<LiffStockCategory[]>([]);
     const [catalogSearch, setCatalogSearch] = useState("");
@@ -193,8 +209,6 @@ export function LiffStockApp(): ReactElement {
     const [processingLoading, setProcessingLoading] = useState(false);
     const [processingError, setProcessingError] = useState<string | null>(null);
 
-    const [variantPickerItem, setVariantPickerItem] = useState<LiffStockCatalogItem | null>(null);
-    const [cartOpen, setCartOpen] = useState(false);
     const [detailOpen, setDetailOpen] = useState(false);
     const [detail, setDetail] = useState<LiffStockRequestDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -367,6 +381,12 @@ export function LiffStockApp(): ReactElement {
             if (!nextCapabilities) {
                 throw new Error("ไม่พบสิทธิ์การใช้งาน Stock");
             }
+            const nextVisibleTabs = getVisibleStockTabs(nextCapabilities);
+            const nextFirstVisibleTab = nextVisibleTabs[0];
+            setActiveTab((currentTab) => {
+                if (!nextFirstVisibleTab) return "browse";
+                return nextVisibleTabs.includes(currentTab) ? currentTab : nextFirstVisibleTab;
+            });
             stockCapabilitiesRef.current = nextCapabilities;
             setStockCapabilities(nextCapabilities);
             return nextCapabilities;
@@ -383,13 +403,6 @@ export function LiffStockApp(): ReactElement {
     useEffect(() => {
         void loadStockCapabilities();
     }, [loadStockCapabilities]);
-
-    useEffect(() => {
-        if (stockCapabilities?.canCreateRequests !== true) {
-            setVariantPickerItem(null);
-            setCartOpen(false);
-        }
-    }, [stockCapabilities]);
 
     useEffect(() => {
         let cancelled = false;
@@ -527,7 +540,7 @@ export function LiffStockApp(): ReactElement {
         canCreateRequests: stockCapabilities?.canCreateRequests === true,
         submitRequest: submitLiffStockRequest,
         onSubmitted: () => {
-            setCartOpen(false);
+            setCreateUiSessionId((currentId) => currentId + 1);
             setRequestPage(1);
             void Promise.all([
                 loadMyRequests({ page: 1, search: requestSearch, status: requestStatus }),
@@ -769,21 +782,11 @@ export function LiffStockApp(): ReactElement {
     const canReadCatalog = stockCapabilities?.canReadCatalog === true;
     const canReadOwnRequests = stockCapabilities?.canReadOwnRequests === true;
     const canProcessRequests = stockCapabilities?.canProcessRequests === true;
-    const visibleTabs: StockTab[] = [
-        ...(canReadCatalog ? ["browse" as const] : []),
-        ...(canReadOwnRequests ? ["mine" as const] : []),
-        ...(canProcessRequests ? ["processing" as const] : []),
-    ];
+    const visibleTabs = getVisibleStockTabs(stockCapabilities);
     const firstVisibleTab = visibleTabs[0] ?? null;
     const safeActiveTab = visibleTabs.includes(activeTab)
         ? activeTab
         : firstVisibleTab;
-
-    useEffect(() => {
-        if (safeActiveTab && safeActiveTab !== activeTab) {
-            setActiveTab(safeActiveTab);
-        }
-    }, [activeTab, safeActiveTab]);
 
     if (stockHomeLoading && !stockCapabilities) {
         return (
@@ -847,13 +850,28 @@ export function LiffStockApp(): ReactElement {
                     </div>
                 ) : null}
 
-                <Tabs
-                    value={safeActiveTab}
-                    onValueChange={(value) => {
-                        const nextTab = value as StockTab;
-                        if (visibleTabs.includes(nextTab)) setActiveTab(nextTab);
-                    }}
+                <LiffStockCreateCapabilitySession
+                    key={`${stockCapabilities.canCreateRequests ? "can-create" : "read-only"}-${createUiSessionId}`}
+                    canCreateRequests={stockCapabilities.canCreateRequests}
+                    cartItems={cartItems}
+                    totalQuantity={cartCount}
+                    projectCode={projectCode}
+                    submitting={submitting}
+                    onProjectCodeChange={setProjectCode}
+                    onChangeQuantity={updateCartQuantity}
+                    onRemove={removeFromCart}
+                    onClear={clearCart}
+                    onSubmit={() => void submitRequest()}
+                    addVariantsToCart={addVariantsToCart}
                 >
+                    {({ onChooseVariant, onOpenCart }) => (
+                        <Tabs
+                            value={safeActiveTab}
+                            onValueChange={(value) => {
+                                const nextTab = value as StockTab;
+                                if (visibleTabs.includes(nextTab)) setActiveTab(nextTab);
+                            }}
+                        >
                     <TabsList
                         className={`grid w-full bg-surface-muted p-1 ${
                             visibleTabs.length === 1
@@ -912,10 +930,8 @@ export function LiffStockApp(): ReactElement {
                                 categoryId,
                             })}
                             onAddDirect={addDirectItem}
-                            onChooseVariant={setVariantPickerItem}
-                            onOpenCart={() => {
-                                if (stockCapabilities.canCreateRequests) setCartOpen(true);
-                            }}
+                            onChooseVariant={onChooseVariant}
+                            onOpenCart={onOpenCart}
                             canCreateRequests={stockCapabilities.canCreateRequests}
                         />
                     </TabsContent> : null}
@@ -973,36 +989,10 @@ export function LiffStockApp(): ReactElement {
                             />
                         </TabsContent>
                     ) : null}
-                </Tabs>
+                        </Tabs>
+                    )}
+                </LiffStockCreateCapabilitySession>
             </div>
-
-            <LiffStockVariantPicker
-                item={variantPickerItem}
-                open={variantPickerItem !== null}
-                onOpenChange={(open) => {
-                    if (!open) setVariantPickerItem(null);
-                }}
-                onConfirm={(selections) => {
-                    if (!variantPickerItem || stockCapabilities.canCreateRequests !== true) return;
-                    addVariantsToCart(variantPickerItem, selections);
-                    setVariantPickerItem(null);
-                }}
-                canCreateRequests={stockCapabilities.canCreateRequests}
-            />
-            <LiffStockCart
-                open={cartOpen}
-                items={cartItems}
-                totalQuantity={cartCount}
-                projectCode={projectCode}
-                submitting={submitting}
-                onOpenChange={setCartOpen}
-                onProjectCodeChange={setProjectCode}
-                onChangeQuantity={updateCartQuantity}
-                onRemove={removeFromCart}
-                onClear={clearCart}
-                onSubmit={() => void submitRequest()}
-                canCreateRequests={stockCapabilities.canCreateRequests}
-            />
             <LiffStockRequestDetailSheet
                 open={detailOpen}
                 detail={detail}
@@ -1029,5 +1019,94 @@ export function LiffStockApp(): ReactElement {
                 onConfirm={(reason) => void executeMutation(reason)}
             />
         </main>
+    );
+}
+
+type LiffStockCreateCapabilitySessionProps = {
+    canCreateRequests: boolean;
+    cartItems: BrowseCartItem[];
+    totalQuantity: number;
+    projectCode: string;
+    submitting: boolean;
+    onProjectCodeChange: (value: string) => void;
+    onChangeQuantity: (variantId: number, delta: number) => void;
+    onRemove: (variantId: number) => void;
+    onClear: () => void;
+    onSubmit: () => void;
+    addVariantsToCart: (
+        item: LiffStockCatalogItem,
+        selections: ReadonlyArray<{
+            variant: LiffStockCatalogVariant;
+            quantity: number;
+        }>,
+    ) => void;
+    children: (handlers: {
+        onChooseVariant: (item: LiffStockCatalogItem) => void;
+        onOpenCart: () => void;
+    }) => ReactNode;
+};
+
+function LiffStockCreateCapabilitySession({
+    canCreateRequests,
+    cartItems,
+    totalQuantity,
+    projectCode,
+    submitting,
+    onProjectCodeChange,
+    onChangeQuantity,
+    onRemove,
+    onClear,
+    onSubmit,
+    addVariantsToCart,
+    children,
+}: LiffStockCreateCapabilitySessionProps): ReactElement {
+    const [variantPickerItem, setVariantPickerItem] = useState<LiffStockCatalogItem | null>(null);
+    const [cartOpen, setCartOpen] = useState(false);
+
+    function onChooseVariant(item: LiffStockCatalogItem): void {
+        if (canCreateRequests) {
+            setVariantPickerItem(item);
+        }
+    }
+
+    function onOpenCart(): void {
+        if (canCreateRequests) {
+            setCartOpen(true);
+        }
+    }
+
+    return (
+        <>
+            {children({ onChooseVariant, onOpenCart })}
+            <LiffStockVariantPicker
+                item={variantPickerItem}
+                open={variantPickerItem !== null}
+                onOpenChange={(open) => {
+                    if (!open) setVariantPickerItem(null);
+                }}
+                onConfirm={(selections) => {
+                    if (!variantPickerItem || !canCreateRequests) return;
+                    addVariantsToCart(variantPickerItem, selections);
+                    setVariantPickerItem(null);
+                }}
+                canCreateRequests={canCreateRequests}
+            />
+            <LiffStockCart
+                open={cartOpen}
+                items={cartItems}
+                totalQuantity={totalQuantity}
+                projectCode={projectCode}
+                submitting={submitting}
+                onOpenChange={(open) => {
+                    if (!open || canCreateRequests) setCartOpen(open);
+                }}
+                onProjectCodeChange={onProjectCodeChange}
+                onChangeQuantity={onChangeQuantity}
+                onRemove={onRemove}
+                onClear={onClear}
+                onSubmit={onSubmit}
+                canCreateRequests={canCreateRequests}
+            />
+        </>
     );
 }

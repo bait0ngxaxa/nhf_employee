@@ -590,3 +590,71 @@ SSE-058 follow-up: เมื่อ availability ของ variant เดิม�
 ```text
 react-hooks/set-state-in-effect = globally enabled
 ```
+
+## Phase L5E Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้วทั้ง 16 finding:
+
+```text
+SSE-001, SSE-013, SSE-016, SSE-017, SSE-027, SSE-030, SSE-031, SSE-032,
+SSE-035, SSE-036, SSE-040, SSE-041, SSE-042, SSE-044, SSE-054, SSE-056
+```
+
+Baseline ก่อน L5E: **42 diagnostics**
+Explicit inventory หลัง L5E: **26 diagnostics**
+Reduction: **16**
+
+รูปแบบ ownership ที่ใช้:
+
+- `SSE-001` — Sidebar เก็บเฉพาะ `collapsedGroupIds` ที่ผู้ใช้เลือกเอง และ derive กลุ่มที่ขยายจากกลุ่มที่มีอยู่ลบด้วยค่าที่ถูกยุบ จึงไม่ synchronize availability เข้า user preference
+- `SSE-013` — Employee provider คง search, filter, pagination และ read-only data; `EmployeeList` เป็น capability owner ของ edit session และ `EmployeeModals` อยู่ภายใน session นั้น
+- `SSE-016` — Leave model คง history/filter/page; create, cancel และ not-taken ใช้ controller/session แยกกันตาม capability ของตัวเอง
+- `SSE-017` — Manager approval decision session เป็น subtree ของ `canApproveAssignedRequests`; not-taken และ cancellation workflows ยังอยู่นอก boundary นี้
+- `SSE-027` — occurrence override editor เป็น per-row capability session; details dialog แบบอ่านอย่างเดียวยังคงอยู่นอก session
+- `SSE-030` / `SSE-031` — operational edit detail fetch, create form และ edit form อยู่ใน per-task/capability session; task list, filters, page และ reference state ที่ไม่ใช่ draft อยู่นอก session
+- `SSE-032` — Routine tab state เก็บ visible-tab lifetime key และปรับ active tab เป็น fallback ที่ valid แบบ durable โดยไม่ rewrite URL synchronization
+- `SSE-035` — delete confirmation เป็น per-task destructive session ซึ่ง mount เฉพาะเมื่อ global และ task-level eligibility ยังใช้ได้
+- `SSE-036` — Routine LIFF create/edit/delete form state อยู่ใน capability-owned sessions; delete error อยู่ใน delete session ส่วน detail Sheet ยังคง stable เพื่อไม่กระทบ read-only detail loading
+- `SSE-040` — inventory management controls/dialogs อยู่ใน capability-keyed inventory session; catalog filters, page และ read-only rows อยู่นอก owner
+- `SSE-041` — admin cancellation เป็น per-request action session; process/issue capability ไม่ถูกผูกกับ cancellation state
+- `SSE-042` — dashboard variant picker อยู่ใน create-capability session; `useStockBrowseCart` และ cart persistence มี owner แยกต่างหาก
+- `SSE-044` — own-request cancellation target อยู่ใน capability-keyed request-history session; search/filter/page อยู่ใน UI context เดิม
+- `SSE-054` — LIFF Stock picker และ cart open/closed UI อยู่ใน create-capability session; cart contents, project code และ idempotency persistence ยังคงอยู่ใน cart hook
+- `SSE-056` — LIFF Stock active tab ถูก reconcile ที่ server capability response boundary และ fallback ถูกเขียนกลับไปยัง state จึงไม่ย้อนกลับไปยัง tab ที่ถูกถอนสิทธิ์เมื่อ capability กลับมา
+
+Invariants ที่ตรวจแล้ว:
+
+- เปิด workflow → capability หาย → owner unmount/reset → capability กลับมาแล้ว workflow ปิดและต้องเปิดใหม่โดยผู้ใช้
+- capability ของ workflow หนึ่งไม่ล้าง history, search, filter, pagination, read-only detail หรือ workflow ของ capability อื่น
+- sidebar collapse preference คงอยู่ผ่าน rerender, availability loss/regrant และ explicit re-expand
+- tab ที่ถูกซ่อนเลือก fallback อย่างถาวรจนกว่าจะมี explicit user selection ใหม่
+- persisted Stock cart และ idempotency state ไม่ถูกล้างเพียงเพราะ create capability หาย
+- client mutation guards และ server authorization/ownership/status checks ไม่ถูกลดทอน
+
+Focused verification ที่ผ่าน:
+
+- `npm.cmd run test:run --` พร้อม explicit paths ของ Sidebar, Employee, Leave, Routine dashboard/LIFF และ Stock dashboard/LIFF — **22 files, 191 tests ผ่าน**
+- `npm.cmd run lint:strict` — ผ่าน
+- `npx.cmd tsc --noEmit --pretty false` — ผ่าน
+- `git diff --check` และตรวจ diff ไม่พบอักขระแทนที่หรือข้อความเสียรูป — ผ่าน
+- ไม่รัน `architecture:check` เพราะไม่มีการเปลี่ยน module/import boundary
+- ไม่รัน `npm run build` และไม่รัน full repository suite เพราะ focused/static verification เพียงพอกับขอบเขต L5E
+
+Repository-wide explicit inventory:
+
+```text
+npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json
+→ 26 diagnostics
+```
+
+ไม่เก็บ raw JSON ไว้ใน repository และไม่พบ diagnostic ของ 16 L5E IDs ที่แก้ใน inventory หลังการเปลี่ยนแปลง
+
+Scope audit: ไม่แตะ L5F (`SSE-028`, `SSE-039`), hydration, external-store, pagination (`SSE-015`, `SSE-029`), URL/deep-link (`SSE-018`, `SSE-033`, `SSE-034`, `SSE-055`) หรือ async lifecycle (`SSE-037`, `SSE-053`) นอกเหนือจากการคง behavior ที่ L5E ต้องใช้ร่วมกัน รายการ 26 diagnostics ที่เหลือจึงเป็นงานของเฟสถัดไปตาม roadmap และยังไม่มีการเริ่ม L5F
+
+ไม่มีการแก้ API contract, schema, migration, server authorization, lint suppression หรือ timing workaround เป้าหมายสุดท้ายยังคงเป็น:
+
+```text
+react-hooks/set-state-in-effect = globally enabled
+```

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { ChevronDown, Home, PanelLeft, PanelLeftClose, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppLogo } from "@/components/brand/AppLogo";
@@ -170,20 +170,17 @@ export function useExpandedSidebarGroups(availableMenuGroups: MenuGroup[]): {
     expandedGroups: ReadonlySet<string>;
     toggleGroup: (groupId: string) => void;
 } {
-    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-        () => new Set(availableMenuGroups.map((group) => group.id)),
+    const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
+        () => new Set(),
     );
-
-    useEffect(() => {
-        setExpandedGroups((current) => {
-            const next = new Set(current);
-            availableMenuGroups.forEach((group) => next.add(group.id));
-            return next;
-        });
-    }, [availableMenuGroups]);
+    const expandedGroups = useMemo(() => {
+        const next = new Set(availableMenuGroups.map((group) => group.id));
+        collapsedGroupIds.forEach((groupId) => next.delete(groupId));
+        return next;
+    }, [availableMenuGroups, collapsedGroupIds]);
 
     function toggleGroup(groupId: string): void {
-        setExpandedGroups((current) => {
+        setCollapsedGroupIds((current) => {
             const next = new Set(current);
             if (next.has(groupId)) {
                 next.delete(groupId);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ClipboardList, Search, X } from "lucide-react";
 import { type StockRequestStatus } from "@prisma/client";
 import { Pagination } from "@/components/Pagination";
@@ -39,6 +39,17 @@ import { StockRequestListSkeleton } from "./StockSkeletons";
 import { StockRequestMobileCards } from "./StockRequestMobileCards";
 
 export function StockMyRequests() {
+    const { stockCapabilities } = useStockDataContext();
+    const canCancelOwnRequests = stockCapabilities.canCancelOwnRequests;
+
+    return (
+        <StockMyRequestsCapabilitySession
+            key={canCancelOwnRequests ? "can-cancel-own-requests" : "read-only-requests"}
+        />
+    );
+}
+
+function StockMyRequestsCapabilitySession() {
     const {
         requests,
         isLoading,
@@ -62,11 +73,6 @@ export function StockMyRequests() {
         onCancelSuccess: refreshRequests,
         onCancelSettled: () => setCancelTarget(null),
     });
-    useEffect(() => {
-        if (!canCancelOwnRequests) {
-            setCancelTarget(null);
-        }
-    }, [canCancelOwnRequests]);
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;

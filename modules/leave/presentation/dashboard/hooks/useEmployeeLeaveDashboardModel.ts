@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { LeaveStatusValue as LeaveStatus, LeaveTypeValue as LeaveType } from "../../types";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -27,16 +27,11 @@ export interface EmployeeLeaveDashboardModel {
     canCancelOwnRequests: boolean;
     canRequestOwnNotTaken: boolean;
     isLoading: boolean;
-    isRequestFormOpen: boolean;
     quotas: LeaveQuota[];
     history: LeaveRequest[];
     metadata: LeaveProfileResponse["metadata"] | undefined;
     page: number;
     isSubmitting: boolean;
-    cancelConfirmRequest: LeaveRequest | null;
-    cancelReason: string;
-    notTakenRequestId: string | null;
-    notTakenNote: string;
     historyQuery: string;
     historyLeaveType: LeaveType | "";
     historyStatus: LeaveStatus | "";
@@ -52,17 +47,9 @@ export interface EmployeeLeaveDashboardModel {
     setHistoryStatus: (value: LeaveStatus | "") => void;
     setHistoryYear: (value: string) => void;
     resetHistoryFilters: () => void;
-    openRequestForm: () => void;
-    closeRequestForm: () => void;
     onRequestSuccess: () => Promise<void>;
-    openCancelDialog: (request: LeaveRequest) => void;
-    closeCancelDialog: () => void;
-    setCancelReason: (value: string) => void;
-    confirmCancelLeave: () => Promise<void>;
-    openNotTakenDialog: (leaveId: string) => void;
-    closeNotTakenDialog: () => void;
-    setNotTakenNote: (value: string) => void;
-    confirmNotTakenRequest: () => Promise<void>;
+    confirmCancelLeave: (request: LeaveRequest, reason: string) => Promise<void>;
+    confirmNotTakenRequest: (leaveId: string, note: string) => Promise<void>;
 }
 
 export function useEmployeeLeaveDashboardModel(
@@ -72,13 +59,8 @@ export function useEmployeeLeaveDashboardModel(
     const canCreateOwnRequests = leaveCapabilities?.canCreateOwnRequests === true;
     const canCancelOwnRequests = leaveCapabilities?.canCancelOwnRequests === true;
     const canRequestOwnNotTaken = leaveCapabilities?.canRequestOwnNotTaken === true;
-    const [isRequestFormOpen, setIsRequestFormOpen] = useState(false);
     const [page, setPage] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [cancelConfirmRequest, setCancelConfirmRequest] = useState<LeaveRequest | null>(null);
-    const [cancelReason, setCancelReason] = useState("");
-    const [notTakenRequestId, setNotTakenRequestId] = useState<string | null>(null);
-    const [notTakenNote, setNotTakenNote] = useState("");
     const [historyQuery, setHistoryQuery] = useState("");
     const [historyLeaveType, setHistoryLeaveType] = useState<LeaveType | "">("");
     const [historyStatus, setHistoryStatus] = useState<LeaveStatus | "">("");
@@ -123,26 +105,8 @@ export function useEmployeeLeaveDashboardModel(
         enabled: canReadOwnRequests,
     });
 
-    useEffect(() => {
-        if (!canCreateOwnRequests) {
-            setIsRequestFormOpen(false);
-        }
-        if (!canCancelOwnRequests) {
-            setCancelConfirmRequest(null);
-            setCancelReason("");
-        }
-        if (!canRequestOwnNotTaken) {
-            setNotTakenRequestId(null);
-            setNotTakenNote("");
-        }
-    }, [canCancelOwnRequests, canCreateOwnRequests, canRequestOwnNotTaken]);
-
     const getQuota = (type: LeaveType): LeaveQuotaBalance =>
         quotas.find((quota) => quota.leaveType === type) ?? EMPTY_LEAVE_QUOTA;
-
-    const closeRequestForm = (): void => {
-        setIsRequestFormOpen(false);
-    };
 
     const handleHistoryQueryChange = (value: string): void => {
         setHistoryQuery(value);
@@ -172,71 +136,32 @@ export function useEmployeeLeaveDashboardModel(
         setPage(1);
     };
 
-    const openRequestForm = (): void => {
-        if (!canCreateOwnRequests) return;
-        setIsRequestFormOpen(true);
-    };
-
     const onRequestSuccess = async (): Promise<void> => {
         if (canReadOwnRequests) {
             await mutate();
         }
-        setIsRequestFormOpen(false);
     };
 
-    const openCancelDialog = (request: LeaveRequest): void => {
+    const confirmCancelLeave = async (
+        request: LeaveRequest,
+        cancelReason: string,
+    ): Promise<void> => {
         const availableActions = getEmployeeLeaveActions(request);
         if (
             !canCancelOwnRequests
             || (!availableActions.includes("CANCEL")
                 && !availableActions.includes("REQUEST_CANCELLATION"))
-        ) return;
-        setCancelConfirmRequest(request);
-        setCancelReason("");
-    };
-
-    const closeCancelDialog = (): void => {
-        setCancelConfirmRequest(null);
-        setCancelReason("");
-    };
-
-    const openNotTakenDialog = (leaveId: string): void => {
-        const request = history.find((item) => item.id === leaveId);
-        if (
-            !canRequestOwnNotTaken
-            || !request
-            || !getEmployeeLeaveActions(request).includes("REQUEST_NOT_TAKEN")
-        ) return;
-        setNotTakenRequestId(leaveId);
-        setNotTakenNote("");
-    };
-
-    const closeNotTakenDialog = (): void => {
-        setNotTakenRequestId(null);
-        setNotTakenNote("");
-    };
-
-    const confirmCancelLeave = async (): Promise<void> => {
-        if (!canCancelOwnRequests || !cancelConfirmRequest) {
-            if (!canCancelOwnRequests) closeCancelDialog();
-            return;
-        }
-        const availableActions = getEmployeeLeaveActions(cancelConfirmRequest);
-        if (
-            !availableActions.includes("CANCEL")
-            && !availableActions.includes("REQUEST_CANCELLATION")
         ) {
-            closeCancelDialog();
             return;
         }
 
         try {
             setIsSubmitting(true);
-            if (cancelConfirmRequest.status === "PENDING") {
-                await cancelLeave(cancelConfirmRequest.id);
+            if (request.status === "PENDING") {
+                await cancelLeave(request.id);
                 toast.success("ยกเลิกคำขอลาเรียบร้อยแล้ว");
             } else {
-                await requestApprovedCancellation(cancelConfirmRequest.id, cancelReason);
+                await requestApprovedCancellation(request.id, cancelReason);
                 toast.success("ส่งคำขอยกเลิกวันลาแล้ว รอผู้อนุมัติยืนยัน");
             }
         } catch (error: unknown) {
@@ -247,12 +172,10 @@ export function useEmployeeLeaveDashboardModel(
             );
         } finally {
             setIsSubmitting(false);
-            closeCancelDialog();
         }
     };
 
-    const confirmNotTakenRequest = async (): Promise<void> => {
-        const leaveId = notTakenRequestId;
+    const confirmNotTakenRequest = async (leaveId: string, notTakenNote: string): Promise<void> => {
         const request = history.find((item) => item.id === leaveId);
         if (
             !canRequestOwnNotTaken
@@ -261,7 +184,6 @@ export function useEmployeeLeaveDashboardModel(
             || !getEmployeeLeaveActions(request).includes("REQUEST_NOT_TAKEN")
             || !notTakenNote.trim()
         ) {
-            if (!canRequestOwnNotTaken) closeNotTakenDialog();
             return;
         }
 
@@ -277,7 +199,6 @@ export function useEmployeeLeaveDashboardModel(
             );
         } finally {
             setIsSubmitting(false);
-            closeNotTakenDialog();
         }
     };
 
@@ -287,16 +208,11 @@ export function useEmployeeLeaveDashboardModel(
         canCancelOwnRequests,
         canRequestOwnNotTaken,
         isLoading: canReadOwnRequests && isLoading,
-        isRequestFormOpen,
         quotas,
         history,
         metadata,
         page,
         isSubmitting,
-        cancelConfirmRequest,
-        cancelReason,
-        notTakenRequestId,
-        notTakenNote,
         historyQuery,
         historyLeaveType,
         historyStatus,
@@ -312,16 +228,8 @@ export function useEmployeeLeaveDashboardModel(
         setHistoryStatus: handleHistoryStatusChange,
         setHistoryYear: handleHistoryYearChange,
         resetHistoryFilters,
-        openRequestForm,
-        closeRequestForm,
         onRequestSuccess,
-        openCancelDialog,
-        closeCancelDialog,
-        setCancelReason,
         confirmCancelLeave,
-        openNotTakenDialog,
-        closeNotTakenDialog,
-        setNotTakenNote,
         confirmNotTakenRequest,
     };
 }

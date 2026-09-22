@@ -659,6 +659,128 @@ describe("LIFF Stock app orchestration", () => {
         expect(mocks.submitRequest.mock.calls[1]?.[1]).toBe(firstKey);
     });
 
+    it("terminates create surfaces and invalidates the processing tab across capability loss and re-grant", async () => {
+        const initialHome = {
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {
+                stockCapabilities: PROCESSOR_STOCK_CAPABILITIES,
+                canRequestStock: true,
+                canProcessStockRequests: true,
+            },
+        };
+        const noCreateHome = {
+            ...initialHome,
+            capabilities: {
+                ...initialHome.capabilities,
+                stockCapabilities: {
+                    ...PROCESSOR_STOCK_CAPABILITIES,
+                    canCreateRequests: false,
+                },
+            },
+        };
+        const noProcessHome = {
+            ...initialHome,
+            capabilities: {
+                ...initialHome.capabilities,
+                stockCapabilities: {
+                    ...PROCESSOR_STOCK_CAPABILITIES,
+                    canProcessRequests: false,
+                },
+                canProcessStockRequests: false,
+            },
+        };
+        mocks.fetchHome
+            .mockReset()
+            .mockResolvedValueOnce(initialHome)
+            .mockResolvedValueOnce(noCreateHome)
+            .mockResolvedValueOnce(noProcessHome)
+            .mockResolvedValueOnce(initialHome);
+        mocks.fetchProcessing.mockResolvedValue(createRequestsResponse([
+            createRequestSummary(71, "NHF-2569", true),
+        ]));
+        mocks.submitRequest
+            .mockRejectedValueOnce(
+                new LiffApiError(
+                    "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
+                    401,
+                    undefined,
+                    { recovered: true, replayed: false },
+                ),
+            )
+            .mockRejectedValueOnce(
+                new LiffApiError(
+                    "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
+                    401,
+                    undefined,
+                    { recovered: true, replayed: false },
+                ),
+            );
+        mocks.issueRequest.mockRejectedValueOnce(
+            new LiffApiError(
+                "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว",
+                401,
+                undefined,
+                { recovered: true, replayed: false },
+            ),
+        );
+
+        render(<LiffStockApp />);
+        expect(await screen.findByText("กระดาษ A4")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มลงตะกร้า" }));
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+        fireEvent.change(screen.getByLabelText("ชื่อย่อโครงการ"), {
+            target: { value: "NHF-2569" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }));
+
+        await waitFor(() => expect(mocks.fetchHome).toHaveBeenCalledTimes(2));
+        expect(screen.queryByRole("button", { name: /เปิดตะกร้า/ }))
+            .not.toBeInTheDocument();
+        const persistedCart = window.localStorage.getItem(
+            "stock:browse-cart:v1:user:7",
+        );
+        expect(persistedCart).toContain('"variantId":101');
+        expect(persistedCart).toContain('"qty":1');
+
+        fireEvent.mouseDown(screen.getByRole("tab", { name: /รอดำเนินการ/ }), {
+            button: 0,
+            ctrlKey: false,
+        });
+        expect(await screen.findByRole("heading", { name: "คำขอรอดำเนินการ" }))
+            .toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "จ่ายวัสดุ" }));
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
+
+        await waitFor(() => expect(mocks.fetchHome).toHaveBeenCalledTimes(3));
+        expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
+            .not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "เลือกวัสดุที่ต้องการเบิก" }))
+            .toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /เปิดตะกร้า/ }));
+        expect(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }))
+            .toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอเบิก 1 ชิ้น" }));
+
+        await waitFor(() => expect(mocks.fetchHome).toHaveBeenCalledTimes(4));
+        fireEvent.click(screen.getByRole("button", { name: "ปิดตะกร้า" }));
+        await waitFor(() => expect(screen.queryByRole("dialog", {
+            name: "ตะกร้าเบิกวัสดุ",
+        })).not.toBeInTheDocument());
+        expect(screen.getByRole("tab", { name: /รอดำเนินการ/ }))
+            .toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "เลือกวัสดุที่ต้องการเบิก" }))
+            .toBeInTheDocument();
+
+        fireEvent.mouseDown(screen.getByRole("tab", { name: /รอดำเนินการ/ }), {
+            button: 0,
+            ctrlKey: false,
+        });
+        expect(await screen.findByRole("heading", { name: "คำขอรอดำเนินการ" }))
+            .toBeInTheDocument();
+    });
+
     it("preserves the exact retry payload and key after an ambiguous failure", async () => {
         const latestCatalog = {
             ...CATALOG,

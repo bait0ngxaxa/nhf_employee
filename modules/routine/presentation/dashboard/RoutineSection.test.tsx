@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { RoutineSection } from "./RoutineSection";
 import type { RoutinePresentationCapabilities } from "../../application/types";
+import type { RoutineTaskWorkItem } from "./types";
 
 const mocks = vi.hoisted(() => ({
     useDashboardDataContext: vi.fn(),
@@ -145,19 +146,23 @@ vi.mock("./RoutineOccurrenceList", () => ({
         routineCapabilities,
         onEditTask,
         onPageChange,
+        renderEditAction,
     }: {
         routineCapabilities?: RoutinePresentationCapabilities;
         onEditTask: (taskId: number) => void;
         onPageChange: (page: number) => void;
+        renderEditAction?: (task: RoutineTaskWorkItem) => ReactNode;
     }) => (
         <div data-testid="routine-occurrence-list">
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้ารายการ Routine ถัดไป
             </button>
             {routineCapabilities?.canUpdateTasks === true ? (
-                <button type="button" onClick={() => onEditTask(71)}>
-                    แก้ไข Routine ทดสอบ
-                </button>
+                renderEditAction ? renderEditAction({ id: 71 } as RoutineTaskWorkItem) : (
+                    <button type="button" onClick={() => onEditTask(71)}>
+                        แก้ไข Routine ทดสอบ
+                    </button>
+                )
             ) : null}
         </div>
     ),
@@ -169,6 +174,7 @@ vi.mock("./RoutineTaskList", () => ({
         categories,
         categoryId,
         onCreate,
+        createAction,
         routineCapabilities,
         onSearchChange,
         onCategoryChange,
@@ -182,6 +188,7 @@ vi.mock("./RoutineTaskList", () => ({
         onSearchChange: (value: string) => void;
         onCategoryChange: (value: string) => void;
         onPageChange: (page: number) => void;
+        createAction?: ReactNode;
     }) => (
         <div data-testid="routine-task-list">
             <input
@@ -204,11 +211,11 @@ vi.mock("./RoutineTaskList", () => ({
             <button type="button" onClick={() => onPageChange(2)}>
                 ไปหน้าถัดไป
             </button>
-            {routineCapabilities?.canCreateTasks === true ? (
+            {createAction ?? (routineCapabilities?.canCreateTasks === true ? (
                 <button type="button" onClick={onCreate}>
                     สร้างแม่แบบงานทดสอบ
                 </button>
-            ) : null}
+            ) : null)}
         </div>
     ),
 }));
@@ -421,9 +428,9 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("จัดการงาน")).toBeInTheDocument();
         expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
-        expect(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "สร้างแม่แบบงาน" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
-        expect(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "แก้ไข Routine" })).toBeInTheDocument();
     });
 
     it.each(["USER", "ADMIN"] as const)(
@@ -473,12 +480,66 @@ describe("RoutineSection tabs", () => {
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
-        fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" }));
+        fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงาน" }));
 
         expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
         expect(screen.getByRole("dialog", { name: "สร้างแม่แบบงานประจำ" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
         await waitFor(() => expect(screen.queryByRole("dialog", { name: "สร้างแม่แบบงานประจำ" })).not.toBeInTheDocument());
+        expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
+    });
+
+    it("does not resurrect a routine tab after its capability is restored", () => {
+        let capabilities: RoutinePresentationCapabilities = allRoutineCapabilities;
+
+        function CapabilityHarness() {
+            const [, rerender] = useState(0);
+
+            function updateCapabilities(nextCapabilities: RoutinePresentationCapabilities): void {
+                capabilities = nextCapabilities;
+                rerender((value) => value + 1);
+            }
+
+            mocks.useDashboardDataContext.mockReturnValue({
+                user: { role: "USER", routineCapabilities: capabilities },
+            });
+
+            return (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => updateCapabilities({
+                            ...allRoutineCapabilities,
+                            canCreateTasks: false,
+                            canUpdateTasks: false,
+                            canDeleteTasks: false,
+                        })}
+                    >
+                        ถอนสิทธิ์จัดการ Routine
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => updateCapabilities(allRoutineCapabilities)}
+                    >
+                        คืนสิทธิ์จัดการ Routine
+                    </button>
+                    <RoutineSection />
+                </>
+            );
+        }
+
+        render(<CapabilityHarness />);
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
+        expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ถอนสิทธิ์จัดการ Routine" }));
+        expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "คืนสิทธิ์จัดการ Routine" }));
+        expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
+        expect(screen.queryByTestId("routine-task-list")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
         expect(screen.getByTestId("routine-task-list")).toBeInTheDocument();
     });
 
@@ -491,7 +552,7 @@ describe("RoutineSection tabs", () => {
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
-        fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงานทดสอบ" }));
+        fireEvent.click(screen.getByRole("button", { name: "สร้างแม่แบบงาน" }));
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), {
             target: { value: "3" },
         });
@@ -515,7 +576,7 @@ describe("RoutineSection tabs", () => {
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
-        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" }));
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine" }));
 
         expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
         expect(screen.getByRole("dialog", { name: "แก้ไข Routine" })).toBeInTheDocument();
@@ -525,7 +586,7 @@ describe("RoutineSection tabs", () => {
         mockRoutineUser("USER");
 
         render(<RoutineSection />);
-        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine ทดสอบ" }));
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข Routine" }));
 
         await waitFor(() => expect(mocks.useSWR).toHaveBeenCalledWith(
             "/api/routines/tasks/71",

@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useManagerApprovalModel } from "./useManagerApprovalModel";
 import { useLeaveApprovals } from "./useLeaveApprovals";
@@ -182,7 +182,7 @@ describe("useManagerApprovalModel", () => {
         });
     });
 
-    it("opens confirmation for special leave before approving", async () => {
+    it("approves special leave through the guarded mutation action", async () => {
         const { result } = renderHook(() => useManagerApprovalModel({
             leaveCapabilities: LEAVE_CAPABILITIES,
             hasApprovalRelationship: true,
@@ -197,11 +197,14 @@ describe("useManagerApprovalModel", () => {
             await result.current.approveLeave(specialLeave);
         });
 
-        expect(result.current.approvalConfirmLeave?.id).toBe("leave-1");
-        expect(submitLeaveDecision).not.toHaveBeenCalled();
+        expect(submitLeaveDecision).toHaveBeenCalledWith({
+            leaveId: "leave-1",
+            action: "APPROVE",
+            reason: undefined,
+        });
     });
 
-    it("keeps normal approval confirmation independent from not-taken capability", async () => {
+    it("keeps approval mutation independent from not-taken capability", async () => {
         const allLeaveCapabilities: LeavePresentationCapabilities = {
             ...LEAVE_CAPABILITIES,
             canManageApprovers: true,
@@ -223,8 +226,7 @@ describe("useManagerApprovalModel", () => {
             await result.current.approveLeave(warningLeave);
         });
 
-        expect(result.current.approvalConfirmLeave).toEqual(warningLeave);
-        expect(submitLeaveDecision).not.toHaveBeenCalled();
+        expect(submitLeaveDecision).toHaveBeenCalledTimes(1);
 
         rerender({
             capabilities: {
@@ -232,8 +234,6 @@ describe("useManagerApprovalModel", () => {
                 canConfirmAssignedNotTaken: false,
             },
         });
-
-        expect(result.current.approvalConfirmLeave).toEqual(warningLeave);
 
         await act(async () => {
             expect(await result.current.confirmNotTaken("leave-not-taken")).toBe(false);
@@ -241,39 +241,22 @@ describe("useManagerApprovalModel", () => {
 
         expect(confirmLeaveNotTaken).not.toHaveBeenCalled();
 
-        rerender({
-            capabilities: {
-                ...allLeaveCapabilities,
-                canApproveAssignedRequests: false,
-                canConfirmAssignedNotTaken: false,
-            },
-        });
-
-        expect(result.current.approvalConfirmLeave).toBeNull();
     });
 
-    it("opens reject dialog and clears state when closed", async () => {
+    it("rejects the supplied leave through the guarded mutation action", async () => {
         const { result } = renderHook(() => useManagerApprovalModel({
             leaveCapabilities: LEAVE_CAPABILITIES,
             hasApprovalRelationship: true,
         }));
 
-        act(() => {
-            result.current.openRejectDialog(result.current.pending[0]);
+        await act(async () => {
+            await result.current.rejectLeave(pendingLeave, "ไม่อนุมัติ");
         });
 
-        expect(result.current.isRejectDialogOpen).toBe(true);
-        expect(result.current.selectedLeave?.id).toBe("leave-1");
-
-        act(() => {
-            result.current.setRejectReason("ไม่อนุมัติ");
-            result.current.closeRejectDialog();
-        });
-
-        await waitFor(() => {
-            expect(result.current.isRejectDialogOpen).toBe(false);
-            expect(result.current.selectedLeave).toBeNull();
-            expect(result.current.rejectReason).toBe("");
+        expect(submitLeaveDecision).toHaveBeenCalledWith({
+            leaveId: "leave-1",
+            action: "REJECT",
+            reason: "ไม่อนุมัติ",
         });
     });
 
@@ -318,30 +301,4 @@ describe("useManagerApprovalModel", () => {
         expect(rejectLeaveCancellation).not.toHaveBeenCalled();
     });
 
-    it("closes stale approval dialogs when approval capability is removed", () => {
-        const { result, rerender } = renderHook(
-            ({ capabilities }: { capabilities: LeavePresentationCapabilities }) =>
-                useManagerApprovalModel({
-                    leaveCapabilities: capabilities,
-                    hasApprovalRelationship: true,
-                }),
-            { initialProps: { capabilities: LEAVE_CAPABILITIES } },
-        );
-
-        act(() => {
-            result.current.openRejectDialog(pendingLeave);
-        });
-        expect(result.current.isRejectDialogOpen).toBe(true);
-
-        rerender({
-            capabilities: {
-                ...LEAVE_CAPABILITIES,
-                canApproveAssignedRequests: false,
-            },
-        });
-
-        expect(result.current.isRejectDialogOpen).toBe(false);
-        expect(result.current.selectedLeave).toBeNull();
-        expect(result.current.approvalConfirmLeave).toBeNull();
-    });
 });

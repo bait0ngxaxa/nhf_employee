@@ -1,9 +1,12 @@
 "use client";
 
-import type { ReactElement } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 
 import { APPROVER_LEAVE_HISTORY_STATUSES } from "../../domain/constants";
-import { useManagerApprovalModel } from "./hooks/useManagerApprovalModel";
+import {
+    hasApprovalWarnings,
+    useManagerApprovalModel,
+} from "./hooks/useManagerApprovalModel";
 import { PendingApprovalList } from "./components/PendingApprovalList";
 import { ApprovalHistoryList } from "./components/ApprovalHistoryList";
 import { LeaveHistoryFilters } from "./components/LeaveHistoryFilters";
@@ -17,6 +20,7 @@ import {
 } from "./components/ApprovalDashboardPrimitives";
 import { ManagerApprovalDashboardSkeleton } from "./LeaveSkeletons";
 import type { LeavePresentationCapabilities } from "../../application/types";
+import type { PendingLeave } from "./hooks/useLeaveApprovals";
 
 interface ManagerApprovalDashboardProps {
     leaveCapabilities?: LeavePresentationCapabilities;
@@ -56,13 +60,30 @@ export function ManagerApprovalDashboard({
                     count={model.metadata?.pending.totalItems ?? model.pending.length}
                     tone="attention"
                 />
-                <PendingApprovalList
-                    pending={model.pending}
-                    isProcessing={model.isProcessing}
-                    onApprove={model.approveLeave}
-                    onOpenReject={model.openRejectDialog}
-                    canApproveAssignedRequests={model.canApproveAssignedRequests}
-                />
+                {model.canApproveAssignedRequests ? (
+                    <ManagerApprovalDecisionCapabilitySession model={model}>
+                        {({ onApprove, onOpenReject, dialogs }) => (
+                            <>
+                                <PendingApprovalList
+                                    pending={model.pending}
+                                    isProcessing={model.isProcessing}
+                                    onApprove={onApprove}
+                                    onOpenReject={onOpenReject}
+                                    canApproveAssignedRequests
+                                />
+                                {dialogs}
+                            </>
+                        )}
+                    </ManagerApprovalDecisionCapabilitySession>
+                ) : (
+                    <PendingApprovalList
+                        pending={model.pending}
+                        isProcessing={model.isProcessing}
+                        onApprove={async () => undefined}
+                        onOpenReject={() => undefined}
+                        canApproveAssignedRequests={false}
+                    />
+                )}
                 <ApprovalPagination
                     metadata={model.metadata?.pending}
                     onPageChange={model.setPendingPage}
@@ -143,30 +164,93 @@ export function ManagerApprovalDashboard({
                 />
             </div>
 
-            <RejectLeaveDialog
-                open={model.isRejectDialogOpen && model.canApproveAssignedRequests}
-                selectedLeave={model.selectedLeave}
-                rejectReason={model.rejectReason}
-                isProcessing={model.isProcessing}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        model.closeRejectDialog();
-                    }
-                }}
-                onRejectReasonChange={model.setRejectReason}
-                onConfirmReject={model.rejectLeave}
-            />
-
-            <ApprovalConfirmDialog
-                leave={model.canApproveAssignedRequests ? model.approvalConfirmLeave : null}
-                isProcessing={model.isProcessing}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        model.closeApprovalConfirmDialog();
-                    }
-                }}
-                onConfirm={model.confirmApproveLeave}
-            />
         </div>
     );
+}
+
+interface ManagerApprovalDecisionSessionRenderProps {
+    onApprove: (leave: PendingLeave) => Promise<void>;
+    onOpenReject: (leave: PendingLeave) => void;
+    dialogs: ReactNode;
+}
+
+function ManagerApprovalDecisionCapabilitySession({
+    model,
+    children,
+}: {
+    model: ReturnType<typeof useManagerApprovalModel>;
+    children: (props: ManagerApprovalDecisionSessionRenderProps) => ReactNode;
+}) {
+    const [selectedLeave, setSelectedLeave] = useState<PendingLeave | null>(null);
+    const [approvalConfirmLeave, setApprovalConfirmLeave] = useState<PendingLeave | null>(null);
+    const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+    const [rejectReason, setRejectReason] = useState("");
+
+    const closeRejectDialog = (): void => {
+        setIsRejectDialogOpen(false);
+        setRejectReason("");
+        setSelectedLeave(null);
+    };
+
+    const handleApprove = async (leave: PendingLeave): Promise<void> => {
+        if (hasApprovalWarnings(leave)) {
+            setApprovalConfirmLeave(leave);
+            return;
+        }
+        await model.approveLeave(leave);
+    };
+
+    const confirmApproveLeave = async (): Promise<void> => {
+        if (!approvalConfirmLeave) {
+            return;
+        }
+        const succeeded = await model.approveLeave(approvalConfirmLeave);
+        if (succeeded) {
+            setApprovalConfirmLeave(null);
+        }
+    };
+
+    const handleOpenReject = (leave: PendingLeave): void => {
+        setSelectedLeave(leave);
+        setRejectReason("");
+        setIsRejectDialogOpen(true);
+    };
+
+    const rejectLeave = async (): Promise<void> => {
+        if (!selectedLeave) {
+            return;
+        }
+        const succeeded = await model.rejectLeave(selectedLeave, rejectReason);
+        if (succeeded) {
+            closeRejectDialog();
+        }
+    };
+
+    return children({
+        onApprove: handleApprove,
+        onOpenReject: handleOpenReject,
+        dialogs: (
+            <>
+                <RejectLeaveDialog
+                    open={isRejectDialogOpen}
+                    selectedLeave={selectedLeave}
+                    rejectReason={rejectReason}
+                    isProcessing={model.isProcessing}
+                    onOpenChange={(open) => {
+                        if (!open) closeRejectDialog();
+                    }}
+                    onRejectReasonChange={setRejectReason}
+                    onConfirmReject={rejectLeave}
+                />
+                <ApprovalConfirmDialog
+                    leave={approvalConfirmLeave}
+                    isProcessing={model.isProcessing}
+                    onOpenChange={(open) => {
+                        if (!open) setApprovalConfirmLeave(null);
+                    }}
+                    onConfirm={confirmApproveLeave}
+                />
+            </>
+        ),
+    });
 }
