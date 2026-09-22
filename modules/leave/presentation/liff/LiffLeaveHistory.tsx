@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Filter, Paperclip, RotateCcw, X } from "lucide-react";
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 
 import { RequestStatusBadge } from "@/components/dashboard/shared/RequestStatusBadge";
 import { Button } from "@/components/ui/button";
@@ -48,9 +48,15 @@ export function LiffLeaveHistory({
     canUseAction = () => true,
 }: LiffLeaveHistoryProps): ReactElement {
     const [filterOpen, setFilterOpen] = useState(false);
+    const [filterSessionId, setFilterSessionId] = useState(0);
     const hasFilters = Boolean(
         filters.query || filters.leaveType || filters.status || filters.year,
     );
+
+    const openFilterSheet = (): void => {
+        setFilterSessionId((current) => current + 1);
+        setFilterOpen(true);
+    };
 
     return (
         <section aria-labelledby="liff-leave-history-heading" className="space-y-3">
@@ -71,7 +77,7 @@ export function LiffLeaveHistory({
                     variant="outline"
                     size="sm"
                     className="min-h-11"
-                    onClick={() => setFilterOpen(true)}
+                    onClick={openFilterSheet}
                 >
                     <Filter className="size-4" aria-hidden="true" />
                     ตัวกรอง{hasFilters ? " · ใช้งาน" : ""}
@@ -133,6 +139,7 @@ export function LiffLeaveHistory({
             ) : null}
 
             <LeaveFilterSheet
+                key={filterOpen ? `open:${filterSessionId}` : "closed"}
                 open={filterOpen}
                 filters={filters}
                 years={profile.metadata.availableYears}
@@ -237,11 +244,7 @@ function LeaveFilterSheet({
     onOpenChange: (open: boolean) => void;
     onApply: (filters: LeaveHistoryFilters) => void;
 }): ReactElement {
-    const [draft, setDraft] = useState<LeaveHistoryFilters>(filters);
-
-    useEffect(() => {
-        if (open) setDraft(filters);
-    }, [filters, open]);
+    const [draft, setDraft] = useState<LeaveHistoryFilters>(() => filters);
 
     const selectClassName = "min-h-12 w-full rounded-md border border-input bg-surface px-3 text-sm text-content-body outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40";
 

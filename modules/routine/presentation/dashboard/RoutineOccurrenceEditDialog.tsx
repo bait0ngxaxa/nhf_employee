@@ -93,24 +93,56 @@ export function RoutineOccurrenceEditDialog({
     task,
 }: RoutineOccurrenceEditDialogProps): ReactElement {
     const occurrence = task?.relevantOccurrence ?? null;
-    const [editor, setEditor] = useState<RoutineOccurrenceEditorState | null>(
-        () => occurrence ? editorState(occurrence) : null,
-    );
-    const [isSaving, setIsSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const saveLockRef = useRef(false);
-
-    useEffect(() => {
-        if (!open || !occurrence) return;
-        setEditor(editorState(occurrence));
-        setError(null);
-    }, [occurrence, open]);
 
     useEffect(() => {
         if (open && !canOverrideOccurrences) {
             onOpenChange(false);
         }
     }, [canOverrideOccurrences, onOpenChange, open]);
+
+    if (!open || !canOverrideOccurrences || !task || !occurrence) {
+        return <Dialog open={false} onOpenChange={onOpenChange} />;
+    }
+
+    return (
+        <RoutineOccurrenceEditSession
+            key={occurrence.id}
+            canOverrideOccurrences={canOverrideOccurrences}
+            employees={employees}
+            occurrence={occurrence}
+            onOpenChange={onOpenChange}
+            onSaved={onSaved}
+            task={task}
+        />
+    );
+}
+
+interface RoutineOccurrenceEditSessionProps {
+    canOverrideOccurrences: boolean;
+    employees: readonly RoutineEmployee[];
+    occurrence: RoutineTaskWorkItemOccurrence;
+    onOpenChange: (open: boolean) => void;
+    onSaved: () => void | Promise<void>;
+    task: RoutineTaskWorkItem;
+}
+
+function RoutineOccurrenceEditSession({
+    canOverrideOccurrences,
+    employees,
+    occurrence,
+    onOpenChange,
+    onSaved,
+    task,
+}: RoutineOccurrenceEditSessionProps): ReactElement {
+    const [session] = useState(() => ({
+        occurrenceId: occurrence.id,
+        periodKey: occurrence.periodKey,
+        reminderVersion: occurrence.reminderVersion,
+    }));
+    const [editor, setEditor] = useState<RoutineOccurrenceEditorState>(() => editorState(occurrence));
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const saveLockRef = useRef(false);
 
     function closeWhenIdle(): void {
         if (!isSaving && !saveLockRef.current) onOpenChange(false);
@@ -137,8 +169,6 @@ export function RoutineOccurrenceEditDialog({
         if (
             !canOverrideOccurrences
             || !task
-            || !occurrence
-            || !editor
             || saveLockRef.current
         ) return;
         const ownerCount = Object.values(editor.assignees)
@@ -157,9 +187,9 @@ export function RoutineOccurrenceEditDialog({
                 ([employeeId, role]) => ({ employeeId: Number(employeeId), role }),
             );
             await sendRoutineMutation(
-                API_ROUTES.routines.occurrenceById(occurrence.id),
+                API_ROUTES.routines.occurrenceById(session.occurrenceId),
                 {
-                    expectedReminderVersion: occurrence.reminderVersion,
+                    expectedReminderVersion: session.reminderVersion,
                     dueDate: editor.dueDate,
                     note: editor.note.trim() || null,
                     assignees,
@@ -180,13 +210,9 @@ export function RoutineOccurrenceEditDialog({
         }
     }
 
-    if (!canOverrideOccurrences || !task || !occurrence || !editor) {
-        return <Dialog open={false} onOpenChange={onOpenChange} />;
-    }
-
     return (
         <Dialog
-            open={open}
+            open
             onOpenChange={(nextOpen) => {
                 if (!nextOpen) closeWhenIdle();
             }}
@@ -202,7 +228,7 @@ export function RoutineOccurrenceEditDialog({
                         ปรับเฉพาะรอบนี้
                     </DialogTitle>
                     <DialogDescription className="max-w-[70ch] break-words text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
-                        แก้วันกำหนดและผู้รับผิดชอบเฉพาะรอบ {occurrence.periodKey} ของ “{task.title}” โดยไม่เปลี่ยนแม่แบบ Routine หรือรอบอื่น
+                        แก้วันกำหนดและผู้รับผิดชอบเฉพาะรอบ {session.periodKey} ของ “{task.title}” โดยไม่เปลี่ยนแม่แบบ Routine หรือรอบอื่น
                     </DialogDescription>
                 </DialogHeader>
 

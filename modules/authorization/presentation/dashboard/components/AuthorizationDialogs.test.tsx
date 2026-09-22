@@ -2,7 +2,12 @@ import { useState, type ReactElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { AddMemberDialog, GrantFormDialog, TeamFormDialog } from "./AuthorizationDialogs";
+import {
+    AddMemberDialog,
+    GrantFormDialog,
+    TeamFormDialog,
+    TeamRoleFormDialog,
+} from "./AuthorizationDialogs";
 import type {
     AuthorizationAdministrationOverviewData,
     AuthorizationAdministrationTeamDetailData,
@@ -214,6 +219,7 @@ describe("Authorization Administration dialogs", () => {
         });
         const view = render(
             <TeamFormDialog
+                key="create:1"
                 open
                 mode="create"
                 busy={false}
@@ -228,6 +234,7 @@ describe("Authorization Administration dialogs", () => {
 
         view.rerender(
             <TeamFormDialog
+                key="closed"
                 open={false}
                 mode="create"
                 busy={false}
@@ -237,6 +244,7 @@ describe("Authorization Administration dialogs", () => {
         );
         view.rerender(
             <TeamFormDialog
+                key="create:2"
                 open
                 mode="create"
                 busy={false}
@@ -251,6 +259,144 @@ describe("Authorization Administration dialogs", () => {
 
         expect(submittedKeys[0]).toMatch(/^new-team-/);
         expect(submittedKeys[1]).toMatch(/^new-team-/);
+        expect(submittedKeys[1]).not.toBe(submittedKeys[0]);
+    });
+
+    it("keeps a Team draft and its session baseline across same-ID refreshes", () => {
+        const view = render(
+            <TeamFormDialog
+                key="edit:11:1"
+                open
+                mode="edit"
+                team={team}
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={vi.fn(async () => undefined)}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("ชื่อทีม"), { target: { value: "ชื่อที่ยังไม่บันทึก" } });
+        view.rerender(
+            <TeamFormDialog
+                key="edit:11:1"
+                open
+                mode="edit"
+                team={{ ...team, name: "ชื่อจากการ refresh", description: "คำอธิบายใหม่" }}
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={vi.fn(async () => undefined)}
+            />,
+        );
+
+        expect(screen.getByLabelText("ชื่อทีม")).toHaveValue("ชื่อที่ยังไม่บันทึก");
+        fireEvent.click(screen.getByRole("button", { name: "ปิดแบบฟอร์มทีม" }));
+        fireEvent.click(screen.getByRole("button", { name: "ทิ้งข้อมูล" }));
+        expect(screen.getByLabelText("ชื่อทีม")).toHaveValue("Operations");
+
+        view.rerender(
+            <TeamFormDialog
+                key="edit:11:2"
+                open
+                mode="edit"
+                team={{ ...team, name: "ชื่อจากการ refresh", description: "คำอธิบายใหม่" }}
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={vi.fn(async () => undefined)}
+            />,
+        );
+        expect(screen.getByLabelText("ชื่อทีม")).toHaveValue("ชื่อจากการ refresh");
+        expect(screen.getByLabelText("คำอธิบายทีม (ไม่บังคับ)")).toHaveValue("คำอธิบายใหม่");
+    });
+
+    it("keeps a TeamRole draft for the same role and snapshots a fresh role session", () => {
+        const role = memberTeam.roles[0];
+        if (!role) throw new Error("Authorization test fixture is incomplete");
+        const view = render(
+            <TeamRoleFormDialog
+                key="edit-role:21:1"
+                open
+                mode="edit"
+                role={role}
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={vi.fn(async () => undefined)}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("ชื่อหน้าที่"), { target: { value: "ชื่อหน้าที่ที่ยังไม่บันทึก" } });
+        view.rerender(
+            <TeamRoleFormDialog
+                key="edit-role:21:1"
+                open
+                mode="edit"
+                role={{ ...role, name: "ชื่อหน้าที่จากการ refresh" }}
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={vi.fn(async () => undefined)}
+            />,
+        );
+        expect(screen.getByLabelText("ชื่อหน้าที่")).toHaveValue("ชื่อหน้าที่ที่ยังไม่บันทึก");
+
+        view.rerender(
+            <TeamRoleFormDialog
+                key="edit-role:21:2"
+                open
+                mode="edit"
+                role={{ ...role, name: "ชื่อหน้าที่จากการ refresh" }}
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={vi.fn(async () => undefined)}
+            />,
+        );
+        expect(screen.getByLabelText("ชื่อหน้าที่")).toHaveValue("ชื่อหน้าที่จากการ refresh");
+    });
+
+    it("generates a fresh technical key for each new TeamRole create session", async () => {
+        const submittedKeys: string[] = [];
+        const onSubmit = vi.fn(async (input: { readonly key?: string; readonly name: string }) => {
+            if (input.key) submittedKeys.push(input.key);
+        });
+        const view = render(
+            <TeamRoleFormDialog
+                key="create-role:1"
+                open
+                mode="create"
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={onSubmit}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText("ชื่อหน้าที่"), { target: { value: "หน้าที่แรก" } });
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มหน้าที่" }));
+        await waitFor(() => expect(submittedKeys).toHaveLength(1));
+
+        view.rerender(
+            <TeamRoleFormDialog
+                key="closed-role"
+                open={false}
+                mode="create"
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={onSubmit}
+            />,
+        );
+        view.rerender(
+            <TeamRoleFormDialog
+                key="create-role:2"
+                open
+                mode="create"
+                busy={false}
+                onClose={vi.fn()}
+                onSubmit={onSubmit}
+            />,
+        );
+        fireEvent.change(screen.getByLabelText("ชื่อหน้าที่"), { target: { value: "หน้าที่สอง" } });
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มหน้าที่" }));
+        await waitFor(() => expect(submittedKeys).toHaveLength(2));
+
+        expect(submittedKeys[0]).toMatch(/^new-role-/);
+        expect(submittedKeys[1]).toMatch(/^new-role-/);
         expect(submittedKeys[1]).not.toBe(submittedKeys[0]);
     });
 

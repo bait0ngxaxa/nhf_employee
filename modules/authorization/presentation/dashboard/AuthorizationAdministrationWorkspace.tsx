@@ -33,7 +33,13 @@ export function AuthorizationAdministrationWorkspace({
     const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
     const [directoryQuery, setDirectoryQuery] = useState("");
     const [createTeamOpen, setCreateTeamOpen] = useState(false);
+    const [createTeamSessionId, setCreateTeamSessionId] = useState(0);
     const [createTeamBusy, setCreateTeamBusy] = useState(false);
+
+    const openCreateTeam = (): void => {
+        setCreateTeamSessionId((current) => current + 1);
+        setCreateTeamOpen(true);
+    };
 
     const data = useAuthorizationAdministrationData({
         initialOverview,
@@ -119,11 +125,12 @@ export function AuthorizationAdministrationWorkspace({
                         error={data.overviewError}
                         selectedTeamId={selectedTeamId}
                         onSelectTeam={selectTeam}
-                        onCreateTeam={() => setCreateTeamOpen(true)}
+                        onCreateTeam={openCreateTeam}
                         onRefresh={() => void refreshOverview()}
                     />
                     {overview && selectedTeamId !== null ? (
                         <TeamAdministration
+                            key={selectedTeamId}
                             team={data.team}
                             loading={data.teamLoading}
                             error={data.teamError}
@@ -156,6 +163,7 @@ export function AuthorizationAdministrationWorkspace({
                 />
             ) : null}
             <TeamFormDialog
+                key={`create:${createTeamSessionId}`}
                 open={createTeamOpen}
                 mode="create"
                 busy={createTeamBusy}

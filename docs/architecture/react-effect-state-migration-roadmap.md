@@ -551,3 +551,40 @@ Regression verification: `UserAccessPanel.test.tsx` เพิ่มกรณี 
 ```text
 react-hooks/set-state-in-effect = globally enabled
 ```
+
+## Phase L5D Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-008`, `SSE-009`, `SSE-023`, `SSE-026`, `SSE-046`, `SSE-058`
+
+Baseline ก่อน L5D: **48** diagnostics
+Baseline หลัง L5D: **42** diagnostics
+Reduction: **6**
+
+รูปแบบ ownership ที่ใช้:
+
+- `SSE-008` / `SSE-009` — Workspace และ `TeamAdministration` เป็นเจ้าของ explicit create/edit session identity; keyed form session จับ technical key และ editable baseline ครั้งเดียวต่อ session ส่วน Team/Role ID เป็น semantic entity identity
+- `SSE-023` — `LiffLeaveHistory` เริ่ม filter session ใหม่เมื่อผู้ใช้เปิด sheet; keyed sheet จับ committed-filter snapshot แยกจาก draft จนกว่าจะกด Apply
+- `SSE-026` — occurrence editor เป็น keyed session subtree; editor draft และ `expectedReminderVersion` มาจาก occurrence snapshot เดียวกันตั้งแต่ session เริ่ม และ session จบเมื่อปิดหรือเปลี่ยน occurrence identity
+- `SSE-046` — dashboard Stock picker เป็น item/session subtree; quantity, active variant และ preview อยู่ใน session เดียวกัน และถูกทำลายเมื่อปิดหรือเปลี่ยน item
+- `SSE-058` — LIFF Stock picker เป็น item-keyed session; quantities ถูกทำลายเมื่อปิดหรือเปลี่ยน item และ confirm ใช้ item/variants ปัจจุบันของ session
+
+Focused verification ที่ผ่าน:
+
+- `npm.cmd run test:run -- modules/authorization/presentation/dashboard/components/AuthorizationDialogs.test.tsx modules/authorization/presentation/dashboard/components/TeamAdministration.test.tsx modules/authorization/presentation/dashboard/AuthorizationAdministrationWorkspace.test.tsx modules/leave/presentation/liff/LiffLeaveComponents.test.tsx modules/routine/presentation/dashboard/RoutineOccurrenceList.test.tsx modules/stock/__tests__/liff-components.test.tsx modules/stock/presentation/dashboard/components/StockVariantPickerDialog.test.tsx` — 7 files, **44 tests ผ่าน**
+- follow-up `npm.cmd run test:run -- modules/authorization/presentation/dashboard/components/AuthorizationDialogs.test.tsx` — **10 tests ผ่าน**
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- targeted `react-hooks/set-state-in-effect:error` สำหรับ L5D source call sites — **0 diagnostics**; diagnostics ที่ยังอยู่ใน caller เป็น finding ของ phase อื่นและไม่ได้แก้
+- `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json` — **42 diagnostics**; raw JSON ใช้ชั่วคราวนอก repository และไม่ถูก commit
+
+ไม่รัน `architecture:check` เพราะไม่มีการเปลี่ยน module/import boundary และไม่รัน `npm run build` หรือ full-suite ตามขอบเขต verification ของ phase นี้
+
+ตรวจแล้วว่า same-session parent refresh ไม่ทับ draft, close/reopen และ entity switch สร้าง draft ใหม่, Team/Role technical key stable ภายใน session, Leave committed filters แยกจาก draft, Routine ใช้ `reminderVersion` จาก session-start snapshot, Stock quantities ไม่ข้าม item session และ preview ไม่รอดจาก picker session
+
+ไม่มีการแก้ API contract, schema, migration, authorization หรือ L5E capability lifecycle. `SSE-027`, `SSE-040`, `SSE-042` และงาน L5E–L5K ยังคง intentionally untouched. เป้าหมายสุดท้ายยังคงเป็น:
+
+```text
+react-hooks/set-state-in-effect = globally enabled
+```

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { KeyedMutator } from "swr";
 
 import { RoutineOccurrenceList } from "./RoutineOccurrenceList";
+import { RoutineOccurrenceEditDialog } from "./RoutineOccurrenceEditDialog";
 import type { RoutinePresentationCapabilities } from "../../application/types";
 import type {
     PaginatedRoutineTaskWorkItemsResponse,
@@ -329,6 +330,114 @@ describe("RoutineOccurrenceList", () => {
         });
         await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
         await waitFor(() => expect(screen.queryByRole("dialog", { name: "ปรับเฉพาะรอบนี้" })).not.toBeInTheDocument());
+    });
+
+    it("keeps the occurrence draft and session-start reminder version across same-ID refreshes", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({ occurrence: { id: 91 } }), { status: 200 }),
+        );
+        const onSaved = vi.fn(async () => undefined);
+        const onOpenChange = vi.fn();
+        const task = taskData.tasks[0];
+        if (!task || !task.relevantOccurrence) throw new Error("Routine test fixture is incomplete");
+        vi.stubGlobal("fetch", fetchMock);
+
+        const view = render(
+            <RoutineOccurrenceEditDialog
+                task={task}
+                open
+                canOverrideOccurrences
+                employees={employees}
+                onOpenChange={onOpenChange}
+                onSaved={onSaved}
+            />,
+        );
+        const dialog = screen.getByRole("dialog", { name: "ปรับเฉพาะรอบนี้" });
+        fireEvent.change(within(dialog).getByLabelText("วันกำหนด"), { target: { value: "2026-08-10" } });
+        fireEvent.change(within(dialog).getByLabelText("หมายเหตุ (ถ้ามี)"), { target: { value: "แก้เฉพาะ session นี้" } });
+
+        const refreshedTask = {
+            ...task,
+            relevantOccurrence: {
+                ...task.relevantOccurrence,
+                dueDate: "2026-09-01",
+                reminderVersion: 2,
+            },
+        };
+        view.rerender(
+            <RoutineOccurrenceEditDialog
+                task={refreshedTask}
+                open
+                canOverrideOccurrences
+                employees={employees}
+                onOpenChange={onOpenChange}
+                onSaved={onSaved}
+            />,
+        );
+
+        expect(screen.getByLabelText("วันกำหนด")).toHaveValue("2026-08-10");
+        expect(screen.getByLabelText("หมายเหตุ (ถ้ามี)")).toHaveValue("แก้เฉพาะ session นี้");
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกการปรับรอบนี้" }));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+        expect(JSON.parse(String(request.body))).toMatchObject({
+            expectedReminderVersion: 1,
+            dueDate: "2026-08-10",
+            note: "แก้เฉพาะ session นี้",
+        });
+        expect(onSaved).toHaveBeenCalledTimes(1);
+    });
+
+    it("starts a fresh occurrence editor after close and when the occurrence identity changes", () => {
+        const onOpenChange = vi.fn();
+        const task = taskData.tasks[0];
+        if (!task || !task.relevantOccurrence) throw new Error("Routine test fixture is incomplete");
+
+        const view = render(
+            <RoutineOccurrenceEditDialog
+                task={task}
+                open
+                canOverrideOccurrences
+                employees={employees}
+                onOpenChange={onOpenChange}
+                onSaved={vi.fn()}
+            />,
+        );
+        fireEvent.change(screen.getByLabelText("วันกำหนด"), { target: { value: "2026-08-11" } });
+        view.rerender(
+            <RoutineOccurrenceEditDialog
+                task={task}
+                open={false}
+                canOverrideOccurrences
+                employees={employees}
+                onOpenChange={onOpenChange}
+                onSaved={vi.fn()}
+            />,
+        );
+        view.rerender(
+            <RoutineOccurrenceEditDialog
+                task={{ ...task, relevantOccurrence: { ...task.relevantOccurrence, dueDate: "2026-08-12" } }}
+                open
+                canOverrideOccurrences
+                employees={employees}
+                onOpenChange={onOpenChange}
+                onSaved={vi.fn()}
+            />,
+        );
+        expect(screen.getByLabelText("วันกำหนด")).toHaveValue("2026-08-12");
+
+        view.rerender(
+            <RoutineOccurrenceEditDialog
+                task={{ ...task, relevantOccurrence: { ...task.relevantOccurrence, id: 92, dueDate: "2026-08-20" } }}
+                open
+                canOverrideOccurrences
+                employees={employees}
+                onOpenChange={onOpenChange}
+                onSaved={vi.fn()}
+            />,
+        );
+        expect(screen.getByLabelText("วันกำหนด")).toHaveValue("2026-08-20");
     });
 
     it("distinguishes occurrence assignee overrides from the master Routine", () => {

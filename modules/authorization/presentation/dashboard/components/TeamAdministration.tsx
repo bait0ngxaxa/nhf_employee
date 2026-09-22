@@ -77,12 +77,14 @@ export function TeamAdministration({
 }): ReactElement {
     const [tab, setTab] = useState<TeamDetailTab>("details");
     const [teamEditorOpen, setTeamEditorOpen] = useState(false);
+    const [teamEditorSessionId, setTeamEditorSessionId] = useState(0);
     const [memberDialogOpen, setMemberDialogOpen] = useState(false);
     const [memberDialogSessionId, setMemberDialogSessionId] = useState(0);
     const [roleEditor, setRoleEditor] = useState<{
         readonly mode: "create" | "edit";
         readonly role?: AuthorizationAdministrationTeamDetailData["roles"][number];
     } | null>(null);
+    const [roleEditorSessionId, setRoleEditorSessionId] = useState(0);
     const [grantSource, setGrantSource] = useState<"TEAM" | "TEAM_ROLE" | null>(null);
     const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
     const [lifecycleTarget, setLifecycleTarget] = useState<LifecycleTarget | null>(null);
@@ -99,6 +101,21 @@ export function TeamAdministration({
     const closeMemberDialog = (): void => {
         onDirectoryQueryChange("");
         setMemberDialogOpen(false);
+    };
+
+    const openTeamEditor = (): void => {
+        setTeamEditorSessionId((current) => current + 1);
+        setTeamEditorOpen(true);
+    };
+
+    const openCreateRole = (): void => {
+        setRoleEditorSessionId((current) => current + 1);
+        setRoleEditor({ mode: "create" });
+    };
+
+    const openEditRole = (role: AuthorizationAdministrationTeamDetailData["roles"][number]): void => {
+        setRoleEditorSessionId((current) => current + 1);
+        setRoleEditor({ mode: "edit", role });
     };
 
     const openLifecycleConfirmation = (target: LifecycleTarget): void => {
@@ -187,7 +204,7 @@ export function TeamAdministration({
                         <Button type="button" variant="outline" size="sm" onClick={() => void onRefresh()} disabled={isBusy}>
                             <RefreshCw aria-hidden="true" />โหลดใหม่
                         </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setTeamEditorOpen(true)} disabled={isBusy}>
+                        <Button type="button" variant="outline" size="sm" onClick={openTeamEditor} disabled={isBusy}>
                             <Edit3 aria-hidden="true" />แก้ไขข้อมูล
                         </Button>
                         <Button type="button" variant={team.isActive ? "destructive" : "default"} size="sm" onClick={() => openLifecycleConfirmation({ kind: "team", id: team.id, name: team.name, nextActive: !team.isActive })} disabled={isBusy}>
@@ -233,13 +250,14 @@ export function TeamAdministration({
                     onAddRoleGrant={() => setGrantSource("TEAM_ROLE")}
                      onRemoveTeamGrant={(grant) => runMutation(`team-grant-remove:${grant.capabilityKey}:${grant.scope}`, async () => { await removeTeamGrant(team.id, { capabilityKey: grant.capabilityKey, scope: grant.scope }); }, "นำสิทธิ์ของทีมออกแล้ว")}
                      onRemoveRoleGrant={(grant) => selectedRole ? runMutation(`role-grant-remove:${grant.capabilityKey}:${grant.scope}`, async () => { await removeTeamRoleGrant(team.id, selectedRole.id, { capabilityKey: grant.capabilityKey, scope: grant.scope }); }, "นำสิทธิ์ของหน้าที่ในทีมออกแล้ว") : Promise.resolve()}
-                    onCreateRole={() => setRoleEditor({ mode: "create" })}
-                    onEditRole={(role) => setRoleEditor({ mode: "edit", role })}
+                     onCreateRole={openCreateRole}
+                     onEditRole={openEditRole}
                     onLifecycleRole={(role) => openLifecycleConfirmation({ kind: "role", id: role.id, name: role.name, nextActive: !role.isActive })}
                 />
             ) : null}
 
             <TeamFormDialog
+                key={`${team.id}:${teamEditorSessionId}`}
                 open={teamEditorOpen}
                 mode="edit"
                 team={team}
@@ -252,6 +270,7 @@ export function TeamAdministration({
                 }}
             />
             <TeamRoleFormDialog
+                key={`${team.id}:${roleEditor?.mode ?? "closed"}:${roleEditor?.role?.id ?? "new"}:${roleEditorSessionId}`}
                 open={roleEditor !== null}
                 mode={roleEditor?.mode ?? "create"}
                 role={roleEditor?.role}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -99,24 +99,15 @@ export function TeamFormDialog({
         readonly description: string | null;
     }) => Promise<void>;
 }): React.ReactElement {
-    const [key, setKey] = useState("");
-    const [name, setName] = useState("");
-    const [description, setDescription] = useState("");
+    const [key] = useState(() => team?.key ?? createAuthorizationTechnicalKey("team"));
+    const [name, setName] = useState(() => team?.name ?? "");
+    const [description, setDescription] = useState(() => team?.description ?? "");
+    const [initialName] = useState(() => team?.name ?? "");
+    const [initialDescription] = useState(() => team?.description ?? "");
     const [error, setError] = useState<unknown>(null);
     const nameId = useId();
     const descriptionId = useId();
 
-    useEffect(() => {
-        if (!open) return;
-        const nextKey = team?.key ?? createAuthorizationTechnicalKey("team");
-        setKey(nextKey);
-        setName(team?.name ?? "");
-        setDescription(team?.description ?? "");
-        setError(null);
-    }, [open, team]);
-
-    const initialName = team?.name ?? "";
-    const initialDescription = team?.description ?? "";
     const dirty = name !== initialName || description !== initialDescription;
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
@@ -211,20 +202,12 @@ export function TeamRoleFormDialog({
     readonly onClose: () => void;
     readonly onSubmit: (input: { readonly key?: string; readonly name: string }) => Promise<void>;
 }): React.ReactElement {
-    const [key, setKey] = useState("");
-    const [name, setName] = useState("");
+    const [key] = useState(() => role?.key ?? createAuthorizationTechnicalKey("role"));
+    const [name, setName] = useState(() => role?.name ?? "");
+    const [initialName] = useState(() => role?.name ?? "");
     const [error, setError] = useState<unknown>(null);
     const nameId = useId();
 
-    useEffect(() => {
-        if (!open) return;
-        const nextKey = role?.key ?? createAuthorizationTechnicalKey("role");
-        setKey(nextKey);
-        setName(role?.name ?? "");
-        setError(null);
-    }, [open, role]);
-
-    const initialName = role?.name ?? "";
     const dirty = name !== initialName;
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {

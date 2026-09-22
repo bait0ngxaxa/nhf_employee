@@ -139,6 +139,60 @@ describe("LIFF Leave mobile components", () => {
         expect(onPageChange).toHaveBeenCalledWith(2);
     });
 
+    it("keeps the Leave filter draft independent from refreshed committed filters", () => {
+        const onApplyFilters = vi.fn();
+        const view = render(
+            <LiffLeaveHistory
+                profile={PROFILE}
+                filters={{ query: "เดิม", leaveType: "SICK", status: "PENDING", year: 2026 }}
+                isLoading={false}
+                onApplyFilters={onApplyFilters}
+                onPageChange={vi.fn()}
+                onOpenDetail={vi.fn()}
+                onAction={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ตัวกรอง · ใช้งาน" }));
+        fireEvent.change(screen.getByLabelText("ค้นหาเหตุผล"), { target: { value: "ร่างที่ผู้ใช้แก้" } });
+        view.rerender(
+            <LiffLeaveHistory
+                profile={PROFILE}
+                filters={{ query: "ล่าสุด", leaveType: "VACATION", status: "APPROVED", year: 2025 }}
+                isLoading
+                onApplyFilters={onApplyFilters}
+                onPageChange={vi.fn()}
+                onOpenDetail={vi.fn()}
+                onAction={vi.fn()}
+            />,
+        );
+        expect(screen.getByLabelText("ค้นหาเหตุผล")).toHaveValue("ร่างที่ผู้ใช้แก้");
+        expect(screen.getByLabelText("ประเภทการลา")).toHaveValue("SICK");
+
+        fireEvent.click(screen.getByRole("button", { name: "ปิดตัวกรองประวัติการลา" }));
+        expect(onApplyFilters).not.toHaveBeenCalled();
+        view.rerender(
+            <LiffLeaveHistory
+                profile={PROFILE}
+                filters={{ query: "หลังปิด", leaveType: "PERSONAL", status: "REJECTED", year: 2024 }}
+                isLoading={false}
+                onApplyFilters={onApplyFilters}
+                onPageChange={vi.fn()}
+                onOpenDetail={vi.fn()}
+                onAction={vi.fn()}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ตัวกรอง · ใช้งาน" }));
+        expect(screen.getByLabelText("ค้นหาเหตุผล")).toHaveValue("หลังปิด");
+        expect(screen.getByLabelText("ประเภทการลา")).toHaveValue("PERSONAL");
+        fireEvent.click(screen.getByRole("button", { name: "ล้างตัวกรอง" }));
+        expect(screen.getByLabelText("ค้นหาเหตุผล")).toHaveValue("");
+        expect(onApplyFilters).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "แสดงผล" }));
+        expect(onApplyFilters).toHaveBeenCalledWith({});
+    });
+
     it("treats an empty approver queue as a healthy completed state", () => {
         render(
             <LiffLeaveApprovals

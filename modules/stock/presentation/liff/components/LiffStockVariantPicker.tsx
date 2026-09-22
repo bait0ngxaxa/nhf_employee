@@ -1,7 +1,7 @@
 "use client";
 
 import { Minus, Plus } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -37,14 +37,28 @@ export function LiffStockVariantPicker({
     onConfirm,
     canCreateRequests,
 }: LiffStockVariantPickerProps): ReactElement | null {
+    if (!open || !item) return null;
+
+    return (
+        <LiffStockVariantPickerSession
+            key={item.id}
+            item={item}
+            onOpenChange={onOpenChange}
+            onConfirm={onConfirm}
+            canCreateRequests={canCreateRequests}
+        />
+    );
+}
+
+function LiffStockVariantPickerSession({
+    item,
+    onOpenChange,
+    onConfirm,
+    canCreateRequests,
+}: Omit<LiffStockVariantPickerProps, "item" | "open"> & { item: LiffStockCatalogItem }): ReactElement {
     const [quantities, setQuantities] = useState<Record<number, number>>({});
 
-    useEffect(() => {
-        if (open) setQuantities({});
-    }, [item?.id, open]);
-
     const selections = useMemo(() => {
-        if (!item) return [];
         return item.variants.flatMap((variant) => {
             const quantity = quantities[variant.id] ?? 0;
             return quantity > 0 ? [{ variant, quantity }] : [];
@@ -54,8 +68,6 @@ export function LiffStockVariantPicker({
         (sum, selection) => sum + selection.quantity,
         0,
     );
-
-    if (!item) return null;
 
     function updateQuantity(
         variant: LiffStockCatalogVariant,
@@ -72,7 +84,7 @@ export function LiffStockVariantPicker({
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open onOpenChange={onOpenChange}>
             <DialogContent
                 closeLabel="ปิดตัวเลือกวัสดุ"
                 scrollMode="area"

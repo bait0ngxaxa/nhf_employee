@@ -42,10 +42,33 @@ export function StockVariantPickerDialog({
     onClose,
     onConfirm,
 }: StockVariantPickerDialogProps) {
-    const variants = useMemo(() => item?.variants ?? [], [item]);
-    const itemId = item?.id ?? null;
-    const [initializedItemId, setInitializedItemId] = useState<number | null>(null);
-    const [activeVariantId, setActiveVariantId] = useState<number | null>(null);
+    if (!open || !item) {
+        return null;
+    }
+
+    return (
+        <StockVariantPickerDialogSession
+            key={item.id}
+            item={item}
+            onClose={onClose}
+            onConfirm={onConfirm}
+        />
+    );
+}
+
+function StockVariantPickerDialogSession({
+    item,
+    onClose,
+    onConfirm,
+}: {
+    readonly item: StockItem;
+    readonly onClose: () => void;
+    readonly onConfirm: (selections: VariantSelection[]) => void;
+}) {
+    const variants = useMemo(() => item.variants ?? [], [item.variants]);
+    const [activeVariantId, setActiveVariantId] = useState<number | null>(
+        () => getInitialActiveVariantId(variants),
+    );
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [selectedQuantities, setSelectedQuantities] = useState<Record<number, number>>({});
 
@@ -66,24 +89,6 @@ export function StockVariantPickerDialog({
             document.removeEventListener("keydown", handleKeyDown);
         };
     }, [previewImageUrl]);
-
-    useEffect(() => {
-        if (!open) {
-            setInitializedItemId(null);
-            setActiveVariantId(null);
-            setPreviewImageUrl(null);
-            setSelectedQuantities({});
-            return;
-        }
-
-        if (itemId === null || initializedItemId === itemId) {
-            return;
-        }
-
-        setInitializedItemId(itemId);
-        setActiveVariantId(getInitialActiveVariantId(variants));
-        setSelectedQuantities({});
-    }, [initializedItemId, itemId, open, variants]);
 
     const activeVariant = useMemo(
         () => variants.find((variant) => variant.id === activeVariantId) ?? null,
@@ -112,10 +117,6 @@ export function StockVariantPickerDialog({
         (total, selection) => total + selection.quantity,
         0,
     );
-
-    if (!item) {
-        return null;
-    }
 
     const activeImageUrl = getBrowseImageUrl(item, activeVariant);
 
@@ -173,7 +174,7 @@ export function StockVariantPickerDialog({
     return (
         <>
             <Dialog
-                open={open}
+                open
                 onOpenChange={(nextOpen) => {
                     if (nextOpen) {
                         return;

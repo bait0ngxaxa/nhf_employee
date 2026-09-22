@@ -109,6 +109,80 @@ describe("LIFF Stock mobile components", () => {
         }]);
     });
 
+    it("keeps LIFF picker quantities within one item session and resets on close or item switch", () => {
+        const onConfirm = vi.fn();
+        const onOpenChange = vi.fn();
+        const otherItem = {
+            ...MULTI_VARIANT_ITEM,
+            id: 11,
+            name: "กระเป๋ากิจกรรม",
+            variants: [{
+                ...MULTI_VARIANT_ITEM.variants[0],
+                id: 201,
+                sku: "BAG-B",
+                availableQuantity: 1,
+            }],
+        };
+        const view = render(
+            <LiffStockVariantPicker
+                item={MULTI_VARIANT_ITEM}
+                open
+                onOpenChange={onOpenChange}
+                onConfirm={onConfirm}
+                canCreateRequests
+            />,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มจำนวน ขนาด: S" }));
+        view.rerender(
+            <LiffStockVariantPicker
+                item={{ ...MULTI_VARIANT_ITEM, variants: [...MULTI_VARIANT_ITEM.variants] }}
+                open
+                onOpenChange={onOpenChange}
+                onConfirm={onConfirm}
+                canCreateRequests
+            />,
+        );
+        expect(screen.getByRole("button", { name: "ลดจำนวน ขนาด: S" })).toBeEnabled();
+
+        view.rerender(
+            <LiffStockVariantPicker
+                item={otherItem}
+                open
+                onOpenChange={onOpenChange}
+                onConfirm={onConfirm}
+                canCreateRequests
+            />,
+        );
+        expect(screen.getByRole("button", { name: "ลดจำนวน ขนาด: S" })).toBeDisabled();
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มจำนวน ขนาด: S" }));
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม 1 ตัวเลือก · 1 ชิ้น" }));
+        expect(onConfirm).toHaveBeenLastCalledWith([{
+            variant: otherItem.variants[0],
+            quantity: 1,
+        }]);
+
+        view.rerender(
+            <LiffStockVariantPicker
+                item={null}
+                open={false}
+                onOpenChange={onOpenChange}
+                onConfirm={onConfirm}
+                canCreateRequests
+            />,
+        );
+        view.rerender(
+            <LiffStockVariantPicker
+                item={MULTI_VARIANT_ITEM}
+                open
+                onOpenChange={onOpenChange}
+                onConfirm={onConfirm}
+                canCreateRequests
+            />,
+        );
+        expect(screen.getByRole("button", { name: "ลดจำนวน ขนาด: S" })).toBeDisabled();
+    });
+
     it("supports cart quantity, project code, submit, and request cancellation actions", () => {
         const onProjectCodeChange = vi.fn();
         const onChangeQuantity = vi.fn();
