@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -9,7 +16,6 @@ import {
     type BrowseCartItem,
     type StockBrowseItem,
     type StockBrowseVariant,
-    type StockVariantAttributeValueLike,
     getPreferredVariant,
     getVariantAvailableQuantity,
 } from "./stockVariant.shared";
@@ -17,49 +23,14 @@ import { normalizeStockProjectCode } from "./stockBrowseCart.shared";
 import {
     buildStockRequestPayload,
     createPayloadSignature,
-    parsePendingIdempotency,
-    type PendingRequestIdempotency,
-    useStockRequestIdempotency,
 } from "./stockRequestSubmission";
-
-const STOCK_BROWSE_CART_STORAGE_KEY_PREFIX = "stock:browse-cart:v1:user:";
-const STOCK_BROWSE_CART_LEGACY_KEY = "stock:browse-cart:v1";
-
-export function clearStockBrowseCart(userId: string): void {
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    try {
-        if (userId.trim().length > 0) {
-            window.localStorage.removeItem(
-                `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userId.trim()}`,
-            );
-        }
-        window.localStorage.removeItem(STOCK_BROWSE_CART_LEGACY_KEY);
-    } catch {
-        // Logout must continue even when storage is unavailable.
-    }
-}
-
-interface PersistedStockBrowseCartState {
-    projectCode: string;
-    cartItems: PersistedStockBrowseCartItem[];
-    pendingIdempotency?: PendingRequestIdempotency | null;
-}
-
-interface PersistedStockBrowseCartItem {
-    itemId: number;
-    itemName: string;
-    itemImageUrl: string | null;
-    variantId: number;
-    variantSku: string;
-    variantUnit: string;
-    variantImageUrl: string | null;
-    variantAvailableQuantity: number;
-    variantAttributeValues?: StockVariantAttributeValueLike[];
-    qty: number;
-}
+import {
+    getStockBrowseCartStorageKey,
+    getStockBrowseCartStore,
+    type StockBrowseCartSnapshot,
+    type StockBrowseCartStore,
+} from "./stockBrowseCart.store";
+export { clearStockBrowseCart } from "./stockBrowseCart.store";
 
 export type StockCartAvailabilityReconciliation = {
     changed: boolean;
@@ -124,161 +95,6 @@ type UseStockBrowseCartResult = {
     submitRequest: () => Promise<void>;
     updateCartQuantity: (variantId: number, delta: number) => void;
 };
-
-function buildStorageKey(userId: UseStockBrowseCartParams["userId"]): string | null {
-    if (typeof userId === "string" && userId.trim().length > 0) {
-        return `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userId}`;
-    }
-    if (typeof userId === "number") {
-        return `${STOCK_BROWSE_CART_STORAGE_KEY_PREFIX}${userId}`;
-    }
-    return null;
-}
-
-function serializeCartItems(
-    cart: Map<number, BrowseCartItem>,
-): PersistedStockBrowseCartItem[] {
-    return Array.from(cart.values()).map((cartItem) => ({
-        itemId: cartItem.item.id,
-        itemName: cartItem.item.name,
-        itemImageUrl: cartItem.item.imageUrl ?? null,
-        variantId: cartItem.variant.id,
-        variantSku: cartItem.variant.sku,
-        variantUnit: cartItem.variant.unit,
-        variantImageUrl: cartItem.variant.imageUrl ?? null,
-        variantAvailableQuantity: cartItem.variant.availableQuantity,
-        variantAttributeValues: cartItem.variant.attributeValues,
-        qty: cartItem.qty,
-    }));
-}
-
-function isPersistedBrowseCartItem(
-    value: unknown,
-): value is PersistedStockBrowseCartItem {
-    if (!value || typeof value !== "object") {
-        return false;
-    }
-
-    const maybeItem = value as Record<string, unknown>;
-    const maybeQty = maybeItem.qty;
-    const itemImageUrl = maybeItem.itemImageUrl;
-    const variantImageUrl = maybeItem.variantImageUrl;
-    const itemId = maybeItem.itemId;
-    const variantId = maybeItem.variantId;
-    const variantAvailableQuantity = maybeItem.variantAvailableQuantity;
-
-    if (typeof maybeQty !== "number" || !Number.isInteger(maybeQty) || maybeQty <= 0) {
-        return false;
-    }
-    if (typeof itemId !== "number" || !Number.isInteger(itemId) || itemId <= 0) {
-        return false;
-    }
-    if (typeof variantId !== "number" || !Number.isInteger(variantId) || variantId <= 0) {
-        return false;
-    }
-
-    return (
-        typeof maybeItem.itemName === "string"
-        && (itemImageUrl === null || itemImageUrl === undefined || typeof itemImageUrl === "string")
-        && typeof maybeItem.variantSku === "string"
-        && typeof maybeItem.variantUnit === "string"
-        && (variantImageUrl === null || variantImageUrl === undefined || typeof variantImageUrl === "string")
-        && typeof variantAvailableQuantity === "number"
-        && Number.isFinite(variantAvailableQuantity)
-    );
-}
-
-function parsePersistedStockBrowseCartState(
-    rawValue: string | null,
-): PersistedStockBrowseCartState | null {
-    if (!rawValue) {
-        return null;
-    }
-
-    try {
-        const parsed: unknown = JSON.parse(rawValue);
-        if (!parsed || typeof parsed !== "object") {
-            return null;
-        }
-
-        const typedParsed = parsed as Record<string, unknown>;
-        const rawProjectCode = typedParsed.projectCode;
-        const rawCartItems = typedParsed.cartItems;
-        const projectCode = typeof rawProjectCode === "string"
-            ? normalizeStockProjectCode(rawProjectCode)
-            : "";
-        const pendingIdempotency = parsePendingIdempotency(
-            typedParsed.pendingIdempotency,
-        );
-
-        if (!Array.isArray(rawCartItems)) {
-            return { projectCode, cartItems: [], pendingIdempotency };
-        }
-
-        return {
-            projectCode,
-            cartItems: rawCartItems.filter(isPersistedBrowseCartItem),
-            pendingIdempotency,
-        };
-    } catch {
-        return null;
-    }
-}
-
-function readPersistedCart(storageKey: string): PersistedStockBrowseCartState | null {
-    try {
-        return parsePersistedStockBrowseCartState(
-            window.localStorage.getItem(storageKey),
-        );
-    } catch {
-        return null;
-    }
-}
-
-function writePersistedCart(
-    storageKey: string,
-    state: PersistedStockBrowseCartState,
-): void {
-    try {
-        window.localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch {
-        // Storage can be unavailable or full; the active in-memory cart still works.
-    }
-}
-
-function hydrateCartItem(
-    persistedCartItem: PersistedStockBrowseCartItem,
-): BrowseCartItem {
-    return {
-        item: {
-            id: persistedCartItem.itemId,
-            name: persistedCartItem.itemName,
-            imageUrl: persistedCartItem.itemImageUrl ?? null,
-        },
-        variant: {
-            id: persistedCartItem.variantId,
-            sku: persistedCartItem.variantSku,
-            unit: persistedCartItem.variantUnit,
-            imageUrl: persistedCartItem.variantImageUrl ?? null,
-            availableQuantity: persistedCartItem.variantAvailableQuantity,
-            attributeValues: persistedCartItem.variantAttributeValues,
-        },
-        qty: persistedCartItem.qty,
-    };
-}
-
-function hydratePersistedCart(
-    persistedState: PersistedStockBrowseCartState,
-): Map<number, BrowseCartItem> {
-    const restoredCart = new Map<number, BrowseCartItem>();
-
-    for (const cartItem of persistedState.cartItems) {
-        const hydratedCartItem = hydrateCartItem(cartItem);
-        restoredCart.set(hydratedCartItem.variant.id, hydratedCartItem);
-    }
-
-    return restoredCart;
-}
 
 function buildCartQuantityByItemId(
     cartItems: BrowseCartItem[],
@@ -376,6 +192,36 @@ function reconcileCartAvailability(
     return reconcileCartVariantAvailability(cart, variants);
 }
 
+function updatePersistedCartState(
+    store: StockBrowseCartStore,
+    updater: (snapshot: StockBrowseCartSnapshot) => StockBrowseCartSnapshot,
+): void {
+    store.update((currentSnapshot) => {
+        const nextSnapshot = updater(currentSnapshot);
+        const payloadSignature = createPayloadSignature(
+            buildStockRequestPayload(
+                nextSnapshot.projectCode,
+                nextSnapshot.cart,
+            ),
+        );
+        const pendingIdempotency = nextSnapshot.pendingIdempotency?.payloadSignature
+            === payloadSignature
+            ? nextSnapshot.pendingIdempotency
+            : null;
+
+        if (pendingIdempotency === nextSnapshot.pendingIdempotency) {
+            return nextSnapshot;
+        }
+
+        return { ...nextSnapshot, pendingIdempotency };
+    });
+}
+
+type ActiveSubmission = {
+    store: StockBrowseCartStore;
+    token: symbol;
+};
+
 export function useStockBrowseCart({
     userId,
     canCreateRequests,
@@ -383,67 +229,30 @@ export function useStockBrowseCart({
     onSubmitError,
     submitRequest: submitRequestTransport = submitDashboardStockRequest,
 }: UseStockBrowseCartParams): UseStockBrowseCartResult {
-    const [cart, setCart] = useState<Map<number, BrowseCartItem>>(new Map());
-    const [projectCode, setProjectCode] = useState("");
-    const [submitting, setSubmitting] = useState(false);
+    const storageKey = getStockBrowseCartStorageKey(userId);
+    const store = useMemo(
+        () => getStockBrowseCartStore(storageKey),
+        [storageKey],
+    );
+    const snapshot = useSyncExternalStore(
+        store.subscribe,
+        store.getSnapshot,
+        store.getServerSnapshot,
+    );
+    const [activeSubmission, setActiveSubmission] =
+        useState<ActiveSubmission | null>(null);
     const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
-    const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
-    const {
-        clear: clearIdempotency,
-        getOrCreate: getOrCreateIdempotency,
-        hasPending: hasPendingIdempotency,
-        reconcile: reconcileIdempotency,
-        restore: restoreIdempotency,
-    } = useStockRequestIdempotency();
-
-    const storageKey = useMemo(() => buildStorageKey(userId), [userId]);
+    const activeStoreRef = useRef<StockBrowseCartStore>(store);
+    const activeSubmissionRef = useRef<ActiveSubmission | null>(null);
+    const isCurrentStore = useCallback(
+        (): boolean => activeStoreRef.current === store,
+        [store],
+    );
+    const submitting = activeSubmission?.store === store;
 
     useEffect(() => {
-        if (!storageKey) {
-            restoreIdempotency(null);
-            setCart(new Map());
-            setProjectCode("");
-            setHydratedStorageKey(null);
-            return;
-        }
-
-        const persistedState = readPersistedCart(storageKey);
-
-        if (persistedState) {
-            restoreIdempotency(persistedState.pendingIdempotency ?? null);
-            setCart(hydratePersistedCart(persistedState));
-            setProjectCode(persistedState.projectCode);
-        } else {
-            restoreIdempotency(null);
-            setCart(new Map());
-            setProjectCode("");
-        }
-
-        setHydratedStorageKey(storageKey);
-    }, [restoreIdempotency, storageKey]);
-
-    useEffect(() => {
-        if (!storageKey || hydratedStorageKey !== storageKey) {
-            return;
-        }
-
-        const payloadSignature = createPayloadSignature(
-            buildStockRequestPayload(projectCode, cart),
-        );
-        const currentIdempotency = reconcileIdempotency(payloadSignature);
-
-        writePersistedCart(storageKey, {
-            projectCode,
-            cartItems: serializeCartItems(cart),
-            pendingIdempotency: currentIdempotency,
-        });
-    }, [
-        cart,
-        hydratedStorageKey,
-        projectCode,
-        reconcileIdempotency,
-        storageKey,
-    ]);
+        activeStoreRef.current = store;
+    }, [store]);
 
     useEffect(() => {
         if (recentlyAddedItemId === null) {
@@ -469,9 +278,12 @@ export function useStockBrowseCart({
         if (!canCreateRequests || variants.length === 0) {
             return;
         }
+        if (!isCurrentStore()) {
+            return;
+        }
 
-        setCart((prev) => {
-            const next = new Map(prev);
+        updatePersistedCartState(store, (currentSnapshot) => {
+            const next = new Map(currentSnapshot.cart);
 
             for (const entry of variants) {
                 if (entry.quantity <= 0) {
@@ -497,7 +309,7 @@ export function useStockBrowseCart({
                 });
             }
 
-            return next;
+            return { ...currentSnapshot, cart: next };
         });
         setRecentlyAddedItemId(item.id);
     }
@@ -511,7 +323,7 @@ export function useStockBrowseCart({
     }
 
     function addDirectItem(item: StockBrowseItem): void {
-        if (!canCreateRequests) {
+        if (!canCreateRequests || !isCurrentStore()) {
             return;
         }
         const defaultVariant = getPreferredVariant(item);
@@ -524,134 +336,188 @@ export function useStockBrowseCart({
     }
 
     function removeFromCart(variantId: number): void {
-        if (!canCreateRequests) {
+        if (!canCreateRequests || !isCurrentStore()) {
             return;
         }
-        setCart((prev) => {
-            const next = new Map(prev);
+        updatePersistedCartState(store, (currentSnapshot) => {
+            if (!currentSnapshot.cart.has(variantId)) {
+                return currentSnapshot;
+            }
+
+            const next = new Map(currentSnapshot.cart);
             next.delete(variantId);
-            return next;
+            return { ...currentSnapshot, cart: next };
         });
     }
 
     function updateCartQuantity(variantId: number, delta: number): void {
-        if (!canCreateRequests) {
+        if (!canCreateRequests || !isCurrentStore()) {
             return;
         }
-        setCart((prev) => {
-            const next = new Map(prev);
-            const existing = next.get(variantId);
+        updatePersistedCartState(store, (currentSnapshot) => {
+            const existing = currentSnapshot.cart.get(variantId);
 
             if (!existing) {
-                return prev;
+                return currentSnapshot;
             }
 
             const nextQuantity = Math.min(
                 getVariantAvailableQuantity(existing.variant),
                 Math.max(0, existing.qty + delta),
             );
+            if (nextQuantity === existing.qty) {
+                return currentSnapshot;
+            }
+
+            const next = new Map(currentSnapshot.cart);
 
             if (nextQuantity === 0) {
                 next.delete(variantId);
-                return next;
+                return { ...currentSnapshot, cart: next };
             }
 
             next.set(variantId, {
                 ...existing,
                 qty: nextQuantity,
             });
-            return next;
+            return { ...currentSnapshot, cart: next };
         });
     }
 
     function clearCart(): void {
-        clearIdempotency();
-        setCart(new Map());
-        setProjectCode("");
+        if (!isCurrentStore()) {
+            return;
+        }
+        store.setEmpty();
     }
 
     function updateProjectCode(value: string): void {
-        setProjectCode(normalizeStockProjectCode(value));
+        if (!isCurrentStore()) {
+            return;
+        }
+        const nextProjectCode = normalizeStockProjectCode(value);
+        updatePersistedCartState(store, (currentSnapshot) => {
+            if (currentSnapshot.projectCode === nextProjectCode) {
+                return currentSnapshot;
+            }
+
+            return {
+                ...currentSnapshot,
+                projectCode: nextProjectCode,
+            };
+        });
     }
 
     const reconcileAvailability = useCallback(
         (catalogItems: ReadonlyArray<StockBrowseItem>): StockCartAvailabilityReconciliation => {
-            const outcome = reconcileCartAvailability(cart, catalogItems);
+            if (!isCurrentStore()) {
+                return { changed: false, adjustedCount: 0, removedCount: 0 };
+            }
+            store.ensureClientReady();
+            const outcome = reconcileCartAvailability(
+                store.getSnapshot().cart,
+                catalogItems,
+            );
             if (outcome.result.changed) {
-                setCart(outcome.nextCart);
+                updatePersistedCartState(store, (currentSnapshot) => ({
+                    ...currentSnapshot,
+                    cart: outcome.nextCart,
+                }));
             }
             return outcome.result;
         },
-        [cart],
+        [isCurrentStore, store],
     );
     const reconcileVariantAvailability = useCallback(
         (
             variants: ReadonlyArray<StockCartVariantAvailability>,
         ): StockCartAvailabilityReconciliation => {
-            const outcome = reconcileCartVariantAvailability(cart, variants);
+            if (!isCurrentStore()) {
+                return { changed: false, adjustedCount: 0, removedCount: 0 };
+            }
+            store.ensureClientReady();
+            const outcome = reconcileCartVariantAvailability(
+                store.getSnapshot().cart,
+                variants,
+            );
             if (outcome.result.changed) {
-                setCart(outcome.nextCart);
+                updatePersistedCartState(store, (currentSnapshot) => ({
+                    ...currentSnapshot,
+                    cart: outcome.nextCart,
+                }));
             }
             return outcome.result;
         },
-        [cart],
+        [isCurrentStore, store],
     );
 
     async function submitRequest(): Promise<void> {
-        if (!canCreateRequests || submitting) {
+        if (!canCreateRequests || !isCurrentStore() || submitting) {
             return;
         }
 
-        if (cart.size === 0) {
+        store.ensureClientReady();
+        const currentSnapshot = store.getSnapshot();
+        if (currentSnapshot.cart.size === 0) {
             return;
         }
 
-        const normalizedProjectCode = normalizeStockProjectCode(projectCode);
+        const normalizedProjectCode = normalizeStockProjectCode(
+            currentSnapshot.projectCode,
+        );
         if (!normalizedProjectCode) {
             toast.error("กรุณาระบุชื่อย่อโครงการ");
             return;
         }
 
-        const payload = buildStockRequestPayload(normalizedProjectCode, cart);
+        const payload = buildStockRequestPayload(
+            normalizedProjectCode,
+            currentSnapshot.cart,
+        );
         const payloadSignature = createPayloadSignature(payload);
-        const idempotency = getOrCreateIdempotency(payloadSignature);
-        if (storageKey) {
-            writePersistedCart(storageKey, {
-                projectCode,
-                cartItems: serializeCartItems(cart),
-                pendingIdempotency: idempotency,
-            });
+        const idempotency = store.getOrCreatePendingIdempotency(payloadSignature);
+        if (!idempotency) {
+            return;
         }
 
-        setSubmitting(true);
+        const submission = { store, token: Symbol("stock-submission") };
+        activeSubmissionRef.current = submission;
+        setActiveSubmission(submission);
         try {
             await submitRequestTransport(payload, idempotency.key);
 
-            clearIdempotency();
-            if (storageKey) {
-                writePersistedCart(storageKey, {
-                    projectCode: "",
-                    cartItems: [],
-                    pendingIdempotency: null,
-                });
+            store.setEmpty();
+            if (isCurrentStore()) {
+                toast.success("ส่งคำขอเบิกวัสดุเรียบร้อยแล้ว");
+                onSubmitted();
             }
-            toast.success("ส่งคำขอเบิกวัสดุเรียบร้อยแล้ว");
-            setCart(new Map());
-            setProjectCode("");
-            onSubmitted();
         } catch (error: unknown) {
-            try {
-                await onSubmitError?.(error);
-            } catch {
-                // A reconciliation failure must not hide the original mutation error.
+            if (isCurrentStore()) {
+                try {
+                    await onSubmitError?.(error);
+                } catch {
+                    // A reconciliation failure must not hide the original mutation error.
+                }
+                if (isCurrentStore()) {
+                    toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+                }
             }
-            toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
         } finally {
-            setSubmitting(false);
+            if (activeSubmissionRef.current?.token === submission.token) {
+                activeSubmissionRef.current = null;
+                setActiveSubmission(null);
+            }
         }
     }
 
-    const cartItems = useMemo(() => Array.from(cart.values()), [cart]);
+    const hasPendingSubmission = useCallback((): boolean => {
+        return isCurrentStore()
+            && store.getSnapshot().pendingIdempotency !== null;
+    }, [isCurrentStore, store]);
+    const cartItems = useMemo(
+        () => Array.from(snapshot.cart.values()),
+        [snapshot.cart],
+    );
     const cartCount = useMemo(
         () => cartItems.reduce((sum, cartItem) => sum + cartItem.qty, 0),
         [cartItems],
@@ -665,15 +531,15 @@ export function useStockBrowseCart({
         cartCount,
         cartItems,
         cartQuantityByItemId,
-        cartSize: cart.size,
-        projectCode,
+        cartSize: snapshot.cart.size,
+        projectCode: snapshot.projectCode,
         recentlyAddedItemId,
         submitting,
         addDirectItem,
         addVariantToCart,
         addVariantsToCart,
         clearCart,
-        hasPendingSubmission: hasPendingIdempotency,
+        hasPendingSubmission,
         removeFromCart,
         reconcileAvailability,
         reconcileVariantAvailability,

@@ -720,3 +720,46 @@ npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json
 ```
 
 `SSE-002`, `SSE-004` และ `SSE-019` ไม่เหลือ diagnostic; `SSE-018` ยังเหลือโดยตั้งใจและถูก deferred ไป L5J. ไม่ได้แก้ findings อื่นแบบ opportunistic และ **ไม่ได้เริ่ม L5H หรือ phase ถัดไป**
+
+## Phase L5H Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-007`, `SSE-047`
+
+รูปแบบ ownership ที่ใช้:
+
+- `SSE-007` — `useIsMobile` ใช้ `useSyncExternalStore` กับ `matchMedia("(max-width: 767px)")` เป็น source เดียวกันสำหรับ `getSnapshot` และ subscription; `MediaQueryList` ถูก cache ต่อ `Window`/`matchMedia` เพื่อให้ snapshot เสถียรและ listener ใช้ object เดียวกัน
+- `SSE-007` — `subscribe` เพิ่ม/ถอด listener เดิมด้วย `addEventListener("change")`/`removeEventListener`; `getServerSnapshot` เป็น `false` แบบ deterministic และไม่แตะ `window` หรือ `matchMedia`; จึงคง policy SSR/initial hydration เป็น non-mobile และคง boundary `767 => mobile`, `768 => desktop`
+- `SSE-047` — localStorage ถูกย้ายไป `stockBrowseCart.store.ts` ซึ่งเป็น user-scoped external store แยกเฉพาะ Stock cart; snapshot เดียวเป็นเจ้าของ `cart`, `projectCode` และ pending idempotency และ cache reference จะเปลี่ยนเมื่อ persisted state เปลี่ยนเท่านั้น
+- `SSE-047` — `getServerSnapshot` ใช้ empty snapshot คงที่โดยไม่อ่าน browser storage; `subscribe` หรือ explicit mutation จึงค่อยอ่าน storage ฝั่ง client และ write-back เริ่มได้หลัง store พร้อมหรือจาก mutation ที่เรียก `ensureClientReady`; ไม่มี default empty write ระหว่าง SSR/hydration
+- `SSE-047` — storage key normalize user ID ด้วย `stock:browse-cart:v1:user:<normalizedUserId>` เดิม; store identity เปลี่ยนตาม key, anonymous/null ใช้ empty store ที่เขียนไม่ได้, และการเปลี่ยน `user A -> user B`, `user -> null`, `null -> user` ไม่แชร์ cart หรือ pending key ข้าม scope
+- `SSE-047` — pending idempotency เป็นส่วนหนึ่งของ snapshot store ไม่ใช่ process/ref lifecycle; การเปลี่ยน payload จะ invalidate key, retry payload เดิมจะ reuse key, และ success จะ persist empty cart/project/pending state
+- `clearStockBrowseCart(userId)` invalidate snapshot cache ของ user เป้าหมาย, ลบเฉพาะ user key กับ legacy key, และไม่ลบ user อื่น; storage read/parse/write/remove failures ยังคงไม่ทำให้ active in-memory flow ล้ม
+- ไม่ได้ implement cross-tab `storage` subscription เพราะไม่ใช่ contract เดิม; in-document store mutation notify subscribers เอง
+
+Invariants ที่ทดสอบ:
+
+- viewport SSR/hydration, 767/768, change event, listener identity/cleanup และไม่มี listener สะสม
+- cart empty/existing storage, no destructive pre-hydration write, SSR ไม่อ่าน localStorage, user switch isolation, pending idempotency isolation, null transitions, retry/payload mutation/availability reconciliation, success clearing, storage failure และ logout cleanup
+- Dashboard และ LIFF ยังคงใช้ shared `useStockBrowseCart` semantics เดิม โดยไม่เปลี่ยน authorization, API, schema หรือ cart domain rules
+
+Focused verification:
+
+- `npm.cmd run test:run -- __tests__/hooks/use-mobile.test.tsx` — **1 file, 5 tests ผ่าน**
+- `npm.cmd run test:run -- modules/stock/presentation/dashboard/components/useStockBrowseCart.test.ts` — **1 file, 20 tests ผ่าน**
+- `npm.cmd run test:run -- modules/stock/__tests__/liff-app.test.tsx` — **1 file, 21 tests ผ่าน**
+- `npm.cmd run test:run -- __tests__/context/DashboardProvider.test.tsx` — **1 file, 15 tests ผ่าน**
+- `npm.cmd run architecture:check` — ผ่าน
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `git diff --check` — ผ่าน
+
+Repository-wide explicit inventory:
+
+```text
+npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json
+→ 21 -> 19 diagnostics
+```
+
+`SSE-007` และ `SSE-047` ไม่เหลือ diagnostic; ไม่ได้แก้ 19 รายการที่เหลือแบบ opportunistic. ไม่ได้เริ่ม `L5I` หรือ phase ถัดไป และไม่ได้แตะ pagination, URL/deep-link, async bootstrap, authorization, API contract, schema, migration, lint suppression หรือ timing workaround

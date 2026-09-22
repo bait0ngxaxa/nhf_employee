@@ -1,7 +1,10 @@
+import { createElement, type ReactElement } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    clearStockBrowseCart,
     useStockBrowseCart,
     type StockCartVariantAvailability,
     type StockCartAvailabilityReconciliation,
@@ -27,6 +30,33 @@ describe("useStockBrowseCart idempotency", () => {
         items: [{ itemId: 10, variantId: 101, quantity: 2 }],
     };
 
+    function writePersistedCart(
+        key: string,
+        projectCode: string,
+        itemId: number,
+        variantId: number,
+        quantity: number,
+        pendingIdempotency: { payloadSignature: string; key: string } | null = null,
+    ): string {
+        const serialized = JSON.stringify({
+            projectCode,
+            cartItems: [{
+                itemId,
+                itemName: itemId === 10 ? "กระดาษ" : "ปากกา",
+                itemImageUrl: null,
+                variantId,
+                variantSku: itemId === 10 ? "PAPER-A4" : "PEN-BLUE",
+                variantUnit: itemId === 10 ? "รีม" : "ด้าม",
+                variantImageUrl: null,
+                variantAvailableQuantity: 20,
+                qty: quantity,
+            }],
+            pendingIdempotency,
+        });
+        window.localStorage.setItem(key, serialized);
+        return serialized;
+    }
+
     beforeEach(() => {
         vi.clearAllMocks();
         window.localStorage.clear();
@@ -36,6 +66,205 @@ describe("useStockBrowseCart idempotency", () => {
             status: 201,
             requestId: "request-id",
         });
+    });
+
+    it("does not read localStorage for its server snapshot", () => {
+        function CartServerProbe(): ReactElement {
+            const { cartSize } = useStockBrowseCart({
+                canCreateRequests: true,
+                userId: 701,
+                onSubmitted: vi.fn(),
+            });
+
+            return createElement("output", null, String(cartSize));
+        }
+
+        const getItemSpy = vi.spyOn(Storage.prototype, "getItem");
+        expect(renderToString(createElement(CartServerProbe))).toContain(
+            ">0<",
+        );
+        expect(getItemSpy).not.toHaveBeenCalled();
+        getItemSpy.mockRestore();
+    });
+
+    it("does not write an empty default when storage is empty", async () => {
+        const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
+            userId: 7,
+            onSubmitted: vi.fn(),
+        }));
+
+        await waitFor(() => expect(result.current.cartSize).toBe(0));
+        expect(window.localStorage.getItem(storageKey)).toBeNull();
+    });
+
+    it("restores an existing cart and project code without rewriting its stored value", async () => {
+        const storedValue = writePersistedCart(
+            storageKey,
+            " nhf 2569 ",
+            10,
+            101,
+            2,
+        );
+        const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
+            userId: " 7 ",
+            onSubmitted: vi.fn(),
+        }));
+
+        await waitFor(() => expect(result.current.cartSize).toBe(1));
+        expect(result.current.projectCode).toBe("NHF2569");
+        expect(window.localStorage.getItem(storageKey)).toBe(storedValue);
+    });
+
+    it("keeps user A and user B isolated when the same hook instance switches users", async () => {
+        const userAKey = "stock:browse-cart:v1:user:7";
+        const userBKey = "stock:browse-cart:v1:user:8";
+        const userAValue = writePersistedCart(userAKey, "PROJECT-A", 10, 101, 2);
+        const userBValue = writePersistedCart(userBKey, "PROJECT-B", 20, 202, 3);
+        const { result, rerender } = renderHook<
+            ReturnType<typeof useStockBrowseCart>,
+            { userId: number | null }
+        >(
+            ({ userId }: { userId: number | null }) => useStockBrowseCart({
+                canCreateRequests: true,
+                userId,
+                onSubmitted: vi.fn(),
+            }),
+            { initialProps: { userId: 7 } },
+        );
+
+        await waitFor(() => expect(result.current.cartItems[0]?.variant.id).toBe(101));
+        rerender({ userId: 8 });
+
+        await waitFor(() => expect(result.current.cartItems[0]?.variant.id).toBe(202));
+        expect(result.current.projectCode).toBe("PROJECT-B");
+        expect(window.localStorage.getItem(userAKey)).toBe(userAValue);
+        expect(window.localStorage.getItem(userBKey)).toBe(userBValue);
+    });
+
+    it("never reuses user A's pending idempotency key for user B", async () => {
+        const userAKey = "stock:browse-cart:v1:user:7";
+        const userBKey = "stock:browse-cart:v1:user:8";
+        const pendingA = {
+            payloadSignature: JSON.stringify({
+                projectCode: "PROJECT-A",
+                items: [{ itemId: 10, variantId: 101, quantity: 2 }],
+            }),
+            key: "user-a-key",
+        };
+        writePersistedCart(userAKey, "PROJECT-A", 10, 101, 2, pendingA);
+        writePersistedCart(userBKey, "PROJECT-B", 20, 202, 3);
+        const submitTransport = vi.fn().mockResolvedValue(undefined);
+        const { result, rerender } = renderHook(
+            ({ userId }: { userId: number }) => useStockBrowseCart({
+                canCreateRequests: true,
+                userId,
+                onSubmitted: vi.fn(),
+                submitRequest: submitTransport,
+            }),
+            { initialProps: { userId: 7 } },
+        );
+
+        await waitFor(() => expect(result.current.cartSize).toBe(1));
+        rerender({ userId: 8 });
+        await waitFor(() => expect(result.current.projectCode).toBe("PROJECT-B"));
+
+        await act(async () => result.current.submitRequest());
+        expect(submitTransport).toHaveBeenCalledTimes(1);
+        expect(submitTransport.mock.calls[0]?.[1]).not.toBe("user-a-key");
+        expect(window.localStorage.getItem(userAKey)).toContain("user-a-key");
+    });
+
+    it("does not expose a user's cart or write an unscoped key across null transitions", async () => {
+        const userAKey = "stock:browse-cart:v1:user:7";
+        writePersistedCart(userAKey, "PROJECT-A", 10, 101, 2);
+        const { result, rerender } = renderHook<
+            ReturnType<typeof useStockBrowseCart>,
+            { userId: number | null }
+        >(
+            ({ userId }: { userId: number | null }) => useStockBrowseCart({
+                canCreateRequests: true,
+                userId,
+                onSubmitted: vi.fn(),
+            }),
+            { initialProps: { userId: 7 } },
+        );
+
+        await waitFor(() => expect(result.current.cartSize).toBe(1));
+        rerender({ userId: null });
+        await waitFor(() => {
+            expect(result.current.cartSize).toBe(0);
+            expect(result.current.projectCode).toBe("");
+        });
+        expect(window.localStorage.getItem(userAKey)).not.toBeNull();
+        expect(window.localStorage.getItem("stock:browse-cart:v1")).toBeNull();
+    });
+
+    it("loads a user's persisted cart after a null-to-user transition", async () => {
+        const userAKey = "stock:browse-cart:v1:user:7";
+        writePersistedCart(userAKey, "PROJECT-A", 10, 101, 2);
+        const { result, rerender } = renderHook<
+            ReturnType<typeof useStockBrowseCart>,
+            { userId: number | null }
+        >(
+            ({ userId }: { userId: number | null }) => useStockBrowseCart({
+                canCreateRequests: true,
+                userId,
+                onSubmitted: vi.fn(),
+            }),
+            { initialProps: { userId: null as number | null } },
+        );
+
+        await waitFor(() => expect(result.current.cartSize).toBe(0));
+        expect(window.localStorage.getItem("stock:browse-cart:v1")).toBeNull();
+        rerender({ userId: 7 });
+
+        await waitFor(() => expect(result.current.cartSize).toBe(1));
+        expect(result.current.projectCode).toBe("PROJECT-A");
+    });
+
+    it("continues with an in-memory cart when reading storage fails", async () => {
+        const getItemSpy = vi.spyOn(Storage.prototype, "getItem")
+            .mockImplementation(() => {
+                throw new Error("storage unavailable");
+            });
+        const item = {
+            id: 10,
+            name: "กระดาษ",
+            imageUrl: null,
+            variants: [{
+                id: 101,
+                sku: "PAPER-A4",
+                unit: "รีม",
+                imageUrl: null,
+                availableQuantity: 3,
+                attributeValues: [],
+            }],
+        };
+        const { result } = renderHook(() => useStockBrowseCart({
+            canCreateRequests: true,
+            userId: 7,
+            onSubmitted: vi.fn(),
+        }));
+
+        await waitFor(() => expect(result.current.cartSize).toBe(0));
+        act(() => result.current.addDirectItem(item));
+        expect(result.current.cartSize).toBe(1);
+        getItemSpy.mockRestore();
+    });
+
+    it("clears only the target user and legacy cart keys", () => {
+        const otherUserKey = "stock:browse-cart:v1:user:8";
+        writePersistedCart(storageKey, "PROJECT-A", 10, 101, 2);
+        window.localStorage.setItem(otherUserKey, "other-user-state");
+        window.localStorage.setItem("stock:browse-cart:v1", "legacy-state");
+
+        clearStockBrowseCart(" 7 ");
+
+        expect(window.localStorage.getItem(storageKey)).toBeNull();
+        expect(window.localStorage.getItem("stock:browse-cart:v1")).toBeNull();
+        expect(window.localStorage.getItem(otherUserKey)).toBe("other-user-state");
     });
 
     it("reuses the persisted key after remounting an unconfirmed request", async () => {

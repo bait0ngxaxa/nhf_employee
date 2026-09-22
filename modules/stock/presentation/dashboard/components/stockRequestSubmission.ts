@@ -1,4 +1,3 @@
-import { useCallback, useRef } from "react";
 import type { CreateRequestInput } from "../../../schemas/stock";
 import type { BrowseCartItem } from "./stockVariant.shared";
 import { normalizeStockProjectCode } from "./stockBrowseCart.shared";
@@ -21,7 +20,7 @@ function createIdempotencyKey(): string {
 
 export function buildStockRequestPayload(
     projectCode: string,
-    cart: Map<number, BrowseCartItem>,
+    cart: ReadonlyMap<number, BrowseCartItem>,
 ): StockRequestPayload {
     return {
         projectCode: normalizeStockProjectCode(projectCode),
@@ -60,50 +59,11 @@ export function parsePendingIdempotency(
     };
 }
 
-type StockRequestIdempotencyLifecycle = {
-    clear: () => void;
-    getOrCreate: (payloadSignature: string) => PendingRequestIdempotency;
-    hasPending: () => boolean;
-    reconcile: (payloadSignature: string) => PendingRequestIdempotency | null;
-    restore: (pending: PendingRequestIdempotency | null) => void;
-};
-
-export function useStockRequestIdempotency(): StockRequestIdempotencyLifecycle {
-    const pendingRef = useRef<PendingRequestIdempotency | null>(null);
-
-    const clear = useCallback((): void => {
-        pendingRef.current = null;
-    }, []);
-    const restore = useCallback(
-        (pending: PendingRequestIdempotency | null): void => {
-            pendingRef.current = pending;
-        },
-        [],
-    );
-    const reconcile = useCallback(
-        (payloadSignature: string): PendingRequestIdempotency | null => {
-            if (pendingRef.current?.payloadSignature !== payloadSignature) {
-                pendingRef.current = null;
-            }
-            return pendingRef.current;
-        },
-        [],
-    );
-    const getOrCreate = useCallback(
-        (payloadSignature: string): PendingRequestIdempotency => {
-            if (pendingRef.current?.payloadSignature !== payloadSignature) {
-                pendingRef.current = {
-                    payloadSignature,
-                    key: createIdempotencyKey(),
-                };
-            }
-            return pendingRef.current;
-        },
-        [],
-    );
-    const hasPending = useCallback((): boolean => {
-        return pendingRef.current !== null;
-    }, []);
-
-    return { clear, getOrCreate, hasPending, reconcile, restore };
+export function createPendingRequestIdempotency(
+    payloadSignature: string,
+): PendingRequestIdempotency {
+    return {
+        payloadSignature,
+        key: createIdempotencyKey(),
+    };
 }
