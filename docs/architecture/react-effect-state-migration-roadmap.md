@@ -568,7 +568,7 @@ Reduction: **6**
 - `SSE-023` — `LiffLeaveHistory` เริ่ม filter session ใหม่เมื่อผู้ใช้เปิด sheet; keyed sheet จับ committed-filter snapshot แยกจาก draft จนกว่าจะกด Apply
 - `SSE-026` — occurrence editor เป็น keyed session subtree; editor draft และ `expectedReminderVersion` มาจาก occurrence snapshot เดียวกันตั้งแต่ session เริ่ม และ session จบเมื่อปิดหรือเปลี่ยน occurrence identity
 - `SSE-046` — dashboard Stock picker เป็น item/session subtree; quantity, active variant และ preview อยู่ใน session เดียวกัน และถูกทำลายเมื่อปิดหรือเปลี่ยน item
-- `SSE-058` — LIFF Stock picker เป็น item-keyed session; quantities ถูกทำลายเมื่อปิดหรือเปลี่ยน item และ confirm ใช้ item/variants ปัจจุบันของ session
+- `SSE-058` — LIFF Stock picker เป็น item-keyed session; quantities ถูกทำลายเมื่อปิดหรือเปลี่ยน item, confirm ใช้ item/variants ปัจจุบันของ session และ projection ของ quantity ถูก clamp ตาม availability ปัจจุบัน
 
 Focused verification ที่ผ่าน:
 
@@ -578,6 +578,8 @@ Focused verification ที่ผ่าน:
 - `npm.cmd run typecheck` — ผ่าน
 - targeted `react-hooks/set-state-in-effect:error` สำหรับ L5D source call sites — **0 diagnostics**; diagnostics ที่ยังอยู่ใน caller เป็น finding ของ phase อื่นและไม่ได้แก้
 - `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json` — **42 diagnostics**; raw JSON ใช้ชั่วคราวนอก repository และไม่ถูก commit
+
+SSE-058 follow-up: เมื่อ availability ของ variant เดิมลดลงระหว่าง session, quantity ที่แสดง, selection และ confirm payload จะไม่เกิน availability ปัจจุบัน; regression test ครอบคลุมกรณี `2 → 1` และผ่านแล้ว
 
 ไม่รัน `architecture:check` เพราะไม่มีการเปลี่ยน module/import boundary และไม่รัน `npm run build` หรือ full-suite ตามขอบเขต verification ของ phase นี้
 

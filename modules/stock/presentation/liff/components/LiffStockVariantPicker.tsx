@@ -58,9 +58,16 @@ function LiffStockVariantPickerSession({
 }: Omit<LiffStockVariantPickerProps, "item" | "open"> & { item: LiffStockCatalogItem }): ReactElement {
     const [quantities, setQuantities] = useState<Record<number, number>>({});
 
+    function getEffectiveQuantity(variant: LiffStockCatalogVariant): number {
+        return Math.min(variant.availableQuantity, quantities[variant.id] ?? 0);
+    }
+
     const selections = useMemo(() => {
         return item.variants.flatMap((variant) => {
-            const quantity = quantities[variant.id] ?? 0;
+            const quantity = Math.min(
+                variant.availableQuantity,
+                quantities[variant.id] ?? 0,
+            );
             return quantity > 0 ? [{ variant, quantity }] : [];
         });
     }, [item, quantities]);
@@ -100,7 +107,7 @@ function LiffStockVariantPickerSession({
                 </div>
                 <DialogScrollArea className="space-y-3 px-4 py-4">
                     {item.variants.map((variant) => {
-                        const quantity = quantities[variant.id] ?? 0;
+                        const quantity = getEffectiveQuantity(variant);
                         const label = getVariantAttributeSummary(
                             variant.attributeValues,
                         ) || variant.sku;

@@ -183,6 +183,49 @@ describe("LIFF Stock mobile components", () => {
         expect(screen.getByRole("button", { name: "ลดจำนวน ขนาด: S" })).toBeDisabled();
     });
 
+    it("clamps preserved quantities to refreshed variant availability", () => {
+        const onConfirm = vi.fn();
+        const view = render(
+            <LiffStockVariantPicker
+                item={MULTI_VARIANT_ITEM}
+                open
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+                canCreateRequests
+            />,
+        );
+
+        const addSmall = screen.getByRole("button", { name: "เพิ่มจำนวน ขนาด: S" });
+        fireEvent.click(addSmall);
+        fireEvent.click(addSmall);
+
+        const refreshedItem = {
+            ...MULTI_VARIANT_ITEM,
+            variants: MULTI_VARIANT_ITEM.variants.map((variant) =>
+                variant.id === 101
+                    ? { ...variant, availableQuantity: 1 }
+                    : variant,
+            ),
+        };
+        view.rerender(
+            <LiffStockVariantPicker
+                item={refreshedItem}
+                open
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+                canCreateRequests
+            />,
+        );
+
+        expect(screen.getByRole("button", { name: "เพิ่ม 1 ตัวเลือก · 1 ชิ้น" }))
+            .toBeEnabled();
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่ม 1 ตัวเลือก · 1 ชิ้น" }));
+        expect(onConfirm).toHaveBeenCalledWith([{
+            variant: refreshedItem.variants[0],
+            quantity: 1,
+        }]);
+    });
+
     it("supports cart quantity, project code, submit, and request cancellation actions", () => {
         const onProjectCodeChange = vi.fn();
         const onChangeQuantity = vi.fn();
