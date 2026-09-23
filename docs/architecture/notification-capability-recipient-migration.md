@@ -6,8 +6,17 @@ rollout and malformed persisted authorization configuration. Phase 13A.2
 contracts the Routine reminder recipient persistence vocabulary.
 
 The capability-based recipient policy and Routine enum contraction are
-implemented. H2B / Phase 13A.2 is CLOSED in the repository. Production rollout
-still requires the read-only collision preflight below to return zero rows.
+implemented. H2A is CLOSED. H2B / Phase 13A.2 is CLOSED:
+
+- Repository implementation — COMPLETE
+- Production collision preflight — PASSED
+- Production deployment of
+  `20260923120000_contract_routine_reminder_recipient_scope` — PASSED
+- Production transition — CLOSED
+
+The Routine recipient persistence transition is CLOSED. Current MySQL, Prisma,
+and application persistence uses only `ASSIGNEES`, `ALL_READERS`, and
+`ASSIGNEES_AND_ALL_READERS`.
 
 ## Why this changed
 
@@ -111,7 +120,12 @@ unchanged: `ASSIGNEES` follows Routine relationships, `ALL_READERS` resolves
 explicit `routine.task.read / ALL` grants, and the combined scope is their
 deduplicated union. No Routine reminder audience is inferred from `Role.ADMIN`.
 
-### H2B production preflight and deployment
+### H2B pre-cutover runbook — historical operational guidance
+
+The following queries and go/no-go instructions are retained as the record of
+the safe pre-cutover procedure. The operator confirmed that the production
+collision preflight PASSED and the H2B migration deployment PASSED. The
+production transition is CLOSED.
 
 Run these read-only queries on production before `prisma migrate deploy`:
 
@@ -153,11 +167,12 @@ GROUP BY `taskId`, `daysBefore`, `channel`, `canonicalScope`
 HAVING COUNT(*) > 1;
 ```
 
-The deployment gate is zero collision rows. If collisions exist, STOP: do not
-migrate or automatically reconcile them. Review the rule IDs and all rule
-fields for each colliding `(taskId, daysBefore, channel, canonicalScope)` group
-and make an explicit production data decision first. Legacy row counts may be
-non-zero; H2B backfills them after the migration guard passes.
+The pre-cutover deployment gate was zero collision rows. If this procedure is
+used for another environment, STOP if collisions exist: do not migrate or
+automatically reconcile them. Review the rule IDs and all rule fields for each
+colliding `(taskId, daysBefore, channel, canonicalScope)` group and make an
+explicit data decision first. Legacy row counts may be non-zero; H2B backfills
+them after the migration guard passes.
 
 To list the conflicting rule identities and data for review:
 
@@ -256,7 +271,12 @@ TeamRole, direct User, lifecycle, invalid relationship, scope, capability,
 ADMIN-without-grant, duplicate-origin, and malformed-grant cases when the
 dedicated integration database is available.
 
-Executed evidence for this closure:
+### Historical Phase 13A / 13A.1 evidence before H2B production cutover
+
+The following repository-only evidence records the state before H2B production
+cutover. The operator-confirmed H2B production closure is recorded above.
+
+Executed evidence for the Phase 13A / 13A.1 repository closure:
 
 - focused Authorization/Routine tests: **11 files / 169 tests passed**;
 - focused Stock/outbox regression tests: **6 files / 108 tests passed**;
@@ -268,12 +288,11 @@ Executed evidence for this closure:
 - `npx.cmd prisma generate` and `npx.cmd prisma validate`: passed;
 - `git diff --check`: passed.
 
-The original Phase 13A migration was found in the current repository history,
-but no production migration table, deployment pipeline record, or production
-database access is present in the repository. Production deployment therefore
-cannot be identified from repository evidence. The migration is kept in the
-expand-only state in this release; contraction is explicitly deferred rather
-than claimed safe.
+At that historical Phase 13A / 13A.1 closure, the original Phase 13A migration
+was found in repository history, but production migration state and deployment
+evidence were not available in the repository. The enum remained expanded at
+that point and contraction was deferred until H2B. The operator-confirmed H2B
+production deployment recorded above supersedes that pre-cutover state.
 
 Intentional role-based behavior remains only in authentication and
 Authorization Administration/control-plane flows. Requester-owned Stock result

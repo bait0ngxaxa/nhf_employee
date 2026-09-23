@@ -31,7 +31,7 @@ audit ยังคงเก็บหลักฐาน ณ เวลาที่
 - [Notification channels](./notification-channels.md): ความหมายของแต่ละช่องทาง
   และ event delivery
 - [Notification recipient migration](./architecture/notification-capability-recipient-migration.md):
-  Phase 13A/13A.1 และขอบเขต rollout ที่ยังเปิดอยู่
+  Phase 13A/13A.1/13A.2 current state และ historical pre-cutover runbook
 
 ปัจจุบัน `modules/` มี 10 ขอบเขต: Audit, Auth, Authorization, Department,
 Employee, Leave, LINE/LIFF, Notification, Routine และ Stock. Phase K1 ปิด
@@ -42,15 +42,15 @@ Authorization ใช้ Default Domain Policy ของแต่ละ capabilit
 TeamRole และ direct User grants ที่ตั้งค่าไว้; `ADMIN` ยังคงเป็นบทบาทของ
 Auth/control plane และไม่สร้าง business authority โดยอัตโนมัติ. Phase
 13A/13A.1/13A.2 ปรับ audience ของ notification ให้ใช้ configured capability
-และปิด Routine recipient enum contraction ใน repository; production deployment
-ยังต้องผ่าน collision preflight. H2A
-ปิดแล้ว: H2A.1 นำ Routine Import runtime, API/UI/application services และ
+และปิด Routine recipient enum contraction. H2A — CLOSED: H2A.1 นำ Routine
+Import runtime, API/UI/application services และ
 `routine.import.manage` ออก; H2A.2 ลบตาราง Import, `RoutineTask` provenance
 columns และ Prisma compatibility models, enums กับ relations แล้ว. Historical
 `ROUTINE_IMPORT_*` AuditAction ยังคงไว้เพื่อ AuditLog เก่า. การสร้างและดูแลงานทำ
-ผ่าน Routine task UI/API. H2B ปิดแล้ว: MySQL, Prisma และ application ใช้
-Routine reminder recipient scopes แบบ canonical เท่านั้น; ก่อน deploy
-migration ต้องรัน production preflight และยืนยันว่า canonical collisions เป็นศูนย์.
+ผ่าน Routine task UI/API. H2B / Phase 13A.2: repository implementation
+COMPLETE; production collision preflight PASSED; production deployment PASSED;
+production transition CLOSED. Routine recipient persistence transition CLOSED.
+MySQL, Prisma และ application ใช้ recipient scopes แบบ canonical เท่านั้น.
 
 ## Runbooks และ workflow specs
 
@@ -67,9 +67,10 @@ migration ต้องรัน production preflight และยืนยัน
 - [Leave notification spec](./leave-notification-spec.md): ข้อกำหนด workflow
   การแจ้งเตือนการลาและลิงก์ไปยัง channel matrix ปัจจุบัน
 
-การตรวจ production จริง เช่น Tunnel/Nginx, scheduler, secrets, LINE/SMTP,
-storage และ acceptance บนอุปกรณ์ ต้องยืนยันโดยผู้ปฏิบัติงาน เอกสารใน repository
-ไม่ใช่หลักฐานว่า production deploy หรือ acceptance เสร็จแล้ว
+การตรวจ production จริงที่ยังไม่มี operator confirmation เช่น Tunnel/Nginx,
+scheduler, secrets, LINE/SMTP, storage และ acceptance บนอุปกรณ์ ต้องยืนยันโดย
+ผู้ปฏิบัติงาน สถานะ H2B ด้านบนเป็น operator-confirmed; เอกสารใน repository
+เพียงอย่างเดียวไม่ใช่หลักฐานแทน operator สำหรับรายการอื่น
 
 ## ADR และบันทึก migration
 

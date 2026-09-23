@@ -12,8 +12,9 @@
 > [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
 > Phase 13A/13A.1/13A.2 subsequently aligned Routine, Stock, and Email Request
 > notification audiences with configured capabilities and contracted the
-> Routine recipient enum. The production collision preflight remains a gate
-> before migration deployment; see
+> Routine recipient enum. H2B / Phase 13A.2 is CLOSED: repository implementation
+> COMPLETE, production collision preflight PASSED, production deployment
+> PASSED, and production transition CLOSED. See
 > [notification-capability-recipient-migration.md](notification-capability-recipient-migration.md).
 > The older Phase 12H-B through 12H-H boundary notes below remain historical
 > records of behavior at those phase boundaries.
@@ -25,8 +26,9 @@
 > audit actions remain readable. The rollback floor is
 > `099dc0ade8b114c40096cebe0e63c92b1ffc00e9` or a newer H2A.1-compatible
 > release. H2B / Phase 13A.2 is CLOSED; MySQL, Prisma, and application
-> recipient scopes now use the canonical-only vocabulary. The migration
-> runbook requires zero canonical collisions before production deployment.
+> recipient scopes now use the canonical-only vocabulary. The operator
+> confirmed production collision preflight and migration deployment PASSED.
+> The Routine recipient persistence transition is CLOSED.
 >
 > The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
@@ -1772,5 +1774,6 @@ backfills `ADMINS` to `ALL_READERS` and `ASSIGNEES_AND_ADMINS` to
 `ASSIGNEES_AND_ALL_READERS`, asserts zero legacy rows, and contracts MySQL to
 the three canonical values. Prisma and application reads/writes use the same
 canonical-only vocabulary, and the persistence compatibility normalizer is
-removed. The production preflight must report zero canonical collisions before
-deployment.
+removed. The operator confirmed the production collision preflight and
+migration deployment PASSED. The Routine recipient persistence transition is
+CLOSED.

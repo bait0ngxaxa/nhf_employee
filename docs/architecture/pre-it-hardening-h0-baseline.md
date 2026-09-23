@@ -504,12 +504,17 @@ ASSIGNEES_AND_ADMINS; application normalization mapped them to
 ASSIGNEES/ALL_READERS/ASSIGNEES_AND_ALL_READERS; mutation writes were
 canonical. Phase 13A.2 was pending at that baseline.
 
-H2B closure update (2026-09-23): Phase 13A.2 is CLOSED in the repository.
-Migration `20260923120000_contract_routine_reminder_recipient_scope` guards
-canonical collisions before backfill, asserts zero legacy rows, and contracts
-the MySQL enum. Prisma/application compatibility normalization has been
-removed. Production rollout still requires the documented zero-collision
-preflight.
+H2B repository closure update (2026-09-23): Phase 13A.2 implementation is
+COMPLETE. Migration `20260923120000_contract_routine_reminder_recipient_scope`
+guards canonical collisions before backfill, asserts zero legacy rows, and
+contracts the MySQL enum. Prisma/application compatibility normalization has
+been removed. At this repository-only closure point, production cutover was
+still outstanding.
+
+H2B production closure update (operator-confirmed): production collision
+preflight PASSED; production migration deployment PASSED. H2B / Phase 13A.2
+production transition and the Routine recipient persistence transition are
+CLOSED.
 
 Affected paths: prisma/schema.prisma, the expand migration, Routine
 recipient normalization, queries, scheduler, reminders, and notification
@@ -522,9 +527,10 @@ Mitigation at the H0 audited baseline: expand-only schema, normalization at
 persistence boundaries, canonical writes, and tests covering both vocabularies.
 
 At the H0 audited baseline, legacy values and old-process compatibility
-remained in the schema and runtime. H2B removes that repository transition
-compatibility; only the controlled production preflight/deployment gate remains
-for rollout.
+remained in the schema and runtime. H2B removed that repository transition
+compatibility. The preflight/deployment gate that remained at repository-only
+closure was subsequently passed, as recorded in the operator-confirmed update
+above.
 
 Recommended phase at the H0 baseline: H2 / Phase 13A.2 was to prove old-process
 retirement, backfill, zero legacy values, deploy contraction, and run

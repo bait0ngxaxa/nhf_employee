@@ -42,8 +42,9 @@ select/write `RoutineTask.sourceFileName`, `sourceSheet`, `sourceRow` หรื�
 `20260923120000_contract_routine_reminder_recipient_scope`. ตอนนี้ MySQL, Prisma
 และ application ใช้ `ASSIGNEES`, `ALL_READERS` และ
 `ASSIGNEES_AND_ALL_READERS` เท่านั้น และไม่มี
-`recipient-scope-compatibility.ts` แล้ว ก่อน deploy migration ใน production
-ต้องตรวจว่า canonical collisions เป็นศูนย์ตาม runbook ใน
+`recipient-scope-compatibility.ts` แล้ว ผู้ปฏิบัติงานยืนยันว่า production
+collision preflight และ migration deployment ผ่านแล้ว; Routine recipient
+persistence transition ปิดแล้ว. ขั้นตอนก่อน cutover เก็บไว้ใน
 [notification capability recipient migration](./architecture/notification-capability-recipient-migration.md).
 
 ## Audit history
