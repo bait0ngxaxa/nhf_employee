@@ -443,7 +443,7 @@ describe("LIFF Leave app orchestration", () => {
 
     it("opens a deep-linked request as presentation intent without mutating", async () => {
         mocks.search = "requestId=leave_1&action=approve";
-        mocks.fetchRequest.mockResolvedValueOnce({
+        mocks.fetchRequest.mockResolvedValue({
             id: "leave_1",
             viewerRole: "APPROVER",
             availableActions: ["APPROVE", "REJECT"],
@@ -456,6 +456,11 @@ describe("LIFF Leave app orchestration", () => {
         view.rerender(<LiffLeaveApp />);
         expect(mocks.fetchRequest).toHaveBeenCalledTimes(1);
         expect(mocks.fetchRequest).toHaveBeenCalledWith("leave_1");
+        mocks.search = "";
+        view.rerender(<LiffLeaveApp />);
+        mocks.search = "requestId=leave_1&action=approve";
+        view.rerender(<LiffLeaveApp />);
+        await waitFor(() => expect(mocks.fetchRequest).toHaveBeenCalledTimes(2));
         expect(mocks.fetchApprovals).not.toHaveBeenCalled();
         expect(screen.getByRole("tab", { name: /รอพิจารณา/ })).toBeInTheDocument();
         expect(mocks.submitDecision).not.toHaveBeenCalled();
@@ -560,6 +565,34 @@ describe("LIFF Leave app orchestration", () => {
         expect(await screen.findByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).not.toHaveBeenCalled();
+    });
+
+    it("does not resurrect an acknowledged invalid-link notice while its URL remains", async () => {
+        mocks.search = "requestId=..%2Fprivate&action=approve";
+        mocks.fetchRequest.mockResolvedValueOnce({
+            id: "leave-a",
+            viewerRole: "REQUESTER",
+            availableActions: [],
+        });
+
+        const view = render(<LiffLeaveApp />);
+
+        expect(await screen.findByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
+            .toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByTestId("history-detail-a"));
+        expect(await screen.findByText("รายละเอียด leave-a intent none"))
+            .toBeInTheDocument();
+        expect(screen.queryByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
+            .not.toBeInTheDocument();
+        expect(mocks.search).toBe("requestId=..%2Fprivate&action=approve");
+
+        view.rerender(<LiffLeaveApp />);
+        expect(screen.queryByText("ลิงก์คำขอลาไม่ถูกต้อง กำลังแสดงรายการของคุณตามปกติ"))
+            .not.toBeInTheDocument();
+        expect(mocks.fetchRequest).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchRequest).toHaveBeenCalledWith("leave-a");
     });
 
     it("keeps the newest history response when filters change quickly", async () => {

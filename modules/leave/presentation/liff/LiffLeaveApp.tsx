@@ -50,6 +50,10 @@ import type { LiffHomeResponse } from "@/modules/line/client";
 type LeaveViewState = "LOADING" | "READY" | "ERROR";
 type LeaveTab = "mine" | "approvals";
 type ApprovalCategory = "pending" | "notTakenPending" | "cancellationPending";
+type LeaveDeepLinkNoticeSession = {
+    intentKey: string | null;
+    notice: string | null;
+};
 
 const INITIAL_APPROVAL_PAGES = {
     pendingPage: 1,
@@ -157,6 +161,14 @@ export function LiffLeaveApp(): ReactElement {
         ? deepLinkIntent.actionIntent
         : null;
     const deepLinkHandledRef = useRef<string | null>(null);
+    const [deepLinkNoticeSession, setDeepLinkNoticeSession] =
+        useState<LeaveDeepLinkNoticeSession>({ intentKey: null, notice: null });
+    if (deepLinkNoticeSession.intentKey !== deepLinkIntentKey) {
+        setDeepLinkNoticeSession({
+            intentKey: deepLinkIntentKey,
+            notice: deepLinkIntent.kind === "invalid" ? deepLinkIntent.message : null,
+        });
+    }
     const [state, setState] = useState<LeaveViewState>("LOADING");
     const [viewError, setViewError] = useState<string | null>(null);
     const [profile, setProfile] = useState<LiffLeaveProfileResponse | null>(null);
@@ -173,7 +185,7 @@ export function LiffLeaveApp(): ReactElement {
     const [requestFormOpen, setRequestFormOpen] = useState(false);
     const [selectedDetail, setSelectedDetail] = useState<LiffLeaveRequestDetailData | null>(null);
     const [selectedDetailActionIntent, setSelectedDetailActionIntent] = useState<string | null>(null);
-    const [focusNotice, setFocusNotice] = useState<string | null>(null);
+    const [operationalNotice, setOperationalNotice] = useState<string | null>(null);
     const [mutationIntent, setMutationIntent] = useState<LiffLeaveMutationIntent | null>(null);
     const [mutationFromDetail, setMutationFromDetail] = useState(false);
     const [mutationError, setMutationError] = useState<string | null>(null);
@@ -186,6 +198,14 @@ export function LiffLeaveApp(): ReactElement {
     const detailRequestSequenceRef = useRef(0);
     const leaveCapabilitiesRef = useRef<LeavePresentationCapabilities | null>(null);
     const hasApprovalRelationshipRef = useRef(false);
+
+    const acknowledgeDeepLinkNotice = useCallback((): void => {
+        setDeepLinkNoticeSession((currentSession) =>
+            currentSession.intentKey === deepLinkIntentKey && currentSession.notice !== null
+                ? { ...currentSession, notice: null }
+                : currentSession,
+        );
+    }, [deepLinkIntentKey]);
 
     useEffect(() => () => {
         initialRequestSequenceRef.current += 1;
@@ -349,7 +369,7 @@ export function LiffLeaveApp(): ReactElement {
         try {
             const detail = await fetchLiffLeaveRequest(requestId);
             if (requestSequence !== detailRequestSequenceRef.current) return;
-            setFocusNotice(null);
+            setOperationalNotice(null);
             setSelectedDetail(detail);
             setSelectedDetailActionIntent(intent);
             if (detail.viewerRole === "APPROVER" && detail.availableActions.length > 0) {
@@ -363,7 +383,7 @@ export function LiffLeaveApp(): ReactElement {
             if (requestSequence !== detailRequestSequenceRef.current) return;
             setSelectedDetail(null);
             setSelectedDetailActionIntent(null);
-            setFocusNotice(
+            setOperationalNotice(
                 error instanceof LiffApiError && error.status === 404
                     ? "ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ดูรายการดังกล่าว"
                     : getViewError(error),
@@ -375,12 +395,13 @@ export function LiffLeaveApp(): ReactElement {
         requestId: string,
         intent: string | null = null,
     ): Promise<void> => {
+        acknowledgeDeepLinkNotice();
         const requestSequence = ++detailRequestSequenceRef.current;
-        setFocusNotice(null);
+        setOperationalNotice(null);
         setSelectedDetail(null);
         setSelectedDetailActionIntent(intent);
         await resolveDetail(requestId, intent, requestSequence);
-    }, [resolveDetail]);
+    }, [acknowledgeDeepLinkNotice, resolveDetail]);
 
     const openDeepLinkDetail = useCallback(async (
         requestId: string,
@@ -446,7 +467,7 @@ export function LiffLeaveApp(): ReactElement {
         request: LiffEmployeeLeaveRequest | LiffLeaveApprovalItem | LiffLeaveRequestDetailData,
     ): void => {
         if (!canUseLiffLeaveAction(action, leaveCapabilitiesRef.current)) {
-            setFocusNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
+            setOperationalNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
             return;
         }
         const fromDetail = selectedDetail !== null;
@@ -473,7 +494,7 @@ export function LiffLeaveApp(): ReactElement {
         if (!canUseLiffLeaveAction(action, leaveCapabilitiesRef.current)) {
             setMutationIntent(null);
             setMutationError(null);
-            setFocusNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
+            setOperationalNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
             return;
         }
         setIsMutating(true);
@@ -539,7 +560,7 @@ export function LiffLeaveApp(): ReactElement {
                 } catch {
                     clearTrustedLeaveProjection();
                 }
-                setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                setOperationalNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 setMutationIntent(null);
                 setMutationError(null);
                 setMutationFromDetail(false);
@@ -591,12 +612,9 @@ export function LiffLeaveApp(): ReactElement {
             className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
         >
             <div className="mx-auto w-full max-w-lg space-y-5">
-                {focusNotice || deepLinkIntent.kind === "invalid" ? (
+                {operationalNotice ?? deepLinkNoticeSession.notice ? (
                     <div role="status" className="rounded-xl border border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong">
-                        {focusNotice
-                            ?? (deepLinkIntent.kind === "invalid"
-                                ? deepLinkIntent.message
-                                : null)}
+                        {operationalNotice ?? deepLinkNoticeSession.notice}
                     </div>
                 ) : null}
                 {hasMineTab || showApprovalTab ? (
@@ -716,7 +734,7 @@ export function LiffLeaveApp(): ReactElement {
                     } catch {
                         clearTrustedLeaveProjection();
                     }
-                    setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                    setOperationalNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 }}
             />
             <LiffLeaveRequestDetail

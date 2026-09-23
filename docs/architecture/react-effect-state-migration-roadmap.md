@@ -841,3 +841,11 @@ Focused verification:
 - ไม่รัน `npm run build` และไม่รัน full repository suite เพราะ focused route/hydration/deep-link/Back-Forward/pagination tests พร้อม lint, typecheck และ architecture check ครอบคลุมขอบเขต L5J
 
 L5K ยังไม่ได้เริ่ม และ findings `SSE-003`, `SSE-006`, `SSE-020`, `SSE-024`, `SSE-025`, `SSE-037`, `SSE-053` ยังคงถูก defer ตามขอบเขต phase
+
+### L5J Review Correction
+
+- URL parser เป็นเจ้าของ navigation-intent identity; deep-link session เป็นเจ้าของอายุของ presentation warning แยกจาก parser result
+- Leave เริ่ม invalid-link notice หนึ่งครั้งต่อ intent; การเปิดรายละเอียดคำขออื่นด้วยตนเอง acknowledge notice โดยไม่แก้ URL และ rerender ด้วย intent เดิมไม่สร้าง notice กลับมา
+- Stock รอ capability projection ก่อน resolve valid intent แล้วบันทึกผลเป็น invalid, read-denied, process-denied หรือ authorized ใน session เดียวกัน; capability warning ไม่ได้ derive จาก URL และ capabilities ทุก render
+- operational notice ยังคงมี owner แยกและ precedence สูงกว่า deep-link notice; การ acknowledge deep-link notice ไม่ล้าง operational notice
+- การนำ URL intent ออกจบ session; เมื่อนำ intent เดิมกลับเข้ามาภายหลังจะเริ่ม session ใหม่และจัดการได้อีกครั้ง ทั้ง Leave และ Stock

@@ -132,6 +132,89 @@ export function parseLiffStockDeepLink(searchParams: Pick<URLSearchParams, "get"
     };
 }
 
+type StockDeepLinkSessionOutcome =
+    | "none"
+    | "pending"
+    | "invalid"
+    | "read-denied"
+    | "process-denied"
+    | "authorized";
+
+type StockDeepLinkNoticeSession = {
+    intentKey: string | null;
+    outcome: StockDeepLinkSessionOutcome;
+    notice: string | null;
+};
+
+function resolveStockDeepLinkNoticeSession(
+    intent: StockDeepLinkIntent,
+    capabilities: StockPresentationCapabilities | null,
+): StockDeepLinkNoticeSession {
+    if (intent.kind === "none") {
+        return { intentKey: null, outcome: "none", notice: null };
+    }
+    if (intent.kind === "invalid") {
+        return { intentKey: intent.key, outcome: "invalid", notice: intent.message };
+    }
+    if (!capabilities) {
+        return { intentKey: intent.key, outcome: "pending", notice: null };
+    }
+
+    const canReadRequest = capabilities.canReadOwnRequests === true
+        || capabilities.canReadAllRequests === true;
+    if (!canReadRequest) {
+        return {
+            intentKey: intent.key,
+            outcome: "read-denied",
+            notice: "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้",
+        };
+    }
+
+    const isProcessorIntent = intent.actionIntent === "issue"
+        || intent.actionIntent === "review";
+    if (isProcessorIntent && capabilities.canProcessRequests !== true) {
+        return {
+            intentKey: intent.key,
+            outcome: "process-denied",
+            notice: "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้",
+        };
+    }
+
+    return { intentKey: intent.key, outcome: "authorized", notice: null };
+}
+
+function useStockDeepLinkNoticeSession(
+    intent: StockDeepLinkIntent,
+    capabilities: StockPresentationCapabilities | null,
+): {
+    session: StockDeepLinkNoticeSession;
+    acknowledge: () => void;
+} {
+    const intentKey = intent.kind === "none" ? null : intent.key;
+    const [session, setSession] = useState<StockDeepLinkNoticeSession>({
+        intentKey: null,
+        outcome: "none",
+        notice: null,
+    });
+    const resolvedSession = resolveStockDeepLinkNoticeSession(intent, capabilities);
+    if (
+        session.intentKey !== resolvedSession.intentKey
+        || (session.outcome === "pending" && resolvedSession.outcome !== "pending")
+    ) {
+        setSession(resolvedSession);
+    }
+
+    const acknowledge = useCallback((): void => {
+        setSession((currentSession) =>
+            currentSession.intentKey === intentKey && currentSession.notice !== null
+                ? { ...currentSession, notice: null }
+                : currentSession,
+        );
+    }, [intentKey, setSession]);
+
+    return { session, acknowledge };
+}
+
 const EMPTY_CATALOG: LiffStockCatalogResponse = {
     items: [],
     total: 0,
@@ -257,7 +340,11 @@ export function LiffStockApp(): ReactElement {
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState<string | null>(null);
     const [detailActionIntent, setDetailActionIntent] = useState<string | null>(null);
-    const [focusNotice, setFocusNotice] = useState<string | null>(null);
+    const [operationalNotice, setOperationalNotice] = useState<string | null>(null);
+    const {
+        session: deepLinkNoticeSession,
+        acknowledge: acknowledgeDeepLinkNotice,
+    } = useStockDeepLinkNoticeSession(deepLinkIntent, stockCapabilities);
     const [decisionIntent, setDecisionIntent] = useState<LiffStockDecisionIntent | null>(null);
     const [decisionFromDetail, setDecisionFromDetail] = useState(false);
     const [mutationError, setMutationError] = useState<string | null>(null);
@@ -361,11 +448,11 @@ export function LiffStockApp(): ReactElement {
         const canReadRequest = capabilities?.canReadOwnRequests === true
             || capabilities?.canReadAllRequests === true;
         if (!canReadRequest) {
-            setFocusNotice("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้");
+            setOperationalNotice("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้");
             return;
         }
         if (isProcessorIntent && capabilities?.canProcessRequests !== true) {
-            setFocusNotice(
+            setOperationalNotice(
                 "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้",
             );
             return;
@@ -408,6 +495,14 @@ export function LiffStockApp(): ReactElement {
     ): Promise<void> => {
         await loadDetail(requestId, actionIntent, true);
     }, [loadDetail]);
+
+    const openManualDetail = useCallback(async (
+        requestId: number,
+        actionIntent: string | null = null,
+    ): Promise<void> => {
+        acknowledgeDeepLinkNotice();
+        await openDetail(requestId, actionIntent);
+    }, [acknowledgeDeepLinkNotice, openDetail]);
 
     const refreshDetail = useCallback(async (requestId: number): Promise<void> => {
         await loadDetail(requestId, null, false);
@@ -531,23 +626,18 @@ export function LiffStockApp(): ReactElement {
             deepLinkHandledRef.current = deepLinkIntentKey;
             return;
         }
-        if (deepLinkIntent.kind !== "detail") {
-            return;
-        }
-        const capabilities = stockCapabilitiesRef.current;
-        if (!capabilities) return;
-        const isProcessorIntent = deepLinkIntent.actionIntent === "issue"
-            || deepLinkIntent.actionIntent === "review";
-        const canReadRequest = capabilities.canReadOwnRequests
-            || capabilities.canReadAllRequests;
-        if (!canReadRequest) {
+        if (deepLinkIntent.kind !== "detail") return;
+
+        const resolution = resolveStockDeepLinkNoticeSession(
+            deepLinkIntent,
+            stockCapabilitiesRef.current,
+        );
+        if (resolution.outcome === "pending") return;
+        if (resolution.outcome !== "authorized") {
             deepLinkHandledRef.current = deepLinkIntentKey;
             return;
         }
-        if (isProcessorIntent && !capabilities.canProcessRequests) {
-            deepLinkHandledRef.current = deepLinkIntentKey;
-            return;
-        }
+
         deepLinkHandledRef.current = deepLinkIntentKey;
         void openDetail(deepLinkIntent.requestId, deepLinkIntent.actionIntent);
     }, [deepLinkIntent, deepLinkIntentKey, openDetail, stockCapabilities]);
@@ -583,7 +673,7 @@ export function LiffStockApp(): ReactElement {
         },
         onSubmitError: async (error) => {
             if (isRecoveredLiffMutation(error)) {
-                setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                setOperationalNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 const capabilities = await loadStockCapabilities();
                 const refreshes: Promise<void>[] = [];
                 if (capabilities?.canReadOwnRequests) {
@@ -657,7 +747,7 @@ export function LiffStockApp(): ReactElement {
                 ? capabilities?.canCancelAnyRequests === true
                 : capabilities?.canCancelOwnRequests === true;
         if (!canUseAction) {
-            setFocusNotice(
+            setOperationalNotice(
                 action === "ISSUE"
                     ? "บัญชีนี้ไม่มีสิทธิ์จ่ายวัสดุ"
                     : "บัญชีนี้ไม่มีสิทธิ์ยกเลิกคำขอนี้",
@@ -754,7 +844,7 @@ export function LiffStockApp(): ReactElement {
         } catch (error) {
             if (isRecoveredLiffMutation(error)) {
                 setMutationError(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
-                setFocusNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
+                setOperationalNotice(LIFF_SESSION_RECOVERED_MUTATION_MESSAGE);
                 const refreshedCapabilities = await loadStockCapabilities();
                 const refreshes: Promise<void>[] = [];
                 if (refreshedCapabilities?.canReadOwnRequests) {
@@ -821,19 +911,6 @@ export function LiffStockApp(): ReactElement {
     const safeActiveTab = visibleTabs.includes(activeTab)
         ? activeTab
         : firstVisibleTab;
-    const deepLinkNotice = deepLinkIntent.kind === "invalid"
-        ? deepLinkIntent.message
-        : deepLinkIntent.kind === "detail" && stockCapabilities
-            ? stockCapabilities.canReadOwnRequests || stockCapabilities.canReadAllRequests
-                ? deepLinkIntent.actionIntent === "issue"
-                    || deepLinkIntent.actionIntent === "review"
-                    ? stockCapabilities.canProcessRequests
-                        ? null
-                        : "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"
-                    : null
-                : "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้"
-            : null;
-
     if (stockHomeLoading && !stockCapabilities) {
         return (
             <main
@@ -887,12 +964,12 @@ export function LiffStockApp(): ReactElement {
             className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
         >
             <div className="mx-auto w-full max-w-lg space-y-4">
-                {focusNotice ?? deepLinkNotice ? (
+                {operationalNotice ?? deepLinkNoticeSession.notice ? (
                     <div
                         role="status"
                         className="border-y border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong"
                     >
-                        {focusNotice ?? deepLinkNotice}
+                        {operationalNotice ?? deepLinkNoticeSession.notice}
                     </div>
                 ) : null}
 
@@ -1004,7 +1081,7 @@ export function LiffStockApp(): ReactElement {
                                 search: requestSearch,
                                 status: requestStatus,
                             })}
-                            onOpenDetail={(requestId) => void openDetail(requestId)}
+                            onOpenDetail={(requestId) => void openManualDetail(requestId)}
                             onAction={startAction}
                             canCancelOwnRequests={stockCapabilities.canCancelOwnRequests}
                         />
@@ -1027,7 +1104,7 @@ export function LiffStockApp(): ReactElement {
                                     page: processingPage,
                                     search: processingSearch,
                                 })}
-                                onOpenDetail={(requestId) => void openDetail(requestId)}
+                                onOpenDetail={(requestId) => void openManualDetail(requestId)}
                                 onAction={startAction}
                                 canProcessRequests={stockCapabilities.canProcessRequests}
                                 canCancelAnyRequests={stockCapabilities.canCancelAnyRequests}

@@ -425,6 +425,40 @@ describe("LIFF Stock app orchestration", () => {
         expect(mocks.issueRequest).not.toHaveBeenCalled();
     });
 
+    it("keeps a cleared process-denial notice cleared while its URL remains", async () => {
+        mocks.search = "requestId=71&action=issue";
+        mocks.fetchMyRequests.mockResolvedValueOnce(createRequestsResponse([
+            createRequestSummary(70, "PROJECT-MANUAL"),
+        ]));
+        mocks.fetchRequest.mockResolvedValueOnce(createProcessorDetail(70, 5, []));
+
+        const view = render(<LiffStockApp />);
+
+        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+            .toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+        expect(mocks.issueRequest).not.toHaveBeenCalled();
+
+        fireEvent.mouseDown(screen.getByRole("tab", { name: "คำขอของฉัน" }), {
+            button: 0,
+            ctrlKey: false,
+        });
+        expect(await screen.findByText("PROJECT-MANUAL")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "รายละเอียด" }));
+        expect(await screen.findByRole("heading", { name: "รายละเอียดคำขอ #70" }))
+            .toBeInTheDocument();
+        expect(screen.queryByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+            .not.toBeInTheDocument();
+        expect(mocks.search).toBe("requestId=71&action=issue");
+
+        view.rerender(<LiffStockApp />);
+        expect(screen.queryByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+            .not.toBeInTheDocument();
+        expect(mocks.fetchRequest).toHaveBeenCalledTimes(1);
+        expect(mocks.fetchRequest).toHaveBeenCalledWith(70);
+        expect(mocks.issueRequest).not.toHaveBeenCalled();
+    });
+
     it("does not treat process capability as request-detail read authority", async () => {
         mocks.search = "requestId=71&action=issue";
         mocks.fetchHome.mockResolvedValueOnce({
@@ -483,12 +517,21 @@ describe("LIFF Stock app orchestration", () => {
         mocks.search = "requestId=71&action=issue";
         mockProcessorHome();
 
-        render(<LiffStockApp />);
+        const view = render(<LiffStockApp />);
 
         expect(await screen.findByText(
             "เปิดจากลิงก์เพื่อดำเนินการ กรุณาตรวจรายละเอียดและกดยืนยันด้วยตนเอง",
         )).toBeInTheDocument();
+        await waitFor(() => expect(mocks.fetchRequest).toHaveBeenCalledTimes(1));
         expect(mocks.fetchRequest).toHaveBeenCalledWith(71);
+
+        view.rerender(<LiffStockApp />);
+        expect(mocks.fetchRequest).toHaveBeenCalledTimes(1);
+        mocks.search = "";
+        view.rerender(<LiffStockApp />);
+        mocks.search = "requestId=71&action=issue";
+        view.rerender(<LiffStockApp />);
+        await waitFor(() => expect(mocks.fetchRequest).toHaveBeenCalledTimes(2));
         expect(mocks.issueRequest).not.toHaveBeenCalled();
 
         const detailIssueButton = screen.getByRole("button", { name: "จ่ายวัสดุ" });
