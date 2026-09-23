@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -500,6 +500,7 @@ describe("LiffRoutineApp", () => {
     });
 
     it("shows a safe Routine error and supports retry", async () => {
+        const retrySummary = deferred<typeof SUMMARY>();
         mocks.fetchLiffRoutineSummary
             .mockRejectedValueOnce(
                 new mocks.MockLiffApiError(
@@ -507,7 +508,7 @@ describe("LiffRoutineApp", () => {
                     403,
                 ),
             )
-            .mockResolvedValueOnce(SUMMARY);
+            .mockReturnValueOnce(retrySummary.promise);
 
         render(<LiffRoutineApp />);
 
@@ -519,6 +520,12 @@ describe("LiffRoutineApp", () => {
         ).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole("button", { name: "ลองใหม่" }));
+        expect(screen.getByText("กำลังโหลดงาน Routine…")).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "เปิด My Routine ไม่สำเร็จ" })).not.toBeInTheDocument();
+        await waitFor(() => expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(2));
+        await act(async () => {
+            retrySummary.resolve(SUMMARY);
+        });
         expect(
             await screen.findByRole("heading", { name: "งาน Routine ของฉัน" }),
         ).toBeInTheDocument();
@@ -743,6 +750,55 @@ describe("LiffRoutineApp", () => {
             expect(screen.getByText("งานเป้าหมายที่สอง")).toBeInTheDocument();
         });
         expect(screen.queryByText("งานเป้าหมายแรก")).not.toBeInTheDocument();
+    });
+
+    it("shows the loading projection as soon as a mounted deep-link identity changes", async () => {
+        const taskA = { ...TASK, title: "งานจาก deep link A" };
+        const taskB = { ...TASK, id: 72, title: "งานจาก deep link B" };
+        const nextHome = deferred<typeof HOME>();
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=71&occurrenceId=91"),
+        );
+        mocks.fetchLiffRoutineTasks
+            .mockResolvedValueOnce(tasksResponse([taskA]))
+            .mockResolvedValueOnce(tasksResponse([taskA]));
+
+        const view = render(<LiffRoutineApp />);
+        expect(await screen.findByText("งานจาก deep link A")).toBeInTheDocument();
+
+        mocks.fetchLiffRoutineTasks.mockImplementation((input: { taskId?: number }) =>
+            Promise.resolve(tasksResponse(input.taskId === 72 ? [taskB] : [TASK])),
+        );
+        mocks.fetchLiffHome.mockReturnValueOnce(nextHome.promise);
+        mocks.useSearchParams.mockReturnValue(
+            new URLSearchParams("taskId=72&occurrenceId=92"),
+        );
+        view.rerender(<LiffRoutineApp />);
+
+        expect(screen.getByText("กำลังโหลดงาน Routine…")).toBeInTheDocument();
+        expect(screen.queryByText("งานจาก deep link A")).not.toBeInTheDocument();
+
+        await act(async () => {
+            nextHome.resolve(HOME);
+        });
+
+        expect(await screen.findByText("งานจาก deep link B")).toBeInTheDocument();
+    });
+
+    it("ignores a late bootstrap response after unmount", async () => {
+        const homeRequest = deferred<typeof HOME>();
+        mocks.fetchLiffHome.mockReturnValueOnce(homeRequest.promise);
+
+        const view = render(<LiffRoutineApp />);
+        expect(screen.getByText("กำลังโหลดงาน Routine…")).toBeInTheDocument();
+        view.unmount();
+
+        await act(async () => {
+            homeRequest.resolve(HOME);
+        });
+
+        expect(mocks.fetchLiffRoutineSummary).not.toHaveBeenCalled();
+        expect(mocks.fetchLiffRoutineTasks).not.toHaveBeenCalled();
     });
 
     it("opens a create form without assignee controls and sends only the LIFF payload", async () => {

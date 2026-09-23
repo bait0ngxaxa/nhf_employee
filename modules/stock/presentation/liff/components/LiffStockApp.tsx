@@ -270,6 +270,7 @@ export function LiffStockApp(): ReactElement {
         ? null
         : deepLinkIntent.key;
     const deepLinkHandledRef = useRef<string | null>(null);
+    const capabilityRequestSequenceRef = useRef(0);
     const catalogRequestSequenceRef = useRef(0);
     const requestHistorySequenceRef = useRef(0);
     const processingQueueSequenceRef = useRef(0);
@@ -301,6 +302,7 @@ export function LiffStockApp(): ReactElement {
     const stockCapabilitiesRef = useRef<StockPresentationCapabilities | null>(null);
 
     useEffect(() => () => {
+        capabilityRequestSequenceRef.current += 1;
         catalogRequestSequenceRef.current += 1;
         requestHistorySequenceRef.current += 1;
         processingQueueSequenceRef.current += 1;
@@ -508,39 +510,62 @@ export function LiffStockApp(): ReactElement {
         await loadDetail(requestId, null, false);
     }, [loadDetail]);
 
-    const loadStockCapabilities = useCallback(async (): Promise<StockPresentationCapabilities | null> => {
-        stockCapabilitiesRef.current = null;
-        setStockCapabilities(null);
-        setStockHomeLoading(true);
-        setStockHomeError(null);
+    const runStockCapabilityRequest = useCallback(async (
+        requestSequence: number,
+    ): Promise<StockPresentationCapabilities | null> => {
+        const isCurrentRequest = (): boolean =>
+            requestSequence === capabilityRequestSequenceRef.current;
+
         try {
             const home = await fetchLiffHome();
+            if (!isCurrentRequest()) return null;
+
             const nextCapabilities = home.capabilities.stockCapabilities;
             if (!nextCapabilities) {
                 throw new Error("ไม่พบสิทธิ์การใช้งาน Stock");
             }
+
             const nextVisibleTabs = getVisibleStockTabs(nextCapabilities);
             const nextFirstVisibleTab = nextVisibleTabs[0];
+            stockCapabilitiesRef.current = nextCapabilities;
+            setStockCapabilities(nextCapabilities);
             setActiveTab((currentTab) => {
                 if (!nextFirstVisibleTab) return "browse";
                 return nextVisibleTabs.includes(currentTab) ? currentTab : nextFirstVisibleTab;
             });
-            stockCapabilitiesRef.current = nextCapabilities;
-            setStockCapabilities(nextCapabilities);
             return nextCapabilities;
         } catch (error: unknown) {
+            if (!isCurrentRequest()) return null;
+
             stockCapabilitiesRef.current = null;
             setStockCapabilities(null);
             setStockHomeError(getStockError(error));
             return null;
         } finally {
-            setStockHomeLoading(false);
+            if (isCurrentRequest()) {
+                setStockHomeLoading(false);
+            }
         }
     }, []);
 
+    const loadStockCapabilities = useCallback((): Promise<StockPresentationCapabilities | null> => {
+        const requestSequence = ++capabilityRequestSequenceRef.current;
+        stockCapabilitiesRef.current = null;
+        setStockCapabilities(null);
+        setStockHomeLoading(true);
+        setStockHomeError(null);
+        return runStockCapabilityRequest(requestSequence);
+    }, [runStockCapabilityRequest]);
+
     useEffect(() => {
-        void loadStockCapabilities();
-    }, [loadStockCapabilities]);
+        const requestSequence = ++capabilityRequestSequenceRef.current;
+        void runStockCapabilityRequest(requestSequence);
+        return () => {
+            if (requestSequence === capabilityRequestSequenceRef.current) {
+                capabilityRequestSequenceRef.current += 1;
+            }
+        };
+    }, [runStockCapabilityRequest]);
 
     useEffect(() => {
         let cancelled = false;

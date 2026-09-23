@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -80,6 +81,18 @@ const HOME = {
         },
     },
 };
+
+function createDeferred<T>(): {
+    promise: Promise<T>;
+    resolve: (value: T) => void;
+} {
+    let resolvePromise: (value: T) => void = () => undefined;
+    const promise = new Promise<T>((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    return { promise, resolve: resolvePromise };
+}
 
 describe("LIFF home", () => {
     beforeEach(() => {
@@ -169,5 +182,90 @@ describe("LIFF home", () => {
             screen.getByText("ไม่สามารถโหลดบริการของคุณได้ กรุณาลองใหม่อีกครั้ง"),
         ).toBeInTheDocument();
         expect(screen.queryByText("provider details")).not.toBeInTheDocument();
+    });
+
+    it("starts in loading while the initial request is unresolved", () => {
+        mocks.fetchLiffHome.mockReturnValueOnce(new Promise(() => undefined));
+
+        render(<LiffHomeApp />);
+
+        expect(screen.getByText("กำลังโหลดบริการของคุณ…")).toBeInTheDocument();
+        expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    });
+
+    it("uses the safe LiffApiError message", async () => {
+        mocks.fetchLiffHome.mockRejectedValueOnce(
+            new mocks.MockLiffApiError("ข้อความที่ปลอดภัย", 503),
+        );
+
+        render(<LiffHomeApp />);
+
+        expect(await screen.findByText("ข้อความที่ปลอดภัย")).toBeInTheDocument();
+        expect(screen.queryByText("provider details")).not.toBeInTheDocument();
+    });
+
+    it("starts a new loading request when retry is clicked", async () => {
+        const retryRequest = createDeferred<typeof HOME>();
+        mocks.fetchLiffHome
+            .mockRejectedValueOnce(new Error("first request failed"))
+            .mockReturnValueOnce(retryRequest.promise);
+
+        render(<LiffHomeApp />);
+
+        fireEvent.click(await screen.findByRole("button", { name: "ลองใหม่" }));
+
+        expect(screen.getByText("กำลังโหลดบริการของคุณ…")).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "โหลดบริการของฉันไม่สำเร็จ" })).not.toBeInTheDocument();
+
+        await act(async () => {
+            retryRequest.resolve(HOME);
+        });
+
+        expect(await screen.findByRole("heading", { name: "สวัสดี พนักงาน ทดสอบ" })).toBeInTheDocument();
+    });
+
+    it("keeps the newest StrictMode mount request when responses resolve out of order", async () => {
+        const olderRequest = createDeferred<typeof HOME>();
+        const newerRequest = createDeferred<typeof HOME>();
+        const newerHome = {
+            ...HOME,
+            workforce: { ...HOME.workforce, name: "ผลลัพธ์ล่าสุด" },
+        };
+        mocks.fetchLiffHome
+            .mockReturnValueOnce(olderRequest.promise)
+            .mockReturnValueOnce(newerRequest.promise);
+
+        render(
+            <StrictMode>
+                <LiffHomeApp />
+            </StrictMode>,
+        );
+
+        await waitFor(() => expect(mocks.fetchLiffHome).toHaveBeenCalledTimes(2));
+        await act(async () => {
+            newerRequest.resolve(newerHome);
+        });
+        expect(await screen.findByRole("heading", { name: "สวัสดี ผลลัพธ์ล่าสุด" })).toBeInTheDocument();
+
+        await act(async () => {
+            olderRequest.resolve(HOME);
+        });
+
+        expect(screen.getByRole("heading", { name: "สวัสดี ผลลัพธ์ล่าสุด" })).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "สวัสดี พนักงาน ทดสอบ" })).not.toBeInTheDocument();
+    });
+
+    it("ignores a late request after unmount", async () => {
+        const request = createDeferred<typeof HOME>();
+        mocks.fetchLiffHome.mockReturnValueOnce(request.promise);
+
+        const { unmount } = render(<LiffHomeApp />);
+        unmount();
+
+        await act(async () => {
+            request.resolve(HOME);
+        });
+
+        expect(screen.queryByRole("main")).not.toBeInTheDocument();
     });
 });

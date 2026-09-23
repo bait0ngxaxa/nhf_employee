@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
 import type { LeavePresentationCapabilities } from "../../application/types";
@@ -277,6 +278,18 @@ const LEAVE_CAPABILITIES: LeavePresentationCapabilities = {
     canManageRecovery: false,
 };
 
+function leaveHome(
+    name: string,
+    leaveCapabilities: LeavePresentationCapabilities = LEAVE_CAPABILITIES,
+    canApproveLeave = false,
+) {
+    return {
+        workforce: { userId: 1, employeeId: 1, name },
+        modules: {},
+        capabilities: { canApproveLeave, leaveCapabilities },
+    };
+}
+
 function approvals(hasActionableWork: boolean) {
     return {
         pending: [],
@@ -319,6 +332,137 @@ describe("LIFF Leave app orchestration", () => {
         });
         mocks.fetchProfile.mockResolvedValue(PROFILE);
         mocks.fetchApprovals.mockResolvedValue(approvals(false));
+    });
+
+    it("keeps initial loading and preserves home, profile, ready, approval order", async () => {
+        const homeRequest = deferred<ReturnType<typeof leaveHome>>();
+        const profileRequest = deferred<typeof PROFILE>();
+        mocks.fetchHome.mockReturnValueOnce(homeRequest.promise);
+        mocks.fetchProfile.mockReturnValueOnce(profileRequest.promise);
+        mocks.fetchApprovals.mockResolvedValueOnce(approvals(true));
+
+        render(<LiffLeaveApp />);
+
+        expect(screen.getByText("กำลังโหลดข้อมูล Leave…")).toBeInTheDocument();
+        expect(mocks.fetchProfile).not.toHaveBeenCalled();
+        expect(mocks.fetchApprovals).not.toHaveBeenCalled();
+
+        await act(async () => {
+            homeRequest.resolve(leaveHome("หัวหน้า ทดสอบ", LEAVE_CAPABILITIES, true));
+        });
+        await waitFor(() => expect(mocks.fetchProfile).toHaveBeenCalledWith({ page: 1 }));
+        expect(mocks.fetchApprovals).not.toHaveBeenCalled();
+
+        await act(async () => {
+            profileRequest.resolve(PROFILE);
+        });
+        expect(await screen.findByRole("heading", { name: "Leave" })).toBeInTheDocument();
+        await waitFor(() => expect(mocks.fetchApprovals).toHaveBeenCalledWith({
+            pendingPage: 1,
+            notTakenPage: 1,
+            cancellationPage: 1,
+        }));
+        expect(mocks.fetchHome.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.fetchProfile.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+        );
+        expect(mocks.fetchProfile.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.fetchApprovals.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+        );
+    });
+
+    it("keeps the newer StrictMode bootstrap authoritative when an older home response resolves late", async () => {
+        const olderHome = deferred<ReturnType<typeof leaveHome>>();
+        const newerHome = deferred<ReturnType<typeof leaveHome>>();
+        mocks.fetchHome
+            .mockReturnValueOnce(olderHome.promise)
+            .mockReturnValueOnce(newerHome.promise);
+
+        render(
+            <StrictMode>
+                <LiffLeaveApp />
+            </StrictMode>,
+        );
+        await waitFor(() => expect(mocks.fetchHome).toHaveBeenCalledTimes(2));
+
+        await act(async () => {
+            newerHome.resolve(leaveHome("บัญชีปัจจุบัน", {
+                ...LEAVE_CAPABILITIES,
+                canReadOwnRequests: false,
+                canReadAssignedApprovals: false,
+                canCreateOwnRequests: false,
+            }));
+        });
+        expect(await screen.findByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+            .toBeInTheDocument();
+
+        await act(async () => {
+            olderHome.resolve(leaveHome("บัญชีเก่า"));
+        });
+
+        expect(screen.getByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+            .toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ยื่นลา" })).not.toBeInTheDocument();
+        expect(mocks.fetchProfile).not.toHaveBeenCalled();
+    });
+
+    it("retries through an explicit loading transition and restores the ready experience", async () => {
+        const retryHome = deferred<ReturnType<typeof leaveHome>>();
+        mocks.fetchHome
+            .mockRejectedValueOnce(new Error("bootstrap failed"))
+            .mockReturnValueOnce(retryHome.promise);
+
+        render(<LiffLeaveApp />);
+        fireEvent.click(await screen.findByRole("button", { name: "ลองใหม่" }));
+        expect(screen.getByText("กำลังโหลดข้อมูล Leave…")).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "เปิด Leave ไม่สำเร็จ" })).not.toBeInTheDocument();
+
+        await act(async () => {
+            retryHome.resolve(leaveHome("พนักงาน ทดสอบ"));
+        });
+        expect(await screen.findByRole("heading", { name: "Leave" })).toBeInTheDocument();
+    });
+
+    it("waits for a retried bootstrap before opening its valid deep link exactly once", async () => {
+        const retryHome = deferred<ReturnType<typeof leaveHome>>();
+        mocks.search = "requestId=leave_retry&action=approve";
+        mocks.fetchHome
+            .mockRejectedValueOnce(new Error("bootstrap failed"))
+            .mockReturnValueOnce(retryHome.promise);
+        mocks.fetchRequest.mockResolvedValue({
+            id: "leave_retry",
+            viewerRole: "APPROVER",
+            availableActions: ["APPROVE", "REJECT"],
+        });
+
+        const view = render(<LiffLeaveApp />);
+        fireEvent.click(await screen.findByRole("button", { name: "ลองใหม่" }));
+
+        expect(screen.getByText("กำลังโหลดข้อมูล Leave…")).toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+        await act(async () => {
+            retryHome.resolve(leaveHome("หัวหน้า ทดสอบ"));
+        });
+
+        expect(await screen.findByText("รายละเอียด leave_retry intent approve"))
+            .toBeInTheDocument();
+        view.rerender(<LiffLeaveApp />);
+        await waitFor(() => expect(mocks.fetchRequest).toHaveBeenCalledTimes(1));
+    });
+
+    it("ignores a bootstrap result that arrives after unmount", async () => {
+        const request = deferred<ReturnType<typeof leaveHome>>();
+        mocks.fetchHome.mockReturnValueOnce(request.promise);
+
+        const view = render(<LiffLeaveApp />);
+        expect(screen.getByText("กำลังโหลดข้อมูล Leave…")).toBeInTheDocument();
+        view.unmount();
+
+        await act(async () => {
+            request.resolve(leaveHome("พนักงาน ทดสอบ"));
+        });
+
+        expect(screen.queryByRole("main")).not.toBeInTheDocument();
+        expect(mocks.fetchProfile).not.toHaveBeenCalled();
     });
 
     it("shows the employee experience and hides an empty approver tab", async () => {

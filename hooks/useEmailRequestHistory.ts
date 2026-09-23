@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SharedDriveOption } from "@/constants/email-request";
 import { apiGet } from "@/lib/client/api-client";
 
@@ -30,6 +30,20 @@ interface Pagination {
     totalPages: number;
 }
 
+type SettledRequest =
+    | {
+          key: string;
+          status: "ready";
+          emailRequests: EmailRequest[];
+          pagination: Pagination;
+      }
+    | {
+          key: string;
+          status: "error";
+          error: string;
+          pagination: Pagination;
+      };
+
 interface UseEmailRequestHistoryReturn {
     emailRequests: EmailRequest[];
     pagination: Pagination;
@@ -40,67 +54,88 @@ interface UseEmailRequestHistoryReturn {
     refresh: () => void;
 }
 
+const INITIAL_PAGINATION: Pagination = {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+};
+
 export function useEmailRequestHistory(): UseEmailRequestHistoryReturn {
-    const [emailRequests, setEmailRequests] = useState<EmailRequest[]>([]);
-    const [pagination, setPagination] = useState<Pagination>({
-        page: 1,
-        limit: 10,
-        total: 0,
-        totalPages: 0,
-    });
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-    const fetchEmailRequests = useCallback(async (): Promise<void> => {
-        try {
-            setIsLoading(true);
-            setError(null);
-
-            const params = new URLSearchParams({
-                page: currentPage.toString(),
-                limit: "10",
-            });
-
-            const result = await apiGet<{
-                success: boolean;
-                emailRequests: EmailRequest[];
-                pagination: Pagination;
-            }>(`/api/email-request?${params}`);
-
-            if (result.success) {
-                setEmailRequests(result.data.emailRequests);
-                setPagination(result.data.pagination);
-            } else {
-                setError(result.error);
-            }
-        } catch (err) {
-            console.error("Error fetching email requests:", err);
-            setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-        } finally {
-            setIsLoading(false);
-        }
-    }, [currentPage]);
+    const [currentPage, setCurrentPageState] = useState(1);
+    const [refreshGeneration, setRefreshGeneration] = useState(0);
+    const [settledRequest, setSettledRequest] = useState<SettledRequest | null>(null);
+    const requestKey = `page=${currentPage}&refresh=${refreshGeneration}`;
+    const currentResult = settledRequest?.key === requestKey ? settledRequest : null;
+    const pagination = settledRequest?.pagination ?? INITIAL_PAGINATION;
 
     useEffect(() => {
-        fetchEmailRequests();
-    }, [fetchEmailRequests, refreshTrigger]);
+        let cancelled = false;
+        const key = `page=${currentPage}&refresh=${refreshGeneration}`;
+        const params = new URLSearchParams({
+            page: currentPage.toString(),
+            limit: "10",
+        });
+
+        const load = async (): Promise<void> => {
+            try {
+                const result = await apiGet<{
+                    success: boolean;
+                    emailRequests: EmailRequest[];
+                    pagination: Pagination;
+                }>(`/api/email-request?${params}`);
+
+                if (cancelled) return;
+
+                if (result.success) {
+                    setSettledRequest({
+                        key,
+                        status: "ready",
+                        emailRequests: result.data.emailRequests,
+                        pagination: result.data.pagination,
+                    });
+                } else {
+                    setSettledRequest((previous) => ({
+                        key,
+                        status: "error",
+                        error: result.error,
+                        pagination: previous?.pagination ?? INITIAL_PAGINATION,
+                    }));
+                }
+            } catch (err) {
+                if (cancelled) return;
+
+                console.error("Error fetching email requests:", err);
+                setSettledRequest((previous) => ({
+                    key,
+                    status: "error",
+                    error: "เกิดข้อผิดพลาดในการเชื่อมต่อ",
+                    pagination: previous?.pagination ?? INITIAL_PAGINATION,
+                }));
+            }
+        };
+
+        void load();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [currentPage, refreshGeneration]);
 
     const updateCurrentPage = useCallback((page: number): void => {
         const maxPage = Math.max(1, pagination.totalPages || 1);
-        setCurrentPage(Math.min(Math.max(1, page), maxPage));
+        setCurrentPageState(Math.min(Math.max(1, page), maxPage));
     }, [pagination.totalPages]);
 
     const refresh = useCallback((): void => {
-        setRefreshTrigger((prev) => prev + 1);
+        setRefreshGeneration((previous) => previous + 1);
     }, []);
 
     return {
-        emailRequests,
+        emailRequests: currentResult?.status === "ready" ? currentResult.emailRequests : [],
         pagination,
-        isLoading,
-        error,
+        isLoading: currentResult === null,
+        error: currentResult?.status === "error" ? currentResult.error : null,
         currentPage,
         setCurrentPage: updateCurrentPage,
         refresh,

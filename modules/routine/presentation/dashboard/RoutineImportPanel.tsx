@@ -50,6 +50,51 @@ import type {
 type ImportFilter = RoutineImportRowStatus | "";
 type ImportIssue = "" | "UNRESOLVED_OWNER";
 
+interface BatchRequestIdentity {
+    batchId: number;
+    page: number;
+    filter: ImportFilter;
+    issue: ImportIssue;
+    selectedOnly: boolean;
+    search: string;
+    refresh: number;
+}
+
+interface BatchRowsSnapshot {
+    key: string;
+    batchId: number;
+    batch: RoutineImportBatchView;
+    rowsPage: RoutineImportRowsPage;
+}
+
+interface BatchRequestError {
+    key: string;
+    message: string;
+}
+
+type ReferenceRequestSnapshot =
+    | {
+          key: string;
+          identity: string;
+          status: "ready";
+          data: RoutineImportReference;
+      }
+    | {
+          key: string;
+          identity: string;
+          status: "error";
+          error: string;
+      };
+
+interface OperationError {
+    key: string;
+    message: string;
+}
+
+function createBatchRequestKey(identity: BatchRequestIdentity): string {
+    return JSON.stringify(identity);
+}
+
 const STATUS_LABELS: Record<RoutineImportRowStatus, string> = {
     VALID: "พร้อมนำเข้า",
     REQUIRES_REVIEW: "ต้องตรวจสอบ",
@@ -294,26 +339,20 @@ export function RoutineImportPanel() {
     const inputRef = useRef<HTMLInputElement>(null);
     const [file, setFile] = useState<File | null>(null);
     const [batchId, setBatchId] = useState<number | null>(null);
-    const [batch, setBatch] = useState<RoutineImportBatchView | null>(null);
-    const [rowsPage, setRowsPage] = useState<RoutineImportRowsPage | null>(
-        null,
-    );
-    const [reference, setReference] = useState<RoutineImportReference | null>(
-        null,
-    );
-    const [referenceBatchKey, setReferenceBatchKey] = useState<string | null>(null);
+    const [batchRowsSnapshot, setBatchRowsSnapshot] = useState<BatchRowsSnapshot | null>(null);
+    const [batchRequestError, setBatchRequestError] = useState<BatchRequestError | null>(null);
+    const [batchRefreshGeneration, setBatchRefreshGeneration] = useState(0);
+    const [referenceSnapshot, setReferenceSnapshot] = useState<ReferenceRequestSnapshot | null>(null);
+    const [referenceGeneration, setReferenceGeneration] = useState(0);
     const [filter, setFilter] = useState<ImportFilter>("");
     const [issue, setIssue] = useState<ImportIssue>("");
     const [selectedOnly, setSelectedOnly] = useState(false);
     const [searchInput, setSearchInput] = useState("");
     const debouncedSearch = useDebouncedValue(searchInput);
     const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [applying, setApplying] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [referenceLoading, setReferenceLoading] = useState(false);
-    const [referenceError, setReferenceError] = useState<string | null>(null);
+    const [operationError, setOperationError] = useState<OperationError | null>(null);
     const [editorRow, setEditorRow] = useState<RoutineImportRowView | null>(
         null,
     );
@@ -323,111 +362,239 @@ export function RoutineImportPanel() {
     const applyLockRef = useRef(false);
     const cancelLockRef = useRef(false);
     const selectionLocksRef = useRef<Set<number>>(new Set());
+    const batchRefreshGenerationRef = useRef(0);
+    const batchRequestIdRef = useRef(0);
+    const batchRequestInFlightRef = useRef<{
+        key: string;
+        requestId: number;
+        promise: Promise<void>;
+    } | null>(null);
     const referenceRequestIdRef = useRef(0);
-    const referenceLoadingKeyRef = useRef<string | null>(null);
+    const referenceGenerationRef = useRef(0);
+    const currentReferenceBatchKeyRef = useRef<string | null>(null);
+    const referenceRequestInFlightRef = useRef<{
+        identity: string;
+        requestId: number;
+        promise: Promise<void>;
+    } | null>(null);
 
-    const loadReference = useCallback(async (batchKey: string): Promise<void> => {
-        if (referenceLoadingKeyRef.current === batchKey) return;
-        const requestId = referenceRequestIdRef.current + 1;
-        referenceRequestIdRef.current = requestId;
-        referenceLoadingKeyRef.current = batchKey;
-        setReferenceLoading(true);
-        setReferenceError(null);
-        setReference(null);
-        setReferenceBatchKey(null);
-        try {
-            const body = await fetchJson<unknown>(
-                API_ROUTES.routines.imports.reference,
-            );
-            const parsed = routineImportReferenceDataSchema.safeParse(body);
-            if (!parsed.success) {
-                throw new Error("ข้อมูลอ้างอิงสำหรับนำเข้าไม่ถูกต้อง กรุณาลองใหม่");
+    const requestBatchQuery = useCallback((identity: BatchRequestIdentity): Promise<void> => {
+        const key = createBatchRequestKey(identity);
+        const inFlight = batchRequestInFlightRef.current;
+        if (inFlight?.key === key) return inFlight.promise;
+
+        const requestId = ++batchRequestIdRef.current;
+        const promise = (async (): Promise<void> => {
+            try {
+                const params = new URLSearchParams({
+                    page: String(identity.page),
+                    limit: "25",
+                });
+                if (identity.filter) params.set("status", identity.filter);
+                if (identity.issue) params.set("issue", identity.issue);
+                if (identity.selectedOnly) params.set("selected", "1");
+                if (identity.search) params.set("search", identity.search);
+                const [batchBody, rowsBody] = await Promise.all([
+                    fetchJson<{ batch: RoutineImportBatchView }>(
+                        API_ROUTES.routines.imports.batchById(identity.batchId),
+                    ),
+                    fetchJson<RoutineImportRowsPage>(
+                        `${API_ROUTES.routines.imports.rows(identity.batchId)}?${params.toString()}`,
+                    ),
+                ]);
+
+                if (batchRequestIdRef.current !== requestId) return;
+
+                currentReferenceBatchKeyRef.current =
+                    `${identity.batchId}:${batchBody.batch.version}`;
+                setBatchRowsSnapshot({
+                    key,
+                    batchId: identity.batchId,
+                    batch: batchBody.batch,
+                    rowsPage: rowsBody,
+                });
+                setBatchRequestError((previous) => previous?.key === key ? null : previous);
+                if (uploadToastBatchIdRef.current === identity.batchId) {
+                    uploadToastBatchIdRef.current = null;
+                    toast.success("อ่านไฟล์และสร้างตัวอย่างข้อมูลสำเร็จ");
+                }
+            } catch (loadError) {
+                if (batchRequestIdRef.current !== requestId) return;
+
+                setBatchRequestError({
+                    key,
+                    message: loadError instanceof Error
+                        ? loadError.message
+                        : "โหลดข้อมูลนำเข้าไม่สำเร็จ",
+                });
+            } finally {
+                if (batchRequestIdRef.current === requestId) {
+                    batchRequestInFlightRef.current = null;
+                }
             }
-            if (referenceRequestIdRef.current !== requestId) return;
-            setReference(parsed.data);
-            setReferenceBatchKey(batchKey);
-        } catch (loadError) {
-            if (referenceRequestIdRef.current !== requestId) return;
-            setReferenceError(
-                loadError instanceof Error
-                    ? loadError.message
-                    : "โหลดข้อมูลอ้างอิงสำหรับนำเข้าไม่สำเร็จ",
-            );
-        } finally {
-            if (referenceRequestIdRef.current === requestId) {
-                setReferenceLoading(false);
-                referenceLoadingKeyRef.current = null;
-            }
-        }
+        })();
+
+        batchRequestInFlightRef.current = { key, requestId, promise };
+        return promise;
     }, []);
 
-    const loadBatch = useCallback(async (): Promise<void> => {
-        if (batchId === null) return;
-        setLoading(true);
-        setError(null);
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                limit: "25",
-            });
-            if (filter) params.set("status", filter);
-            if (issue) params.set("issue", issue);
-            if (selectedOnly) params.set("selected", "1");
-            if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-            const [batchBody, rowsBody] = await Promise.all([
-                fetchJson<{ batch: RoutineImportBatchView }>(
-                    API_ROUTES.routines.imports.batchById(batchId),
-                ),
-                fetchJson<RoutineImportRowsPage>(
-                    `${API_ROUTES.routines.imports.rows(batchId)}?${params.toString()}`,
-                ),
-            ]);
-            setBatch(batchBody.batch);
-            setRowsPage(rowsBody);
-            if (uploadToastBatchIdRef.current === batchId) {
-                uploadToastBatchIdRef.current = null;
-                toast.success("อ่านไฟล์และสร้างตัวอย่างข้อมูลสำเร็จ");
+    const requestReference = useCallback((identity: string, batchKey: string): Promise<void> => {
+        if (currentReferenceBatchKeyRef.current !== batchKey) return Promise.resolve();
+        const inFlight = referenceRequestInFlightRef.current;
+        if (inFlight?.identity === identity) return inFlight.promise;
+
+        const requestId = ++referenceRequestIdRef.current;
+        const promise = (async (): Promise<void> => {
+            try {
+                const body = await fetchJson<unknown>(
+                    API_ROUTES.routines.imports.reference,
+                );
+                const parsed = routineImportReferenceDataSchema.safeParse(body);
+                if (!parsed.success) {
+                    throw new Error("ข้อมูลอ้างอิงสำหรับนำเข้าไม่ถูกต้อง กรุณาลองใหม่");
+                }
+                if (referenceRequestIdRef.current !== requestId) return;
+
+                setReferenceSnapshot({
+                    key: batchKey,
+                    identity,
+                    status: "ready",
+                    data: parsed.data,
+                });
+            } catch (loadError) {
+                if (referenceRequestIdRef.current !== requestId) return;
+
+                setReferenceSnapshot({
+                    key: batchKey,
+                    identity,
+                    status: "error",
+                    error: loadError instanceof Error
+                        ? loadError.message
+                        : "โหลดข้อมูลอ้างอิงสำหรับนำเข้าไม่สำเร็จ",
+                });
+            } finally {
+                if (referenceRequestIdRef.current === requestId) {
+                    referenceRequestInFlightRef.current = null;
+                }
             }
-        } catch (loadError) {
-            setError(
-                loadError instanceof Error
-                    ? loadError.message
-                    : "โหลดข้อมูลนำเข้าไม่สำเร็จ",
-            );
-        } finally {
-            setLoading(false);
-        }
-    }, [batchId, debouncedSearch, filter, issue, page, selectedOnly]);
+        })();
+
+        referenceRequestInFlightRef.current = { identity, requestId, promise };
+        return promise;
+    }, []);
+
+    const normalizedSearch = debouncedSearch.trim();
+    const batchRequestIdentity: BatchRequestIdentity = {
+        batchId: batchId ?? 0,
+        page,
+        filter,
+        issue,
+        selectedOnly,
+        search: normalizedSearch,
+        refresh: batchRefreshGeneration,
+    };
+    const batchRequestKey = JSON.stringify({ ...batchRequestIdentity, batchId });
+    const currentBatchRequest = batchRowsSnapshot?.key === batchRequestKey
+        ? batchRowsSnapshot
+        : null;
+    const batch = batchId !== null && batchRowsSnapshot?.batchId === batchId
+        ? batchRowsSnapshot.batch
+        : null;
+    const rowsPage = currentBatchRequest?.rowsPage ?? null;
+    const currentBatchRequestError = batchRequestError?.key === batchRequestKey
+        ? batchRequestError.message
+        : null;
+    const loading = batchId !== null && currentBatchRequest === null && currentBatchRequestError === null;
+    const error = operationError?.key === batchRequestKey
+        ? operationError.message
+        : currentBatchRequestError;
+
+    function loadBatch(): Promise<void> {
+        if (batchId === null) return Promise.resolve();
+        const refresh = ++batchRefreshGenerationRef.current;
+        setBatchRefreshGeneration(refresh);
+        setOperationError(null);
+        return requestBatchQuery({
+            batchId,
+            page,
+            filter,
+            issue,
+            selectedOnly,
+            search: normalizedSearch,
+            refresh,
+        });
+    }
 
     const currentReferenceBatchKey = batchId !== null && batch
         ? `${batchId}:${batch.version}`
         : null;
-    const referenceReady = currentReferenceBatchKey !== null
-        && referenceBatchKey === currentReferenceBatchKey
-        && reference !== null;
+    const referenceRequestIdentity = currentReferenceBatchKey === null
+        ? null
+        : JSON.stringify([currentReferenceBatchKey, referenceGeneration]);
+    const currentReferenceRequest = referenceSnapshot?.identity === referenceRequestIdentity
+        ? referenceSnapshot
+        : null;
+    const reference = currentReferenceRequest?.status === "ready"
+        ? currentReferenceRequest.data
+        : null;
+    const referenceError = currentReferenceRequest?.status === "error"
+        ? currentReferenceRequest.error
+        : null;
+    const referenceLoading = currentReferenceBatchKey !== null && currentReferenceRequest === null;
+    const referenceReady = reference !== null;
+
+    const loadReference = useCallback((batchKey: string): Promise<void> => {
+        if (batchKey !== currentReferenceBatchKeyRef.current) return Promise.resolve();
+        const generation = ++referenceGenerationRef.current;
+        setReferenceGeneration(generation);
+        return requestReference(JSON.stringify([batchKey, generation]), batchKey);
+    }, [requestReference]);
 
     useEffect(() => {
-        if (currentReferenceBatchKey && !referenceReady) {
-            void loadReference(currentReferenceBatchKey);
-        }
-    }, [currentReferenceBatchKey, loadReference, referenceReady]);
+        if (batchId === null) return;
+        void requestBatchQuery({
+            batchId,
+            page,
+            filter,
+            issue,
+            selectedOnly,
+            search: normalizedSearch,
+            refresh: batchRefreshGeneration,
+        });
+    }, [batchId, batchRefreshGeneration, filter, issue, normalizedSearch, page, requestBatchQuery, selectedOnly]);
+
     useEffect(() => {
-        void loadBatch();
-    }, [loadBatch]);
+        if (currentReferenceBatchKey === null || referenceRequestIdentity === null) return;
+        if (referenceSnapshot?.identity === referenceRequestIdentity) return;
+        void requestReference(referenceRequestIdentity, currentReferenceBatchKey);
+    }, [currentReferenceBatchKey, referenceRequestIdentity, referenceSnapshot?.identity, requestReference]);
+
+    useEffect(() => {
+        return () => {
+            batchRequestIdRef.current += 1;
+            batchRequestInFlightRef.current = null;
+            referenceRequestIdRef.current += 1;
+            referenceRequestInFlightRef.current = null;
+        };
+    }, []);
 
     function reset(): void {
         setFile(null);
         setBatchId(null);
-        setBatch(null);
-        setRowsPage(null);
+        batchRequestIdRef.current += 1;
+        batchRequestInFlightRef.current = null;
+        currentReferenceBatchKeyRef.current = null;
+        setBatchRowsSnapshot(null);
+        setBatchRequestError(null);
+        batchRefreshGenerationRef.current = 0;
+        setBatchRefreshGeneration(0);
         referenceRequestIdRef.current += 1;
-        referenceLoadingKeyRef.current = null;
-        setReference(null);
-        setReferenceBatchKey(null);
-        setReferenceLoading(false);
-        setReferenceError(null);
+        referenceRequestInFlightRef.current = null;
+        setReferenceSnapshot(null);
+        referenceGenerationRef.current = 0;
+        setReferenceGeneration(0);
         setEditorRow(null);
-        setError(null);
+        setOperationError(null);
         uploadToastBatchIdRef.current = null;
         setFilter("");
         setIssue("");
@@ -441,12 +608,15 @@ export function RoutineImportPanel() {
         if (!file || uploadLockRef.current) return;
         uploadLockRef.current = true;
         if (file.size > ROUTINE_IMPORT_MAX_FILE_BYTES) {
-            setError("ไฟล์ต้องมีขนาดไม่เกิน 10 MB");
+            setOperationError({
+                key: batchRequestKey,
+                message: "ไฟล์ต้องมีขนาดไม่เกิน 10 MB",
+            });
             uploadLockRef.current = false;
             return;
         }
         setUploading(true);
-        setError(null);
+        setOperationError(null);
         try {
             const formData = new FormData();
             formData.append("file", file);
@@ -458,11 +628,14 @@ export function RoutineImportPanel() {
                 body: formData,
             });
             uploadToastBatchIdRef.current = body.batch.id;
+            batchRequestIdRef.current += 1;
+            batchRequestInFlightRef.current = null;
             referenceRequestIdRef.current += 1;
-            referenceLoadingKeyRef.current = null;
-            setReference(null);
-            setReferenceBatchKey(null);
-            setReferenceError(null);
+            referenceRequestInFlightRef.current = null;
+            currentReferenceBatchKeyRef.current = null;
+            setReferenceSnapshot(null);
+            referenceGenerationRef.current = 0;
+            setReferenceGeneration(0);
             setBatchId(body.batch.id);
             setPage(1);
         } catch (uploadError) {
@@ -470,7 +643,7 @@ export function RoutineImportPanel() {
                 uploadError instanceof Error
                     ? uploadError.message
                     : "อัปโหลดไฟล์ไม่สำเร็จ";
-            setError(message);
+            setOperationError({ key: batchRequestKey, message });
             toast.error(message);
         } finally {
             setUploading(false);
@@ -490,7 +663,7 @@ export function RoutineImportPanel() {
         )
             return;
         selectionLocksRef.current.add(row.id);
-        setError(null);
+        setOperationError(null);
         try {
             await fetchJson<{ row: RoutineImportRowView }>(
                 API_ROUTES.routines.imports.rowById(batchId ?? 0, row.id),
@@ -507,7 +680,7 @@ export function RoutineImportPanel() {
                 updateError instanceof Error
                     ? updateError.message
                     : "อัปเดตการเลือกไม่สำเร็จ";
-            setError(message);
+            setOperationError({ key: batchRequestKey, message });
             toast.error(message);
         } finally {
             selectionLocksRef.current.delete(row.id);
@@ -519,9 +692,9 @@ export function RoutineImportPanel() {
         applyLockRef.current = true;
         setConfirmOpen(false);
         setApplying(true);
-        setError(null);
+        setOperationError(null);
         try {
-            const result = await fetchJson<{ batch: RoutineImportBatchView }>(
+            await fetchJson<{ batch: RoutineImportBatchView }>(
                 API_ROUTES.routines.imports.apply(batchId),
                 {
                     method: "POST",
@@ -529,7 +702,6 @@ export function RoutineImportPanel() {
                     body: JSON.stringify({ confirm: true }),
                 },
             );
-            setBatch(result.batch);
             await loadBatch();
             toast.success("นำเข้าข้อมูล Routine สำเร็จ");
         } catch (applyError) {
@@ -537,7 +709,7 @@ export function RoutineImportPanel() {
                 applyError instanceof Error
                     ? applyError.message
                     : "นำเข้าข้อมูลไม่สำเร็จ";
-            setError(message);
+            setOperationError({ key: batchRequestKey, message });
             toast.error(message);
             await Promise.all([
                 loadBatch(),
@@ -560,11 +732,10 @@ export function RoutineImportPanel() {
             return;
         cancelLockRef.current = true;
         try {
-            const result = await fetchJson<{ batch: RoutineImportBatchView }>(
+            await fetchJson<{ batch: RoutineImportBatchView }>(
                 API_ROUTES.routines.imports.cancel(batchId),
                 { method: "POST" },
             );
-            setBatch(result.batch);
             await loadBatch();
             toast.success("ยกเลิกชุดข้อมูลนำเข้าสำเร็จ");
         } catch (cancelError) {
@@ -572,7 +743,7 @@ export function RoutineImportPanel() {
                 cancelError instanceof Error
                     ? cancelError.message
                     : "ยกเลิกชุดข้อมูลไม่สำเร็จ";
-            setError(message);
+            setOperationError({ key: batchRequestKey, message });
             toast.error(message);
         } finally {
             cancelLockRef.current = false;
@@ -617,7 +788,7 @@ export function RoutineImportPanel() {
                                 accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 onChange={(event) => {
                                     setFile(event.target.files?.[0] ?? null);
-                                    setError(null);
+                                    setOperationError(null);
                                 }}
                             />
                         </label>

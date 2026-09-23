@@ -65,6 +65,13 @@ function getRoutineFocus(searchParams: {
         : null;
 }
 
+function getRoutineBootstrapIdentity(
+    focus: { taskId: number; occurrenceId: number } | null,
+): string {
+    if (focus === null) return "routine:default";
+    return `routine:task:${focus.taskId}:occurrence:${focus.occurrenceId}`;
+}
+
 function initialPagination(): LiffRoutineTasksResponse["pagination"] {
     return { page: 1, limit: LIFF_TASK_PAGE_SIZE, total: 0, pages: 0 };
 }
@@ -92,7 +99,9 @@ export function LiffRoutineApp(): ReactElement {
     const initialRoutineFocus = getRoutineFocus(searchParams);
     const initialFocusTaskId = initialRoutineFocus?.taskId ?? null;
     const initialFocusOccurrenceId = initialRoutineFocus?.occurrenceId ?? null;
+    const bootstrapIdentity = getRoutineBootstrapIdentity(initialRoutineFocus);
     const [state, setState] = useState<LiffRoutineState>("LOADING");
+    const [settledBootstrapIdentity, setSettledBootstrapIdentity] = useState<string | null>(null);
     const [home, setHome] = useState<LiffHomeResponse | null>(null);
     const [viewError, setViewError] = useState<string | null>(null);
     const [summary, setSummary] = useState<LiffRoutineSummary | null>(null);
@@ -131,6 +140,9 @@ export function LiffRoutineApp(): ReactElement {
     const canUpdateTasks = routineCapabilities?.canUpdateTasks === true;
     const canDeleteTasks = routineCapabilities?.canDeleteTasks === true;
     const routineReadAvailable = hasRoutineReadAccess(home);
+    const presentedState = settledBootstrapIdentity === bootstrapIdentity
+        ? state
+        : "LOADING";
 
     useEffect(() => () => {
         routineRequestIdRef.current += 1;
@@ -139,40 +151,38 @@ export function LiffRoutineApp(): ReactElement {
         referenceRequestIdRef.current += 1;
     }, []);
 
-    const loadRoutine = useCallback(async (): Promise<void> => {
-        const requestId = routineRequestIdRef.current + 1;
-        routineRequestIdRef.current = requestId;
-        taskRequestIdRef.current += 1;
-        detailRequestIdRef.current += 1;
-        setState("LOADING");
-        setViewError(null);
-        setHome(null);
-        setSummary(null);
-        setTasks([]);
-        setPagination(initialPagination());
-        setFocusedTaskId(null);
-        setFocusNotice(null);
-        setSelectedTaskId(null);
-        setDetail(null);
-        setDetailError(null);
-        setDetailLoading(false);
-
+    const runRoutineBootstrap = useCallback(async (
+        requestId: number,
+        requestIdentity: string,
+        focusTaskId: number | null,
+        focusOccurrenceId: number | null,
+    ): Promise<void> => {
         try {
             const homeResponse = await fetchLiffHome();
             if (requestId !== routineRequestIdRef.current) return;
             setHome(homeResponse);
             if (!hasRoutineReadAccess(homeResponse)) {
+                setSummary(null);
+                setTasks([]);
+                setPagination(initialPagination());
+                setFocusedTaskId(null);
+                setFocusNotice(null);
+                setSelectedTaskId(null);
+                setDetail(null);
+                setDetailError(null);
+                setDetailLoading(false);
+                setSettledBootstrapIdentity(requestIdentity);
                 setState("UNAVAILABLE");
                 return;
             }
 
-            const focusedTasksPromise = initialFocusTaskId !== null
-                && initialFocusOccurrenceId !== null
+            const focusedTasksPromise = focusTaskId !== null
+                && focusOccurrenceId !== null
                 ? fetchLiffRoutineTasks({
                       page: 1,
                       limit: 1,
-                      taskId: initialFocusTaskId,
-                      occurrenceId: initialFocusOccurrenceId,
+                      taskId: focusTaskId,
+                      occurrenceId: focusOccurrenceId,
                   })
                 : Promise.resolve(null);
             const [summaryResponse, tasksResponse, focusedTasksResponse] =
@@ -187,17 +197,18 @@ export function LiffRoutineApp(): ReactElement {
             if (requestId !== routineRequestIdRef.current) return;
 
             let initialTasks = tasksResponse.tasks;
+            let nextFocusedTaskId: number | null = null;
+            let nextFocusNotice: string | null = null;
             if (
-                initialFocusTaskId !== null
-                && initialFocusOccurrenceId !== null
+                focusTaskId !== null
+                && focusOccurrenceId !== null
             ) {
                 const focusedTask = focusedTasksResponse?.tasks[0] ?? null;
                 if (!focusedTask) {
-                    setFocusNotice(
-                        "ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์เข้าถึงรายการดังกล่าว กำลังแสดงงาน Routine ของคุณตามปกติ",
-                    );
+                    nextFocusNotice =
+                        "ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์เข้าถึงรายการดังกล่าว กำลังแสดงงาน Routine ของคุณตามปกติ";
                 } else {
-                    setFocusedTaskId(focusedTask.id);
+                    nextFocusedTaskId = focusedTask.id;
                     initialTasks = [
                         focusedTask,
                         ...tasksResponse.tasks.filter(
@@ -210,17 +221,55 @@ export function LiffRoutineApp(): ReactElement {
             setSummary(summaryResponse.summary);
             setTasks(initialTasks);
             setPagination(tasksResponse.pagination);
+            setFocusedTaskId(nextFocusedTaskId);
+            setFocusNotice(nextFocusNotice);
+            setSelectedTaskId(null);
+            setDetail(null);
+            setDetailError(null);
+            setDetailLoading(false);
+            setSettledBootstrapIdentity(requestIdentity);
             setState("READY");
         } catch (error) {
             if (requestId !== routineRequestIdRef.current) return;
             setViewError(toRoutineViewError(error));
+            setSettledBootstrapIdentity(requestIdentity);
             setState("ERROR");
         }
-    }, [initialFocusOccurrenceId, initialFocusTaskId]);
+    }, []);
+
+    const startRoutineBootstrap = useCallback((
+        requestIdentity: string,
+        focusTaskId: number | null,
+        focusOccurrenceId: number | null,
+    ): void => {
+        const requestId = ++routineRequestIdRef.current;
+        taskRequestIdRef.current += 1;
+        detailRequestIdRef.current += 1;
+        void runRoutineBootstrap(
+            requestId,
+            requestIdentity,
+            focusTaskId,
+            focusOccurrenceId,
+        );
+    }, [runRoutineBootstrap]);
+
+    const retryRoutine = useCallback((): void => {
+        setState("LOADING");
+        setViewError(null);
+        startRoutineBootstrap(
+            bootstrapIdentity,
+            initialFocusTaskId,
+            initialFocusOccurrenceId,
+        );
+    }, [bootstrapIdentity, initialFocusOccurrenceId, initialFocusTaskId, startRoutineBootstrap]);
 
     useEffect(() => {
-        void loadRoutine();
-    }, [loadRoutine]);
+        startRoutineBootstrap(
+            bootstrapIdentity,
+            initialFocusTaskId,
+            initialFocusOccurrenceId,
+        );
+    }, [bootstrapIdentity, initialFocusOccurrenceId, initialFocusTaskId, startRoutineBootstrap]);
 
     const loadReference = useCallback(async (
         mode: LiffRoutineTaskFormMode,
@@ -567,22 +616,22 @@ export function LiffRoutineApp(): ReactElement {
         setDetailLoading(false);
     }, []);
 
-    if (state === "UNAVAILABLE") {
+    if (presentedState === "UNAVAILABLE") {
         return <LiffModuleLanding module="routine" enabled={false} />;
     }
 
-    if (state === "ERROR") {
+    if (presentedState === "ERROR") {
         return (
             <ErrorState
                 title="เปิด My Routine ไม่สำเร็จ"
                 description={viewError ?? "กรุณาลองใหม่อีกครั้ง"}
-                action={{ label: "ลองใหม่", onClick: () => void loadRoutine() }}
+                action={{ label: "ลองใหม่", onClick: retryRoutine }}
                 className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );
     }
 
-    if (state !== "READY" || !summary) {
+    if (presentedState !== "READY" || !summary) {
         return (
             <LoadingState
                 label="กำลังโหลดงาน Routine…"

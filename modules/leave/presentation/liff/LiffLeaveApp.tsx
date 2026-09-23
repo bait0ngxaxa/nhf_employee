@@ -315,25 +315,7 @@ export function LiffLeaveApp(): ReactElement {
         return home;
     }, [applyTrustedHomeProjection]);
 
-    const loadInitialData = useCallback(async (): Promise<void> => {
-        const requestSequence = ++initialRequestSequenceRef.current;
-        profileRequestSequenceRef.current += 1;
-        approvalsRequestSequenceRef.current += 1;
-        capabilityRequestSequenceRef.current += 1;
-        detailRequestSequenceRef.current += 1;
-        setState("LOADING");
-        setViewError(null);
-        setApprovalError(null);
-        leaveCapabilitiesRef.current = null;
-        hasApprovalRelationshipRef.current = false;
-        setLeaveCapabilities(null);
-        setProfile(null);
-        setApprovals(EMPTY_APPROVALS);
-        setHadApprovalWork(false);
-        setIsProfileLoading(false);
-        setIsApprovalsLoading(false);
-        setSelectedDetail(null);
-        setSelectedDetailActionIntent(null);
+    const runInitialRequest = useCallback(async (requestSequence: number): Promise<void> => {
         try {
             const home = await fetchLiffHome();
             if (requestSequence !== initialRequestSequenceRef.current) return;
@@ -357,9 +339,37 @@ export function LiffLeaveApp(): ReactElement {
         }
     }, [applyTrustedHomeProjection, refreshApprovals]);
 
+    const retryInitialData = useCallback((): void => {
+        const requestSequence = ++initialRequestSequenceRef.current;
+        profileRequestSequenceRef.current += 1;
+        approvalsRequestSequenceRef.current += 1;
+        capabilityRequestSequenceRef.current += 1;
+        detailRequestSequenceRef.current += 1;
+        setState("LOADING");
+        setViewError(null);
+        setApprovalError(null);
+        leaveCapabilitiesRef.current = null;
+        hasApprovalRelationshipRef.current = false;
+        setLeaveCapabilities(null);
+        setProfile(null);
+        setApprovals(EMPTY_APPROVALS);
+        setHadApprovalWork(false);
+        setIsProfileLoading(false);
+        setIsApprovalsLoading(false);
+        setSelectedDetail(null);
+        setSelectedDetailActionIntent(null);
+        void runInitialRequest(requestSequence);
+    }, [runInitialRequest]);
+
     useEffect(() => {
-        void loadInitialData();
-    }, [loadInitialData]);
+        const requestSequence = ++initialRequestSequenceRef.current;
+        void runInitialRequest(requestSequence);
+        return () => {
+            if (initialRequestSequenceRef.current === requestSequence) {
+                initialRequestSequenceRef.current += 1;
+            }
+        };
+    }, [runInitialRequest]);
 
     const resolveDetail = useCallback(async (
         requestId: string,
@@ -577,7 +587,7 @@ export function LiffLeaveApp(): ReactElement {
             <ErrorState
                 title="เปิด Leave ไม่สำเร็จ"
                 description={viewError ?? "กรุณาลองใหม่อีกครั้ง"}
-                action={{ label: "ลองใหม่", onClick: () => void loadInitialData() }}
+                action={{ label: "ลองใหม่", onClick: retryInitialData }}
                 className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );

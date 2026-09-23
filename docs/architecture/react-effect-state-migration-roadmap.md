@@ -849,3 +849,46 @@ L5K ยังไม่ได้เริ่ม และ findings `SSE-003`, `SS
 - Stock รอ capability projection ก่อน resolve valid intent แล้วบันทึกผลเป็น invalid, read-denied, process-denied หรือ authorized ใน session เดียวกัน; capability warning ไม่ได้ derive จาก URL และ capabilities ทุก render
 - operational notice ยังคงมี owner แยกและ precedence สูงกว่า deep-link notice; การ acknowledge deep-link notice ไม่ล้าง operational notice
 - การนำ URL intent ออกจบ session; เมื่อนำ intent เดิมกลับเข้ามาภายหลังจะเริ่ม session ใหม่และจัดการได้อีกครั้ง ทั้ง Leave และ Stock
+
+## Phase L5K Completion Record
+
+สถานะ: **เสร็จสิ้น**
+
+แก้ไขแล้ว: `SSE-003`, `SSE-006`, `SSE-020`, `SSE-024`, `SSE-025`, `SSE-037`, `SSE-053`
+
+รูปแบบ request ownership ที่ใช้:
+
+- `SSE-003` — LIFF Home เริ่มด้วย `LOADING`; mount Effect เริ่มคำขอที่ผูกกับ sequence โดยไม่ reset state, retry เริ่ม transition จาก event และเริ่ม sequence ใหม่; cleanup และ sequence guard กันผลลัพธ์เก่าหรือผลหลัง unmount
+- `SSE-006` — Email Request identity คือ `page + refresh generation`; loading/data/error derive จาก identity ที่ settle แล้ว, cleanup ละทิ้งผลเก่า, `refresh()` คงหน้าเดิมและสร้าง generation ใหม่; page clamp เดิมยังคงใช้ `max(1, totalPages)`
+- `SSE-020` — Leave mount เริ่ม bootstrap จาก initial loading projection; ลำดับยังเป็น trusted home → capability projection → profile เฉพาะเมื่ออ่านคำขอของตนได้ → READY → approval refresh แบบไม่ block; retry ล้าง projection และ invalidates bootstrap/profile/approval/capability/detail sequences; L5J one-shot deep-link session ยังคงเดิม
+- `SSE-024` — Routine Import reference ใช้ key `${batchId}:${batch.version}` พร้อม request generation; presentation ซ่อน reference ที่ key ไม่ตรงกับ batch/version ปัจจุบัน, schema validation เดิมยังบังคับใช้, retry เริ่ม request instance ใหม่ และ sequence guard กันผลเก่าหรือผลหลัง unmount
+- `SSE-025` — Routine Import batch/rows ใช้ identity `batchId + page + filter + issue + selectedOnly + normalized debouncedSearch + refresh generation`; metadata กับ rows commit จาก `Promise.all` เป็น snapshot เดียว, latest request เท่านั้น commit success/error, mutation callers ยัง await การ revalidation; upload toast ถูก consume ได้เฉพาะ batch ปัจจุบันหลัง metadata และ rows สำเร็จทั้งคู่
+- `SSE-037` — Routine bootstrap identity คือ `routine:default` หรือคู่ task/occurrence ที่ผ่าน parser เดิม; identity mismatch แสดง loading projection ทันที, trusted home ตรวจสิทธิ์ก่อน Routine APIs, sequence guard ป้องกัน focus เก่า, retry เริ่มคำขอใหม่และ invalidates task/detail work ตาม lifetime เดิม
+- `SSE-053` — Stock capability bootstrap ใช้ sequence แยก; mount Effect ไม่ reset state, retry และ session-recovery workflow ล้าง projection แล้ว await `Promise<StockPresentationCapabilities | null>`; current sequence เท่านั้น commit capability/ref/tab projection, stale/unmounted response ไม่มีผล และ L5J deep-link intent resolve กับ capability ปัจจุบัน
+
+Focused verification:
+
+- `npm.cmd run test:run -- __tests__/components/LiffHome.test.tsx` — **1 file, 9 tests ผ่าน**
+- `npm.cmd run test:run -- __tests__/hooks/useEmailRequestHistory.test.tsx __tests__/components/EmailRequestHistory.test.tsx` — **2 files, 8 tests ผ่าน**
+- `npm.cmd run test:run -- modules/routine/presentation/dashboard/RoutineImportPanel.test.tsx` — **1 file, 26 tests ผ่าน**
+- `npm.cmd run test:run -- modules/leave/presentation/liff/LiffLeaveApp.test.tsx` — **1 file, 20 tests ผ่าน**
+- `npm.cmd run test:run -- modules/routine/presentation/liff/LiffRoutine.test.tsx` — **1 file, 44 tests ผ่าน**
+- `npm.cmd run test:run -- modules/stock/__tests__/liff-app.test.tsx` — **1 file, 27 tests ผ่าน**
+- `npm.cmd run lint:strict` — ผ่าน
+- `npm.cmd run typecheck` — ผ่าน
+- `npm.cmd run architecture:check` — ไม่รัน; ไม่ได้เพิ่ม production module หรือเปลี่ยน import boundary
+- `git diff --check` — ผ่าน
+- explicit inventory `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --format json --output-file <temp>` — **7 → 0 diagnostics**
+- ไม่รัน full repository suite หรือ production build; focused suites ครอบคลุม request races, retry, identity transition และ unmount ของทั้งเจ็ด request families แล้ว
+
+ไม่มี lint suppression, artificial timing boundary, API/auth/schema redesign หรือ async request migration นอก L5K เพิ่มเข้ามา
+
+## React effect-state migration closure
+
+React effect-state migration explicit inventory:
+
+```text
+initial audited findings: 58
+remaining react-hooks/set-state-in-effect findings: 0
+lint suppressions added for migration: 0
+```

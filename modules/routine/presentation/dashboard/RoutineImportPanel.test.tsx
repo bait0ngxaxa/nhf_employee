@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toastMocks = vi.hoisted(() => ({
@@ -41,6 +41,18 @@ const batch = {
 
 function response(body: unknown, ok = true): Response {
     return { ok, json: async () => body } as Response;
+}
+
+function createDeferred<T>(): {
+    promise: Promise<T>;
+    resolve: (value: T) => void;
+} {
+    let resolvePromise: (value: T) => void = () => undefined;
+    const promise = new Promise<T>((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    return { promise, resolve: resolvePromise };
 }
 
 function selectUploadFile(): void {
@@ -235,6 +247,329 @@ describe("RoutineImportPanel", () => {
 
         await waitFor(() => expect(toastMocks.success).toHaveBeenCalledTimes(1));
         expect(toastMocks.success).toHaveBeenCalledWith("อ่านไฟล์และสร้างตัวอย่างข้อมูลสำเร็จ");
+    });
+
+    it("keeps the newest batch and rows when an older filtered request fails later", async () => {
+        const batchRequests: ReturnType<typeof createDeferred<Response>>[] = [];
+        const rowRequests = new Map<string, ReturnType<typeof createDeferred<Response>>>();
+        let deferFilteredQueries = false;
+        const fetchMock = vi.fn((input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes("/preview")) {
+                return Promise.resolve(response({ batch: { id: 1 }, reusedExisting: false }));
+            }
+            if (url.endsWith("/imports/reference")) return Promise.resolve(response(reference));
+            if (url.includes("/rows")) {
+                if (deferFilteredQueries) {
+                    const search = new URL(url, "http://localhost").search;
+                    const request = createDeferred<Response>();
+                    rowRequests.set(search, request);
+                    return request.promise;
+                }
+                return Promise.resolve(response({
+                    rows: [validRow],
+                    pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+                }));
+            }
+            if (url.endsWith("/imports/1")) {
+                if (deferFilteredQueries) {
+                    const request = createDeferred<Response>();
+                    batchRequests.push(request);
+                    return request.promise;
+                }
+                return Promise.resolve(response({ batch: { ...batch, totalRows: 1, selectedRows: 1 } }));
+            }
+            return Promise.resolve(response({ units: [], categories: [], employees: [] }));
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        const statusFilter = await screen.findByLabelText("สถานะ");
+        deferFilteredQueries = true;
+
+        fireEvent.change(statusFilter, { target: { value: "VALID" } });
+        await waitFor(() => expect(batchRequests).toHaveLength(1));
+        fireEvent.change(screen.getByLabelText("ประเด็น"), {
+            target: { value: "UNRESOLVED_OWNER" },
+        });
+        await waitFor(() => expect(batchRequests).toHaveLength(2));
+
+        const newerRowsEntry = [...rowRequests.entries()].find(([search]) => {
+            const params = new URLSearchParams(search);
+            return params.get("status") === "VALID"
+                && params.get("issue") === "UNRESOLVED_OWNER";
+        });
+        const olderRowsEntry = [...rowRequests.entries()].find(([search]) => {
+            const params = new URLSearchParams(search);
+            return params.get("status") === "VALID" && params.get("issue") === null;
+        });
+        expect(newerRowsEntry).toBeDefined();
+        expect(olderRowsEntry).toBeDefined();
+
+        const newerRow = {
+            ...validRow,
+            data: { ...validRow.data, title: "แถวจาก query ล่าสุด" },
+        };
+        await act(async () => {
+            batchRequests[1]?.resolve(response({
+                batch: { ...batch, totalRows: 2, selectedRows: 2 },
+            }));
+            newerRowsEntry?.[1].resolve(response({
+                rows: [newerRow],
+                pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+            }));
+        });
+
+        expect(await screen.findByText("แถวจาก query ล่าสุด")).toBeInTheDocument();
+        const selectedCount = screen.getByText("เลือกไว้สำหรับนำเข้า").parentElement?.querySelectorAll("p")[1];
+        expect(selectedCount).toHaveTextContent("2");
+
+        await act(async () => {
+            batchRequests[0]?.resolve(response({ batch: { ...batch, totalRows: 1, selectedRows: 1 } }));
+            olderRowsEntry?.[1].resolve(response({ error: "stale query error" }, false));
+        });
+
+        expect(screen.getByText("แถวจาก query ล่าสุด")).toBeInTheDocument();
+        expect(
+            screen.getByText("เลือกไว้สำหรับนำเข้า").parentElement?.querySelectorAll("p")[1],
+        ).toHaveTextContent("2");
+        expect(screen.queryByText("stale query error")).not.toBeInTheDocument();
+    });
+
+    it("does not let a delayed old batch request replace a newly uploaded batch or consume its toast", async () => {
+        const oldBatchRequest = createDeferred<Response>();
+        const oldRowsRequest = createDeferred<Response>();
+        let previewAttempt = 0;
+        let delayOldBatch = false;
+        let oldBatchStarted = false;
+        let oldRowsStarted = false;
+        const fetchMock = vi.fn((input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes("/preview")) {
+                previewAttempt += 1;
+                return Promise.resolve(response({
+                    batch: { id: previewAttempt },
+                    reusedExisting: false,
+                }));
+            }
+            if (url.endsWith("/imports/reference")) return Promise.resolve(response(reference));
+            if (url.includes("/rows")) {
+                if (delayOldBatch && url.includes("/imports/1/rows")) {
+                    oldRowsStarted = true;
+                    return oldRowsRequest.promise;
+                }
+                if (url.includes("/imports/2/rows")) {
+                    return Promise.resolve(response({
+                        rows: [{
+                            ...validRow,
+                            data: { ...validRow.data, title: "แถวจาก batch 2" },
+                        }],
+                        pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+                    }));
+                }
+                return Promise.resolve(response({
+                    rows: [validRow],
+                    pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+                }));
+            }
+            if (url.endsWith("/imports/1")) {
+                if (delayOldBatch) {
+                    oldBatchStarted = true;
+                    return oldBatchRequest.promise;
+                }
+                return Promise.resolve(response({ batch: { ...batch, id: 1 } }));
+            }
+            if (url.endsWith("/imports/2")) {
+                return Promise.resolve(response({
+                    batch: { ...batch, id: 2, originalFileName: "second.xlsx" },
+                }));
+            }
+            return Promise.resolve(response({ units: [], categories: [], employees: [] }));
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        await screen.findByText(/routine\.xlsx/);
+        await waitFor(() => expect(toastMocks.success).toHaveBeenCalledTimes(1));
+        toastMocks.success.mockClear();
+
+        delayOldBatch = true;
+        fireEvent.click(screen.getByRole("button", { name: "รีเฟรช" }));
+        await waitFor(() => expect(oldBatchStarted && oldRowsStarted).toBe(true));
+
+        fireEvent.click(screen.getByRole("button", { name: "อัปโหลดไฟล์ใหม่" }));
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+
+        expect(await screen.findByText(/second\.xlsx/)).toBeInTheDocument();
+        await waitFor(() => expect(toastMocks.success).toHaveBeenCalledTimes(1));
+
+        await act(async () => {
+            oldBatchRequest.resolve(response({ batch: { ...batch, id: 1, originalFileName: "stale.xlsx" } }));
+            oldRowsRequest.resolve(response({
+                rows: [{ ...validRow, data: { ...validRow.data, title: "แถวเก่าของ batch 1" } }],
+                pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+            }));
+        });
+
+        expect(screen.getByText(/second\.xlsx/)).toBeInTheDocument();
+        expect(screen.queryByText("stale.xlsx")).not.toBeInTheDocument();
+        expect(screen.getByText("แถวจาก batch 2")).toBeInTheDocument();
+        expect(toastMocks.success).toHaveBeenCalledTimes(1);
+    });
+
+    it("hides a ready reference immediately while the new batch version reference loads", async () => {
+        const nextReference = createDeferred<Response>();
+        let batchRequestCount = 0;
+        let referenceAttempts = 0;
+        let delayNextReference = false;
+        const referenceForVersionTwo = {
+            ...reference,
+            employees: [{
+                ...reference.employees[0],
+                firstName: "พนักงานใหม่",
+                lastName: "ทดสอบ",
+                nickname: "ใหม่",
+            }],
+        };
+        const fetchMock = vi.fn((input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes("/preview")) {
+                return Promise.resolve(response({ batch: { id: 1 }, reusedExisting: false }));
+            }
+            if (url.endsWith("/imports/reference")) {
+                referenceAttempts += 1;
+                if (delayNextReference) return nextReference.promise;
+                return Promise.resolve(response(reference));
+            }
+            if (url.includes("/rows")) {
+                return Promise.resolve(response({
+                    rows: [editableRow],
+                    pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+                }));
+            }
+            if (url.endsWith("/imports/1")) {
+                batchRequestCount += 1;
+                return Promise.resolve(response({
+                    batch: {
+                        ...batch,
+                        version: batchRequestCount > 1 ? 2 : 1,
+                        totalRows: 1,
+                        reviewRows: 1,
+                    },
+                }));
+            }
+            return Promise.resolve(response({ units: [], categories: [], employees: [] }));
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        fireEvent.click(await screen.findByRole("button", { name: "แก้ไขและ map ผู้รับผิดชอบ" }));
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+        delayNextReference = true;
+        fireEvent.click(screen.getByRole("button", { name: "รีเฟรช" }));
+        await waitFor(() => expect(referenceAttempts).toBe(2));
+
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขและ map ผู้รับผิดชอบ" }));
+        await waitFor(() => expect(referenceAttempts).toBe(3));
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+        await act(async () => {
+            nextReference.resolve(response(referenceForVersionTwo));
+        });
+
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(screen.getByRole("searchbox", { name: "ค้นหาพนักงาน" }), {
+            target: { value: "พนักงานใหม่" },
+        });
+        expect(await screen.findByRole("option", { name: /เพิ่ม พนักงานใหม่ ทดสอบ/ })).toBeInTheDocument();
+        expect(dialog).toBeInTheDocument();
+    });
+
+    it("keeps the new batch-version reference after older reference requests resolve", async () => {
+        const olderReference = createDeferred<Response>();
+        const retriedOldReference = createDeferred<Response>();
+        const newReference = createDeferred<Response>();
+        let batchRequestCount = 0;
+        let referenceAttempts = 0;
+        const referenceForVersionTwo = {
+            ...reference,
+            employees: [{
+                ...reference.employees[0],
+                firstName: "คนใหม่",
+                lastName: "ปัจจุบัน",
+                nickname: "ล่าสุด",
+            }],
+        };
+        const fetchMock = vi.fn((input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes("/preview")) {
+                return Promise.resolve(response({ batch: { id: 1 }, reusedExisting: false }));
+            }
+            if (url.endsWith("/imports/reference")) {
+                referenceAttempts += 1;
+                if (referenceAttempts === 1) return olderReference.promise;
+                if (referenceAttempts === 2) return retriedOldReference.promise;
+                return newReference.promise;
+            }
+            if (url.includes("/rows")) {
+                return Promise.resolve(response({
+                    rows: [editableRow],
+                    pagination: { page: 1, limit: 25, total: 1, pages: 1 },
+                }));
+            }
+            if (url.endsWith("/imports/1")) {
+                batchRequestCount += 1;
+                return Promise.resolve(response({
+                    batch: {
+                        ...batch,
+                        version: batchRequestCount > 1 ? 2 : 1,
+                        totalRows: 1,
+                        reviewRows: 1,
+                    },
+                }));
+            }
+            return Promise.resolve(response({ units: [], categories: [], employees: [] }));
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        render(<RoutineImportPanel />);
+        selectUploadFile();
+        fireEvent.click(screen.getByRole("button", { name: /อัปโหลดและดูตัวอย่าง/ }));
+        await screen.findByRole("button", { name: "แก้ไขและ map ผู้รับผิดชอบ" });
+        await waitFor(() => expect(referenceAttempts).toBe(1));
+
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไขและ map ผู้รับผิดชอบ" }));
+        await waitFor(() => expect(referenceAttempts).toBe(2));
+        fireEvent.click(screen.getByRole("button", { name: "รีเฟรช" }));
+        await waitFor(() => expect(referenceAttempts).toBe(3));
+
+        await act(async () => {
+            newReference.resolve(response(referenceForVersionTwo));
+        });
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        const employeeSearch = screen.getByRole("searchbox", { name: "ค้นหาพนักงาน" });
+        fireEvent.change(employeeSearch, { target: { value: "คนใหม่" } });
+        expect(await screen.findByRole("option", { name: /เพิ่ม คนใหม่ ปัจจุบัน/ })).toBeInTheDocument();
+
+        await act(async () => {
+            retriedOldReference.resolve(response(reference));
+            olderReference.resolve(response(reference));
+        });
+
+        fireEvent.change(employeeSearch, { target: { value: "สมชาย" } });
+        expect(screen.queryByRole("option", { name: /เพิ่ม สมชาย ใจดี/ })).not.toBeInTheDocument();
+        fireEvent.change(employeeSearch, { target: { value: "คนใหม่" } });
+        expect(screen.getByRole("option", { name: /เพิ่ม คนใหม่ ปัจจุบัน/ })).toBeInTheDocument();
     });
 
     it("keeps the row editor controls enabled and allows mapping an employee", async () => {

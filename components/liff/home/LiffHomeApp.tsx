@@ -12,6 +12,7 @@ import Link from "next/link";
 import {
     useCallback,
     useEffect,
+    useRef,
     useState,
     type ReactElement,
 } from "react";
@@ -174,31 +175,47 @@ export function LiffHomeApp(): ReactElement {
     const [state, setState] = useState<LiffHomeState>("LOADING");
     const [home, setHome] = useState<LiffHomeResponse | null>(null);
     const [viewError, setViewError] = useState<string | null>(null);
+    const requestSequenceRef = useRef(0);
 
-    const loadHome = useCallback(async (): Promise<void> => {
-        setState("LOADING");
-        setViewError(null);
-
+    const runHomeRequest = useCallback(async (requestId: number): Promise<void> => {
         try {
             const response = await fetchLiffHome();
+            if (requestSequenceRef.current !== requestId) return;
+
             setHome(response);
+            setViewError(null);
             setState("READY");
         } catch (error) {
+            if (requestSequenceRef.current !== requestId) return;
+
             setViewError(getHomeErrorMessage(error));
             setState("ERROR");
         }
     }, []);
 
     useEffect(() => {
-        void loadHome();
-    }, [loadHome]);
+        const requestId = ++requestSequenceRef.current;
+        void runHomeRequest(requestId);
+
+        return () => {
+            requestSequenceRef.current += 1;
+        };
+    }, [runHomeRequest]);
+
+    const retryHome = useCallback((): void => {
+        const requestId = ++requestSequenceRef.current;
+        setState("LOADING");
+        setHome(null);
+        setViewError(null);
+        void runHomeRequest(requestId);
+    }, [runHomeRequest]);
 
     if (state === "ERROR") {
         return (
             <ErrorState
                 title="โหลดบริการของฉันไม่สำเร็จ"
                 description={viewError ?? "กรุณาลองใหม่อีกครั้ง"}
-                action={{ label: "ลองใหม่", onClick: () => void loadHome() }}
+                action={{ label: "ลองใหม่", onClick: retryHome }}
                 className="min-h-[60svh] rounded-none border-0 bg-surface-subtle px-4 py-10"
             />
         );

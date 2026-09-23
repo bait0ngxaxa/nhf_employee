@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
@@ -337,6 +338,126 @@ describe("LIFF Stock app orchestration", () => {
         });
         expect(await screen.findByRole("heading", { name: "ยังไม่มีประวัติการเบิก" }))
             .toBeInTheDocument();
+    });
+
+    it("keeps the newest StrictMode capability response authoritative for a pending deep link", async () => {
+        const oldProcessorHome = createDeferred<{
+            workforce: { userId: number; employeeId: number; name: string };
+            modules: Record<string, never>;
+            capabilities: { stockCapabilities: typeof PROCESSOR_STOCK_CAPABILITIES };
+        }>();
+        const currentEmployeeHome = createDeferred<{
+            workforce: { userId: number; employeeId: number; name: string };
+            modules: Record<string, never>;
+            capabilities: { stockCapabilities: typeof EMPLOYEE_STOCK_CAPABILITIES };
+        }>();
+        mocks.search = "requestId=71&action=issue";
+        mocks.fetchHome
+            .mockImplementationOnce(() => oldProcessorHome.promise)
+            .mockImplementationOnce(() => currentEmployeeHome.promise);
+
+        render(
+            <StrictMode>
+                <LiffStockApp />
+            </StrictMode>,
+        );
+
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "กำลังตรวจสอบสิทธิ์การใช้งาน Stock",
+        );
+        await waitFor(() => expect(mocks.fetchHome).toHaveBeenCalledTimes(2));
+
+        currentEmployeeHome.resolve({
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: { stockCapabilities: EMPLOYEE_STOCK_CAPABILITIES },
+        });
+        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+            .toBeInTheDocument();
+        expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
+            .not.toBeInTheDocument();
+
+        await act(async () => {
+            oldProcessorHome.resolve({
+                workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+                modules: {},
+                capabilities: { stockCapabilities: PROCESSOR_STOCK_CAPABILITIES },
+            });
+            await oldProcessorHome.promise;
+        });
+
+        expect(screen.getByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+            .toBeInTheDocument();
+        expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
+            .not.toBeInTheDocument();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
+    });
+
+    it("ignores a capability response after unmount", async () => {
+        const pendingHome = createDeferred<{
+            workforce: { userId: number; employeeId: number; name: string };
+            modules: Record<string, never>;
+            capabilities: { stockCapabilities: typeof EMPLOYEE_STOCK_CAPABILITIES };
+        }>();
+        mocks.fetchHome.mockImplementationOnce(() => pendingHome.promise);
+
+        const view = render(<LiffStockApp />);
+
+        expect(screen.getByRole("status")).toBeInTheDocument();
+        view.unmount();
+        await act(async () => {
+            pendingHome.resolve({
+                workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+                modules: {},
+                capabilities: { stockCapabilities: EMPLOYEE_STOCK_CAPABILITIES },
+            });
+            await pendingHome.promise;
+        });
+
+        expect(mocks.fetchItems).not.toHaveBeenCalled();
+        expect(mocks.fetchMyRequests).not.toHaveBeenCalled();
+    });
+
+    it("shows safe capability errors and explicitly retries into loading", async () => {
+        mocks.fetchHome
+            .mockRejectedValueOnce(new Error("provider secret detail"))
+            .mockResolvedValueOnce({
+                workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+                modules: {},
+                capabilities: { stockCapabilities: EMPLOYEE_STOCK_CAPABILITIES },
+            });
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+            "ไม่สามารถโหลดข้อมูล Stock ได้ กรุณาลองใหม่อีกครั้ง",
+        );
+        expect(screen.queryByText("provider secret detail")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ลองตรวจสอบอีกครั้ง" }));
+
+        expect(screen.getByRole("status")).toHaveTextContent(
+            "กำลังตรวจสอบสิทธิ์การใช้งาน Stock",
+        );
+        expect(await screen.findByRole("heading", { name: "เลือกวัสดุที่ต้องการเบิก" }))
+            .toBeInTheDocument();
+    });
+
+    it("fails safely when the trusted home response has no Stock capability", async () => {
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 7, employeeId: 70, name: "พนักงาน ทดสอบ" },
+            modules: {},
+            capabilities: {},
+        });
+
+        render(<LiffStockApp />);
+
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+            "ไม่สามารถโหลดข้อมูล Stock ได้ กรุณาลองใหม่อีกครั้ง",
+        );
+        expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+        expect(mocks.fetchItems).not.toHaveBeenCalled();
+        expect(mocks.fetchRequest).not.toHaveBeenCalled();
     });
 
     it("does not load catalog data without catalog read capability", async () => {
