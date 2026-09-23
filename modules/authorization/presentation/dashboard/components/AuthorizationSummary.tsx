@@ -69,7 +69,7 @@ export function AuthorizationSummary({
                 </div>
             ) : null}
 
-            <section className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
+            <section>
                 <div className="flex flex-col gap-4 border-b border-border-subtle px-4 py-4 lg:flex-row lg:items-end lg:justify-between sm:px-5">
                     <div>
                         <h2 className="text-base font-semibold text-content-heading">ทีม</h2>

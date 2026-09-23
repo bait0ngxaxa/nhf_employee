@@ -127,7 +127,7 @@ function GrantItem({
                     <Trash2 aria-hidden="true" />นำสิทธิ์ออก
                 </Button>
             </div>
-            <div className="mt-3 rounded-lg border border-border-subtle bg-surface-subtle/50 px-3 py-3">
+            <div className="mt-3 border-t border-border-subtle pt-3">
                 <p className="text-xs font-semibold text-content-secondary">ขอบเขตการเข้าถึง</p>
                 <p className="mt-1 text-sm font-semibold text-content-heading">{scope.label}</p>
                 <p className="mt-1 text-xs leading-5 text-content-secondary">{scope.description}</p>

@@ -257,7 +257,7 @@ export function TeamAdministration({
             ) : null}
 
             <TeamFormDialog
-                key={`${team.id}:${teamEditorSessionId}`}
+                key={`team-editor:${team.id}:${teamEditorSessionId}`}
                 open={teamEditorOpen}
                 mode="edit"
                 team={team}
@@ -289,7 +289,7 @@ export function TeamAdministration({
                 }}
             />
             <AddMemberDialog
-                key={`${team.id}:${memberDialogSessionId}`}
+                key={`add-member:${team.id}:${memberDialogSessionId}`}
                 open={memberDialogOpen}
                 team={team}
                 users={directoryUsers}
@@ -392,8 +392,8 @@ function PermissionsPanel({
 }): ReactElement {
     const selectedRole = team.roles.find((role) => role.id === selectedRoleId) ?? null;
     return (
-        <section className="space-y-4 rounded-xl border border-border-subtle bg-surface-subtle/60 p-3 sm:p-4" aria-labelledby="authorization-team-permissions-heading">
-            <header>
+        <section className="space-y-4" aria-labelledby="authorization-team-permissions-heading">
+            <header className="border-b border-border-subtle pb-3">
                 <h2 id="authorization-team-permissions-heading" className="text-base font-semibold text-content-heading">สิทธิ์ของทีมและหน้าที่ในทีม</h2>
                 <p className="mt-1 text-sm leading-6 text-content-secondary">แยกดูสิทธิ์ของทีม หน้าที่ในทีม และสิทธิ์ของหน้าที่ที่กำลังเลือก</p>
             </header>

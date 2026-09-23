@@ -121,7 +121,7 @@ export function LineAddFriendCard({
                                     : "text-dashboard-hero-muted",
                             )}
                         >
-                            รับการแจ้งเตือนจาก NHF ได้สะดวกขึ้น
+                            รับการแจ้งเตือนและเข้าใช้บริการของ NHF ผ่าน LINE ได้เลย
                         </p>
 
                         {normalizedAddFriendUrl ? (
