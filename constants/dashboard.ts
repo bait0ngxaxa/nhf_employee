@@ -25,6 +25,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
         id: "leave-management",
         label: "NHF Leave",
+        sidebarLabel: "การลา",
         icon: CalendarRange,
         description: "ยื่นใบลาและตรวจสอบโควต้าวันลา",
         feature: FEATURE_KEYS.leave,
@@ -32,12 +33,14 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
         id: "stock",
         label: "NHF Stock",
+        sidebarLabel: "วัสดุและคลัง",
         icon: Boxes,
         description: "เบิกวัสดุจากคลัง",
     },
     {
         id: "routine",
         label: "NHF Routine",
+        sidebarLabel: "งานประจำ",
         icon: ClipboardCheck,
         description: "บันทึกและติดตามงานประจำขององค์กร",
         feature: FEATURE_KEYS.routine,
@@ -45,6 +48,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
         id: "email-request",
         label: "ส่งคำร้องพนักงานใหม่",
+        sidebarLabel: "คำร้องบริการ IT",
         icon: Mail,
         description: "ส่งคำร้องอีเมล สารบรรณ และ Shared Drive ให้ทีมไอที",
     },
@@ -110,8 +114,8 @@ export function getDashboardPageLabel(menuId: string): string {
 
 export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
     {
-        id: "employee-apps",
-        label: "แอปพลิเคชัน",
+        id: "internal-services",
+        label: "บริการภายใน",
         icon: AppWindow,
         items: [
             getDashboardMenuItem("leave-management"),
@@ -120,13 +124,20 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         ],
     },
     {
-        id: "management",
-        label: "การจัดการระบบ",
-        icon: ShieldCheck,
+        id: "people",
+        label: "บุคลากร",
+        icon: Users,
         items: [
-            getDashboardMenuItem("email-request"),
             getDashboardMenuItem("employee-management"),
             getDashboardMenuItem("add-employee"),
+            getDashboardMenuItem("email-request"),
+        ],
+    },
+    {
+        id: "system-access",
+        label: "ระบบและสิทธิ์",
+        icon: ShieldCheck,
+        items: [
             getDashboardMenuItem("audit-logs"),
             getDashboardMenuItem("authorization-administration"),
         ],

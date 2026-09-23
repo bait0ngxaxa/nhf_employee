@@ -5,7 +5,10 @@ import {
     useDashboardDataContext,
     useDashboardUIContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
-import { getAvailableMenuGroups } from "@/constants/dashboard";
+import {
+    DASHBOARD_MENU_GROUPS,
+    getAvailableMenuGroups,
+} from "@/constants/dashboard";
 import { useExpandedSidebarGroups } from "@/components/dashboard/layout/DashboardSidebarPrimitives";
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
@@ -25,7 +28,16 @@ const adminEmployeeCapabilities = {
     canExportEmployees: true,
 } as const;
 
-function mockSidebarContext(desktopSidebarCollapsed: boolean): void {
+function mockSidebarContext(
+    desktopSidebarCollapsed: boolean,
+    availableMenuGroups = getAvailableMenuGroups(
+        true,
+        undefined,
+        undefined,
+        undefined,
+        adminEmployeeCapabilities,
+    ),
+): void {
     vi.mocked(useDashboardDataContext).mockReturnValue({
         status: "authenticated",
         user: {
@@ -36,13 +48,7 @@ function mockSidebarContext(desktopSidebarCollapsed: boolean): void {
             employeeCapabilities: adminEmployeeCapabilities,
         },
         isAdmin: true,
-        availableMenuGroups: getAvailableMenuGroups(
-            true,
-            undefined,
-            undefined,
-            undefined,
-            adminEmployeeCapabilities,
-        ),
+        availableMenuGroups,
     });
     vi.mocked(useDashboardUIContext).mockReturnValue({
         selectedMenu: "employee-management",
@@ -73,16 +79,40 @@ describe("DashboardSidebar", () => {
             screen.getByRole("button", { name: "ข้อมูลพนักงาน" }),
         ).toHaveAttribute("aria-current", "page");
 
-        const managementGroup = screen.getByRole("button", {
-            name: "การจัดการระบบ",
+        const peopleGroup = screen.getByRole("button", {
+            name: "บุคลากร",
         });
-        expect(managementGroup).toHaveAttribute("aria-expanded", "true");
+        expect(peopleGroup).toHaveAttribute("aria-expanded", "true");
 
-        fireEvent.click(managementGroup);
+        fireEvent.click(peopleGroup);
 
-        expect(managementGroup).toHaveAttribute("aria-expanded", "false");
+        expect(peopleGroup).toHaveAttribute("aria-expanded", "false");
         expect(
             screen.queryByRole("button", { name: "ข้อมูลพนักงาน" }),
+        ).not.toBeInTheDocument();
+    });
+
+    it("shows task-oriented Thai labels in the expanded sidebar", () => {
+        mockSidebarContext(false, DASHBOARD_MENU_GROUPS);
+
+        render(<DashboardSidebar />);
+
+        expect(
+            screen.getByRole("button", { name: "การลา" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "วัสดุและคลัง" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "งานประจำ" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", {
+                name: "คำร้องบริการ IT",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("button", { name: "NHF Leave" }),
         ).not.toBeInTheDocument();
     });
 

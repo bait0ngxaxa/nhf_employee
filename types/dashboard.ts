@@ -4,6 +4,8 @@ import { type FeatureKey } from "@/lib/ssot/features";
 export interface MenuItem {
     id: string;
     label: string;
+    /** Short task-oriented label used in the dashboard sidebar only. */
+    sidebarLabel?: string;
     icon: ComponentType<{ className?: string }>;
     description: string;
     requiredRole?: "ADMIN";

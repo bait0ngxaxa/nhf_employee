@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     canAccessLeaveDashboard,
     canAccessEmployeeDashboard,
+    DASHBOARD_MENU_GROUPS,
     DASHBOARD_MENU_ITEMS,
     getLeaveDashboardTabVisibility,
     getDashboardPageLabel,
@@ -145,7 +146,41 @@ afterEach(() => {
 });
 
 describe("dashboard menu", () => {
-    it("uses Employee read surfaces for management-menu availability", () => {
+    it("groups sidebar destinations by work area", () => {
+        expect(DASHBOARD_MENU_GROUPS.map((group) => [
+            group.label,
+            group.items.map((item) => item.id),
+        ])).toEqual([
+            ["บริการภายใน", ["leave-management", "stock", "routine"]],
+            ["บุคลากร", ["employee-management", "add-employee", "email-request"]],
+            ["ระบบและสิทธิ์", ["audit-logs", "authorization-administration"]],
+        ]);
+    });
+
+    it("keeps Thai task labels specific to the dashboard sidebar", () => {
+        const menuItem = (id: string) =>
+            DASHBOARD_MENU_ITEMS.find((item) => item.id === id);
+
+        expect(menuItem("leave-management")).toMatchObject({
+            label: "NHF Leave",
+            sidebarLabel: "การลา",
+        });
+        expect(menuItem("stock")).toMatchObject({
+            label: "NHF Stock",
+            sidebarLabel: "วัสดุและคลัง",
+        });
+        expect(menuItem("routine")).toMatchObject({
+            label: "NHF Routine",
+            sidebarLabel: "งานประจำ",
+        });
+        expect(menuItem("email-request")).toMatchObject({
+            label: "ส่งคำร้องพนักงานใหม่",
+            sidebarLabel: "คำร้องบริการ IT",
+        });
+        expect(getDashboardPageLabel("routine")).toBe("NHF Routine");
+    });
+
+    it("uses Employee read surfaces for people-menu availability", () => {
         expect(canAccessEmployeeDashboard()).toBe(false);
         expect(canAccessEmployeeDashboard({
             ...employeeReadCapabilities,

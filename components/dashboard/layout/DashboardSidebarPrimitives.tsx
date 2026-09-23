@@ -56,7 +56,8 @@ type SidebarFooterProps = {
 };
 
 function getItemLabel(item: MenuItem): string {
-    return item.comingSoon ? `${item.label} (เร็วๆ นี้)` : item.label;
+    const label = item.sidebarLabel ?? item.label;
+    return item.comingSoon ? `${label} (เร็วๆ นี้)` : label;
 }
 
 function SidebarMenuItem({
@@ -101,7 +102,7 @@ function SidebarMenuItem({
                         <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
                     </span>
                     {sidebarOpen && (
-                        <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                        <span className="min-w-0 flex-1 truncate text-left">{itemLabel}</span>
                     )}
                     {sidebarOpen && disabled && (
                         <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
