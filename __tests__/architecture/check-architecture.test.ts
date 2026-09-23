@@ -461,19 +461,13 @@ describe("architecture checker module boundaries", () => {
                 'export { x } from "./presentation/example";',
             ].join("\n"),
             "modules/routine/presentation/example.ts": [
-                'import { buildRoutineImportSourceKey } from "@/modules/routine/application/imports/sheet-config";',
-                'import { formatRoutineTimingStatus } from "@/modules/routine/domain/labels";',
+                'import { getRoutineTimingStatus } from "@/modules/routine/domain/timing";',
                 'import type { RoutinePresentationCapabilities } from "@/modules/routine/application/types";',
-                "export const x = buildRoutineImportSourceKey(formatRoutineTimingStatus(), 1);",
+                "export const x = getRoutineTimingStatus(1);",
             ].join("\n"),
-            "modules/routine/application/imports/sheet-config.ts": [
-                "export function buildRoutineImportSourceKey(sheetName: string, sourceRow: number): string {",
-                "    return `${sheetName}:${sourceRow}`;",
-                "}",
-            ].join("\n"),
-            "modules/routine/domain/labels.ts": [
-                "export function formatRoutineTimingStatus(): string {",
-                '    return "ready";',
+            "modules/routine/domain/timing.ts": [
+                "export function getRoutineTimingStatus(daysUntilDue: number): string {",
+                "    return String(daysUntilDue);",
                 "}",
             ].join("\n"),
         });

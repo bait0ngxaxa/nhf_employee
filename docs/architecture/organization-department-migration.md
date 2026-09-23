@@ -184,10 +184,10 @@ decision.
   serialization. It displays or sorts by the live Department name; it does not
   authorize by Department or mutate Department. Leave's real policy dependency
   is Employee hierarchy and Leave approval state.
-- Routine reference and import-staging data carries Employee `departmentId`.
-  The current Routine code does not use it to authorize, filter, or assign a
-  task. Routine's Thai `หน่วยงาน` UI is its own `RoutineUnit` capability and
-  must not be confused with Department or Organization.
+- Routine reference data carries Employee `departmentId`. The current Routine
+  code does not use it to authorize, filter, or assign a task. Routine's Thai
+  `หน่วยงาน` UI is its own `RoutineUnit` capability and must not be confused
+  with Department or Organization. H2A retired Routine import-staging DTOs.
 - No meaningful production Department/Organization consumer was found in
   `modules/stock/**`. Stock uses User/Employee display and requester/issuer
   projections, not Department policy.
@@ -270,7 +270,7 @@ being counted as runtime consumers.
 | `modules/employee/presentation/import/*`, `modules/employee/application/import-employees.ts` | Textual Department code/name mapping | Accepts legacy aliases; only ADMIN/ACADEMIC are currently accepted; import remains Employee-owned. | Employee | Employee parser/mapping stays local; owner supplies only validated reference data. | G2/G3 |
 | `lib/auth/server.ts`, `lib/auth/types.ts`, `app/api/auth/me/route.ts`, `components/auth/*`, Dashboard navbar/home | `Employee.dept.name` projection | Places Department name in session/user display; no Department-based authorization. | Auth/session composition and Dashboard presentation | Keep display projection in Auth/Employee composition; no Organization contract until requirements exist. | G3 re-audit |
 | `modules/leave/application/approvals/*`, `application/queries/participant-access.ts`, `infrastructure/reports/*`, `server/liff-serialization.ts`, Leave presentation | Employee `departmentId`/`dept.name` projection | Displays/sorts Department labels in approval lists, reports, exports, and LIFF; policy is manager/Leave state, not Department. | Leave | Keep Leave dependent on a narrow Employee/reference projection, not Department internals. | G3 re-audit |
-| `modules/routine/application/queries.ts`, `application/imports/staging.ts`, `schemas/import-reference.ts`, Routine presentation types | Employee `departmentId` carried in reference DTOs | Transports Employee data for Routine/import compatibility; no current Department filter, assignment, or authorization. | Routine | Keep the ID as an opaque Employee projection until a proven rule requires more. | G3 re-audit |
+| `modules/routine/application/queries.ts`, Routine presentation types | Employee `departmentId` carried in reference DTOs | Transports Employee data in the current Routine reference projection; no Department filter, assignment, or authorization. | Routine | Keep the ID as an opaque Employee projection until a proven rule requires more. | G3 re-audit; H2A retired import DTOs |
 | `modules/stock/**` | None found | Stock uses User/Employee requester/issuer/display projections; no Department rule or query was found. | Stock | No Organization/Department dependency to introduce speculatively. | No migration; verify in G3 |
 | `app/api/email-request/route.ts`, `lib/validations/email-request.ts`, `lib/services/email-request/*`, `components/email/*`, `lib/line/flex-messages/email-request.ts` | `EmailRequest.department: String` | Stores and redisplays requester-entered `สังกัด` text as a historical request value. | Email Request/application plus delivery integrations | Preserve as a snapshot/free-text field unless a separate product decision changes the request contract. | No normalization in G1-G3 |
 | `lib/audit-log/*` and Employee route audit payloads | `departmentId` metadata/label | Records operation context or display labels; does not resolve or authorize Department. | Shared audit platform / source feature | Keep historical audit semantics; assess organization scoping only in a later tenant phase. | G3 re-audit |
@@ -388,7 +388,7 @@ Later phases must preserve or explicitly approve changes to the following:
 | Employee list/stats/export/display | Preserve live Department labels, search behavior, Thai column labels, and existing ADMIN/ACADEMIC counters until separately redesigned. |
 | Auth/session/Dashboard | Preserve `user.department` display projection; do not silently turn it into authorization or membership. |
 | Leave approvals/reports/LIFF | Preserve Department labels/projections and existing manager/approver policy; do not replace `managerId` with Department head semantics. |
-| Routine reference/import DTOs | Preserve the carried Employee `departmentId` field while it remains part of current contracts. |
+| Routine reference DTOs | Preserve the carried Employee `departmentId` field while it remains part of the current contract; H2A retired Routine import DTOs. |
 | `EmailRequest.department` | Preserve the stored free-text/snapshot string across API, UI history, audit, email, and LINE flows. Do not normalize implicitly. |
 | Schema IDs and FK behavior | Preserve Department IDs, globally unique name/code behavior, required Employee FK, restrictive Department deletion, and existing historical Employee/Leave/Routine references until an approved migration changes them. |
 | Employee offboarding | Preserve soft-delete behavior; do not physically remove Department references as a side effect. |

@@ -136,13 +136,6 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
-        key: "routine.import.manage",
-        domain: "routine",
-        description: "Manage Routine task imports within an authorized resource scope.",
-        scopes: ["ALL"] as const,
-        channels: ["DASHBOARD"] as const,
-    }),
-    defineCapability({
         key: "routine.task.export",
         domain: "routine",
         description: "Export Routine task records within an authorized resource scope.",

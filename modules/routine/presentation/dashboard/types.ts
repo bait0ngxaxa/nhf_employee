@@ -112,9 +112,6 @@ export interface RoutineTask extends RoutineTaskCapabilities {
     businessDayPolicy: string;
     isActive: boolean;
     version: number;
-    sourceFileName: string | null;
-    sourceSheet: string | null;
-    sourceRow: number | null;
     createdById: number;
     updatedById: number;
     createdAt: string;

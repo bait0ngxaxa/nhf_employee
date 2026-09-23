@@ -169,14 +169,11 @@ describe("Routine task create idempotency", () => {
         expect(result.task).toMatchObject({ id: 71 });
     });
 
-    it("hashes the canonical self-service payload instead of spoofed fields", async () => {
+    it("hashes the canonical self-service assignment and reminder values", async () => {
         const userActor = { id: 3, role: "USER", email: "user@example.com" };
         const spoofedInput = {
             ...input,
             assignees: [{ employeeId: 999, role: "OWNER" as const }],
-            sourceFileName: "spoof.xlsx",
-            sourceSheet: "Sheet1",
-            sourceRow: 12,
             reminderRules: [{
                 daysBefore: 1,
                 sendHour: 9,
@@ -221,9 +218,6 @@ describe("Routine task create idempotency", () => {
         const expectedCanonicalInput = {
             ...spoofedInput,
             assignees: [{ employeeId: 11, role: "OWNER" as const }],
-            sourceFileName: undefined,
-            sourceSheet: undefined,
-            sourceRow: undefined,
             reminderRules: [{
                 daysBefore: 1,
                 sendHour: 9,
@@ -242,9 +236,6 @@ describe("Routine task create idempotency", () => {
             data: expect.objectContaining({
                 createdById: 3,
                 updatedById: 3,
-                sourceFileName: null,
-                sourceSheet: null,
-                sourceRow: null,
                 assignees: { create: [{ employeeId: 11, role: "OWNER" }] },
                 reminderRules: {
                     create: [{
@@ -259,83 +250,4 @@ describe("Routine task create idempotency", () => {
         });
     });
 
-    it("does not hash normal task-create requests differently for spoofed provenance under ALL", async () => {
-        const userActor = { id: 3, role: "USER", email: "user@example.com" };
-        const commonInput = {
-            ...input,
-            assignees: [{ employeeId: 999, role: "OWNER" as const }],
-            reminderRules: [{
-                daysBefore: 1,
-                sendHour: 9,
-                channel: "IN_APP" as const,
-                recipientScope: "ALL_READERS" as const,
-                isActive: true,
-            }],
-        };
-        const firstInput = {
-            ...commonInput,
-            sourceFileName: "spoof-a.xlsx",
-            sourceSheet: "Spoof A",
-            sourceRow: 12,
-        };
-        const secondInput = {
-            ...commonInput,
-            sourceFileName: "spoof-b.xlsx",
-            sourceSheet: "Spoof B",
-            sourceRow: 13,
-        };
-        assertActiveRoutineActorMock.mockResolvedValue({
-            authorizationActor: {
-                userId: 3,
-                employeeId: 11,
-                systemRole: "USER",
-                channel: "DASHBOARD",
-            },
-            employeeId: 11,
-        });
-        resolveRoutineCapabilityInTransactionMock.mockResolvedValue({
-            actor: {
-                userId: 3,
-                employeeId: 11,
-                systemRole: "USER",
-                channel: "DASHBOARD",
-            },
-            capability: "routine.task.create",
-            decision: {
-                capability: "routine.task.create",
-                allowed: true,
-                scopes: ["ALL"],
-                grants: [{
-                    capability: "routine.task.create",
-                    scope: "ALL",
-                    source: { type: "USER", userId: 3 },
-                }],
-            },
-            defaultScopes: ["OWN"],
-            scopes: ["ALL"],
-            hasBroadAuthority: true,
-            liffSelfServicePolicyApplied: false,
-        });
-
-        await createRoutineTask(firstInput, userActor, {
-            idempotencyKey: "broad-provenance-a",
-        });
-        await createRoutineTask(secondInput, userActor, {
-            idempotencyKey: "broad-provenance-b",
-        });
-
-        const idempotencyCalls = prismaMock.routineTaskCreateIdempotency.create.mock.calls;
-        expect(idempotencyCalls).toHaveLength(2);
-        expect(idempotencyCalls[0]?.[0]?.data.requestHash).toBe(
-            idempotencyCalls[1]?.[0]?.data.requestHash,
-        );
-        expect(prismaMock.routineTask.create).toHaveBeenCalledTimes(2);
-        for (const call of prismaMock.routineTask.create.mock.calls) {
-            expect(call[0]?.data).toMatchObject({
-                sourceFileName: null,
-                sourceSheet: null,
-                sourceRow: null,
-            });
-        }
-    });
 });

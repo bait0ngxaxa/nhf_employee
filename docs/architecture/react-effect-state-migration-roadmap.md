@@ -2,6 +2,9 @@
 
 สถานะปัจจุบัน (2026-09-23): migration L5A–L5K เสร็จสิ้น `react-hooks/set-state-in-effect` เปิดใช้ทั่ว repository และไม่เหลือ diagnostics; inventory 58 รายการและแผนด้านล่างเป็น baseline ประวัติของ Phase L5A
 
+H2A permanently retired Routine Import. Rows naming its former panel/editor
+remain migration-history evidence and are no longer live findings or work items.
+
 Phase L5A เป็น **audit / architecture analysis เท่านั้น** ไม่มี production code, tests, `eslint.config.mjs` หรือ suppression ใดถูกแก้ใน phase นั้น
 
 เป้าหมายปลายทางที่ยังคงบังคับใช้คือ:

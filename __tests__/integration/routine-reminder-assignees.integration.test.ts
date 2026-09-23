@@ -37,11 +37,8 @@ async function cleanRoutineReminderDatabase(): Promise<void> {
     await prisma.routineOccurrence.deleteMany();
     await prisma.routineReminderRule.deleteMany();
     await prisma.routineTaskAssignee.deleteMany();
-    await prisma.routineImportRow.deleteMany();
-    await prisma.routineImportLedger.deleteMany();
     await prisma.routineTaskCreateIdempotency.deleteMany();
     await prisma.routineTask.deleteMany();
-    await prisma.routineImportBatch.deleteMany();
     await prisma.routineCategory.deleteMany();
     await prisma.routineUnit.deleteMany();
     await prisma.auditLog.deleteMany();

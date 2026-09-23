@@ -457,15 +457,5 @@ export const API_ROUTES = {
         tasks: "/api/routines/tasks",
         taskById: (id: number | string): string => `/api/routines/tasks/${id}`,
         reference: "/api/routines/reference",
-        imports: {
-            reference: "/api/routines/imports/reference",
-            preview: "/api/routines/imports/preview",
-            batchById: (id: number | string): string => `/api/routines/imports/${id}`,
-            rows: (id: number | string): string => `/api/routines/imports/${id}/rows`,
-            rowById: (batchId: number | string, rowId: number | string): string =>
-                `/api/routines/imports/${batchId}/rows/${rowId}`,
-            apply: (id: number | string): string => `/api/routines/imports/${id}/apply`,
-            cancel: (id: number | string): string => `/api/routines/imports/${id}/cancel`,
-        },
     },
 } as const;

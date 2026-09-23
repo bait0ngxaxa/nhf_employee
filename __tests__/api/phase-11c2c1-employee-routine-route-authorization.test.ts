@@ -94,21 +94,16 @@ const mocks = vi.hoisted(() => {
 
     return {
         after: vi.fn(),
-        applyRoutineImportBatch: vi.fn(),
         authorizationRepository,
         authorizationResolve: vi.fn(),
         authorizationResolveInTransaction: vi.fn(),
         authState,
-        cancelRoutineImportBatch: vi.fn(),
         createEmployeeExport: vi.fn(),
         enforceAuthenticatedMutationRateLimit: vi.fn(),
-        getRoutineImportBatch: vi.fn(),
-        getRoutineImportRows: vi.fn(),
         logDataExport: vi.fn(),
         prisma,
         requireApiSession: vi.fn(),
         transaction,
-        updateRoutineImportRow: vi.fn(),
     };
 });
 
@@ -164,25 +159,11 @@ vi.mock("@/modules/employee", async (importOriginal) => ({
     createEmployeeExport: mocks.createEmployeeExport,
 }));
 
-vi.mock("@/modules/routine", async (importOriginal) => ({
-    ...(await importOriginal()),
-    applyRoutineImportBatch: mocks.applyRoutineImportBatch,
-    cancelRoutineImportBatch: mocks.cancelRoutineImportBatch,
-    getRoutineImportBatch: mocks.getRoutineImportBatch,
-    getRoutineImportRows: mocks.getRoutineImportRows,
-    updateRoutineImportRow: mocks.updateRoutineImportRow,
-}));
-
 import { GET as getEmployeeExport } from "@/app/api/employees/export/route";
 import { GET as getRoutineTasks } from "@/app/api/routines/tasks/route";
 import { POST as postRoutineTask } from "@/app/api/routines/tasks/route";
 import { GET as getRoutineOccurrences } from "@/app/api/routines/occurrences/route";
 import { GET as getRoutineOccurrence } from "@/app/api/routines/occurrences/[id]/route";
-import { GET as getRoutineImportBatch } from "@/app/api/routines/imports/[batchId]/route";
-import { GET as getRoutineImportRows } from "@/app/api/routines/imports/[batchId]/rows/route";
-import { PATCH as updateRoutineImportRow } from "@/app/api/routines/imports/[batchId]/rows/[rowId]/route";
-import { POST as applyRoutineImportBatch } from "@/app/api/routines/imports/[batchId]/apply/route";
-import { POST as cancelRoutineImportBatch } from "@/app/api/routines/imports/[batchId]/cancel/route";
 
 const USER = {
     id: 5,
@@ -394,7 +375,7 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
                 reminderRules: [],
                 userId: 999,
                 employeeId: 999,
-                capability: "routine.import.manage",
+                capability: "routine.task.delete",
                 scope: "ALL",
             }),
         }));
@@ -479,77 +460,4 @@ describe("Phase 11C.2C.1 exact Employee and Routine route authorization", () => 
         );
     });
 
-    it("LEDGER-ROU-14 denies batch data from GET /api/routines/imports/:batchId", async () => {
-        const response = await getRoutineImportBatch(
-            request("/api/routines/imports/17"),
-            { params: Promise.resolve({ batchId: "17" }) },
-        );
-
-        expect(response.status).toBe(403);
-        expectDashboardAuthorization("routine.import.manage");
-        expect(mocks.getRoutineImportBatch).not.toHaveBeenCalled();
-    });
-
-    it("LEDGER-ROU-15 denies batch rows from GET /api/routines/imports/:batchId/rows", async () => {
-        const response = await getRoutineImportRows(
-            request("/api/routines/imports/17/rows?page=1&limit=10&capability=routine.task.read"),
-            { params: Promise.resolve({ batchId: "17" }) },
-        );
-
-        expect(response.status).toBe(403);
-        expectDashboardAuthorization("routine.import.manage");
-        expect(mocks.getRoutineImportRows).not.toHaveBeenCalled();
-    });
-
-    it("LEDGER-ROU-16 denies row mutation from PATCH /api/routines/imports/:batchId/rows/:rowId", async () => {
-        const response = await updateRoutineImportRow(
-            request("/api/routines/imports/17/rows/23", {
-                method: "PATCH",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    version: 1,
-                    selected: true,
-                    userId: 999,
-                    capability: "routine.task.create",
-                }),
-            }),
-            { params: Promise.resolve({ batchId: "17", rowId: "23" }) },
-        );
-
-        expect(response.status).toBe(403);
-        expectDashboardAuthorization("routine.import.manage");
-        expect(mocks.updateRoutineImportRow).not.toHaveBeenCalled();
-    });
-
-    it("LEDGER-ROU-17 denies applying a batch from POST /api/routines/imports/:batchId/apply", async () => {
-        const response = await applyRoutineImportBatch(
-            request("/api/routines/imports/17/apply", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    confirm: true,
-                    userId: 999,
-                    capability: "routine.task.create",
-                }),
-            }),
-            { params: Promise.resolve({ batchId: "17" }) },
-        );
-
-        expect(response.status).toBe(403);
-        expectDashboardAuthorization("routine.import.manage");
-        expect(mocks.applyRoutineImportBatch).not.toHaveBeenCalled();
-    });
-
-    it("LEDGER-ROU-18 denies cancelling a batch from POST /api/routines/imports/:batchId/cancel", async () => {
-        const response = await cancelRoutineImportBatch(
-            request("/api/routines/imports/17/cancel?capability=routine.task.create", {
-                method: "POST",
-            }),
-            { params: Promise.resolve({ batchId: "17" }) },
-        );
-
-        expect(response.status).toBe(403);
-        expectDashboardAuthorization("routine.import.manage");
-        expect(mocks.cancelRoutineImportBatch).not.toHaveBeenCalled();
-    });
 });

@@ -4,6 +4,9 @@
 
 เนื้อหา audit ด้านล่างบันทึกผลตรวจ lint rules ที่ถูกปิดชั่วคราวระหว่าง migration; ข้อความเกี่ยวกับสถานะในแต่ละ phase เป็นประวัติ ณ เวลานั้น
 
+H2A permanently retired Routine Import. Any former Routine import UI paths in
+this historical inventory describe deleted code and are not live lint debt.
+
 ## Executive Summary
 
 พบ 80 raw ESLint diagnostics ในไฟล์ที่ไม่ซ้ำกัน 46 ไฟล์ แบ่งเป็น errors 78 รายการและ warnings 2 รายการ ตัวเลขนี้รวม diagnostics ที่ ESLint รายงานซ้ำจาก AST ranges ที่ทับซ้อนกัน โดยเฉพาะ ref access ใน LiffLeaveApp ซึ่งเป็น code site เดียวแต่ถูกรายงาน 7 ครั้ง

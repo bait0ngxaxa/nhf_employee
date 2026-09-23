@@ -2553,11 +2553,6 @@ function getRoutineClientGraphViolations(rootPath, getRuntimeImports) {
     if (!existsSync(entryPath)) return [];
 
     const routineServerRoot = resolve(rootPath, "modules/routine");
-    // This is the one currently reachable application helper proven to be
-    // browser-safe; other Routine application paths own server behavior.
-    const routineClientSafePaths = new Set([
-        resolve(rootPath, "modules/routine/application/imports/sheet-config.ts"),
-    ]);
     const pending = [entryPath];
     const visited = new Set();
     const violations = [];
@@ -2606,14 +2601,11 @@ function getRoutineClientGraphViolations(rootPath, getRuntimeImports) {
                 filePath,
                 rootPath,
             );
-            const isRoutineClientSafePath = sourcePath !== null
-                && routineClientSafePaths.has(sourcePath);
-            const reachesRoutineServerDirectory = !isRoutineClientSafePath
-                && [importTarget, sourcePath].some((target) =>
-                    target !== null && serverDirectories.some((directory) =>
-                        pathIsWithin(target, resolve(rootPath, directory)),
-                    ),
-                );
+            const reachesRoutineServerDirectory = [importTarget, sourcePath].some((target) =>
+                target !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(target, resolve(rootPath, directory)),
+                ),
+            );
             const reachesRoutineServerEntry = importTarget === routineServerRoot
                 || (sourcePath !== null
                     && pathIsWithin(sourcePath, routineServerRoot)

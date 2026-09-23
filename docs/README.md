@@ -1,9 +1,9 @@
 # ดัชนีเอกสาร
 
-เอกสารชุดนี้ตรวจเทียบกับ repository ณ 2026-09-23, source revision
-`79529f4930bb58c3f77e18c895e6b33cdca72389` เพื่อใช้เป็น baseline สำหรับงาน
-ต่อไป เอกสาร phase และ audit ยังคงเก็บหลักฐาน ณ เวลาที่ตรวจ ไม่ได้อ้างว่า
-ทุกข้อสรุปในบันทึกเก่าเป็นสถานะปัจจุบัน
+งาน H2A re-audit เริ่มจาก `main` ณ source revision
+`b5ddee48b42aa37f8fdb6d527e105a9ed94e2072` เป็น baseline เอกสาร phase และ
+audit ยังคงเก็บหลักฐาน ณ เวลาที่ตรวจ ไม่ได้อ้างว่าทุกข้อสรุปในบันทึกเก่าเป็น
+สถานะปัจจุบัน
 
 ## เริ่มอ่าน
 
@@ -41,7 +41,9 @@ Authorization ใช้ Default Domain Policy ของแต่ละ capabilit
 TeamRole และ direct User grants ที่ตั้งค่าไว้; `ADMIN` ยังคงเป็นบทบาทของ
 Auth/control plane และไม่สร้าง business authority โดยอัตโนมัติ. Phase 13A/13A.1
 ปรับ audience ของ notification ให้ใช้ configured capability; Routine enum
-contraction ยังรอหลักฐาน production rollout และอยู่นอกขอบเขตที่ปิดแล้ว.
+contraction ยังรอหลักฐาน production rollout และอยู่นอกขอบเขตที่ปิดแล้ว. H2A
+ยุติ Routine Excel/file import ถาวร; การสร้างและดูแลงานทำผ่าน Routine task
+UI/API. H2B จะแยกจัดการ legacy recipient enum ต่อไป.
 
 ## Runbooks และ workflow specs
 
@@ -54,7 +56,7 @@ contraction ยังรอหลักฐาน production rollout และอ
   matrix สำหรับผู้ปฏิบัติงาน
 - [LINE Routine reminder manual test](./line-routine-reminder-manual-test.md)
 - [Leave attachment deployment](./leave-attachments-deployment.md)
-- [Routine import](./routine-import.md)
+- [Routine Import — retired](./routine-import.md): ประกาศการยุติการนำเข้าไฟล์
 - [Leave notification spec](./leave-notification-spec.md): ข้อกำหนด workflow
   การแจ้งเตือนการลาและลิงก์ไปยัง channel matrix ปัจจุบัน
 

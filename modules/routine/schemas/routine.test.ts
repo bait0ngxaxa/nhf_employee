@@ -7,7 +7,6 @@ import {
     routineTaskSelfServiceUpdateSchema,
     routineReminderOutboxPayloadSchema,
 } from "./routine";
-import { routineImportRowUpdateSchema } from "./import";
 
 describe("NHF Routine validation", () => {
     it("accepts the supported schedule config shapes", () => {
@@ -59,7 +58,7 @@ describe("NHF Routine validation", () => {
         }
     });
 
-    it("keeps LIFF self-service schemas free of assignee and import fields", () => {
+    it("rejects client assignees and creator metadata in LIFF task input", () => {
         const valid = routineTaskSelfServiceCreateSchema.safeParse({
             unitId: 1,
             categoryId: 1,
@@ -70,7 +69,6 @@ describe("NHF Routine validation", () => {
         expect(valid.success).toBe(true);
         if (valid.success) {
             expect(valid.data).not.toHaveProperty("assignees");
-            expect(valid.data).not.toHaveProperty("sourceFileName");
         }
 
         expect(
@@ -86,7 +84,7 @@ describe("NHF Routine validation", () => {
         expect(
             routineTaskSelfServiceUpdateSchema.safeParse({
                 version: 1,
-                sourceSheet: "Spoof",
+                createdById: 999,
             }).success,
         ).toBe(false);
     });
@@ -245,35 +243,6 @@ describe("NHF Routine validation", () => {
             scheduleType: "YEARLY_DATE",
             scheduleConfig: { month: 13, day: 10 },
             assignees: [{ employeeId: 11, role: "OWNER" }],
-        });
-
-        expect(result.success).toBe(false);
-        if (!result.success) {
-            expect(result.error.issues).toEqual(expect.arrayContaining([
-                expect.objectContaining({
-                    path: ["scheduleConfig", "month"],
-                    message: "กรุณาระบุเดือนตั้งแต่ 1 ถึง 12",
-                }),
-            ]));
-        }
-    });
-
-    it("keeps schedule field errors specific in the import row editor", () => {
-        const result = routineImportRowUpdateSchema.safeParse({
-            version: 1,
-            categoryName: "ระบบคอมพิวเตอร์",
-            title: "งานประจำ",
-            mappedAssignees: [{ employeeId: 11, role: "OWNER" }],
-            scheduleText: null,
-            scheduleType: "YEARLY_DATE",
-            scheduleConfig: { month: 13, day: 10 },
-            businessDayPolicy: "NONE",
-            contractStartDate: null,
-            contractEndDate: null,
-            contractText: null,
-            extraDetails: null,
-            selected: true,
-            reminderRules: [],
         });
 
         expect(result.success).toBe(false);

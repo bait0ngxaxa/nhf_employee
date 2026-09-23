@@ -64,7 +64,6 @@ const ROUTINE_CAPABILITIES = {
     canOverrideOccurrences: false,
     canReassignOccurrences: false,
     canChangeOccurrenceDueDate: false,
-    canManageImports: false,
     canExportTasks: false,
     canReadSummary: true,
     canReadAllSummary: false,

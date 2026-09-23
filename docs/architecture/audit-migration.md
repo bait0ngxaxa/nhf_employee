@@ -30,6 +30,14 @@ below are historical migration evidence; the final current ownership result
 is recorded in Sections 25 and 26 and in the L6 closure of
 `docs/architecture/runtime-hardening.md`.
 
+H2A permanently retired Routine Import producers, routes, and import tables.
+The four Prisma `AuditAction` values `ROUTINE_IMPORT_UPLOAD`,
+`ROUTINE_IMPORT_ROW_UPDATE`, `ROUTINE_IMPORT_APPLY`, and
+`ROUTINE_IMPORT_CANCEL` remain in the schema and presentation mapping because
+this repository provides no trustworthy evidence that production has zero
+matching AuditLog rows. Historical events remain renderable; H2A does not
+rewrite audit history or emit new Routine Import actions.
+
 ## 1. Scope
 
 Phase I0 covered the complete production repository, including application
@@ -562,10 +570,10 @@ contain the value.
 | ROUTINE_TASK_DELETE | Routine task mutation | RoutineTask | Active; strict |
 | ROUTINE_OCCURRENCE_REASSIGN | Routine occurrence mutation | RoutineOccurrence | Active; strict |
 | ROUTINE_OCCURRENCE_DUE_DATE_CHANGE | Routine occurrence mutation | RoutineOccurrence | Active; strict |
-| ROUTINE_IMPORT_UPLOAD | Routine import preview | RoutineImportBatch | Active; strict |
-| ROUTINE_IMPORT_ROW_UPDATE | Routine import row update | RoutineImportRow | Active; strict |
-| ROUTINE_IMPORT_APPLY | Routine import apply | RoutineImportBatch | Active; strict |
-| ROUTINE_IMPORT_CANCEL | Routine import cancel | RoutineImportBatch | Active; strict |
+| ROUTINE_IMPORT_UPLOAD | Historical Routine import preview | RoutineImportBatch | Historical; display retained, producer retired in H2A |
+| ROUTINE_IMPORT_ROW_UPDATE | Historical Routine import row update | RoutineImportRow | Historical; display retained, producer retired in H2A |
+| ROUTINE_IMPORT_APPLY | Historical Routine import apply | RoutineImportBatch | Historical; display retained, producer retired in H2A |
+| ROUTINE_IMPORT_CANCEL | Historical Routine import cancel | RoutineImportBatch | Historical; display retained, producer retired in H2A |
 
 At the I0 baseline there were 38 distinct enum values emitted by current
 production paths. Phase 10B adds 13 active Authorization Administration

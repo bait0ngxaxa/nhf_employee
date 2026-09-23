@@ -85,7 +85,7 @@ ASSIGNEES_AND_ADMINS
 
 The expand migration only widens the MySQL enum. It does not rewrite rows and
 does not contract the enum. Prisma Client temporarily includes both sets of
-members so transition code can read old rows safely. New create/update/import
+members so transition code can read old rows safely. New create/update
 boundaries accept canonical values only and therefore write only canonical
 values.
 
@@ -97,8 +97,14 @@ ASSIGNEES_AND_ADMINS    → ASSIGNEES_AND_ALL_READERS
 ```
 
 Routine scheduler, reminder dispatch, query serialization, and persisted
-import-row parsing operate on the canonical values after normalization. The
+reminder-rule reads operate on the canonical values after normalization. H2A
+removed `RoutineImportRow.normalizedData` and its compatibility consumer. The
 legacy token is never interpreted as `User.role === ADMIN`.
+
+H2A does not contract the MySQL or Prisma recipient enum. Legacy values can
+still exist in persisted `routine_reminder_rules`, so normalization remains in
+place until the separate H2B backfill, zero-legacy assertion, and enum
+contraction are completed.
 
 The later `Phase 13A.2 — Routine Recipient Enum Contract` must, in an
 explicitly controlled rollout, verify that no old process remains, backfill

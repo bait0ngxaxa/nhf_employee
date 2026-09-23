@@ -139,7 +139,6 @@ const allRoutineCapabilities = {
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
     canChangeOccurrenceDueDate: true,
-    canManageImports: true,
     canExportTasks: true,
     canReadSummary: true,
     canReadAllSummary: true,
@@ -155,7 +154,6 @@ const userRoutineCapabilities = {
     canDeleteAllTasks: false,
     canReadAllReferences: false,
     canReadAllSummary: false,
-    canManageImports: false,
 } satisfies RoutinePresentationCapabilities;
 
 const readOnlyRoutineCapabilities = {
@@ -479,7 +477,6 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
         expect(screen.getByText("จัดการงาน")).toBeInTheDocument();
-        expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
     });
 
     it("keeps work tabs visible while hiding capability-gated actions", () => {
@@ -490,16 +487,14 @@ describe("RoutineSection tabs", () => {
         expect(screen.getByText("รายการของฉัน")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "รายการทั้งหมด" })).not.toBeInTheDocument();
         expect(screen.queryByText("จัดการงาน")).not.toBeInTheDocument();
-        expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "สร้างแม่แบบงานทดสอบ" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "แก้ไข Routine ทดสอบ" })).not.toBeInTheDocument();
     });
 
-    it("keeps management and import tabs independently capability-driven", () => {
+    it("shows task management from create capability even without task read", () => {
         mockRoutineUser("USER", {
             ...readOnlyRoutineCapabilities,
             canReadTasks: false,
-            canManageImports: true,
             canCreateTasks: true,
         });
 
@@ -508,7 +503,6 @@ describe("RoutineSection tabs", () => {
         expect(screen.queryByRole("button", { name: "รายการของฉัน" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "รายการทั้งหมด" })).not.toBeInTheDocument();
         expect(screen.getByRole("button", { name: "จัดการงาน" })).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "นำเข้าจาก Excel" })).toBeInTheDocument();
         expect(mocks.useSWR).toHaveBeenCalledWith(null, expect.any(Function), expect.objectContaining({ keepPreviousData: true }));
     });
 
@@ -518,7 +512,6 @@ describe("RoutineSection tabs", () => {
         render(<RoutineSection />);
 
         expect(screen.getByText("จัดการงาน")).toBeInTheDocument();
-        expect(screen.getByText("นำเข้าจาก Excel")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "จัดการงาน" }));
         expect(screen.getByRole("button", { name: "สร้างแม่แบบงาน" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "รายการทั้งหมด" }));
@@ -536,20 +529,6 @@ describe("RoutineSection tabs", () => {
             expect(screen.getByRole("button", { name: "รายการทั้งหมด" })).toBeInTheDocument();
         },
     );
-
-    it("falls back from a stale import tab URL when import capability is absent", () => {
-        mockRoutineUser("USER");
-        setRoutineSearchParams("routineTab=import");
-
-        render(<RoutineSection />);
-
-        expect(screen.queryByText("นำเข้าจาก Excel")).not.toBeInTheDocument();
-        expect(screen.getByTestId("routine-occurrence-list")).toBeInTheDocument();
-        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
-            "/dashboard/routine?routineTab=mine",
-            { scroll: false },
-        );
-    });
 
     it("prioritizes authorized focus over a conflicting tab and lets the user leave it", () => {
         mockRoutineUser("ADMIN");

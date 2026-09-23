@@ -31,7 +31,6 @@ interface RoutineOccurrenceListProps {
     error: Error | undefined;
     focusOccurrenceId: number | null;
     focusTaskId: number | null;
-    canReadImportMetadata: boolean;
     isLoading: boolean;
     mutate: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
     routineCapabilities?: RoutinePresentationCapabilities;
@@ -61,7 +60,6 @@ function RoutineOccurrenceListContent({
     error,
     focusOccurrenceId,
     focusTaskId,
-    canReadImportMetadata,
     isLoading,
     employees,
     mutate,
@@ -224,7 +222,6 @@ function RoutineOccurrenceListContent({
                 task={detailsTask}
                 open={detailsOpen}
                 onOpenChange={setDetailsOpen}
-                canReadImportMetadata={canReadImportMetadata}
             />
         </div>
     );

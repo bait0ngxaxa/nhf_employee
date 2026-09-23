@@ -18,7 +18,6 @@ const allRoutineCapabilities = {
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
     canChangeOccurrenceDueDate: true,
-    canManageImports: true,
     canExportTasks: true,
     canReadSummary: true,
     canReadAllSummary: true,
@@ -44,9 +43,6 @@ const task = {
     businessDayPolicy: "NONE",
     isActive: true,
     version: 1,
-    sourceFileName: null,
-    sourceSheet: null,
-    sourceRow: null,
     createdById: 5,
     updatedById: 5,
     createdAt: "2026-08-01T00:00:00.000Z",
@@ -65,7 +61,6 @@ function makeProps() {
             pagination: { page: 1, limit: 20, total: 1, pages: 1 },
         },
         error: undefined,
-        canReadImportMetadata: true,
         isLoading: false,
         routineCapabilities: allRoutineCapabilities,
         onRetry: vi.fn(),
@@ -180,32 +175,6 @@ describe("RoutineTaskList", () => {
         expect(row).not.toHaveTextContent("ทุกเดือน");
     });
 
-    it("shows import metadata only with import-management authority", () => {
-        const importedTask: RoutineTask = {
-            ...task,
-            sourceFileName: "routine.xlsx",
-            sourceSheet: "งานประจำ",
-            sourceRow: 12,
-        };
-        const props = makeProps();
-        const importedData = {
-            ...props.data,
-            tasks: [importedTask],
-        };
-        const { rerender } = render(
-            <RoutineTaskList {...props} data={importedData} canReadImportMetadata={false} />,
-        );
-
-        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
-        expect(screen.getByRole("dialog")).not.toHaveTextContent("ข้อมูลต้นทางการนำเข้า");
-        fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
-
-        rerender(<RoutineTaskList {...props} data={importedData} canReadImportMetadata />);
-        fireEvent.click(screen.getByRole("button", { name: "ดูรายละเอียด" }));
-        expect(screen.getByRole("dialog")).toHaveTextContent("ข้อมูลต้นทางการนำเข้า");
-        expect(screen.getByRole("dialog")).toHaveTextContent("routine.xlsx");
-    });
-
     it("retains activate/deactivate and delete management actions", async () => {
         const props = makeProps();
         render(<RoutineTaskList {...props} />);
@@ -276,7 +245,6 @@ describe("RoutineTaskList", () => {
         render(
             <RoutineTaskList
                 {...props}
-                canReadImportMetadata={false}
                 routineCapabilities={{
                     ...allRoutineCapabilities,
                     canCreateTasks: false,
@@ -295,7 +263,7 @@ describe("RoutineTaskList", () => {
 
     it("allows an actor with explicitly granted task capabilities", () => {
         const props = makeProps();
-        render(<RoutineTaskList {...props} canReadImportMetadata={true} />);
+        render(<RoutineTaskList {...props} />);
 
         expect(screen.getByRole("button", { name: "สร้างแม่แบบงาน" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แก้ไข" })).toBeInTheDocument();

@@ -73,7 +73,6 @@ const HOME = {
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
-            canManageImports: false,
             canExportTasks: false,
             canReadSummary: true,
             canReadAllSummary: false,

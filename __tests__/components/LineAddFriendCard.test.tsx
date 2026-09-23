@@ -13,7 +13,7 @@ describe("LineAddFriendCard", () => {
             }),
         ).toBeInTheDocument();
         expect(
-            screen.getByText("รับการแจ้งเตือนจาก NHF ได้สะดวกขึ้น"),
+            screen.getByText("รับการแจ้งเตือนและเข้าใช้บริการของ NHF ผ่าน LINE ได้เลย"),
         ).toBeInTheDocument();
 
         const qrImages = screen.getAllByAltText(

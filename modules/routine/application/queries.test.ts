@@ -24,7 +24,6 @@ import { routineTaskFiltersSchema } from "../schemas/routine";
 import type * as RoutineAuthorizationModule from "./authorization";
 
 const resolveRoutineCapabilityMock = vi.hoisted(() => vi.fn());
-const resolveOptionalRoutineCapabilityMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -33,7 +32,6 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("./authorization", async (importOriginal) => ({
     ...(await importOriginal<typeof RoutineAuthorizationModule>()),
     resolveRoutineCapability: resolveRoutineCapabilityMock,
-    resolveOptionalRoutineCapability: resolveOptionalRoutineCapabilityMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
@@ -51,9 +49,6 @@ function taskRow(
     return {
         id,
         createdById,
-        sourceFileName: null,
-        sourceSheet: null,
-        sourceRow: null,
         title: `งาน ${id}`,
         description: null,
         scheduleType: "MONTHLY_DAY",
@@ -121,7 +116,6 @@ function occurrenceRow(
 describe("NHF Routine query authorization", () => {
     beforeEach(() => {
         mockReset(prismaMock);
-        resolveOptionalRoutineCapabilityMock.mockResolvedValue(null);
         resolveRoutineCapabilityMock.mockImplementation(async (
             actor: { id: number; role: string; mode?: "LIFF_SELF_SERVICE" },
             _employeeId: number | null,
@@ -1422,7 +1416,7 @@ describe("NHF Routine query authorization", () => {
         );
     });
 
-    it("allows the task creator to fetch full detail while redacting source metadata", async () => {
+    it("allows the task creator to fetch full detail", async () => {
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
             ...taskRow(71, 42, 5),
             unitId: 1,
@@ -1431,9 +1425,6 @@ describe("NHF Routine query authorization", () => {
             updatedById: 5,
             createdAt: new Date("2026-08-01T00:00:00.000Z"),
             updatedAt: new Date("2026-08-01T00:00:00.000Z"),
-            sourceFileName: "internal-import.xlsx",
-            sourceSheet: "งานประจำ",
-            sourceRow: 12,
             occurrences: [],
         }));
 
@@ -1446,9 +1437,6 @@ describe("NHF Routine query authorization", () => {
             id: 71,
             canEdit: true,
             canDelete: true,
-            sourceFileName: null,
-            sourceSheet: null,
-            sourceRow: null,
         });
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -1467,9 +1455,6 @@ describe("NHF Routine query authorization", () => {
             updatedById: 99,
             createdAt: new Date("2026-08-01T00:00:00.000Z"),
             updatedAt: new Date("2026-08-01T00:00:00.000Z"),
-            sourceFileName: "internal-import.xlsx",
-            sourceSheet: "งานประจำ",
-            sourceRow: 12,
             occurrences: [],
         };
         prismaMock.routineTask.findFirst.mockResolvedValue(asNever(task));
@@ -1484,9 +1469,6 @@ describe("NHF Routine query authorization", () => {
             createdById: 99,
             canEdit: true,
             canDelete: false,
-            sourceFileName: null,
-            sourceSheet: null,
-            sourceRow: null,
         });
         expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -1513,44 +1495,6 @@ describe("NHF Routine query authorization", () => {
                         },
                     ],
                 },
-            }),
-        );
-    });
-
-    it("exposes source metadata when a non-admin has effective import-management authority", async () => {
-        resolveOptionalRoutineCapabilityMock.mockResolvedValueOnce({
-            scopes: ["ALL"],
-        });
-        prismaMock.routineTask.findFirst.mockResolvedValue(asNever({
-            ...taskRow(71, 21, 99),
-            unitId: 1,
-            categoryId: 1,
-            version: 2,
-            updatedById: 99,
-            createdAt: new Date("2026-08-01T00:00:00.000Z"),
-            updatedAt: new Date("2026-08-01T00:00:00.000Z"),
-            sourceFileName: "internal-import.xlsx",
-            sourceSheet: "งานประจำ",
-            sourceRow: 12,
-            occurrences: [],
-        }));
-
-        const result = await getRoutineTaskById(71, {
-            actor: { id: 5, email: "user@example.com", role: "USER" },
-            employeeId: 21,
-        });
-
-        expect(result).toMatchObject({
-            id: 71,
-            canEdit: true,
-            canDelete: false,
-            sourceFileName: "internal-import.xlsx",
-            sourceSheet: "งานประจำ",
-            sourceRow: 12,
-        });
-        expect(prismaMock.routineTask.findFirst).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: expect.objectContaining({ id: 71 }),
             }),
         );
     });

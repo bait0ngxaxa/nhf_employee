@@ -38,7 +38,6 @@ const routineUser = {
         canOverrideOccurrences: false,
         canReassignOccurrences: false,
         canChangeOccurrenceDueDate: false,
-        canManageImports: false,
         canExportTasks: true,
         canReadSummary: true,
         canReadAllSummary: false,

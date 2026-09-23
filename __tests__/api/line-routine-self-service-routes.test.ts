@@ -130,9 +130,6 @@ function taskDetail(
         canEdit: capabilities.canEdit,
         canDelete: capabilities.canDelete,
         createdById: capabilities.canDelete ? 7 : 99,
-        sourceFileName: "internal.xlsx",
-        sourceSheet: "Sheet1",
-        sourceRow: 12,
     };
 }
 
@@ -238,7 +235,7 @@ describe("LIFF Routine self-service route contracts", () => {
         );
     });
 
-    it("rejects assignee and import metadata at the LIFF boundary", async () => {
+    it("rejects client-supplied assignees at the LIFF boundary", async () => {
         const response = await createTask(
             request("/api/line/routine/tasks", {
                 method: "POST",
@@ -249,9 +246,6 @@ describe("LIFF Routine self-service route contracts", () => {
                 body: JSON.stringify({
                     ...CREATE_PAYLOAD,
                     assignees: [{ employeeId: 999, role: "OWNER" }],
-                    sourceFileName: "spoof.xlsx",
-                    sourceSheet: "Spoof",
-                    sourceRow: 1,
                 }),
             }),
         );
@@ -308,7 +302,7 @@ describe("LIFF Routine self-service route contracts", () => {
         });
     });
 
-    it("exposes assigned detail with edit but no delete and no internal metadata", async () => {
+    it("exposes assigned detail with edit but no delete and no creator metadata", async () => {
         mocks.getLiffRoutineTaskById.mockResolvedValueOnce(taskDetail({
             canEdit: true,
             canDelete: false,
@@ -323,9 +317,6 @@ describe("LIFF Routine self-service route contracts", () => {
         expect(response.status).toBe(200);
         expect(body.task).toMatchObject({ id: 71, canEdit: true, canDelete: false });
         expect(body.task).not.toHaveProperty("createdById");
-        expect(body.task).not.toHaveProperty("sourceFileName");
-        expect(body.task).not.toHaveProperty("sourceSheet");
-        expect(body.task).not.toHaveProperty("sourceRow");
         expect(body.task).toEqual(expect.objectContaining({
             reminderRules: [{
                 daysBefore: 1,

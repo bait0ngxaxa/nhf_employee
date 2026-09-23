@@ -109,7 +109,6 @@ const HOME = {
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
-            canManageImports: false,
             canExportTasks: false,
             canReadSummary: true,
             canReadAllSummary: false,
@@ -840,9 +839,6 @@ describe("LiffRoutineApp", () => {
             isActive: true,
         });
         expect(payload).not.toHaveProperty("assignees");
-        expect(payload).not.toHaveProperty("sourceFileName");
-        expect(payload).not.toHaveProperty("sourceSheet");
-        expect(payload).not.toHaveProperty("sourceRow");
         expect(mocks.fetchLiffRoutineReference).toHaveBeenCalledTimes(1);
     });
 
@@ -1211,9 +1207,6 @@ describe("LiffRoutineApp", () => {
         );
         const updatePayload = (mocks.updateLiffRoutineTask.mock.calls[0] as [number, Record<string, unknown>])[1];
         expect(updatePayload).not.toHaveProperty("assignees");
-        expect(updatePayload).not.toHaveProperty("sourceFileName");
-        expect(updatePayload).not.toHaveProperty("sourceSheet");
-        expect(updatePayload).not.toHaveProperty("sourceRow");
         expect(updatePayload).not.toHaveProperty("isActive");
         await waitFor(() => {
             expect(screen.queryByRole("heading", { name: "แก้ไข Routine ของฉัน" })).not.toBeInTheDocument();

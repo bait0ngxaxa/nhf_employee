@@ -126,40 +126,6 @@ export function RoutineOccurrenceListSkeleton(): ReactElement {
     );
 }
 
-export function RoutineImportRowsSkeleton(): ReactElement {
-    return (
-        <div
-            className="overflow-hidden rounded-xl border border-brand-border/70 bg-surface-raised"
-            role="status"
-            aria-live="polite"
-            aria-busy="true"
-            aria-label="กำลังโหลดแถวข้อมูลนำเข้า"
-        >
-            <div className="overflow-x-auto">
-                <div className="min-w-[1100px]">
-                    <div className="flex gap-4 border-b border-brand-border/70 bg-brand-surface px-4 py-3">
-                        {Array.from({ length: 8 }).map((_, index) => (
-                            <Skeleton key={index} className="h-4 flex-1" />
-                        ))}
-                    </div>
-                    <div className="divide-y divide-border-subtle">
-                        {Array.from({ length: 6 }).map((_, rowIndex) => (
-                            <div key={rowIndex} className="flex items-center gap-4 px-4 py-3">
-                                {Array.from({ length: 8 }).map((__, columnIndex) => (
-                                    <Skeleton
-                                        key={columnIndex}
-                                        className="h-10 flex-1"
-                                    />
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export function RoutineSectionSkeleton(): ReactElement {
     return (
         <div

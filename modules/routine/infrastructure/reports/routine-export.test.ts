@@ -128,13 +128,6 @@ describe("Routine task Excel export", () => {
         expect(sheet.getRow(2).getCell(1).value).toBe(71);
         expect(sheet.getRow(2).getCell(2).value).toBe("งานของผู้ใช้อื่น");
         expect(sheet.getRow(2).getCell(11).value).toBe("พนักงาน 42");
-        const rowText = Array.from(
-            { length: sheet.columnCount },
-            (_value, index: number) => String(
-                sheet.getRow(2).getCell(index + 1).value ?? "",
-            ),
-        ).join(" ");
-        expect(rowText).not.toContain("sourceFileName");
     });
 
     it("enforces the server-side task row limit", async () => {

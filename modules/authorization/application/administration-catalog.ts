@@ -65,7 +65,6 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "routine.occurrence.override": CENTRAL_ONLY,
     "routine.occurrence.reassign": CENTRAL_ONLY,
     "routine.occurrence.change_due_date": CENTRAL_ONLY,
-    "routine.import.manage": CENTRAL_ONLY,
     "routine.task.export": CENTRAL_ONLY,
     "routine.summary.read": CENTRAL_WITH_DEFAULT_POLICY,
     "routine.reference.read": CENTRAL_WITH_DEFAULT_POLICY,

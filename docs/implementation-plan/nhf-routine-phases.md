@@ -1,6 +1,10 @@
 # NHF Routine — Reminder-Based Routine List
 
-เอกสารนี้เป็น implementation guide ของ NHF Routine บน branch `featureroutine` หลัง refactor ให้เป็นรายการกำหนดการและการแจ้งเตือน ไม่ใช่ระบบ Task/Workflow
+เอกสารนี้เป็น historical implementation plan ของ NHF Routine บน branch `featureroutine` หลัง refactor ให้เป็นรายการกำหนดการและการแจ้งเตือน ไม่ใช่ระบบ Task/Workflow
+
+H2A permanently retired the later Routine Excel/file import feature. Import
+phases and assumptions below preserve their historical planning context and do
+not describe current application behavior.
 
 ## ขอบเขตของงานนี้
 

@@ -1,11 +1,12 @@
 # Routine module migration
 
-Status: Phase D — Routine server/business and Dashboard/LIFF ownership migrated.
+Status: Phase D module migration completed. Routine Import was permanently retired
+by H2A; the current module shape below excludes its former implementation.
 
 Routine is now owned by `modules/routine/`. The migration moved the existing
 domain, application, validation, HTTP, scheduler, reminder, contract-reminder,
-import, Dashboard, and LIFF implementations without changing their business
-contracts.
+Dashboard, and LIFF implementations. H2A later retired the separate Excel/file
+import workflow as a permanent product decision.
 
 ## Ownership and public entry points
 
@@ -16,17 +17,14 @@ The module owns:
 - task and occurrence application services, authorization, audit, idempotency,
   generation/reconciliation, recipient resolution, reminders, contract
   reminders, and scheduler under `application/`;
-- the complete Routine workbook import workflow under
-  `application/imports/`, including parsing, normalization, staging, preview,
-  row editing, apply, and cancel;
 - Routine schemas and server adapters under `schemas/` and `server/`;
 - Dashboard and LIFF presentation under `presentation/`; and
 - Routine-specific email/LINE payload and message composition under
   `application/notifications/`.
 
 Server/application consumers use the explicit `@/modules/routine` entry point.
-It exposes the route-facing task, occurrence, reference, summary, import,
-scheduler, reminder-dispatch, contract-reminder-dispatch, actor, HTTP,
+It exposes the route-facing task, occurrence, reference, summary, scheduler,
+reminder-dispatch, contract-reminder-dispatch, actor, HTTP,
 serialization, schema, link, and error contracts required by the current API,
 cron, outbox, and compatibility consumers. Internal Prisma selects,
 transaction-only helpers, workbook internals, and private recipient helpers
@@ -60,19 +58,6 @@ modules/routine/
 │   ├── reminders.ts
 │   ├── scheduler.ts
 │   ├── types.ts
-│   ├── imports/
-│   │   ├── apply.ts
-│   │   ├── constants.ts
-│   │   ├── dates.ts
-│   │   ├── index.ts
-│   │   ├── owner-mapping.ts
-│   │   ├── schedule-normalizer.ts
-│   │   ├── sheet-config.ts
-│   │   ├── staging.ts
-│   │   ├── types.ts
-│   │   ├── validation.ts
-│   │   ├── workbook.ts
-│   │   └── xlsx-safety.ts
 │   └── notifications/
 │       ├── email.ts
 │       ├── notification-types.ts
@@ -90,8 +75,6 @@ modules/routine/
 │   ├── dashboard/
 │   │   ├── RoutineAssigneePicker.tsx
 │   │   ├── RoutineDetailsDialog.tsx
-│   │   ├── RoutineImportPanel.tsx
-│   │   ├── RoutineImportRowEditor.tsx
 │   │   ├── RoutineKpiGrid.tsx
 │   │   ├── RoutineOccurrenceEditDialog.tsx
 │   │   ├── RoutineOccurrenceList.tsx
@@ -104,7 +87,6 @@ modules/routine/
 │   │   ├── RoutineTaskList.tsx
 │   │   ├── focus-invalid-field.ts
 │   │   ├── form-dirty-state.ts
-│   │   ├── import-types.ts
 │   │   ├── labels.ts
 │   │   └── types.ts
 │   └── liff/
@@ -120,8 +102,6 @@ modules/routine/
 │       ├── api.ts
 │       └── types.ts
 ├── schemas/
-│   ├── import-reference.ts
-│   ├── import.ts
 │   ├── liff.ts
 │   └── routine.ts
 ├── server/

@@ -22,7 +22,6 @@ import { RoutineKpiGrid } from "./RoutineKpiGrid";
 import { RoutineOccurrenceList } from "./RoutineOccurrenceList";
 import { RoutineTaskDialog } from "./RoutineTaskDialog";
 import { RoutineTaskList } from "./RoutineTaskList";
-import { RoutineImportPanel } from "./RoutineImportPanel";
 import { formatRoutineUnitLabel, uniqueRoutineUnits } from "./labels";
 import type { RoutinePresentationCapabilities } from "../../application/types";
 import type {
@@ -48,7 +47,6 @@ async function fetchRoutine<T>(url: string): Promise<T> {
 }
 
 function RoutineOccurrencePanel({
-    canReadImportMetadata,
     currentEmployeeId,
     routineCapabilities,
     scope,
@@ -59,7 +57,6 @@ function RoutineOccurrencePanel({
     summaryError,
     summaryLoading,
 }: {
-    canReadImportMetadata: boolean;
     currentEmployeeId?: number;
     routineCapabilities?: RoutinePresentationCapabilities;
     scope: "mine" | "all";
@@ -266,7 +263,6 @@ function RoutineOccurrencePanel({
                 data={data}
                 error={error}
                 isLoading={isLoading}
-                canReadImportMetadata={canReadImportMetadata}
                 routineCapabilities={routineCapabilities}
                 focusTaskId={taskId}
                 focusOccurrenceId={occurrenceId}
@@ -472,7 +468,6 @@ function RoutineTaskSettings({
             <RoutineTaskList
                 data={tasks}
                 error={tasksError}
-                canReadImportMetadata={routineCapabilities?.canManageImports === true}
                 routineCapabilities={routineCapabilities}
                 isLoading={tasksLoading}
                 onRetry={() => void mutateTasks()}
@@ -642,7 +637,7 @@ function RoutineTaskEditCapabilitySession({
     );
 }
 
-const ROUTINE_TAB_ORDER = ["mine", "all", "manage", "import"] as const;
+const ROUTINE_TAB_ORDER = ["mine", "all", "manage"] as const;
 
 export function resolveRoutineActiveTab({
     requestedTab,
@@ -680,7 +675,6 @@ function RoutineSectionCapabilitySurface() {
     const canReadAllTasks = routineCapabilities?.canReadAllTasks === true;
     const canExportTasks = routineCapabilities?.canExportTasks === true;
     const canReadSummary = routineCapabilities?.canReadSummary === true;
-    const canManageImports = routineCapabilities?.canManageImports === true;
     const canManageTasks = routineCapabilities?.canCreateTasks === true
         || routineCapabilities?.canUpdateTasks === true
         || routineCapabilities?.canDeleteTasks === true;
@@ -700,10 +694,9 @@ function RoutineSectionCapabilitySurface() {
                 ...(canReadTasks ? ["mine"] : []),
                 ...(canReadTasks && canReadAllTasks ? ["all"] : []),
                 ...(canManageTasks ? ["manage"] : []),
-                ...(canManageImports ? ["import"] : []),
             ],
         ),
-        [canManageImports, canManageTasks, canReadAllTasks, canReadTasks],
+        [canManageTasks, canReadAllTasks, canReadTasks],
     );
     const requestedTab = searchParams.get("routineTab");
     const activeTab = resolveRoutineActiveTab({
@@ -777,14 +770,14 @@ function RoutineSectionCapabilitySurface() {
             group: "work",
             groupLabel: "รายการงาน",
             visible: visibleRoutineTabs.has("mine"),
-            content: <RoutineOccurrencePanel scope="mine" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryScope === "mine" ? summaryData?.summary : undefined} summaryError={summaryScope === "mine" ? summaryError : undefined} summaryLoading={summaryScope === "mine" ? summaryLoading : false} />,
+            content: <RoutineOccurrencePanel scope="mine" currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryScope === "mine" ? summaryData?.summary : undefined} summaryError={summaryScope === "mine" ? summaryError : undefined} summaryLoading={summaryScope === "mine" ? summaryLoading : false} />,
         },
         {
             value: "all",
             label: "รายการทั้งหมด",
             group: "work",
             visible: visibleRoutineTabs.has("all"),
-            content: <RoutineOccurrencePanel scope="all" canReadImportMetadata={canManageImports} currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryScope === "all" ? summaryData?.summary : undefined} summaryError={summaryScope === "all" ? summaryError : undefined} summaryLoading={summaryScope === "all" ? summaryLoading : false} />,
+            content: <RoutineOccurrencePanel scope="all" currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} taskId={taskId} occurrenceId={occurrenceId} onTaskSaved={() => void mutateSummary()} summary={summaryScope === "all" ? summaryData?.summary : undefined} summaryError={summaryScope === "all" ? summaryError : undefined} summaryLoading={summaryScope === "all" ? summaryLoading : false} />,
         },
         {
             value: "manage",
@@ -793,14 +786,6 @@ function RoutineSectionCapabilitySurface() {
             groupLabel: "จัดการ",
             visible: visibleRoutineTabs.has("manage"),
             content: <RoutineTaskSettings currentEmployeeId={user?.employeeId} routineCapabilities={routineCapabilities} onTaskSaved={() => void mutateSummary()} />,
-        },
-        {
-            value: "import",
-            label: "นำเข้าจาก Excel",
-            group: "tools",
-            groupLabel: "เครื่องมือ",
-            visible: visibleRoutineTabs.has("import"),
-            content: <RoutineImportPanel />,
         },
     ];
 

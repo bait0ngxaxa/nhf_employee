@@ -39,7 +39,6 @@ import {
     buildRoutineOccurrenceScope,
     buildRoutineTaskAccessScope,
     buildRoutineTaskScope,
-    resolveOptionalRoutineCapability,
     resolveRoutineCapability,
     type RoutineCapabilityAuthorization,
 } from "./authorization";
@@ -102,9 +101,6 @@ const ROUTINE_TASK_SELECT = {
     businessDayPolicy: true,
     isActive: true,
     version: true,
-    sourceFileName: true,
-    sourceSheet: true,
-    sourceRow: true,
     createdById: true,
     updatedById: true,
     createdAt: true,
@@ -530,23 +526,6 @@ async function resolveTaskMutationCapabilities(
         ),
     ]);
     return { edit, delete: deleteAuthorization };
-}
-
-function redactRoutineSourceMetadata<T extends {
-    sourceFileName: string | null;
-    sourceSheet: string | null;
-    sourceRow: number | null;
-}>(task: T, canReadImportMetadata: boolean): T {
-    if (canReadImportMetadata) {
-        return task;
-    }
-
-    return {
-        ...task,
-        sourceFileName: null,
-        sourceSheet: null,
-        sourceRow: null,
-    };
 }
 
 function buildRoutineTaskReadWhere(
@@ -1334,11 +1313,6 @@ export async function getRoutineTasks(
         employeeId,
         "routine.task.read",
     );
-    const importAuthorization = await resolveOptionalRoutineCapability(
-        queryActor.actor,
-        employeeId,
-        "routine.import.manage",
-    );
     const mutationAuthorizations = await resolveTaskMutationCapabilities(
         queryActor,
         employeeId,
@@ -1387,10 +1361,7 @@ export async function getRoutineTasks(
                 reminderRules: normalizeRoutineReminderRules(task.reminderRules),
             };
             return {
-                ...redactRoutineSourceMetadata(
-                    normalizedTask,
-                    importAuthorization?.scopes.includes("ALL") === true,
-                ),
+                ...normalizedTask,
                 ...await getRoutineTaskCapabilities(
                     normalizedTask,
                     queryActor,
@@ -1454,11 +1425,6 @@ export async function getRoutineTaskById(
         employeeId,
         "routine.task.read",
     );
-    const importAuthorization = await resolveOptionalRoutineCapability(
-        queryActor.actor,
-        employeeId,
-        "routine.import.manage",
-    );
     const mutationAuthorizations = await resolveTaskMutationCapabilities(
         queryActor,
         employeeId,
@@ -1467,12 +1433,8 @@ export async function getRoutineTaskById(
         id: taskId,
         ...buildRoutineTaskAccessWhere(queryActor, capabilityAuthorization),
     });
-    const visibleTask = redactRoutineSourceMetadata(
-        task,
-        importAuthorization?.scopes.includes("ALL") === true,
-    );
     return {
-        ...visibleTask,
+        ...task,
         ...await getRoutineTaskCapabilities(
             task,
             queryActor,

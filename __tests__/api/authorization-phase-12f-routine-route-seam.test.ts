@@ -232,13 +232,6 @@ import { GET as getRoutineOccurrence } from "@/app/api/routines/occurrences/[id]
 import { PATCH as overrideRoutineOccurrence } from "@/app/api/routines/occurrences/[id]/route";
 import { PATCH as reassignRoutineOccurrence } from "@/app/api/routines/occurrences/[id]/assignees/route";
 import { PATCH as changeRoutineOccurrenceDueDate } from "@/app/api/routines/occurrences/[id]/due-date/route";
-import { POST as previewRoutineImport } from "@/app/api/routines/imports/preview/route";
-import { GET as getRoutineImportReference } from "@/app/api/routines/imports/reference/route";
-import { GET as getRoutineImportBatch } from "@/app/api/routines/imports/[batchId]/route";
-import { GET as getRoutineImportRows } from "@/app/api/routines/imports/[batchId]/rows/route";
-import { PATCH as updateRoutineImportRow } from "@/app/api/routines/imports/[batchId]/rows/[rowId]/route";
-import { POST as applyRoutineImport } from "@/app/api/routines/imports/[batchId]/apply/route";
-import { POST as cancelRoutineImport } from "@/app/api/routines/imports/[batchId]/cancel/route";
 import { GET as getStockCategories } from "@/app/api/stock/categories/route";
 import { POST as createStockCategory } from "@/app/api/stock/categories/route";
 import { DELETE as deleteStockCategory } from "@/app/api/stock/categories/route";
@@ -673,40 +666,6 @@ describe("Phase 12F direct migrated route seams", () => {
                 }),
             }),
             { params: Promise.resolve({ id: "91" }) },
-        )],
-        ["routine.import.manage", () => getRoutineImportReference(
-            request("/api/routines/imports/reference"),
-        )],
-        ["routine.import.manage", () => previewRoutineImport(
-            request("/api/routines/imports/preview", { method: "POST" }),
-        )],
-        ["routine.import.manage", () => getRoutineImportBatch(
-            request("/api/routines/imports/17"),
-            { params: Promise.resolve({ batchId: "17" }) },
-        )],
-        ["routine.import.manage", () => getRoutineImportRows(
-            request("/api/routines/imports/17/rows"),
-            { params: Promise.resolve({ batchId: "17" }) },
-        )],
-        ["routine.import.manage", () => updateRoutineImportRow(
-            request("/api/routines/imports/17/rows/23", {
-                method: "PATCH",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ version: 1, selected: true }),
-            }),
-            { params: Promise.resolve({ batchId: "17", rowId: "23" }) },
-        )],
-        ["routine.import.manage", () => applyRoutineImport(
-            request("/api/routines/imports/17/apply", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ confirm: true }),
-            }),
-            { params: Promise.resolve({ batchId: "17" }) },
-        )],
-        ["routine.import.manage", () => cancelRoutineImport(
-            request("/api/routines/imports/17/cancel", { method: "POST" }),
-            { params: Promise.resolve({ batchId: "17" }) },
         )],
     ] as const)("proves %s reaches its real Dashboard Routine resolver seam", async (capability, invoke) => {
         await expectDirectConfigurationBoundary(capability, "DASHBOARD", 21, invoke);

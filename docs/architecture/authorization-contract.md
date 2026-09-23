@@ -235,7 +235,6 @@ contract values.
 | `routine.occurrence.override` | `ALL` | `DASHBOARD` | Atomic occurrence override of due date/assignee data; current Admin and transaction rules remain Routine-owned. |
 | `routine.occurrence.reassign` | `ALL` | `DASHBOARD` | Occurrence reassignment; active target and concurrency checks remain Routine-owned. |
 | `routine.occurrence.change_due_date` | `ALL` | `DASHBOARD` | Explicit occurrence due-date change; date, reminder, lock, and audit behavior remain Routine-owned. |
-| `routine.import.manage` | `ALL` | `DASHBOARD` | Import preview, staging, row, apply, and cancel operations; current Admin-only behavior is `CURRENT_COMPATIBILITY`. |
 | `routine.task.export` | `ALL` | `DASHBOARD` | Centrally enforced broad active Routine export; no-grant actors use the approved domain default, while broader access requires configured authority. |
 | `routine.summary.read` | `ASSIGNED`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Centrally enforced context-sensitive KPI read: Dashboard `mine` is `ASSIGNED`, Dashboard `all` is `ALL`, and LIFF is self-service `ASSIGNED`. |
 | `routine.reference.read` | `OWN`, `ALL` | `DASHBOARD`, `LIFF_SELF_SERVICE` | Centrally enforced reference read: the Dashboard default is `OWN`, configured `ALL` may expand active Employee references, and LIFF retains the no-Employee-list response contract. |

@@ -464,7 +464,6 @@ describe("Authorization Administration capability catalog", () => {
             "routine.occurrence.override",
             "routine.occurrence.reassign",
             "routine.occurrence.change_due_date",
-            "routine.import.manage",
             "routine.task.export",
             "stock.inventory.manage",
             "stock.request.process",
@@ -507,10 +506,10 @@ describe("Authorization Administration capability catalog", () => {
             "notification.inbox.read",
             "notification.inbox.update",
         ]);
-        expect(first).toHaveLength(41);
+        expect(first).toHaveLength(40);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_ONLY",
-        )).toHaveLength(17);
+        )).toHaveLength(16);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
         )).toHaveLength(24);
@@ -522,7 +521,7 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(0);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(41);
+        )).toHaveLength(40);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
         )).toHaveLength(0);

@@ -36,7 +36,6 @@ export const ROUTINE_CAPABILITIES = [
     "routine.occurrence.override",
     "routine.occurrence.reassign",
     "routine.occurrence.change_due_date",
-    "routine.import.manage",
     "routine.task.export",
     "routine.summary.read",
     "routine.reference.read",
@@ -148,7 +147,6 @@ export function defaultRoutineScopes(
         case "routine.occurrence.override":
         case "routine.occurrence.reassign":
         case "routine.occurrence.change_due_date":
-        case "routine.import.manage":
             return [];
         case "routine.task.export":
             return [];
@@ -184,7 +182,6 @@ function routineLiffSelfServiceScopes(
         case "routine.occurrence.override":
         case "routine.occurrence.reassign":
         case "routine.occurrence.change_due_date":
-        case "routine.import.manage":
         case "routine.task.export":
             return null;
         case "routine.summary.read":
@@ -419,7 +416,6 @@ function inspectRoutineDashboardEffectiveAccess(
         "routine.occurrence.override",
         "routine.occurrence.reassign",
         "routine.occurrence.change_due_date",
-        "routine.import.manage",
     ] as const) {
         inspections.push(inspectRoutineCapability(
             actor,
@@ -622,30 +618,6 @@ export async function resolveRoutineCapability(
     );
 }
 
-export async function resolveOptionalRoutineCapability(
-    actor: RoutineCommandActor,
-    employeeId: number | null,
-    capability: string,
-    options: RoutineCapabilityOptions = {},
-): Promise<RoutineCapabilityAuthorization | null> {
-    try {
-        return await resolveRoutineCapability(
-            actor,
-            employeeId,
-            capability,
-            options,
-        );
-    } catch (error) {
-        if (
-            error instanceof RoutineCapabilityDeniedError
-            && error.authorizationReason !== "UNKNOWN_CAPABILITY"
-        ) {
-            return null;
-        }
-        throw error;
-    }
-}
-
 function projectRoutineCapabilityDecision(
     actor: AuthorizationActor,
     capability: RoutineCapability,
@@ -730,7 +702,6 @@ export async function getRoutinePresentationCapabilities(
         canChangeOccurrenceDueDate: getScopes(
             "routine.occurrence.change_due_date",
         ) !== null,
-        canManageImports: getScopes("routine.import.manage") !== null,
         canExportTasks: getScopes("routine.task.export") !== null,
         canReadSummary: summaryReadScopes !== null,
         canReadAllSummary: summaryReadScopes?.includes("ALL") === true,

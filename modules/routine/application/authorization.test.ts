@@ -538,12 +538,11 @@ describe("Routine authorization adapter", () => {
         ).rejects.toMatchObject({ statusCode: 403 });
     });
 
-    it("does not provide a USER default for occurrence administration or import", async () => {
+    it("does not provide a USER default for occurrence administration", async () => {
         for (const capability of [
             "routine.occurrence.override",
             "routine.occurrence.reassign",
             "routine.occurrence.change_due_date",
-            "routine.import.manage",
         ] as const) {
             mocks.resolve.mockResolvedValueOnce(
                 decision(capability, false, [], "NO_APPLICABLE_GRANT"),
@@ -559,7 +558,6 @@ describe("Routine authorization adapter", () => {
         "routine.occurrence.override",
         "routine.occurrence.reassign",
         "routine.occurrence.change_due_date",
-        "routine.import.manage",
     ] as const)("denies revoked central-only capability %s in a transaction", async (capability) => {
         const persistenceContext = {} as AuthorizationPersistenceContext;
         const activeActor = {
@@ -585,28 +583,6 @@ describe("Routine authorization adapter", () => {
             authorizationReason: "NO_APPLICABLE_GRANT",
             statusCode: 403,
         });
-    });
-
-    it("accepts a configured import grant without creating a USER default", async () => {
-        mocks.resolve.mockResolvedValue(
-            decision(
-                "routine.import.manage",
-                true,
-                ["ALL"],
-                undefined,
-                [userGrant("routine.import.manage", "ALL")],
-            ),
-        );
-
-        const result = await resolveRoutineCapability(
-            actor(),
-            null,
-            "routine.import.manage",
-        );
-
-        expect(result.scopes).toEqual(["ALL"]);
-        expect(result.defaultScopes).toEqual([]);
-        expect(result.hasBroadAuthority).toBe(true);
     });
 
     it("clamps a LIFF ADMIN configured grant to Routine self-service scopes", async () => {

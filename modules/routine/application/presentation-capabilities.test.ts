@@ -44,12 +44,6 @@ const ALLOWED_DECISION: AuthorizationDecision = {
     grants: [],
 };
 
-const IMPORT_GRANT: EffectiveAuthorizationGrant = {
-    capability: "routine.import.manage",
-    scope: "ALL",
-    source: { type: "USER", userId: 7 },
-};
-
 function allowedDecisions(): ReadonlyMap<string, AuthorizationDecision> {
     return new Map(
         ROUTINE_CAPABILITIES.map((capability) => [
@@ -95,7 +89,6 @@ describe("Routine presentation capability projection", () => {
             canOverrideOccurrences: true,
             canReassignOccurrences: true,
             canChangeOccurrenceDueDate: true,
-            canManageImports: true,
             canExportTasks: true,
             canReadSummary: true,
             canReadAllSummary: true,
@@ -109,48 +102,6 @@ describe("Routine presentation capability projection", () => {
 
         expect(mocks.resolveMany).toHaveBeenCalledTimes(1);
         expect(mocks.resolve).not.toHaveBeenCalled();
-    });
-
-    it("keeps the no-grant USER default floor and honors a configured grant", async () => {
-        mockResolveMany((capability) =>
-            capability === "routine.import.manage"
-                ? {
-                      capability,
-                      allowed: true,
-                      scopes: ["ALL"],
-                      grants: [IMPORT_GRANT],
-                  }
-                : {
-                      capability,
-                      allowed: false,
-                      scopes: [],
-                      grants: [],
-                      reason: "NO_APPLICABLE_GRANT",
-                  },
-        );
-
-        await expect(
-            getRoutinePresentationCapabilities(ACTOR, 21),
-        ).resolves.toEqual({
-            canReadTasks: true,
-            canReadAllTasks: false,
-            canCreateTasks: true,
-            canCreateTasksForOthers: false,
-            canUpdateTasks: true,
-            canUpdateAllTasks: false,
-            canDeleteTasks: true,
-            canDeleteAllTasks: false,
-            canReadOccurrences: true,
-            canOverrideOccurrences: false,
-            canReassignOccurrences: false,
-            canChangeOccurrenceDueDate: false,
-            canManageImports: true,
-            canExportTasks: false,
-            canReadSummary: true,
-            canReadAllSummary: false,
-            canReadReference: true,
-            canReadAllReferences: false,
-        });
     });
 
     it("honors explicit non-admin task grants in the LIFF projection", async () => {
@@ -219,7 +170,6 @@ describe("Routine presentation capability projection", () => {
             canOverrideOccurrences: true,
             canReassignOccurrences: true,
             canChangeOccurrenceDueDate: true,
-            canManageImports: true,
             canExportTasks: true,
             canReadSummary: true,
             canReadAllSummary: true,
@@ -240,7 +190,6 @@ describe("Routine presentation capability projection", () => {
     it("keeps no-grant USER default policy for LIFF self-service", async () => {
         mockResolveMany((capability) => {
             const dashboardOnly = capability.startsWith("routine.occurrence.")
-                || capability === "routine.import.manage"
                 || capability === "routine.task.export";
 
             return {
@@ -268,7 +217,6 @@ describe("Routine presentation capability projection", () => {
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
-            canManageImports: false,
             canExportTasks: false,
             canReadSummary: true,
             canReadAllSummary: false,
@@ -300,7 +248,6 @@ describe("Routine presentation capability projection", () => {
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
-            canManageImports: false,
             canExportTasks: false,
             canReadSummary: false,
             canReadAllSummary: false,
@@ -338,7 +285,6 @@ describe("Routine presentation capability projection", () => {
                 || capability === "routine.occurrence.override"
                 || capability === "routine.occurrence.reassign"
                 || capability === "routine.occurrence.change_due_date"
-                || capability === "routine.import.manage"
                 || capability === "routine.task.export";
 
             return {
@@ -373,7 +319,6 @@ describe("Routine presentation capability projection", () => {
             canOverrideOccurrences: false,
             canReassignOccurrences: false,
             canChangeOccurrenceDueDate: false,
-            canManageImports: false,
             canExportTasks: false,
             canReadSummary: true,
             canReadAllSummary: false,

@@ -77,7 +77,6 @@ interface RoutinePresentationCapabilities {
     canOverrideOccurrences: boolean;
     canReassignOccurrences: boolean;
     canChangeOccurrenceDueDate: boolean;
-    canManageImports: boolean;
     canExportTasks: boolean;
     canReadSummary: boolean;
     canReadAllSummary: boolean;
@@ -86,7 +85,7 @@ interface RoutinePresentationCapabilities {
 ```
 
 `getRoutinePresentationCapabilities()` is the one reusable server-side
-Routine projection. It asks the central resolver for all 12 registered
+Routine projection. It asks the central resolver for all 11 registered
 capabilities through one `resolveMany()` call, then applies permanent Routine
 default composition and the Routine execution-channel policy to each decision.
 For a USER, the central resolver loads one shared authorization snapshot through
@@ -124,7 +123,7 @@ server Routine projection
     -> AuthenticatedUser.routineCapabilities
     -> DashboardProvider menu filtering
     -> /dashboard/routine feature + read-capability route boundary
-    -> Routine tabs and task/occurrence/import presentation controls
+    -> Routine tabs and task/occurrence presentation controls
 ```
 
 Routine navigation requires both the Routine feature flag and
@@ -135,7 +134,7 @@ operational `mine` and `all` tabs use `canReadTasks`; their distinction remains
 server-scoped and is not reimplemented in the browser. Export visibility uses
 `canExportTasks`, while the export API independently resolves
 `routine.task.export`. Create, update,
-lifecycle, delete, occurrence override, and import visibility use their
+lifecycle, delete, and occurrence override visibility use their
 corresponding projection booleans together with existing resource projections
 such as `task.canEdit` and `task.canDelete`.
 
@@ -196,7 +195,7 @@ Routine LIFF task presentation uses the granular projection as follows:
 | Edit | `canUpdateTasks AND task.canEdit` |
 | Delete | `canDeleteTasks AND task.canDelete` |
 | Lifecycle mutation | `canUpdateTasks AND` the existing resource lifecycle eligibility; no broader access is inferred |
-| Occurrence administration/import | Not exposed in LIFF; the LIFF self-service clamp keeps these capabilities unavailable |
+| Occurrence administration | Not exposed in LIFF; the LIFF self-service clamp keeps this capability unavailable |
 
 The client also guards form opening, confirmation, submission, and stale open
 state. These are presentation controls only; the LIFF routes and Routine
@@ -218,8 +217,8 @@ uses `ALL` for a normal USER without a configured grant. A normal USER's
 configured supported grant is additive. A system ADMIN in LIFF is instead
 constrained by the Routine self-service channel policy and does not gain
 `routine.occurrence.override`,
-`routine.occurrence.reassign`, `routine.occurrence.change_due_date`, or
-`routine.import.manage` presentation access. Dashboard ADMIN behavior remains
+`routine.occurrence.reassign`, or `routine.occurrence.change_due_date` presentation
+access. Routine Import was permanently retired in H2A. Dashboard ADMIN behavior remains
 the Phase 5B behavior. LIFF summary/reference projections remain available only
 for self-service behavior; central/configured `ALL` authority is clamped before
 the projection is exposed.

@@ -135,9 +135,8 @@ type RoutineReminderRuleRecord = {
 
 function routineOwnershipMode(
     authorization: RoutineCapabilityAuthorization,
-    broadOperation = false,
 ): "BROAD_AUTHORITY" | "SELF_SERVICE" {
-    if (authorization.hasBroadAuthority || broadOperation) {
+    if (authorization.hasBroadAuthority) {
         return "BROAD_AUTHORITY";
     }
     return "SELF_SERVICE";
@@ -169,20 +168,9 @@ function normalizeRoutineTaskCreateInput(
     input: RoutineTaskCreateInput,
     actorAuthorization: RoutineActorAuthorization,
     capabilityAuthorization: RoutineCapabilityAuthorization,
-    operation: "TASK_CREATE" | "IMPORT_APPLY",
 ): RoutineTaskCreateInput {
-    if (operation === "IMPORT_APPLY") {
-        return input;
-    }
-
-    const provenanceSafeInput: RoutineTaskCreateInput = {
-        ...input,
-        sourceFileName: undefined,
-        sourceSheet: undefined,
-        sourceRow: undefined,
-    };
     if (capabilityAuthorization.hasBroadAuthority) {
-        return provenanceSafeInput;
+        return input;
     }
 
     if (actorAuthorization.employeeId === null) {
@@ -190,7 +178,7 @@ function normalizeRoutineTaskCreateInput(
     }
 
     return {
-        ...provenanceSafeInput,
+        ...input,
         assignees: [{ employeeId: actorAuthorization.employeeId, role: "OWNER" }],
         reminderRules: canonicalizeReminderRules(
             input.reminderRules,
@@ -204,16 +192,10 @@ function normalizeRoutineTaskUpdateInput(
     authorization: RoutineCapabilityAuthorization,
     options: { canChangeLifecycle: boolean },
 ): RoutineTaskUpdateInput {
-    const provenanceSafeInput: RoutineTaskUpdateInput = {
-        ...input,
-        sourceFileName: undefined,
-        sourceSheet: undefined,
-        sourceRow: undefined,
-    };
-    if (authorization.hasBroadAuthority) return provenanceSafeInput;
+    if (authorization.hasBroadAuthority) return input;
 
     return {
-        ...provenanceSafeInput,
+        ...input,
         assignees: undefined,
         isActive: options.canChangeLifecycle ? input.isActive : undefined,
         reminderRules: canonicalizeReminderRules(input.reminderRules, authorization),
@@ -386,23 +368,18 @@ export async function createRoutineTaskInTransaction(
     tx: Prisma.TransactionClient,
     input: RoutineTaskCreateInput,
     actor: RoutineCommandActor,
-    generationOptions: RoutineGenerationOptions & {
-        authorizationCapability?: "routine.task.create" | "routine.import.manage";
-    } = {},
+    generationOptions: RoutineGenerationOptions = {},
 ): Promise<Prisma.RoutineTaskGetPayload<{ include: typeof ROUTINE_TASK_INCLUDE }>> {
     const actorAuthorization = await assertActiveRoutineActorInTransaction(tx, actor);
-    const capability = generationOptions.authorizationCapability
-        ?? "routine.task.create";
     const capabilityAuthorization = await resolveRoutineCapabilityInTransaction(
         tx,
         actorAuthorization,
-        capability,
+        "routine.task.create",
     );
     const normalizedInput = normalizeRoutineTaskCreateInput(
         input,
         actorAuthorization,
         capabilityAuthorization,
-        capability === "routine.import.manage" ? "IMPORT_APPLY" : "TASK_CREATE",
     );
     const scheduleType = normalizedInput.scheduleType as RoutineScheduleType;
     const scheduleConfig = parseScheduleConfig(scheduleType, normalizedInput.scheduleConfig);
@@ -434,9 +411,6 @@ export async function createRoutineTaskInTransaction(
             extraDetails: normalizedInput.extraDetails ?? null,
             businessDayPolicy: normalizedInput.businessDayPolicy as PrismaRoutineBusinessDayPolicy,
             isActive: normalizedInput.isActive,
-            sourceFileName: normalizedInput.sourceFileName ?? null,
-            sourceSheet: normalizedInput.sourceSheet ?? null,
-            sourceRow: normalizedInput.sourceRow ?? null,
             createdById: actor.id,
             updatedById: actor.id,
             assignees: { create: assignees },
@@ -462,10 +436,7 @@ export async function createRoutineTaskInTransaction(
             affectedEmployeeIds: assignees.map((assignee) => assignee.employeeId),
             scheduleType,
             version: task.version,
-            ownershipMode: routineOwnershipMode(
-                capabilityAuthorization,
-                capability === "routine.import.manage",
-            ),
+            ownershipMode: routineOwnershipMode(capabilityAuthorization),
             createdById: actor.id,
         },
     );
@@ -507,7 +478,6 @@ export async function createRoutineTask(
                 input,
                 actorAuthorization,
                 capabilityAuthorization,
-                "TASK_CREATE",
             );
             const normalizedRequestHash = createRoutineTaskRequestHash(normalizedInput);
             requestHash = normalizedRequestHash;
@@ -676,14 +646,6 @@ export async function deleteRoutineTask(
 
         await tx.routineTaskAssignee.deleteMany({ where: { taskId } });
         await tx.routineReminderRule.deleteMany({ where: { taskId } });
-        await tx.routineImportRow.updateMany({
-            where: { appliedTaskId: taskId },
-            data: { appliedTaskId: null },
-        });
-        await tx.routineImportLedger.updateMany({
-            where: { taskId },
-            data: { taskId: null },
-        });
         await tx.routineTaskCreateIdempotency.deleteMany({
             where: { taskId },
         });
@@ -820,9 +782,6 @@ export async function updateRoutineTask(
             extraDetails: normalizedInput.extraDetails,
             businessDayPolicy: normalizedInput.businessDayPolicy as PrismaRoutineBusinessDayPolicy | undefined,
             isActive: normalizedInput.isActive,
-            sourceFileName: normalizedInput.sourceFileName,
-            sourceSheet: normalizedInput.sourceSheet,
-            sourceRow: normalizedInput.sourceRow,
             updatedById: actor.id,
             version: { increment: 1 },
         };

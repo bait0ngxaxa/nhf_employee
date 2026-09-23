@@ -24,7 +24,6 @@ const allRoutineCapabilities = {
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
     canChangeOccurrenceDueDate: true,
-    canManageImports: true,
     canExportTasks: true,
     canReadSummary: true,
     canReadAllSummary: true,
@@ -131,7 +130,6 @@ const employees: RoutineEmployee[] = [{
 interface RenderListOptions {
     data?: PaginatedRoutineTaskWorkItemsResponse;
     focusOccurrenceId?: number | null;
-    canReadImportMetadata?: boolean;
     mutate?: KeyedMutator<PaginatedRoutineTaskWorkItemsResponse>;
     onEditTask?: (taskId: number) => void;
     routineCapabilities?: RoutinePresentationCapabilities;
@@ -140,7 +138,6 @@ interface RenderListOptions {
 function renderList({
     data = taskData,
     focusOccurrenceId = null,
-    canReadImportMetadata = false,
     mutate = vi.fn(async () => undefined),
     onEditTask = vi.fn<(taskId: number) => void>(),
     routineCapabilities = {
@@ -154,7 +151,6 @@ function renderList({
             data={data}
             error={undefined}
             isLoading={false}
-            canReadImportMetadata={canReadImportMetadata}
             focusTaskId={null}
             focusOccurrenceId={focusOccurrenceId}
             onRetry={vi.fn()}
@@ -235,7 +231,6 @@ describe("RoutineOccurrenceList", () => {
         };
         renderList({
             data: adminData,
-            canReadImportMetadata: true,
             onEditTask,
             routineCapabilities: allRoutineCapabilities,
         });
@@ -275,7 +270,6 @@ describe("RoutineOccurrenceList", () => {
         const fetchMock = vi.fn();
         vi.stubGlobal("fetch", fetchMock);
         renderList({
-            canReadImportMetadata: true,
             routineCapabilities: {
                 ...allRoutineCapabilities,
                 canUpdateTasks: false,
@@ -315,7 +309,6 @@ describe("RoutineOccurrenceList", () => {
                         data={taskData}
                         error={undefined}
                         isLoading={false}
-                        canReadImportMetadata={false}
                         focusTaskId={null}
                         focusOccurrenceId={null}
                         onRetry={vi.fn()}
@@ -356,7 +349,6 @@ describe("RoutineOccurrenceList", () => {
         const mutate = vi.fn().mockResolvedValue(undefined);
         vi.stubGlobal("fetch", fetchMock);
         renderList({
-            canReadImportMetadata: true,
             mutate,
             routineCapabilities: {
                 ...allRoutineCapabilities,
@@ -546,7 +538,6 @@ describe("RoutineOccurrenceList", () => {
                 ...taskData,
                 tasks: [{ ...taskData.tasks[0], canEdit: true, canDelete: true }],
             },
-            canReadImportMetadata: false,
             onEditTask,
             routineCapabilities: allRoutineCapabilities,
         });

@@ -88,14 +88,6 @@ describe("NHF Routine task deletion", () => {
         expect(prismaMock.routineOccurrence.deleteMany).toHaveBeenCalledWith({ where: { taskId: 71 } });
         expect(prismaMock.routineTaskAssignee.deleteMany).toHaveBeenCalledWith({ where: { taskId: 71 } });
         expect(prismaMock.routineReminderRule.deleteMany).toHaveBeenCalledWith({ where: { taskId: 71 } });
-        expect(prismaMock.routineImportRow.updateMany).toHaveBeenCalledWith({
-            where: { appliedTaskId: 71 },
-            data: { appliedTaskId: null },
-        });
-        expect(prismaMock.routineImportLedger.updateMany).toHaveBeenCalledWith({
-            where: { taskId: 71 },
-            data: { taskId: null },
-        });
         expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 action: "ROUTINE_TASK_DELETE",

@@ -259,9 +259,6 @@ const routineTaskCreateFields = {
         .array(routineAssigneeSchema)
         .min(1, "กรุณาระบุผู้รับผิดชอบ")
         .max(100, "ผู้รับผิดชอบมีได้ไม่เกิน 100 คน"),
-    sourceFileName: optionalText(255),
-    sourceSheet: optionalText(255),
-    sourceRow: z.coerce.number().int().positive().nullable().optional(),
     reminderRules: routineReminderRulesSchema.optional(),
 } as const;
 
@@ -281,9 +278,6 @@ const routineTaskUpdateFields = {
     businessDayPolicy: routineBusinessDayPolicySchema.optional(),
     isActive: z.boolean().optional(),
     assignees: routineTaskCreateFields.assignees.optional(),
-    sourceFileName: routineTaskCreateFields.sourceFileName,
-    sourceSheet: routineTaskCreateFields.sourceSheet,
-    sourceRow: routineTaskCreateFields.sourceRow,
     reminderRules: routineTaskCreateFields.reminderRules,
 } as const;
 

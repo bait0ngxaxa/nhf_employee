@@ -147,7 +147,6 @@ const ROUTINE = {
     canOverrideOccurrences: true,
     canReassignOccurrences: true,
     canChangeOccurrenceDueDate: true,
-    canManageImports: true,
     canExportTasks: true,
     canReadSummary: true,
     canReadAllSummary: true,

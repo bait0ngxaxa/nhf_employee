@@ -5,7 +5,6 @@ import {
     BellRing,
     CalendarClock,
     ClipboardList,
-    Database,
     ListChecks,
     Users,
 } from "lucide-react";
@@ -48,7 +47,6 @@ import type {
 type RoutineDetailsTask = RoutineTask | RoutineTaskWorkItem;
 
 interface RoutineDetailsDialogProps {
-    canReadImportMetadata: boolean;
     onOpenChange: (open: boolean) => void;
     open: boolean;
     task: RoutineDetailsTask | null;
@@ -144,13 +142,7 @@ function AssigneeList({ assignees }: { assignees: readonly RoutineAssignee[] }):
     );
 }
 
-function hasImportMetadata(task: RoutineDetailsTask): task is RoutineTask {
-    return "sourceFileName" in task
-        && Boolean(task.sourceFileName || task.sourceSheet || task.sourceRow);
-}
-
 export function RoutineDetailsDialog({
-    canReadImportMetadata,
     onOpenChange,
     open,
     task,
@@ -163,7 +155,6 @@ export function RoutineDetailsDialog({
     const hasOccurrenceAssigneeOverride = occurrence !== null
         && !areRoutineAssigneeSnapshotsEqual(task.assignees, occurrence.assignees);
     const extraDetails = task.extraDetails?.trim();
-    const showImportMetadata = canReadImportMetadata && hasImportMetadata(task);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -311,19 +302,6 @@ export function RoutineDetailsDialog({
                                 <p className="whitespace-pre-wrap break-words text-sm leading-6 text-content-body [overflow-wrap:anywhere]">
                                     {extraDetails}
                                 </p>
-                            </DetailSection>
-                        ) : null}
-
-                        {showImportMetadata ? (
-                            <DetailSection icon={Database} title="ข้อมูลต้นทางการนำเข้า">
-                                <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-                                    <DetailItem label="ไฟล์ต้นทาง" value={optionalText(task.sourceFileName)} />
-                                    <DetailItem label="ชีตต้นทาง" value={optionalText(task.sourceSheet)} />
-                                    <DetailItem
-                                        label="แถวต้นทาง"
-                                        value={task.sourceRow === null ? "ไม่ได้ระบุ" : String(task.sourceRow)}
-                                    />
-                                </dl>
                             </DetailSection>
                         ) : null}
                     </div>
