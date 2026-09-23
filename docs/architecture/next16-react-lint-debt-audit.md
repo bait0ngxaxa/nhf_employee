@@ -1,8 +1,8 @@
 # Next.js 16 / React lint-debt audit
 
-สถานะ: diagnostic-only inventory หลังการอัปเกรดเป็น Next.js 16.3.3
+สถานะปัจจุบัน (2026-09-23): migration L1–L5K เสร็จสิ้น กฎ `react-hooks/set-state-in-effect` เปิดใช้ทั่ว repository และไม่เหลือ diagnostics; ตัวเลข 80 รายการด้านล่างเป็น inventory ในวันที่เริ่ม audit
 
-เอกสารนี้บันทึกผลตรวจ lint rules ที่ถูกปิดชั่วคราวระหว่าง migration เท่านั้น ไม่มีการแก้ production code, test, ESLint configuration หรือพฤติกรรมของแอป
+เนื้อหา audit ด้านล่างบันทึกผลตรวจ lint rules ที่ถูกปิดชั่วคราวระหว่าง migration; ข้อความเกี่ยวกับสถานะในแต่ละ phase เป็นประวัติ ณ เวลานั้น
 
 ## Executive Summary
 
@@ -476,3 +476,7 @@ git diff
 - `npm.cmd run typecheck` — ผ่าน
 - `git diff --check` — ผ่าน
 - ไม่รัน `npm.cmd run test:full:serial` และไม่รัน `npm.cmd run build`
+
+## Migration closure (2026-09-23)
+
+Phase L5A–L5K แก้ findings ของ `react-hooks/set-state-in-effect` ครบแล้ว (58 → 0 จาก baseline หลัง L2A) และเปิด rule เป็น `error` ทั่ว repository ใน `eslint.config.mjs` ผล `lint:strict`, `typecheck`, `architecture:check` และ `test:full:serial` ผ่านทั้งหมด (346 files, 3,290 tests) รายละเอียด lifecycle และการตรวจแต่ละ phase อยู่ใน [React effect-state migration roadmap](./react-effect-state-migration-roadmap.md)

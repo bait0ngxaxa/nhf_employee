@@ -1,6 +1,8 @@
 # Phase L5A — `react-hooks/set-state-in-effect` Architecture Classification & Migration Roadmap
 
-สถานะของเอกสารนี้คือ **audit / architecture analysis เท่านั้น** ไม่มี production code, tests, `eslint.config.mjs` หรือ suppression ใดถูกแก้ใน Phase L5A
+สถานะปัจจุบัน (2026-09-23): migration L5A–L5K เสร็จสิ้น `react-hooks/set-state-in-effect` เปิดใช้ทั่ว repository และไม่เหลือ diagnostics; inventory 58 รายการและแผนด้านล่างเป็น baseline ประวัติของ Phase L5A
+
+Phase L5A เป็น **audit / architecture analysis เท่านั้น** ไม่มี production code, tests, `eslint.config.mjs` หรือ suppression ใดถูกแก้ใน phase นั้น
 
 เป้าหมายปลายทางที่ยังคงบังคับใช้คือ:
 
@@ -8,11 +10,11 @@
 react-hooks/set-state-in-effect = globally enabled
 ```
 
-การปิด rule ในปัจจุบันเป็น migration debt ชั่วคราว ไม่ใช่ policy ถาวรของสถาปัตยกรรม
+การปิด rule ใน Phase L5A เป็น migration debt ชั่วคราว ไม่ใช่ policy ถาวรของสถาปัตยกรรม
 
 ## Executive Summary
 
-- inventory ปัจจุบันจาก source จริงคือ **58 diagnostics ใน 38 ไฟล์**
+- inventory ณ Phase L5A จาก source จริงคือ **58 diagnostics ใน 38 ไฟล์**
 - จำนวน 58 ตรงกับ expected baseline หลัง L2A ที่ลบออก 3 จาก 61 รายการเดิม จึงไม่พบ discrepancy ของจำนวน
 - historical B/D ใช้เป็นหลักฐานประกอบเท่านั้น ไม่ได้ใช้เป็นคำตัดสินสุดท้าย
 - หลังอ่าน lifecycle จริงแล้ว ไม่พบ finding ที่เป็น Pattern A หรือ B แบบบริสุทธิ์เหลืออยู่: 3 รายการ B ที่ปลอดภัยถูกแก้ใน L2A ส่วน B ที่เหลือเป็น capability, URL, pagination หรือ disclosure transition ที่มี driver ภายนอกและไม่ใช่ event-owned ล้วน ๆ
@@ -892,3 +894,11 @@ initial audited findings: 58
 remaining react-hooks/set-state-in-effect findings: 0
 lint suppressions added for migration: 0
 ```
+
+### ESLint policy cleanup (2026-09-23)
+
+- เปิด `react-hooks/set-state-in-effect` เป็น `error` ใน `eslint.config.mjs` และลบคอมเมนต์ที่อธิบายการปิด rule ชั่วคราว
+- `npx.cmd eslint . --rule "react-hooks/set-state-in-effect:error" --max-warnings=0` ผ่านก่อนเปิด rule ใน config; `npm.cmd run lint:strict` ผ่านหลังเปิด rule
+- `npm.cmd run typecheck` และ `npm.cmd run architecture:check` ผ่าน (ตรวจ 1,181 source files)
+- `npm.cmd run test:full:serial` ผ่าน: 346 files, 3,290 tests
+- ไม่พบ suppression ของ `react-hooks/set-state-in-effect` ใน source และไม่ต้องเพิ่ม exception

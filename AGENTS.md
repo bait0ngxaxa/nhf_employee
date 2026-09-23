@@ -121,29 +121,27 @@ Run only checks proportional to the change. Typical order:
 Examples:
 
 ```bash
-npm run test:run -- path/to/changed-feature.test.ts
+npm run test -- path/to/changed-feature.test.ts
 npm run architecture:check
 npm run lint:strict
 npm run typecheck
 ```
 
-`test:run` is intended for explicitly scoped targeted tests. Agents MUST NOT run `npm run test:run` without an explicit test path during routine implementation iterations. An unscoped `npm run test:run` is a full repository suite, not an iterative debugging loop.
+During routine implementation, pass an explicit test path to `npm run test`. Without a path, this command runs the full repository suite.
 
 ### Full-suite rule
 
-If a full repository test suite is genuinely justified by broad regression risk, use only:
+If a full repository test suite is genuinely justified by broad regression risk, use:
 
 ```bash
-npm run test:full:serial
+npm run test
 ```
 
-This command disables Vitest file parallelism and is the standard full-suite command for constrained development machines. Do not use it during normal edit/fix iterations. Normally run it no more than once near task completion, only after implementation is complete, targeted tests are green, lint is green, typecheck is green, architecture checks are green where applicable, and the diff is stable.
-
-Do not replace `test:run` with an umbrella command that runs the complete repository suite.
+This command uses Vitest's default file parallelism. Do not use the full suite during normal edit/fix iterations. Normally run it no more than once near task completion, only after implementation is complete, targeted tests are green, lint is green, typecheck is green, architecture checks are green where applicable, and the diff is stable.
 
 ### Failure handling
 
-If the full serialized suite exposes failures:
+If the full suite exposes failures:
 
 1. identify and group the failures by root cause;
 2. reproduce each relevant failure with targeted test commands;
@@ -151,7 +149,7 @@ If the full serialized suite exposes failures:
 4. rerun only the affected targeted tests;
 5. rerun lint, typecheck, or architecture checks only when the fix affects them;
 6. do not immediately rerun the complete suite after every small edit;
-7. perform another full serialized confirmation only when the corrective diff is stable and the additional full run is justified.
+7. perform another full confirmation only when the corrective diff is stable and the additional full run is justified.
 
 Do not use this loop:
 
@@ -170,7 +168,7 @@ full suite
 A timeout, worker termination, resource exhaustion, or isolated failure from a broad run must not automatically be treated as a product defect. Reproduce the affected test in isolation first, for example:
 
 ```bash
-npm run test:run -- path/to/failing.test.ts
+npm run test -- path/to/failing.test.ts
 ```
 
 If the focused test passes consistently and there is evidence of machine or resource contention, classify the broad-run failure separately from a deterministic application regression. Do not modify production code or weaken tests merely to make a resource-sensitive broad suite pass.

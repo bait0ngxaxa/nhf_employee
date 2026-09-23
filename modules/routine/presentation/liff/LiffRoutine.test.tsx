@@ -933,8 +933,10 @@ describe("LiffRoutineApp", () => {
         toggleDetails(extraDetails);
         expect(extraDetails).toHaveProperty("open", false);
         fireEvent.click(submit);
-        await waitFor(() => expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(2));
-        expect(extraDetails).toHaveProperty("open", true);
+        await waitFor(() => {
+            expect(mocks.updateLiffRoutineTask).toHaveBeenCalledTimes(2);
+            expect(extraDetails).toHaveProperty("open", true);
+        });
     });
 
     it("keeps one create idempotency key when the same logical submission is retried", async () => {

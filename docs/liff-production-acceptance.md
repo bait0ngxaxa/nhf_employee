@@ -270,7 +270,7 @@ Provider evidence ต้องเป็น safe identifiers เท่านั�
 
 | ID | Check | Expected | Result | Evidence |
 | --- | --- | --- | --- | --- |
-| AUTO-01 | staged verification: `architecture:check`, `lint:strict`, `typecheck` และ targeted tests; ใช้ `test:full:serial` เมื่อ full-suite evidence มีเหตุผลรองรับ | checks และ Vitest ผ่านตาม scope | `NOT RUN` |  |
+| AUTO-01 | staged verification: `architecture:check`, `lint:strict`, `typecheck` และ targeted tests; ใช้ `npm run test` เมื่อ full-suite evidence มีเหตุผลรองรับ | checks และ Vitest ผ่านตาม scope | `NOT RUN` |  |
 | AUTO-02 | `npm run build` | production build ผ่านด้วย local/non-secret configuration หรือมี blocker ระบุชัด | `NOT RUN` |  |
 | AUTO-03 | `npm run line:richmenu:provision` | dry-run ผ่าน/ระบุ missing config และไม่มี LINE mutation | `NOT RUN` |  |
 | AUTO-04 | `npm run line:richmenu:status` ใน isolated/local environment | redacted status; หากไม่มี credential ให้บันทึก blocked ไม่ใช้ production token | `NOT RUN` |  |

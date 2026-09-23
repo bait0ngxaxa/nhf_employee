@@ -231,12 +231,12 @@ npx prisma generate
 npm run architecture:check
 npm run lint:strict
 npm run typecheck
-npm run test:run -- path/to/relevant-release.test.ts
+npm run test -- path/to/relevant-release.test.ts
 ```
 
 ให้ระบุ path ของ targeted tests ที่เกี่ยวข้องกับ release เสมอ อย่ารัน
-`npm run test:run` แบบไม่ระบุ path ในรอบแก้ไขปกติ หากเป็น release ที่มีความเสี่ยงกว้าง
-และจำเป็นต้องยืนยันทั้ง repository ให้ใช้ `npm run test:full:serial` หลัง checks
+`npm run test` แบบไม่ระบุ path ในรอบแก้ไขปกติ หากเป็น release ที่มีความเสี่ยงกว้าง
+และจำเป็นต้องยืนยันทั้ง repository ให้รัน `npm run test` หลัง checks
 ข้างต้นผ่านและ diff คงที่แล้ว
 
 ### 4. Apply migrations และ seed
@@ -447,7 +447,7 @@ counters เมื่อบางรายการทำงานไม่ส�
 - [ ] `npx prisma migrate deploy` ผ่าน
 - [ ] `npm run architecture:check` ผ่านเมื่อมีการเปลี่ยน module boundary
 - [ ] `npm run lint:strict` และ `npm run typecheck` ผ่าน
-- [ ] targeted tests ที่เกี่ยวข้องผ่าน; high-risk release ให้ใช้ `npm run test:full:serial` เมื่อมีเหตุผลรองรับ
+- [ ] targeted tests ที่เกี่ยวข้องผ่าน; high-risk release ให้ใช้ `npm run test` เมื่อมีเหตุผลรองรับ
 - [ ] ตั้ง feature flags ก่อน `npm run build`
 - [ ] process supervisor รัน Next.js ด้วย non-root user และมี Next.js เพียงหนึ่ง process (ห้าม PM2 cluster)
 - [ ] `npm run start` bind ที่ `127.0.0.1:3000` และ port นี้ไม่ reachable จาก Internet โดยตรง
@@ -470,7 +470,7 @@ npx prisma generate
 npm run architecture:check
 npm run lint:strict
 npm run typecheck
-npm run test:run -- path/to/relevant-release.test.ts
+npm run test -- path/to/relevant-release.test.ts
 npx prisma migrate deploy
 npm run build
 ```
@@ -508,16 +508,16 @@ Runner จะ apply Prisma migrations ก่อนทดสอบ และป�
 npm run dev
 npm run lint:strict
 npm run typecheck
-npm run test:run -- path/to/relevant.test.ts
-npm run test:full:serial
+npm run test -- path/to/relevant.test.ts
+npm run test
 npm run test:coverage
 npm run build
 npm run start
 npm run db:seed
 ```
 
-`test:full:serial` ใช้ยืนยัน full suite เมื่อมีเหตุผลด้าน regression risk เท่านั้น
-การพัฒนาและแก้ไขปกติให้ใช้ `test:run` พร้อม path ของ test ที่เกี่ยวข้อง
+`npm run test` แบบไม่ระบุ path ใช้ยืนยัน full suite เมื่อมีเหตุผลด้าน regression risk เท่านั้น
+การพัฒนาและแก้ไขปกติให้ใช้ `npm run test -- path/to/relevant.test.ts` พร้อม path ของ test ที่เกี่ยวข้อง
 
 ## Troubleshooting
 
