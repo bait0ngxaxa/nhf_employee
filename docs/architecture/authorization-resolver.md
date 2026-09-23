@@ -22,6 +22,15 @@ capability, and Email Request uses centralized configured `OWN`/`ALL` read and
 `ALL` create decisions. The completion record is in
 [authorization-phase-12hd-missing-deferred-capability-completion.md](./authorization-phase-12hd-missing-deferred-capability-completion.md).
 
+Phase 13A/13A.1 adds the narrow server contract
+`findActiveUsersWithConfiguredCapabilityScope` for notification audience
+lookup. It enumerates candidates with explicit configured grants and evaluates
+them through the canonical configured resolver; it is not a replacement for
+domain Default Domain Policy or a general authorization decision. Candidates
+with malformed persisted authorization are excluded. Current mappings and the
+rollout boundary are recorded in
+[notification-capability-recipient-migration.md](./notification-capability-recipient-migration.md).
+
 Status: Phase 3 complete. This document describes the resolver introduced
 after the Phase 1 capability contract and Phase 2 authorization persistence.
 It extends, and does not replace, the current behavior record in

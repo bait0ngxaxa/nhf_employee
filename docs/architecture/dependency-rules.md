@@ -9,9 +9,10 @@ complete. These rules
 govern new architecture code while unrelated legacy features remain compatible
 during incremental migration.
 
-The authoritative K0 repository-wide checker re-audit is
-[final-repository-audit.md](./final-repository-audit.md). It records current
-coverage gaps without broadening the checker speculatively.
+The repository-wide K0 checker audit, K1 closure, and later audited-source
+baseline are recorded in [final-repository-audit.md](./final-repository-audit.md).
+K0 checker-coverage notes below are historical; use the K1/H0 sections there
+for the later repository audit findings.
 
 The authoritative Auth boundary is recorded in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -163,13 +164,15 @@ Notification. A direct processor-to-Notification dispatch is reserved for a
 future truly Notification-owned generic event whose payload is already a fully
 resolved Notification command; no current production event uses that shape.
 
-The current `lib/services/notifications/in-app.ts` helper is now a minimal
+The current `lib/services/notifications/in-app.ts` helper is a minimal
 explicit-user compatibility adapter used only by deferred Email Request. It
-contains no audience lookup. `createAdminInAppNotificationsOnce` was removed;
-Stock owns its active-admin and requester-cancellation admin policies locally.
-Do not introduce a generic Notification audience query or migrate Email
-Request until the future IT capability boundary is approved. Legacy IT
-notification and outbox enum values remain storage-compatible history only.
+contains no audience lookup. `createAdminInAppNotificationsOnce` was removed.
+Phase 13A/13A.1 moved the Routine, Stock, and Email Request notification
+audiences to configured capabilities; the business producer still owns each
+event and recipient policy. Do not add a generic Notification audience query
+or migrate the Email Request workflow until the future IT capability boundary
+is approved. Legacy IT notification and outbox enum values remain
+storage-compatible history only.
 
 Notification application commands distinguish strict `createForUser` and
 `createForUsers` persistence from idempotent `createForUserOnce`: strict
@@ -397,12 +400,13 @@ the module boundary from a legacy directory, while imports unrelated to
 | Routine 11B.1 browser boundary | `app/dashboard/routine/**`, `app/liff/routine/**`, `modules/routine/**`, and the Routine client graph | Requires Routine presentation routes to consume `@/modules/routine/client`; rejects Routine server/deep imports from those routes, Routine internals re-entering either public barrel, Routine server-entry reachability, and proven server-only runtime dependencies from `@/modules/routine/client`; preserves runtime-safe presentation/domain contracts and the explicit `sheet-config.ts` pure helper |
 | Auth J3 Audit producer ownership | `app/api/auth/**` | Requires Auth producers to use `@/modules/audit` directly; rejects Auth API imports of `@/lib/server/audit` without banning legitimate non-Auth compatibility consumers |
 
-K0 checker coverage note: the current client/server graph guard explicitly
-walks Leave, Employee, Department, Notification, Audit, Auth, LINE, and Stock
-boundaries, and Phase 11B.1 now adds the Routine client graph and route
-boundary. Exact ownership of compatibility adapters and provider-specific
-payload composition is not mechanically allowlisted. The K0 audit records
-these as correction slices; K0 does not add speculative rules.
+Historical K0 checker-coverage note: the client/server graph guard at that
+baseline explicitly walked Leave, Employee, Department, Notification, Audit,
+Auth, LINE, and Stock boundaries, and Phase 11B.1 had added the Routine client
+graph and route boundary. Exact ownership of compatibility adapters and
+provider-specific payload composition was not mechanically allowlisted at
+that baseline. K1 later closed the three Stock findings; the K0 note is
+retained as audit history rather than a current checker-coverage statement.
 
 ## Auth J2 browser and projection boundary
 

@@ -7,10 +7,9 @@ exclusivity remains closed. Phase H3 Notification producer integration and
 final migration audit remain complete. Phase G3 Department migration remains
 complete.
 
-The authoritative K0 repository-wide audit and deferred-boundary inventory is
-[final-repository-audit.md](./final-repository-audit.md). It records the
-current ownership map, the remaining Stock boundary findings, and the
-intentional future IT boundary without changing production behavior.
+The repository-wide K0 audit, K1 closure, and deferred-boundary inventory are
+recorded in [final-repository-audit.md](./final-repository-audit.md). K1 closed
+the three Stock ownership findings; the future IT boundary remains deferred.
 
 The authoritative J0 decision is recorded in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -30,9 +29,8 @@ target architecture. Stock server/business ownership is now migrated into
 `modules/stock/`; its Dashboard and client presentation now live in the same
 module behind separate server and client public entry points. See
 [stock-migration.md](./stock-migration.md) for the migration status and
-transitional dependencies. The K0 audit records that the active Stock LIFF
-presentation remains outside this Phase C Dashboard boundary and is a future
-Stock correction slice.
+transitional dependencies. The Stock LIFF and provider ownership findings
+recorded by K0 were closed by K1; the closure is summarized below.
 
 Routine server/business and Dashboard/LIFF presentation ownership is now also
 migrated into `modules/routine/`. See

@@ -11,7 +11,8 @@
 - New Employee Request: ส่งคำร้องอีเมล สารบรรณ และ Shared Drive ให้ทีมไอที
 - Notification: แจ้งเตือนในระบบ, Email และ LINE ผ่าน transactional outbox
 - Notification architecture และ channel matrix: [Notification Channel Architecture](./docs/notification-channels.md)
-- Security: JWT access token, refresh-token rotation, RBAC และ audit log
+- ดัชนีเอกสาร repository: [Documentation Index](./docs/README.md)
+- Security: JWT access token, refresh-token rotation, สิทธิ์ธุรกิจตาม capability และ configured grants, และ audit log
 
 ## Technology Stack
 

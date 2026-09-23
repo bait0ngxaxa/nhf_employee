@@ -38,20 +38,21 @@ orchestration and business use cases behind the Stock public API, but it did
 not relocate every Stock-specific delivery payload from the generic provider
 paths.
 
-## Historical K0 note
+## Historical K0 note — findings closed by K1
 
-The final repository audit records two Stock boundaries that remain for a
-future K1 correction and are not evidence that Phase C's defined migration
-scope is open:
+At the K0 audit, two Stock boundaries remained for a K1 correction. The
+following bullets preserve that snapshot; both findings were closed by K1 in
+the current state below. They are not evidence that Phase C's defined
+migration scope is open:
 
-* Stock LIFF presentation still spans `app/liff/stock/**`,
+* Stock LIFF presentation spanned `app/liff/stock/**`,
   `components/liff/stock/**`, `lib/client/liff-stock.ts`, and
   `lib/types/stock-liff.ts` instead of being fully exposed through
   `@/modules/stock/client`.
-* Generic provider paths still compose Stock-specific email and LINE meaning,
+* Generic provider paths composed Stock-specific email and LINE meaning,
   including Stock subjects, message IDs, sender names, status/template
   selection, and Flex payloads under `lib/email/**`, `lib/line/**`, and
-  related Stock notification adapters. K1 should move that business-specific
+  related Stock notification adapters. K1 moved that business-specific
   composition behind the Stock boundary while keeping generic transport
   infrastructure platform-owned.
 

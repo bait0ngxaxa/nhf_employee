@@ -5,6 +5,12 @@ Phase H1 server/application ownership and Phase H0 discovery remain closed.
 Notification H0-H3 migration is complete. Email Request/IT remains an explicit
 deferred capability exception.
 
+Current-state note: this record preserves the H0-H3 boundary and recipient
+behavior at that migration's closure. Phase 13A/13A.1 later moved Routine,
+Stock, and Email Request notification audience selection to configured
+capabilities; the current mappings and deferred enum contraction are recorded
+in [notification-capability-recipient-migration.md](./notification-capability-recipient-migration.md).
+
 This record is the source of truth for the Notification boundary and its
 incremental implementation. It records the repository behavior observed at the
 G3 closure baseline and separates the in-app Inbox capability from business

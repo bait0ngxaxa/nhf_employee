@@ -9,6 +9,11 @@
 - In-app notifications remain supported.
 - Stock legacy LINE remains supported during the migration period.
 
+Routine, Stock, and Email Request recipient selection now uses configured
+capabilities after Phase 13A/13A.1; see the
+[recipient migration record](./architecture/notification-capability-recipient-migration.md)
+for the current mappings and rollout boundary.
+
 ## Architecture
 
 ทุก business event ยังคงสร้าง notification semantics เดิมของโมดูล แล้วส่งงานผ่าน
@@ -63,7 +68,7 @@ LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel �
 | Leave cancelled after approval | มี parent เดิม | มี parent เดิม | employee ตาม flow เดิม | ไม่ใช้ |
 | Leave not-taken requested | มี parent เดิม | มี parent เดิม | approver ตาม flow เดิม | ไม่ใช้ |
 | Leave not-taken confirmed | มี parent เดิม | มี parent เดิม | employee ตาม flow เดิม | ไม่ใช้ |
-| Routine reminder | มี | มี | recipient ตาม scope ที่ active และมี link; assignee ใช้ Routine LIFF, admin คง dashboard URL เดิม | ไม่ใช้ |
+| Routine reminder | มี | มี | recipient ตาม scope ที่ active และมี link; assignee ใช้ Routine LIFF, `ALL_READERS` ใช้ Dashboard URL | ไม่ใช้ |
 | Routine contract expiry | มี | มี | assignee ที่ active และมี link; คง destination semantics เดิม | ไม่ใช้ |
 | Stock request result: issued / admin cancellation | มีเดิม | มีเดิม | requester ที่ active และมี link → Stock LIFF | ไม่ใช้ |
 | Stock request self-cancellation | มีเดิม | ไม่เพิ่ม/ไม่เปลี่ยน behavior เดิม | requester ที่ active และมี link → Stock LIFF | ไม่ใช้ |

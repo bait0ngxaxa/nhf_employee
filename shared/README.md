@@ -23,8 +23,8 @@ producer/read seams. Production physical AuditLog persistence is now exclusive
 to Audit infrastructure. Legacy Audit adapters remain only for
 Email Request and export compatibility; Auth/Session/Identity ownership is
 complete, and future IT remains intentionally deferred.
-The authoritative repository-wide K0 ownership map and deferred-boundary
-inventory is [final-repository-audit.md](../docs/architecture/final-repository-audit.md).
+The repository-wide K0 ownership map, K1 closure, and deferred-boundary
+inventory are recorded in [final-repository-audit.md](../docs/architecture/final-repository-audit.md).
 
 See [module boundaries](../docs/architecture/module-boundaries.md) and
 [dependency rules](../docs/architecture/dependency-rules.md) for the complete

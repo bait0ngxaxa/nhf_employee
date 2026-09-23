@@ -651,8 +651,10 @@ role-neutral configured resolver and the same domain composition used by
 server enforcement. ADMIN identity alone does not project central-only
 business surfaces; equivalent configured USER and ADMIN actors project
 equivalent access. Authorization Administration remains a separate ADMIN-only
-control-plane projection, and role-based Routine/Stock recipient policies
-remain domain recipient policy rather than current-actor authority.
+control-plane projection. Phase 13A/13A.1 later replaced role-based
+Routine/Stock recipient audiences with configured capabilities. Recipient
+resolution remains business-owned and separate from current-actor authority;
+see [notification-capability-recipient-migration.md](./notification-capability-recipient-migration.md).
 
 The full projection, route, lifecycle, and security regression record is in
 [authorization-phase-12hg-enforcement-cutover-security-regression.md](authorization-phase-12hg-enforcement-cutover-security-regression.md).

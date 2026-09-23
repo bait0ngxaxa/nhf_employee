@@ -9,10 +9,10 @@ complete.
 Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
-The authoritative K0 repository-wide ownership and deferred-boundary audit is
-[final-repository-audit.md](./final-repository-audit.md). It records the
-remaining Stock presentation/provider findings and confirms the intentional
-future modules/it boundary.
+The repository-wide K0 ownership audit, K1 closure, and deferred-boundary
+inventory are recorded in [final-repository-audit.md](./final-repository-audit.md).
+K1 closed the three Stock findings; the future `modules/it` boundary remains
+deferred.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -192,10 +192,10 @@ supersede semantics. Notification must not grow audience APIs such as “notify
 all Stock admins” or become a workflow owner for another module. Leave, Stock,
 and Routine use only `@/modules/notification` for Inbox persistence; physical
 Prisma `Notification` delegate operations are owned exclusively by
-`modules/notification/infrastructure/**` in production. Stock's active/
-non-deleted admin policy and separate requester-cancellation `role = ADMIN`
-policy remain Stock-owned and intentionally distinct. The legacy generic
-adapter remains solely for deferred Email Request.
+`modules/notification/infrastructure/**` in production. Phase 13A/13A.1
+updates Routine, Stock, and Email Request audience selection to configured
+capabilities; each producer still owns its event and recipient policy. The
+legacy generic adapter remains solely for deferred Email Request.
 
 `NotificationOutbox` is a separate shared/platform boundary. The global
 outbox owns reliable asynchronous delivery, event claim and status lifecycle,
@@ -541,10 +541,13 @@ imports are not rewritten merely to make the target diagram look complete. A
 migration must preserve behavior unless a separate change explicitly requests
 a behavior change.
 
-The Stock server and Dashboard boundary is migrated, but the active Stock LIFF
-presentation still uses `components/liff/stock/**`, `lib/client/liff-stock.ts`,
-and `lib/types/stock-liff.ts`. This is an identified future Stock correction
-slice, not a reason to create a second Stock module or a new capability.
+### Historical K0 Stock finding — closed by K1
+
+At the K0 audit, the Stock server and Dashboard boundary was migrated, while
+the active Stock LIFF presentation still used `components/liff/stock/**`,
+`lib/client/liff-stock.ts`, and `lib/types/stock-liff.ts`. K1 moved that
+presentation, browser transport, and neutral contracts under `modules/stock/`;
+the current boundary is recorded below.
 
 Leave is a completed incremental migration: `modules/leave/` owns server,
 Dashboard presentation, and LIFF presentation behavior. No Leave compatibility

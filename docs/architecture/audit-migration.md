@@ -5,9 +5,10 @@ persistence exclusivity complete.**
 
 Audit capability migration I0-I3 is closed. At the I3 audited baseline,
 Auth/Session/Identity migration had not started. Phase J0 discovery has since
-closed; the current Auth boundary is authoritative in
+closed, and the current Auth / Session / Identity migration (J0-J3) is complete.
+Its current boundary is authoritative in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md),
-while J1-J3 implementation remains unstarted.
+while Email Request/future IT migration remains deferred.
 
 Baseline audited: `05c2327be2f46e83a843040b978093b30a1c0289`
 (`refactor(notification): migrate Leave Stock and Routine Inbox writes`).
@@ -1249,8 +1250,9 @@ the verification record below after the final checks complete.
 Phase I3 CLOSED — Audit producer integration and physical persistence
 exclusivity complete.
 Audit capability migration I0-I3 CLOSED.
-Auth/Session/Identity J1-J3 implementation NOT STARTED; Phase J0 discovery is
-closed in the current architecture record.
+Auth/Session/Identity J0-J3 migration CLOSED; see
+`auth-session-identity-migration.md` for its current boundary and evidence.
+Email Request/future IT migration remains deferred.
 
 ## 27. L6 current compatibility status
 

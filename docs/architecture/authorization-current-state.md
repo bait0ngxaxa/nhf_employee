@@ -1,7 +1,8 @@
 # NHF Employee — Current Authorization State
 
-> **Current repository state (Phase 12H-I):** ADMIN is an Auth/control-plane
-> role only. Business authorization is the domain Default Domain Policy plus
+> **Current repository state (Phase 12H-I and notification-recipient
+> Phase 13A/13A.1):** ADMIN is an Auth/control-plane role only. Business
+> authorization is the domain Default Domain Policy plus
 > configured Team, TeamRole, and exceptional direct User grants. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load and
 > evaluate configured persistence for USER and ADMIN alike; `systemRole` is
@@ -9,6 +10,10 @@
 > **CLOSED / ACCEPTED** from operator-confirmed evidence. Phase 12H-I
 > compatibility-debt removal is recorded in
 > [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
+> Phase 13A/13A.1 subsequently aligned Routine, Stock, and Email Request
+> notification audiences with configured capabilities. Routine enum
+> contraction remains deferred pending production rollout evidence; see
+> [notification-capability-recipient-migration.md](notification-capability-recipient-migration.md).
 > The older Phase 12H-B through 12H-H boundary notes below remain historical
 > records of behavior at those phase boundaries.
 >

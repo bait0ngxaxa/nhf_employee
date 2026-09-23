@@ -3,9 +3,9 @@
 `modules/` is the ownership boundary for business capabilities in the NHF
 Employee application.
 
-Stock, Routine, Leave, Employee, Department, Audit, Auth/Session, and
-LINE/LIFF integration are
-migrated capability modules. Audit Phase I3 is closed with generic
+`modules/` currently contains the Audit, Auth, Authorization, Department,
+Employee, Leave, LINE/LIFF, Notification, Routine, and Stock capability
+boundaries. Audit Phase I3 is closed with generic
 server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in
 `modules/audit/`. Its public server entry is `@/modules/audit`; its browser-facing entry is
@@ -21,8 +21,8 @@ Phase J3 closes LINE/LIFF identity integration plus Auth Audit producer
 migration; the Auth / Session / Identity migration is complete. The
 authoritative record is
 [`docs/architecture/auth-session-identity-migration.md`](../docs/architecture/auth-session-identity-migration.md).
-The authoritative repository-wide K0 ownership map and deferred-boundary
-inventory is
+The repository-wide K0 ownership map, K1 closure, and deferred-boundary
+inventory are recorded in
 [`docs/architecture/final-repository-audit.md`](../docs/architecture/final-repository-audit.md).
 The runtime Auth capability is `modules/auth/`, with
 `@/modules/auth` as its server public entry and `@/modules/auth/client` as its
