@@ -250,23 +250,23 @@ imports before traversal.
 
 The accepted current Routine browser graph consists of the Dashboard and LIFF
 presentation modules, their browser transport and UI dependencies, Routine
-schemas, the pure Routine domain helpers used by that presentation, and the
-proven pure helper `modules/routine/application/imports/sheet-config.ts`.
+schemas, and the pure Routine domain helpers used by that presentation.
 Browser-safe cross-module entries such as `@/modules/employee/client`,
 `@/modules/line/client`, and shared client/HTTP contracts remain allowed. The
 type-only `modules/routine/application/types.ts` contract is also allowed and
 does not become a runtime edge.
 
-The Routine graph rejects the Routine server root/index, all current Routine
-application code except the explicit `sheet-config.ts` helper, Routine
-infrastructure, Routine server adapters, and the following platform boundaries:
-database/server/email/LINE/outbox infrastructure, server HTTP/network
-helpers, and `lib/auth` API/context/CSRF/hybrid/rate-limit/server/workforce
-helpers. It also rejects runtime Prisma, bcrypt, mail/provider SDKs,
-`server-only`, `next/server`, `next/headers`, `next/cache`, and Node built-ins.
-The rule uses these exact ownership and runtime boundaries rather than a
-repository-wide directory blacklist; packages used by a server-owned Routine
-workbook/parser path are protected by that path's ownership boundary.
+The Routine graph rejects the Routine server root/index, all Routine
+application code, Routine infrastructure, Routine server adapters, and the
+following platform boundaries: database/server/email/LINE/outbox
+infrastructure, server HTTP/network helpers, and `lib/auth`
+API/context/CSRF/hybrid/rate-limit/server/workforce helpers. It also rejects
+runtime Prisma, bcrypt, mail/provider SDKs, `server-only`, `next/server`,
+`next/headers`, `next/cache`, and Node built-ins. The rule uses these exact
+ownership and runtime boundaries rather than a repository-wide directory
+blacklist. H2A.1 retired the Routine Import application path; Prisma persistence
+models for deployment compatibility are server-only and have no current
+application consumer until H2A.2 removes them.
 
 Routine module internals must use local contracts and must not re-enter either
 Routine public entry. These checks protect module composition and browser
@@ -397,7 +397,7 @@ the module boundary from a legacy directory, while imports unrelated to
 | Audit I1-I2 ownership | `app/api/audit-logs/**`, `app/dashboard/audit/**`, `modules/audit/**`, production client graphs, production source | Requires Audit API routes to consume `@/modules/audit` and Audit Dashboard routes to consume `@/modules/audit/client`; rejects deleted Audit presentation paths, deep/self-barrel imports, server-only dependencies and other module server entries in the Audit client graph, while preserving the I1 direct-access allowlist |
 | Auth J1/J2 ownership | `app/api/auth/**`, `modules/auth/**`, Employee lifecycle composition, production source/client graphs | Restricts production `AuthRefreshToken` and `PasswordResetToken` delegate access to Auth persistence infrastructure; requires server consumers to use `@/modules/auth` and browser consumers to use `@/modules/auth/client`; rejects Auth presentation deep imports, deleted legacy browser seams, Auth internals importing their own barrel, client reachability of the server entry, and server-only runtime dependencies from the Auth client graph; preserves tests, fixtures, schema/migrations, seed/support, and generated-code exceptions |
 | LINE J3 ownership | `app/api/line/**`, `modules/line/**`, production source/client graphs, production `LineAccountLink` access | Requires server consumers to use `@/modules/line` and browser consumers to use `@/modules/line/client`; rejects LINE deep imports, LINE internal self-barrel imports, deleted LIFF compatibility paths, client reachability of the server entry, server/secret/Node dependencies from the LINE client graph, and direct/aliased/destructured `LineAccountLink` delegates outside `modules/line/infrastructure/**`; preserves tests, fixtures, Prisma support, and provider infrastructure exceptions |
-| Routine 11B.1 browser boundary | `app/dashboard/routine/**`, `app/liff/routine/**`, `modules/routine/**`, and the Routine client graph | Requires Routine presentation routes to consume `@/modules/routine/client`; rejects Routine server/deep imports from those routes, Routine internals re-entering either public barrel, Routine server-entry reachability, and proven server-only runtime dependencies from `@/modules/routine/client`; preserves runtime-safe presentation/domain contracts and the explicit `sheet-config.ts` pure helper |
+| Routine 11B.1 browser boundary | `app/dashboard/routine/**`, `app/liff/routine/**`, `modules/routine/**`, and the Routine client graph | Requires Routine presentation routes to consume `@/modules/routine/client`; rejects Routine server/deep imports from those routes, Routine internals re-entering either public barrel, Routine server-entry reachability, and proven server-only runtime dependencies from `@/modules/routine/client`; preserves runtime-safe presentation/domain contracts |
 | Auth J3 Audit producer ownership | `app/api/auth/**` | Requires Auth producers to use `@/modules/audit` directly; rejects Auth API imports of `@/lib/server/audit` without banning legitimate non-Auth compatibility consumers |
 
 Historical K0 checker-coverage note: the client/server graph guard at that

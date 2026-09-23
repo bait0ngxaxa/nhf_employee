@@ -24,6 +24,14 @@ Employee remains the owner of its selectors, import presentation, and
 Department-specific display compatibility; no Department client entry is
 required.
 
+Current-state note: H2A.1 has permanently retired Routine Import runtime
+behavior. Routine Import paths and semantics mentioned in the earlier
+discovery records below describe the historical implementation; the current
+Routine module has no Import consumer. Prisma keeps the corresponding
+persistence representation only for rollout compatibility until H2A.2. See
+[Routine Import retirement](../routine-import.md) for the current rollout
+status.
+
 ## F1 implementation record
 
 Authoritative Employee server/business ownership is now:
@@ -858,7 +866,7 @@ the final owners below are the contracts now used by production code.
 | `getEmployeeStatusValueFromLabel` | Employee CSV/form label parsing | Employee import/presentation-local only | No external production consumer after F2 |
 | `isEmployeeActive` | Employee status-only predicate | Employee domain/presentation-local, distinct from workforce eligibility | No external production consumer after F2 |
 | `isEmployeeSuspended` | Employee status-only predicate | Employee domain/presentation-local | No external production consumer after F2 |
-| `getEmployeeFullName` | Pure Employee identity formatting | Employee domain identity; server root export because signup and Routine server code consume it | `app/api/auth/signup/route.ts`, `modules/routine/application/imports/owner-mapping.ts` |
+| `getEmployeeFullName` | Pure Employee identity formatting | Employee domain identity; server root export because Auth signup and Employee mutations consume it | `modules/auth/application/signup.ts`, `modules/employee/application/mutations.ts` |
 | `getEmployeeDisplayName` | Employee full name plus nickname | Employee domain identity; server root and browser-safe client exports | Leave/Routine server and browser presentation, audit display |
 | `getEmployeeInitials` | Pure Employee presentation formatting | Employee presentation-local formatter | Employee avatar/table presentation |
 | `getEmployeeEmailStatus` | Employee temporary/valid/invalid display classification | Employee domain implementation used by Employee export; not an Auth credential validator | `modules/employee/infrastructure/export/employee-export.ts` |
@@ -1047,8 +1055,6 @@ modules/routine/application/recipients.ts
 modules/routine/application/scheduler.ts
 modules/routine/application/reminders.ts
 modules/routine/application/contract-reminders.ts
-modules/routine/application/imports/staging.ts
-modules/routine/application/imports/owner-mapping.ts
 modules/routine/presentation/dashboard/labels.ts
 modules/routine/presentation/dashboard/RoutineAssigneePicker.tsx
 modules/routine/presentation/dashboard/RoutineTaskForm.tsx
@@ -1061,14 +1067,12 @@ Routine owns:
 - routine authorization scope;
 - active-assignee validation as a Routine rule;
 - notification readiness and recipient selection;
-- import owner-name mapping, duplicate/unresolved-owner review, and Routine
-  import semantics;
 - Routine display/serialization of a selected assignee.
 
 Employee owns the base Employee identity, lifecycle state, department ID, and
 organizational hierarchy that Routine reads. Routine's current direct
 transactional `employee` queries can remain Routine-owned where they are part
-of assignment/import/notification rules. A future narrow Employee reference
+of assignment/notification rules. A future narrow Employee reference
 projection may replace repeated display/lifecycle reads, but F0 does not force
 an API call or a cross-module dependency that would weaken transaction
 semantics.
@@ -1344,7 +1348,7 @@ were used as behavioral evidence, not as the reason to retain an export.
 | --- | --- | --- |
 | `hasEligibleEmployeeLifecycle` | Auth server and hybrid-login route | Employee-only lifecycle eligibility; it does not replace User/session authorization |
 | `findSignupEmployee`, `lockAndRecheckSignupEmployee` | `app/api/auth/signup/route.ts` | Exact-email lookup and serializable transaction row-lock/recheck seam for signup concurrency |
-| `getEmployeeFullName` | Signup error/audit projection and Routine server owner mapping | Pure Employee identity formatting |
+| `getEmployeeFullName` | Auth signup and Employee mutation projections | Pure Employee identity formatting |
 | `getEmployeeDisplayName` | Leave/Routine server application/report code and the Employee client entry | Pure Employee full-name/nickname formatting |
 | `EmployeeDisplayNameSource` | `modules/routine/application/recipients.ts` | Structural Employee identity projection for a server-side recipient contract |
 | `applyEmployeeManagerChangesInTransaction` | `modules/leave/application/approvals/approver-assignment.ts` | Employee-owned `managerId` mutation; Leave retains approver policy and transaction coordination |

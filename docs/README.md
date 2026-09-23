@@ -3,7 +3,8 @@
 งาน H2A re-audit เริ่มจาก `main` ณ source revision
 `b5ddee48b42aa37f8fdb6d527e105a9ed94e2072` เป็น baseline เอกสาร phase และ
 audit ยังคงเก็บหลักฐาน ณ เวลาที่ตรวจ ไม่ได้อ้างว่าทุกข้อสรุปในบันทึกเก่าเป็น
-สถานะปัจจุบัน
+สถานะปัจจุบัน. การแก้ rollout-safety ของ H2A.1 re-baseline บน
+`3de85126f59de55f1d995224afbe7bdb727ba193`.
 
 ## เริ่มอ่าน
 
@@ -42,8 +43,10 @@ TeamRole และ direct User grants ที่ตั้งค่าไว้; `
 Auth/control plane และไม่สร้าง business authority โดยอัตโนมัติ. Phase 13A/13A.1
 ปรับ audience ของ notification ให้ใช้ configured capability; Routine enum
 contraction ยังรอหลักฐาน production rollout และอยู่นอกขอบเขตที่ปิดแล้ว. H2A
-ยุติ Routine Excel/file import ถาวร; การสร้างและดูแลงานทำผ่าน Routine task
-UI/API. H2B จะแยกจัดการ legacy recipient enum ต่อไป.
+ยุติ Routine Excel/file import ใน runtime ถาวร. H2A.1 คง Prisma/DB persistence
+compatibility ไว้ระหว่างที่ process รุ่นก่อนหน้ากำลังถูกแทนที่; H2A.2 จะ drop
+ตารางและ provenance columns หลังยืนยันว่า process เดิมหยุดทั้งหมด. การสร้างและ
+ดูแลงานทำผ่าน Routine task UI/API. H2B จะแยกจัดการ legacy recipient enum ต่อไป.
 
 ## Runbooks และ workflow specs
 

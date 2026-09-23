@@ -1,12 +1,18 @@
 # Routine module migration
 
-Status: Phase D module migration completed. Routine Import was permanently retired
-by H2A; the current module shape below excludes its former implementation.
+Status: Phase D module migration completed. H2A.1 permanently retired Routine
+Import runtime behavior; the module shape below excludes its former
+implementation. Prisma models and DB fields temporarily remain as deployment
+compatibility for the previous application process. H2A.2 will contract that
+persistence after all previous processes are confirmed retired.
 
 Routine is now owned by `modules/routine/`. The migration moved the existing
 domain, application, validation, HTTP, scheduler, reminder, contract-reminder,
 Dashboard, and LIFF implementations. H2A later retired the separate Excel/file
-import workflow as a permanent product decision.
+import workflow as a permanent product decision. The H2A.1 schema retains only
+the physical compatibility representation; no Routine runtime module consumes
+it. See [Routine Import retirement](../routine-import.md) for the H2A.1/H2A.2
+rollout stages.
 
 ## Ownership and public entry points
 

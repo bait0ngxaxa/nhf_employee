@@ -17,11 +17,15 @@
 > The older Phase 12H-B through 12H-H boundary notes below remain historical
 > records of behavior at those phase boundaries.
 >
-> H2A permanently retired Routine Excel/file import. Current code and policy
-> contain no `routine.import.manage` capability, import routes, staging, or
-> RoutineTask import provenance. Historical `ROUTINE_IMPORT_*` audit actions
-> remain readable for existing records. H2A also preserves the expanded
-> reminder-recipient persistence enum and legacy normalization until H2B.
+> H2A.1 permanently retired Routine Excel/file import from the current runtime.
+> Current code and policy contain no `routine.import.manage` capability, import
+> routes, staging services, or RoutineTask provenance consumers. Prisma keeps
+> temporary compatibility models/fields matching the physical database so the
+> previous application process remains schema-compatible during migration-first
+> deployment. H2A.1 removes only persisted capability grants; H2A.2 will perform
+> physical contraction after old processes are confirmed retired. Historical
+> `ROUTINE_IMPORT_*` audit actions remain readable. H2A does not contract the
+> reminder-recipient persistence enum; legacy normalization remains until H2B.
 >
 > The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
@@ -1600,12 +1604,15 @@ self-service constraints remain independently enforced. Routine application
 code uses scope-derived `hasBroadAuthority` for the operation being performed;
 it does not use an unrelated broad capability as a global admin bit.
 
-H2A permanently retired Routine Import and removed all task import-provenance
-fields. Current RoutineTask records are application-created entities; no
-capability or query projection exposes import metadata. The Phase 12H-F
-provenance restrictions below describe the former implementation and are kept
-only as historical security evidence, not as current schema or runtime
-behavior.
+H2A.1 permanently retired Routine Import runtime behavior and removed all live
+application consumers of task import provenance. To preserve schema
+compatibility with the previous process, the current Prisma model still maps
+`sourceFileName`, `sourceSheet`, `sourceRow` and the former import relations;
+current application queries, mutations, serializers, and presentation expose or
+write none of them. These fields and relations are persistence compatibility
+only and are scheduled for removal in H2A.2 after previous processes are
+confirmed retired. The Phase 12H-F provenance restrictions below describe the
+former runtime implementation and remain historical security evidence.
 
 Authorization Administration remains the explicit ADMIN-only control plane:
 its menu visibility, page/API guards, `requireDashboardAuthorizationAdministration()`,
@@ -1648,8 +1655,9 @@ Phase 12H-F verification evidence:
 - `git diff --check`: passed.
 
 Historical post-closure verification for the Routine import-provenance
-boundary ran against `4e7236ef9d6d9a6b33cdf495544595a0ae4f9b67`, before H2A
-retired the provenance fields and Import workflow:
+runtime boundary ran against `4e7236ef9d6d9a6b33cdf495544595a0ae4f9b67`, before
+H2A.1 retired the Import workflow. It predates the current H2A.1 Prisma/DB
+compatibility representation and does not establish physical contraction:
 
 - Routine mutation, idempotency, import/staging/apply, query, authorization,
   and presentation selection: **20 files / 273 tests passed**;
