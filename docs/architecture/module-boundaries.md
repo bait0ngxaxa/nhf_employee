@@ -72,10 +72,10 @@ Routine follows the same split: server/application consumers use
 The Routine browser entry is enforced as a runtime boundary: its current graph
 may use presentation, browser transport, schemas, and pure domain helpers, but
 may not reach the Routine server entry, Routine application/infrastructure
-code, or proven platform/auth server-only dependencies. H2A.1 retired the
-Routine Import application path; Prisma retains its persistence representation
-only for deployment compatibility until H2A.2. Routine Dashboard and LIFF route
-composition and Routine internal self-barrel imports are checked by
+code, or proven platform/auth server-only dependencies. H2A removed the Routine
+Import application path, and H2A.2 subsequently removed its persistence
+compatibility representation from Prisma and the database. Routine Dashboard
+and LIFF route composition and Routine internal self-barrel imports are checked by
 `npm run architecture:check`.
 
 Leave server/application consumers use `@/modules/leave`. Leave Dashboard and

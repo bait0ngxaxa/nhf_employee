@@ -43,10 +43,11 @@ TeamRole และ direct User grants ที่ตั้งค่าไว้; `
 Auth/control plane และไม่สร้าง business authority โดยอัตโนมัติ. Phase 13A/13A.1
 ปรับ audience ของ notification ให้ใช้ configured capability; Routine enum
 contraction ยังรอหลักฐาน production rollout และอยู่นอกขอบเขตที่ปิดแล้ว. H2A
-ยุติ Routine Excel/file import ใน runtime ถาวร. H2A.1 คง Prisma/DB persistence
-compatibility ไว้ระหว่างที่ process รุ่นก่อนหน้ากำลังถูกแทนที่; H2A.2 จะ drop
-ตารางและ provenance columns หลังยืนยันว่า process เดิมหยุดทั้งหมด. การสร้างและ
-ดูแลงานทำผ่าน Routine task UI/API. H2B จะแยกจัดการ legacy recipient enum ต่อไป.
+ปิดแล้ว: H2A.1 นำ Routine Import runtime, API/UI/application services และ
+`routine.import.manage` ออก; H2A.2 ลบตาราง Import, `RoutineTask` provenance
+columns และ Prisma compatibility models, enums กับ relations แล้ว. Historical
+`ROUTINE_IMPORT_*` AuditAction ยังคงไว้เพื่อ AuditLog เก่า. การสร้างและดูแลงานทำ
+ผ่าน Routine task UI/API; H2B เรื่อง legacy recipient enum ยัง pending.
 
 ## Runbooks และ workflow specs
 

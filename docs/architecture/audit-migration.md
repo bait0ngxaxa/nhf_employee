@@ -30,17 +30,16 @@ below are historical migration evidence; the final current ownership result
 is recorded in Sections 25 and 26 and in the L6 closure of
 `docs/architecture/runtime-hardening.md`.
 
-H2A.1 permanently retired Routine Import runtime producers and routes. The
-physical import tables remain in the Prisma/database compatibility schema until
-H2A.2, after all previous application processes are confirmed retired. The four
-Prisma `AuditAction` values `ROUTINE_IMPORT_UPLOAD`,
+H2A.1 retired the Routine Import runtime path, API routes, UI, application
+services, `routine.import.manage` capability, and audit producers. H2A.2
+removed the Import tables and `RoutineTask` provenance persistence after the
+previous application processes were replaced. The four Prisma `AuditAction`
+values `ROUTINE_IMPORT_UPLOAD`,
 `ROUTINE_IMPORT_ROW_UPDATE`, `ROUTINE_IMPORT_APPLY`, and
 `ROUTINE_IMPORT_CANCEL` remain in the schema and presentation mapping because
 this repository provides no trustworthy evidence that production has zero
 matching AuditLog rows. Historical events remain renderable; H2A does not
-rewrite audit history. The H2A.1 application code has no Routine Import audit
-producers; the compatibility schema allows previous processes to remain
-structurally valid until deployment has retired them.
+rewrite audit history. There are no current Routine Import audit producers.
 
 ## 1. Scope
 

@@ -264,9 +264,9 @@ API/context/CSRF/hybrid/rate-limit/server/workforce helpers. It also rejects
 runtime Prisma, bcrypt, mail/provider SDKs, `server-only`, `next/server`,
 `next/headers`, `next/cache`, and Node built-ins. The rule uses these exact
 ownership and runtime boundaries rather than a repository-wide directory
-blacklist. H2A.1 retired the Routine Import application path; Prisma persistence
-models for deployment compatibility are server-only and have no current
-application consumer until H2A.2 removes them.
+blacklist. H2A removed the Routine Import application path, and H2A.2
+subsequently removed its persistence compatibility representation from the
+Prisma schema and database.
 
 Routine module internals must use local contracts and must not re-enter either
 Routine public entry. These checks protect module composition and browser

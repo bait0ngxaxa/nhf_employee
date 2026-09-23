@@ -24,13 +24,11 @@ Employee remains the owner of its selectors, import presentation, and
 Department-specific display compatibility; no Department client entry is
 required.
 
-Current-state note: H2A.1 has permanently retired Routine Import runtime
-behavior. Routine Import paths and semantics mentioned in the earlier
-discovery records below describe the historical implementation; the current
-Routine module has no Import consumer. Prisma keeps the corresponding
-persistence representation only for rollout compatibility until H2A.2. See
-[Routine Import retirement](../routine-import.md) for the current rollout
-status.
+Current-state note: Routine Import runtime behavior is retired, and H2A.2
+removed its persistence representation from the database and Prisma schema.
+Routine Import paths and semantics mentioned in the earlier discovery records
+below remain historical evidence. See
+[Routine Import retirement](../routine-import.md) for the current status.
 
 ## F1 implementation record
 
