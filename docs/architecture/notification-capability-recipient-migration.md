@@ -98,15 +98,16 @@ ASSIGNEES_AND_ADMINS    → ASSIGNEES_AND_ALL_READERS
 
 Routine scheduler, reminder dispatch, query serialization, and persisted
 reminder-rule reads operate on the canonical values after normalization. H2A.1
-removed the live application consumer for `RoutineImportRow.normalizedData`; the
-Prisma compatibility model still maps the field until H2A.2 drops its table
-after previous application processes are retired. The legacy token is never
+removed the live application consumer for `RoutineImportRow.normalizedData`;
+H2A.2 subsequently dropped the Import tables and Prisma models after previous
+application processes were retired. H2A is CLOSED. The legacy token is never
 interpreted as `User.role === ADMIN`.
 
 H2A does not contract the MySQL or Prisma recipient enum. Legacy values can
 still exist in persisted `routine_reminder_rules`, so normalization remains in
 place until the separate H2B backfill, zero-legacy assertion, and enum
-contraction are completed.
+contraction are completed. H2B is PENDING; H2A.2 leaves
+`recipient-scope-compatibility.ts` and the expanded enum unchanged.
 
 The later `Phase 13A.2 — Routine Recipient Enum Contract` must, in an
 explicitly controlled rollout, verify that no old process remains, backfill

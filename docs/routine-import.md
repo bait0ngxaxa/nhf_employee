@@ -3,34 +3,44 @@
 H2A แบ่งการยุติ Routine Import ออกเป็นสองขั้นเพื่อให้เข้ากับลำดับ deploy ที่
 รัน Prisma migration ก่อนแทนที่ Next.js process เดิม
 
-สถานะ rollout: H2A.1 พร้อม deploy และจะปิดได้หลังยืนยันการ deploy และการ
-retire process รุ่นก่อนหน้า; H2A.2 และ H2B ยังรอดำเนินการ
+สถานะปัจจุบัน: **H2A — CLOSED**; **H2B — PENDING**
+H2A.1 ถูก deploy ขึ้น production แล้ว และ process รุ่นก่อนหน้าถูกแทนที่ทั้งหมด
+แอปที่ deploy อยู่ไม่อ่านหรือเขียน Routine Import และไม่ใช้ provenance ของ
+`RoutineTask` อีกต่อไป จึงทำ H2A.2 หลังขั้น deploy แอปได้อย่างปลอดภัย
 
-## H2A.1 — runtime retirement (ขั้นปัจจุบัน)
+## H2A.1 — runtime retirement (เสร็จแล้ว)
 
 Routine Excel/file import ถูกยุติถาวรใน product runtime: release นี้ไม่มี Import
 routes, UI, application services, authorization capability หรือ audit producers
 ผู้ใช้สร้างและดูแลงานผ่าน Routine task UI/API ตามปกติ ซึ่งยังรองรับ schedule,
 assignee, occurrence และ reminder
 
-เพื่อให้ process รุ่นก่อนหน้ายังอ่านและเขียนฐานข้อมูลได้ระหว่าง deploy, H2A.1
-ยังคง Prisma compatibility models, enums, relations และ `RoutineTask` provenance
-fields ที่ตรงกับ physical tables/columns เดิมไว้ โค้ด application ปัจจุบันไม่มี
-consumer สำหรับข้อมูลเหล่านี้; ไม่ใช่การคง Import feature ไว้ชั่วคราวเพื่อใช้งาน
-ต่อ migration `20260923100000_retire_routine_import` ลบเฉพาะ persisted grants ของ
-`routine.import.manage` และไม่เปลี่ยน Routine schema
+Migration `20260923100000_retire_routine_import` ลบ persisted Import grants
+และคงตาราง Import กับ provenance columns ชั่วคราวเพื่อรองรับ process รุ่นเก่า
+ระหว่างลำดับ deploy ที่รัน migration ก่อนแทนที่แอป
 
-## H2A.2 — physical persistence contraction (รอดำเนินการ)
+## H2A.2 — physical persistence contraction (เสร็จแล้ว)
 
-หลัง H2A.1 deploy แล้วและยืนยันว่า process รุ่นก่อนหน้าทั้งหมดหยุดทำงาน จึงเพิ่ม
-forward migration แยกเพื่อ drop `routine_import_rows`, `routine_import_ledger`,
-`routine_import_batches` และ `routine_tasks.sourceFileName`, `sourceSheet`,
-`sourceRow` ตาม dependency-safe order จากนั้นลบ compatibility models/fields/enums
-ออกจาก Prisma schema การเปลี่ยนแปลงนี้จะไม่ลบ RoutineTask, occurrence, reminder
-rule, assignee หรือข้อมูลธุรกิจอื่น
+Migration `20260923110000_contract_routine_import_persistence` ลบ
+`routine_import_rows`, `routine_import_ledger`, `routine_import_batches`
+ตามลำดับ foreign key และลบ `routine_tasks.sourceFileName`, `sourceSheet`,
+`sourceRow` ออกจากฐานข้อมูล Prisma schema ไม่มี Import models, enums,
+relations หรือ provenance fields อีกแล้ว งาน Routine ปกติ รวมถึง assignee,
+occurrence และ reminder ยังคงอยู่
 
-H2A.2 ไม่เปลี่ยน `RoutineReminderRecipientScope`; การ backfill และ contraction ของ
-recipient enum เป็นงาน H2B แยกต่างหาก
+**Rollback floor:** ก่อน H2A.2 ฐานข้อมูลยังรองรับ process ก่อน H2A เพราะมี
+ตาราง Import และ provenance columns หลัง H2A.2 ฐานข้อมูลไม่รองรับ binary ที่
+select/write `RoutineTask.sourceFileName`, `sourceSheet`, `sourceRow` หรือเข้าถึง
+ตาราง Routine Import อีกต่อไป รุ่นเก่าสุดที่ rollback ได้คือ
+`099dc0ade8b114c40096cebe0e63c92b1ffc00e9` หรือ release ใหม่กว่าที่
+เข้ากันได้กับ H2A.1 ห้ามใช้ `b5ddee4` หรือ binary ก่อน H2A.1 เป็น rollback target
+ลำดับ deploy ปัจจุบันปลอดภัยเพราะ H2A.1 ที่ deploy แล้วไม่ใช้โครงสร้างที่ลบ
+
+H2A.2 ไม่เปลี่ยน `RoutineReminderRecipientScope` และไม่ backfill ค่า `ADMINS`
+หรือ `ASSIGNEES_AND_ADMINS` แอปใช้ `ASSIGNEES`, `ALL_READERS` และ
+`ASSIGNEES_AND_ALL_READERS` เป็น canonical vocabulary ส่วน compatibility ของ
+recipient enum และ `recipient-scope-compatibility.ts` ยังคงอยู่จนกว่า H2B จะทำ
+backfill และ contraction แยกต่างหาก
 
 ## Audit history
 

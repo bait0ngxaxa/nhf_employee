@@ -33,9 +33,6 @@ model User {
   routineTaskCreateIdempotencies RoutineTaskCreateIdempotency[]
   createdRoutineTasks         RoutineTask[]               @relation("RoutineTaskCreatedBy")
   updatedRoutineTasks         RoutineTask[]               @relation("RoutineTaskUpdatedBy")
-  // H2A.1 compatibility for previous app binaries; remove after H2A.2 rollout.
-  routineImportLedgers        RoutineImportLedger[]       @relation("RoutineImportAppliedBy")
-  routineImportBatches         RoutineImportBatch[]        @relation("RoutineImportUploadedBy")
   lineAccountLink              LineAccountLink?
   teamMemberships             TeamMembership[]
   userCapabilityGrants        UserCapabilityGrant[]
@@ -833,10 +830,6 @@ model RoutineTask {
   businessDayPolicy RoutineBusinessDayPolicy @default(NONE)
   isActive          Boolean                  @default(true)
   version           Int                      @default(1)
-  // H2A.1 compatibility for previous app binaries; no current app code uses these fields.
-  sourceFileName    String?                  @db.VarChar(255)
-  sourceSheet       String?                  @db.VarChar(255)
-  sourceRow         Int?
   createdById       Int
   updatedById       Int
   createdAt         DateTime                 @default(now())
@@ -847,9 +840,6 @@ model RoutineTask {
   assignees   RoutineTaskAssignee[]
   reminderRules RoutineReminderRule[]
   occurrences RoutineOccurrence[]
-  // H2A.1 compatibility relations; remove after H2A.2 rollout.
-  importLedger RoutineImportLedger?
-  importRows  RoutineImportRow[]
   createIdempotency RoutineTaskCreateIdempotency?
   createdBy   User                  @relation("RoutineTaskCreatedBy", fields: [createdById], references: [id])
   updatedBy   User                  @relation("RoutineTaskUpdatedBy", fields: [updatedById], references: [id])
@@ -893,100 +883,6 @@ model RoutineReminderRule {
   @@unique([taskId, daysBefore, channel, recipientScope], map: "routine_reminder_rules_unique")
   @@index([taskId, isActive])
   @@map("routine_reminder_rules")
-}
-
-// H2A.1 persistence compatibility only; no current application code uses this model.
-// Remove in H2A.2 after all previous application processes are retired.
-model RoutineImportLedger {
-  id              Int                 @id @default(autoincrement())
-  sourceFileName  String              @db.VarChar(255)
-  sourceSheet     String              @db.VarChar(255)
-  sourceRow       Int
-  sourceFingerprint String            @db.Char(64)
-  status          RoutineImportStatus
-  taskId          Int?                @unique
-  appliedById     Int?
-  resolutionNote  String?             @db.Text
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-
-  task      RoutineTask? @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  appliedBy User?        @relation("RoutineImportAppliedBy", fields: [appliedById], references: [id], onDelete: SetNull)
-
-  @@unique([sourceFileName, sourceSheet, sourceRow], map: "routine_import_ledger_source_identity")
-  @@index([sourceFingerprint])
-  @@index([status])
-  @@map("routine_import_ledger")
-}
-
-// H2A.1 persistence compatibility only; no current application code uses this model.
-// Remove in H2A.2 after all previous application processes are retired.
-model RoutineImportBatch {
-  id               Int                      @id @default(autoincrement())
-  originalFileName String                   @db.VarChar(255)
-  fileHash         String                   @db.Char(64)
-  targetSheet      String                   @db.VarChar(255)
-  asOfDate         DateTime                 @db.Date
-  ignoredSheets    Json?
-  status           RoutineImportBatchStatus @default(PREVIEW)
-  uploadedById     Int
-  totalRows        Int                      @default(0)
-  validRows        Int                      @default(0)
-  reviewRows       Int                      @default(0)
-  excludedRows     Int                      @default(0)
-  alreadyImportedRows Int                    @default(0)
-  appliedRows      Int                      @default(0)
-  conflictRows     Int                      @default(0)
-  failedRows       Int                      @default(0)
-  selectedRows     Int                      @default(0)
-  unresolvedOwnerRows Int                   @default(0)
-  expiresAt        DateTime?
-  appliedAt        DateTime?
-  errorMessage     String?                  @db.Text
-  version          Int                      @default(1)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-
-  uploadedBy User               @relation("RoutineImportUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
-  rows       RoutineImportRow[]
-
-  @@index([fileHash, targetSheet, status])
-  @@index([uploadedById, createdAt])
-  @@index([status, expiresAt])
-  @@map("routine_import_batches")
-}
-
-// H2A.1 persistence compatibility only; no current application code uses this model.
-// Remove in H2A.2 after all previous application processes are retired.
-model RoutineImportRow {
-  id                 Int                     @id @default(autoincrement())
-  batchId            Int
-  sourceSheet        String                  @db.VarChar(255)
-  sourceRow          Int
-  sourceKey          String                  @db.VarChar(255)
-  sourceFingerprint  String                  @db.Char(64)
-  categoryName       String                  @db.VarChar(200)
-  title              String                  @db.VarChar(255)
-  ownerNamesText     String                  @db.Text
-  rawData            Json
-  normalizedData     Json
-  status             RoutineImportRowStatus  @default(REQUIRES_REVIEW)
-  selected           Boolean                 @default(false)
-  proposedActivation RoutineImportActivation @default(ACTIVE)
-  reviewReasons      Json
-  appliedTaskId      Int?
-  version            Int                     @default(1)
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-
-  batch       RoutineImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  appliedTask RoutineTask?        @relation(fields: [appliedTaskId], references: [id], onDelete: SetNull)
-
-  @@unique([batchId, sourceSheet, sourceRow], map: "routine_import_rows_source_identity")
-  @@index([batchId, status, selected])
-  @@index([batchId, title])
-  @@index([sourceKey, sourceFingerprint])
-  @@map("routine_import_rows")
 }
 
 model RoutineTaskAssignee {
@@ -1065,39 +961,4 @@ enum RoutineReminderRecipientScope {
   ASSIGNEES_AND_ADMINS
   ALL_READERS
   ASSIGNEES_AND_ALL_READERS
-}
-
-// H2A.1 database representation only; no current feature uses these import enums.
-// Remove with the corresponding models in H2A.2 after old processes are retired.
-enum RoutineImportStatus {
-  APPLIED
-  SKIPPED
-  CONFLICT
-}
-
-// H2A.1 database representation only; no current feature uses this import enum.
-enum RoutineImportBatchStatus {
-  PREVIEW
-  READY
-  APPLYING
-  COMPLETED
-  FAILED
-  CANCELLED
-  EXPIRED
-}
-
-// H2A.1 database representation only; no current feature uses this import enum.
-enum RoutineImportRowStatus {
-  VALID
-  REQUIRES_REVIEW
-  EXCLUDED
-  ALREADY_IMPORTED
-  CONFLICT
-  APPLIED
-  FAILED
-}
-
-// H2A.1 database representation only; no current feature uses this import enum.
-enum RoutineImportActivation {
-  ACTIVE
 }
