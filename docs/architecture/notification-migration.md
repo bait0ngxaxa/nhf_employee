@@ -8,8 +8,9 @@ deferred capability exception.
 Current-state note: this record preserves the H0-H3 boundary and recipient
 behavior at that migration's closure. Phase 13A/13A.1 later moved Routine,
 Stock, and Email Request notification audience selection to configured
-capabilities; the current mappings and deferred enum contraction are recorded
-in [notification-capability-recipient-migration.md](./notification-capability-recipient-migration.md).
+capabilities; Phase 13A.2 subsequently contracted the Routine recipient enum.
+The current mappings and deployment preflight are recorded in
+[notification-capability-recipient-migration.md](./notification-capability-recipient-migration.md).
 
 This record is the source of truth for the Notification boundary and its
 incremental implementation. It records the repository behavior observed at the

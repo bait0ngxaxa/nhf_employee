@@ -1311,14 +1311,14 @@ describe("NHF Routine query authorization", () => {
     });
 
     it.each([
-        ["legacy ADMINS", "ADMINS", "ALL_READERS"],
-        ["legacy combined scope", "ASSIGNEES_AND_ADMINS", "ASSIGNEES_AND_ALL_READERS"],
-        ["canonical ASSIGNEES", "ASSIGNEES", "ASSIGNEES"],
+        ["ASSIGNEES", "ASSIGNEES"],
+        ["ALL_READERS", "ALL_READERS"],
+        ["ASSIGNEES_AND_ALL_READERS", "ASSIGNEES_AND_ALL_READERS"],
     ] as const)(
-        "normalizes %s in management results",
-        async (_label, persistedScope, expectedScope) => {
+        "preserves canonical %s in management results",
+        async (recipientScope, expectedScope) => {
             prismaMock.routineTask.findMany.mockResolvedValue(asNever([
-                taskRow(71, 21, 99, persistedScope),
+                taskRow(71, 21, 99, recipientScope),
             ]));
             prismaMock.routineTask.count.mockResolvedValue(1);
 
@@ -1333,8 +1333,6 @@ describe("NHF Routine query authorization", () => {
             const scopes = result.tasks.flatMap((task) =>
                 task.reminderRules.map((rule) => rule.recipientScope));
             expect(scopes).toEqual([expectedScope]);
-            expect(scopes).not.toContain("ADMINS");
-            expect(scopes).not.toContain("ASSIGNEES_AND_ADMINS");
         },
     );
 

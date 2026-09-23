@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     parseRoutineScheduleConfig,
     routineTaskCreateSchema,
+    routineTaskUpdateSchema,
     routineTaskSelfServiceCreateSchema,
     routineTaskSelfServiceUpdateSchema,
     routineReminderOutboxPayloadSchema,
@@ -134,21 +135,28 @@ describe("NHF Routine validation", () => {
                     .toBe(recipientScope);
             }
         }
-        expect(routineTaskCreateSchema.safeParse({
-            unitId: 1,
-            categoryId: 1,
-            title: "งานประจำ",
-            scheduleType: "MONTHLY_DAY",
-            scheduleConfig: { day: 10, monthOffset: 0 },
-            assignees: [{ employeeId: 11, role: "OWNER" }],
-            reminderRules: [{
+        for (const recipientScope of ["ADMINS", "ASSIGNEES_AND_ADMINS"]) {
+            const reminderRules = [{
                 daysBefore: 1,
                 sendHour: 9,
                 channel: "IN_APP",
-                recipientScope: "ADMINS",
+                recipientScope,
                 isActive: true,
-            }],
-        }).success).toBe(false);
+            }];
+            expect(routineTaskCreateSchema.safeParse({
+                unitId: 1,
+                categoryId: 1,
+                title: "งานประจำ",
+                scheduleType: "MONTHLY_DAY",
+                scheduleConfig: { day: 10, monthOffset: 0 },
+                assignees: [{ employeeId: 11, role: "OWNER" }],
+                reminderRules,
+            }).success).toBe(false);
+            expect(routineTaskUpdateSchema.safeParse({
+                version: 1,
+                reminderRules,
+            }).success).toBe(false);
+        }
 
         const validPayload = routineReminderOutboxPayloadSchema.safeParse({
             occurrenceId: 1,

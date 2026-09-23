@@ -1,13 +1,13 @@
-# Phase 13A / 13A.1 — Capability-Based Notification Recipient Policy Migration
+# Phase 13A / 13A.1 / 13A.2 — Capability-Based Notification Recipient Policy Migration
 
 Phase 13A aligns notification audiences with the post-12H role-neutral business
 authorization model. Phase 13A.1 hardens that implementation for production
-rollout and malformed persisted authorization configuration.
+rollout and malformed persisted authorization configuration. Phase 13A.2
+contracts the Routine reminder recipient persistence vocabulary.
 
-The business recipient migration is implemented. Routine enum contraction is
-intentionally deferred to a follow-up release because the production database
-and all deployed application versions cannot be proven from this repository to
-be ready for contraction.
+The capability-based recipient policy and Routine enum contraction are
+implemented. H2B / Phase 13A.2 is CLOSED in the repository. Production rollout
+still requires the read-only collision preflight below to return zero rows.
 
 ## Why this changed
 
@@ -75,7 +75,7 @@ ALL_READERS
 ASSIGNEES_AND_ALL_READERS
 ```
 
-During Phase 13A.1 the Prisma/MySQL persistence enum intentionally accepts both
+During Phase 13A.1 the Prisma/MySQL persistence enum intentionally accepted both
 the canonical values and the two legacy persisted values:
 
 ```text
@@ -83,44 +83,146 @@ ADMINS
 ASSIGNEES_AND_ADMINS
 ```
 
-The expand migration only widens the MySQL enum. It does not rewrite rows and
-does not contract the enum. Prisma Client temporarily includes both sets of
-members so transition code can read old rows safely. New create/update
-boundaries accept canonical values only and therefore write only canonical
-values.
+The historical expand migration only widened the MySQL enum. It did not rewrite
+rows. The H2A.1-compatible production runtime writes and reads canonical values
+and does not require legacy values to remain present.
 
-At the persistence boundary, legacy values normalize immediately:
+H2B / Phase 13A.2 is CLOSED. Migration
+`20260923120000_contract_routine_reminder_recipient_scope` maps persisted rows:
 
 ```text
 ADMINS                  → ALL_READERS
 ASSIGNEES_AND_ADMINS    → ASSIGNEES_AND_ALL_READERS
 ```
 
-Routine scheduler, reminder dispatch, query serialization, and persisted
-reminder-rule reads operate on the canonical values after normalization. H2A.1
-removed the live application consumer for `RoutineImportRow.normalizedData`;
-H2A.2 subsequently dropped the Import tables and Prisma models after previous
-application processes were retired. H2A is CLOSED. The legacy token is never
-interpreted as `User.role === ADMIN`.
+The migration first inserts every current unique key into a temporary table
+using the canonical mapping. Its unique key matches
+`(taskId, daysBefore, channel, recipientScope)`, so any synonym collision fails
+before reminder rows change. After backfill, a second temporary-table guard
+fails if any legacy value remains. Only then does MySQL contract the enum to
+exactly `ASSIGNEES`, `ALL_READERS`, and `ASSIGNEES_AND_ALL_READERS`. The
+migration updates only `recipientScope`; it does not recreate or delete rules,
+tasks, occurrences, assignees, or audit rows.
 
-H2A does not contract the MySQL or Prisma recipient enum. Legacy values can
-still exist in persisted `routine_reminder_rules`, so normalization remains in
-place until the separate H2B backfill, zero-legacy assertion, and enum
-contraction are completed. H2B is PENDING; H2A.2 leaves
-`recipient-scope-compatibility.ts` and the expanded enum unchanged.
+Prisma and application reads/writes now use exactly the canonical values.
+`recipient-scope-compatibility.ts` and its tests were removed. The request
+schema continues to reject both legacy strings. Reminder semantics are
+unchanged: `ASSIGNEES` follows Routine relationships, `ALL_READERS` resolves
+explicit `routine.task.read / ALL` grants, and the combined scope is their
+deduplicated union. No Routine reminder audience is inferred from `Role.ADMIN`.
 
-The later `Phase 13A.2 — Routine Recipient Enum Contract` must, in an
-explicitly controlled rollout, verify that no old process remains, backfill
-remaining legacy rows, verify zero legacy rows, and only then contract the
-MySQL/Prisma enum. It must not delete or recreate tasks, occurrences, or
-reminder rules.
+### H2B production preflight and deployment
 
-Rollback implication: the expanded database is compatible with the old client
-while persisted rows remain legacy. Once a canonical-only application writes a
-canonical value, rollback to an old client that knows only the legacy enum is
-not supported. Deployment must therefore expand the database first, drain old
-processes before canonical writes, and treat post-write rollback as a forward
-compatibility decision rather than an automatic old-binary rollback.
+Run these read-only queries on production before `prisma migrate deploy`:
+
+```sql
+SELECT
+    @@GLOBAL.sql_mode AS `globalSqlMode`,
+    @@SESSION.sql_mode AS `sessionSqlMode`;
+```
+
+Confirm both results include `STRICT_TRANS_TABLES` or `STRICT_ALL_TABLES`.
+MySQL 8 defaults to strict mode; with strict mode disabled, an invalid ENUM
+write can be coerced to MySQL's special empty error value instead of rejected.
+See the [MySQL 8.0 ENUM](https://dev.mysql.com/doc/refman/8.0/en/enum.html)
+and [SQL mode](https://dev.mysql.com/doc/refman/8.0/en/sql-mode.html)
+references. Do not deploy if the application sessions do not use strict mode.
+
+```sql
+SELECT
+    `recipientScope`,
+    COUNT(*) AS `count`
+FROM `routine_reminder_rules`
+GROUP BY `recipientScope`
+ORDER BY `recipientScope`;
+```
+
+```sql
+SELECT
+    `taskId`,
+    `daysBefore`,
+    `channel`,
+    CASE `recipientScope`
+        WHEN 'ADMINS' THEN 'ALL_READERS'
+        WHEN 'ASSIGNEES_AND_ADMINS' THEN 'ASSIGNEES_AND_ALL_READERS'
+        ELSE `recipientScope`
+    END AS `canonicalScope`,
+    COUNT(*) AS `cnt`
+FROM `routine_reminder_rules`
+GROUP BY `taskId`, `daysBefore`, `channel`, `canonicalScope`
+HAVING COUNT(*) > 1;
+```
+
+The deployment gate is zero collision rows. If collisions exist, STOP: do not
+migrate or automatically reconcile them. Review the rule IDs and all rule
+fields for each colliding `(taskId, daysBefore, channel, canonicalScope)` group
+and make an explicit production data decision first. Legacy row counts may be
+non-zero; H2B backfills them after the migration guard passes.
+
+To list the conflicting rule identities and data for review:
+
+```sql
+WITH canonicalized AS (
+    SELECT
+        `id`,
+        `taskId`,
+        `daysBefore`,
+        `sendHour`,
+        `channel`,
+        `recipientScope`,
+        CASE `recipientScope`
+            WHEN 'ADMINS' THEN 'ALL_READERS'
+            WHEN 'ASSIGNEES_AND_ADMINS' THEN 'ASSIGNEES_AND_ALL_READERS'
+            ELSE `recipientScope`
+        END AS `canonicalScope`,
+        `isActive`,
+        `createdAt`,
+        `updatedAt`
+    FROM `routine_reminder_rules`
+), collisions AS (
+    SELECT `taskId`, `daysBefore`, `channel`, `canonicalScope`
+    FROM canonicalized
+    GROUP BY `taskId`, `daysBefore`, `channel`, `canonicalScope`
+    HAVING COUNT(*) > 1
+)
+SELECT
+    rules.`id`,
+    rules.`taskId`,
+    rules.`daysBefore`,
+    rules.`sendHour`,
+    rules.`channel`,
+    rules.`recipientScope`,
+    rules.`canonicalScope`,
+    rules.`isActive`,
+    rules.`createdAt`,
+    rules.`updatedAt`
+FROM canonicalized AS rules
+INNER JOIN collisions
+    USING (`taskId`, `daysBefore`, `channel`, `canonicalScope`)
+ORDER BY
+    rules.`taskId`,
+    rules.`daysBefore`,
+    rules.`channel`,
+    rules.`canonicalScope`,
+    rules.`id`;
+```
+
+The deployed H2A.1-compatible process writes only canonical scopes, reads
+canonical scopes, and does not need legacy rows. The deployment order is:
+
+```text
+existing H2A.1-compatible process
+        ↓
+prisma migrate deploy (H2B backfill and enum contraction)
+        ↓
+build / reload the application
+```
+
+This invariant applies to the deployed compatible process, not arbitrary older
+application versions. H2A remains CLOSED. The rollback floor remains
+`099dc0ade8b114c40096cebe0e63c92b1ffc00e9` or a newer H2A.1-compatible release
+that does not consume removed Routine Import persistence and writes canonical
+recipient scopes. Do not lower that floor.
 
 Routine resolves the configured broad audience at enqueue time. Email and LINE
 child deliveries re-check the current recipient condition inside the existing

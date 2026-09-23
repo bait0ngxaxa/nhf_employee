@@ -20,7 +20,6 @@ import {
     includesRoutineAssignees,
     type RoutineReminderRecipientScope,
 } from "../domain/reminder-recipients";
-import { normalizeRoutineReminderRules } from "./recipient-scope-compatibility";
 
 export interface RoutineSchedulerResult {
     occurrencesCreated: number;
@@ -243,13 +242,7 @@ async function findSchedulerOccurrences(
         },
         orderBy: [{ dueDate: "asc" }, { id: "asc" }],
     });
-    return rows.map((row) => ({
-        ...row,
-        task: {
-            ...row.task,
-            reminderRules: normalizeRoutineReminderRules(row.task.reminderRules),
-        },
-    }));
+    return rows;
 }
 
 export async function runRoutineScheduler(

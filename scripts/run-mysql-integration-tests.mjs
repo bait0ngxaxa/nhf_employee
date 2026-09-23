@@ -30,6 +30,9 @@ const require = createRequire(import.meta.url);
 const prismaCli = require.resolve("prisma/build/index.js");
 const vitestPackageDirectory = dirname(require.resolve("vitest/package.json"));
 const vitestCli = resolve(vitestPackageDirectory, "vitest.mjs");
+const recipientMigrationTest = resolve(
+    "scripts/test-routine-reminder-recipient-contract.mjs",
+);
 const writeProgress = (message) => process.stdout.write(`${message}\n`);
 
 const run = (label, cliPath, args) => {
@@ -60,6 +63,7 @@ const run = (label, cliPath, args) => {
 writeProgress(
     `[integration] MySQL ${parsedUrl.hostname}:${parsedUrl.port || "3306"}/${databaseName}`,
 );
+run("Routine recipient migration SQL coverage", recipientMigrationTest, []);
 run("ใช้ Prisma migrations", prismaCli, ["migrate", "deploy"]);
 run("รัน Vitest", vitestCli, [
     "run",

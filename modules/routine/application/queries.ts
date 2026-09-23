@@ -16,7 +16,6 @@ import {
     getRoutineTimingStatus,
     type RoutineTimingStatus,
 } from "../domain/timing";
-import type { RoutineReminderRecipientScope } from "../domain/reminder-recipients";
 import { isRoutineNotificationReady } from "../domain/notification-readiness";
 import {
     resolveRoutineTaskCapabilities,
@@ -34,7 +33,6 @@ import {
     RoutineNotFoundError,
     RoutineValidationError,
 } from "./errors";
-import { normalizeRoutineReminderRules } from "./recipient-scope-compatibility";
 import {
     buildRoutineOccurrenceScope,
     buildRoutineTaskAccessScope,
@@ -153,18 +151,7 @@ type RoutineTaskRow = Prisma.RoutineTaskGetPayload<{
     select: typeof ROUTINE_TASK_SELECT;
 }>;
 
-type CanonicalRoutineReminderRule = Omit<
-    RoutineTaskRow["reminderRules"][number],
-    "recipientScope"
-> & {
-    recipientScope: RoutineReminderRecipientScope;
-};
-
-type CanonicalRoutineReminderRules = CanonicalRoutineReminderRule[];
-
-type RoutineTaskListRow = Omit<RoutineTaskRow, "reminderRules"> & {
-    reminderRules: CanonicalRoutineReminderRules;
-} & RoutineTaskCapabilities;
+type RoutineTaskListRow = RoutineTaskRow & RoutineTaskCapabilities;
 
 type RoutineTaskDetailRow = RoutineTaskRow & {
     occurrences: RoutineOccurrenceRow[];
@@ -183,7 +170,7 @@ type RoutineTaskDetailResultBase = Omit<
     contractEndDate: string | null;
     createdAt: string;
     updatedAt: string;
-    reminderRules: CanonicalRoutineReminderRules;
+    reminderRules: RoutineTaskRow["reminderRules"];
     occurrences: SerializedRoutineOccurrence[];
 };
 
@@ -224,7 +211,7 @@ export interface SerializedRoutineTaskWorkItem {
     unit: { id: number; code: string; name: string };
     category: { id: number; name: string };
     assignees: SerializedRoutineAssignee[];
-    reminderRules: CanonicalRoutineReminderRules;
+    reminderRules: RoutineTaskRow["reminderRules"];
     relevantOccurrence: SerializedRoutineTaskOccurrence | null;
 }
 
@@ -786,7 +773,7 @@ function serializeRoutineTaskFields(
             name: task.category.name,
         },
         assignees: task.assignees.map(serializeAssignee),
-        reminderRules: normalizeRoutineReminderRules(task.reminderRules),
+        reminderRules: task.reminderRules,
         relevantOccurrence: serializedOccurrence
             ? {
                   id: serializedOccurrence.id,
@@ -1355,21 +1342,15 @@ export async function getRoutineTasks(
     ]);
 
     const serializedTasks = await Promise.all(
-        tasks.map(async (task) => {
-            const normalizedTask = {
-                ...task,
-                reminderRules: normalizeRoutineReminderRules(task.reminderRules),
-            };
-            return {
-                ...normalizedTask,
-                ...await getRoutineTaskCapabilities(
-                    normalizedTask,
-                    queryActor,
-                    employeeId,
-                    mutationAuthorizations,
-                ),
-            };
-        }),
+        tasks.map(async (task) => ({
+            ...task,
+            ...await getRoutineTaskCapabilities(
+                task,
+                queryActor,
+                employeeId,
+                mutationAuthorizations,
+            ),
+        })),
     );
     return {
         tasks: serializedTasks,
@@ -1402,7 +1383,7 @@ async function findRoutineTaskDetail(
     if (!task) throw new RoutineNotFoundError();
     return {
         ...task,
-        reminderRules: normalizeRoutineReminderRules(task.reminderRules),
+        reminderRules: task.reminderRules,
         contractStartDate: task.contractStartDate
             ? toBangkokCalendarDate(task.contractStartDate)
             : null,

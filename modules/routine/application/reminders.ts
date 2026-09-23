@@ -19,7 +19,6 @@ import {
     isRoutineReminderDue,
     toBangkokCalendarDate,
 } from "../domain/schedule";
-import type { RoutineReminderRecipientScope } from "../domain/reminder-recipients";
 import {
     routineReminderEmailOutboxPayloadSchema,
     routineReminderLineOutboxPayloadSchema,
@@ -33,7 +32,6 @@ import {
     resolveRoutineNotificationRecipients,
     type RoutineNotificationRecipient,
 } from "./recipients";
-import { normalizeRoutineReminderRules } from "./recipient-scope-compatibility";
 
 export const ROUTINE_REMINDER_OUTBOX_TYPE = "ROUTINE_REMINDER_IN_APP" as const;
 export const ROUTINE_REMINDER_EMAIL_OUTBOX_TYPE = "ROUTINE_REMINDER_EMAIL" as const;
@@ -98,36 +96,6 @@ const ROUTINE_REMINDER_OCCURRENCE_SELECT = {
 type RoutineReminderOccurrence = Prisma.RoutineOccurrenceGetPayload<{
     select: typeof ROUTINE_REMINDER_OCCURRENCE_SELECT;
 }>;
-
-type CanonicalRoutineReminderRule = Omit<
-    RoutineReminderOccurrence["task"]["reminderRules"][number],
-    "recipientScope"
-> & {
-    recipientScope: RoutineReminderRecipientScope;
-};
-
-type CanonicalRoutineReminderOccurrence = Omit<
-    RoutineReminderOccurrence,
-    "task"
-> & {
-    task: Omit<RoutineReminderOccurrence["task"], "reminderRules"> & {
-        reminderRules: CanonicalRoutineReminderRule[];
-    };
-};
-
-function normalizeRoutineReminderOccurrence(
-    occurrence: RoutineReminderOccurrence,
-): CanonicalRoutineReminderOccurrence {
-    return {
-        ...occurrence,
-        task: {
-            ...occurrence.task,
-            reminderRules: normalizeRoutineReminderRules(
-                occurrence.task.reminderRules,
-            ),
-        },
-    };
-}
 
 export function buildRoutineReminderEventKey(
     occurrenceId: number,
@@ -280,8 +248,8 @@ type RoutineReminderValidationPayload = {
 };
 
 type CurrentRoutineReminderState = {
-    occurrence: CanonicalRoutineReminderOccurrence;
-    rule: CanonicalRoutineReminderRule;
+    occurrence: RoutineReminderOccurrence;
+    rule: RoutineReminderOccurrence["task"]["reminderRules"][number];
     currentDueDate: string;
     expectedScheduledFor: Date;
 };
@@ -298,9 +266,7 @@ async function getCurrentRoutineReminderState(
         where: { id: payload.occurrenceId },
         select: ROUTINE_REMINDER_OCCURRENCE_SELECT,
     });
-    const occurrence = rawOccurrence
-        ? normalizeRoutineReminderOccurrence(rawOccurrence)
-        : null;
+    const occurrence = rawOccurrence;
     const rule = occurrence?.task.reminderRules.find(
         (candidate) => candidate.id === payload.ruleId,
     );
@@ -660,9 +626,7 @@ export async function dispatchRoutineReminderOutbox(
             where: { id: payload.occurrenceId },
             select: ROUTINE_REMINDER_OCCURRENCE_SELECT,
         });
-        const occurrence = rawOccurrence
-            ? normalizeRoutineReminderOccurrence(rawOccurrence)
-            : null;
+        const occurrence = rawOccurrence;
         const rule = occurrence?.task.reminderRules.find(
             (candidate) => candidate.id === payload.ruleId,
         );

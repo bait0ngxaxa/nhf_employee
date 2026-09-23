@@ -1,7 +1,7 @@
 # NHF Employee — Current Authorization State
 
 > **Current repository state (Phase 12H-I and notification-recipient
-> Phase 13A/13A.1):** ADMIN is an Auth/control-plane role only. Business
+> Phase 13A/13A.1/13A.2):** ADMIN is an Auth/control-plane role only. Business
 > authorization is the domain Default Domain Policy plus
 > configured Team, TeamRole, and exceptional direct User grants. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load and
@@ -10,9 +10,10 @@
 > **CLOSED / ACCEPTED** from operator-confirmed evidence. Phase 12H-I
 > compatibility-debt removal is recorded in
 > [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
-> Phase 13A/13A.1 subsequently aligned Routine, Stock, and Email Request
-> notification audiences with configured capabilities. Routine enum
-> contraction remains deferred pending production rollout evidence; see
+> Phase 13A/13A.1/13A.2 subsequently aligned Routine, Stock, and Email Request
+> notification audiences with configured capabilities and contracted the
+> Routine recipient enum. The production collision preflight remains a gate
+> before migration deployment; see
 > [notification-capability-recipient-migration.md](notification-capability-recipient-migration.md).
 > The older Phase 12H-B through 12H-H boundary notes below remain historical
 > records of behavior at those phase boundaries.
@@ -23,7 +24,9 @@
 > before H2A.2 removed the physical persistence. Historical `ROUTINE_IMPORT_*`
 > audit actions remain readable. The rollback floor is
 > `099dc0ade8b114c40096cebe0e63c92b1ffc00e9` or a newer H2A.1-compatible
-> release. H2B reminder-recipient enum contraction remains PENDING.
+> release. H2B / Phase 13A.2 is CLOSED; MySQL, Prisma, and application
+> recipient scopes now use the canonical-only vocabulary. The migration
+> runbook requires zero canonical collisions before production deployment.
 >
 > The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
@@ -1763,10 +1766,11 @@ does not replace domain authorization or Default Domain Policy evaluation. The
 lookup now evaluates each candidate through the canonical configured evaluator
 and excludes principals whose persisted configuration is malformed.
 
-Phase 13A.1 leaves the Routine recipient database enum expanded for rollout
-compatibility. Legacy `ADMINS` and `ASSIGNEES_AND_ADMINS` values are accepted
-only at persistence boundaries and normalize to `ALL_READERS` and
-`ASSIGNEES_AND_ALL_READERS`. New writes remain canonical. Enum backfill and
-contraction require a separately controlled Phase 13A.2 release after old
-application versions are retired; this current-state record does not claim
-that production contraction is safe.
+Phase 13A.1 historically kept the Routine recipient database enum expanded for
+rollout compatibility. H2B / Phase 13A.2 is now CLOSED: the forward migration
+backfills `ADMINS` to `ALL_READERS` and `ASSIGNEES_AND_ADMINS` to
+`ASSIGNEES_AND_ALL_READERS`, asserts zero legacy rows, and contracts MySQL to
+the three canonical values. Prisma and application reads/writes use the same
+canonical-only vocabulary, and the persistence compatibility normalizer is
+removed. The production preflight must report zero canonical collisions before
+deployment.

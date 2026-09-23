@@ -499,11 +499,17 @@ Invariant: old deployed processes must continue reading persisted values
 during rollout, while new application writes use canonical capability-based
 values.
 
-Evidence: the expand migration retains ADMINS and
-ASSIGNEES_AND_ADMINS; application normalization maps them to
-ASSIGNEES/ALL_READERS/ASSIGNEES_AND_ALL_READERS; mutation writes are
-canonical. Authorization-current-state.md and
-notification-capability-recipient-migration.md leave Phase 13A.2 pending.
+Evidence at the H0 audited baseline: the expand migration retained ADMINS and
+ASSIGNEES_AND_ADMINS; application normalization mapped them to
+ASSIGNEES/ALL_READERS/ASSIGNEES_AND_ALL_READERS; mutation writes were
+canonical. Phase 13A.2 was pending at that baseline.
+
+H2B closure update (2026-09-23): Phase 13A.2 is CLOSED in the repository.
+Migration `20260923120000_contract_routine_reminder_recipient_scope` guards
+canonical collisions before backfill, asserts zero legacy rows, and contracts
+the MySQL enum. Prisma/application compatibility normalization has been
+removed. Production rollout still requires the documented zero-collision
+preflight.
 
 Affected paths: prisma/schema.prisma, the expand migration, Routine
 recipient normalization, queries, scheduler, reminders, and notification
@@ -512,16 +518,18 @@ recipient lookup.
 Failure scenario: contracting the enum while an old process or legacy row
 remains would cause write/read failure or notification-policy drift.
 
-Current mitigation: expand-only schema, normalization at persistence
-boundaries, canonical writes, and tests covering both vocabularies.
+Mitigation at the H0 audited baseline: expand-only schema, normalization at
+persistence boundaries, canonical writes, and tests covering both vocabularies.
 
-Residual risk: legacy values and old-process compatibility remain in the
-schema and runtime.
+At the H0 audited baseline, legacy values and old-process compatibility
+remained in the schema and runtime. H2B removes that repository transition
+compatibility; only the controlled production preflight/deployment gate remains
+for rollout.
 
-Recommended phase: H2 / Phase 13A.2: prove old-process retirement, backfill,
-zero legacy values, deploy contraction, and run post-cutover verification.
-Production behavior must change: yes, in H2 cutover.
-Schema or migration required: yes, contraction migration after evidence.
+Recommended phase at the H0 baseline: H2 / Phase 13A.2 was to prove old-process
+retirement, backfill, zero legacy values, deploy contraction, and run
+post-cutover verification. Production behavior and a contraction migration were
+required for that follow-up.
 
 ### Finding H0-TRANS-02 — Stock explicit default
 
@@ -843,15 +851,17 @@ Request migration.
 | --- | --- |
 | H0 — Fresh Source Baseline & SSOT Repair | Completed by this record and the linked documentation repair |
 | H1 — CI / Merge Quality Gate | DEFERRED — owner decision |
-| H2 — Transitional Persistence Closure | Routine enum contraction evidence and Stock explicit-default rollout closure |
+| H2 — Transitional Persistence Closure | Routine recipient enum closure completed by H2B; Stock explicit-default rollout closure remains |
 | H3 — Runtime Observability / Structured Logging | Central event schema, logger ownership, counters, alerts, and correlation propagation |
 | H4 — Liveness / Readiness | Minimal repository-owned liveness/readiness contract tied to deployment checks |
 | H5 — Critical E2E Smoke Coverage | Minimal real-browser coverage for auth/LIFF, one Stock mutation, private Leave attachment/authorization, and one Routine journey |
 | H6 — Production Operational Acceptance / Restore Drill | Operator-confirmed topology, cron, proxy, SMTP/LINE, backups, uploads, rollback, and database/file restore |
 | H7 — Security & Dependency Hygiene | Authorization Administration transaction-time revalidation, dependency/security review, and approved compatibility cleanup |
 
-H2 planning is the next recommended activity. H1 must not be started by this
-H0 handoff, and future IT remains deferred.
+At the H0 handoff, H2 planning was the next recommended activity. H2A and H2B
+have since closed the Routine Import and Routine recipient persistence work;
+H2 remains in progress for the Stock explicit-default rollout closure. H1
+remains deferred by owner decision, and future IT remains deferred.
 
 ## 7. H0 changes
 

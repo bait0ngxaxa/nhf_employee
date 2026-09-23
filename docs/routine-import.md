@@ -3,7 +3,7 @@
 H2A แบ่งการยุติ Routine Import ออกเป็นสองขั้นเพื่อให้เข้ากับลำดับ deploy ที่
 รัน Prisma migration ก่อนแทนที่ Next.js process เดิม
 
-สถานะปัจจุบัน: **H2A — CLOSED**; **H2B — PENDING**
+สถานะปัจจุบัน: **H2A — CLOSED**; **H2B / Phase 13A.2 — CLOSED**
 H2A.1 ถูก deploy ขึ้น production แล้ว และ process รุ่นก่อนหน้าถูกแทนที่ทั้งหมด
 แอปที่ deploy อยู่ไม่อ่านหรือเขียน Routine Import และไม่ใช้ provenance ของ
 `RoutineTask` อีกต่อไป จึงทำ H2A.2 หลังขั้น deploy แอปได้อย่างปลอดภัย
@@ -36,11 +36,15 @@ select/write `RoutineTask.sourceFileName`, `sourceSheet`, `sourceRow` หรื�
 เข้ากันได้กับ H2A.1 ห้ามใช้ `b5ddee4` หรือ binary ก่อน H2A.1 เป็น rollback target
 ลำดับ deploy ปัจจุบันปลอดภัยเพราะ H2A.1 ที่ deploy แล้วไม่ใช้โครงสร้างที่ลบ
 
-H2A.2 ไม่เปลี่ยน `RoutineReminderRecipientScope` และไม่ backfill ค่า `ADMINS`
-หรือ `ASSIGNEES_AND_ADMINS` แอปใช้ `ASSIGNEES`, `ALL_READERS` และ
-`ASSIGNEES_AND_ALL_READERS` เป็น canonical vocabulary ส่วน compatibility ของ
-recipient enum และ `recipient-scope-compatibility.ts` ยังคงอยู่จนกว่า H2B จะทำ
-backfill และ contraction แยกต่างหาก
+ณ จุดตัด H2A.2 ยังไม่ได้เปลี่ยน `RoutineReminderRecipientScope` หรือ backfill
+ค่า `ADMINS` และ `ASSIGNEES_AND_ADMINS`; H2B ปิดงาน recipient contraction
+แยกต่างหากแล้วด้วย migration
+`20260923120000_contract_routine_reminder_recipient_scope`. ตอนนี้ MySQL, Prisma
+และ application ใช้ `ASSIGNEES`, `ALL_READERS` และ
+`ASSIGNEES_AND_ALL_READERS` เท่านั้น และไม่มี
+`recipient-scope-compatibility.ts` แล้ว ก่อน deploy migration ใน production
+ต้องตรวจว่า canonical collisions เป็นศูนย์ตาม runbook ใน
+[notification capability recipient migration](./architecture/notification-capability-recipient-migration.md).
 
 ## Audit history
 

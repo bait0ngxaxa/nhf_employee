@@ -40,14 +40,17 @@ IT ยังคง deferred.
 
 Authorization ใช้ Default Domain Policy ของแต่ละ capability ร่วมกับ Team,
 TeamRole และ direct User grants ที่ตั้งค่าไว้; `ADMIN` ยังคงเป็นบทบาทของ
-Auth/control plane และไม่สร้าง business authority โดยอัตโนมัติ. Phase 13A/13A.1
-ปรับ audience ของ notification ให้ใช้ configured capability; Routine enum
-contraction ยังรอหลักฐาน production rollout และอยู่นอกขอบเขตที่ปิดแล้ว. H2A
+Auth/control plane และไม่สร้าง business authority โดยอัตโนมัติ. Phase
+13A/13A.1/13A.2 ปรับ audience ของ notification ให้ใช้ configured capability
+และปิด Routine recipient enum contraction ใน repository; production deployment
+ยังต้องผ่าน collision preflight. H2A
 ปิดแล้ว: H2A.1 นำ Routine Import runtime, API/UI/application services และ
 `routine.import.manage` ออก; H2A.2 ลบตาราง Import, `RoutineTask` provenance
 columns และ Prisma compatibility models, enums กับ relations แล้ว. Historical
 `ROUTINE_IMPORT_*` AuditAction ยังคงไว้เพื่อ AuditLog เก่า. การสร้างและดูแลงานทำ
-ผ่าน Routine task UI/API; H2B เรื่อง legacy recipient enum ยัง pending.
+ผ่าน Routine task UI/API. H2B ปิดแล้ว: MySQL, Prisma และ application ใช้
+Routine reminder recipient scopes แบบ canonical เท่านั้น; ก่อน deploy
+migration ต้องรัน production preflight และยืนยันว่า canonical collisions เป็นศูนย์.
 
 ## Runbooks และ workflow specs
 

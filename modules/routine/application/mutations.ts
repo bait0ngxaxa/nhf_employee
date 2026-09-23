@@ -2,8 +2,6 @@ import type {
     Prisma,
     RoutineAssigneeRole as PrismaRoutineAssigneeRole,
     RoutineBusinessDayPolicy as PrismaRoutineBusinessDayPolicy,
-    RoutineReminderChannel as PrismaRoutineReminderChannel,
-    RoutineReminderRecipientScope as PrismaRoutineReminderRecipientScope,
     RoutineScheduleType as PrismaRoutineScheduleType,
 } from "@prisma/client";
 import { ZodError } from "zod";
@@ -36,10 +34,6 @@ import {
     type RoutineActorAuthorization,
     type RoutineCapabilityAuthorization,
 } from "./authorization";
-import {
-    normalizeRoutineReminderRecipientScope,
-    normalizeRoutineReminderTask,
-} from "./recipient-scope-compatibility";
 import {
     assertMatchingRoutineTaskIdempotency,
     createRoutineTaskRequestHash,
@@ -202,22 +196,20 @@ function normalizeRoutineTaskUpdateInput(
     };
 }
 
-function normalizeReminderRules(
+function toReminderRuleData(
     rules: readonly RoutineReminderRuleInput[] | undefined,
 ): Array<{
     daysBefore: number;
     sendHour: number;
-    channel: PrismaRoutineReminderChannel;
-    recipientScope: PrismaRoutineReminderRecipientScope;
+    channel: RoutineReminderRuleInput["channel"];
+    recipientScope: RoutineReminderRuleInput["recipientScope"];
     isActive: boolean;
 }> {
     return (rules ?? []).map((rule) => ({
         daysBefore: rule.daysBefore,
         sendHour: rule.sendHour,
-        channel: rule.channel as PrismaRoutineReminderChannel,
-        recipientScope: normalizeRoutineReminderRecipientScope(
-            rule.recipientScope,
-        ) as PrismaRoutineReminderRecipientScope,
+        channel: rule.channel,
+        recipientScope: rule.recipientScope,
         isActive: rule.isActive,
     }));
 }
@@ -233,7 +225,7 @@ function areReminderRulesEqual(
             rule.daysBefore,
             rule.sendHour,
             rule.channel,
-            normalizeRoutineReminderRecipientScope(rule.recipientScope),
+            rule.recipientScope,
             rule.isActive,
         ].join(":");
 
@@ -417,7 +409,7 @@ export async function createRoutineTaskInTransaction(
             ...(normalizedInput.reminderRules !== undefined
                 ? {
                       reminderRules: {
-                          create: normalizeReminderRules(normalizedInput.reminderRules),
+                          create: toReminderRuleData(normalizedInput.reminderRules),
                       },
                   }
                 : {}),
@@ -451,7 +443,7 @@ export async function createRoutineTaskInTransaction(
         where: { id: task.id },
         include: ROUTINE_TASK_INCLUDE,
     });
-    return normalizeRoutineReminderTask(createdTask);
+    return createdTask;
 }
 
 export async function createRoutineTask(
@@ -504,7 +496,7 @@ export async function createRoutineTask(
                     );
                 }
                 return {
-                    task: normalizeRoutineReminderTask(task),
+                    task,
                     replayed: true,
                 };
             }
@@ -555,7 +547,7 @@ export async function createRoutineTask(
             );
         }
         return {
-            task: normalizeRoutineReminderTask(task),
+            task,
             replayed: true,
         };
     }
@@ -746,7 +738,7 @@ export async function updateRoutineTask(
             ? normalizeAssignees(normalizedInput.assignees)
             : null;
         const nextReminderRules = normalizedInput.reminderRules !== undefined
-            ? normalizeReminderRules(normalizedInput.reminderRules)
+            ? toReminderRuleData(normalizedInput.reminderRules)
             : null;
         const assigneesChanged = nextAssignees !== null
             && !areAssigneesEqual(current.assignees, nextAssignees);
@@ -865,7 +857,7 @@ export async function updateRoutineTask(
             previousAssignees: assigneesChanged ? current.assignees : undefined,
         });
 
-        return normalizeRoutineReminderTask(updatedTask);
+        return updatedTask;
     });
 }
 

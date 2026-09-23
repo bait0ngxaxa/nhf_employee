@@ -793,14 +793,14 @@ describe("Routine reminder dispatch", () => {
         );
     });
 
-    it("normalizes a legacy persisted broad scope to configured ALL readers", async () => {
+    it("uses configured ALL readers for the canonical broad scope", async () => {
         prismaMock.routineOccurrence.findUnique.mockResolvedValue(
             asNever(buildOccurrence({
                 task: {
                     ...buildOccurrence().task,
                     reminderRules: [{
                         ...buildOccurrence().task.reminderRules[0],
-                        recipientScope: "ADMINS",
+                        recipientScope: "ALL_READERS",
                     }],
                 },
             })),

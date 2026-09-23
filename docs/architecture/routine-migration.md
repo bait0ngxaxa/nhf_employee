@@ -2,8 +2,10 @@
 
 Status: Phase D module migration completed. H2A is CLOSED. H2A.1 permanently
 retired Routine Import runtime behavior; H2A.2 removed its physical persistence
-after the previous application processes were replaced. H2B recipient enum
-contraction is PENDING.
+after the previous application processes were replaced. H2B / Phase 13A.2 is
+CLOSED: the Routine reminder recipient enum and application vocabulary are
+canonical-only. Production deployment requires a zero-collision preflight; see
+[the recipient migration runbook](./notification-capability-recipient-migration.md).
 
 Routine is now owned by `modules/routine/`. The migration moved the existing
 domain, application, validation, HTTP, scheduler, reminder, contract-reminder,
