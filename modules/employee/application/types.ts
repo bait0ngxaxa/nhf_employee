@@ -81,6 +81,12 @@ export interface CurrentEmployeeProjection {
     isManager: boolean;
 }
 
+export interface CurrentWorkforceDepartmentSnapshot {
+    readonly employeeId: number;
+    readonly departmentId: number;
+    readonly departmentName: string;
+}
+
 export interface LiffEmployeeIdentity {
     id: number;
     firstName: string;

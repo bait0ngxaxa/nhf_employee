@@ -21,7 +21,6 @@ import {
     resolveITCapability,
     resolveITCapabilityInTransaction,
     type ITAuthorizationContext,
-    type ITCapability,
 } from "./authorization";
 
 const mocks = vi.hoisted(() => ({

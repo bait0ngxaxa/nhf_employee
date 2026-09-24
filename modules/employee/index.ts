@@ -7,6 +7,7 @@ export {
 export {
     hasEligibleCurrentEmployeeForUser,
     findCurrentEmployeeProjection,
+    getCurrentWorkforceDepartmentSnapshotInTransaction,
     findLiffEmployeeByUserId,
     listEmployees,
     getEmployeeStats,
@@ -55,6 +56,7 @@ export type {
     EmployeeAccountLifecycleProvider,
     EmployeeAccountLifecycleRecord,
     CurrentEmployeeProjection,
+    CurrentWorkforceDepartmentSnapshot,
     EmployeePresentationCapabilities,
     LiffEmployeeIdentity,
 } from "./application/types";

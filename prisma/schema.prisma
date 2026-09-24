@@ -36,6 +36,12 @@ model User {
   lineAccountLink              LineAccountLink?
   teamMemberships             TeamMembership[]
   userCapabilityGrants        UserCapabilityGrant[]
+  requestedITTickets          ITTicket[]                   @relation("ITTicketRequester")
+  assignedITTickets           ITTicket[]                   @relation("ITTicketAssignee")
+  authoredITTicketEvents      ITTicketEvent[]               @relation("ITTicketEventActor")
+  fromITTicketAssigneeEvents  ITTicketEvent[]               @relation("ITTicketEventFromAssignee")
+  toITTicketAssigneeEvents    ITTicketEvent[]               @relation("ITTicketEventToAssignee")
+  itTicketCreateIdempotencies ITTicketCreateIdempotency[]   @relation("ITTicketCreateIdempotencyRequester")
 
   @@map("users")
 }
@@ -200,6 +206,7 @@ model Department {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   employees   Employee[]
+  itTicketDepartmentSnapshots ITTicket[]
 
   @@map("departments")
 }
@@ -208,6 +215,119 @@ enum EmployeeStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+}
+
+enum ITTicketType {
+  INCIDENT
+  SERVICE_REQUEST
+  SUGGESTION
+}
+
+enum ITTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_REQUESTER
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum ITTicketEventKind {
+  CREATED
+  STATUS_CHANGED
+  ASSIGNED
+  UNASSIGNED
+  CATEGORY_CHANGED
+}
+
+model ITTicket {
+  id                              Int            @id @default(autoincrement())
+  type                            ITTicketType
+  title                           String         @db.VarChar(200)
+  description                     String         @db.Text
+  status                          ITTicketStatus @default(OPEN)
+  requesterUserId                 Int
+  assignedToUserId                Int?
+  categoryId                      Int?
+  requesterDepartmentId           Int?
+  requesterDepartmentNameSnapshot String?        @db.VarChar(191)
+  version                         Int            @default(1)
+  resolvedAt                      DateTime?
+  createdAt                       DateTime       @default(now())
+  updatedAt                       DateTime       @updatedAt
+
+  requester         User               @relation("ITTicketRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
+  assignedTo        User?              @relation("ITTicketAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
+  requesterDepartment Department?       @relation(fields: [requesterDepartmentId], references: [id], onDelete: SetNull)
+  category          ITTicketCategory?  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  events            ITTicketEvent[]
+  createIdempotency ITTicketCreateIdempotency?
+
+  @@index([requesterUserId, createdAt, id])
+  @@index([status, createdAt, id])
+  @@index([assignedToUserId, status, createdAt])
+  @@index([type, createdAt])
+  @@index([categoryId, createdAt])
+  @@index([requesterDepartmentId])
+  @@map("it_tickets")
+}
+
+model ITTicketCategory {
+  id        Int        @id @default(autoincrement())
+  key       String     @unique @db.VarChar(64)
+  name      String     @db.VarChar(191)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  tickets   ITTicket[]
+  fromEvents ITTicketEvent[] @relation("ITTicketEventFromCategory")
+  toEvents   ITTicketEvent[] @relation("ITTicketEventToCategory")
+
+  @@map("it_ticket_categories")
+}
+
+model ITTicketEvent {
+  id                   Int               @id @default(autoincrement())
+  ticketId             Int
+  actorUserId          Int
+  kind                 ITTicketEventKind
+  fromStatus           ITTicketStatus?
+  toStatus             ITTicketStatus?
+  fromAssigneeUserId   Int?
+  toAssigneeUserId     Int?
+  fromCategoryId       Int?
+  toCategoryId         Int?
+  occurredAt           DateTime          @default(now())
+
+  ticket       ITTicket         @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  actor        User             @relation("ITTicketEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  fromAssignee User?            @relation("ITTicketEventFromAssignee", fields: [fromAssigneeUserId], references: [id], onDelete: Restrict)
+  toAssignee   User?            @relation("ITTicketEventToAssignee", fields: [toAssigneeUserId], references: [id], onDelete: Restrict)
+  fromCategory ITTicketCategory? @relation("ITTicketEventFromCategory", fields: [fromCategoryId], references: [id], onDelete: Restrict)
+  toCategory   ITTicketCategory? @relation("ITTicketEventToCategory", fields: [toCategoryId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, occurredAt, id])
+  @@index([actorUserId])
+  @@index([fromAssigneeUserId])
+  @@index([toAssigneeUserId])
+  @@index([fromCategoryId])
+  @@index([toCategoryId])
+  @@map("it_ticket_events")
+}
+
+model ITTicketCreateIdempotency {
+  id             Int      @id @default(autoincrement())
+  requesterUserId Int
+  idempotencyKey String   @db.VarChar(255)
+  requestHash    String   @db.Char(64)
+  ticketId       Int      @unique
+  createdAt      DateTime @default(now())
+
+  requester User     @relation("ITTicketCreateIdempotencyRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
+  ticket    ITTicket @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  @@unique([requesterUserId, idempotencyKey])
+  @@map("it_ticket_create_idempotency")
 }
 
 enum NotificationOutboxType {

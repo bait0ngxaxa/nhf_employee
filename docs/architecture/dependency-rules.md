@@ -170,9 +170,10 @@ contains no audience lookup. `createAdminInAppNotificationsOnce` was removed.
 Phase 13A/13A.1 moved the Routine, Stock, and Email Request notification
 audiences to configured capabilities; the business producer still owns each
 event and recipient policy. Do not add a generic Notification audience query or
-migrate the Email Request workflow as part of IT1. IT's authorization boundary
-is registered; Email Request ownership migration remains deferred to IT8.
-Legacy IT notification and outbox enum values remain
+migrate the Email Request workflow as part of IT1. IT1 registered the
+authorization boundary and IT2 added Ticket persistence/domain commands; no
+Ticket notification producer exists yet. Email Request ownership migration
+remains deferred to IT8. Legacy IT notification and outbox enum values remain
 storage-compatible history only.
 
 Notification application commands distinguish strict `createForUser` and

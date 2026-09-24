@@ -37,9 +37,11 @@ audit ยังคงเก็บหลักฐาน ณ เวลาที่
 
 ปัจจุบัน `modules/` มี 11 ขอบเขต: Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine และ Stock. Phase K1 ปิด
-ขอบเขต Stock LIFF/provider ที่เคยพบใน K0. IT1 เพิ่ม IT authorization domain,
-capability registry และ server entry แล้ว แต่ยังไม่มี Ticket persistence หรือ
-runtime. การย้าย Email Request ยังรอ IT8.
+ขอบเขต Stock LIFF/provider ที่เคยพบใน K0. IT1 และ IT2 ปิดแล้ว: IT มี
+authorization domain, capability registry, server entry, Ticket persistence,
+การสร้างและ idempotency, workflow, assignment, category classification และ
+event history. ยังไม่มี Ticket API/UI, comments/attachments หรือ notification
+producer. การย้าย Email Request ยังรอ IT8.
 
 Authorization ใช้ Default Domain Policy ของแต่ละ capability ร่วมกับ Team,
 TeamRole และ direct User grants ที่ตั้งค่าไว้; `ADMIN` ยังคงเป็นบทบาทของ

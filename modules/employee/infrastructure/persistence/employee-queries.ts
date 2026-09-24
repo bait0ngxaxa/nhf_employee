@@ -5,12 +5,52 @@ import { getBootstrapAdminEmails } from "@/lib/ssot/admin-bootstrap";
 import { EMPLOYEE_PAGINATION_DEFAULTS } from "../../application/constants";
 import { hasEligibleEmployeeLifecycle } from "../../domain/lifecycle";
 import type {
+    CurrentWorkforceDepartmentSnapshot,
     CurrentEmployeeProjection,
     EmployeeFilters,
     EmployeeRecord,
     LiffEmployeeIdentity,
     PaginatedEmployeesResult,
 } from "../../application/types";
+
+export async function getCurrentWorkforceDepartmentSnapshotInTransaction(
+    tx: Prisma.TransactionClient,
+    userId: number,
+): Promise<CurrentWorkforceDepartmentSnapshot | null> {
+    const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: {
+            isActive: true,
+            deletedAt: true,
+            employee: {
+                select: {
+                    id: true,
+                    status: true,
+                    deletedAt: true,
+                    departmentId: true,
+                    dept: { select: { name: true } },
+                },
+            },
+        },
+    });
+
+    if (
+        user === null
+        || !user.isActive
+        || user.deletedAt !== null
+        || user.employee === null
+        || user.employee.status !== "ACTIVE"
+        || user.employee.deletedAt !== null
+    ) {
+        return null;
+    }
+
+    return Object.freeze({
+        employeeId: user.employee.id,
+        departmentId: user.employee.departmentId,
+        departmentName: user.employee.dept.name,
+    });
+}
 
 export async function hasEligibleCurrentEmployeeForUser(
     userId: number,

@@ -87,8 +87,6 @@ export function createAuthorizationRecipientLookup(
                     const decision = evaluateConfiguredAuthorization(
                         {
                             userId: candidate.userId,
-                            employeeId: null,
-                            systemRole: "USER",
                             channel: definition.channels[0],
                         },
                         validatedRequest.capability,

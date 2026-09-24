@@ -11,9 +11,10 @@ server/business and active presentation ownership are migrated as well.
 
 The repository-wide K0 ownership audit, K1 closure, and deferred-boundary
 inventory are recorded in [final-repository-audit.md](./final-repository-audit.md).
-K1 closed the three Stock findings. IT1 has since established the
-`modules/it` server authorization foundation; Ticket runtime and persistence
-remain deferred.
+K1 closed the three Stock findings. IT1 established the `modules/it` server
+authorization foundation and IT2 added IT-owned Ticket persistence and domain
+commands. Ticket API/UI, comments, attachments, notifications, and Email
+Request migration remain deferred.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -113,7 +114,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT authorization foundation (IT1)
+## IT module foundation and Ticket domain (IT1/IT2)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -124,10 +125,13 @@ names, TeamRole names, and assignment do not create IT authority or requester
 ownership.
 
 IT1 adds the `it` authorization domain and five Dashboard-only capabilities.
-The public entry exposes those authorization/resource contracts and the
-assignee eligibility evaluator. It has no Ticket persistence, API, UI, browser
-entry, notification producer, or production grant configuration. Add a client
-entry only when IT owns an actual browser consumer. See
+IT2 adds new `it_*` Ticket, category, event, and creation-idempotency tables,
+validated server commands, transaction-time workforce/configured-authority
+checks, version concurrency, and the approved workflow. The public entry exposes
+stable command, result, error, enum, and authorization contracts. IT2 adds no
+Ticket API/UI, browser entry, comments, attachments, notification producer, or
+production grant configuration. Add a client entry only when IT owns an actual
+browser consumer. See
 [it-module-design.md](./it-module-design.md) for the phase contract and
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.
@@ -331,7 +335,8 @@ inventory and deferred compatibility boundaries.
 The full producer, reader, retention, presentation, action, identity,
 transaction, metadata, compatibility, and phased I1-I3 ledger is in
 audit-migration.md. The I3 source record explicitly kept Auth/Session/Identity
-and Email Request deferred; IT1 later added an authorization foundation only.
+and Email Request deferred; IT1/IT2 later added the IT authorization foundation
+and Ticket server/domain persistence, while API/UI and delivery remain deferred.
 No Prisma schema or AuditAction taxonomy change occurred in I3.
 
 ## Larger feature shape

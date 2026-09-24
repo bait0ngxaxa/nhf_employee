@@ -2,7 +2,10 @@ import { Role } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
-import { authorization } from "@/modules/authorization";
+import {
+    authorization,
+    hasConfiguredCapabilityScopeForUser,
+} from "@/modules/authorization";
 import type { AuthorizationConfigurationError } from "@/modules/authorization";
 import type { AuthorizationActor } from "@/modules/authorization";
 
@@ -422,6 +425,74 @@ describe.sequential("authorization resolver with real MySQL", () => {
         });
     });
 
+    it("checks exact configured IT scopes inside a transaction without domain defaults", async () => {
+        const user = await createUser("exact-configured-scope");
+        const team = await createTeam("exact-configured-scope");
+        const role = await prisma.teamRole.create({
+            data: {
+                teamId: team.id,
+                key: "exact-configured-scope-role",
+                name: "บทบาทตรวจสอบสิทธิ์ที่กำหนด",
+            },
+        });
+        await prisma.teamMembership.create({
+            data: { teamId: team.id, userId: user.id, teamRoleId: role.id },
+        });
+        await prisma.teamCapabilityGrant.create({
+            data: { teamId: team.id, capabilityKey: "it.ticket.read", scope: "ALL" },
+        });
+        await prisma.teamRoleCapabilityGrant.create({
+            data: { teamRoleId: role.id, capabilityKey: "it.ticket.comment", scope: "ALL" },
+        });
+        await prisma.userCapabilityGrant.create({
+            data: { userId: user.id, capabilityKey: "it.ticket.manage", scope: "ALL" },
+        });
+
+        const hasScopeInTransaction = (
+            capability: string,
+            scope: "OWN" | "ALL",
+            channel: "DASHBOARD" | "SYSTEM" = "DASHBOARD",
+        ) => prisma.$transaction((tx) => hasConfiguredCapabilityScopeForUser({
+            userId: user.id,
+            capability,
+            scope,
+            channel,
+        }, tx));
+
+        await expect(hasScopeInTransaction("it.ticket.read", "ALL")).resolves.toBe(true);
+        await expect(hasScopeInTransaction("it.ticket.comment", "ALL")).resolves.toBe(true);
+        await expect(hasScopeInTransaction("it.ticket.manage", "ALL")).resolves.toBe(true);
+        await expect(hasScopeInTransaction("it.ticket.create", "OWN")).resolves.toBe(false);
+        await expect(hasScopeInTransaction("it.ticket.create", "ALL")).resolves.toBe(false);
+        await expect(hasScopeInTransaction("it.ticket.read", "ALL", "SYSTEM")).resolves.toBe(false);
+        await expect(hasScopeInTransaction("it.unknown.capability", "ALL")).resolves.toBe(false);
+
+        await prisma.team.update({ where: { id: team.id }, data: { isActive: false } });
+        await expect(hasScopeInTransaction("it.ticket.read", "ALL")).resolves.toBe(false);
+        await prisma.team.update({ where: { id: team.id }, data: { isActive: true } });
+
+        await prisma.teamRole.update({ where: { id: role.id }, data: { isActive: false } });
+        await expect(hasScopeInTransaction("it.ticket.comment", "ALL")).resolves.toBe(false);
+        await prisma.teamRole.update({ where: { id: role.id }, data: { isActive: true } });
+
+        await prisma.teamMembership.delete({
+            where: { teamId_userId: { teamId: team.id, userId: user.id } },
+        });
+        await expect(hasScopeInTransaction("it.ticket.read", "ALL")).resolves.toBe(false);
+        await expect(hasScopeInTransaction("it.ticket.comment", "ALL")).resolves.toBe(false);
+
+        await prisma.userCapabilityGrant.delete({
+            where: {
+                userId_capabilityKey_scope: {
+                    userId: user.id,
+                    capabilityKey: "it.ticket.manage",
+                    scope: "ALL",
+                },
+            },
+        });
+        await expect(hasScopeInTransaction("it.ticket.manage", "ALL")).resolves.toBe(false);
+    });
+
     it("fails closed for a persisted IT scope that its capability does not support", async () => {
         const user = await createUser("it-invalid-scope");
         await prisma.userCapabilityGrant.create({
@@ -435,6 +506,15 @@ describe.sequential("authorization resolver with real MySQL", () => {
         await expect(
             authorization.resolve(userActor(user.id), "it.ticket.manage"),
         ).rejects.toMatchObject({
+            name: "AuthorizationConfigurationError",
+            code: "UNSUPPORTED_PERSISTED_SCOPE",
+        } satisfies Partial<AuthorizationConfigurationError>);
+        await expect(prisma.$transaction((tx) => hasConfiguredCapabilityScopeForUser({
+            userId: user.id,
+            capability: "it.ticket.manage",
+            scope: "ALL",
+            channel: "DASHBOARD",
+        }, tx))).rejects.toMatchObject({
             name: "AuthorizationConfigurationError",
             code: "UNSUPPORTED_PERSISTED_SCOPE",
         } satisfies Partial<AuthorizationConfigurationError>);

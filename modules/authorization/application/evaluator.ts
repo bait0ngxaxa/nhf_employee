@@ -44,7 +44,7 @@ export type AuthorizationEvaluationContext =
     };
 
 export function getAuthorizationEvaluationContext(
-    actor: AuthorizationActor,
+    actor: Pick<AuthorizationActor, "userId" | "channel">,
     capability: string,
     registry: CapabilityRegistry = CAPABILITY_REGISTRY,
 ): AuthorizationEvaluationContext {
@@ -90,7 +90,7 @@ export function normalizeAuthorizationScopes(
  * does not affect configured business-grant evaluation here.
  */
 export function evaluateConfiguredAuthorization(
-    actor: AuthorizationActor,
+    actor: Pick<AuthorizationActor, "userId" | "channel">,
     capability: string,
     resolutionData: AuthorizationResolutionData =
         EMPTY_AUTHORIZATION_RESOLUTION_DATA,
@@ -115,7 +115,7 @@ export function evaluateConfiguredAuthorization(
 
 
 function evaluateConfiguredGrants(
-    actor: AuthorizationActor,
+    actor: Pick<AuthorizationActor, "userId" | "channel">,
     definition: CapabilityDefinition,
     resolutionData: AuthorizationResolutionData,
     registry: CapabilityRegistry,

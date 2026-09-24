@@ -26,6 +26,8 @@ export {
     CapabilityGrantValidationError,
     validateCapabilityGrant,
 } from "./application/grant-validation";
+export { hasConfiguredCapabilityScopeForUser } from "./application/configured-scope";
+export type { ConfiguredCapabilityScopeRequest } from "./application/configured-scope";
 export type {
     CapabilityGrantInput,
     CapabilityGrantValidationCode,
