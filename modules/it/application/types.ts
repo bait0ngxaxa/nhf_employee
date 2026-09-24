@@ -1,6 +1,8 @@
 import type { AuthorizationScope } from "@/modules/authorization";
 import type { ITTicketStatus, ITTicketType } from "@prisma/client";
 
+export type { ITPresentationCapabilities } from "../contracts";
+
 export interface ITTicketRecord {
     readonly id: number;
     readonly type: ITTicketType;
@@ -26,16 +28,6 @@ export interface ITTicketMutationResult {
 export interface CreateITTicketResult {
     readonly ticket: ITTicketRecord;
     readonly replayed: boolean;
-}
-
-export interface ITPresentationCapabilities {
-    readonly canReadOwnTickets: boolean;
-    readonly canReadAllTickets: boolean;
-    readonly canCreateOwnTickets: boolean;
-    readonly canCommentOwnTickets: boolean;
-    readonly canCommentAllTickets: boolean;
-    readonly canManageTickets: boolean;
-    readonly canReadAnalytics: boolean;
 }
 
 export interface ITTicketResourceScope {

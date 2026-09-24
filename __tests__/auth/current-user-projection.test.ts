@@ -12,6 +12,7 @@ import type {
 import type { DepartmentPresentationCapabilities } from "@/modules/department";
 import type { AuditPresentationCapabilities } from "@/modules/audit";
 import type { NotificationPresentationCapabilities } from "@/modules/notification";
+import type { ITPresentationCapabilities } from "@/modules/it";
 
 const {
     cookiesMock,
@@ -33,6 +34,8 @@ const {
     notificationProjectionMock,
     emailRequestContextMock,
     emailRequestCapabilitiesMock,
+    itContextMock,
+    itCapabilitiesMock,
     userTeamsMock,
 } = vi.hoisted(() => ({
     cookiesMock: vi.fn(),
@@ -54,6 +57,8 @@ const {
     notificationProjectionMock: vi.fn(),
     emailRequestContextMock: vi.fn(),
     emailRequestCapabilitiesMock: vi.fn(),
+    itContextMock: vi.fn(),
+    itCapabilitiesMock: vi.fn(),
     userTeamsMock: vi.fn(),
 }));
 
@@ -91,6 +96,10 @@ vi.mock("@/modules/notification", () => ({
 vi.mock("@/lib/services/email-request/authorization", () => ({
     buildEmailRequestAuthorizationContext: emailRequestContextMock,
     getEmailRequestPresentationCapabilities: emailRequestCapabilitiesMock,
+}));
+vi.mock("@/modules/it", () => ({
+    buildITAuthorizationContext: itContextMock,
+    getITPresentationCapabilities: itCapabilitiesMock,
 }));
 vi.mock("@/modules/authorization", () => ({
     findActiveUserTeams: userTeamsMock,
@@ -194,6 +203,16 @@ const NOTIFICATION_CAPABILITIES: NotificationPresentationCapabilities = {
     canUpdateInbox: false,
 };
 
+const IT_CAPABILITIES: ITPresentationCapabilities = {
+    canReadOwnTickets: true,
+    canReadAllTickets: false,
+    canCreateOwnTickets: true,
+    canCommentOwnTickets: true,
+    canCommentAllTickets: false,
+    canManageTickets: false,
+    canReadAnalytics: false,
+};
+
 describe("current-user application projection", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -232,6 +251,8 @@ describe("current-user application projection", () => {
         notificationProjectionMock.mockResolvedValue(NOTIFICATION_CAPABILITIES);
         emailRequestContextMock.mockReturnValue({ authorizationActor: "email-request-actor" });
         emailRequestCapabilitiesMock.mockResolvedValue(EMAIL_REQUEST_CAPABILITIES);
+        itContextMock.mockReturnValue({ authorizationActor: "it-actor" });
+        itCapabilitiesMock.mockResolvedValue(IT_CAPABILITIES);
         userTeamsMock.mockResolvedValue([{ id: 8, name: "IT" }]);
     });
 
@@ -255,6 +276,7 @@ describe("current-user application projection", () => {
             auditCapabilities: AUDIT_CAPABILITIES,
             notificationCapabilities: NOTIFICATION_CAPABILITIES,
             emailRequestCapabilities: EMAIL_REQUEST_CAPABILITIES,
+            itCapabilities: IT_CAPABILITIES,
         });
         expect(resolveAccountMock).toHaveBeenCalledWith("access-token");
         expect(employeeProjectionMock).toHaveBeenCalledWith(41);
@@ -320,6 +342,8 @@ describe("current-user application projection", () => {
         expect(emailRequestCapabilitiesMock).toHaveBeenCalledWith({
             authorizationActor: "email-request-actor",
         });
+        expect(itContextMock).toHaveBeenCalledWith({ id: 41, role: "ADMIN" }, 101);
+        expect(itCapabilitiesMock).toHaveBeenCalledWith({ authorizationActor: "it-actor" });
     });
 
     it("keeps the broad projection unauthorized without an eligible Employee", async () => {
@@ -333,6 +357,8 @@ describe("current-user application projection", () => {
         expect(departmentProjectionMock).not.toHaveBeenCalled();
         expect(auditProjectionMock).not.toHaveBeenCalled();
         expect(notificationProjectionMock).not.toHaveBeenCalled();
+        expect(itContextMock).not.toHaveBeenCalled();
+        expect(itCapabilitiesMock).not.toHaveBeenCalled();
     });
 
     it.each(["inactive", "suspended", "deleted"])(
@@ -401,5 +427,7 @@ describe("current-user application projection", () => {
         expect(departmentProjectionMock).not.toHaveBeenCalled();
         expect(auditProjectionMock).not.toHaveBeenCalled();
         expect(notificationProjectionMock).not.toHaveBeenCalled();
+        expect(itContextMock).not.toHaveBeenCalled();
+        expect(itCapabilitiesMock).not.toHaveBeenCalled();
     });
 });

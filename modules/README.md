@@ -5,11 +5,14 @@ Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. IT1 and IT2 are closed under `modules/it/`; its public entry is
-`@/modules/it`. The module owns Ticket persistence and server-side creation,
-workflow, assignment, classification, idempotency, and event history. Ticket
-API/UI and a browser entry do not exist yet. Email Request migration remains
-deferred to IT8. Audit Phase I3 is closed with generic
+boundaries. IT1, IT2, and IT3 are closed under `modules/it/`; its server entry
+is `@/modules/it` and its browser-safe Dashboard presentation entry is
+`@/modules/it/client`. The module owns Ticket persistence, creation and
+idempotency, requester-scoped list/detail queries, approved workflow,
+assignment, classification, and event history. IT3 supplies the internal
+requester API and self-service Dashboard only; operator workflows remain
+deferred. Email Request migration remains deferred to IT8. Audit Phase I3 is
+closed with generic
 server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in
 `modules/audit/`. Its public server entry is `@/modules/audit`; its browser-facing entry is
@@ -206,7 +209,7 @@ persistence context; the global processor does not pass a transaction client
 directly to Notification. A direct processor-to-Notification dispatch is
 reserved for a future truly Notification-owned generic event with a fully
 resolved command payload; no current production event uses that shape.
-Email Request migration remains deferred until IT8. IT1/IT2 add no Ticket
+Email Request migration remains deferred until IT8. IT1-IT3 add no Ticket
 notification producer. See
 [notification-migration.md](../docs/architecture/notification-migration.md)
 for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices. H3
@@ -220,9 +223,10 @@ Phase H1 CLOSED — Notification server/application ownership complete.
 Phase H2 CLOSED — Notification presentation ownership complete.
 Phase H3 CLOSED — Notification producer integration and final migration audit complete.
 
-Notification H0-H3 migration complete. IT1 authorization foundation and IT2
-Ticket persistence/workflow are closed. Ticket API/UI, notifications, and
-Email Request migration remain deferred.
+Notification H0-H3 migration complete. IT1 authorization foundation, IT2
+Ticket persistence/workflow, and IT3 requester self-service are closed.
+Operator workflows, comments/attachments, notifications, and Email Request
+migration remain deferred.
 
 ## Stock K1 ownership closure
 
@@ -240,4 +244,4 @@ Messaging channel and `LINE_STOCK_CHANNEL_ACCESS_TOKEN`.
 The shared Outbox Processor remains platform-owned and delegates Stock event
 interpretation through `@/modules/stock`; it continues to own claim, retry,
 stale-processing, dead-letter, and supersede lifecycle. Email Request migration
-and Ticket API/UI remain deferred.
+and IT operator/notification workflows remain deferred.

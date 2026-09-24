@@ -10,6 +10,7 @@ import {
     ShieldCheck,
     ClipboardCheck,
     KeyRound,
+    Headset,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -19,6 +20,7 @@ import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { ITPresentationCapabilities } from "@/modules/it/client";
 
 /** Flat lookup used by handleMenuClick for feature and capability validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -44,6 +46,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         icon: ClipboardCheck,
         description: "บันทึกและติดตามงานประจำขององค์กร",
         feature: FEATURE_KEYS.routine,
+    },
+    {
+        id: "it-tickets",
+        label: "IT Ticket",
+        sidebarLabel: "ขอความช่วยเหลือด้าน IT",
+        icon: Headset,
+        description: "แจ้งปัญหาและติดตามคำขอรับบริการจากทีมไอที",
     },
     {
         id: "email-request",
@@ -121,6 +130,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
             getDashboardMenuItem("leave-management"),
             getDashboardMenuItem("stock"),
             getDashboardMenuItem("routine"),
+            getDashboardMenuItem("it-tickets"),
         ],
     },
     {
@@ -165,6 +175,13 @@ export function canAccessEmailRequestDashboard(
 ): boolean {
     return capabilities?.canReadRequests === true
         || capabilities?.canCreateRequests === true;
+}
+
+export function canAccessITTicketDashboard(
+    capabilities?: ITPresentationCapabilities,
+): boolean {
+    return capabilities?.canReadOwnTickets === true
+        || capabilities?.canCreateOwnTickets === true;
 }
 
 export const LEAVE_DASHBOARD_TABS = [
@@ -240,6 +257,7 @@ export function getAvailableMenuGroups(
     employeeCapabilities?: EmployeePresentationCapabilities,
     auditCapabilities?: AuditPresentationCapabilities,
     emailRequestCapabilities?: EmailRequestPresentationCapabilities,
+    itCapabilities?: ITPresentationCapabilities,
 ): MenuGroup[] {
     const stockAvailable = canAccessStockDashboard(stockCapabilities);
     const employeeAvailable = canAccessEmployeeDashboard(employeeCapabilities);
@@ -260,6 +278,9 @@ export function getAvailableMenuGroups(
             }
             if (item.id === "email-request") {
                 return canAccessEmailRequestDashboard(emailRequestCapabilities);
+            }
+            if (item.id === "it-tickets") {
+                return canAccessITTicketDashboard(itCapabilities);
             }
             return !item.requiredRole
                 || (item.requiredRole === "ADMIN" && isAdmin);
@@ -313,6 +334,16 @@ export const getMenuTheme = (menuId: string) => {
                 hover: "hover:bg-indigo-50",
                 activeBg: "bg-indigo-50/80",
                 glow: "from-indigo-400 via-violet-400 to-purple-400",
+            };
+        case "it-tickets":
+            return {
+                gradient: "from-sky-600 to-cyan-700",
+                lightBg: "bg-sky-50",
+                text: "text-sky-700",
+                border: "border-sky-700",
+                hover: "hover:bg-sky-50",
+                activeBg: "bg-sky-50/80",
+                glow: "from-sky-400 via-cyan-400 to-blue-400",
             };
         case "stock":
             return {

@@ -1,8 +1,12 @@
 import { ITTicketStatus, ITTicketType } from "@prisma/client";
 import { z } from "zod";
 
-export const IT_TICKET_TITLE_MAX_LENGTH = 200;
-export const IT_TICKET_DESCRIPTION_MAX_LENGTH = 10_000;
+import {
+    IT_TICKET_DESCRIPTION_MAX_LENGTH,
+    IT_TICKET_TITLE_MAX_LENGTH,
+} from "../contracts";
+
+export { IT_TICKET_DESCRIPTION_MAX_LENGTH, IT_TICKET_TITLE_MAX_LENGTH };
 
 export const createITTicketInputSchema = z.object({
     type: z.nativeEnum(ITTicketType),

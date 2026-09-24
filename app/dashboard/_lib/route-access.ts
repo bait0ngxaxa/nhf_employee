@@ -9,6 +9,8 @@ import {
 } from "@/modules/authorization";
 import type { EmployeePresentationCapabilities } from "@/modules/employee";
 import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { ITPresentationCapabilities } from "@/modules/it";
+import { canAccessITTicketDashboard } from "@/constants/dashboard";
 
 export type DashboardEmployeeCapability = keyof Pick<
     EmployeePresentationCapabilities,
@@ -31,6 +33,30 @@ export async function requireDashboardEmailRequestAccess(): Promise<EmailRequest
     }
 
     return capabilities;
+}
+
+export async function requireDashboardITSelfServiceAccess(): Promise<ITPresentationCapabilities> {
+    const user = await getCurrentUserProjection();
+    if (!user) redirect(APP_ROUTES.login);
+
+    const capabilities = user.itCapabilities ?? {
+        canReadOwnTickets: false,
+        canReadAllTickets: false,
+        canCreateOwnTickets: false,
+        canCommentOwnTickets: false,
+        canCommentAllTickets: false,
+        canManageTickets: false,
+        canReadAnalytics: false,
+    };
+    if (!canAccessITTicketDashboard(capabilities)) {
+        redirect(APP_ROUTES.accessDenied);
+    }
+    return capabilities;
+}
+
+export async function requireDashboardITReadAccess(): Promise<void> {
+    const capabilities = await requireDashboardITSelfServiceAccess();
+    if (!capabilities.canReadOwnTickets) redirect(APP_ROUTES.accessDenied);
 }
 
 export async function requireDashboardAuthorizationAdministration(): Promise<

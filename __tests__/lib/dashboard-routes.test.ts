@@ -23,6 +23,9 @@ describe("dashboard route SSOT", () => {
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.stock)).toBe(
             APP_ROUTES.dashboardStock,
         );
+        expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itTickets)).toBe(
+            APP_ROUTES.dashboardIT,
+        );
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.routine)).toBe(
             APP_ROUTES.dashboardRoutine,
         );
@@ -49,6 +52,9 @@ describe("dashboard route SSOT", () => {
         );
         expect(getDashboardMenuIdFromPathname(APP_ROUTES.dashboardStock)).toBe(
             APP_DASHBOARD_TABS.stock,
+        );
+        expect(getDashboardMenuIdFromPathname(APP_ROUTES.dashboardIT)).toBe(
+            APP_DASHBOARD_TABS.itTickets,
         );
         expect(
             getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardEmployees}/new`),
@@ -106,6 +112,14 @@ describe("dashboard route SSOT", () => {
         );
         expect(routes.userGrants(7)).toBe(
             "/api/authorization/administration/users/7/grants",
+        );
+    });
+
+    it("centralizes internal IT Ticket API routes without changing the Stock alias", () => {
+        expect(API_ROUTES.itTickets.list).toBe("/api/it/tickets");
+        expect(API_ROUTES.itTickets.byId(27)).toBe("/api/it/tickets/27");
+        expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itEquipment)).toBe(
+            APP_ROUTES.dashboardStock,
         );
     });
 });

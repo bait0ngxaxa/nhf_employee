@@ -12,9 +12,10 @@ server/business and active presentation ownership are migrated as well.
 The repository-wide K0 ownership audit, K1 closure, and deferred-boundary
 inventory are recorded in [final-repository-audit.md](./final-repository-audit.md).
 K1 closed the three Stock findings. IT1 established the `modules/it` server
-authorization foundation and IT2 added IT-owned Ticket persistence and domain
-commands. Ticket API/UI, comments, attachments, notifications, and Email
-Request migration remain deferred.
+authorization foundation, IT2 added IT-owned Ticket persistence and domain
+commands, and IT3 added requester-only Ticket API and Dashboard presentation.
+Operator queue, comments, attachments, notifications, and Email Request
+migration remain deferred.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -114,7 +115,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT module foundation and Ticket domain (IT1/IT2)
+## IT module foundation and Ticket self-service (IT1/IT2/IT3)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -127,11 +128,14 @@ ownership.
 IT1 adds the `it` authorization domain and five Dashboard-only capabilities.
 IT2 adds new `it_*` Ticket, category, event, and creation-idempotency tables,
 validated server commands, transaction-time workforce/configured-authority
-checks, version concurrency, and the approved workflow. The public entry exposes
-stable command, result, error, enum, and authorization contracts. IT2 adds no
-Ticket API/UI, browser entry, comments, attachments, notification producer, or
-production grant configuration. Add a client entry only when IT owns an actual
-browser consumer. See
+checks, version concurrency, and the approved workflow. IT3 adds requester
+list/detail queries whose database predicates always include the authenticated
+requester, internal Dashboard API handlers, and a requester-safe DTO. The root
+server entry exposes stable application contracts; `@/modules/it/client` is the
+browser-safe presentation entry. Dashboard navigation and route guards use the
+server-derived capability projection, while API/query boundaries independently
+revalidate workforce and read authority. IT3 adds no operator queue, comments,
+attachments, notification producer, or production grant configuration. See
 [it-module-design.md](./it-module-design.md) for the phase contract and
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.

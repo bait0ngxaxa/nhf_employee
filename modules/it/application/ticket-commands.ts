@@ -8,6 +8,7 @@ import {
     type ITAuthorizationContext,
 } from "./authorization";
 import { evaluateITAssigneeEligibility } from "./assignee-eligibility";
+import { assertITActorCurrentWorkforce } from "./workforce";
 import {
     ITTicketAssigneeNotEligibleError,
     ITTicketCategoryInactiveError,
@@ -17,7 +18,6 @@ import {
     ITTicketInvalidTransitionError,
     ITTicketMutationConflictError,
     ITTicketNotFoundError,
-    ITWorkforceDeniedError,
 } from "./ticket-errors";
 import {
     assignITTicketInputSchema,
@@ -70,25 +70,6 @@ function toITTicketRecord(ticket: PrismaITTicket): ITTicketRecord {
         createdAt: ticket.createdAt,
         updatedAt: ticket.updatedAt,
     });
-}
-
-async function assertCurrentWorkforce(
-    tx: Prisma.TransactionClient,
-    context: ITAuthorizationContext,
-): Promise<{ readonly employeeId: number; readonly departmentId: number; readonly departmentName: string }> {
-    const actor = context.authorizationActor;
-    const workforce = await getCurrentWorkforceDepartmentSnapshotInTransaction(
-        tx,
-        actor.userId,
-    );
-    if (
-        workforce === null
-        || actor.employeeId === null
-        || workforce.employeeId !== actor.employeeId
-    ) {
-        throw new ITWorkforceDeniedError();
-    }
-    return workforce;
 }
 
 async function assertITCapabilityScope(
@@ -158,7 +139,7 @@ export async function createITTicket(
 
     try {
         return await runSerializableTransaction(async (tx) => {
-            const workforce = await assertCurrentWorkforce(tx, context);
+            const workforce = await assertITActorCurrentWorkforce(tx, context);
             await assertITCapabilityScope(
                 tx,
                 context,
@@ -235,7 +216,7 @@ async function assertOperatorAuthority(
     tx: Prisma.TransactionClient,
     context: ITAuthorizationContext,
 ): Promise<void> {
-    await assertCurrentWorkforce(tx, context);
+    await assertITActorCurrentWorkforce(tx, context);
     await assertITCapabilityScope(
         tx,
         context,

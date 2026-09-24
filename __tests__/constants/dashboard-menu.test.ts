@@ -17,6 +17,7 @@ import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { ITPresentationCapabilities } from "@/modules/it/client";
 
 const originalRoutineFlag = process.env.NEXT_PUBLIC_FEATURE_ROUTINE;
 const originalLeaveFlag = process.env.NEXT_PUBLIC_FEATURE_LEAVE;
@@ -115,6 +116,16 @@ const emailCreateCapabilities: EmailRequestPresentationCapabilities = {
     canCreateRequests: true,
 };
 
+const itReadCapabilities: ITPresentationCapabilities = {
+    canReadOwnTickets: true,
+    canReadAllTickets: false,
+    canCreateOwnTickets: true,
+    canCommentOwnTickets: true,
+    canCommentAllTickets: false,
+    canManageTickets: false,
+    canReadAnalytics: false,
+};
+
 function getMenuIds(
     isAdmin: boolean,
     leaveAvailability?: Parameters<typeof getAvailableMenuGroups>[3],
@@ -150,7 +161,7 @@ describe("dashboard menu", () => {
             group.label,
             group.items.map((item) => item.id),
         ])).toEqual([
-            ["บริการภายใน", ["leave-management", "stock", "routine"]],
+            ["บริการภายใน", ["leave-management", "stock", "routine", "it-tickets"]],
             ["บุคลากร", ["employee-management", "add-employee", "email-request"]],
             ["ระบบและสิทธิ์", ["audit-logs", "authorization-administration"]],
         ]);
@@ -175,6 +186,10 @@ describe("dashboard menu", () => {
         expect(menuItem("email-request")).toMatchObject({
             label: "ส่งคำร้องพนักงานใหม่",
             sidebarLabel: "คำร้องบริการ IT",
+        });
+        expect(menuItem("it-tickets")).toMatchObject({
+            label: "IT Ticket",
+            sidebarLabel: "ขอความช่วยเหลือด้าน IT",
         });
         expect(getDashboardPageLabel("routine")).toBe("NHF Routine");
     });
@@ -257,6 +272,24 @@ describe("dashboard menu", () => {
         expect(userMenuIds).not.toContain("authorization-administration");
         expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === "authorization-administration")?.requiredRole)
             .toBe("ADMIN");
+    });
+
+    it("shows the IT requester surface only from projected read/create capability", () => {
+        const noCapabilityMenuIds = getAvailableMenuGroups(true)
+            .flatMap((group) => group.items.map((item) => item.id));
+        const requesterMenuIds = getAvailableMenuGroups(
+            false,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            itReadCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+
+        expect(noCapabilityMenuIds).not.toContain("it-tickets");
+        expect(requesterMenuIds).toContain("it-tickets");
     });
 
     it("keeps CSV import route available but hides it from dashboard menus", () => {

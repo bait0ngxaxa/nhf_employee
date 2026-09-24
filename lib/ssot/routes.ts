@@ -10,6 +10,7 @@ export const APP_ROUTES = {
     dashboardStock: "/dashboard/stock",
     dashboardRoutine: "/dashboard/routine",
     dashboardEmailRequest: "/dashboard/email-request",
+    dashboardIT: "/dashboard/it",
     dashboardEmployees: "/dashboard/employees",
     dashboardEmployeeNew: "/dashboard/employees/new",
     dashboardEmployeeImport: "/dashboard/employees/import",
@@ -48,6 +49,7 @@ export const APP_DASHBOARD_TABS = {
     notifications: "notifications",
     sessions: "sessions",
     itEquipment: "it-equipment",
+    itTickets: "it-tickets",
     authorizationAdministration: "authorization-administration",
 } as const;
 
@@ -61,6 +63,7 @@ export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     "manager-approval": `${APP_ROUTES.dashboardLeave}?leaveTab=approvals`,
     stock: APP_ROUTES.dashboardStock,
     "it-equipment": APP_ROUTES.dashboardStock,
+    "it-tickets": APP_ROUTES.dashboardIT,
     routine: APP_ROUTES.dashboardRoutine,
     "email-request": APP_ROUTES.dashboardEmailRequest,
     "employee-management": APP_ROUTES.dashboardEmployees,
@@ -82,6 +85,7 @@ const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     [APP_ROUTES.dashboardStock, APP_DASHBOARD_TABS.stock],
     [APP_ROUTES.dashboardRoutine, APP_DASHBOARD_TABS.routine],
     [APP_ROUTES.dashboardEmailRequest, APP_DASHBOARD_TABS.emailRequest],
+    [APP_ROUTES.dashboardIT, APP_DASHBOARD_TABS.itTickets],
     [APP_ROUTES.dashboardAudit, APP_DASHBOARD_TABS.auditLogs],
     [APP_ROUTES.dashboardNotifications, APP_DASHBOARD_TABS.notifications],
     [APP_ROUTES.dashboardSessions, APP_DASHBOARD_TABS.sessions],
@@ -397,6 +401,10 @@ export const API_ROUTES = {
     },
     emailRequest: {
         list: "/api/email-request",
+    },
+    itTickets: {
+        list: "/api/it/tickets",
+        byId: (id: number | string): string => `/api/it/tickets/${id}`,
     },
     line: {
         accountLink: "/api/line/account-link",

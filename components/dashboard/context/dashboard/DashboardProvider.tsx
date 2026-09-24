@@ -11,6 +11,7 @@ import { useRouter, usePathname } from "next/navigation";
 import {
     DASHBOARD_MENU_ITEMS,
     canAccessEmailRequestDashboard,
+    canAccessITTicketDashboard,
     canAccessEmployeeDashboard,
     canAccessLeaveDashboard,
     canAccessStockDashboard,
@@ -74,6 +75,7 @@ export function DashboardProvider({
             user?.employeeCapabilities,
             user?.auditCapabilities,
             user?.emailRequestCapabilities,
+            user?.itCapabilities,
         ),
         [
             isAdmin,
@@ -85,6 +87,7 @@ export function DashboardProvider({
             user?.employeeCapabilities,
             user?.auditCapabilities,
             user?.emailRequestCapabilities,
+            user?.itCapabilities,
         ],
     );
 
@@ -159,6 +162,13 @@ export function DashboardProvider({
                 router.push(APP_ROUTES.accessDenied);
                 return;
             }
+            if (
+                menuId === "it-tickets"
+                && !canAccessITTicketDashboard(user?.itCapabilities)
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
             if (menuId === "authorization-administration" && !isAdmin) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
@@ -181,6 +191,7 @@ export function DashboardProvider({
             user?.employeeCapabilities,
             user?.auditCapabilities,
             user?.emailRequestCapabilities,
+            user?.itCapabilities,
         ],
     );
 

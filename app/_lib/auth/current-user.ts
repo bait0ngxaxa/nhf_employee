@@ -33,6 +33,10 @@ import {
     buildEmailRequestAuthorizationContext,
     getEmailRequestPresentationCapabilities,
 } from "@/lib/services/email-request/authorization";
+import {
+    buildITAuthorizationContext,
+    getITPresentationCapabilities,
+} from "@/modules/it";
 import type { AuthenticatedUser } from "@/modules/auth/client";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { getUserDisplayName } from "@/shared/identity/display";
@@ -68,6 +72,7 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         auditCapabilities,
         notificationCapabilities,
         emailRequestCapabilities,
+        itCapabilities,
     ] = await Promise.all([
         getCurrentEmployeeLeaveProjection(
             employee.id,
@@ -135,6 +140,12 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
                 role: account.role,
             }),
         ),
+        getITPresentationCapabilities(
+            buildITAuthorizationContext(
+                { id: account.userId, role: account.role },
+                employee.id,
+            ),
+        ),
     ]);
 
     return {
@@ -166,5 +177,6 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         auditCapabilities,
         notificationCapabilities,
         emailRequestCapabilities,
+        itCapabilities,
     };
 }

@@ -9,6 +9,7 @@ export {
     resolveITCapability,
     resolveITCapabilityInTransaction,
 } from "./application/authorization";
+export { buildCurrentITAuthorizationContext } from "./application/workforce";
 export type {
     ITAuthorizationActor,
     ITAuthorizationContext,
@@ -28,6 +29,15 @@ export {
     transitionITTicketStatus,
 } from "./application/ticket-commands";
 export {
+    getITRequesterTicket,
+    IT_TICKET_LIST_DEFAULT_LIMIT,
+    IT_TICKET_LIST_DEFAULT_PAGE,
+    IT_TICKET_LIST_MAX_LIMIT,
+    listITRequesterTickets,
+    listITRequesterTicketsInputSchema,
+} from "./application/ticket-queries";
+export { toITRequesterTicket } from "./application/ticket-dto";
+export {
     ITTicketAssigneeNotEligibleError,
     ITTicketCategoryInactiveError,
     ITTicketCategoryNotFoundError,
@@ -46,6 +56,11 @@ export type {
     ITPresentationCapabilities,
     ITTicketResourceScope,
 } from "./application/types";
+export type {
+    ITRequesterTicket,
+    ITRequesterTicketList,
+    ITRequesterTicketPagination,
+} from "./contracts";
 export type {
     AssignITTicketInput,
     CreateITTicketInput,

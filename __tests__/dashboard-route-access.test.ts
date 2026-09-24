@@ -16,6 +16,8 @@ vi.mock("@/app/_lib/auth/current-user", () => ({
 import {
     requireDashboardAuditCapability,
     requireDashboardAuthorizationAdministration,
+    requireDashboardITReadAccess,
+    requireDashboardITSelfServiceAccess,
 } from "@/app/dashboard/_lib/route-access";
 
 describe("Dashboard Audit route authorization", () => {
@@ -84,5 +86,71 @@ describe("Dashboard Audit route authorization", () => {
             systemRole: "ADMIN",
         });
         expect(mocks.redirect).not.toHaveBeenCalled();
+    });
+});
+
+describe("Dashboard IT Ticket route authorization", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("redirects unauthenticated self-service access to login", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue(null);
+
+        await expect(requireDashboardITSelfServiceAccess()).rejects.toThrow(
+            "NEXT_REDIRECT:/login",
+        );
+    });
+
+    it("denies a direct route when neither requester capability is projected", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "USER",
+            itCapabilities: {
+                canReadOwnTickets: false,
+                canReadAllTickets: false,
+                canCreateOwnTickets: false,
+                canCommentOwnTickets: false,
+                canCommentAllTickets: false,
+                canManageTickets: false,
+                canReadAnalytics: false,
+            },
+        });
+
+        await expect(requireDashboardITSelfServiceAccess()).rejects.toThrow(
+            "NEXT_REDIRECT:/access-denied",
+        );
+    });
+
+    it("requires read authority for a direct Ticket detail route", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "USER",
+            itCapabilities: { canReadOwnTickets: false, canCreateOwnTickets: true },
+        });
+
+        await expect(requireDashboardITReadAccess()).rejects.toThrow(
+            "NEXT_REDIRECT:/access-denied",
+        );
+    });
+
+    it("allows the server-projected requester surface without role checks", async () => {
+        const capabilities = {
+            canReadOwnTickets: true,
+            canReadAllTickets: false,
+            canCreateOwnTickets: true,
+            canCommentOwnTickets: true,
+            canCommentAllTickets: false,
+            canManageTickets: false,
+            canReadAnalytics: false,
+        };
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "USER",
+            itCapabilities: capabilities,
+        });
+
+        await expect(requireDashboardITSelfServiceAccess()).resolves.toEqual(capabilities);
+        await expect(requireDashboardITReadAccess()).resolves.toBeUndefined();
     });
 });
