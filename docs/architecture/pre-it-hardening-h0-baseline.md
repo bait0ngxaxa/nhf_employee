@@ -91,16 +91,16 @@ coverage are recorded below; this is not production deployment evidence.
 
 No Critical or High finding was established by the current source review.
 The stale historical hardening evidence is fixed by H0 documentation repair.
-The remaining Medium findings are the transaction-time Authorization
-Administration revalidation gap and distributed runtime observability. The
-remaining Low and Informational findings are bounded hardening gaps,
-transitional debt, operational acceptance items, or intentional deployment
-tradeoffs.
+The remaining Medium finding is distributed runtime observability.
+H0-AUTH-01 and H0-SEC-01 are closed by the focused Pre-IT Authorization
+Administration hardening. The remaining Low and Informational findings are
+bounded hardening gaps, transitional debt, operational acceptance items, or
+intentional deployment tradeoffs.
 
 At the H0 baseline, no finding blocked H2 planning. The control-plane
-revalidation finding should be closed before adding new security-sensitive
-administration surfaces to a future IT capability. It does not authorize
-starting IT work in H0.
+revalidation finding is closed, so the Authorization Administration security
+prerequisite for future IT administration surfaces is closed. This does not
+authorize starting IT work in H0.
 
 H1 is explicitly DEFERRED — owner decision. It is not BLOCKED and not FAILED.
 The expected handoff after H0 was H2 planning. H2 has since closed: Routine
