@@ -36,15 +36,20 @@ export function assertTrustedMutationRequest(request: NextRequest): NextResponse
     return null;
 }
 
-type TrustedMutationHandler = (request: NextRequest) => Promise<NextResponse>;
+type TrustedMutationHandler<Arguments extends readonly unknown[]> = (
+    request: NextRequest,
+    ...arguments_: Arguments
+) => Promise<NextResponse>;
 
-export function withTrustedMutation(handler: TrustedMutationHandler): TrustedMutationHandler {
-    return async (request: NextRequest): Promise<NextResponse> => {
+export function withTrustedMutation<Arguments extends readonly unknown[] = []>(
+    handler: TrustedMutationHandler<Arguments>,
+): TrustedMutationHandler<Arguments> {
+    return async (request: NextRequest, ...arguments_: Arguments): Promise<NextResponse> => {
         const csrfError = assertTrustedMutationRequest(request);
         if (csrfError) {
             return csrfError;
         }
-        return handler(request);
+        return handler(request, ...arguments_);
     };
 }
 

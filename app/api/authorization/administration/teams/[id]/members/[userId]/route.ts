@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { withTrustedMutation } from "@/lib/auth/csrf";
 
 import {
     changeAuthorizationAdministrationTeamMemberRole,
@@ -21,10 +23,10 @@ type MemberRouteParams = Promise<{
     readonly userId: string;
 }>;
 
-export async function PATCH(
-    request: Request,
+export const PATCH = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: MemberRouteParams },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -51,12 +53,12 @@ export async function PATCH(
         console.error("Error changing Authorization Administration Team member role:", error);
         return operationFailed(500);
     }
-}
+});
 
-export async function DELETE(
-    request: Request,
+export const DELETE = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: MemberRouteParams },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -78,4 +80,4 @@ export async function DELETE(
         console.error("Error removing Authorization Administration Team member:", error);
         return operationFailed(500);
     }
-}
+});

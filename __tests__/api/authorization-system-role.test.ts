@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AUTH_MUTATION_HEADERS } from "@/lib/auth/csrf";
+
 const mocks = vi.hoisted(() => ({
     changeSystemRole: vi.fn(),
     buildContext: vi.fn(),
@@ -19,6 +21,11 @@ vi.mock("@/app/api/authorization/administration/_lib/route-auth", () => ({
 
 import { SystemRoleChangeError } from "@/modules/auth";
 import { PATCH } from "@/app/api/authorization/administration/users/[id]/system-role/route";
+
+const TRUSTED_HEADERS = {
+    ...AUTH_MUTATION_HEADERS,
+    origin: "http://localhost",
+};
 
 describe("PATCH /api/authorization/administration/users/[id]/system-role", () => {
     beforeEach(() => {
@@ -46,6 +53,7 @@ describe("PATCH /api/authorization/administration/users/[id]/system-role", () =>
             new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", {
                 method: "PATCH",
                 body: JSON.stringify({ systemRole: "ADMIN" }),
+                headers: TRUSTED_HEADERS,
             }),
             { params: Promise.resolve({ id: "7" }) },
         );
@@ -70,7 +78,11 @@ describe("PATCH /api/authorization/administration/users/[id]/system-role", () =>
         });
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", { method: "PATCH", body: "{}" }),
+            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", {
+                method: "PATCH",
+                body: "{}",
+                headers: TRUSTED_HEADERS,
+            }),
             { params: Promise.resolve({ id: "7" }) },
         );
 
@@ -80,11 +92,11 @@ describe("PATCH /api/authorization/administration/users/[id]/system-role", () =>
 
     it("rejects malformed identifiers and bodies", async () => {
         const invalidIdentifier = await PATCH(
-            new NextRequest("http://localhost/api/authorization/administration/users/not-an-id/system-role", { method: "PATCH", body: JSON.stringify({ systemRole: "ADMIN" }) }),
+            new NextRequest("http://localhost/api/authorization/administration/users/not-an-id/system-role", { method: "PATCH", body: JSON.stringify({ systemRole: "ADMIN" }), headers: TRUSTED_HEADERS }),
             { params: Promise.resolve({ id: "not-an-id" }) },
         );
         const invalidBody = await PATCH(
-            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", { method: "PATCH", body: JSON.stringify({ systemRole: "ADMIN", actorUserId: 1 }) }),
+            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", { method: "PATCH", body: JSON.stringify({ systemRole: "ADMIN", actorUserId: 1 }), headers: TRUSTED_HEADERS }),
             { params: Promise.resolve({ id: "7" }) },
         );
 
@@ -101,12 +113,56 @@ describe("PATCH /api/authorization/administration/users/[id]/system-role", () =>
         ));
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", { method: "PATCH", body: JSON.stringify({ systemRole: "USER" }) }),
+            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", { method: "PATCH", body: JSON.stringify({ systemRole: "USER" }), headers: TRUSTED_HEADERS }),
             { params: Promise.resolve({ id: "7" }) },
         );
         const body = await response.json() as { code?: string };
 
         expect(response.status).toBe(409);
         expect(body.code).toBe("LAST_ELIGIBLE_ADMIN");
+    });
+
+    it("returns a stable ACTOR_NOT_AUTHORIZED response for transaction-time actor loss", async () => {
+        mocks.changeSystemRole.mockRejectedValueOnce(new SystemRoleChangeError(
+            "ACTOR_NOT_AUTHORIZED",
+            "ไม่มีสิทธิ์ดำเนินการนี้",
+            403,
+        ));
+
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", {
+                method: "PATCH",
+                body: JSON.stringify({ systemRole: "USER" }),
+                headers: TRUSTED_HEADERS,
+            }),
+            { params: Promise.resolve({ id: "7" }) },
+        );
+        const body = await response.json() as { code?: string; error?: string };
+
+        expect(response.status).toBe(403);
+        expect(body).toMatchObject({
+            code: "ACTOR_NOT_AUTHORIZED",
+            error: "Authorization Administration mutation rejected",
+        });
+    });
+
+    it.each([
+        ["missing Origin", { ...AUTH_MUTATION_HEADERS }],
+        ["wrong Origin", { ...AUTH_MUTATION_HEADERS, origin: "https://evil.example.com" }],
+        ["missing X-Requested-With", { origin: "http://localhost" }],
+        ["wrong X-Requested-With", { origin: "http://localhost", "X-Requested-With": "fetch" }],
+    ])("rejects when the system-role request has %s", async (_label, headers) => {
+        const response = await PATCH(
+            new NextRequest("http://localhost/api/authorization/administration/users/7/system-role", {
+                method: "PATCH",
+                body: JSON.stringify({ systemRole: "USER" }),
+                headers,
+            }),
+            { params: Promise.resolve({ id: "7" }) },
+        );
+
+        expect(response.status).toBe(403);
+        expect(mocks.requireSession).not.toHaveBeenCalled();
+        expect(mocks.changeSystemRole).not.toHaveBeenCalled();
     });
 });

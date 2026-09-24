@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { withTrustedMutation } from "@/lib/auth/csrf";
 
 import {
     addAuthorizationAdministrationUserGrant,
@@ -33,10 +35,10 @@ async function parseUserGrantRequest(
     return { ok: true, userId: parsedId.id, body: body.body };
 }
 
-export async function POST(
-    request: Request,
+export const POST = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: UserGrantRouteParams },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -56,12 +58,12 @@ export async function POST(
         console.error("Error adding Authorization Administration User grant:", error);
         return operationFailed(500);
     }
-}
+});
 
-export async function DELETE(
-    request: Request,
+export const DELETE = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: UserGrantRouteParams },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -81,5 +83,4 @@ export async function DELETE(
         console.error("Error removing Authorization Administration User grant:", error);
         return operationFailed(500);
     }
-}
-
+});

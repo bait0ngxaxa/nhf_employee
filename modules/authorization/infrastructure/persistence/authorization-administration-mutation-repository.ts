@@ -1,7 +1,10 @@
 import type { Prisma } from "@prisma/client";
 
+import { prisma } from "@/lib/db/prisma";
+
 import type {
     AuthorizationAdministrationMutationMembership,
+    AuthorizationAdministrationMutationActorState,
     AuthorizationAdministrationMutationRepository,
     AuthorizationAdministrationMutationTeam,
     AuthorizationAdministrationMutationTeamGrant,
@@ -50,6 +53,20 @@ const TEAM_ROLE_GRANT_SELECT = {
     teamRole: { select: { teamId: true } },
 } as const satisfies Prisma.TeamRoleCapabilityGrantSelect;
 
+const MUTATION_ACTOR_SELECT = {
+    id: true,
+    role: true,
+    isActive: true,
+    deletedAt: true,
+    employee: {
+        select: {
+            id: true,
+            status: true,
+            deletedAt: true,
+        },
+    },
+} as const satisfies Prisma.UserSelect;
+
 type TeamRow = Prisma.TeamGetPayload<{ select: typeof TEAM_SELECT }>;
 type TeamRoleRow = Prisma.TeamRoleGetPayload<{
     select: typeof TEAM_ROLE_SELECT;
@@ -62,6 +79,9 @@ type TeamGrantRow = Prisma.TeamCapabilityGrantGetPayload<{
 }>;
 type TeamRoleGrantRow = Prisma.TeamRoleCapabilityGrantGetPayload<{
     select: typeof TEAM_ROLE_GRANT_SELECT;
+}>;
+type MutationActorRow = Prisma.UserGetPayload<{
+    select: typeof MUTATION_ACTOR_SELECT;
 }>;
 
 function projectTeam(row: TeamRow): AuthorizationAdministrationMutationTeam {
@@ -105,6 +125,22 @@ function projectTeamRoleGrant(
 export function createAuthorizationAdministrationMutationRepository():
     AuthorizationAdministrationMutationRepository {
     return {
+        async findActorEmployeeIdLockHint(userId) {
+            const row = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { employeeId: true },
+            });
+            return row?.employeeId ?? null;
+        },
+
+        async findActorEmployeeId(tx, userId) {
+            const row = await tx.user.findUnique({
+                where: { id: userId },
+                select: { employeeId: true },
+            });
+            return row?.employeeId ?? null;
+        },
+
         async findTeamById(tx, teamId) {
             const row = await tx.team.findUnique({
                 where: { id: teamId },
@@ -175,6 +211,17 @@ export function createAuthorizationAdministrationMutationRepository():
             const row = await tx.user.findUnique({
                 where: { id: userId },
                 select: { id: true },
+            });
+            return row;
+        },
+
+        async findActorStateById(
+            tx,
+            userId,
+        ): Promise<AuthorizationAdministrationMutationActorState | null> {
+            const row: MutationActorRow | null = await tx.user.findUnique({
+                where: { id: userId },
+                select: MUTATION_ACTOR_SELECT,
             });
             return row;
         },

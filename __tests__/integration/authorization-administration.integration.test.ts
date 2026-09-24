@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
 import { getAuditLogs } from "@/modules/audit";
+import { AuthorizationAdministrationAccessError } from "@/modules/authorization";
 import {
     addAuthorizationAdministrationTeamGrant,
     addAuthorizationAdministrationTeamMember,
@@ -56,16 +57,41 @@ async function cleanFixtures(): Promise<void> {
     await prisma.user.deleteMany({
         where: { email: { startsWith: `${TEST_PREFIX}-` } },
     });
+    await prisma.employee.deleteMany({
+        where: { email: { startsWith: `${TEST_PREFIX}-employee-` } },
+    });
+    await prisma.department.deleteMany({
+        where: { code: { startsWith: `${TEST_PREFIX}-department-` } },
+    });
 }
 
 async function createUser(label: string, role: Role = Role.USER): Promise<{ id: number; email: string }> {
     const email = `${TEST_PREFIX}-${label}@integration.test`;
+    const department = await prisma.department.create({
+        data: {
+            name: `${TEST_PREFIX}-department-${label}`,
+            code: `${TEST_PREFIX}-department-${label}`,
+        },
+        select: { id: true },
+    });
+    const employee = await prisma.employee.create({
+        data: {
+            firstName: "Authorization",
+            lastName: label,
+            email: `${TEST_PREFIX}-employee-${label}@integration.test`,
+            position: "Integration Test",
+            departmentId: department.id,
+            status: "ACTIVE",
+        },
+        select: { id: true },
+    });
     return prisma.user.create({
         data: {
             email,
             name: `Phase 10B ${label}`,
             password: "integration-test-only",
             role,
+            employeeId: employee.id,
         },
         select: { id: true, email: true },
     });
@@ -225,6 +251,35 @@ describe.sequential("Phase 10B authorization administration with real MySQL", ()
         });
     });
 
+    it("rejects a stale ADMIN context after a committed role demotion without state or success Audit", async () => {
+        const admin = await createUser("stale-actor", Role.ADMIN);
+        const staleContext = mutationContext(admin);
+        const key = `${TEST_PREFIX}-stale-actor-team`;
+
+        await prisma.user.update({
+            where: { id: admin.id },
+            data: { role: Role.USER },
+        });
+
+        await expect(createAuthorizationAdministrationTeam(
+            staleContext,
+            { key, name: "Stale actor Team" },
+        )).rejects.toBeInstanceOf(AuthorizationAdministrationAccessError);
+
+        const [persistedTeam, successAudits] = await Promise.all([
+            prisma.team.findUnique({ where: { key } }),
+            prisma.auditLog.findMany({
+                where: {
+                    action: "TEAM_CREATE",
+                    userId: admin.id,
+                    userEmail: admin.email,
+                },
+            }),
+        ]);
+        expect(persistedTeam).toBeNull();
+        expect(successAudits).toHaveLength(0);
+    });
+
     it("permits lifecycle changes when historical grants cannot change effective access", async () => {
         const admin = await createUser("admin-unaffected", Role.ADMIN);
         const target = await createUser("target-unaffected");
@@ -290,17 +345,18 @@ describe.sequential("Phase 10B authorization administration with real MySQL", ()
 
     it("rolls back a Team mutation when strict audit append fails", async () => {
         const key = `${TEST_PREFIX}-rollback-team`;
-        const missingAuditActor = {
-            id: 2_147_483_000,
-            email: `${TEST_PREFIX}-missing-audit-actor@integration.test`,
+        const admin = await createUser("rollback-audit", Role.ADMIN);
+        const oversizedUserAgentContext = {
+            ...mutationContext(admin),
+            userAgent: "x".repeat(70_000),
         };
 
         await expect(
             createAuthorizationAdministrationTeam(
-                mutationContext(missingAuditActor),
+                oversizedUserAgentContext,
                 { key, name: "Rollback team" },
             ),
-        ).rejects.toMatchObject({ code: "CONFLICT" });
+        ).rejects.toBeDefined();
 
         await expect(
             prisma.team.findUnique({ where: { key } }),

@@ -747,6 +747,7 @@ export async function resolveRoutineCapabilityInTransaction(
 
 interface ActiveUserRecord {
     id: number;
+    employeeId: number | null;
     role: string;
     isActive: boolean;
     deletedAt: Date | null;
@@ -760,12 +761,17 @@ interface ActiveUserRecord {
 async function findActiveUser(
     tx: RoutineTransaction,
     actorId: number,
+    employeeId: number | null | undefined,
 ): Promise<ActiveUserRecord | null> {
+    if (employeeId === null || employeeId === undefined) return null;
+
+    await lockEmployeeRows(tx, [employeeId]);
     await lockUserRows(tx, [actorId]);
     return tx.user.findUnique({
         where: { id: actorId },
         select: {
             id: true,
+            employeeId: true,
             role: true,
             isActive: true,
             deletedAt: true,
@@ -786,16 +792,22 @@ export async function assertActiveRoutineActorInTransaction(
     tx: RoutineTransaction,
     actor: RoutineCommandActor,
 ): Promise<RoutineActorAuthorization> {
-    const user = await findActiveUser(tx, actor.id);
+    const user = await findActiveUser(tx, actor.id, actor.employeeIdHint);
     if (!user || !user.isActive || user.deletedAt !== null) {
         throw new RoutineForbiddenError("บัญชีผู้ใช้ไม่พร้อมดำเนินการ");
+    }
+
+    if (user.employeeId !== actor.employeeIdHint) {
+        throw new RoutineForbiddenError("บัญชีพนักงานไม่พร้อมดำเนินการ");
     }
 
     if (!isActiveEmployee(user.employee)) {
         throw new RoutineForbiddenError("บัญชีพนักงานไม่พร้อมดำเนินการ");
     }
 
-    await lockEmployeeRows(tx, [user.employee.id]);
+    if (user.employee.id !== actor.employeeIdHint) {
+        throw new RoutineForbiddenError("บัญชีพนักงานไม่พร้อมดำเนินการ");
+    }
     return {
         authorizationActor: buildRoutineAuthorizationActor(
             actor,
@@ -810,18 +822,21 @@ export async function assertActiveWorkforceInTransaction(
     tx: RoutineTransaction,
     actor: RoutineCommandActor,
 ): Promise<number> {
-    const user = await findActiveUser(tx, actor.id);
+    const user = await findActiveUser(tx, actor.id, actor.employeeIdHint);
     if (
         !user
         || !user.isActive
         || user.deletedAt !== null
+        || user.employeeId !== actor.employeeIdHint
         || !user.employee
         || !isActiveEmployee(user.employee)
     ) {
         throw new RoutineForbiddenError("บัญชีพนักงานไม่พร้อมดำเนินการ");
     }
 
-    await lockEmployeeRows(tx, [user.employee.id]);
+    if (user.employee.id !== actor.employeeIdHint) {
+        throw new RoutineForbiddenError("บัญชีพนักงานไม่พร้อมดำเนินการ");
+    }
     return user.employee.id;
 }
 

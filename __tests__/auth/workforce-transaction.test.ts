@@ -17,18 +17,13 @@ function deferred(): Deferred {
 }
 
 function transactionClient(options: {
-    employeeId?: number | null;
     isActive?: boolean;
 } = {}): {
     tx: Prisma.TransactionClient;
     queryRaw: ReturnType<typeof vi.fn>;
-    findUnique: ReturnType<typeof vi.fn>;
     findFirst: ReturnType<typeof vi.fn>;
 } {
     const queryRaw = vi.fn().mockResolvedValue([]);
-    const findUnique = vi.fn().mockResolvedValue({
-        employeeId: options.employeeId === undefined ? 100 : options.employeeId,
-    });
     const findFirst = vi.fn().mockResolvedValue(
         options.isActive === false ? null : { id: 7 },
     );
@@ -36,27 +31,21 @@ function transactionClient(options: {
     return {
         tx: {
             $queryRaw: queryRaw,
-            user: { findUnique, findFirst },
+            user: { findFirst },
         } as unknown as Prisma.TransactionClient,
         queryRaw,
-        findUnique,
         findFirst,
     };
 }
 
 describe("assertActiveWorkforceInTransaction", () => {
-    it("should lock user and employee before the final active-state check", async () => {
-        const { tx, queryRaw, findUnique, findFirst } = transactionClient();
+    it("should lock employee then user before the final active-state check", async () => {
+        const { tx, queryRaw, findFirst } = transactionClient();
 
-        await assertActiveWorkforceInTransaction(tx, 7);
+        await assertActiveWorkforceInTransaction(tx, 7, 100);
 
         expect(queryRaw).toHaveBeenCalledTimes(2);
-        expect(queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
-            findUnique.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
-        );
-        expect(findUnique.mock.invocationCallOrder[0]).toBeLessThan(
-            queryRaw.mock.invocationCallOrder[1] ?? Number.MAX_SAFE_INTEGER,
-        );
+        expect(queryRaw.mock.invocationCallOrder[0]).toBeLessThan(queryRaw.mock.invocationCallOrder[1] ?? Number.MAX_SAFE_INTEGER);
         expect(queryRaw.mock.invocationCallOrder[1]).toBeLessThan(
             findFirst.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
         );
@@ -66,18 +55,18 @@ describe("assertActiveWorkforceInTransaction", () => {
         const { tx } = transactionClient({ isActive: false });
 
         await expect(
-            assertActiveWorkforceInTransaction(tx, 7),
+            assertActiveWorkforceInTransaction(tx, 7, 100),
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
     });
 
-    it("should reject a user without an employee profile before employee lock", async () => {
-        const { tx, queryRaw, findFirst } = transactionClient({ employeeId: null });
+    it("should reject a user without an employee profile before taking locks", async () => {
+        const { tx, queryRaw, findFirst } = transactionClient();
 
         await expect(
-            assertActiveWorkforceInTransaction(tx, 7),
+            assertActiveWorkforceInTransaction(tx, 7, null),
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
 
-        expect(queryRaw).toHaveBeenCalledTimes(1);
+        expect(queryRaw).not.toHaveBeenCalled();
         expect(findFirst).not.toHaveBeenCalled();
     });
 
@@ -99,7 +88,7 @@ describe("assertActiveWorkforceInTransaction", () => {
 
         const queryRaw = vi.fn(async (): Promise<unknown[]> => {
             rawQueryCount += 1;
-            if (rawQueryCount === 2) {
+            if (rawQueryCount === 1) {
                 workforceWaitingForEmployee.resolve();
                 await releaseEmployeeLock.promise;
             }
@@ -113,7 +102,7 @@ describe("assertActiveWorkforceInTransaction", () => {
             },
         } as unknown as Prisma.TransactionClient;
 
-        const authorizationPromise = assertActiveWorkforceInTransaction(tx, 7);
+        const authorizationPromise = assertActiveWorkforceInTransaction(tx, 7, 100);
         const authorizationExpectation = expect(
             authorizationPromise,
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);

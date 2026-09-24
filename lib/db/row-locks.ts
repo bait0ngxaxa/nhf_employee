@@ -35,3 +35,28 @@ export async function lockEmployeeRows(
         FOR UPDATE
     `;
 }
+
+export async function lockEmployeeLifecycleRows(
+    tx: Prisma.TransactionClient,
+    employeeIds: readonly number[],
+    actorUserId: number,
+    linkedEmployeeIds: readonly number[] = employeeIds,
+): Promise<void> {
+    const sortedEmployeeIds = sortedUniqueIds(employeeIds);
+    const sortedLinkedEmployeeIds = sortedUniqueIds(linkedEmployeeIds);
+    await lockEmployeeRows(tx, sortedEmployeeIds);
+
+    if (sortedLinkedEmployeeIds.length === 0) {
+        await lockUserRows(tx, [actorUserId]);
+        return;
+    }
+
+    await tx.$queryRaw`
+        SELECT id
+        FROM users
+        WHERE id = ${actorUserId}
+            OR employeeId IN (${Prisma.join(sortedLinkedEmployeeIds)})
+        ORDER BY id
+        FOR UPDATE
+    `;
+}

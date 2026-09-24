@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as AuthorizationModule from "@/modules/authorization";
 
+import { AUTH_MUTATION_HEADERS } from "@/lib/auth/csrf";
+
 const mocks = vi.hoisted(() => ({
     getApiAuthSession: vi.fn(),
     buildUserContext: vi.fn(),
@@ -122,9 +124,11 @@ function jsonRequest(
 ): NextRequest {
     return new NextRequest(`http://localhost${path}`, {
         method,
-        headers: body === undefined
-            ? undefined
-            : { "content-type": "application/json" },
+        headers: {
+            ...AUTH_MUTATION_HEADERS,
+            origin: "http://localhost",
+            ...(body === undefined ? {} : { "content-type": "application/json" }),
+        },
         body: body === undefined ? undefined : JSON.stringify(body),
     });
 }

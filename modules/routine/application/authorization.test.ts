@@ -54,6 +54,7 @@ function actor(
         id: 7,
         role: "USER",
         email: "user@example.com",
+        employeeIdHint: 21,
         ...overrides,
     };
 }
@@ -126,6 +127,7 @@ describe("Routine authorization adapter", () => {
             user: {
                 findUnique: vi.fn().mockResolvedValue({
                     id: 7,
+                    employeeId: 21,
                     role: "USER",
                     isActive: true,
                     deletedAt: null,
@@ -145,6 +147,9 @@ describe("Routine authorization adapter", () => {
         );
 
         expect(routeActor.role).toBe("ADMIN");
+        expect(mocks.lockEmployeeRows.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.lockUserRows.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+        );
         expect(result.authorizationActor).toEqual({
             userId: 7,
             employeeId: 21,
@@ -159,6 +164,7 @@ describe("Routine authorization adapter", () => {
             user: {
                 findUnique: vi.fn().mockResolvedValue({
                     id: 7,
+                    employeeId: 21,
                     role: "USER",
                     isActive: true,
                     deletedAt: null,

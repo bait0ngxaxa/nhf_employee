@@ -276,6 +276,7 @@ import { PUT as confirmLiffLeaveNotTaken } from "@/app/api/line/leave/not-taken/
 
 const USER = {
     id: 7,
+    employeeId: 21,
     role: "USER",
     email: "user@example.com",
     name: "ผู้ใช้ทดสอบ",
@@ -448,6 +449,7 @@ describe("Phase 12F direct migrated route seams", () => {
         mocks.requireLiffWorkforceSession.mockResolvedValue(LIFF_AUTH);
         mocks.transaction.user.findUnique.mockResolvedValue({
             id: USER.id,
+            employeeId: USER.employeeId,
             role: USER.role,
             isActive: true,
             deletedAt: null,

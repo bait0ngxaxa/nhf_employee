@@ -10,10 +10,12 @@ import {
 } from "@/modules/employee";
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
 import {
+    assertEligibleSystemAdminRemovalSafe,
     changeSystemRole,
     employeeAccountLifecycle,
     type SystemRoleChangeActor,
 } from "@/modules/auth";
+import { lockUserRows } from "@/lib/db/row-locks";
 
 const RUN_PREFIX = `phase12hh-system-role-${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -483,8 +485,8 @@ describe.sequential("Auth system-role lifecycle with real MySQL", () => {
         expect(fulfilled).toHaveLength(1);
         expect(rejected).toBeDefined();
         expect(rejected?.reason).toMatchObject({
-            code: "LAST_ELIGIBLE_ADMIN",
-            statusCode: 409,
+            code: "ACTOR_NOT_AUTHORIZED",
+            statusCode: 403,
         });
 
         const [eligibleAdminIds, targetUsers] = await Promise.all([
@@ -539,10 +541,10 @@ describe.sequential("Auth system-role lifecycle with real MySQL", () => {
             const lifecycleSucceeded = lifecycleResult.value.success;
             expect([roleSucceeded, lifecycleSucceeded].filter(Boolean)).toHaveLength(1);
             if (!roleSucceeded) {
-                expect(roleResult.reason).toMatchObject({
-                    code: "LAST_ELIGIBLE_ADMIN",
-                    statusCode: 409,
-                });
+                expect([
+                    "ACTOR_NOT_AUTHORIZED",
+                    "LAST_ELIGIBLE_ADMIN",
+                ]).toContain(roleResult.reason.code);
             }
             if (!lifecycleSucceeded) {
                 expect(lifecycleResult.value.status).toBe(409);
@@ -551,6 +553,42 @@ describe.sequential("Auth system-role lifecycle with real MySQL", () => {
             await expect(findEligibleAdminIds()).resolves.toHaveLength(1);
         },
     );
+
+    it("locks lower-ID subordinate Employees before User rows during offboarding", async () => {
+        const departmentId = await createDepartment("subordinate-lock-order");
+        const subordinate = await createAccount(departmentId, "lower-subordinate");
+        const manager = await createAccount(departmentId, "offboarded-manager");
+        const admin = await createAccount(departmentId, "subordinate-admin", {
+            role: Role.ADMIN,
+        });
+        if (!subordinate.employee || !manager.employee) {
+            throw new Error("ต้องมี Employee สำหรับ lock-order integration test");
+        }
+        await prisma.employee.update({
+            where: { id: subordinate.employee.id },
+            data: { managerId: manager.employee.id },
+        });
+        await createEmployeeUpdateGrant(manager.user.id);
+        await createEmployeeUpdateGrant(admin.user.id);
+
+        const [offboardingResult, subordinateUpdateResult] = await Promise.allSettled([
+            offboardEmployee(manager, admin),
+            updateEmployee(
+                subordinate.employee.id,
+                { firstName: "Updated Subordinate" },
+                employeeLifecycleActor(manager),
+                getEmployeeLeaveOffboardingBlockers,
+                employeeAccountLifecycle,
+            ),
+        ]);
+
+        expect(offboardingResult.status).toBe("fulfilled");
+        expect(subordinateUpdateResult.status).toBe("fulfilled");
+        if (offboardingResult.status !== "fulfilled") throw offboardingResult.reason;
+        if (subordinateUpdateResult.status !== "fulfilled") throw subordinateUpdateResult.reason;
+        expect(offboardingResult.value).toMatchObject({ success: false, status: 409 });
+        expect(subordinateUpdateResult.value.success).toBe(true);
+    });
 
     it("counts only a usable active ADMIN as the last control-plane root", async () => {
         const departmentId = await createDepartment("eligibility-matrix");
@@ -587,6 +625,13 @@ describe.sequential("Auth system-role lifecycle with real MySQL", () => {
             targetUserId: eligibleAdmin.user.id,
             systemRole: "USER",
             actor: systemRoleActor(unlinkedAdmin),
+        })).rejects.toMatchObject({
+            code: "ACTOR_NOT_AUTHORIZED",
+            statusCode: 403,
+        });
+        await expect(prisma.$transaction(async (tx) => {
+            await lockUserRows(tx, [eligibleAdmin.user.id]);
+            await assertEligibleSystemAdminRemovalSafe(tx, eligibleAdmin.user.id);
         })).rejects.toMatchObject({
             code: "LAST_ELIGIBLE_ADMIN",
             statusCode: 409,

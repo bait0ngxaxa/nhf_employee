@@ -2,9 +2,15 @@ import type { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const auditAppendMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const lockUserRowsMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const lockEmployeeRowsMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock("@/modules/audit", () => ({
     appendAuditInTransaction: auditAppendMock,
+}));
+vi.mock("@/lib/db/row-locks", () => ({
+    lockEmployeeRows: lockEmployeeRowsMock,
+    lockUserRows: lockUserRowsMock,
 }));
 
 import {
@@ -24,6 +30,7 @@ import {
 } from "@/modules/authorization";
 import type {
     AuthorizationAdministrationMutationDependencies,
+    AuthorizationAdministrationMutationActorState,
     AuthorizationAdministrationMutationRepository,
     AuthorizationAdministrationMutationTeam,
     AuthorizationAdministrationMutationTeamGrant,
@@ -99,11 +106,26 @@ function userGrant(overrides: Partial<AuthorizationAdministrationMutationUserGra
     };
 }
 
+function eligibleActorState(
+    overrides: Partial<AuthorizationAdministrationMutationActorState> = {},
+): AuthorizationAdministrationMutationActorState {
+    return {
+        id: 1,
+        role: "ADMIN",
+        isActive: true,
+        deletedAt: null,
+        employee: { id: 101, status: "ACTIVE", deletedAt: null },
+        ...overrides,
+    };
+}
+
 function repository(
     overrides: Partial<AuthorizationAdministrationMutationRepository> = {},
 ): AuthorizationAdministrationMutationRepository {
     const method = () => vi.fn().mockResolvedValue(null);
     return {
+        findActorEmployeeIdLockHint: vi.fn().mockResolvedValue(101),
+        findActorEmployeeId: vi.fn().mockResolvedValue(101),
         findTeamById: method(),
         findTeamByKey: method(),
         createTeam: method(),
@@ -113,6 +135,7 @@ function repository(
         createTeamRole: method(),
         updateTeamRole: method(),
         findUserById: method(),
+        findActorStateById: vi.fn().mockResolvedValue(eligibleActorState()),
         findMembership: method(),
         listMembershipsForTeam: vi.fn().mockResolvedValue([]),
         createMembership: method(),
@@ -145,6 +168,8 @@ describe("Phase 10B Authorization Administration commands", () => {
     beforeEach(() => {
         vi.restoreAllMocks();
         auditAppendMock.mockReset().mockResolvedValue(undefined);
+        lockUserRowsMock.mockReset().mockResolvedValue(undefined);
+        lockEmployeeRowsMock.mockReset().mockResolvedValue(undefined);
     });
 
     it("requires a trusted ADMIN principal and ignores a forged USER context", async () => {
@@ -165,7 +190,9 @@ describe("Phase 10B Authorization Administration commands", () => {
     it("creates a Team and appends the trusted actor plus before/after audit details", async () => {
         const created = team();
         const createTeam = vi.fn().mockResolvedValue(created);
+        const findActorStateById = vi.fn().mockResolvedValue(eligibleActorState());
         const repo = repository({
+            findActorStateById,
             findTeamByKey: vi.fn().mockResolvedValue(null),
             createTeam,
         });
@@ -177,6 +204,18 @@ describe("Phase 10B Authorization Administration commands", () => {
         );
 
         expect(result).toEqual(created);
+        expect(lockEmployeeRowsMock).toHaveBeenCalledWith(TX, [101]);
+        expect(lockUserRowsMock).toHaveBeenCalledWith(TX, [1]);
+        expect(findActorStateById).toHaveBeenCalledWith(TX, 1);
+        expect(lockEmployeeRowsMock.mock.invocationCallOrder[0]).toBeLessThan(
+            lockUserRowsMock.mock.invocationCallOrder[0],
+        );
+        expect(lockUserRowsMock.mock.invocationCallOrder[0]).toBeLessThan(
+            findActorStateById.mock.invocationCallOrder[0],
+        );
+        expect(findActorStateById.mock.invocationCallOrder[0]).toBeLessThan(
+            createTeam.mock.invocationCallOrder[0],
+        );
         expect(auditAppendMock).toHaveBeenCalledWith(
             TX,
             expect.objectContaining({
@@ -283,6 +322,97 @@ describe("Phase 10B Authorization Administration commands", () => {
             ),
         ).rejects.toThrow("audit unavailable");
         expect(persisted).toBe(false);
+    });
+
+    it.each([
+        ["missing persisted User", null],
+        ["demoted User", eligibleActorState({ role: "USER" })],
+        ["inactive User", eligibleActorState({ isActive: false })],
+        ["soft-deleted User", eligibleActorState({ deletedAt: new Date("2026-01-01T00:00:00.000Z") })],
+        ["missing Employee", eligibleActorState({ employee: null })],
+        ["suspended Employee", eligibleActorState({ employee: { id: 101, status: "SUSPENDED", deletedAt: null } })],
+        ["inactive Employee", eligibleActorState({ employee: { id: 101, status: "INACTIVE", deletedAt: null } })],
+        ["soft-deleted Employee", eligibleActorState({ employee: { id: 101, status: "ACTIVE", deletedAt: new Date("2026-01-01T00:00:00.000Z") } })],
+    ] as const)("rejects a stale actor with %s before any write or audit", async (_label, persistedActor) => {
+        const createTeam = vi.fn();
+        const findActorStateById = vi.fn().mockResolvedValue(persistedActor);
+        const repo = repository({
+            findActorStateById,
+            findTeamByKey: vi.fn().mockResolvedValue(null),
+            createTeam,
+        });
+
+        await expect(
+            createAuthorizationAdministrationTeam(
+                ADMIN_CONTEXT,
+                { key: "people", name: "People" },
+                dependencies(repo),
+            ),
+        ).rejects.toMatchObject({
+            name: "AuthorizationAdministrationAccessError",
+            code: "ADMIN_REQUIRED",
+        });
+
+        expect(lockEmployeeRowsMock).toHaveBeenCalledWith(TX, [101]);
+        expect(lockUserRowsMock).toHaveBeenCalledWith(TX, [1]);
+        expect(findActorStateById).toHaveBeenCalledWith(TX, 1);
+        expect(createTeam).not.toHaveBeenCalled();
+        expect(auditAppendMock).not.toHaveBeenCalled();
+    });
+
+    it("uses the central actor revalidation path for Team and direct User grant mutations", async () => {
+        const findActorStateById = vi.fn().mockResolvedValue(eligibleActorState());
+        const repo = repository({
+            findActorStateById,
+            findTeamByKey: vi.fn().mockResolvedValue(null),
+            createTeam: vi.fn().mockResolvedValue(team()),
+            findUserById: vi.fn().mockResolvedValue({ id: 7 }),
+            findUserGrant: vi.fn().mockResolvedValue(null),
+            createUserGrant: vi.fn().mockResolvedValue(userGrant()),
+        });
+
+        await createAuthorizationAdministrationTeam(
+            ADMIN_CONTEXT,
+            { key: "people", name: "People" },
+            dependencies(repo),
+        );
+        await addAuthorizationAdministrationUserGrant(
+            ADMIN_CONTEXT,
+            7,
+            { capabilityKey: "audit.read", scope: "ALL" },
+            dependencies(repo),
+        );
+
+        expect(lockUserRowsMock).toHaveBeenCalledTimes(2);
+        expect(findActorStateById).toHaveBeenCalledTimes(2);
+        expect(auditAppendMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("rejects a changed Employee link before loading workforce state", async () => {
+        const findActorStateById = vi.fn().mockResolvedValue(eligibleActorState());
+        const createTeam = vi.fn();
+        const repo = repository({
+            findActorEmployeeIdLockHint: vi.fn().mockResolvedValue(101),
+            findActorEmployeeId: vi.fn().mockResolvedValue(102),
+            findActorStateById,
+            findTeamByKey: vi.fn().mockResolvedValue(null),
+            createTeam,
+        });
+
+        await expect(createAuthorizationAdministrationTeam(
+            ADMIN_CONTEXT,
+            { key: "people", name: "People" },
+            dependencies(repo),
+        )).rejects.toMatchObject({
+            name: "AuthorizationAdministrationAccessError",
+            code: "ADMIN_REQUIRED",
+        });
+
+        expect(lockEmployeeRowsMock).toHaveBeenCalledWith(TX, [101]);
+        expect(lockUserRowsMock).toHaveBeenCalledWith(TX, [1]);
+        expect(findActorStateById).not.toHaveBeenCalled();
+        expect(createTeam).not.toHaveBeenCalled();
+        expect(auditAppendMock).not.toHaveBeenCalled();
     });
 
     it("accepts add/remove for all eight registered Leave capabilities", async () => {

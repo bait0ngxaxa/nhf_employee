@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { withTrustedMutation } from "@/lib/auth/csrf";
 
 import {
     changeSystemRole,
@@ -15,10 +17,10 @@ import { readAuthorizationAdministrationJsonBody } from "../../../_lib/mutation-
 
 type SystemRoleRouteParams = Promise<{ readonly id: string }>;
 
-export async function PATCH(
-    request: Request,
+export const PATCH = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: SystemRoleRouteParams },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -58,4 +60,4 @@ export async function PATCH(
         console.error("Error changing Authorization Administration system role:", error);
         return operationFailed(500);
     }
-}
+});

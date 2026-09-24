@@ -186,6 +186,7 @@ export type {
 } from "./application/administration-mutation-schemas";
 export type {
     AuthorizationAdministrationMutationActor,
+    AuthorizationAdministrationMutationActorState,
     AuthorizationAdministrationMutationContext,
     AuthorizationAdministrationMutationMembership,
     AuthorizationAdministrationMutationRepository,

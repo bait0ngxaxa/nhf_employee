@@ -12,23 +12,19 @@ export class WorkforceAuthorizationError extends Error {
 export async function assertActiveWorkforceInTransaction(
     tx: Prisma.TransactionClient,
     userId: number,
+    employeeId: number | null,
 ): Promise<void> {
-    await lockUserRows(tx, [userId]);
-
-    const user = await tx.user.findUnique({
-        where: { id: userId },
-        select: { employeeId: true },
-    });
-    if (!user?.employeeId) {
+    if (employeeId === null) {
         throw new WorkforceAuthorizationError();
     }
 
-    await lockEmployeeRows(tx, [user.employeeId]);
+    await lockEmployeeRows(tx, [employeeId]);
+    await lockUserRows(tx, [userId]);
 
     const activeUser = await tx.user.findFirst({
         where: {
             id: userId,
-            employeeId: user.employeeId,
+            employeeId,
             isActive: true,
             deletedAt: null,
             employee: {

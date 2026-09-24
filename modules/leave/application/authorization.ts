@@ -338,8 +338,8 @@ async function findActiveLeaveAuthorizationUser(
         throw new WorkforceAuthorizationError();
     }
 
-    await lockUserRows(tx, [requestedActor.userId]);
     await lockEmployeeRows(tx, [requestedActor.employeeId]);
+    await lockUserRows(tx, [requestedActor.userId]);
 
     const user = await tx.user.findFirst({
         where: {

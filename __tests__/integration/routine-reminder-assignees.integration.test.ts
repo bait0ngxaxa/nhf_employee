@@ -155,6 +155,7 @@ async function createRoutineReminderFixture(): Promise<RoutineReminderFixture> {
     return {
         actor: {
             id: admin.id,
+            employeeIdHint: actorEmployee.id,
             email: admin.email,
             role: "ADMIN",
             ipAddress: "192.0.2.10",

@@ -25,6 +25,7 @@ const adminActor = {
     id: 99,
     role: "ADMIN",
     email: "admin@example.com",
+    employeeIdHint: 99,
 };
 
 describe("NHF Routine task deletion", () => {
@@ -39,6 +40,7 @@ describe("NHF Routine task deletion", () => {
         prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         prismaMock.user.findUnique.mockResolvedValue(asNever({
             id: 99,
+            employeeId: 99,
             role: "ADMIN",
             isActive: true,
             deletedAt: null,
@@ -111,13 +113,19 @@ describe("NHF Routine task deletion", () => {
     it("returns not found for a regular user accessing another user's task", async () => {
         prismaMock.user.findUnique.mockResolvedValue(asNever({
             id: 5,
+            employeeId: 21,
             role: "USER",
             isActive: true,
             deletedAt: null,
             employee: { id: 21, status: "ACTIVE", deletedAt: null },
         }));
 
-        await expect(deleteRoutineTask(71, { ...adminActor, id: 5, role: "USER" }))
+        await expect(deleteRoutineTask(71, {
+            ...adminActor,
+            id: 5,
+            role: "USER",
+            employeeIdHint: 21,
+        }))
             .rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
         expect(prismaMock.routineTask.findUnique).not.toHaveBeenCalled();
     });
@@ -125,6 +133,7 @@ describe("NHF Routine task deletion", () => {
     it("does not let an assigned non-creator delete an Admin-created task", async () => {
         prismaMock.user.findUnique.mockResolvedValue(asNever({
             id: 5,
+            employeeId: 21,
             role: "USER",
             isActive: true,
             deletedAt: null,
@@ -133,7 +142,12 @@ describe("NHF Routine task deletion", () => {
         prismaMock.routineTask.findFirst.mockResolvedValue(null);
 
         await expect(
-            deleteRoutineTask(71, { ...adminActor, id: 5, role: "USER" }),
+            deleteRoutineTask(71, {
+                ...adminActor,
+                id: 5,
+                role: "USER",
+                employeeIdHint: 21,
+            }),
         ).rejects.toMatchObject({ statusCode: 404, code: "NOT_FOUND" });
         expect(prismaMock.routineTask.delete).not.toHaveBeenCalled();
     });
@@ -141,6 +155,7 @@ describe("NHF Routine task deletion", () => {
     it("keeps creator deletion available for a self-service task", async () => {
         prismaMock.user.findUnique.mockResolvedValue(asNever({
             id: 5,
+            employeeId: 21,
             role: "USER",
             isActive: true,
             deletedAt: null,
@@ -154,7 +169,12 @@ describe("NHF Routine task deletion", () => {
         }));
         prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([]));
 
-        await deleteRoutineTask(71, { ...adminActor, id: 5, role: "USER" });
+        await deleteRoutineTask(71, {
+            ...adminActor,
+            id: 5,
+            role: "USER",
+            employeeIdHint: 21,
+        });
 
         expect(prismaMock.routineTask.delete).toHaveBeenCalledWith({ where: { id: 71 } });
     });

@@ -7,8 +7,8 @@ export async function isActiveEmployeeInTransaction(
     userId: number,
     employeeId: number,
 ): Promise<boolean> {
-    await lockUserRows(tx, [userId]);
     await lockEmployeeRows(tx, [employeeId]);
+    await lockUserRows(tx, [userId]);
 
     const user = await tx.user.findFirst({
         where: {

@@ -25,6 +25,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         const actor = createRoutineCommandActor(
             {
                 id: auth.user.id,
+                employeeId: "employeeId" in auth ? auth.employeeId : null,
                 role: auth.user.role ?? "USER",
                 email: auth.user.email ?? "",
             },

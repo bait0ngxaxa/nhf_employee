@@ -158,12 +158,12 @@ describe("Employee Mutations", () => {
         await expect(
             updateEmployee(1, { firstName: "Should not write" }, ACTOR),
         ).rejects.toBe(authorizationDenied);
-        expect(authorizationMocks.resolveEmployeeCapabilityInTransaction)
-            .toHaveBeenCalledWith(
-                expect.anything(),
-                expect.objectContaining({ userId: ACTOR.userId }),
-                "employee.update",
-            );
+        const authorizationCall = authorizationMocks.resolveEmployeeCapabilityInTransaction.mock.calls[0];
+        expect(authorizationCall?.[1]).toEqual(
+            expect.objectContaining({ userId: ACTOR.userId }),
+        );
+        expect(authorizationCall?.[2]).toBe("employee.update");
+        expect(authorizationCall?.[3]).toBeNull();
         expect(prismaMock.employee.update).not.toHaveBeenCalled();
     });
 

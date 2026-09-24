@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isActiveEmployeeInTransaction } from "./active-employee-session";
 
 describe("active employee transaction guards", () => {
-    it("locks the user and employee before checking the workforce identity", async () => {
+    it("locks the employee before the user when checking the workforce identity", async () => {
         const tx = {
             $queryRaw: vi.fn().mockResolvedValue([{ id: 10 }]),
             user: {

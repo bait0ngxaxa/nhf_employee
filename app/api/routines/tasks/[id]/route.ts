@@ -35,6 +35,7 @@ export async function GET(
         const actor = createRoutineCommandActor(
             {
                 id: auth.user.id,
+                employeeId: "employeeId" in auth ? auth.employeeId : null,
                 role: auth.user.role ?? "USER",
                 email: auth.user.email ?? "",
             },
@@ -82,6 +83,7 @@ export async function PATCH(
         const actor = createRoutineCommandActor(
             {
                 id: auth.user.id,
+                employeeId: "employeeId" in auth ? auth.employeeId : null,
                 role: auth.user.role ?? "USER",
                 email: auth.user.email ?? "",
             },
@@ -117,6 +119,7 @@ export async function DELETE(
         const actor = createRoutineCommandActor(
             {
                 id: auth.user.id,
+                employeeId: "employeeId" in auth ? auth.employeeId : null,
                 role: auth.user.role ?? "USER",
                 email: auth.user.email ?? "",
             },

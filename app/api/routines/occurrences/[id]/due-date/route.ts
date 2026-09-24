@@ -29,7 +29,15 @@ export async function PATCH(
     try {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
-        const actor = createRoutineCommandActor({ id: auth.user.id, role: auth.user.role ?? "USER", email: auth.user.email ?? "" }, request.headers);
+        const actor = createRoutineCommandActor(
+            {
+                id: auth.user.id,
+                employeeId: "employeeId" in auth ? auth.employeeId : null,
+                role: auth.user.role ?? "USER",
+                email: auth.user.email ?? "",
+            },
+            request.headers,
+        );
         await assertRoutineCapability(
             actor,
             "employeeId" in auth ? auth.employeeId : null,

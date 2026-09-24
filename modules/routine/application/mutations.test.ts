@@ -46,6 +46,7 @@ function actor(
         email: `${role.toLowerCase()}-${id}@example.com`,
         name: role === "ADMIN" ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน",
         role,
+        employeeIdHint: role === "ADMIN" ? 99 : 11,
         ipAddress: "192.0.2.10",
         userAgent: "routine-test",
         requestId: "routine-request",
@@ -95,6 +96,7 @@ function occurrence(overrides: Record<string, unknown> = {}): Record<string, unk
 function activeUser(role: "USER" | "ADMIN", employeeId: number, status = "ACTIVE") {
     return {
         id: role === "ADMIN" ? 99 : 3,
+        employeeId,
         role,
         isActive: true,
         deletedAt: null,
@@ -1117,13 +1119,19 @@ describe("NHF Routine mutations", () => {
             prismaMock.user.findUnique.mockResolvedValue(
                 asNever(activeUser("USER", employeeId)),
             );
+            prismaMock.user.findFirst.mockResolvedValue(
+                asNever(activeUser("USER", employeeId)),
+            );
             prismaMock.routineTask.findFirst.mockResolvedValue(null);
 
             await expect(
                 updateRoutineTask(
                     71,
                     { version: 1, title: "ไม่ควรแก้ได้" },
-                    actor(3, "USER"),
+                    {
+                        ...actor(3, "USER"),
+                        employeeIdHint: employeeId,
+                    },
                 ),
             ).rejects.toMatchObject({ code: "NOT_FOUND", statusCode: 404 });
         }

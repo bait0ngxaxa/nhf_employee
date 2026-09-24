@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { withTrustedMutation } from "@/lib/auth/csrf";
 
 import {
     addAuthorizationAdministrationTeamRoleGrant,
@@ -48,10 +50,10 @@ async function parseGrantRoute(
     };
 }
 
-export async function POST(
-    request: Request,
+export const POST = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: TeamRoleGrantRouteParams },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -72,12 +74,12 @@ export async function POST(
         console.error("Error adding Authorization Administration TeamRole grant:", error);
         return operationFailed(500);
     }
-}
+});
 
-export async function DELETE(
-    request: Request,
+export const DELETE = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: TeamRoleGrantRouteParams },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -98,4 +100,4 @@ export async function DELETE(
         console.error("Error removing Authorization Administration TeamRole grant:", error);
         return operationFailed(500);
     }
-}
+});

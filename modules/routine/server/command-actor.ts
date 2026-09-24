@@ -11,7 +11,12 @@ function getTraceId(headers: Headers, name: string): string | undefined {
 }
 
 export function createRoutineCommandActor(
-    user: { id: number; role: string; email: string },
+    user: {
+        id: number;
+        role: string;
+        email: string;
+        employeeId: number | null;
+    },
     headers: Headers,
     options: { mode?: RoutineCommandActor["mode"] } = {},
 ): RoutineCommandActor {
@@ -20,6 +25,7 @@ export function createRoutineCommandActor(
         id: user.id,
         role: user.role,
         email: user.email,
+        employeeIdHint: user.employeeId,
         ipAddress: getTrustedClientIp(headers) ?? undefined,
         userAgent: headers.get("user-agent") ?? undefined,
         requestId,

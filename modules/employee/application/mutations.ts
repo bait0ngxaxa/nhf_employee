@@ -1,6 +1,9 @@
 import type { Prisma } from "@prisma/client";
 
-import { lockEmployeeRows } from "@/lib/db/row-locks";
+import {
+    lockEmployeeLifecycleRows,
+    lockEmployeeRows,
+} from "@/lib/db/row-locks";
 import { hasPrismaErrorCode, runSerializableTransaction } from "@/lib/db/transaction";
 import { prisma } from "@/lib/db/prisma";
 import { appendAuditInTransaction } from "@/modules/audit";
@@ -163,6 +166,23 @@ async function lockEmployeeForMutation(
     return { employee: lockedEmployee, account: lockedEmployee.user };
 }
 
+async function findActorEmployeeIdLockHint(actorUserId: number): Promise<number | null> {
+    const actor = await prisma.user.findUnique({
+        where: { id: actorUserId },
+        select: { employeeId: true },
+    });
+    return actor?.employeeId ?? null;
+}
+
+async function findSubordinateEmployeeIdsLockHint(employeeId: number): Promise<number[]> {
+    const subordinates = await prisma.employee.findMany({
+        where: { managerId: employeeId, deletedAt: null },
+        select: { id: true },
+        orderBy: { id: "asc" },
+    });
+    return subordinates.map((employee) => employee.id);
+}
+
 async function assertCanDeactivateEmployee(
     tx: Prisma.TransactionClient,
     employee: LifecycleEmployee,
@@ -182,9 +202,6 @@ async function assertCanDeactivateEmployee(
         }),
         offboardingDependencyProvider(tx, employee.id),
     ]);
-    if (subordinates.length > 0) {
-        await lockEmployeeRows(tx, subordinates.map((subordinate) => subordinate.id));
-    }
     if (subordinates.length > 0 || leaveDependencies.length > 0) {
         throw new EmployeeMutationError(
             managerDependenciesMessage(subordinates, leaveDependencies),
@@ -290,13 +307,30 @@ async function runEmployeeLifecycle(
     offboardingDependencyProvider: EmployeeOffboardingDependencyProvider | undefined,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
+    // These reads only determine lock order. The transaction rechecks the
+    // Employee link and offboarding dependencies before any lifecycle write.
+    const [actorEmployeeIdHint, subordinateEmployeeIdHints] = await Promise.all([
+        findActorEmployeeIdLockHint(actor.userId),
+        isEmployeeDeactivation(operation)
+            ? findSubordinateEmployeeIdsLockHint(employeeId)
+            : Promise.resolve([]),
+    ]);
     try {
         return await runSerializableTransaction(async (tx) => {
+            await lockEmployeeLifecycleRows(
+                tx,
+                [employeeId, actorEmployeeIdHint, ...subordinateEmployeeIdHints]
+                    .filter((id): id is number => id !== null),
+                actor.userId,
+                [employeeId, actorEmployeeIdHint]
+                    .filter((id): id is number => id !== null),
+            );
             assertEmployeeCapabilityScope(
                 await resolveEmployeeCapabilityInTransaction(
                     tx,
                     actor,
                     capability,
+                    actorEmployeeIdHint,
                 ),
                 "ALL",
             );
@@ -389,13 +423,22 @@ async function runEmployeeProfileUpdate(
     actor: EmployeeAuthorizedCommandActor,
     accountLifecycleProvider: EmployeeAccountLifecycleProvider,
 ): Promise<EmployeeMutationResult> {
+    // This read only determines lock order. The transaction resolver verifies
+    // the current Employee link after both Employee and User rows are locked.
+    const actorEmployeeIdHint = await findActorEmployeeIdLockHint(actor.userId);
     try {
         return await runSerializableTransaction(async (tx) => {
+            await lockEmployeeLifecycleRows(
+                tx,
+                [employeeId, actorEmployeeIdHint].filter((id): id is number => id !== null),
+                actor.userId,
+            );
             assertEmployeeCapabilityScope(
                 await resolveEmployeeCapabilityInTransaction(
                     tx,
                     actor,
                     "employee.update",
+                    actorEmployeeIdHint,
                 ),
                 "ALL",
             );

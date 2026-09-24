@@ -593,6 +593,7 @@ describe("Stock authorization adapter", () => {
             user: {
                 findUnique: vi.fn().mockResolvedValue({
                     id: 7,
+                    employeeId: 21,
                     role: "USER",
                     isActive: true,
                     deletedAt: null,
@@ -622,8 +623,11 @@ describe("Stock authorization adapter", () => {
             "stock.request.cancel",
         );
 
-        expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
         expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [21]);
+        expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
+        expect(mocks.lockEmployeeRows.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.lockUserRows.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+        );
         expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
             {
                 userId: 7,
@@ -642,6 +646,7 @@ describe("Stock authorization adapter", () => {
             user: {
                 findUnique: vi.fn().mockResolvedValue({
                     id: 7,
+                    employeeId: 21,
                     role: "USER",
                     isActive: true,
                     deletedAt: null,
@@ -700,6 +705,7 @@ describe("Stock authorization adapter", () => {
                 user: {
                     findUnique: vi.fn().mockResolvedValue({
                         id: 7,
+                        employeeId: null,
                         role: "ADMIN",
                         isActive: true,
                         deletedAt: null,
@@ -714,7 +720,11 @@ describe("Stock authorization adapter", () => {
                     capability,
                 ),
             ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
-            expect(mocks.lockEmployeeRows).not.toHaveBeenCalled();
+            expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [21]);
+            expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
+            expect(mocks.lockEmployeeRows.mock.invocationCallOrder[0]).toBeLessThan(
+                mocks.lockUserRows.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+            );
             expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
         },
     );
@@ -729,6 +739,7 @@ describe("Stock authorization adapter", () => {
                 user: {
                     findUnique: vi.fn().mockResolvedValue({
                         id: 7,
+                        employeeId: null,
                         role: "ADMIN",
                         isActive: true,
                         deletedAt: null,
@@ -753,6 +764,7 @@ describe("Stock authorization adapter", () => {
             user: {
                 findUnique: vi.fn().mockResolvedValue({
                     id: 7,
+                    employeeId: null,
                     role: "USER",
                     isActive: true,
                     deletedAt: null,

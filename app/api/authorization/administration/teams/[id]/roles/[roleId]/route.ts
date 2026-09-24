@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { withTrustedMutation } from "@/lib/auth/csrf";
 
 import {
     updateAuthorizationAdministrationTeamRole,
@@ -15,8 +17,8 @@ import {
     requireAuthorizationAdministrationApiSession,
 } from "../../../../_lib/route-auth";
 
-export async function PATCH(
-    request: Request,
+export const PATCH = withTrustedMutation(async (
+    request: NextRequest,
     {
         params,
     }: {
@@ -25,7 +27,7 @@ export async function PATCH(
             readonly roleId: string;
         }>;
     },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -52,4 +54,4 @@ export async function PATCH(
         console.error("Error updating Authorization Administration TeamRole:", error);
         return operationFailed(500);
     }
-}
+});

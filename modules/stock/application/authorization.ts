@@ -287,6 +287,7 @@ export async function assertStockCapability(
 
 interface ActiveStockUserRecord {
     readonly id: number;
+    readonly employeeId: number | null;
     readonly role: string;
     readonly isActive: boolean;
     readonly deletedAt: Date | null;
@@ -300,12 +301,17 @@ interface ActiveStockUserRecord {
 async function findActiveStockUser(
     tx: Prisma.TransactionClient,
     actorId: number,
+    employeeId: number | null,
 ): Promise<ActiveStockUserRecord | null> {
+    if (employeeId === null) return null;
+
+    await lockEmployeeRows(tx, [employeeId]);
     await lockUserRows(tx, [actorId]);
-    return tx.user.findUnique({
+    const user = await tx.user.findUnique({
         where: { id: actorId },
         select: {
             id: true,
+            employeeId: true,
             role: true,
             isActive: true,
             deletedAt: true,
@@ -314,6 +320,7 @@ async function findActiveStockUser(
             },
         },
     });
+    return user?.employeeId === employeeId ? user : null;
 }
 
 function isActiveStockEmployee(
@@ -335,7 +342,11 @@ export async function resolveStockCapabilityInTransaction(
         throw new WorkforceAuthorizationError();
     }
 
-    const user = await findActiveStockUser(tx, actor.id);
+    const user = await findActiveStockUser(
+        tx,
+        actor.id,
+        requestedActor.employeeId,
+    );
     if (!user || !user.isActive || user.deletedAt !== null) {
         throw new WorkforceAuthorizationError();
     }
@@ -348,7 +359,9 @@ export async function resolveStockCapabilityInTransaction(
         throw new WorkforceAuthorizationError();
     }
 
-    await lockEmployeeRows(tx, [activeEmployee.id]);
+    if (activeEmployee.id !== requestedActor.employeeId) {
+        throw new WorkforceAuthorizationError();
+    }
     const activeActor = buildStockAuthorizationActor(
         { id: user.id, role: currentRole },
         activeEmployee.id,

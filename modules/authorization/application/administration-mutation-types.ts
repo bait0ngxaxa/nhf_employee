@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { EmployeeStatus, Prisma } from "@prisma/client";
 
 import type { AuthorizationAdministrationPrincipal } from "./administration-types";
 
@@ -40,6 +40,18 @@ export interface AuthorizationAdministrationMutationUser {
     readonly id: number;
 }
 
+export interface AuthorizationAdministrationMutationActorState {
+    readonly id: number;
+    readonly role: AuthorizationAdministrationPrincipal["systemRole"];
+    readonly isActive: boolean;
+    readonly deletedAt: Date | null;
+    readonly employee: {
+        readonly id: number;
+        readonly status: EmployeeStatus;
+        readonly deletedAt: Date | null;
+    } | null;
+}
+
 export interface AuthorizationAdministrationMutationMembership {
     readonly teamId: number;
     readonly userId: number;
@@ -67,6 +79,11 @@ export interface AuthorizationAdministrationMutationUserGrant {
 }
 
 export interface AuthorizationAdministrationMutationRepository {
+    findActorEmployeeIdLockHint(userId: number): Promise<number | null>;
+    findActorEmployeeId(
+        tx: Prisma.TransactionClient,
+        userId: number,
+    ): Promise<number | null>;
     findTeamById(
         tx: Prisma.TransactionClient,
         teamId: number,
@@ -123,6 +140,10 @@ export interface AuthorizationAdministrationMutationRepository {
         tx: Prisma.TransactionClient,
         userId: number,
     ): Promise<AuthorizationAdministrationMutationUser | null>;
+    findActorStateById(
+        tx: Prisma.TransactionClient,
+        userId: number,
+    ): Promise<AuthorizationAdministrationMutationActorState | null>;
     findMembership(
         tx: Prisma.TransactionClient,
         teamId: number,

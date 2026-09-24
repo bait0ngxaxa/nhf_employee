@@ -2,7 +2,8 @@ import type { EmployeeStatus, Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { appendAuditInTransaction } from "@/modules/audit";
-import { lockUserRows } from "@/lib/db/row-locks";
+import { prisma } from "@/lib/db/prisma";
+import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
 
@@ -21,6 +22,7 @@ export interface SystemRoleChangeActor {
 
 export type SystemRoleChangeErrorCode =
     | "INVALID_INPUT"
+    | "ACTOR_NOT_AUTHORIZED"
     | "NOT_FOUND"
     | "TARGET_NOT_ELIGIBLE"
     | "LAST_ELIGIBLE_ADMIN"
@@ -106,6 +108,17 @@ async function findSystemRoleAccount(
     });
 }
 
+async function findEmployeeIdForUser(
+    tx: Prisma.TransactionClient,
+    userId: number,
+): Promise<number | null | undefined> {
+    const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { employeeId: true },
+    });
+    return user?.employeeId;
+}
+
 async function findEligibleActiveAdminIds(
     tx: Prisma.TransactionClient,
 ): Promise<number[]> {
@@ -169,8 +182,59 @@ export async function changeSystemRole(input: {
         throw invalidInput("บทบาทระบบไม่ถูกต้อง");
     }
 
+    // These IDs determine lock order only. The transaction re-reads and
+    // verifies both links before it relies on the related Employee state.
+    const [actorEmployeeHint, targetEmployeeHint] = await Promise.all([
+        prisma.user.findUnique({
+            where: { id: input.actor.userId },
+            select: { employeeId: true },
+        }),
+        prisma.user.findUnique({
+            where: { id: input.targetUserId },
+            select: { employeeId: true },
+        }),
+    ]);
+
     return runSerializableTransaction(async (tx) => {
-        await lockUserRows(tx, [input.targetUserId]);
+        await lockEmployeeRows(
+            tx,
+            [actorEmployeeHint?.employeeId, targetEmployeeHint?.employeeId]
+                .filter((employeeId): employeeId is number => employeeId !== null && employeeId !== undefined),
+        );
+        await lockUserRows(tx, [input.actor.userId, input.targetUserId]);
+        const currentActorEmployeeId = await findEmployeeIdForUser(tx, input.actor.userId);
+        if (
+            currentActorEmployeeId === undefined
+            || currentActorEmployeeId !== (actorEmployeeHint?.employeeId ?? null)
+        ) {
+            throw new SystemRoleChangeError(
+                "ACTOR_NOT_AUTHORIZED",
+                "ไม่มีสิทธิ์ดำเนินการนี้",
+                403,
+            );
+        }
+
+        const currentTargetEmployeeId = await findEmployeeIdForUser(tx, input.targetUserId);
+        if (
+            currentTargetEmployeeId !== undefined
+            && currentTargetEmployeeId !== (targetEmployeeHint?.employeeId ?? null)
+        ) {
+            throw new SystemRoleChangeError(
+                "TARGET_NOT_ELIGIBLE",
+                "บัญชีเป้าหมายไม่พร้อมสำหรับการเปลี่ยนบทบาทระบบ",
+                409,
+            );
+        }
+
+        const actor = await findSystemRoleAccount(tx, input.actor.userId);
+        if (!actor || !isEligibleActiveSystemAdmin(actor)) {
+            throw new SystemRoleChangeError(
+                "ACTOR_NOT_AUTHORIZED",
+                "ไม่มีสิทธิ์ดำเนินการนี้",
+                403,
+            );
+        }
+
         let target = await findSystemRoleAccount(tx, input.targetUserId);
         if (!target) {
             throw new SystemRoleChangeError(

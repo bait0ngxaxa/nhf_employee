@@ -1030,3 +1030,32 @@ Phase 12G — First Production Capability Deployment Readiness
 
 Production inventory, rollout prerequisites, first real capability deployment,
 rollback/observability and operational readiness belong to Phase 12G.
+
+## Current superseding disposition — Pre-IT Authorization Administration hardening
+
+This section updates only the current disposition of the historical
+Authorization Administration evidence above; it does not rewrite Phase 12F.
+The focused Pre-IT hardening closes H0-AUTH-01 and H0-SEC-01. All 14
+Authorization Administration POST/PATCH/DELETE handlers now use the shared
+trusted-mutation helper, with untrusted Origin or missing/incorrect
+`X-Requested-With` rejected as 403 before route authentication, body parsing,
+or command execution. The four GET/read handlers remain ungated.
+
+Authorization Administration commands still require the server-derived ADMIN
+principal at the request boundary. Their shared serializable transaction locks
+and re-reads the persisted actor User and linked Employee lifecycle before any
+authorization write; stale or ineligible actors receive a generic 403, with no
+state change or success Audit. The separate Auth-owned system-role mutation
+locks actor and target User rows together and applies equivalent transaction-
+time actor validation. Employee lifecycle retains Employee-then-User locking;
+these guards do not add a reverse Employee row lock. Current test and MySQL
+evidence is recorded in the Pre-IT baseline. No production deployment claim is
+made.
+
+Lock-order clarification added by the later Pre-IT hardening: the statement
+above that Administration mutations did not lock Employee rows is superseded.
+Authorization Administration, system-role, and Employee lifecycle mutations
+lock relevant Employee rows in deterministic order before relevant User rows.
+The existing Leave, Stock, Routine, and shared workforce actor guards use the
+same Employee-before-User order. Employee IDs read before transaction start
+are order hints only and their User links are re-read after the locks are held.

@@ -1777,3 +1777,28 @@ canonical-only vocabulary, and the persistence compatibility normalizer is
 removed. The operator confirmed the production collision preflight and
 migration deployment PASSED. The Routine recipient persistence transition is
 CLOSED.
+
+## Pre-IT Authorization Administration security hardening
+
+The focused Pre-IT hardening closes H0-AUTH-01 and H0-SEC-01 from the audited
+H0 baseline. All 14 Authorization Administration POST/PATCH/DELETE handlers
+use the shared trusted-mutation contract; the four GET/read handlers remain
+outside that gate. The request boundary still derives the ADMIN principal from
+the authenticated server session. Inside each Team, TeamRole, membership, or
+grant serializable transaction, the mutation locks the linked Employee row and
+actor User row in that order, then re-reads persisted role, account, and
+Employee lifecycle before running the write callback. The Auth-owned
+system-role transaction locks actor and target Employee rows before actor and
+target User rows, each in deterministic order, and performs the same current
+actor eligibility check before changing role state. Successful writes and
+Audit remain atomic.
+
+Actor eligibility requires a present ADMIN User that is active and not
+soft-deleted, with a linked ACTIVE Employee that is not soft-deleted. These
+paths and the existing Leave, Stock, Routine, and shared workforce actor
+guards follow Employee-then-User locking. Related Employee IDs read before the
+transaction determine lock order only; the User-to-Employee link is checked
+again inside the transaction after locking. The security change adds no schema
+or migration and does not claim production deployment evidence.
+Focused API, application, and real-MySQL regression evidence is recorded in
+[pre-it-hardening-h0-baseline.md](pre-it-hardening-h0-baseline.md).

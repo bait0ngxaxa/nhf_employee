@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { withTrustedMutation } from "@/lib/auth/csrf";
 
 import {
     addAuthorizationAdministrationTeamMember,
@@ -15,10 +17,10 @@ import {
     requireAuthorizationAdministrationApiSession,
 } from "../../../_lib/route-auth";
 
-export async function POST(
-    request: Request,
+export const POST = withTrustedMutation(async (
+    request: NextRequest,
     { params }: { readonly params: Promise<{ readonly id: string }> },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireAuthorizationAdministrationApiSession();
         if (!auth.ok) return auth.response;
@@ -42,4 +44,4 @@ export async function POST(
         console.error("Error adding Authorization Administration Team member:", error);
         return operationFailed(500);
     }
-}
+});

@@ -1,7 +1,8 @@
 import type { NextResponse } from "next/server";
 
-import { badRequest, jsonError, notFound } from "@/lib/ssot/http";
+import { badRequest, forbidden, jsonError, notFound } from "@/lib/ssot/http";
 import {
+    AuthorizationAdministrationAccessError,
     AuthorizationAdministrationMutationError,
     type AuthorizationAdministrationMutationErrorCode,
 } from "@/modules/authorization";
@@ -34,6 +35,9 @@ const NOT_FOUND_CODES = new Set<AuthorizationAdministrationMutationErrorCode>([
 export function authorizationAdministrationMutationErrorResponse(
     error: unknown,
 ): NextResponse | null {
+    if (error instanceof AuthorizationAdministrationAccessError) {
+        return forbidden();
+    }
     if (!(error instanceof AuthorizationAdministrationMutationError)) {
         return null;
     }

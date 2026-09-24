@@ -336,21 +336,30 @@ function isActiveEmployee(
 async function findActiveEmployeeAuthorizationUser(
     tx: Prisma.TransactionClient,
     requestedActor: EmployeeAuthorizationActor,
+    expectedEmployeeId: number | null,
 ): Promise<ActiveEmployeeAuthorizationUser> {
     if (requestedActor.channel !== "DASHBOARD") {
         throw new WorkforceAuthorizationError();
     }
 
-    await lockUserRows(tx, [requestedActor.userId]);
-    const userBeforeEmployeeLock = await tx.user.findUnique({
-        where: { id: requestedActor.userId },
-        select: ACTIVE_EMPLOYEE_AUTHORIZATION_USER_SELECT,
-    });
-    if (!userBeforeEmployeeLock?.employee) {
+    if (
+        requestedActor.employeeId !== null
+        && requestedActor.employeeId !== expectedEmployeeId
+    ) {
         throw new WorkforceAuthorizationError();
     }
 
-    await lockEmployeeRows(tx, [userBeforeEmployeeLock.employee.id]);
+    if (expectedEmployeeId !== null) {
+        await lockEmployeeRows(tx, [expectedEmployeeId]);
+    }
+    await lockUserRows(tx, [requestedActor.userId]);
+    const userLink = await tx.user.findUnique({
+        where: { id: requestedActor.userId },
+        select: { employeeId: true },
+    });
+    if (!userLink || userLink.employeeId !== expectedEmployeeId || expectedEmployeeId === null) {
+        throw new WorkforceAuthorizationError();
+    }
 
     const user = await tx.user.findUnique({
         where: { id: requestedActor.userId },
@@ -389,13 +398,18 @@ export async function resolveEmployeeCapabilityInTransaction(
     tx: Prisma.TransactionClient,
     actor: EmployeeAuthorizedCommandActor,
     capability: string,
+    expectedEmployeeId: number | null,
 ): Promise<EmployeeCapabilityAuthorization> {
     const requestedActor = actor.authorization.authorizationActor;
     if (requestedActor.userId !== actor.userId) {
         throw new WorkforceAuthorizationError();
     }
 
-    const user = await findActiveEmployeeAuthorizationUser(tx, requestedActor);
+    const user = await findActiveEmployeeAuthorizationUser(
+        tx,
+        requestedActor,
+        expectedEmployeeId,
+    );
     const activeActor = buildCurrentEmployeeAuthorizationActor(user);
     const decision = await authorization.resolveInTransaction(
         activeActor,

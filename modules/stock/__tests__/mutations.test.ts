@@ -188,6 +188,7 @@ describe("Stock Service Mutations", () => {
         prismaMock.user.findUnique.mockImplementation((args) =>
             asNever({
                 id: args.where.id,
+                employeeId: 100,
                 role: "ADMIN",
                 isActive: true,
                 deletedAt: null,
@@ -324,6 +325,7 @@ describe("Stock Service Mutations", () => {
                 .mockResolvedValueOnce(asNever([]));
             prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
                 id: 9,
+                employeeId: 100,
                 role: "USER",
                 isActive: true,
                 deletedAt: null,
@@ -1407,7 +1409,7 @@ describe("Stock Service Mutations", () => {
                 ),
             ).rejects.toThrow("ไม่มีสิทธิ์ดำเนินการสำหรับสถานะพนักงานปัจจุบัน");
 
-            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
             expect(prismaMock.stockRequest.findUnique).not.toHaveBeenCalled();
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
@@ -1840,6 +1842,7 @@ describe("Stock Service Mutations", () => {
                 .mockResolvedValueOnce(asNever([]));
             prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
                 id: 9,
+                employeeId: 100,
                 role: "USER",
                 isActive: true,
                 deletedAt: null,
@@ -1879,6 +1882,7 @@ describe("Stock Service Mutations", () => {
                 .mockResolvedValueOnce(asNever([]));
             prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
                 id: 9,
+                employeeId: 100,
                 role: "USER",
                 isActive: true,
                 deletedAt: null,
@@ -1916,7 +1920,7 @@ describe("Stock Service Mutations", () => {
                 ),
             ).rejects.toThrow("ไม่มีสิทธิ์ดำเนินการสำหรับสถานะพนักงานปัจจุบัน");
 
-            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+            expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(2);
             expect(prismaMock.stockRequest.findUnique).not.toHaveBeenCalled();
             expect(prismaMock.stockRequest.updateMany).not.toHaveBeenCalled();
         });
@@ -1950,6 +1954,7 @@ describe("Stock Service Mutations", () => {
         it("should cancel only pending issue requests", async () => {
             prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
                 id: 3,
+                employeeId: 100,
                 role: "USER",
                 isActive: true,
                 deletedAt: null,
@@ -2156,6 +2161,7 @@ describe("Stock Service Mutations", () => {
         it("should use processor notifications for an explicit USER ALL cancellation of another user's request", async () => {
             prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
                 id: 9,
+                employeeId: 100,
                 role: "USER",
                 isActive: true,
                 deletedAt: null,
@@ -2259,6 +2265,7 @@ describe("Stock Service Mutations", () => {
         it("should reject when non-admin tries to cancel another user's request", async () => {
             prismaMock.user.findUnique.mockResolvedValueOnce(asNever({
                 id: 3,
+                employeeId: 100,
                 role: "USER",
                 isActive: true,
                 deletedAt: null,

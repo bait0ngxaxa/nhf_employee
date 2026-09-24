@@ -2,6 +2,8 @@ export interface RoutineCommandActor {
     id: number;
     role: string;
     email: string;
+    /** Server-derived employee ID used only as a workforce row-lock hint. */
+    employeeIdHint?: number | null;
     mode?: "LIFF_SELF_SERVICE";
     ipAddress?: string;
     userAgent?: string;

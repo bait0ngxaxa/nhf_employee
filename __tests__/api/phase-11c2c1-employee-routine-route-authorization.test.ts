@@ -167,6 +167,7 @@ import { GET as getRoutineOccurrence } from "@/app/api/routines/occurrences/[id]
 
 const USER = {
     id: 5,
+    employeeId: 21,
     email: "user@example.com",
     name: "ผู้ใช้ทดสอบ",
     role: "USER",
@@ -187,6 +188,7 @@ const ACTIVE_WORKFORCE_RECORD = {
 
 const ACTIVE_TRANSACTION_USER = {
     id: USER.id,
+    employeeId: USER.employeeId,
     role: USER.role,
     isActive: true,
     deletedAt: null,

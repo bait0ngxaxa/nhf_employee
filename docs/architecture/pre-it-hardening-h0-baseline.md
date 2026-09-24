@@ -22,7 +22,7 @@ preserved in [runtime-hardening.md](./runtime-hardening.md).
 | Audited source baseline date | 2026-09-20 16:45:12 +07:00 |
 | Repository | bait0ngxaxa/nhf_employee |
 | Initial H0 baseline documentation commit | c2f0374216f560ddf18c560cc4c73f23a54aaee5 |
-| Relationship | H0 implementation and follow-up corrections after the audited source baseline are documentation-only; the audited runtime/application source remains bb61c03bdf93453b3e92ebee61c41637c3e5a477 |
+| Relationship | At original H0 closure, follow-up corrections were documentation-only and the audited runtime/application source remained bb61c03bdf93453b3e92ebee61c41637c3e5a477; the later Pre-IT Authorization Administration hardening below supersedes that runtime-state statement for H0-AUTH-01 and H0-SEC-01 |
 | Previous purported L7 SHA | 6032381072cf589578f46188a4af2dbe50287fec |
 | What that SHA actually is | Commit subject is chore: close L6 compatibility residue cleanup; it is not a separately evidenced L7 re-audit commit |
 | Last runtime-hardening documentation commit | 5f903df3cf57f56eb2d34b7e4904d81823c21b4d |
@@ -77,11 +77,15 @@ business grant source. This is documented in
 [authorization-current-state.md](./authorization-current-state.md) and
 implemented by the Authorization resolver/evaluator.
 
-One Medium control-plane race remains: Authorization Administration verifies
-ADMIN at the request boundary, then passes an actor snapshot into its
-serializable mutation transaction without re-reading or locking the acting
-User inside that transaction. This is a real residual hardening finding, not
-a reason to redesign the authorization architecture.
+At the audited H0 source baseline, one Medium control-plane race remained:
+Authorization Administration verified ADMIN at the request boundary, then
+passed an actor snapshot into its serializable mutation transaction without
+re-reading or locking the acting User inside that transaction. The current
+Pre-IT Authorization Administration hardening closes H0-AUTH-01 by locking and
+re-reading the persisted actor and workforce state before each authorization
+write, and closes H0-SEC-01 by applying the shared trusted-mutation contract to
+all Administration mutation routes. The implementation and regression
+coverage are recorded below; this is not production deployment evidence.
 
 ### Severity conclusion
 
@@ -207,8 +211,9 @@ bounded hardening gap rather than an architecture-refactor trigger.
   application paths enforce the current account link for protected use.
 - modules/authorization/application/evaluator.ts does not turn systemRole
   into a business grant.
-- modules/authorization/application/administration-mutations.ts has the
-  transaction-time actor snapshot gap described in Finding H0-AUTH-01.
+- At the audited source baseline, modules/authorization/application/
+  administration-mutations.ts had the transaction-time actor snapshot gap
+  described in Finding H0-AUTH-01.
 
 Searches that found ADMIN references were classified rather than treated as
 defects. They are control-plane guards, role normalization at an adapter
@@ -370,6 +375,25 @@ Schema or migration required: no.
 
 ### Finding H0-AUTH-01 — transaction-time administration revalidation
 
+Historical H0 finding.
+
+Current status: CLOSED by the focused Pre-IT Authorization Administration
+hardening. Each Authorization Administration application mutation locks the
+linked Employee row followed by the actor User row, re-reads persisted
+role/account/Employee eligibility inside its serializable write transaction,
+and rejects stale authority before the mutation callback. Authorization
+Administration, system-role, and Employee lifecycle paths follow
+Employee-then-User row locking; existing Leave, Stock, Routine, and shared
+workforce actor guards use that same order. Related Employee IDs read before
+the transaction are lock-order hints only and are checked again after locking.
+The Auth-owned system-role mutation locks actor and target rows in
+deterministic order and revalidates the persisted actor in the same
+transaction. Focused application and real-MySQL regressions cover rejection
+without target writes or success Audit. No production deployment evidence is
+claimed. The invariant, evidence, failure scenario, mitigation, residual-risk,
+recommendation, and schema statements below reproduce the audited historical
+finding.
+
 Invariant: a control-plane mutation that changes Team, TeamRole, membership,
 or direct grant state should verify the acting ADMIN and current workforce
 lifecycle inside the same transaction that writes the authorization state.
@@ -402,6 +426,16 @@ Production behavior must change: yes, when H7 is implemented.
 Schema or migration required: no.
 
 ### Finding H0-SEC-01 — Authorization Administration trusted-mutation coverage
+
+Historical H0 finding.
+
+Current status: CLOSED by the focused Pre-IT Authorization Administration
+hardening. All 14 POST/PATCH/DELETE handlers use the shared
+`withTrustedMutation` contract, which rejects an untrusted Origin or missing /
+incorrect `X-Requested-With: XMLHttpRequest` with 403 before authentication,
+body parsing, or command execution. The four GET/read handlers remain outside
+the gate. The API route matrix covers every mutation handler and its trusted
+control path. No production deployment evidence is claimed.
 
 Invariant: state-changing browser requests must have a server-side trusted
 mutation/CSRF decision in addition to authentication and authorization.

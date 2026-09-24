@@ -20,6 +20,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const actor = createRoutineCommandActor(
             {
                 id: auth.user.id,
+                employeeId: auth.employeeId,
                 role: auth.user.role,
                 email: auth.user.email,
             },

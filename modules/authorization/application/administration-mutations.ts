@@ -7,6 +7,7 @@ import {
     hasPrismaErrorCode,
     runSerializableTransaction,
 } from "@/lib/db/transaction";
+import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 
 import {
     assertAuthorizationAdministrationAccess,
@@ -16,6 +17,7 @@ import {
 } from "./administration-catalog";
 import type {
     AuthorizationAdministrationMutationActor,
+    AuthorizationAdministrationMutationActorState,
     AuthorizationAdministrationMutationContext,
     AuthorizationAdministrationMutationMembership,
     AuthorizationAdministrationMutationRepository,
@@ -94,6 +96,24 @@ function getMutationActor(
     });
 }
 
+// Keep the control-plane predicate here: importing Auth's application helper
+// would add Authorization -> Auth -> Employee -> Authorization to the module graph.
+function assertCurrentMutationActorIsEligibleAdmin(
+    actor: AuthorizationAdministrationMutationActorState | null,
+): void {
+    if (
+        actor === null
+        || actor.role !== "ADMIN"
+        || !actor.isActive
+        || actor.deletedAt !== null
+        || actor.employee === null
+        || actor.employee.status !== "ACTIVE"
+        || actor.employee.deletedAt !== null
+    ) {
+        throw new AuthorizationAdministrationAccessError();
+    }
+}
+
 function parseMutationInput<T>(schema: ZodType<T>, input: unknown): T {
     const result = schema.safeParse(input);
     if (!result.success) {
@@ -132,9 +152,26 @@ async function runMutation<T>(
         ?? authorizationAdministrationMutationRepository;
     const transactionRunner = dependencies.transactionRunner
         ?? ((operation) => runSerializableTransaction(operation));
+    const actorEmployeeIdLockHint = await repository.findActorEmployeeIdLockHint(actor.userId);
 
     try {
-        return await transactionRunner((tx) => callback(tx, repository, actor));
+        return await transactionRunner(async (tx) => {
+            // Keep the same Employee -> User order as Employee lifecycle and
+            // system-role mutations. The pre-transaction ID is only a lock
+            // hint; verify the persisted link before reading Employee state.
+            await lockEmployeeRows(
+                tx,
+                actorEmployeeIdLockHint === null ? [] : [actorEmployeeIdLockHint],
+            );
+            await lockUserRows(tx, [actor.userId]);
+            const currentEmployeeId = await repository.findActorEmployeeId(tx, actor.userId);
+            if (currentEmployeeId !== actorEmployeeIdLockHint || currentEmployeeId === null) {
+                throw new AuthorizationAdministrationAccessError();
+            }
+            const currentActor = await repository.findActorStateById(tx, actor.userId);
+            assertCurrentMutationActorIsEligibleAdmin(currentActor);
+            return callback(tx, repository, actor);
+        });
     } catch (error) {
         if (error instanceof AuthorizationAdministrationMutationError) {
             throw error;

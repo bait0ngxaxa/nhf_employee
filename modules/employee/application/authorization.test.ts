@@ -101,6 +101,7 @@ function activeUser(
     role: string;
     isActive: boolean;
     deletedAt: null;
+    employeeId: number;
     employee: { id: number; status: string; deletedAt: Date | null };
 } {
     return {
@@ -108,6 +109,7 @@ function activeUser(
         role,
         isActive: true,
         deletedAt: null,
+        employeeId,
         employee: {
             id: employeeId,
             status: employeeStatus,
@@ -420,11 +422,15 @@ describe("Employee authorization adapter", () => {
             tx,
             commandActor("USER"),
             "employee.update",
+            21,
         );
 
         expect(tx.user.findUnique).toHaveBeenCalledTimes(2);
         expect(mocks.lockUserRows).toHaveBeenCalledWith(tx, [7]);
         expect(mocks.lockEmployeeRows).toHaveBeenCalledWith(tx, [21]);
+        expect(mocks.lockEmployeeRows.mock.invocationCallOrder[0]).toBeLessThan(
+            mocks.lockUserRows.mock.invocationCallOrder[0],
+        );
         expect(mocks.resolveInTransaction).toHaveBeenCalledWith(
             {
                 userId: 7,
@@ -464,6 +470,7 @@ describe("Employee authorization adapter", () => {
             tx,
             commandActor("USER"),
             "employee.delete",
+            21,
         );
 
         expect(result.actor.systemRole).toBe("ADMIN");
@@ -488,6 +495,7 @@ describe("Employee authorization adapter", () => {
                     tx,
                     commandActor("USER"),
                     capability,
+                    21,
                 ),
             ).rejects.toMatchObject({
                 capability,
@@ -524,6 +532,7 @@ describe("Employee authorization adapter", () => {
                 tx,
                 commandActor(),
                 "employee.update",
+                21,
             ),
         ).rejects.toBeInstanceOf(WorkforceAuthorizationError);
         expect(mocks.resolveInTransaction).not.toHaveBeenCalled();
