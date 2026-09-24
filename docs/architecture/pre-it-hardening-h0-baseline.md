@@ -93,12 +93,13 @@ remaining Low and Informational findings are bounded hardening gaps,
 transitional debt, operational acceptance items, or intentional deployment
 tradeoffs.
 
-No finding blocks H2 planning. The control-plane revalidation finding should
-be closed before adding new security-sensitive administration surfaces to a
-future IT capability. It does not authorize starting IT work in H0.
+At the H0 baseline, no finding blocked H2 planning. The control-plane
+revalidation finding should be closed before adding new security-sensitive
+administration surfaces to a future IT capability. It does not authorize
+starting IT work in H0.
 
 H1 is explicitly DEFERRED — owner decision. It is not BLOCKED and not FAILED.
-The expected handoff after H0 is H2 planning.
+The expected handoff after H0 was H2 planning; H2 is now in progress.
 
 ### Stock default-variant track
 
@@ -107,11 +108,44 @@ The expected handoff after H0 is H2 planning.
 - H2C.2 — CLOSED. Stock runtime treats `StockItem.defaultVariantId` as the
   canonical default. The dual-read flag, lowest-active read fallback, and
   runtime shadow comparison were removed. The nullable column remains
-  intentional when an item has no active variants.
+  intentional when an item has no active variants. When active variants exist,
+  the value is required and must reference an active variant owned by that
+  item. Explicit reads do not depend on the lowest variant ID; deterministic
+  ID order remains only for mutation-time replacement.
 - H2C.3 — CLOSED. The one-time default-variant backfill tooling was retired;
   `stock:audit` now permanently validates canonical explicit-default integrity.
-- H2C.4 — NEXT. Complete final repository/production audit closure evidence
-  and H2 Stock sign-off.
+- H2C.4 — REPOSITORY VERIFICATION PASS; PRODUCTION EVIDENCE PENDING. The
+  repository gates, focused Stock tests, MySQL integration suite, permanent
+  audit CLI checks on the dedicated integration database, and full test suite
+  passed on 2026-09-24. The integration database contained no Stock rows, so
+  these results verify repository behavior and CLI operation only.
+- H2 Stock — NOT YET SIGNED OFF. Production closure requires an operator to
+  run `npm run stock:audit:strict -- --json` against the deployed application
+  containing H2C.2 and H2C.3, then return the deployed revision, command exit
+  code, and JSON summary. No production audit was run for H2C.4.
+
+H2C.4 repository verification record (2026-09-24):
+
+- Focused Stock tests: 5 files and 100 tests passed, covering the permanent
+  inventory audit, canonical default, replacement writer, queries, and
+  mutations/request creation.
+- `npm run test:integration:mysql`: 17 files and 98 tests passed; all 71
+  migrations were already applied to the dedicated integration database. Its
+  Stock concurrency cases cover item-only default resolution and preservation
+  of a request's variant snapshot after the default changes.
+- `npm run stock:audit -- --json` and
+  `npm run stock:audit:strict -- --json`: both exited 0 on the dedicated
+  integration database. Its summary was `items=0`, `variants=0`,
+  `activeItemsWithoutVariant=0`, `activeItemsWithoutActiveVariant=0`,
+  `pendingRequestItemsWithoutVariant=0`, `crossItemReferences=0`,
+  `defaultVariantInvariantViolations=0`, and `negativeInventoryRecords=0`.
+  Informational `quantityMismatches`, `ledgerDiscrepancies`, and all other
+  reported counts were 0 because the test database contained no Stock rows.
+- `npm run lint:strict`, `npm run typecheck`, `npm run architecture:check`,
+  and `npx prisma validate` passed. The architecture checker examined 1,142
+  source files. Prisma emitted the existing `package.json#prisma`
+  deprecation warning.
+- `npm run test`: 334 files and 3,198 tests passed.
 
 ## 3. Evidence inventory
 
@@ -251,7 +285,7 @@ evidence into PASS.
 
 ## 4. Ranked finding ledger
 
-| Rank | Finding | Severity | Classification | H0 status | Future phase |
+| Rank | H0 finding (historical) | Severity | Classification | H0 disposition (historical) | Recommended phase at H0 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Stale L7 PASS and missing Section 24 source-of-truth | Medium | CONFIRMED_DEFECT | Fixed in H0 documentation | Closed by H0 |
 | 2 | Authorization Administration actor is not revalidated inside its mutation transaction | Medium | HARDENING_GAP | Open; documented only | H7 |
@@ -272,6 +306,14 @@ evidence into PASS.
 | 17 | Best-effort Audit persistence remains on non-transactional paths | Informational | INTENTIONAL_TRADEOFF | Accepted and documented | H3/H6 |
 | 18 | Retained LINE compatibility surface has no repository-local consumer proof | Informational | INTENTIONAL_TRADEOFF | Retained; do not remove | H7/ops confirmation |
 | 19 | Email Request remains outside modules/ by design | Informational | INTENTIONAL_TRADEOFF | No action in H0 | Future IT decision |
+
+Rows 12 and 13 record H0 dispositions. Their current dispositions are:
+
+- H0-TRANS-01 — Historical H0 finding; CLOSED by H2B, including the
+  operator-confirmed production transition.
+- H0-TRANS-02 — Historical H0 finding; H2C.1–H2C.3 CLOSED; H2C.4 repository
+  verification PASS and production evidence PENDING; H2 Stock NOT YET SIGNED
+  OFF.
 
 ### Finding H0-DOC-01 — stale L7 and missing Section 24
 
@@ -508,6 +550,9 @@ Schema or migration required: no.
 
 ### Finding H0-TRANS-01 — Routine recipient enum
 
+Historical H0 finding. Current status: CLOSED by H2B, including the
+operator-confirmed production transition recorded below.
+
 Invariant: old deployed processes must continue reading persisted values
 during rollout, while new application writes use canonical capability-based
 values.
@@ -552,9 +597,11 @@ required for that follow-up.
 
 ### Finding H0-TRANS-02 — Stock explicit default
 
-This finding records the H0 audited baseline only. H2C.1–H2C.3 later closed
-the rollout, removed transitional runtime behavior and backfill tooling, and
-made the permanent Stock audit validate the canonical explicit default.
+Historical H0 finding.
+
+Current status: H2C.1–H2C.3 CLOSED; H2C.4 repository verification PASS and
+production evidence PENDING; H2 Stock NOT YET SIGNED OFF. The H0 baseline
+details below describe historical runtime and tooling only.
 
 Invariant: an explicit default variant may be introduced without changing
 selection behavior until data is backfilled, shadow comparison is clean, and
@@ -874,7 +921,7 @@ Request migration.
 | --- | --- |
 | H0 — Fresh Source Baseline & SSOT Repair | Completed by this record and the linked documentation repair |
 | H1 — CI / Merge Quality Gate | DEFERRED — owner decision |
-| H2 — Transitional Persistence Closure | Routine recipient enum closure completed by H2B; only final H2C.4 repository/production closure evidence and H2 Stock sign-off remain |
+| H2 — Transitional Persistence Closure | Routine closure completed by H2B; H2C.1–H2C.3 closed. H2C.4 repository verification passed; post-H2C.3 production audit evidence is pending, so H2 Stock is not signed off |
 | H3 — Runtime Observability / Structured Logging | Central event schema, logger ownership, counters, alerts, and correlation propagation |
 | H4 — Liveness / Readiness | Minimal repository-owned liveness/readiness contract tied to deployment checks |
 | H5 — Critical E2E Smoke Coverage | Minimal real-browser coverage for auth/LIFF, one Stock mutation, private Leave attachment/authorization, and one Routine journey |
@@ -883,10 +930,10 @@ Request migration.
 
 At the H0 handoff, H2 planning was the next recommended activity. H2A and H2B
 have since closed the Routine Import and Routine recipient persistence work;
-H2C.1–H2C.3 have since closed the Stock explicit-default rollout and retired
-its transitional backfill tooling. Only H2C.4 final repository/production
-closure evidence and H2 Stock sign-off remain. H1 remains deferred by owner
-decision, and future IT remains deferred.
+H2C.1–H2C.3 closed the Stock explicit-default runtime and tooling transition.
+H2C.4 repository verification has passed. Its post-H2C.3 production audit
+evidence remains pending, so H2 Stock is not yet signed off. H1 remains
+deferred by owner decision, and future IT remains deferred.
 
 ## 7. H0 changes
 
@@ -904,6 +951,9 @@ tooling, Routine enum, Stock flag, Outbox design, upload backend, or future IT
 module was changed.
 
 ## 8. Verification limitations
+
+These limitations describe the H0 audited-source verification on 2026-09-21.
+The current H2C.4 production evidence status is recorded in Section 2.
 
 - No production database, supervisor/PM2 instance, Cloudflare/Tunnel,
   Nginx host, SMTP provider, LINE Console, monitoring system, or backup
