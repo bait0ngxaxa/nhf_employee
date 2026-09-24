@@ -175,23 +175,11 @@ export type {
 } from "./infrastructure/notifications/notification-payloads";
 
 export {
-    applyDefaultVariantBackfill,
-    loadDefaultVariantBackfillReport,
-} from "./application/maintenance/default-variant-backfill";
-export {
-    assertDefaultVariantApplyAuthorized,
-    assertDefaultVariantReportSafeForApply,
-    getDefaultVariantDatabaseTarget,
-} from "./application/maintenance/default-variant-backfill-safety";
-export type {
-    DefaultVariantBackfillApplyResult,
-    DefaultVariantBackfillReport,
-} from "./application/maintenance/default-variant-backfill";
-export {
     classifyStockInventoryAudit,
     determineAuditExitCode,
 } from "./domain/inventory-audit";
 export type {
+    DefaultVariantInvariantViolation,
     StockInventoryAuditResult,
     StockInventoryAuditSnapshot,
 } from "./domain/inventory-audit";

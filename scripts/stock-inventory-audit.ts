@@ -50,6 +50,7 @@ async function loadAuditSnapshot(): Promise<StockInventoryAuditSnapshot> {
                 id: true,
                 sku: true,
                 name: true,
+                defaultVariantId: true,
                 quantity: true,
                 minStock: true,
                 isActive: true,
@@ -152,8 +153,8 @@ function printTerminalReport(result: StockInventoryAuditResult): void {
     );
     printDetail("Cross-item references", result.details.crossItemReferences);
     printDetail(
-        "Implicit default variants",
-        result.details.implicitDefaultVariants,
+        "Canonical default variant violations",
+        result.details.defaultVariantInvariantViolations,
     );
     printDetail(
         "Negative or invalid inventory records",

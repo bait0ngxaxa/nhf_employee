@@ -12,6 +12,7 @@ function createCleanSnapshot(): StockInventoryAuditSnapshot {
             id: 1,
             sku: "ITEM-1",
             name: "วัสดุทดสอบ",
+            defaultVariantId: 11,
             quantity: 5,
             minStock: 1,
             isActive: true,
@@ -58,6 +59,7 @@ describe("stock inventory audit classification", () => {
             pendingRequestItemsWithoutVariant: 0,
             transactionsWithoutVariant: 0,
             crossItemReferences: 0,
+            defaultVariantInvariantViolations: 0,
             negativeInventoryRecords: 0,
             variantsWithoutLedgerCoverage: 0,
             ledgerDiscrepancies: 0,
@@ -85,6 +87,7 @@ describe("stock inventory audit classification", () => {
     it("counts inactive items without variants separately without failing strict mode", () => {
         const snapshot = createCleanSnapshot();
         snapshot.items[0].isActive = false;
+        snapshot.items[0].defaultVariantId = null;
         snapshot.items[0].quantity = 0;
         snapshot.variants = [];
         snapshot.transactions = [];
@@ -97,7 +100,7 @@ describe("stock inventory audit classification", () => {
         expect(determineAuditExitCode(result, true)).toBe(0);
     });
 
-    it("classifies an active item with only inactive variants as critical", () => {
+    it("classifies an active item with only inactive variants separately from its default", () => {
         const snapshot = createCleanSnapshot();
         snapshot.variants[0].isActive = false;
 
@@ -109,12 +112,110 @@ describe("stock inventory audit classification", () => {
             itemName: "วัสดุทดสอบ",
             persistedVariantCount: 1,
         }]);
-        expect(result.details.implicitDefaultVariants[0]).toEqual({
+        expect(result.details.defaultVariantInvariantViolations).toEqual([{
+            kind: "DEFAULT_VARIANT_INACTIVE",
             itemId: 1,
             itemSku: "ITEM-1",
+            itemName: "วัสดุทดสอบ",
+            defaultVariantId: 11,
             activeVariantCount: 0,
-            implicitDefaultVariantId: null,
+            message: "StockItem.defaultVariantId ต้องอ้างถึง active variant",
+        }]);
+        expect(determineAuditExitCode(result, true)).toBe(1);
+    });
+
+    it("accepts an explicit active default that is not the lowest variant ID", () => {
+        const snapshot = createCleanSnapshot();
+        snapshot.variants.unshift({
+            id: 9,
+            stockItemId: 1,
+            sku: "VARIANT-9",
+            quantity: 0,
+            minStock: 1,
+            isActive: true,
         });
+
+        const result = classifyStockInventoryAudit(snapshot);
+
+        expect(snapshot.items[0].defaultVariantId).toBe(11);
+        expect(result.details.defaultVariantInvariantViolations).toEqual([]);
+        expect(result.summary.defaultVariantInvariantViolations).toBe(0);
+        expect(determineAuditExitCode(result, true)).toBe(0);
+    });
+
+    it("fails strict mode when active variants exist without a canonical default", () => {
+        const snapshot = createCleanSnapshot();
+        snapshot.items[0].defaultVariantId = null;
+
+        const result = classifyStockInventoryAudit(snapshot);
+
+        expect(result.details.defaultVariantInvariantViolations).toMatchObject([{
+            kind: "MISSING_DEFAULT_WITH_ACTIVE_VARIANTS",
+            itemId: 1,
+            defaultVariantId: null,
+            activeVariantCount: 1,
+        }]);
+        expect(result.summary.defaultVariantInvariantViolations).toBe(1);
+        expect(determineAuditExitCode(result, true)).toBe(1);
+    });
+
+    it("fails strict mode when the canonical default references a missing variant", () => {
+        const snapshot = createCleanSnapshot();
+        snapshot.items[0].defaultVariantId = 999;
+
+        const result = classifyStockInventoryAudit(snapshot);
+
+        expect(result.details.defaultVariantInvariantViolations).toMatchObject([{
+            kind: "DEFAULT_VARIANT_MISSING",
+            itemId: 1,
+            defaultVariantId: 999,
+            activeVariantCount: 1,
+        }]);
+        expect(determineAuditExitCode(result, true)).toBe(1);
+    });
+
+    it("fails strict mode when the canonical default belongs to another item", () => {
+        const snapshot = createCleanSnapshot();
+        snapshot.items.push({
+            id: 2,
+            sku: "ITEM-2",
+            name: "วัสดุอีกชิ้น",
+            defaultVariantId: null,
+            quantity: 0,
+            minStock: 0,
+            isActive: false,
+        });
+        snapshot.variants.push({
+            id: 22,
+            stockItemId: 2,
+            sku: "VARIANT-22",
+            quantity: 0,
+            minStock: 0,
+            isActive: false,
+        });
+        snapshot.items[0].defaultVariantId = 22;
+
+        const result = classifyStockInventoryAudit(snapshot);
+
+        expect(result.details.defaultVariantInvariantViolations).toMatchObject([{
+            kind: "DEFAULT_VARIANT_CROSS_ITEM",
+            itemId: 1,
+            defaultVariantId: 22,
+            activeVariantCount: 1,
+        }]);
+        expect(determineAuditExitCode(result, true)).toBe(1);
+    });
+
+    it("reports no canonical-default violation for zero active variants and a null default", () => {
+        const snapshot = createCleanSnapshot();
+        snapshot.items[0].defaultVariantId = null;
+        snapshot.variants[0].isActive = false;
+
+        const result = classifyStockInventoryAudit(snapshot);
+
+        expect(result.summary.defaultVariantInvariantViolations).toBe(0);
+        expect(result.details.defaultVariantInvariantViolations).toEqual([]);
+        expect(result.summary.activeItemsWithoutActiveVariant).toBe(1);
         expect(determineAuditExitCode(result, true)).toBe(1);
     });
 
@@ -156,6 +257,7 @@ describe("stock inventory audit classification", () => {
             id: 2,
             sku: "ITEM-2",
             name: "วัสดุอีกชิ้น",
+            defaultVariantId: null,
             quantity: 0,
             minStock: 0,
             isActive: false,
@@ -212,7 +314,7 @@ describe("stock inventory audit classification", () => {
         expect(determineAuditExitCode(result, true)).toBe(0);
     });
 
-    it("groups variant-less records and reports missing ledger coverage and lowest active ID", () => {
+    it("groups variant-less records and reports missing ledger coverage without comparing default order", () => {
         const snapshot = createCleanSnapshot();
         snapshot.variants.push({
             id: 9,
@@ -243,9 +345,7 @@ describe("stock inventory audit classification", () => {
         expect(result.summary.requestItemsWithoutVariantByStatus.CANCELLED).toBe(1);
         expect(result.summary.transactionsWithoutVariantByType.IN).toBe(1);
         expect(result.summary.variantsWithoutLedgerCoverage).toBe(1);
-        expect(result.details.implicitDefaultVariants[0]).toMatchObject({
-            activeVariantCount: 2,
-            implicitDefaultVariantId: 9,
-        });
+        expect(result.details.defaultVariantInvariantViolations).toEqual([]);
+        expect(result.summary.defaultVariantInvariantViolations).toBe(0);
     });
 });

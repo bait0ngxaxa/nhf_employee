@@ -102,15 +102,16 @@ The expected handoff after H0 is H2 planning.
 
 ### Stock default-variant track
 
-- H2C.1 — CLOSED. Operator-confirmed production backfill candidates were 0,
-  and production was already running with
-  `STOCK_EXPLICIT_DEFAULT_READ_ENABLED=true`.
+- H2C.1 — CLOSED. Operator-confirmed production backfill evidence passed with
+  0 candidates; the explicit-default read cutover was enabled and stable.
 - H2C.2 — CLOSED. Stock runtime treats `StockItem.defaultVariantId` as the
   canonical default. The dual-read flag, lowest-active read fallback, and
   runtime shadow comparison were removed. The nullable column remains
   intentional when an item has no active variants.
-- H2C.3 — NEXT. Retire the one-time backfill tooling and convert the Stock
-  audit to permanent explicit-default invariant protection.
+- H2C.3 — CLOSED. The one-time default-variant backfill tooling was retired;
+  `stock:audit` now permanently validates canonical explicit-default integrity.
+- H2C.4 — NEXT. Complete final repository/production audit closure evidence
+  and H2 Stock sign-off.
 
 ## 3. Evidence inventory
 
@@ -174,8 +175,9 @@ the current Routine, Stock, or Email Request recipient implementations.
   variants may have no default. When active variants exist, the runtime
   validates that the canonical default belongs to the item and is active.
 - H2C.2 removed the Stock runtime flag, dual-read fallback, and shadow
-  comparison without a schema migration. The guarded one-time backfill
-  tooling remains until H2C.3.
+  comparison without a schema migration. H2C.3 retired the one-time backfill
+  tooling and made the read-only RepeatableRead Stock audit validate the
+  canonical explicit-default invariant.
 
 ### Runtime reliability
 
@@ -550,6 +552,10 @@ required for that follow-up.
 
 ### Finding H0-TRANS-02 — Stock explicit default
 
+This finding records the H0 audited baseline only. H2C.1–H2C.3 later closed
+the rollout, removed transitional runtime behavior and backfill tooling, and
+made the permanent Stock audit validate the canonical explicit default.
+
 Invariant: an explicit default variant may be introduced without changing
 selection behavior until data is backfilled, shadow comparison is clean, and
 the controlled read cutover is approved.
@@ -868,7 +874,7 @@ Request migration.
 | --- | --- |
 | H0 — Fresh Source Baseline & SSOT Repair | Completed by this record and the linked documentation repair |
 | H1 — CI / Merge Quality Gate | DEFERRED — owner decision |
-| H2 — Transitional Persistence Closure | Routine recipient enum closure completed by H2B; Stock explicit-default rollout closure remains |
+| H2 — Transitional Persistence Closure | Routine recipient enum closure completed by H2B; only final H2C.4 repository/production closure evidence and H2 Stock sign-off remain |
 | H3 — Runtime Observability / Structured Logging | Central event schema, logger ownership, counters, alerts, and correlation propagation |
 | H4 — Liveness / Readiness | Minimal repository-owned liveness/readiness contract tied to deployment checks |
 | H5 — Critical E2E Smoke Coverage | Minimal real-browser coverage for auth/LIFF, one Stock mutation, private Leave attachment/authorization, and one Routine journey |
@@ -877,8 +883,10 @@ Request migration.
 
 At the H0 handoff, H2 planning was the next recommended activity. H2A and H2B
 have since closed the Routine Import and Routine recipient persistence work;
-H2 remains in progress for the Stock explicit-default rollout closure. H1
-remains deferred by owner decision, and future IT remains deferred.
+H2C.1–H2C.3 have since closed the Stock explicit-default rollout and retired
+its transitional backfill tooling. Only H2C.4 final repository/production
+closure evidence and H2 Stock sign-off remain. H1 remains deferred by owner
+decision, and future IT remains deferred.
 
 ## 7. H0 changes
 

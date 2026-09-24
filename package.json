@@ -20,9 +20,7 @@
     "line:richmenu:provision": "tsx scripts/line-rich-menu.ts provision",
     "line:richmenu:set-default": "tsx scripts/line-rich-menu.ts set-default",
     "stock:audit": "tsx scripts/stock-inventory-audit.ts",
-    "stock:audit:strict": "tsx scripts/stock-inventory-audit.ts --fail-on-error",
-    "stock:default-variant:backfill": "tsx scripts/stock-default-variant-backfill.ts",
-    "stock:default-variant:backfill:apply": "tsx scripts/stock-default-variant-backfill.ts --apply"
+    "stock:audit:strict": "tsx scripts/stock-inventory-audit.ts --fail-on-error"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -12,10 +12,6 @@ import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import { stockService } from "../../index";
 import {
-    applyDefaultVariantBackfill,
-    loadDefaultVariantBackfillReport,
-} from "../../application/maintenance/default-variant-backfill";
-import {
     InvalidStockDefaultVariantError,
     setStockItemDefaultVariantIfUnset,
 } from "../../infrastructure/persistence/default-variant-writer";
@@ -217,27 +213,6 @@ describe.sequential("stock mutations with real MySQL", () => {
         })).toBe(1);
     });
 
-    it("default variant dry-run รายงาน candidate โดยไม่เขียนข้อมูล", async () => {
-        const fixture = await createStockFixture(prisma, { suffix: "DEFAULT-DRY" });
-        await prisma.stockItem.update({
-            where: { id: fixture.item.id },
-            data: { defaultVariantId: null },
-        });
-
-        const report = await loadDefaultVariantBackfillReport();
-
-        expect(report.details).toContainEqual(expect.objectContaining({
-            itemId: fixture.item.id,
-            preferredDefaultVariantId: fixture.variant.id,
-            explicitDefaultVariantId: null,
-            classification: "READY_FOR_BACKFILL",
-        }));
-        expect((await prisma.stockItem.findUniqueOrThrow({
-            where: { id: fixture.item.id },
-            select: { defaultVariantId: true },
-        })).defaultVariantId).toBeNull();
-    });
-
     it("explicit default writer บังคับ same-item active variant", async () => {
         const first = await createStockFixture(prisma, {
             suffix: "DEFAULT-OWNER-A",
@@ -290,89 +265,6 @@ describe.sequential("stock mutations with real MySQL", () => {
             where: { id: first.item.id },
             select: { defaultVariantId: true },
         })).defaultVariantId).toBe(first.variant.id);
-    });
-
-    it("default variant apply เลือก preferred active ID และรันซ้ำได้โดยไม่ overwrite", async () => {
-        const fixture = await createStockFixture(prisma, { suffix: "DEFAULT-APPLY" });
-        await prisma.stockItem.update({
-            where: { id: fixture.item.id },
-            data: { defaultVariantId: null },
-        });
-        const laterVariant = await prisma.stockItemVariant.create({
-            data: {
-                stockItemId: fixture.item.id,
-                sku: "DEFAULT-APPLY-LATER",
-                unit: "ชิ้น",
-                quantity: 4,
-                minStock: 1,
-            },
-        });
-        const before = await loadDefaultVariantBackfillReport();
-
-        const firstApply = await applyDefaultVariantBackfill(
-            before.candidateItemIds,
-        );
-        const secondApply = await applyDefaultVariantBackfill([
-            fixture.item.id,
-        ]);
-
-        expect(firstApply.updatedItemIds).toContain(fixture.item.id);
-        expect(secondApply).toMatchObject({
-            attempted: 1,
-            updated: 0,
-            skipped: 1,
-        });
-        expect((await prisma.stockItem.findUniqueOrThrow({
-            where: { id: fixture.item.id },
-            select: { defaultVariantId: true },
-        })).defaultVariantId).toBe(fixture.variant.id);
-
-        await prisma.stockItem.update({
-            where: { id: fixture.item.id },
-            data: { defaultVariantId: laterVariant.id },
-        });
-        const mismatch = await loadDefaultVariantBackfillReport();
-        const detail = mismatch.details.find(
-            (entry) => entry.itemId === fixture.item.id,
-        );
-        expect(detail).toMatchObject({
-            preferredDefaultVariantId: fixture.variant.id,
-            explicitDefaultVariantId: laterVariant.id,
-            classification: "MISMATCH",
-        });
-        expect(mismatch.candidateItemIds).not.toContain(fixture.item.id);
-
-        const otherItem = await prisma.stockItem.create({
-            data: {
-                name: "วัสดุ default คนละ item",
-                sku: "DEFAULT-APPLY-OTHER",
-                unit: "ชิ้น",
-                quantity: 1,
-                minStock: 1,
-                categoryId: fixture.category.id,
-            },
-        });
-        const otherVariant = await prisma.stockItemVariant.create({
-            data: {
-                stockItemId: otherItem.id,
-                sku: "DEFAULT-APPLY-OTHER-VARIANT",
-                unit: "ชิ้น",
-                quantity: 1,
-                minStock: 1,
-            },
-        });
-        await prisma.stockItem.update({
-            where: { id: fixture.item.id },
-            data: { defaultVariantId: otherVariant.id },
-        });
-        const crossItemReport = await loadDefaultVariantBackfillReport();
-        expect(crossItemReport.details.find(
-            (entry) => entry.itemId === fixture.item.id,
-        )).toMatchObject({
-            explicitDefaultVariantId: otherVariant.id,
-            explicitDefaultVariantStockItemId: otherItem.id,
-            classification: "CROSS_ITEM_DEFAULT",
-        });
     });
 
     it("สร้างวัสดุหลาย variant พร้อม derived aggregate, ledger ราย variant และ SKU uniqueness", async () => {

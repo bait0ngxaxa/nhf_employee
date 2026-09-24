@@ -8,6 +8,7 @@ export type StockInventoryAuditSnapshot = {
         id: number;
         sku: string;
         name: string;
+        defaultVariantId: number | null;
         quantity: number;
         minStock: number;
         isActive: boolean;
@@ -46,11 +47,18 @@ export type QuantityMismatch = {
     difference: number;
 };
 
-export type ImplicitDefaultVariant = {
+export type DefaultVariantInvariantViolation = {
+    kind:
+        | "MISSING_DEFAULT_WITH_ACTIVE_VARIANTS"
+        | "DEFAULT_VARIANT_MISSING"
+        | "DEFAULT_VARIANT_CROSS_ITEM"
+        | "DEFAULT_VARIANT_INACTIVE";
     itemId: number;
     itemSku: string;
+    itemName: string;
+    defaultVariantId: number | null;
     activeVariantCount: number;
-    implicitDefaultVariantId: number | null;
+    message: string;
 };
 
 type MissingVariantItem = {
@@ -130,6 +138,7 @@ export type StockInventoryAuditResult = {
         pendingRequestItemsWithoutVariant: number;
         transactionsWithoutVariant: number;
         crossItemReferences: number;
+        defaultVariantInvariantViolations: number;
         negativeInventoryRecords: number;
         variantsWithoutLedgerCoverage: number;
         ledgerDiscrepancies: number;
@@ -143,7 +152,7 @@ export type StockInventoryAuditResult = {
         requestItemsWithoutVariant: RequestItemWithoutVariant[];
         transactionsWithoutVariant: TransactionWithoutVariant[];
         crossItemReferences: CrossItemReference[];
-        implicitDefaultVariants: ImplicitDefaultVariant[];
+        defaultVariantInvariantViolations: DefaultVariantInvariantViolation[];
         negativeInventoryRecords: NegativeInventoryRecord[];
         ledgerCoverage: LedgerCoverage[];
         ledgerDiscrepancies: LedgerDiscrepancy[];
@@ -273,16 +282,50 @@ export function classifyStockInventoryAudit(
             }];
         }),
     ];
-    const implicitDefaultVariants = snapshot.items.map((item) => {
-        const activeVariants = (variantsByItemId.get(item.id) ?? [])
-            .filter((variant) => variant.isActive)
-            .sort((left, right) => left.id - right.id);
-        return {
+    const defaultVariantInvariantViolations = snapshot.items.flatMap((item) => {
+        const activeVariantCount = (variantsByItemId.get(item.id) ?? [])
+            .filter((variant) => variant.isActive).length;
+        const base = {
             itemId: item.id,
             itemSku: item.sku,
-            activeVariantCount: activeVariants.length,
-            implicitDefaultVariantId: activeVariants[0]?.id ?? null,
+            itemName: item.name,
+            defaultVariantId: item.defaultVariantId,
+            activeVariantCount,
         };
+        const violation = (
+            kind: DefaultVariantInvariantViolation["kind"],
+            message: string,
+        ): DefaultVariantInvariantViolation[] => [{ ...base, kind, message }];
+
+        if (item.defaultVariantId === null) {
+            return activeVariantCount > 0
+                ? violation(
+                    "MISSING_DEFAULT_WITH_ACTIVE_VARIANTS",
+                    "มี active variant แต่ StockItem.defaultVariantId เป็น null",
+                )
+                : [];
+        }
+
+        const defaultVariant = variantById.get(item.defaultVariantId);
+        if (!defaultVariant) {
+            return violation(
+                "DEFAULT_VARIANT_MISSING",
+                "StockItem.defaultVariantId อ้างถึง variant ที่ไม่มีอยู่",
+            );
+        }
+        if (defaultVariant.stockItemId !== item.id) {
+            return violation(
+                "DEFAULT_VARIANT_CROSS_ITEM",
+                "StockItem.defaultVariantId อ้างถึง variant ของ StockItem อื่น",
+            );
+        }
+        if (!defaultVariant.isActive) {
+            return violation(
+                "DEFAULT_VARIANT_INACTIVE",
+                "StockItem.defaultVariantId ต้องอ้างถึง active variant",
+            );
+        }
+        return [];
     });
     const negativeInventoryRecords: NegativeInventoryRecord[] = [
         ...snapshot.items.flatMap((item) => [
@@ -375,6 +418,8 @@ export function classifyStockInventoryAudit(
             ).length,
             transactionsWithoutVariant: transactionsWithoutVariant.length,
             crossItemReferences: crossItemReferences.length,
+            defaultVariantInvariantViolations:
+                defaultVariantInvariantViolations.length,
             negativeInventoryRecords: negativeInventoryRecords.length,
             variantsWithoutLedgerCoverage: ledgerCoverage.filter(
                 (coverage) => coverage.transactionCount === 0,
@@ -398,7 +443,7 @@ export function classifyStockInventoryAudit(
             requestItemsWithoutVariant,
             transactionsWithoutVariant,
             crossItemReferences,
-            implicitDefaultVariants,
+            defaultVariantInvariantViolations,
             negativeInventoryRecords,
             ledgerCoverage,
             ledgerDiscrepancies,
@@ -418,6 +463,7 @@ export function determineAuditExitCode(
         || result.summary.activeItemsWithoutActiveVariant > 0
         || result.summary.pendingRequestItemsWithoutVariant > 0
         || result.summary.crossItemReferences > 0
+        || result.summary.defaultVariantInvariantViolations > 0
         || result.summary.negativeInventoryRecords > 0
         ? 1
         : 0;
