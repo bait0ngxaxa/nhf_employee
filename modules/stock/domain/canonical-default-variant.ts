@@ -6,10 +6,9 @@ export type CanonicalDefaultVariant = {
     isActive: boolean;
 };
 
-export function resolveCanonicalDefaultVariantId(input: {
+export function resolveCanonicalDefaultVariantIdFromActiveVariantIds(input: {
     itemId: number;
     defaultVariantId: number | null;
-    defaultVariant: CanonicalDefaultVariant | null;
     activeVariantIds: readonly number[];
 }): number | null {
     if (input.defaultVariantId === null) {
@@ -20,6 +19,25 @@ export function resolveCanonicalDefaultVariantId(input: {
         }
 
         return null;
+    }
+
+    if (!input.activeVariantIds.includes(input.defaultVariantId)) {
+        throw new StockInvariantViolationError(
+            `Stock default variant invariant violated: item ${input.itemId} default is not an active variant of that item`,
+        );
+    }
+
+    return input.defaultVariantId;
+}
+
+export function resolveCanonicalDefaultVariantId(input: {
+    itemId: number;
+    defaultVariantId: number | null;
+    defaultVariant: CanonicalDefaultVariant | null;
+    activeVariantIds: readonly number[];
+}): number | null {
+    if (input.defaultVariantId === null) {
+        return resolveCanonicalDefaultVariantIdFromActiveVariantIds(input);
     }
 
     const defaultVariant = input.defaultVariant;
@@ -38,11 +56,6 @@ export function resolveCanonicalDefaultVariantId(input: {
             `Stock default variant invariant violated: item ${input.itemId} references an inactive variant`,
         );
     }
-    if (!input.activeVariantIds.includes(defaultVariant.id)) {
-        throw new StockInvariantViolationError(
-            `Stock default variant invariant violated: item ${input.itemId} default is absent from its active variants`,
-        );
-    }
 
-    return defaultVariant.id;
+    return resolveCanonicalDefaultVariantIdFromActiveVariantIds(input);
 }

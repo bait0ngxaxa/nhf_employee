@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StockRequestStatus, type PrismaClient } from "@prisma/client";
+import { Prisma, StockRequestStatus, type PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -22,9 +22,57 @@ function asNever<T>(value: T): never {
     return value as unknown as never;
 }
 
+function createCanonicalDefaultReadSnapshot() {
+    return {
+        id: 5,
+        name: "Keyboard",
+        sku: "ITEM-5",
+        quantity: 15,
+        unit: "ชิ้น",
+        minStock: 5,
+        imageUrl: null,
+        isActive: true,
+        categoryId: 1,
+        defaultVariantId: 51,
+        category: { id: 1, name: "General" },
+        variants: [
+            {
+                id: 51,
+                stockItemId: 5,
+                sku: "ITEM-5-A",
+                quantity: 7,
+                unit: "ชิ้น",
+                minStock: 2,
+                imageUrl: null,
+                isActive: true,
+                attributeValues: [],
+            },
+            {
+                id: 52,
+                stockItemId: 5,
+                sku: "ITEM-5-B",
+                quantity: 8,
+                unit: "ชิ้น",
+                minStock: 3,
+                imageUrl: null,
+                isActive: true,
+                attributeValues: [],
+            },
+        ],
+    };
+}
+
 describe("Stock Queries", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        prismaMock.$transaction.mockImplementation(async (operation, options) => {
+            expect(options?.isolationLevel)
+                .toBe(Prisma.TransactionIsolationLevel.RepeatableRead);
+            if (typeof operation !== "function") {
+                throw new Error("Expected an interactive read transaction");
+            }
+            return operation(prismaMock as never);
+        });
     });
 
     it("calculates targeted variant availability from pending reservations", async () => {
@@ -115,6 +163,22 @@ describe("Stock Queries", () => {
                 reservedQuantity: 3,
                 availableQuantity: 7,
             });
+        });
+
+        it("validates the default against the catalog snapshot during a concurrent variant update", async () => {
+            prismaMock.stockItem.findMany.mockResolvedValue(asNever([
+                createCanonicalDefaultReadSnapshot(),
+            ]));
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+                { id: 51, stockItemId: 5, isActive: false },
+            ]));
+            prismaMock.stockItem.count.mockResolvedValue(asNever(1));
+            prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
+
+            const result = await getItems({ page: 1, limit: 20 });
+
+            expect(result.items[0]?.defaultVariantId).toBe(51);
+            expect(prismaMock.stockItemVariant.findMany).not.toHaveBeenCalled();
         });
 
         it("ignores legacy parent inventory", async () => {
@@ -375,6 +439,20 @@ describe("Stock Queries", () => {
     });
 
     describe("read-only detail and categories", () => {
+        it("validates the default against the detail snapshot during a concurrent variant update", async () => {
+            prismaMock.stockItem.findUnique.mockResolvedValue(asNever(
+                createCanonicalDefaultReadSnapshot(),
+            ));
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+                { id: 51, stockItemId: 5, isActive: false },
+            ]));
+
+            const result = await getItemById(5);
+
+            expect(result?.defaultVariantId).toBe(51);
+            expect(prismaMock.stockItemVariant.findMany).not.toHaveBeenCalled();
+        });
+
         it("uses summed active variant quantity for item detail", async () => {
             prismaMock.stockItem.findUnique.mockResolvedValue(asNever({
                 id: 5,

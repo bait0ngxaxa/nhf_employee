@@ -1,4 +1,4 @@
-import { StockRequestStatus, type Prisma } from "@prisma/client";
+import { Prisma, StockRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import type {
     StockItemsFilter,
@@ -37,16 +37,22 @@ export async function getItems(filters: StockItemsFilter) {
         }),
     };
 
-    const items = await prisma.stockItem.findMany({
-        where,
-        include: buildItemInclude(),
-        orderBy: { name: "asc" },
-        skip: (page - 1) * limit,
-        take: limit,
+    const { items, total } = await prisma.$transaction(async (tx) => {
+        const items = await tx.stockItem.findMany({
+            where,
+            include: buildItemInclude(),
+            orderBy: { name: "asc" },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+        await assertPersistedVariantsForRead(items, tx);
+        assertCanonicalDefaultVariantsForItems(items);
+        const total = await tx.stockItem.count({ where });
+
+        return { items, total };
+    }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
     });
-    await assertPersistedVariantsForRead(items);
-    await assertCanonicalDefaultVariantsForItems(prisma, items);
-    const total = await prisma.stockItem.count({ where });
 
     const itemIds = items.map((item) => item.id);
     const pendingRequestItems =
@@ -167,19 +173,24 @@ export async function getVariantAvailability(
 }
 
 export async function getItemById(id: number) {
-    const item = await prisma.stockItem.findUnique({
-        where: { id },
-        include: buildItemInclude(),
-    });
-    if (item) {
-        await assertPersistedVariantsForRead([item]);
-        await assertCanonicalDefaultVariantsForItems(prisma, [item]);
+    return prisma.$transaction(async (tx) => {
+        const item = await tx.stockItem.findUnique({
+            where: { id },
+            include: buildItemInclude(),
+        });
+        if (!item) {
+            return item;
+        }
+
+        await assertPersistedVariantsForRead([item], tx);
+        assertCanonicalDefaultVariantsForItems([item]);
         return {
             ...item,
             ...summarizeVariantInventory(item.variants),
         };
-    }
-    return item;
+    }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    });
 }
 
 export async function getRequests(

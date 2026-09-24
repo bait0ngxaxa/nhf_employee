@@ -9,7 +9,10 @@ import type {
     CreateRequestInput,
 } from "../../schemas/stock";
 import type { PendingRequestItemRecord } from "../../domain/types";
-import { resolveCanonicalDefaultVariantId } from "../../domain/canonical-default-variant";
+import {
+    resolveCanonicalDefaultVariantId,
+    resolveCanonicalDefaultVariantIdFromActiveVariantIds,
+} from "../../domain/canonical-default-variant";
 import { StockInvariantViolationError } from "../../domain/errors";
 
 export function generateSku(): string {
@@ -73,37 +76,17 @@ export async function loadCanonicalDefaultVariantsByItemIds(
     return defaultVariants;
 }
 
-export async function assertCanonicalDefaultVariantsForItems(
-    tx: Prisma.TransactionClient,
+export function assertCanonicalDefaultVariantsForItems(
     items: ReadonlyArray<{
         id: number;
         defaultVariantId: number | null;
         variants: ReadonlyArray<{ id: number; isActive: boolean }>;
     }>,
-): Promise<void> {
-    const defaultVariantIds = Array.from(new Set(
-        items
-            .map((item) => item.defaultVariantId)
-            .filter((variantId): variantId is number => variantId !== null),
-    ));
-    const defaultVariants = defaultVariantIds.length > 0
-        ? await tx.stockItemVariant.findMany({
-              where: { id: { in: defaultVariantIds } },
-              select: { id: true, stockItemId: true, isActive: true },
-          })
-        : [];
-    const defaultVariantById = new Map(
-        defaultVariants.map((variant) => [variant.id, variant]),
-    );
-
+): void {
     for (const item of items) {
-        const defaultVariant = item.defaultVariantId === null
-            ? null
-            : defaultVariantById.get(item.defaultVariantId) ?? null;
-        resolveCanonicalDefaultVariantId({
+        resolveCanonicalDefaultVariantIdFromActiveVariantIds({
             itemId: item.id,
             defaultVariantId: item.defaultVariantId,
-            defaultVariant,
             activeVariantIds: item.variants
                 .filter((variant) => variant.isActive)
                 .map((variant) => variant.id),
@@ -117,6 +100,7 @@ export async function assertPersistedVariantsForRead(
         sku: string;
         variants: ReadonlyArray<unknown>;
     }>,
+    tx: Pick<Prisma.TransactionClient, "stockItemVariant"> = prisma,
 ): Promise<void> {
     const itemsWithoutActiveVariants = items.filter(
         (item) => item.variants.length === 0,
@@ -125,7 +109,7 @@ export async function assertPersistedVariantsForRead(
         return;
     }
 
-    const persistedVariants = await prisma.stockItemVariant.findMany({
+    const persistedVariants = await tx.stockItemVariant.findMany({
         where: {
             stockItemId: {
                 in: itemsWithoutActiveVariants.map((item) => item.id),
