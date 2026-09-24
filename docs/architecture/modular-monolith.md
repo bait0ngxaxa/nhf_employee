@@ -9,7 +9,8 @@ complete.
 
 The repository-wide K0 audit, K1 closure, and deferred-boundary inventory are
 recorded in [final-repository-audit.md](./final-repository-audit.md). K1 closed
-the three Stock ownership findings; the future IT boundary remains deferred.
+the three Stock ownership findings. IT1 has since established the server-only
+IT authorization foundation; Ticket runtime and persistence remain deferred.
 
 The authoritative J0 decision is recorded in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -64,8 +65,9 @@ Phase H1 established the server/application Notification boundary in
 `@/modules/notification/client`. It is the in-app Notification/Inbox owner; it
 does not absorb business notification semantics, the global
 `NotificationOutbox`, or Email/LINE delivery infrastructure. Leave, Stock, and
-Routine retain event and recipient policy, while Email Request remains a
-transitional/deferred consumer pending the future IT capability boundary. The
+Routine retain event and recipient policy. IT1 registers the IT authorization
+boundary without adding a Ticket notification producer; Email Request remains a
+transitional/deferred consumer pending the IT8 ownership migration. The
 Notification page/loading routes use the client entry, while
 `DashboardNavbar` remains Dashboard-owned and mounts the dropdown through it.
 See [notification-migration.md](./notification-migration.md) for the complete

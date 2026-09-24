@@ -94,6 +94,12 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
 
     "notification.inbox.read": CENTRAL_WITH_DEFAULT_POLICY,
     "notification.inbox.update": CENTRAL_WITH_DEFAULT_POLICY,
+
+    "it.ticket.read": CENTRAL_WITH_DEFAULT_POLICY,
+    "it.ticket.create": CENTRAL_WITH_DEFAULT_POLICY,
+    "it.ticket.comment": CENTRAL_WITH_DEFAULT_POLICY,
+    "it.ticket.manage": CENTRAL_ONLY,
+    "it.analytics.read": CENTRAL_ONLY,
 });
 
 function getAdministrativeStatus(

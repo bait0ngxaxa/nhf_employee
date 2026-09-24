@@ -335,7 +335,9 @@ Phase 12C.2 has migrated Employee, Phase 12C.3 has migrated the enforced
 Routine capabilities, Phase 12C.4 has migrated all seven Stock capabilities,
 Phase 12C.5 has migrated all eight registered Leave capabilities, and Phase
 12D has migrated Routine export, summary, and reference to that composition.
-Email Request and the future IT module remain outside that roadmap.
+Ticket runtime and persistence remain outside that roadmap. IT1 registers the
+IT authorization foundation; Email Request ownership migration remains
+deferred to IT8.
 
 ## Phase boundary
 

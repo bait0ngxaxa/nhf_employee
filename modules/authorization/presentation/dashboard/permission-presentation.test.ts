@@ -9,6 +9,7 @@ import {
     authorizationCapabilityPresentation,
     authorizationChannelPresentation,
     authorizationContextPresentation,
+    authorizationDomainPresentation,
     authorizationLimitationPresentation,
     authorizationScopePresentation,
     getAuthorizationChannelPresentation,
@@ -30,6 +31,23 @@ describe("Authorization Administration presentation vocabulary", () => {
             expect(presentation?.actionLabel).toBeTruthy();
             expect(presentation?.description).toBeTruthy();
         }
+    });
+
+    it("presents the IT authorization domain and approved capabilities in Thai", () => {
+        expect(authorizationDomainPresentation.it).toEqual({
+            label: "งานไอที",
+            description: "การสนับสนุนและงานบริการด้านไอที",
+        });
+        expect(authorizationCapabilityPresentation["it.ticket.read"].actionLabel)
+            .toBe("ดู Ticket ไอที");
+        expect(authorizationCapabilityPresentation["it.ticket.create"].actionLabel)
+            .toBe("สร้าง Ticket ไอที");
+        expect(authorizationCapabilityPresentation["it.ticket.comment"].actionLabel)
+            .toBe("ตอบกลับ Ticket ไอที");
+        expect(authorizationCapabilityPresentation["it.ticket.manage"].actionLabel)
+            .toBe("จัดการ Ticket ไอที");
+        expect(authorizationCapabilityPresentation["it.analytics.read"].actionLabel)
+            .toBe("ดูรายงานและสถิติ IT");
     });
 
     it("covers every supported scope with ordinary labels and explanations", () => {

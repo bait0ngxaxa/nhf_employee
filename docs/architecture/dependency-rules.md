@@ -169,9 +169,10 @@ explicit-user compatibility adapter used only by deferred Email Request. It
 contains no audience lookup. `createAdminInAppNotificationsOnce` was removed.
 Phase 13A/13A.1 moved the Routine, Stock, and Email Request notification
 audiences to configured capabilities; the business producer still owns each
-event and recipient policy. Do not add a generic Notification audience query
-or migrate the Email Request workflow until the future IT capability boundary
-is approved. Legacy IT notification and outbox enum values remain
+event and recipient policy. Do not add a generic Notification audience query or
+migrate the Email Request workflow as part of IT1. IT's authorization boundary
+is registered; Email Request ownership migration remains deferred to IT8.
+Legacy IT notification and outbox enum values remain
 storage-compatible history only.
 
 Notification application commands distinguish strict `createForUser` and

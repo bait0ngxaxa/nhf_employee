@@ -28,15 +28,18 @@ audit ยังคงเก็บหลักฐาน ณ เวลาที่
   K1 closure และ H0 audited-source record; อ่านสถานะตามหัวข้อ closure ล่าสุด
 - [Current authorization state](./architecture/authorization-current-state.md):
   business authority, configured grants และ notification-recipient follow-up
+- [IT module design and phase status](./architecture/it-module-design.md):
+  ขอบเขต IT, authorization contract และสถานะการพัฒนา Ticket
 - [Notification channels](./notification-channels.md): ความหมายของแต่ละช่องทาง
   และ event delivery
 - [Notification recipient migration](./architecture/notification-capability-recipient-migration.md):
   Phase 13A/13A.1/13A.2 current state และ historical pre-cutover runbook
 
-ปัจจุบัน `modules/` มี 10 ขอบเขต: Audit, Auth, Authorization, Department,
-Employee, Leave, LINE/LIFF, Notification, Routine และ Stock. Phase K1 ปิด
-ขอบเขต Stock LIFF/provider ที่เคยพบใน K0. การย้าย Email Request ไปยังขอบเขต
-IT ยังคง deferred.
+ปัจจุบัน `modules/` มี 11 ขอบเขต: Audit, Auth, Authorization, Department,
+Employee, IT, Leave, LINE/LIFF, Notification, Routine และ Stock. Phase K1 ปิด
+ขอบเขต Stock LIFF/provider ที่เคยพบใน K0. IT1 เพิ่ม IT authorization domain,
+capability registry และ server entry แล้ว แต่ยังไม่มี Ticket persistence หรือ
+runtime. การย้าย Email Request ยังรอ IT8.
 
 Authorization ใช้ Default Domain Policy ของแต่ละ capability ร่วมกับ Team,
 TeamRole และ direct User grants ที่ตั้งค่าไว้; `ADMIN` ยังคงเป็นบทบาทของ

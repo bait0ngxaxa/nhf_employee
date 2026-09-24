@@ -597,7 +597,7 @@ describe("authorization production readiness", () => {
     it("keeps all registered capabilities accounted for and grantable", () => {
         const catalog = buildCapabilityAdministrationCatalog();
 
-        expect(CAPABILITY_REGISTRY.definitions).toHaveLength(40);
+        expect(CAPABILITY_REGISTRY.definitions).toHaveLength(45);
         expect(catalog).toHaveLength(CAPABILITY_REGISTRY.definitions.length);
         expect(catalog.map(({ key }) => key)).toEqual(
             CAPABILITY_REGISTRY.definitions.map(({ key }) => key),

@@ -2,8 +2,9 @@
 
 Status: **Phase H3 CLOSED — Notification producer integration and final migration audit complete.**
 Phase H1 server/application ownership and Phase H0 discovery remain closed.
-Notification H0-H3 migration is complete. Email Request/IT remains an explicit
-deferred capability exception.
+Notification H0-H3 migration is complete. Email Request remains on its
+transitional notification path pending IT8. IT1 adds authorization metadata
+only; it adds no Ticket notification producer or delivery behavior.
 
 Current-state note: this record preserves the H0-H3 boundary and recipient
 behavior at that migration's closure. Phase 13A/13A.1 later moved Routine,
@@ -164,8 +165,9 @@ of Notification persistence or business meaning.
     values described below, are historical storage compatibility only. H0 does
     not restore IT Support or delete these values.
 12. **Email Request:** it remains a transitional/deferred consumer. It is not
-    migrated or redesigned with Notification; its future ownership is intended
-    to be decided with the future IT capability boundary.
+    migrated or redesigned with Notification; IT1 establishes the authorization
+    foundation, while Email Request ownership migration remains scheduled for
+    IT8.
 13. **Transitional paths:** H1 now routes the legacy
     `app/api/notifications/**` HTTP adapters and generic
     `lib/services/notifications/in-app.ts` writes through the Notification
@@ -742,8 +744,9 @@ change explicitly supersedes them:
 - Provider side effects are at-least-once. Existing event keys, dedupe keys,
   and provider retry keys are part of reliability behavior and must not be
   weakened during migration.
-- Email Request remains coupled to the current global processor and configured
-  recipient lookup until the future IT boundary is approved.
+- At this H0 baseline, Email Request remained coupled to the global processor
+  and configured recipient lookup. IT1 has since registered the IT authorization
+  boundary; IT8 owns the Email Request migration.
 
 ## Exhaustive migration ledger
 
@@ -852,7 +855,8 @@ not change the Prisma schema, business producer writes, NotificationOutbox,
 global processor, Email/LINE behavior, or Notification presentation. At the
 H1 baseline the timestamp-only cursor tie risk remained intentionally
 unresolved; L4 later closed it for newly generated cursors while preserving
-legacy timestamp compatibility. Email Request/IT remains deferred; H2
+legacy timestamp compatibility. Email Request migration and Ticket runtime
+remain deferred; H2
 subsequently moved presentation ownership and H3 owns producer integration and
 compatibility cleanup.
 

@@ -79,6 +79,10 @@ export const authorizationDomainPresentation: Readonly<
         label: "การแจ้งเตือน",
         description: "การแจ้งเตือนภายในระบบ",
     },
+    it: {
+        label: "งานไอที",
+        description: "การสนับสนุนและงานบริการด้านไอที",
+    },
 });
 
 export const authorizationScopePresentation: Readonly<
@@ -368,6 +372,18 @@ export const authorizationCapabilityPresentation: Readonly<
 
     "notification.inbox.read": capability("ดูการแจ้งเตือน", "ดูการแจ้งเตือนของผู้ใช้นี้", ["การแจ้งเตือน", "แจ้งเตือน", "ดู"]),
     "notification.inbox.update": capability("จัดการการแจ้งเตือน", "จัดการสถานะการแจ้งเตือนของผู้ใช้นี้", ["การแจ้งเตือน", "แจ้งเตือน", "จัดการ", "อ่านแล้ว"]),
+
+    "it.ticket.read": capability("ดู Ticket ไอที", "ดู Ticket ไอทีของตนเองหรือรายการทั้งหมดตามสิทธิ์ที่ได้รับ", ["ไอที", "IT", "Ticket", "งานสนับสนุน", "ดู"], {
+        OWN: "Ticket ไอทีที่ผู้ใช้นี้เป็นผู้แจ้ง",
+        ALL: "Ticket ไอทีทั้งหมดที่ความสามารถนี้อนุญาต",
+    }),
+    "it.ticket.create": capability("สร้าง Ticket ไอที", "สร้าง Ticket ไอทีโดยใช้ผู้แจ้งจากบัญชีที่เข้าสู่ระบบ", ["ไอที", "IT", "Ticket", "งานสนับสนุน", "สร้าง"]),
+    "it.ticket.comment": capability("ตอบกลับ Ticket ไอที", "สื่อสารใน Ticket ไอทีของตนเองหรือรายการที่ได้รับสิทธิ์", ["ไอที", "IT", "Ticket", "ตอบกลับ", "ความคิดเห็น"], {
+        OWN: "Ticket ไอทีที่ผู้ใช้นี้เป็นผู้แจ้ง",
+        ALL: "Ticket ไอทีทั้งหมดที่ความสามารถนี้อนุญาต",
+    }),
+    "it.ticket.manage": capability("จัดการ Ticket ไอที", "ดำเนินงานและปรับข้อมูลของ Ticket ไอทีที่ได้รับสิทธิ์", ["ไอที", "IT", "Ticket", "จัดการ", "มอบหมาย", "สถานะ", "หมวดหมู่", "ความสำคัญ"]),
+    "it.analytics.read": capability("ดูรายงานและสถิติ IT", "ดูรายงานและสถิติการดำเนินงานด้านไอที", ["ไอที", "IT", "รายงาน", "สถิติ", "วิเคราะห์", "ดู"]),
 });
 
 export function getAuthorizationDomainPresentation(

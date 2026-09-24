@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     AUTHORIZATION_CHANNELS,
+    AUTHORIZATION_DOMAINS,
     AUTHORIZATION_SCOPES,
     CAPABILITY_DEFINITIONS,
     CAPABILITY_KEYS,
@@ -17,6 +18,21 @@ import type {
 } from "@/modules/authorization";
 
 describe("authorization contracts", () => {
+    it("declares the complete authorization domain inventory", () => {
+        expect(AUTHORIZATION_DOMAINS).toEqual([
+            "employee",
+            "department",
+            "routine",
+            "stock",
+            "leave",
+            "audit",
+            "email",
+            "notification",
+            "it",
+        ]);
+        expect(Object.isFrozen(AUTHORIZATION_DOMAINS)).toBe(true);
+    });
+
     it("defines the approved scope and execution-channel vocabularies", () => {
         expect(AUTHORIZATION_SCOPES).toEqual([
             "OWN",
@@ -94,6 +110,36 @@ describe("authorization contracts", () => {
             channels: ["DASHBOARD"],
         }));
         expect(CAPABILITY_REGISTRY.get("email.request.create")).toEqual(expect.objectContaining({
+            scopes: ["ALL"],
+            channels: ["DASHBOARD"],
+        }));
+
+        expect(CAPABILITY_REGISTRY.definitions
+            .filter(({ domain }) => domain === "it")
+            .map(({ key }) => key)).toEqual([
+            "it.ticket.read",
+            "it.ticket.create",
+            "it.ticket.comment",
+            "it.ticket.manage",
+            "it.analytics.read",
+        ]);
+        expect(CAPABILITY_REGISTRY.get("it.ticket.read")).toEqual(expect.objectContaining({
+            scopes: ["OWN", "ALL"],
+            channels: ["DASHBOARD"],
+        }));
+        expect(CAPABILITY_REGISTRY.get("it.ticket.create")).toEqual(expect.objectContaining({
+            scopes: ["OWN"],
+            channels: ["DASHBOARD"],
+        }));
+        expect(CAPABILITY_REGISTRY.get("it.ticket.comment")).toEqual(expect.objectContaining({
+            scopes: ["OWN", "ALL"],
+            channels: ["DASHBOARD"],
+        }));
+        expect(CAPABILITY_REGISTRY.get("it.ticket.manage")).toEqual(expect.objectContaining({
+            scopes: ["ALL"],
+            channels: ["DASHBOARD"],
+        }));
+        expect(CAPABILITY_REGISTRY.get("it.analytics.read")).toEqual(expect.objectContaining({
             scopes: ["ALL"],
             channels: ["DASHBOARD"],
         }));

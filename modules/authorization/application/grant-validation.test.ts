@@ -67,4 +67,22 @@ describe("authorization grant persistence validation", () => {
             scope: " OWN ",
         })).toThrow("Unsupported authorization scope");
     });
+
+    it.each([
+        "it.ticket.read",
+        "it.ticket.create",
+        "it.ticket.comment",
+        "it.ticket.manage",
+        "it.analytics.read",
+    ])("rejects TEAM as an unsupported configured scope for %s", (capabilityKey) => {
+        try {
+            validateCapabilityGrant({ capabilityKey, scope: "TEAM" });
+            throw new Error("Expected unsupported IT scope to be rejected");
+        } catch (error) {
+            expect(error).toMatchObject({
+                name: "CapabilityGrantValidationError",
+                code: "UNSUPPORTED_SCOPE",
+            });
+        }
+    });
 });

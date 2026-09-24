@@ -163,7 +163,7 @@ Stock แบ่งเป็นสองกลุ่ม:
   `eventKey` ทำให้ enqueue ซ้ำจาก parent retry ไม่สร้าง child ซ้ำ
 - `sendLineAppMessage()` ส่ง `X-Line-Retry-Key`; provider duplicate acknowledgement (`409`)
   ที่มี retry key ถือว่าสำเร็จตาม implementation ปัจจุบัน
-- Email Request ยังคงเป็น deferred IT capability ในตำแหน่งเดิม; Outbox dispatch ใช้
+- Email Request ยังรอการย้ายเจ้าของไปยัง IT ใน IT8; IT1 ไม่เปลี่ยนพฤติกรรมปัจจุบัน. Outbox dispatch ใช้
   `eventKey` เดิมสร้าง retry key เมื่อมีค่า และใช้ `outbox:<type>:<id>` เป็น fallback
   สำหรับ historical row ที่ไม่มี `eventKey` ทั้ง push และ broadcast ใช้ identity เดียวกัน
 - Stock operational broadcast ใช้ `outbox:<type>:<id>` เป็น retry identity โดยตรง

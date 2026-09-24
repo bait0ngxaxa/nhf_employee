@@ -27,6 +27,7 @@ export const AUTHORIZATION_DOMAINS = Object.freeze([
     "audit",
     "email",
     "notification",
+    "it",
 ] as const);
 
 export type AuthorizationDomain = (typeof AUTHORIZATION_DOMAINS)[number];

@@ -1,7 +1,7 @@
 # NHF Employee — Current Authorization State
 
-> **Current repository state (Phase 12H-I and notification-recipient
-> Phase 13A/13A.1/13A.2):** ADMIN is an Auth/control-plane role only. Business
+> **Current repository state (Phase 12H-I, notification-recipient
+> Phase 13A/13A.1/13A.2, and IT1):** ADMIN is an Auth/control-plane role only. Business
 > authorization is the domain Default Domain Policy plus
 > configured Team, TeamRole, and exceptional direct User grants. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load and
@@ -30,6 +30,12 @@
 > confirmed production collision preflight and migration deployment PASSED.
 > The Routine recipient persistence transition is CLOSED.
 >
+> IT1 is CLOSED: `it` and its five Dashboard-only capabilities are registered;
+> the IT server adapter composes role-neutral OWN defaults for Ticket read,
+> create, and comment. Ticket persistence/runtime and Email Request migration
+> remain deferred. `AUTHORIZATION_SEED_CONFIGURATION` remains empty, with no IT
+> Team, membership, role, or grant mapping.
+>
 > The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
 > [pre-it-hardening-h0-baseline.md](pre-it-hardening-h0-baseline.md).
@@ -43,9 +49,19 @@ The current production source of truth after Phase 12H-I is:
 | Account/control plane | `User.role` / `Role.ADMIN` remains the Auth system role for authentication, Authorization Administration, bootstrap, role management, and last-eligible-ADMIN protection. |
 | Business authority | Domain-owned Default Domain Policy plus configured `TEAM`, `TEAM_ROLE`, and exceptional direct `USER` grants. |
 | Resolver | `createAuthorizationResolver()` is the canonical constructor; USER and ADMIN load configured persistence equally. `systemRole` never creates a business grant. |
+| IT authorization | IT1 registers `it.ticket.read/create/comment/manage` and `it.analytics.read`, all for `DASHBOARD`; defaults are read/create/comment `OWN`, while manage and analytics require configured grants. Ticket resources use requester ownership only. |
 | Administration presentation | Account/system role is shown separately from business grant sources. Business explanations contain only Team, TeamRole, and direct User origins. |
 | Routine provenance | Future mutation classification uses effective business authority; historical `ownershipMode: "ADMIN"` audit JSON remains readable and is not rewritten. |
 | Fail-closed behavior | Unknown, inactive, revoked, malformed, unsupported, or structurally invalid configured sources remain denied or surface the existing configuration error. |
+
+The current registry contains 45 capabilities across the nine authorization
+domains: `employee`, `department`, `routine`, `stock`, `leave`, `audit`,
+`email`, `notification`, and `it`. IT1 adds no production authorization
+configuration: `AUTHORIZATION_SEED_CONFIGURATION` remains empty. The IT
+assignee contract requires active workforce plus configured read, comment, and
+manage `ALL`; Default Domain Policy and analytics authority do not satisfy
+those requirements. Ticket persistence/runtime does not exist, and Email
+Request remains on its compatibility implementation pending IT8.
 
 The detailed matrices and phase notes below include historical evidence from
 before this final cleanup. They are retained for traceability and must not be

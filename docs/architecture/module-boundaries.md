@@ -11,8 +11,9 @@ server/business and active presentation ownership are migrated as well.
 
 The repository-wide K0 ownership audit, K1 closure, and deferred-boundary
 inventory are recorded in [final-repository-audit.md](./final-repository-audit.md).
-K1 closed the three Stock findings; the future `modules/it` boundary remains
-deferred.
+K1 closed the three Stock findings. IT1 has since established the
+`modules/it` server authorization foundation; Ticket runtime and persistence
+remain deferred.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -112,6 +113,25 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
+## IT authorization foundation (IT1)
+
+`modules/it/index.ts` is the supported IT server entry. The application adapter
+owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
+scope, presentation capability projection, and pure assignee-eligibility rule.
+It delegates configured Team, TeamRole, and direct User authority to the
+central `@/modules/authorization` resolver. `systemRole`, Department, Team
+names, TeamRole names, and assignment do not create IT authority or requester
+ownership.
+
+IT1 adds the `it` authorization domain and five Dashboard-only capabilities.
+The public entry exposes those authorization/resource contracts and the
+assignee eligibility evaluator. It has no Ticket persistence, API, UI, browser
+entry, notification producer, or production grant configuration. Add a client
+entry only when IT owns an actual browser consumer. See
+[it-module-design.md](./it-module-design.md) for the phase contract and
+[authorization-current-state.md](./authorization-current-state.md) for the
+live authorization model.
+
 ## Authorization Administration boundary (Phase 10C + Phase 12E)
 
 `modules/authorization/` owns the Authorization Administration application
@@ -186,10 +206,11 @@ presentation is now owned under
 the browser-safe `@/modules/notification/client` entry.
 
 The module must receive explicit recipients and semantic payloads. Leave,
-Stock, Routine, and the deferred Email Request/IT capability retain ownership
-of the triggering event, recipient policy, notification type, title/message,
-action URL, reference ID, channel choice, and event-specific dedupe or
-supersede semantics. Notification must not grow audience APIs such as “notify
+Stock, Routine, and Email Request retain ownership of their current triggering
+events, recipient policy, notification type, title/message, action URL,
+reference ID, channel choice, and event-specific dedupe or supersede semantics.
+IT owns no Ticket event or producer in IT1; Ticket notification meaning remains
+a later IT phase. Notification must not grow audience APIs such as “notify
 all Stock admins” or become a workflow owner for another module. Leave, Stock,
 and Routine use only `@/modules/notification` for Inbox persistence; physical
 Prisma `Notification` delegate operations are owned exclusively by
@@ -279,10 +300,10 @@ Audit-specific Dashboard/browser presentation. Its layer ownership is:
 - `modules/audit/infrastructure/**` for physical AuditLog persistence only;
 - `modules/audit/presentation/**` for Audit-specific browser/UI presentation.
 
-Auth, Employee, Leave, Stock, Routine, and the deferred IT capability continue
-to own event meaning, AuditAction,
-entity meaning/identifiers, snapshots, event metadata, actor semantics, and
-the decision and failure policy for each write. Transaction-bound writes must
+Auth, Employee, Leave, Stock, and Routine own their current event meaning,
+AuditAction, entity meaning/identifiers, snapshots, event metadata, actor
+semantics, and the decision and failure policy for each write. IT will own
+Ticket audit producers when Ticket mutations exist; IT1 adds none. Transaction-bound writes must
 keep the same business transaction; current best-effort and after-response
 writes must not be normalized. Leave's CUID-in-details fallback and all
 historical enum/storage values remain compatibility constraints.
@@ -309,9 +330,9 @@ inventory and deferred compatibility boundaries.
 
 The full producer, reader, retention, presentation, action, identity,
 transaction, metadata, compatibility, and phased I1-I3 ledger is in
-audit-migration.md. The source record explicitly keeps Auth/Session/Identity
-and Email Request/future IT deferred; no Prisma schema or AuditAction taxonomy
-change occurred in I3.
+audit-migration.md. The I3 source record explicitly kept Auth/Session/Identity
+and Email Request deferred; IT1 later added an authorization foundation only.
+No Prisma schema or AuditAction taxonomy change occurred in I3.
 
 ## Larger feature shape
 

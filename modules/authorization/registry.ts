@@ -308,6 +308,42 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
         scopes: ["OWN"] as const,
         channels: ["DASHBOARD"] as const,
     }),
+
+    defineCapability({
+        key: "it.ticket.read",
+        domain: "it",
+        description: "Read IT Tickets within an authorized requester scope.",
+        scopes: ["OWN", "ALL"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
+    defineCapability({
+        key: "it.ticket.create",
+        domain: "it",
+        description: "Create IT Tickets for the authenticated requester.",
+        scopes: ["OWN"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
+    defineCapability({
+        key: "it.ticket.comment",
+        domain: "it",
+        description: "Comment on IT Tickets within an authorized requester scope.",
+        scopes: ["OWN", "ALL"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
+    defineCapability({
+        key: "it.ticket.manage",
+        domain: "it",
+        description: "Manage IT Ticket operations within an authorized resource scope.",
+        scopes: ["ALL"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
+    defineCapability({
+        key: "it.analytics.read",
+        domain: "it",
+        description: "Read IT operational analytics within an authorized resource scope.",
+        scopes: ["ALL"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
 ] as const satisfies readonly CapabilityDefinition[]);
 
 export type RegisteredCapabilityKey =

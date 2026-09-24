@@ -4,8 +4,11 @@
 Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
-Employee, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. Audit Phase I3 is closed with generic
+Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
+boundaries. IT1 is closed with a server-only authorization foundation under
+`modules/it/`; its public entry is `@/modules/it`. Ticket persistence/runtime,
+Dashboard presentation, and a browser entry do not exist yet. Email Request
+migration remains deferred to IT8. Audit Phase I3 is closed with generic
 server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in
 `modules/audit/`. Its public server entry is `@/modules/audit`; its browser-facing entry is
@@ -13,7 +16,7 @@ producer, entity-history query, and Dashboard presentation ownership in
 `modules/audit/presentation/dashboard/**`. Production physical AuditLog
 delegates are exclusive to `modules/audit/infrastructure/**`; Employee, Leave,
 Stock, and Routine retain event meaning and consume only the public Audit
-server entry. Email Request/future IT migration remains deferred. Phase J0
+server entry. Email Request migration remains deferred to IT8. Phase J0
 Auth / Session / Identity discovery and boundary definition is closed, Phase
 J1 Auth / Session server and persistence ownership is closed, and Phase J2
 Auth identity projection and browser presentation ownership is closed, and
@@ -180,10 +183,10 @@ without interpreting business state. The former
 `createAdminInAppNotificationsOnce` helper was removed. The generic
 `createInAppNotificationOnce` adapter remains only for deferred Email Request
 and has no audience lookup.
-Leave, Stock, Routine, and the deferred Email Request/IT capability continue to
-own event meaning, recipients, titles/messages, action/reference values,
-channel choices, and event-specific dedupe or supersede rules. Leave, Stock,
-and Routine now use `@/modules/notification` for Inbox writes. Physical
+Leave, Stock, and Routine own their current event meaning, recipients,
+titles/messages, action/reference values, channel choices, and event-specific
+dedupe or supersede rules. IT owns no Ticket event yet. Leave, Stock, and
+Routine now use `@/modules/notification` for Inbox writes. Physical
 Notification persistence is owned only by
 `modules/notification/infrastructure/**`; Stock's two intentionally different
 admin eligibility policies remain Stock-owned.
@@ -201,8 +204,8 @@ persistence context; the global processor does not pass a transaction client
 directly to Notification. A direct processor-to-Notification dispatch is
 reserved for a future truly Notification-owned generic event with a fully
 resolved command payload; no current production event uses that shape.
-Email Request remains explicitly deferred until the future IT capability
-boundary is ready. See
+Email Request migration remains deferred until IT8. IT1 adds no Ticket
+notification producer. See
 [notification-migration.md](../docs/architecture/notification-migration.md)
 for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices. H3
 producer integration and compatibility cleanup are complete. NotificationOutbox
@@ -215,7 +218,8 @@ Phase H1 CLOSED — Notification server/application ownership complete.
 Phase H2 CLOSED — Notification presentation ownership complete.
 Phase H3 CLOSED — Notification producer integration and final migration audit complete.
 
-Notification H0-H3 migration complete. Email Request/IT remains deferred.
+Notification H0-H3 migration complete. IT1 authorization foundation is closed;
+Ticket runtime and Email Request migration remain deferred.
 
 ## Stock K1 ownership closure
 
@@ -232,5 +236,5 @@ Messaging channel and `LINE_STOCK_CHANNEL_ACCESS_TOKEN`.
 
 The shared Outbox Processor remains platform-owned and delegates Stock event
 interpretation through `@/modules/stock`; it continues to own claim, retry,
-stale-processing, dead-letter, and supersede lifecycle. Email Request and the
-future IT capability remain deferred.
+stale-processing, dead-letter, and supersede lifecycle. Email Request migration
+and Ticket runtime remain deferred.

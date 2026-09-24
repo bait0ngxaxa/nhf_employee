@@ -391,6 +391,24 @@ describe("Authorization Administration capability catalog", () => {
             expect(first.find((capability) => capability.key === key)?.nonGrantableReason).toBeUndefined();
         }
         for (const key of [
+            "it.ticket.read",
+            "it.ticket.create",
+            "it.ticket.comment",
+        ]) {
+            expect(first.find((capability) => capability.key === key)).toMatchObject({
+                runtimeAuthorizationMode: "CENTRAL_WITH_DEFAULT_POLICY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
+            });
+        }
+        for (const key of ["it.ticket.manage", "it.analytics.read"]) {
+            expect(first.find((capability) => capability.key === key)).toMatchObject({
+                runtimeAuthorizationMode: "CENTRAL_ONLY",
+                administrativeStatus: "GRANTABLE",
+                administrativelyGrantable: true,
+            });
+        }
+        for (const key of [
             "stock.catalog.read",
             "stock.request.read",
             "stock.request.create",
@@ -473,6 +491,8 @@ describe("Authorization Administration capability catalog", () => {
             "audit.read",
             "email.request.read",
             "email.request.create",
+            "it.ticket.manage",
+            "it.analytics.read",
         ]);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
@@ -505,14 +525,17 @@ describe("Authorization Administration capability catalog", () => {
             "leave.request.not_taken",
             "notification.inbox.read",
             "notification.inbox.update",
+            "it.ticket.read",
+            "it.ticket.create",
+            "it.ticket.comment",
         ]);
-        expect(first).toHaveLength(40);
+        expect(first).toHaveLength(45);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_ONLY",
-        )).toHaveLength(16);
+        )).toHaveLength(18);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
-        )).toHaveLength(24);
+        )).toHaveLength(27);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_COMPATIBILITY",
         )).toHaveLength(0);
@@ -521,7 +544,7 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(0);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(40);
+        )).toHaveLength(45);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
         )).toHaveLength(0);

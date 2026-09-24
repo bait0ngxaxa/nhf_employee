@@ -328,6 +328,118 @@ describe.sequential("authorization resolver with real MySQL", () => {
         });
     });
 
+    it("resolves the approved IT capabilities through Team, TeamRole, and direct User grants", async () => {
+        const user = await createUser("capability-sources");
+        const team = await createTeam("capability-sources");
+        const role = await prisma.teamRole.create({
+            data: {
+                teamId: team.id,
+                key: "resolver-role",
+                name: "บทบาททดสอบ",
+            },
+        });
+        await prisma.teamMembership.create({
+            data: {
+                teamId: team.id,
+                userId: user.id,
+                teamRoleId: role.id,
+            },
+        });
+        await prisma.teamCapabilityGrant.create({
+            data: {
+                teamId: team.id,
+                capabilityKey: "it.ticket.read",
+                scope: "ALL",
+            },
+        });
+        await prisma.teamRoleCapabilityGrant.create({
+            data: {
+                teamRoleId: role.id,
+                capabilityKey: "it.ticket.comment",
+                scope: "ALL",
+            },
+        });
+        await prisma.userCapabilityGrant.create({
+            data: {
+                userId: user.id,
+                capabilityKey: "it.ticket.manage",
+                scope: "ALL",
+            },
+        });
+
+        const readDecision = await authorization.resolve(
+            userActor(user.id),
+            "it.ticket.read",
+        );
+        const commentDecision = await authorization.resolve(
+            userActor(user.id),
+            "it.ticket.comment",
+        );
+        const manageDecision = await authorization.resolve(
+            userActor(user.id),
+            "it.ticket.manage",
+        );
+
+        expect(readDecision).toMatchObject({
+            allowed: true,
+            scopes: ["ALL"],
+            grants: [{ source: { type: "TEAM", teamId: team.id } }],
+        });
+        expect(commentDecision).toMatchObject({
+            allowed: true,
+            scopes: ["ALL"],
+            grants: [{
+                source: {
+                    type: "TEAM_ROLE",
+                    teamId: team.id,
+                    teamRoleId: role.id,
+                },
+            }],
+        });
+        expect(manageDecision).toMatchObject({
+            allowed: true,
+            scopes: ["ALL"],
+            grants: [{ source: { type: "USER", userId: user.id } }],
+        });
+
+        await prisma.userCapabilityGrant.delete({
+            where: {
+                userId_capabilityKey_scope: {
+                    userId: user.id,
+                    capabilityKey: "it.ticket.manage",
+                    scope: "ALL",
+                },
+            },
+        });
+        await expect(
+            authorization.resolve(userActor(user.id), "it.ticket.manage"),
+        ).resolves.toEqual({
+            capability: "it.ticket.manage",
+            allowed: false,
+            scopes: [],
+            grants: [],
+            reason: "NO_APPLICABLE_GRANT",
+        });
+    });
+
+    it("fails closed for a persisted IT scope that its capability does not support", async () => {
+        const user = await createUser("it-invalid-scope");
+        await prisma.userCapabilityGrant.create({
+            data: {
+                userId: user.id,
+                capabilityKey: "it.ticket.manage",
+                scope: "OWN",
+            },
+        });
+
+        await expect(
+            authorization.resolve(userActor(user.id), "it.ticket.manage"),
+        ).rejects.toMatchObject({
+            name: "AuthorizationConfigurationError",
+            code: "UNSUPPORTED_PERSISTED_SCOPE",
+        } satisfies Partial<AuthorizationConfigurationError>);
+    });
+
     it("stops using a removed TeamRole grant on a fresh resolution", async () => {
         const user = await createUser("role-revocation");
         const team = await createTeam("role-revocation");
