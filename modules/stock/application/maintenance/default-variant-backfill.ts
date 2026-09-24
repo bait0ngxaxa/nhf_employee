@@ -3,11 +3,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { runSerializableTransaction } from "@/lib/db/transaction";
 import {
-    LEGACY_DEFAULT_VARIANT_ORDER_BY,
-    selectLegacyDefaultVariantId,
-} from "../../domain/legacy-default-variant";
+    DEFAULT_VARIANT_ORDER_BY,
+    selectPreferredDefaultVariantId,
+} from "../../domain/default-variant-policy";
 import { lockStockInventoryRows } from "../../infrastructure/persistence/locks";
-import { loadActiveDefaultVariantsByItemIds } from "../../infrastructure/persistence/shared";
 import { setStockItemDefaultVariantIfUnset } from "../../infrastructure/persistence/default-variant-writer";
 
 const BACKFILL_PAGE_SIZE = 500;
@@ -34,14 +33,14 @@ export type DefaultVariantClassification =
     | "ALREADY_MATCHES"
     | "NO_ACTIVE_VARIANT"
     | "CROSS_ITEM_DEFAULT"
-    | "SHADOW_MISMATCH";
+    | "MISMATCH";
 
 export type DefaultVariantBackfillDetail = {
     itemId: number;
     itemSku: string;
     itemIsActive: boolean;
     activeVariantCount: number;
-    legacyDefaultVariantId: number | null;
+    preferredDefaultVariantId: number | null;
     explicitDefaultVariantId: number | null;
     explicitDefaultVariantStockItemId: number | null;
     classification: DefaultVariantClassification;
@@ -54,7 +53,7 @@ export type DefaultVariantBackfillReport = {
         alreadyMatches: number;
         noActiveVariant: number;
         crossItemDefaults: number;
-        shadowMismatches: number;
+        mismatches: number;
     };
     details: DefaultVariantBackfillDetail[];
     candidateItemIds: number[];
@@ -72,7 +71,7 @@ function classifyDefaultVariant(
     itemId: number,
     explicitDefaultVariantId: number | null,
     explicitDefaultVariantStockItemId: number | null,
-    legacyDefaultVariantId: number | null,
+    preferredDefaultVariantId: number | null,
 ): DefaultVariantClassification {
     if (
         explicitDefaultVariantId !== null
@@ -81,7 +80,7 @@ function classifyDefaultVariant(
         return "CROSS_ITEM_DEFAULT";
     }
     if (
-        legacyDefaultVariantId === null
+        preferredDefaultVariantId === null
         && explicitDefaultVariantId === null
     ) {
         return "NO_ACTIVE_VARIANT";
@@ -89,10 +88,10 @@ function classifyDefaultVariant(
     if (explicitDefaultVariantId === null) {
         return "READY_FOR_BACKFILL";
     }
-    if (explicitDefaultVariantId === legacyDefaultVariantId) {
+    if (explicitDefaultVariantId === preferredDefaultVariantId) {
         return "ALREADY_MATCHES";
     }
-    return "SHADOW_MISMATCH";
+    return "MISMATCH";
 }
 
 export function buildDefaultVariantBackfillReport(
@@ -111,15 +110,15 @@ export function buildDefaultVariantBackfillReport(
     const details = snapshot.items
         .map((item): DefaultVariantBackfillDetail => {
             const activeVariants = activeVariantsByItemId.get(item.id) ?? [];
-            const legacyDefaultVariantId =
-                selectLegacyDefaultVariantId(activeVariants);
+            const preferredDefaultVariantId =
+                selectPreferredDefaultVariantId(activeVariants);
 
             return {
                 itemId: item.id,
                 itemSku: item.sku,
                 itemIsActive: item.isActive,
                 activeVariantCount: activeVariants.length,
-                legacyDefaultVariantId,
+                preferredDefaultVariantId,
                 explicitDefaultVariantId: item.defaultVariantId,
                 explicitDefaultVariantStockItemId:
                     item.explicitDefaultVariantStockItemId,
@@ -127,7 +126,7 @@ export function buildDefaultVariantBackfillReport(
                     item.id,
                     item.defaultVariantId,
                     item.explicitDefaultVariantStockItemId,
-                    legacyDefaultVariantId,
+                    preferredDefaultVariantId,
                 ),
             };
         })
@@ -143,13 +142,13 @@ export function buildDefaultVariantBackfillReport(
                 (detail) => detail.classification === "ALREADY_MATCHES",
             ).length,
             noActiveVariant: details.filter(
-                (detail) => detail.legacyDefaultVariantId === null,
+                (detail) => detail.preferredDefaultVariantId === null,
             ).length,
             crossItemDefaults: details.filter(
                 (detail) => detail.classification === "CROSS_ITEM_DEFAULT",
             ).length,
-            shadowMismatches: details.filter(
-                (detail) => detail.classification === "SHADOW_MISMATCH",
+            mismatches: details.filter(
+                (detail) => detail.classification === "MISMATCH",
             ).length,
         },
         details,
@@ -184,7 +183,7 @@ export async function loadDefaultVariantBackfillReport(): Promise<
                             stockItemId: true,
                             isActive: true,
                         },
-                        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
+                        orderBy: DEFAULT_VARIANT_ORDER_BY,
                     },
                 },
                 orderBy: { id: "asc" },
@@ -234,17 +233,19 @@ async function applyDefaultVariantForItem(itemId: number): Promise<boolean> {
             return false;
         }
 
-        const legacyDefaultVariant = (
-            await loadActiveDefaultVariantsByItemIds(tx, [itemId])
-        ).get(itemId);
-        if (!legacyDefaultVariant) {
+        const preferredDefaultVariant = await tx.stockItemVariant.findFirst({
+            where: { stockItemId: itemId, isActive: true },
+            orderBy: DEFAULT_VARIANT_ORDER_BY,
+            select: { id: true },
+        });
+        if (!preferredDefaultVariant) {
             return false;
         }
 
         return setStockItemDefaultVariantIfUnset(
             tx,
             itemId,
-            legacyDefaultVariant.id,
+            preferredDefaultVariant.id,
         );
     });
 }

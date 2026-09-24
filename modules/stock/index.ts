@@ -148,7 +148,7 @@ export {
     getStockRequestReportMeta,
     getStockRequestReportYears,
 } from "./infrastructure/reports/report-export";
-export { StockInvariantViolationError } from "./infrastructure/persistence/shared";
+export { StockInvariantViolationError } from "./domain/errors";
 
 export {
     buildStockRequestResultLineEventKey,

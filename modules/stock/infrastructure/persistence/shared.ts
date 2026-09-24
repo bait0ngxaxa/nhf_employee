@@ -9,16 +9,8 @@ import type {
     CreateRequestInput,
 } from "../../schemas/stock";
 import type { PendingRequestItemRecord } from "../../domain/types";
-import {
-    LEGACY_DEFAULT_VARIANT_ORDER_BY,
-    selectLegacyDefaultVariantId,
-} from "../../domain/legacy-default-variant";
-import {
-    buildDefaultVariantShadowComparison,
-    isExplicitDefaultVariantReadEnabled,
-    reportDefaultVariantShadowComparison,
-    resolveDefaultVariantId,
-} from "../../domain/default-variant-shadow";
+import { resolveCanonicalDefaultVariantId } from "../../domain/canonical-default-variant";
+import { StockInvariantViolationError } from "../../domain/errors";
 
 export function generateSku(): string {
     const time = Date.now().toString(36).toUpperCase();
@@ -26,11 +18,10 @@ export function generateSku(): string {
     return `SKU-${time}-${rand}`;
 }
 
-/** Resolve existing active defaults for commands without creating variants. */
-export async function loadActiveDefaultVariantsByItemIds(
+/** Load and validate the persisted canonical defaults for requested items. */
+export async function loadCanonicalDefaultVariantsByItemIds(
     tx: Prisma.TransactionClient,
     itemIds: number[],
-    options: { explicitReadEnabled?: boolean } = {},
 ): Promise<Map<number, { id: number }>> {
     const uniqueItemIds = Array.from(new Set(itemIds));
     if (uniqueItemIds.length === 0) {
@@ -43,85 +34,80 @@ export async function loadActiveDefaultVariantsByItemIds(
             id: true,
             stockItemId: true,
         },
-        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
     });
-    const explicitDefaultItems = await tx.stockItem.findMany({
+    const items = await tx.stockItem.findMany({
         where: { id: { in: uniqueItemIds } },
         select: {
             id: true,
             defaultVariantId: true,
             defaultVariant: {
-                select: { stockItemId: true },
+                select: { id: true, stockItemId: true, isActive: true },
             },
         },
     });
 
-    const variantsByItemId = new Map<
-        number,
-        Array<{ id: number; isActive: boolean }>
-    >();
-    const explicitDefaultsByItemId = new Map<number, {
-        id: number | null;
-        stockItemId: number | null;
-    }>();
+    const variantsByItemId = new Map<number, number[]>();
     for (const variant of variants) {
-        const itemVariants = variantsByItemId.get(variant.stockItemId) ?? [];
-        itemVariants.push({ id: variant.id, isActive: true });
-        variantsByItemId.set(variant.stockItemId, itemVariants);
+        const activeVariantIds = variantsByItemId.get(variant.stockItemId) ?? [];
+        activeVariantIds.push(variant.id);
+        variantsByItemId.set(variant.stockItemId, activeVariantIds);
     }
-    for (const item of explicitDefaultItems) {
-        if (!("defaultVariantId" in item)) continue;
-        explicitDefaultsByItemId.set(item.id, {
-            id: item.defaultVariantId,
-            stockItemId: item.defaultVariant?.stockItemId ?? null,
-        });
-    }
+    const itemById = new Map(items.map((item) => [item.id, item]));
 
     const defaultVariants = new Map<number, { id: number }>();
     for (const itemId of uniqueItemIds) {
-        const activeVariants = variantsByItemId.get(itemId) ?? [];
-        const legacyDefaultVariantId = selectLegacyDefaultVariantId(
-            activeVariants,
-        );
-        const explicitDefault = explicitDefaultsByItemId.get(itemId);
-        if (explicitDefault) {
-            reportDefaultVariantShadowComparison(
-                buildDefaultVariantShadowComparison({
-                    itemId,
-                    legacyDefaultVariantId,
-                    explicitDefaultVariantId: explicitDefault.id,
-                    explicitDefaultVariantStockItemId:
-                        explicitDefault.stockItemId,
-                }),
-            );
-        }
-        const resolvedDefaultVariantId = resolveDefaultVariantId({
-            legacyDefaultVariantId,
-            explicitDefaultVariantId: explicitDefault?.id ?? null,
-            explicitDefaultIsUsable: explicitDefault?.id !== null
-                && explicitDefault?.id !== undefined
-                && explicitDefault.stockItemId === itemId
-                && activeVariants.some(
-                    (variant) => variant.id === explicitDefault.id,
-                ),
-            explicitReadEnabled:
-                options.explicitReadEnabled
-                ?? isExplicitDefaultVariantReadEnabled(),
+        const item = itemById.get(itemId);
+        if (!item) continue;
+
+        const defaultVariantId = resolveCanonicalDefaultVariantId({
+            itemId,
+            defaultVariantId: item.defaultVariantId,
+            defaultVariant: item.defaultVariant,
+            activeVariantIds: variantsByItemId.get(itemId) ?? [],
         });
-        if (resolvedDefaultVariantId !== null) {
-            defaultVariants.set(itemId, { id: resolvedDefaultVariantId });
+        if (defaultVariantId !== null) {
+            defaultVariants.set(itemId, { id: defaultVariantId });
         }
     }
 
     return defaultVariants;
 }
 
-export class StockInvariantViolationError extends Error {
-    constructor(
-        message = "ข้อมูลวัสดุไม่สอดคล้อง: ไม่พบรายการย่อยของวัสดุ",
-    ) {
-        super(message);
-        this.name = "StockInvariantViolationError";
+export async function assertCanonicalDefaultVariantsForItems(
+    tx: Prisma.TransactionClient,
+    items: ReadonlyArray<{
+        id: number;
+        defaultVariantId: number | null;
+        variants: ReadonlyArray<{ id: number; isActive: boolean }>;
+    }>,
+): Promise<void> {
+    const defaultVariantIds = Array.from(new Set(
+        items
+            .map((item) => item.defaultVariantId)
+            .filter((variantId): variantId is number => variantId !== null),
+    ));
+    const defaultVariants = defaultVariantIds.length > 0
+        ? await tx.stockItemVariant.findMany({
+              where: { id: { in: defaultVariantIds } },
+              select: { id: true, stockItemId: true, isActive: true },
+          })
+        : [];
+    const defaultVariantById = new Map(
+        defaultVariants.map((variant) => [variant.id, variant]),
+    );
+
+    for (const item of items) {
+        const defaultVariant = item.defaultVariantId === null
+            ? null
+            : defaultVariantById.get(item.defaultVariantId) ?? null;
+        resolveCanonicalDefaultVariantId({
+            itemId: item.id,
+            defaultVariantId: item.defaultVariantId,
+            defaultVariant,
+            activeVariantIds: item.variants
+                .filter((variant) => variant.isActive)
+                .map((variant) => variant.id),
+        });
     }
 }
 

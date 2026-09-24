@@ -30,7 +30,7 @@ describe("explicit default variant writer", () => {
         expect(tx.stockItem.updateMany).not.toHaveBeenCalled();
     });
 
-    it("replaces an inactive explicit default with the lowest active variant", async () => {
+    it("replaces an inactive default with the preferred active variant", async () => {
         const tx = mockDeep<Prisma.TransactionClient>();
         tx.stockItem.findUnique.mockResolvedValue(asNever({
             defaultVariantId: 102,

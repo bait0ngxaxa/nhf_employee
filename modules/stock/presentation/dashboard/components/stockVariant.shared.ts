@@ -24,6 +24,7 @@ export interface StockBrowseItem {
     id: number;
     name: string;
     imageUrl?: string | null;
+    defaultVariantId: number | null;
     variants?: StockBrowseVariant[];
 }
 
@@ -70,7 +71,13 @@ export function getVariantDisplayName(
 }
 
 export function getPreferredVariant(item: StockBrowseItem): StockBrowseVariant | null {
-    return item.variants?.[0] ?? null;
+    if (item.defaultVariantId === null) {
+        return null;
+    }
+
+    return item.variants?.find(
+        (variant) => variant.id === item.defaultVariantId,
+    ) ?? null;
 }
 
 export function getItemAvailableQuantity(item: StockItem): number {

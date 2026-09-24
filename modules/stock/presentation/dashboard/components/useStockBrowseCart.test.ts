@@ -233,6 +233,7 @@ describe("useStockBrowseCart idempotency", () => {
             id: 10,
             name: "กระดาษ",
             imageUrl: null,
+            defaultVariantId: 101,
             variants: [{
                 id: 101,
                 sku: "PAPER-A4",
@@ -321,6 +322,7 @@ describe("useStockBrowseCart idempotency", () => {
             id: 10,
             name: "กระดาษ",
             imageUrl: null,
+            defaultVariantId: 101,
             variants: [{
                 id: 101,
                 sku: "PAPER-A4",
@@ -369,6 +371,7 @@ describe("useStockBrowseCart idempotency", () => {
             id: 10,
             name: "กระดาษ",
             imageUrl: null,
+            defaultVariantId: 101,
             variants: [{
                 id: 101,
                 sku: "PAPER-A4",
@@ -497,6 +500,7 @@ describe("useStockBrowseCart idempotency", () => {
             id: 10,
             name: "กระดาษ",
             imageUrl: null,
+            defaultVariantId: 101,
             variants: [{
                 id: 101,
                 sku: "PAPER-A4",
@@ -558,6 +562,7 @@ describe("useStockBrowseCart availability reconciliation", () => {
         id: 10,
         name: "กระดาษ",
         imageUrl: null,
+        defaultVariantId: 101,
         variants: [{
             id: 101,
             sku: "PAPER-A4",

@@ -147,7 +147,9 @@ export function ensureStockApiSuccess<T>(
 }
 
 export function createVariantSummary(item: StockItem): string {
-    const defaultVariant = item.variants?.[0];
+    const defaultVariant = item.defaultVariantId === null
+        ? undefined
+        : item.variants?.find((variant) => variant.id === item.defaultVariantId);
     if (!defaultVariant) {
         return STOCK_ADMIN_TEXT.noVariant;
     }

@@ -12,7 +12,7 @@ import {
     buildRequestInclude,
     buildReservedQuantityMaps,
     getAvailableQuantity,
-    loadActiveDefaultVariantsByItemIds,
+    loadCanonicalDefaultVariantsByItemIds,
     normalizeRequestItems,
 } from "../../infrastructure/persistence/shared";
 import type { StockAuthorizedCommandActor } from "../authorization";
@@ -112,7 +112,10 @@ async function normalizeRequestedItems(
           })
         : [];
     const itemIdByVariantId = validateRequestedVariants(data.items, variants);
-    const defaultVariantsByItemId = await loadActiveDefaultVariantsByItemIds(tx, itemIds);
+    const defaultVariantsByItemId = await loadCanonicalDefaultVariantsByItemIds(
+        tx,
+        itemIds,
+    );
 
     return {
         items: normalizeRequestItems(

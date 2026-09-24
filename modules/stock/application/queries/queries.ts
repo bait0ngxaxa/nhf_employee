@@ -4,7 +4,6 @@ import type {
     StockItemsFilter,
     StockRequestsFilter,
 } from "../../schemas/stock";
-import { buildResolvedDefaultVariantIds } from "../../domain/default-variant-shadow";
 import { summarizeVariantInventory } from "../../domain/inventory-quantity-read";
 import type { StockRequestWithDetails } from "../requests/request-creation";
 import type { StockRequestQueryAuthorization } from "../authorization";
@@ -14,6 +13,7 @@ import {
     buildReservedQuantityMaps,
     getAvailableQuantity,
     assertPersistedVariantsForRead,
+    assertCanonicalDefaultVariantsForItems,
 } from "../../infrastructure/persistence/shared";
 
 export async function getCategories() {
@@ -45,6 +45,7 @@ export async function getItems(filters: StockItemsFilter) {
         take: limit,
     });
     await assertPersistedVariantsForRead(items);
+    await assertCanonicalDefaultVariantsForItems(prisma, items);
     const total = await prisma.stockItem.count({ where });
 
     const itemIds = items.map((item) => item.id);
@@ -62,7 +63,6 @@ export async function getItems(filters: StockItemsFilter) {
                   },
               })
             : [];
-    buildResolvedDefaultVariantIds(items);
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
     );
@@ -173,7 +173,7 @@ export async function getItemById(id: number) {
     });
     if (item) {
         await assertPersistedVariantsForRead([item]);
-        buildResolvedDefaultVariantIds([item]);
+        await assertCanonicalDefaultVariantsForItems(prisma, [item]);
         return {
             ...item,
             ...summarizeVariantInventory(item.variants),

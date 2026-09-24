@@ -29,7 +29,7 @@ function createSnapshot(): DefaultVariantBackfillSnapshot {
 }
 
 describe("default variant backfill planning", () => {
-    it("selects the lowest active variant ID without changing legacy semantics", () => {
+    it("selects the preferred active variant ID for the retained backfill tool", () => {
         const report = buildDefaultVariantBackfillReport(createSnapshot());
 
         expect(report.summary).toEqual({
@@ -38,14 +38,14 @@ describe("default variant backfill planning", () => {
             alreadyMatches: 0,
             noActiveVariant: 0,
             crossItemDefaults: 0,
-            shadowMismatches: 0,
+            mismatches: 0,
         });
         expect(report.details).toEqual([{
             itemId: 1,
             itemSku: "ITEM-1",
             itemIsActive: true,
             activeVariantCount: 2,
-            legacyDefaultVariantId: 11,
+            preferredDefaultVariantId: 11,
             explicitDefaultVariantId: null,
             explicitDefaultVariantStockItemId: null,
             classification: "READY_FOR_BACKFILL",
@@ -53,7 +53,7 @@ describe("default variant backfill planning", () => {
         expect(report.candidateItemIds).toEqual([1]);
     });
 
-    it("classifies an explicit default that already matches the legacy default", () => {
+    it("classifies an explicit default that matches the preferred variant", () => {
         const snapshot = createSnapshot();
         snapshot.items[0].defaultVariantId = 11;
         snapshot.items[0].explicitDefaultVariantStockItemId = 1;
@@ -61,22 +61,22 @@ describe("default variant backfill planning", () => {
         const report = buildDefaultVariantBackfillReport(snapshot);
 
         expect(report.summary.alreadyMatches).toBe(1);
-        expect(report.summary.shadowMismatches).toBe(0);
+        expect(report.summary.mismatches).toBe(0);
         expect(report.candidateItemIds).toEqual([]);
     });
 
-    it("reports but never overwrites a shadow mismatch", () => {
+    it("reports but never overwrites a preferred-default mismatch", () => {
         const snapshot = createSnapshot();
         snapshot.items[0].defaultVariantId = 12;
         snapshot.items[0].explicitDefaultVariantStockItemId = 1;
 
         const report = buildDefaultVariantBackfillReport(snapshot);
 
-        expect(report.summary.shadowMismatches).toBe(1);
+        expect(report.summary.mismatches).toBe(1);
         expect(report.details[0]).toMatchObject({
-            legacyDefaultVariantId: 11,
+            preferredDefaultVariantId: 11,
             explicitDefaultVariantId: 12,
-            classification: "SHADOW_MISMATCH",
+            classification: "MISMATCH",
         });
         expect(report.candidateItemIds).toEqual([]);
     });
@@ -92,13 +92,13 @@ describe("default variant backfill planning", () => {
         expect(report.summary.noActiveVariant).toBe(1);
         expect(report.details[0]).toMatchObject({
             activeVariantCount: 0,
-            legacyDefaultVariantId: null,
+            preferredDefaultVariantId: null,
             classification: "NO_ACTIVE_VARIANT",
         });
         expect(report.candidateItemIds).toEqual([]);
     });
 
-    it("reports a shadow mismatch when explicit default exists without an active legacy default", () => {
+    it("reports a mismatch when an explicit default exists without an active variant", () => {
         const snapshot = createSnapshot();
         snapshot.items[0].defaultVariantId = 12;
         snapshot.items[0].explicitDefaultVariantStockItemId = 1;
@@ -109,11 +109,11 @@ describe("default variant backfill planning", () => {
         const report = buildDefaultVariantBackfillReport(snapshot);
 
         expect(report.summary.noActiveVariant).toBe(1);
-        expect(report.summary.shadowMismatches).toBe(1);
+        expect(report.summary.mismatches).toBe(1);
         expect(report.details[0]).toMatchObject({
-            legacyDefaultVariantId: null,
+            preferredDefaultVariantId: null,
             explicitDefaultVariantId: 12,
-            classification: "SHADOW_MISMATCH",
+            classification: "MISMATCH",
         });
     });
 

@@ -8,7 +8,7 @@ import {
 } from "./shared";
 import { createStockOpeningBalanceTransaction } from "./write-helpers";
 import { reconcileStockItemDefaultVariant } from "./default-variant-writer";
-import { LEGACY_DEFAULT_VARIANT_ORDER_BY } from "../../domain/legacy-default-variant";
+import { DEFAULT_VARIANT_ORDER_BY } from "../../domain/default-variant-policy";
 import { withVariantInventorySummary } from "../../domain/inventory-quantity-read";
 import {
     type ExistingItemRecord,
@@ -52,7 +52,7 @@ async function getExistingVariants(
             quantity: true,
             isActive: true,
         },
-        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
+        orderBy: DEFAULT_VARIANT_ORDER_BY,
     });
 }
 

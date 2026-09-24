@@ -25,6 +25,7 @@ export interface StockItem {
     availableQuantity: number;
     minStock: number;
     categoryId: number;
+    defaultVariantId: number | null;
     isActive: boolean;
     category: StockItemCategory;
     variants?: StockItemVariant[];

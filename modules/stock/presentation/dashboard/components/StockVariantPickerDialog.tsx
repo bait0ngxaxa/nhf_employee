@@ -27,13 +27,15 @@ type StockVariantPickerDialogProps = {
     onConfirm: (selections: VariantSelection[]) => void;
 };
 
-function getInitialActiveVariantId(variants: StockItemVariant[]): number | null {
-    const firstAvailableVariant =
-        variants.find((variant) => getVariantAvailableQuantity(variant) > 0) ??
-        variants[0] ??
-        null;
+function getInitialActiveVariantId(
+    variants: StockItemVariant[],
+    defaultVariantId: number | null,
+): number | null {
+    if (defaultVariantId === null) {
+        return null;
+    }
 
-    return firstAvailableVariant?.id ?? null;
+    return variants.find((variant) => variant.id === defaultVariantId)?.id ?? null;
 }
 
 export function StockVariantPickerDialog({
@@ -67,7 +69,7 @@ function StockVariantPickerDialogSession({
 }) {
     const variants = useMemo(() => item.variants ?? [], [item.variants]);
     const [activeVariantId, setActiveVariantId] = useState<number | null>(
-        () => getInitialActiveVariantId(variants),
+        () => getInitialActiveVariantId(variants, item.defaultVariantId),
     );
     const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
     const [selectedQuantities, setSelectedQuantities] = useState<Record<number, number>>({});

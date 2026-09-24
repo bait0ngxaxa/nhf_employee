@@ -179,6 +179,10 @@ export async function createStockFixture(
             minStock,
         },
     });
+    const itemWithDefault = await client.stockItem.update({
+        where: { id: item.id },
+        data: { defaultVariantId: variant.id },
+    });
     const request = await client.stockRequest.create({
         data: {
             requestedBy: requester.id,
@@ -202,7 +206,7 @@ export async function createStockFixture(
         requesterActor: toActor(requester, requesterEmployee.id),
         issuerActor: toActor(issuer, issuerEmployee.id),
         category,
-        item,
+        item: itemWithDefault,
         variant,
         request,
         quantity,

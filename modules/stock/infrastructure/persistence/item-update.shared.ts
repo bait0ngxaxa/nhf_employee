@@ -3,6 +3,7 @@ import {
     assertNoPendingStockRequestsForItem,
     buildItemInclude,
 } from "./shared";
+import { resolveCanonicalDefaultVariantId } from "../../domain/canonical-default-variant";
 import { updateItemWithVariants } from "./item-update.variant-sync";
 import {
     type StockItemWithDetails,
@@ -11,14 +12,6 @@ import {
     trackReplacedUploadUrl,
 } from "./item-update.types";
 import { reconcileStockItemDefaultVariant } from "./default-variant-writer";
-import {
-    isExplicitDefaultVariantReadEnabled,
-    resolveDefaultVariantId,
-} from "../../domain/default-variant-shadow";
-import {
-    LEGACY_DEFAULT_VARIANT_ORDER_BY,
-    selectLegacyDefaultVariantId,
-} from "../../domain/legacy-default-variant";
 import { withVariantInventorySummary } from "../../domain/inventory-quantity-read";
 
 async function updateItemWithoutVariants(
@@ -34,7 +27,21 @@ async function updateItemWithoutVariants(
         select: {
             imageUrl: true,
             defaultVariantId: true,
+            defaultVariant: {
+                select: { id: true, stockItemId: true, isActive: true },
+            },
         },
+    });
+
+    const activeVariants = await tx.stockItemVariant.findMany({
+        where: { stockItemId: itemId, isActive: true },
+        select: { id: true },
+    });
+    const defaultVariantId = resolveCanonicalDefaultVariantId({
+        itemId,
+        defaultVariantId: currentItem.defaultVariantId,
+        defaultVariant: currentItem.defaultVariant,
+        activeVariantIds: activeVariants.map((variant) => variant.id),
     });
 
     const nextItem = await tx.stockItem.update({
@@ -51,33 +58,9 @@ async function updateItemWithoutVariants(
 
     trackReplacedUploadUrl(currentItem.imageUrl, nextItem.imageUrl, tracking);
 
-    const existingVariants = await tx.stockItemVariant.findMany({
-        where: { stockItemId: itemId },
-        select: {
-            id: true,
-            isActive: true,
-        },
-        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
-    });
-    const defaultVariantId = resolveDefaultVariantId({
-        legacyDefaultVariantId:
-            selectLegacyDefaultVariantId(existingVariants),
-        explicitDefaultVariantId: currentItem.defaultVariantId,
-        explicitDefaultIsUsable: currentItem.defaultVariantId !== null
-            && existingVariants.some(
-                (variant) =>
-                    variant.id === currentItem.defaultVariantId
-                    && variant.isActive,
-            ),
-        explicitReadEnabled: isExplicitDefaultVariantReadEnabled(),
-    });
-    const defaultVariant = existingVariants.find(
-        (variant) => variant.id === defaultVariantId,
-    );
-
-    if (defaultVariant) {
+    if (defaultVariantId !== null) {
         await tx.stockItemVariant.update({
-            where: { id: defaultVariant.id },
+            where: { id: defaultVariantId },
             data: {
                 ...(originalData.sku !== undefined && { sku: nextItem.sku }),
                 ...(originalData.unit !== undefined && { unit: nextItem.unit }),

@@ -100,6 +100,18 @@ future IT capability. It does not authorize starting IT work in H0.
 H1 is explicitly DEFERRED — owner decision. It is not BLOCKED and not FAILED.
 The expected handoff after H0 is H2 planning.
 
+### Stock default-variant track
+
+- H2C.1 — CLOSED. Operator-confirmed production backfill candidates were 0,
+  and production was already running with
+  `STOCK_EXPLICIT_DEFAULT_READ_ENABLED=true`.
+- H2C.2 — CLOSED. Stock runtime treats `StockItem.defaultVariantId` as the
+  canonical default. The dual-read flag, lowest-active read fallback, and
+  runtime shadow comparison were removed. The nullable column remains
+  intentional when an item has no active variants.
+- H2C.3 — NEXT. Retire the one-time backfill tooling and convert the Stock
+  audit to permanent explicit-default invariant protection.
+
 ## 3. Evidence inventory
 
 ### Architecture and boundaries
@@ -158,13 +170,12 @@ the current Routine, Stock, or Email Request recipient implementations.
 - application normalization is in
   modules/routine/application/recipient-scope-compatibility.ts; mutation
   writes remain canonical.
-- Stock defaultVariantId is nullable by design during the dual-read rollout.
-  The environment example keeps STOCK_EXPLICIT_DEFAULT_READ_ENABLED=false,
-  and the resolver retains a safe lowest-active-variant fallback.
-- scripts/stock-default-variant-backfill.ts provides guarded dry-run/apply
-  tooling; H0 found no repository evidence proving that production backfill,
-  shadow equality, or the production flag cutover has completed.
-- No schema contraction or compatibility removal was performed in H0.
+- StockItem.defaultVariantId remains nullable because an item with no active
+  variants may have no default. When active variants exist, the runtime
+  validates that the canonical default belongs to the item and is active.
+- H2C.2 removed the Stock runtime flag, dual-read fallback, and shadow
+  comparison without a schema migration. The guarded one-time backfill
+  tooling remains until H2C.3.
 
 ### Runtime reliability
 

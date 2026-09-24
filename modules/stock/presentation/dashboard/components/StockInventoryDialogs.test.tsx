@@ -5,6 +5,7 @@ import type { StockItem } from "../context/types";
 
 const item: StockItem = {
     id: 1,
+    defaultVariantId: 11,
     name: "แฟ้มเอกสาร",
     sku: "FILE-001",
     unit: "ชิ้น",

@@ -10,6 +10,7 @@ import type { LiffStockRequestSummary } from "../contracts/liff";
 
 const MULTI_VARIANT_ITEM = {
     id: 10,
+    defaultVariantId: 101,
     name: "เสื้อกิจกรรมชื่อยาวสำหรับทดสอบบนหน้าจอมือถือ",
     description: null,
     imageUrl: null,
@@ -115,6 +116,7 @@ describe("LIFF Stock mobile components", () => {
         const otherItem = {
             ...MULTI_VARIANT_ITEM,
             id: 11,
+            defaultVariantId: 201,
             name: "กระเป๋ากิจกรรม",
             variants: [{
                 ...MULTI_VARIANT_ITEM.variants[0],

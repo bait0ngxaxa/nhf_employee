@@ -42,6 +42,7 @@ export function toLiffStockCatalogItem(
         imageUrl: item.imageUrl,
         sku: item.sku,
         unit: item.unit,
+        defaultVariantId: item.defaultVariantId,
         availableQuantity: item.availableQuantity,
         category: {
             id: item.category.id,

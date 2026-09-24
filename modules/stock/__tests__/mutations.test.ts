@@ -1680,20 +1680,23 @@ describe("Stock Service Mutations", () => {
             expect(prismaMock.stockRequest.create).not.toHaveBeenCalled();
         });
 
-        it("should keep using the default variant when only itemId is provided", async () => {
+        it("should use the canonical default when only itemId is provided", async () => {
             prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
                 id: 50,
-                sku: "SKU-50",
-                unit: "ชิ้น",
-                quantity: 10,
-                minStock: 1,
-                imageUrl: null,
-                isActive: true,
+                defaultVariantId: 502,
+                defaultVariant: {
+                    id: 502,
+                    stockItemId: 50,
+                    isActive: true,
+                },
             }]));
             prismaMock.stockItemVariant.findMany
-                .mockResolvedValueOnce(asNever([{ id: 501, stockItemId: 50 }]))
+                .mockResolvedValueOnce(asNever([
+                    { id: 501, stockItemId: 50 },
+                    { id: 502, stockItemId: 50 },
+                ]))
                 .mockResolvedValueOnce(
-                    asNever([{ id: 501, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]),
+                    asNever([{ id: 502, quantity: 10, unit: "ชิ้น", stockItem: { name: "จอภาพ" } }]),
                 );
             prismaMock.stockRequest.create.mockResolvedValue(asNever({
                 id: 1,
@@ -1712,7 +1715,7 @@ describe("Stock Service Mutations", () => {
             expect(prismaMock.stockRequest.create).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
-                        items: { create: [{ itemId: 50, variantId: 501, quantity: 1 }] },
+                        items: { create: [{ itemId: 50, variantId: 502, quantity: 1 }] },
                     }),
                 }),
             );

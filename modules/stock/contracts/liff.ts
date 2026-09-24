@@ -26,6 +26,7 @@ export interface LiffStockCatalogItem {
     imageUrl: string | null;
     sku: string;
     unit: string;
+    defaultVariantId: number | null;
     availableQuantity: number;
     category: { id: number; name: string };
     variants: LiffStockCatalogVariant[];

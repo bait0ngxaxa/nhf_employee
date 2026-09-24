@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { LEGACY_DEFAULT_VARIANT_ORDER_BY } from "../../domain/legacy-default-variant";
+import { DEFAULT_VARIANT_ORDER_BY } from "../../domain/default-variant-policy";
 
 export class InvalidStockDefaultVariantError extends Error {
     constructor() {
@@ -72,7 +72,7 @@ export async function reconcileStockItemDefaultVariant(
 
     const replacement = await tx.stockItemVariant.findFirst({
         where: { stockItemId: itemId, isActive: true },
-        orderBy: LEGACY_DEFAULT_VARIANT_ORDER_BY,
+        orderBy: DEFAULT_VARIANT_ORDER_BY,
         select: { id: true },
     });
     if (!replacement) {

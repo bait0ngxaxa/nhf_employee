@@ -10,7 +10,7 @@ import {
     getRequests,
     getVariantAvailability,
 } from "../application/queries/queries";
-import { StockInvariantViolationError } from "../infrastructure/persistence/shared";
+import { StockInvariantViolationError } from "../domain/errors";
 
 vi.mock("@/lib/db/prisma", () => ({
     prisma: mockDeep<PrismaClient>(),
@@ -99,6 +99,9 @@ describe("Stock Queries", () => {
                     },
                 ],
             }]));
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+                { id: 11, stockItemId: 1, isActive: true },
+            ]));
             prismaMock.stockItem.count.mockResolvedValue(asNever(1));
             prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([
                 { itemId: 1, variantId: 11, quantity: 3 },
@@ -135,6 +138,9 @@ describe("Stock Queries", () => {
                     attributeValues: [],
                 }],
             }]));
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+                { id: 11, stockItemId: 1, isActive: true },
+            ]));
             prismaMock.stockItem.count.mockResolvedValue(asNever(1));
             prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([]));
             const result = await getItems({ page: 1, limit: 20 });
@@ -145,6 +151,33 @@ describe("Stock Queries", () => {
                 minStock: 5,
                 availableQuantity: 10,
             });
+        });
+
+        it("rejects an active item whose persisted default is missing", async () => {
+            prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+                id: 1,
+                name: "Mouse",
+                sku: "ITEM-1",
+                quantity: 10,
+                unit: "ชิ้น",
+                minStock: 1,
+                imageUrl: null,
+                isActive: true,
+                categoryId: 1,
+                defaultVariantId: null,
+                category: { id: 1, name: "General" },
+                variants: [{
+                    id: 11,
+                    quantity: 10,
+                    minStock: 1,
+                    isActive: true,
+                    attributeValues: [],
+                }],
+            }]));
+
+            await expect(getItems({ page: 1, limit: 20 }))
+                .rejects.toBeInstanceOf(StockInvariantViolationError);
+            expect(prismaMock.stockItem.count).not.toHaveBeenCalled();
         });
 
         it("aggregates pending reservations by item and variant", async () => {
@@ -158,6 +191,7 @@ describe("Stock Queries", () => {
                 imageUrl: null,
                 isActive: true,
                 categoryId: 1,
+                defaultVariantId: 11,
                 category: { id: 1, name: "General" },
                 variants: [
                     {
@@ -184,6 +218,9 @@ describe("Stock Queries", () => {
                     },
                 ],
             }]));
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+                { id: 11, stockItemId: 1, isActive: true },
+            ]));
             prismaMock.stockItem.count.mockResolvedValue(asNever(1));
             prismaMock.stockRequestItem.findMany.mockResolvedValue(asNever([
                 { itemId: 1, variantId: 11, quantity: 3 },
@@ -226,6 +263,7 @@ describe("Stock Queries", () => {
                         imageUrl: null,
                         isActive: true,
                         categoryId: 1,
+                        defaultVariantId: 11,
                         category: { id: 1, name: "General" },
                         variants: [
                             {
@@ -243,6 +281,9 @@ describe("Stock Queries", () => {
                     },
                 ]),
             );
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+                { id: 11, stockItemId: 1, isActive: true },
+            ]));
             prismaMock.stockItem.count.mockResolvedValue(asNever(1));
             prismaMock.stockRequestItem.findMany.mockResolvedValue(
                 asNever([
@@ -273,6 +314,7 @@ describe("Stock Queries", () => {
                     imageUrl: null,
                     isActive: true,
                     categoryId: 1,
+                    defaultVariantId: null,
                     category: { id: 1, name: "General" },
                     variants: [],
                 },
@@ -311,6 +353,7 @@ describe("Stock Queries", () => {
                 imageUrl: null,
                 isActive: false,
                 categoryId: 1,
+                defaultVariantId: null,
                 category: { id: 1, name: "General" },
                 variants: [],
             }]));
@@ -332,7 +375,7 @@ describe("Stock Queries", () => {
     });
 
     describe("read-only detail and categories", () => {
-        it("uses summed active variant quantity for item detail when enabled", async () => {
+        it("uses summed active variant quantity for item detail", async () => {
             prismaMock.stockItem.findUnique.mockResolvedValue(asNever({
                 id: 5,
                 name: "Keyboard",
@@ -362,6 +405,9 @@ describe("Stock Queries", () => {
                     },
                 ],
             }));
+            prismaMock.stockItemVariant.findMany.mockResolvedValue(asNever([
+                { id: 51, stockItemId: 5, isActive: true },
+            ]));
             const result = await getItemById(5);
 
             expect(result?.quantity).toBe(15);
@@ -379,6 +425,7 @@ describe("Stock Queries", () => {
                 imageUrl: null,
                 isActive: true,
                 categoryId: 1,
+                defaultVariantId: null,
                 category: { id: 1, name: "General" },
                 variants: [],
             }));

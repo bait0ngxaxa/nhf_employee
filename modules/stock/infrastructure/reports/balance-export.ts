@@ -8,7 +8,6 @@ import {
     type StockBalanceVariant,
     type StockBalanceItem,
 } from "./balance-workbook";
-import { buildResolvedDefaultVariantIds } from "../../domain/default-variant-shadow";
 import { summarizeVariantInventory } from "../../domain/inventory-quantity-read";
 import {
     buildItemInclude,
@@ -38,7 +37,6 @@ async function loadActiveStockItems(): Promise<StockBalanceItem[]> {
     const pendingRequestItems = await loadPendingRequestItems(
         items.map((item) => item.id),
     );
-    buildResolvedDefaultVariantIds(items);
     const { reservedByItemId, reservedByVariantId } = buildReservedQuantityMaps(
         pendingRequestItems,
     );

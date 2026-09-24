@@ -42,6 +42,7 @@ function createItem(id: number, name: string, variants = [
         availableQuantity: variants.reduce((total, variant) => total + variant.availableQuantity, 0),
         minStock: 0,
         categoryId: 1,
+        defaultVariantId: variants[1]?.id ?? variants[0]?.id ?? null,
         isActive: true,
         category: { id: 1, name: "กิจกรรม" },
         variants,
@@ -66,6 +67,10 @@ describe("StockVariantPickerDialog", () => {
         );
 
         expect(screen.getByText("เลือกแล้ว 0 รายการ")).toBeInTheDocument();
+        expect(screen.getByAltText("เสื้อกิจกรรม")).toHaveAttribute(
+            "src",
+            "/stock-102.jpg",
+        );
         fireEvent.click(screen.getByRole("button", { name: "เพิ่มจำนวน ขนาด: S" }));
         expect(screen.getByText("เลือกแล้ว 1 รายการ")).toBeInTheDocument();
 

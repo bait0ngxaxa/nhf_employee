@@ -38,6 +38,8 @@ import type {
     LowStockAlertCandidate,
     StockCommandActor,
 } from "../../domain/types";
+import { selectPreferredDefaultVariantId } from "../../domain/default-variant-policy";
+import { StockInvariantViolationError } from "../../domain/errors";
 import type { StockAuthorizedCommandActor } from "../authorization";
 import { resolveStockCapabilityInTransaction } from "../authorization";
 import { lockStockInventoryRows } from "../../infrastructure/persistence/locks";
@@ -498,7 +500,14 @@ export async function createItem(
                 );
             }
         }
-        const defaultVariantId = Math.min(...createdVariantIds);
+        const defaultVariantId = selectPreferredDefaultVariantId(
+            createdVariantIds.map((id) => ({ id, isActive: true })),
+        );
+        if (defaultVariantId === null) {
+            throw new StockInvariantViolationError(
+                "Stock item creation did not produce an active default variant",
+            );
+        }
         await setStockItemDefaultVariantIfUnset(
             tx,
             item.id,

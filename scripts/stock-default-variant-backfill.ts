@@ -69,7 +69,7 @@ function printTerminalResult(result: BackfillRunResult): void {
         console.table([result.applyResult]);
     }
     if (result.after) {
-        printReport("After / shadow comparison", result.after);
+        printReport("After / canonical default inspection", result.after);
     }
 }
 

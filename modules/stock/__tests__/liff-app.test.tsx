@@ -127,6 +127,7 @@ const CATALOG = {
         imageUrl: null,
         sku: "PAPER-A4",
         unit: "รีม",
+        defaultVariantId: 101,
         availableQuantity: 5,
         category: { id: 2, name: "เครื่องเขียน" },
         variants: [{
