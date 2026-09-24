@@ -99,7 +99,9 @@ administration surfaces to a future IT capability. It does not authorize
 starting IT work in H0.
 
 H1 is explicitly DEFERRED — owner decision. It is not BLOCKED and not FAILED.
-The expected handoff after H0 was H2 planning; H2 is now in progress.
+The expected handoff after H0 was H2 planning. H2 has since closed: Routine
+recipient persistence under H2B and Stock explicit-default persistence under
+H2C.
 
 ### Stock default-variant track
 
@@ -114,15 +116,14 @@ The expected handoff after H0 was H2 planning; H2 is now in progress.
   ID order remains only for mutation-time replacement.
 - H2C.3 — CLOSED. The one-time default-variant backfill tooling was retired;
   `stock:audit` now permanently validates canonical explicit-default integrity.
-- H2C.4 — REPOSITORY VERIFICATION PASS; PRODUCTION EVIDENCE PENDING. The
-  repository gates, focused Stock tests, MySQL integration suite, permanent
-  audit CLI checks on the dedicated integration database, and full test suite
-  passed on 2026-09-24. The integration database contained no Stock rows, so
-  these results verify repository behavior and CLI operation only.
-- H2 Stock — NOT YET SIGNED OFF. Production closure requires an operator to
-  run `npm run stock:audit:strict -- --json` against the deployed application
-  containing H2C.2 and H2C.3, then return the deployed revision, command exit
-  code, and JSON summary. No production audit was run for H2C.4.
+- H2C.4 — CLOSED. Repository verification passed, and the operator-confirmed
+  post-H2C.3 production audit exited 0 on deployed revision
+  `9437999609e23a96c36ab6f88d3cebf94784e18f`. The audit reported zero strict
+  Stock integrity violations. Its non-strict informational findings are
+  recorded below.
+- Stock explicit-default rollout — CLOSED.
+- Stock transitional persistence debt — CLOSED.
+- H2 Stock — CLOSED.
 
 H2C.4 repository verification record (2026-09-24):
 
@@ -146,6 +147,26 @@ H2C.4 repository verification record (2026-09-24):
   source files. Prisma emitted the existing `package.json#prisma`
   deprecation warning.
 - `npm run test`: 334 files and 3,198 tests passed.
+
+H2C.4 operator-confirmed production audit evidence (run date not supplied):
+
+- Command: `npm run stock:audit:strict -- --json` from the reported production
+  application directory `/var/www/nhf_employee`.
+- Exit code: `0`.
+- Deployed revision: `9437999609e23a96c36ab6f88d3cebf94784e18f`. Repository
+  history confirms this revision descends from H2C.3 (`1b42c97f`).
+- The JSON summary reported `items=82` and `variants=155`. Strict integrity
+  counts were all zero: `activeItemsWithoutVariant=0`,
+  `activeItemsWithoutActiveVariant=0`, `pendingRequestItemsWithoutVariant=0`,
+  `crossItemReferences=0`, `defaultVariantInvariantViolations=0`, and
+  `negativeInventoryRecords=0`. The output also reported
+  `itemsWithoutVariant=0`, `inactiveItemsWithoutVariant=0`,
+  `requestItemsWithoutVariant=0`, and `transactionsWithoutVariant=0`.
+- Informational findings were `quantityMismatches=50`,
+  `variantsWithoutLedgerCoverage=61`, and `ledgerDiscrepancies=134`. These
+  retain their existing non-strict severity and are not reported as zero.
+- No production repair was performed as part of H2C.4; the audit command is
+  read-only.
 
 ## 3. Evidence inventory
 
@@ -311,9 +332,10 @@ Rows 12 and 13 record H0 dispositions. Their current dispositions are:
 
 - H0-TRANS-01 — Historical H0 finding; CLOSED by H2B, including the
   operator-confirmed production transition.
-- H0-TRANS-02 — Historical H0 finding; H2C.1–H2C.3 CLOSED; H2C.4 repository
-  verification PASS and production evidence PENDING; H2 Stock NOT YET SIGNED
-  OFF.
+- H0-TRANS-02 — Historical H0 finding; CLOSED by H2C.4 after the production
+  strict audit exited 0 on deployed revision
+  `9437999609e23a96c36ab6f88d3cebf94784e18f`; all strict integrity counts were
+  zero. H2 Stock is CLOSED.
 
 ### Finding H0-DOC-01 — stale L7 and missing Section 24
 
@@ -599,9 +621,11 @@ required for that follow-up.
 
 Historical H0 finding.
 
-Current status: H2C.1–H2C.3 CLOSED; H2C.4 repository verification PASS and
-production evidence PENDING; H2 Stock NOT YET SIGNED OFF. The H0 baseline
-details below describe historical runtime and tooling only.
+Current status: H2C.1–H2C.4 CLOSED; H2 Stock and the Stock explicit-default
+rollout are CLOSED. The production strict audit exited 0 on deployed revision
+`9437999609e23a96c36ab6f88d3cebf94784e18f` and reported zero strict integrity
+violations. The H0 baseline details below describe historical runtime and
+tooling only.
 
 Invariant: an explicit default variant may be introduced without changing
 selection behavior until data is backfilled, shadow comparison is clean, and
@@ -921,7 +945,7 @@ Request migration.
 | --- | --- |
 | H0 — Fresh Source Baseline & SSOT Repair | Completed by this record and the linked documentation repair |
 | H1 — CI / Merge Quality Gate | DEFERRED — owner decision |
-| H2 — Transitional Persistence Closure | Routine closure completed by H2B; H2C.1–H2C.3 closed. H2C.4 repository verification passed; post-H2C.3 production audit evidence is pending, so H2 Stock is not signed off |
+| H2 — Transitional Persistence Closure | CLOSED — Routine persistence closed by H2B; Stock explicit-default persistence closed by H2C.1–H2C.4 with repository verification and post-H2C.3 production strict audit PASS |
 | H3 — Runtime Observability / Structured Logging | Central event schema, logger ownership, counters, alerts, and correlation propagation |
 | H4 — Liveness / Readiness | Minimal repository-owned liveness/readiness contract tied to deployment checks |
 | H5 — Critical E2E Smoke Coverage | Minimal real-browser coverage for auth/LIFF, one Stock mutation, private Leave attachment/authorization, and one Routine journey |
@@ -929,10 +953,10 @@ Request migration.
 | H7 — Security & Dependency Hygiene | Authorization Administration transaction-time revalidation, dependency/security review, and approved compatibility cleanup |
 
 At the H0 handoff, H2 planning was the next recommended activity. H2A and H2B
-have since closed the Routine Import and Routine recipient persistence work;
-H2C.1–H2C.3 closed the Stock explicit-default runtime and tooling transition.
-H2C.4 repository verification has passed. Its post-H2C.3 production audit
-evidence remains pending, so H2 Stock is not yet signed off. H1 remains
+closed the Routine Import and Routine recipient persistence work. H2C.1–H2C.4
+closed the Stock explicit-default runtime and tooling transition, with
+repository verification passed and the post-H2C.3 production strict audit
+exiting 0 with zero strict integrity violations. H2 is CLOSED. H1 remains
 deferred by owner decision, and future IT remains deferred.
 
 ## 7. H0 changes
