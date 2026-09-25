@@ -96,7 +96,7 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
         { id: 91, createdAt: new Date("2026-09-25T15:59:59.000Z") },
         { id: 92, createdAt: new Date("2026-09-25T15:30:00.000Z") },
     ],
-    categories: [{ id: 19, name: "หมวดประวัติที่ปิดแล้ว" }],
+    categories: [{ id: 19, name: "หมวดประวัติที่ปิดแล้ว", key: "ARCHIVED" }],
 };
 
 function useSnapshot(snapshot: ITAnalyticsPersistenceSnapshot): void {
@@ -197,6 +197,103 @@ describe("IT analytics application query", () => {
             resolutionEventKind: "STATUS_CHANGED",
             resolutionStatus: "RESOLVED",
         });
+    });
+
+    it("preserves category identity while Department snapshots still group by normalized label", async () => {
+        useSnapshot({
+            ...populatedSnapshot,
+            statuses: [{ status: "OPEN", count: 8 }],
+            backlogCategories: [
+                { categoryId: 19, count: 3 },
+                { categoryId: 20, count: 5 },
+            ],
+            backlogAssignees: [{ userId: null, count: 8 }],
+            departmentSnapshots: [
+                { departmentNameSnapshot: "  ฝ่ายเดียวกัน  ", count: 2 },
+                { departmentNameSnapshot: "ฝ่ายเดียวกัน", count: 3 },
+            ],
+            categories: [
+                { id: 19, name: "ระบบ", key: "NETWORK" },
+                { id: 20, name: "ระบบ", key: "SOFTWARE" },
+            ],
+        });
+
+        const result = await getITAnalyticsDashboard(actor, "7D", now);
+
+        expect(result.categoryBacklog).toEqual([
+            { label: "ระบบ (SOFTWARE)", count: 5 },
+            { label: "ระบบ (NETWORK)", count: 3 },
+        ]);
+        expect(result.assigneeBacklog).toEqual([
+            { label: "ยังไม่มีผู้รับผิดชอบ", count: 8 },
+        ]);
+        expect(result.categoryBacklog.reduce((sum, row) => sum + row.count, 0))
+            .toBe(result.summary.currentBacklog);
+        expect(result.assigneeBacklog.reduce((sum, row) => sum + row.count, 0))
+            .toBe(result.summary.currentBacklog);
+        expect(result.departmentCreated).toEqual([
+            { label: "ฝ่ายเดียวกัน", count: 5 },
+        ]);
+    });
+
+    it("preserves distinct active assignee identities when display names collide", async () => {
+        useSnapshot({
+            ...populatedSnapshot,
+            statuses: [{ status: "OPEN", count: 5 }],
+            backlogCategories: [{ categoryId: 19, count: 5 }],
+            backlogAssignees: [
+                { userId: 205, count: 3 },
+                { userId: 101, count: 2 },
+            ],
+            categories: [{ id: 19, name: "หมวดทั่วไป", key: "GENERAL" }],
+        });
+        mocks.findCurrentEmployees.mockResolvedValue([
+            {
+                userId: 205,
+                employeeId: 295,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: null,
+            },
+            {
+                userId: 101,
+                employeeId: 191,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: null,
+            },
+        ]);
+
+        const result = await getITAnalyticsDashboard(actor, "7D", now);
+
+        expect(result.assigneeBacklog).toEqual([
+            { label: "สมชาย ใจดี (2)", count: 3 },
+            { label: "สมชาย ใจดี (1)", count: 2 },
+        ]);
+        expect(result.assigneeBacklog.reduce((sum, row) => sum + row.count, 0))
+            .toBe(result.summary.currentBacklog);
+    });
+
+    it("keeps separate fallback rows for distinct unresolved assignee identities", async () => {
+        useSnapshot({
+            ...populatedSnapshot,
+            statuses: [{ status: "OPEN", count: 10 }],
+            backlogCategories: [{ categoryId: null, count: 10 }],
+            backlogAssignees: [
+                { userId: 205, count: 6 },
+                { userId: 101, count: 4 },
+            ],
+        });
+        mocks.findCurrentEmployees.mockResolvedValue([]);
+
+        const result = await getITAnalyticsDashboard(actor, "7D", now);
+
+        expect(result.assigneeBacklog).toEqual([
+            { label: "ผู้รับผิดชอบเดิม (2)", count: 6 },
+            { label: "ผู้รับผิดชอบเดิม (1)", count: 4 },
+        ]);
+        expect(result.assigneeBacklog.reduce((sum, row) => sum + row.count, 0))
+            .toBe(result.summary.currentBacklog);
     });
 
     it("defaults a missing period to 30D and rejects unsupported periods before querying", async () => {

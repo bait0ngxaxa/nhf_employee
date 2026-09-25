@@ -443,6 +443,107 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         expect(trackedTicketIds).toContain(oldestBacklogTicket);
     });
 
+    it("preserves category and assignee identities when display labels collide", async () => {
+        const departmentId = await createDepartment("dimension-identity");
+        const requester = await createWorkforceUser("dimension-requester", departmentId);
+        const sameNameAssigneeA = await createWorkforceUser("ชื่อซ้ำ", departmentId);
+        const sameNameAssigneeB = await createWorkforceUser("ชื่อซ้ำ", departmentId);
+        const inactiveAssigneeA = await createWorkforceUser("อดีตผู้รับผิดชอบ A", departmentId);
+        const inactiveAssigneeB = await createWorkforceUser("อดีตผู้รับผิดชอบ B", departmentId);
+        const analyticsOnly = await createWorkforceUser("dimension-report-reader", departmentId);
+        await grant(analyticsOnly.userId, "it.analytics.read");
+
+        const categoryA = await prisma.iTTicketCategory.create({
+            data: {
+                key: nextFixtureKey("duplicate-name-network"),
+                name: "ระบบ",
+                isActive: true,
+            },
+            select: { id: true, key: true },
+        });
+        const categoryB = await prisma.iTTicketCategory.create({
+            data: {
+                key: nextFixtureKey("duplicate-name-software"),
+                name: "ระบบ",
+                isActive: true,
+            },
+            select: { id: true, key: true },
+        });
+        trackedCategoryIds.add(categoryA.id);
+        trackedCategoryIds.add(categoryB.id);
+
+        const createdAt = new Date("2026-09-25T16:00:00.000Z");
+        const createBacklogGroup = async (
+            count: number,
+            assignedToUserId: number,
+            categoryId: number | null,
+        ): Promise<void> => {
+            for (let index = 0; index < count; index += 1) {
+                await createTicket({
+                    requester,
+                    type: "INCIDENT",
+                    status: "OPEN",
+                    createdAt,
+                    assignedToUserId,
+                    categoryId,
+                    requesterDepartmentNameSnapshot: "หน่วยงาน ณ วันสร้าง",
+                });
+            }
+        };
+
+        await createBacklogGroup(3, sameNameAssigneeA.userId, categoryA.id);
+        await createBacklogGroup(5, sameNameAssigneeB.userId, categoryB.id);
+        await createBacklogGroup(4, inactiveAssigneeA.userId, null);
+        await createBacklogGroup(6, inactiveAssigneeB.userId, null);
+
+        await prisma.iTTicketCategory.updateMany({
+            where: { id: { in: [categoryA.id, categoryB.id] } },
+            data: { isActive: false },
+        });
+        for (const inactiveAssignee of [inactiveAssigneeA, inactiveAssigneeB]) {
+            await prisma.user.update({
+                where: { id: inactiveAssignee.userId },
+                data: { isActive: false },
+            });
+            await prisma.employee.update({
+                where: { id: inactiveAssignee.employeeId },
+                data: { status: "INACTIVE" },
+            });
+        }
+
+        const dashboard = await getITAnalyticsDashboard(analyticsOnly.context, "7D", NOW);
+
+        expect(dashboard.summary.currentBacklog).toBe(18);
+        expect(dashboard.categoryBacklog).toContainEqual({
+            label: `ระบบ (${categoryA.key})`,
+            count: 3,
+        });
+        expect(dashboard.categoryBacklog).toContainEqual({
+            label: `ระบบ (${categoryB.key})`,
+            count: 5,
+        });
+        expect(dashboard.assigneeBacklog).toContainEqual({
+            label: "เจ้าหน้าที่ ชื่อซ้ำ (1)",
+            count: 3,
+        });
+        expect(dashboard.assigneeBacklog).toContainEqual({
+            label: "เจ้าหน้าที่ ชื่อซ้ำ (2)",
+            count: 5,
+        });
+        expect(dashboard.assigneeBacklog).toContainEqual({
+            label: "ผู้รับผิดชอบเดิม (1)",
+            count: 4,
+        });
+        expect(dashboard.assigneeBacklog).toContainEqual({
+            label: "ผู้รับผิดชอบเดิม (2)",
+            count: 6,
+        });
+        expect(dashboard.categoryBacklog.reduce((sum, row) => sum + row.count, 0))
+            .toBe(dashboard.summary.currentBacklog);
+        expect(dashboard.assigneeBacklog.reduce((sum, row) => sum + row.count, 0))
+            .toBe(dashboard.summary.currentBacklog);
+    });
+
     it("allows analytics-only authority and denies defaults, ADMIN, ticket scopes, and inactive workforce", async () => {
         const departmentId = await createDepartment("auth");
         const defaults = await createWorkforceUser("default", departmentId);

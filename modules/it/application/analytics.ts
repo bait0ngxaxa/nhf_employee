@@ -62,6 +62,83 @@ function increment(map: Map<string, number>, key: string, count = 1): void {
     map.set(key, (map.get(key) ?? 0) + count);
 }
 
+interface IdentifiedDimensionRow {
+    readonly identity: number | null;
+    readonly label: string;
+    readonly count: number;
+}
+
+interface QualifiedDimensionRow extends IdentifiedDimensionRow {
+    readonly qualifier?: string;
+}
+
+function compareDimensionIdentity(
+    left: number | null,
+    right: number | null,
+): number {
+    if (left === null) return right === null ? 0 : -1;
+    if (right === null) return 1;
+    return left - right;
+}
+
+/** Disambiguates colliding display labels while preserving each ID-backed row. */
+function disambiguateDimensionLabels<T extends IdentifiedDimensionRow>(
+    rows: readonly T[],
+    getQualifier: (row: T, duplicateOrdinal: number) => string,
+): readonly T[] {
+    const rowsByLabel = new Map<string, T[]>();
+    for (const row of rows) {
+        const sameLabelRows = rowsByLabel.get(row.label) ?? [];
+        sameLabelRows.push(row);
+        rowsByLabel.set(row.label, sameLabelRows);
+    }
+
+    const duplicateOrdinals = new Map<T, number>();
+    for (const sameLabelRows of rowsByLabel.values()) {
+        if (sameLabelRows.length < 2) continue;
+        [...sameLabelRows]
+            .sort((left, right) => compareDimensionIdentity(left.identity, right.identity))
+            .forEach((row, index) => duplicateOrdinals.set(row, index + 1));
+    }
+
+    const reservedLabels = new Set(rows.map((row) => row.label));
+    const assignedLabels = new Set<string>();
+    const labelsByRow = new Map<T, string>();
+    const stableRows = [...rows].sort((left, right) =>
+        compareDimensionIdentity(left.identity, right.identity));
+
+    for (const row of stableRows) {
+        const duplicateOrdinal = duplicateOrdinals.get(row);
+        if (duplicateOrdinal === undefined) {
+            labelsByRow.set(row, row.label);
+            assignedLabels.add(row.label);
+            continue;
+        }
+
+        const qualifier = getQualifier(row, duplicateOrdinal);
+        let collisionOrdinal = 0;
+        let label = `${row.label} (${qualifier})`;
+        while (assignedLabels.has(label) || reservedLabels.has(label)) {
+            collisionOrdinal += 1;
+            label = `${row.label} (${qualifier} · ${collisionOrdinal})`;
+        }
+        labelsByRow.set(row, label);
+        assignedLabels.add(label);
+    }
+
+    return rows.map((row) => ({ ...row, label: labelsByRow.get(row) ?? row.label }));
+}
+
+function sortedDimensionRows(
+    rows: readonly IdentifiedDimensionRow[],
+): readonly { readonly label: string; readonly count: number }[] {
+    return [...rows]
+        .sort((left, right) => right.count - left.count
+            || (left.label < right.label ? -1 : left.label > right.label ? 1 : 0)
+            || compareDimensionIdentity(left.identity, right.identity))
+        .map(({ label, count }) => ({ label, count }));
+}
+
 export async function getITAnalyticsDashboard(
     context: ITAuthorizationContext,
     periodInput?: string,
@@ -110,23 +187,37 @@ export async function getITAnalyticsDashboard(
         ]));
 
         const categoriesById = new Map(
-            persistence.categories.map((category) => [category.id, category.name]),
+            persistence.categories.map((category) => [category.id, category]),
         );
-        const categoryCounts = new Map<string, number>();
-        for (const row of persistence.backlogCategories) {
-            const label = row.categoryId === null
-                ? "ยังไม่จัดหมวดหมู่"
-                : categoriesById.get(row.categoryId) ?? "หมวดหมู่เดิม";
-            increment(categoryCounts, label, row.count);
-        }
+        const categoryRows = disambiguateDimensionLabels(
+            persistence.backlogCategories.map((row): QualifiedDimensionRow => {
+                const category = row.categoryId === null
+                    ? undefined
+                    : categoriesById.get(row.categoryId);
+                return {
+                    identity: row.categoryId,
+                    label: row.categoryId === null
+                        ? "ยังไม่จัดหมวดหมู่"
+                        : category?.name ?? "หมวดหมู่เดิม",
+                    count: row.count,
+                    qualifier: row.categoryId === null
+                        ? "ไม่ระบุหมวดหมู่"
+                        : category?.key,
+                };
+            }),
+            (row, ordinal) => row.qualifier ?? `หมวดหมู่ ${ordinal}`,
+        );
 
-        const assigneeCounts = new Map<string, number>();
-        for (const row of persistence.backlogAssignees) {
-            const label = row.userId === null
-                ? "ยังไม่มีผู้รับผิดชอบ"
-                : assigneeNames.get(row.userId) ?? "ผู้รับผิดชอบเดิม";
-            increment(assigneeCounts, label, row.count);
-        }
+        const assigneeRows = disambiguateDimensionLabels(
+            persistence.backlogAssignees.map((row): IdentifiedDimensionRow => ({
+                identity: row.userId,
+                label: row.userId === null
+                    ? "ยังไม่มีผู้รับผิดชอบ"
+                    : assigneeNames.get(row.userId) ?? "ผู้รับผิดชอบเดิม",
+                count: row.count,
+            })),
+            (_row, ordinal) => String(ordinal),
+        );
 
         const departmentCounts = new Map<string, number>();
         for (const row of persistence.departmentSnapshots) {
@@ -225,8 +316,8 @@ export async function getITAnalyticsDashboard(
             })),
             statusDistribution,
             typeDistribution,
-            categoryBacklog: sortedLabels(categoryCounts),
-            assigneeBacklog: sortedLabels(assigneeCounts),
+            categoryBacklog: sortedDimensionRows(categoryRows),
+            assigneeBacklog: sortedDimensionRows(assigneeRows),
             departmentCreated: sortedLabels(departmentCounts),
         };
     }, {

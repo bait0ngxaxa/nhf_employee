@@ -45,7 +45,7 @@ describe("IT Ticket analytics persistence", () => {
                 createdAt: new Date("2026-09-01T12:00:00.000Z"),
             }]);
         const findCategories = vi.fn().mockResolvedValue([
-            { id: 19, name: "หมวดประวัติ" },
+            { id: 19, name: "หมวดประวัติ", key: "ARCHIVED" },
         ]);
         const tx = {
             iTTicket: {
@@ -100,7 +100,7 @@ describe("IT Ticket analytics persistence", () => {
         });
         expect(findCategories).toHaveBeenCalledWith({
             where: { id: { in: [19] } },
-            select: { id: true, name: true },
+            select: { id: true, name: true, key: true },
         });
         expect(findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
             where: {
@@ -110,7 +110,11 @@ describe("IT Ticket analytics persistence", () => {
             select: { createdAt: true, firstRespondedAt: true },
         }));
         expect(result.resolvedEvents).toHaveLength(1);
-        expect(result.categories).toEqual([{ id: 19, name: "หมวดประวัติ" }]);
+        expect(result.categories).toEqual([{
+            id: 19,
+            name: "หมวดประวัติ",
+            key: "ARCHIVED",
+        }]);
         expect(result.departmentSnapshots).toEqual([
             { departmentNameSnapshot: null, count: 1 },
         ]);

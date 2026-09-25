@@ -5,7 +5,10 @@ Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. IT1 through IT7 are closed under `modules/it/`. Its server entry is
+boundaries. IT1 through IT6 are closed under `modules/it/`; IT7's category and
+assignee identity correction is implemented, with repository-wide closure
+verification pending after a resource-sensitive architecture test timeout.
+Its server entry is
 `@/modules/it` and its browser-safe Dashboard presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and
 idempotency, requester and operator queries, approved workflow, assignment,

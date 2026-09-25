@@ -60,6 +60,7 @@ export interface ITAnalyticsResolvedTicket {
 export interface ITAnalyticsCategoryName {
     readonly id: number;
     readonly name: string;
+    readonly key: string;
 }
 
 export interface ITAnalyticsPersistenceSnapshot {
@@ -158,7 +159,7 @@ export async function readITAnalyticsPersistenceSnapshot(
         ? []
         : await tx.iTTicketCategory.findMany({
             where: { id: { in: categoryIds } },
-            select: { id: true, name: true },
+            select: { id: true, name: true, key: true },
         });
 
     return {
