@@ -70,15 +70,26 @@ function referenceResponse(): Response {
     return apiResponse({ success: true, ...reference });
 }
 
-function timelineResponse(): Response {
+function timelineResponse(withStatusChange = false): Response {
+    const items: unknown[] = [{
+        type: "CREATED",
+        id: 1,
+        createdAt: ticket.createdAt,
+        actorDisplayName: ticket.requester.displayName,
+    }];
+    if (withStatusChange) {
+        items.push({
+            type: "STATUS_CHANGED",
+            id: 2,
+            createdAt: "2026-09-03T01:30:00.000Z",
+            actorDisplayName: "เจ้าหน้าที่อีกคน",
+            fromStatus: "OPEN",
+            toStatus: "IN_PROGRESS",
+        });
+    }
     return apiResponse({
         success: true,
-        items: [{
-            type: "CREATED",
-            id: 1,
-            createdAt: ticket.createdAt,
-            actorDisplayName: ticket.requester.displayName,
-        }],
+        items,
         olderCursor: null,
         hasMore: false,
     });
@@ -224,15 +235,108 @@ describe("IT operator Ticket detail presentation", () => {
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
 
         expect(await screen.findByText("ส่งข้อความเรียบร้อยแล้ว")).toBeInTheDocument();
-        expect(screen.getByText("กำลังตรวจสอบให้ค่ะ")).toBeInTheDocument();
+        expect(screen.getAllByText("กำลังตรวจสอบให้ค่ะ")).toHaveLength(1);
         expect(screen.getByText("รับเรื่องแล้ว")).toBeInTheDocument();
         const postCall = fetchMock.mock.calls.find(([, options]) => options?.method === "POST");
         expect(postCall?.[0]).toBe("/api/it/operator/tickets/19/comments");
         expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({ body: "กำลังตรวจสอบให้ค่ะ" });
+        expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/timeline"))).toHaveLength(1);
+        expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "PATCH")).toHaveLength(0);
+    });
+
+    it("reloads the latest timeline after a successful workflow version change", async () => {
+        let detailReadCount = 0;
+        let timelineReadCount = 0;
+        const progressedTicket: ITOperatorTicket = {
+            ...ticket,
+            status: "IN_PROGRESS",
+            version: 5,
+        };
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("/timeline")) {
+                timelineReadCount += 1;
+                return timelineResponse(timelineReadCount > 1);
+            }
+            if (init?.method === "PATCH") {
+                return apiResponse({
+                    success: true,
+                    changed: true,
+                    ticket: {
+                        id: 19,
+                        version: 5,
+                        status: "IN_PROGRESS",
+                        assignedToUserId: null,
+                        categoryId: null,
+                        updatedAt: "2026-09-03T02:00:00.000Z",
+                    },
+                });
+            }
+            detailReadCount += 1;
+            return detailResponse(detailReadCount === 1 ? ticket : progressedTicket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "เริ่มดำเนินการ" }));
+
+        expect(await screen.findByText("รุ่น 5")).toBeInTheDocument();
+        expect(await screen.findByText(
+            "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
+        )).toBeInTheDocument();
+        expect(timelineReadCount).toBe(2);
+    });
+
+    it("does not refetch the timeline for a no-op workflow mutation with the same version", async () => {
+        let detailReadCount = 0;
+        let timelineReadCount = 0;
+        let patchCount = 0;
+        const assignedTicket: ITOperatorTicket = {
+            ...ticket,
+            assignee: { userId: 51, displayName: "สมชาย ใจดี" },
+        };
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("/timeline")) {
+                timelineReadCount += 1;
+                return timelineResponse();
+            }
+            if (init?.method === "PATCH") {
+                patchCount += 1;
+                return apiResponse({
+                    success: true,
+                    changed: false,
+                    ticket: {
+                        id: 19,
+                        version: 4,
+                        status: "OPEN",
+                        assignedToUserId: 51,
+                        categoryId: null,
+                        updatedAt: assignedTicket.updatedAt,
+                    },
+                });
+            }
+            detailReadCount += 1;
+            return detailResponse(assignedTicket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+        await waitFor(() => expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeEnabled());
+
+        expect(patchCount).toBe(1);
+        expect(detailReadCount).toBe(2);
+        expect(timelineReadCount).toBe(1);
     });
 
     it("sends the displayed version and requires review after loading a stale conflict", async () => {
         let detailReadCount = 0;
+        let timelineReadCount = 0;
         const latestTicket: ITOperatorTicket = {
             ...ticket,
             status: "IN_PROGRESS",
@@ -249,7 +353,10 @@ describe("IT operator Ticket detail presentation", () => {
         fetchMock.mockImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) return referenceResponse();
-            if (url.includes("/timeline")) return timelineResponse();
+            if (url.includes("/timeline")) {
+                timelineReadCount += 1;
+                return timelineResponse(timelineReadCount > 1);
+            }
             if (init?.method === "PATCH") {
                 patchBodies.push(JSON.parse(String(init.body)) as unknown);
                 patchCount += 1;
@@ -293,6 +400,10 @@ describe("IT operator Ticket detail presentation", () => {
         expect(await screen.findByRole("alert")).toHaveTextContent("Ticket เปลี่ยนแปลงโดยผู้ใช้อื่นแล้ว");
         await waitFor(() => expect(screen.getByLabelText("ผู้รับผิดชอบ Ticket")).toHaveValue("62"));
         expect(screen.getByText("รุ่น 5")).toBeInTheDocument();
+        expect(await screen.findByText(
+            "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
+        )).toBeInTheDocument();
+        expect(timelineReadCount).toBe(2);
         expect(screen.getByRole("button", { name: "รอข้อมูลจากผู้แจ้ง" })).toBeDisabled();
         expect(patchBodies[0]).toEqual({ targetStatus: "IN_PROGRESS", expectedVersion: 4 });
 

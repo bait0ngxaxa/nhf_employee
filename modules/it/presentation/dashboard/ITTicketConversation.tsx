@@ -98,11 +98,13 @@ export function ITTicketConversation({
     status,
     canComment,
     operator,
+    timelineRevision,
 }: {
     readonly ticketId: number;
     readonly status: ITTicketStatus;
     readonly canComment: boolean;
     readonly operator: boolean;
+    readonly timelineRevision?: number;
 }): ReactElement {
     const [timelineState, setTimelineState] = useState<TimelineState | null>(null);
     const [timelineRetry, setTimelineRetry] = useState(0);
@@ -113,7 +115,7 @@ export function ITTicketConversation({
     const [postError, setPostError] = useState<string | null>(null);
     const [postMessage, setPostMessage] = useState<string | null>(null);
     const [postingDenied, setPostingDenied] = useState(false);
-    const requestKey = `${ticketId}:${operator ? "operator" : "requester"}:${timelineRetry}`;
+    const requestKey = `${ticketId}:${operator ? "operator" : "requester"}:${timelineRevision ?? "default"}:${timelineRetry}`;
     const currentTimeline = timelineState?.key === requestKey ? timelineState : null;
     const loadedTimeline = currentTimeline?.kind === "loaded" ? currentTimeline.page : null;
     const timelineError = currentTimeline?.kind === "error" ? currentTimeline.message : null;

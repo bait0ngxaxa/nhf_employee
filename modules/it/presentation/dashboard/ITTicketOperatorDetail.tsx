@@ -73,7 +73,12 @@ export function ITTicketOperatorDetail({
 
     const detailKey = `${ticketId}:${refreshKey}`;
     const currentDetail = detailState?.key === detailKey ? detailState : null;
-    const ticket = currentDetail?.kind === "loaded" ? currentDetail.ticket : null;
+    const previousTicket = detailState?.kind === "loaded" && detailState.ticket.id === ticketId
+        ? detailState.ticket
+        : null;
+    const ticket = currentDetail?.kind === "loaded"
+        ? currentDetail.ticket
+        : currentDetail?.kind === "error" ? null : previousTicket;
     const detailError = currentDetail?.kind === "error" ? currentDetail.message : null;
     const loading = currentDetail === null;
     const currentReference = referenceState?.key === referenceRefreshKey ? referenceState : null;
@@ -145,7 +150,7 @@ export function ITTicketOperatorDetail({
         body: Record<string, number | string | null>,
         successMessage: string,
     ): Promise<void> => {
-        if (!ticket || inFlightRef.current || conflictReviewRequired || mutationAccessDenied) return;
+        if (!ticket || loading || inFlightRef.current || conflictReviewRequired || mutationAccessDenied) return;
         inFlightRef.current = true;
         setBusy(true);
         setActionError(null);
@@ -276,12 +281,17 @@ export function ITTicketOperatorDetail({
                     กลับไปยังคิว IT Ticket
                 </Link>
 
-                {loading ? (
+                {loading && !ticket ? (
                     <div role="status" aria-label="กำลังโหลด Ticket" className="space-y-4">
                         <Skeleton className="h-8 w-2/5" />
                         <Skeleton className="h-72 w-full rounded-xl" />
                         <Skeleton className="h-48 w-full rounded-xl" />
                     </div>
+                ) : null}
+                {loading && ticket ? (
+                    <p role="status" className="text-sm text-content-secondary">
+                        กำลังโหลดข้อมูล Ticket ล่าสุด การดำเนินการถูกพักไว้ชั่วคราว
+                    </p>
                 ) : null}
 
                 {!loading && detailError ? (
@@ -297,7 +307,7 @@ export function ITTicketOperatorDetail({
                     </div>
                 ) : null}
 
-                {!loading && !detailError && ticket ? (
+                {!detailError && ticket ? (
                     <>
                         <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
                             <div className="min-w-0 space-y-1">
@@ -420,6 +430,7 @@ export function ITTicketOperatorDetail({
                             status={ticket.status}
                             canComment={capabilities.canCommentAllTickets}
                             operator
+                            timelineRevision={ticket.version}
                         />
 
                         {canManage ? (

@@ -30,7 +30,8 @@
 > confirmed production collision preflight and migration deployment PASSED.
 > The Routine recipient persistence transition is CLOSED.
 >
-> IT1, IT2, IT3, IT4, and IT5A are CLOSED. The `it` domain and its five
+> IT1, IT2, IT3, and IT4 are CLOSED. IT5A implementation is present, with
+> closure verification pending. The `it` domain and its five
 > Dashboard-only capabilities remain role-neutral; Ticket persistence,
 > server-side commands, requester OWN queries/conversation, a separate
 > read-ALL operator API/Dashboard surface, operator read-ALL/comment-ALL
