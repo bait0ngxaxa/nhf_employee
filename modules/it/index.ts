@@ -50,6 +50,11 @@ export {
     postITOperatorTicketComment,
     postITRequesterTicketComment,
 } from "./application/ticket-comment-commands";
+export { getITTicketAttachmentForDownload } from "./application/ticket-attachment-queries";
+export { cleanupOrphanedITTicketAttachments } from "./infrastructure/attachments/cleanup-orphans";
+export { readITTicketAttachment } from "./infrastructure/attachments/storage";
+export { ITTicketAttachmentValidationError } from "./infrastructure/attachments/validation";
+export type { ITTicketAttachmentSource } from "./infrastructure/attachments/validation";
 export {
     createITTicketCommentBodySchema,
     createITTicketCommentInputSchema,
@@ -57,6 +62,16 @@ export {
 export {
     IT_TICKET_COMMENTABLE_STATUSES,
     IT_TICKET_COMMENT_MAX_LENGTH,
+    IT_TICKET_ATTACHMENT_ACCEPTED_TYPES,
+    IT_TICKET_ATTACHMENT_MAX_BYTES,
+    IT_TICKET_ATTACHMENT_MAX_FILES,
+    IT_TICKET_ATTACHMENT_MAX_HEIGHT,
+    IT_TICKET_ATTACHMENT_MAX_INPUT_PIXELS,
+    IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES,
+    IT_TICKET_ATTACHMENT_MAX_TOTAL_BYTES,
+    IT_TICKET_ATTACHMENT_MAX_WIDTH,
+    IT_TICKET_ATTACHMENT_ORPHAN_SAFETY_WINDOW_MS,
+    IT_TICKET_ATTACHMENT_WEBP_QUALITY,
     IT_TICKET_DATABASE_INT_MAX,
     IT_TICKET_DESCRIPTION_MAX_LENGTH,
     IT_TICKET_TIMELINE_DEFAULT_LIMIT,
@@ -114,6 +129,7 @@ export type {
     TransitionITTicketStatusInput,
 } from "./application/ticket-schemas";
 export type { ITTicketCommentSubmission, ITTicketTimelinePage, ITTicketTimelineItem } from "./contracts";
+export type { ITTicketAttachmentSummary } from "./contracts";
 export type {
     CreateITTicketResult,
     ITTicketMutationResult,

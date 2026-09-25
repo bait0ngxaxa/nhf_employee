@@ -44,6 +44,7 @@ model User {
   itTicketCreateIdempotencies ITTicketCreateIdempotency[]   @relation("ITTicketCreateIdempotencyRequester")
   authoredITTicketComments    ITTicketComment[]             @relation("ITTicketCommentAuthor")
   itTicketCommentIdempotencies ITTicketCommentIdempotency[] @relation("ITTicketCommentIdempotencyAuthor")
+  uploadedITTicketAttachments ITTicketAttachment[]          @relation("ITTicketAttachmentUploader")
 
   @@map("users")
 }
@@ -271,6 +272,7 @@ model ITTicket {
   events            ITTicketEvent[]
   createIdempotency ITTicketCreateIdempotency?
   comments          ITTicketComment[]
+  attachments       ITTicketAttachment[]
 
   @@index([requesterUserId, createdAt, id])
   @@index([createdAt, id])
@@ -352,9 +354,35 @@ model ITTicketComment {
   ticket      ITTicket                    @relation(fields: [ticketId], references: [id], onDelete: Restrict)
   author      User                        @relation("ITTicketCommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
   idempotency ITTicketCommentIdempotency?
+  attachments ITTicketAttachment[]
 
   @@index([ticketId, createdAt, id])
+  @@unique([ticketId, id])
   @@map("it_ticket_comments")
+}
+
+model ITTicketAttachment {
+  id             String   @id @db.VarChar(32)
+  ticketId       Int
+  commentId      String   @db.VarChar(30)
+  uploaderUserId Int
+  position       Int
+  storageKey     String   @unique @db.VarChar(191)
+  originalName   String   @db.VarChar(255)
+  contentType    String   @db.VarChar(64)
+  contentSha256  String   @db.Char(64)
+  sizeBytes      Int
+  width          Int
+  height         Int
+  createdAt      DateTime @default(now())
+
+  ticket   ITTicket        @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  comment  ITTicketComment @relation(fields: [ticketId, commentId], references: [ticketId, id], onDelete: Restrict)
+  uploader User            @relation("ITTicketAttachmentUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
+
+  @@unique([commentId, position])
+  @@index([ticketId, commentId])
+  @@map("it_ticket_attachments")
 }
 
 model ITTicketCommentIdempotency {

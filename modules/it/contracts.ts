@@ -21,6 +21,20 @@ export const IT_TICKET_LIST_MAX_LIMIT = 100;
 export const IT_TICKET_DATABASE_INT_MAX = 2_147_483_647;
 export const IT_OPERATOR_QUEUE_DEFAULT_LIMIT = 25;
 export const IT_OPERATOR_QUEUE_MAX_LIMIT = 100;
+export const IT_TICKET_ATTACHMENT_MAX_FILES = 3;
+export const IT_TICKET_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+export const IT_TICKET_ATTACHMENT_MAX_TOTAL_BYTES = 20 * 1024 * 1024;
+export const IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES = 25_000_000;
+export const IT_TICKET_ATTACHMENT_MAX_INPUT_PIXELS = 40_000_000;
+export const IT_TICKET_ATTACHMENT_MAX_WIDTH = 2400;
+export const IT_TICKET_ATTACHMENT_MAX_HEIGHT = 2400;
+export const IT_TICKET_ATTACHMENT_WEBP_QUALITY = 88;
+export const IT_TICKET_ATTACHMENT_ORPHAN_SAFETY_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const IT_TICKET_ATTACHMENT_ACCEPTED_TYPES = Object.freeze([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+] as const);
 
 export interface ITPresentationCapabilities {
     readonly canReadOwnTickets: boolean;
@@ -106,6 +120,17 @@ export interface ITTicketTimelineComment {
     readonly authorDisplayName: string;
     readonly authorSide: ITTicketCommentKind;
     readonly body: string;
+    readonly attachments: readonly ITTicketAttachmentSummary[];
+}
+
+export interface ITTicketAttachmentSummary {
+    readonly id: string;
+    readonly originalName: string;
+    readonly contentType: "image/webp";
+    readonly sizeBytes: number;
+    readonly width: number;
+    readonly height: number;
+    readonly position: number;
 }
 
 export type ITTicketTimelineEvent =

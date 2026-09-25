@@ -3,6 +3,7 @@ import {
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
     type ITTicketCommentSubmission,
+    type ITTicketAttachmentSummary,
     type ITTicketTimelineItem,
     type ITTicketTimelinePage,
     type ITAssignableOperator,
@@ -356,9 +357,15 @@ export function parseITTicketTimelineItem(value: unknown): ITTicketTimelineItem 
         if (typeof value.id !== "string"
             || typeof value.authorDisplayName !== "string"
             || (value.authorSide !== "REQUESTER" && value.authorSide !== "OPERATOR")
-            || typeof value.body !== "string") {
+            || typeof value.body !== "string"
+            || !Array.isArray(value.attachments)
+            || value.attachments.length > 3) {
             return null;
         }
+        const attachments = value.attachments.map(parseITTicketAttachmentSummary);
+        if (attachments.some((attachment, index) =>
+            attachment === null || attachment.position !== index,
+        )) return null;
         return {
             type: "COMMENT",
             id: value.id,
@@ -366,6 +373,9 @@ export function parseITTicketTimelineItem(value: unknown): ITTicketTimelineItem 
             authorDisplayName: value.authorDisplayName,
             authorSide: value.authorSide,
             body: value.body,
+            attachments: attachments.filter(
+                (attachment): attachment is ITTicketAttachmentSummary => attachment !== null,
+            ),
         };
     }
 
@@ -416,6 +426,43 @@ export function parseITTicketTimelineItem(value: unknown): ITTicketTimelineItem 
         };
     }
     return null;
+}
+
+function parseITTicketAttachmentSummary(value: unknown): ITTicketAttachmentSummary | null {
+    if (!isITTicketResponseRecord(value)
+        || typeof value.id !== "string"
+        || !/^[a-f0-9]{32}$/.test(value.id)
+        || typeof value.originalName !== "string"
+        || value.originalName.length < 1
+        || value.originalName.length > 255
+        || value.originalName.trim().length === 0
+        || value.originalName !== value.originalName.trim()
+        || /[\\/]/.test(value.originalName)
+        || /\p{Cc}/u.test(value.originalName)
+        || value.originalName.includes("..")
+        || value.contentType !== "image/webp"
+        || !Number.isSafeInteger(value.sizeBytes)
+        || (value.sizeBytes as number) <= 0
+        || !Number.isSafeInteger(value.width)
+        || (value.width as number) <= 0
+        || (value.width as number) > 2400
+        || !Number.isSafeInteger(value.height)
+        || (value.height as number) <= 0
+        || (value.height as number) > 2400
+        || !Number.isSafeInteger(value.position)
+        || (value.position as number) < 0
+        || (value.position as number) >= 3) {
+        return null;
+    }
+    return {
+        id: value.id,
+        originalName: value.originalName,
+        contentType: "image/webp",
+        sizeBytes: value.sizeBytes as number,
+        width: value.width as number,
+        height: value.height as number,
+        position: value.position as number,
+    };
 }
 
 export function parseITTicketTimelinePage(value: unknown): ITTicketTimelinePage | null {

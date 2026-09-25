@@ -13,6 +13,7 @@ import {
     ITTicketMutationConflictError,
     ITTicketNotCommentableError,
     ITTicketNotFoundError,
+    ITTicketAttachmentValidationError,
     ITWorkforceDeniedError,
 } from "@/modules/it";
 
@@ -29,6 +30,9 @@ export function mapITOperatorRouteError(error: unknown): NextResponse | null {
         return forbidden({ success: false });
     }
     if (error instanceof ITTicketInputValidationError) {
+        return jsonError(error.message, 400, { success: false });
+    }
+    if (error instanceof ITTicketAttachmentValidationError) {
         return jsonError(error.message, 400, { success: false });
     }
     if (error instanceof ITTicketIdempotencyConflictError) {

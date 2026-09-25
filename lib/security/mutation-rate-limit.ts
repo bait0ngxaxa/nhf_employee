@@ -26,7 +26,8 @@ export type PreAuthRateLimitScope =
     | "routine-task-create"
     | "routine-task-update"
     | "routine-task-delete"
-    | "routine-occurrence-admin";
+    | "routine-occurrence-admin"
+    | "it-ticket-comment-attachment";
 
 export type AuthenticatedMutationRateLimitScope = Exclude<
     PreAuthRateLimitScope,
@@ -48,6 +49,7 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
     "routine-task-update": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
     "routine-task-delete": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
     "routine-occurrence-admin": { windowMs: 15 * 60 * 1000, maxRequests: 180 },
+    "it-ticket-comment-attachment": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
 } as const satisfies Record<PreAuthRateLimitScope, MutationRateLimitPolicy>;
 
 export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
@@ -63,6 +65,7 @@ export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
     "routine-task-update": { windowMs: 60 * 1000, maxRequests: 40 },
     "routine-task-delete": { windowMs: 60 * 1000, maxRequests: 20 },
     "routine-occurrence-admin": { windowMs: 60 * 1000, maxRequests: 60 },
+    "it-ticket-comment-attachment": { windowMs: 60 * 1000, maxRequests: 10 },
 } as const satisfies Record<
     AuthenticatedMutationRateLimitScope,
     MutationRateLimitPolicy

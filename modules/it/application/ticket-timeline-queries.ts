@@ -156,6 +156,20 @@ function toCommentItem(comment: ITTicketCommentRecord): Extract<
     ITTicketTimelineItem,
     { readonly type: "COMMENT" }
 > {
+    const attachments = comment.attachments.map((attachment) => {
+        if (attachment.contentType !== "image/webp") {
+            throw new Error("Invalid IT Ticket attachment content type");
+        }
+        return {
+            id: attachment.id,
+            originalName: attachment.originalName,
+            contentType: "image/webp" as const,
+            sizeBytes: attachment.sizeBytes,
+            width: attachment.width,
+            height: attachment.height,
+            position: attachment.position,
+        };
+    });
     return {
         type: "COMMENT",
         id: comment.id,
@@ -163,6 +177,7 @@ function toCommentItem(comment: ITTicketCommentRecord): Extract<
         authorDisplayName: getUserDisplayName(comment.author, "ไม่ระบุชื่อ"),
         authorSide: comment.kind,
         body: comment.body,
+        attachments,
     };
 }
 

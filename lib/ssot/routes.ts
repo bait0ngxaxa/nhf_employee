@@ -427,6 +427,9 @@ export const API_ROUTES = {
         statusById: (id: number | string): string =>
             `/api/it/operator/tickets/${id}/status`,
     },
+    itTicketAttachments: {
+        byId: (id: string): string => `/api/it/attachments/${id}`,
+    },
     line: {
         accountLink: "/api/line/account-link",
         liffSession: "/api/line/liff/session",

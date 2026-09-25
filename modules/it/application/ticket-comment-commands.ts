@@ -21,9 +21,20 @@ import {
 import { createITTicketCommentInputSchema } from "./ticket-schemas";
 import { createITTicketCommentRequestHash, isITTicketCommentableStatus } from "../domain/ticket-conversation";
 import {
+    ITTicketAttachmentValidationError,
+    prepareITTicketAttachments,
+    type ITTicketAttachmentSource,
+} from "../infrastructure/attachments/validation";
+import {
+    deleteITTicketAttachmentFiles,
+    writeITTicketAttachments,
+} from "../infrastructure/attachments/storage";
+import {
     claimITTicketFirstResponse,
     createITTicketComment,
+    createITTicketAttachmentRows,
     createITTicketCommentIdempotency,
+    findITTicketCommentById,
     findITTicketCommentReplay,
     findOperatorITTicketConversationState,
     findRequesterITTicketConversationState,
@@ -34,6 +45,7 @@ import type { ITTicketCommentSubmission } from "../contracts";
 
 interface PostCommentOptions {
     readonly idempotencyKey: string;
+    readonly attachments?: readonly ITTicketAttachmentSource[];
 }
 
 type ITTicketCommentSide = typeof ITTicketCommentKind[keyof typeof ITTicketCommentKind];
@@ -52,6 +64,20 @@ function toSubmission(
             authorDisplayName: getUserDisplayName(comment.author, "ไม่ระบุชื่อ"),
             authorSide: comment.kind,
             body: comment.body,
+            attachments: comment.attachments.map((attachment) => {
+                if (attachment.contentType !== "image/webp") {
+                    throw new Error("Invalid IT Ticket attachment content type");
+                }
+                return {
+                    id: attachment.id,
+                    originalName: attachment.originalName,
+                    contentType: "image/webp" as const,
+                    sizeBytes: attachment.sizeBytes,
+                    width: attachment.width,
+                    height: attachment.height,
+                    position: attachment.position,
+                };
+            }),
         },
         replayed,
     };
@@ -148,14 +174,52 @@ async function postITTicketComment(
     const { ticketId, body } = parsedInput.data;
     const idempotencyKey = parsedKey.data;
     const authorUserId = context.authorizationActor.userId;
+    const preparedAttachments = await prepareITTicketAttachments(options.attachments ?? []);
     const requestHash = createITTicketCommentRequestHash({
         ticketId,
         authorSide: side,
         body,
+        attachments: preparedAttachments.map((attachment) => ({
+            originalName: attachment.originalName,
+            contentSha256: attachment.contentSha256,
+        })),
     });
 
+    if (preparedAttachments.length > 0) {
+        const replay = await prisma.$transaction(async (tx) => {
+            await assertITActorCurrentWorkforce(tx, context);
+            await assertCommentAuthority(tx, context, side);
+            const ticket = await findConversationTicket(
+                tx,
+                ticketId,
+                authorUserId,
+                side,
+            );
+            const existing = await findITTicketCommentReplay(
+                tx,
+                authorUserId,
+                idempotencyKey,
+            );
+            if (existing !== null) {
+                if (existing.requestHash !== requestHash) {
+                    throw new ITTicketIdempotencyConflictError();
+                }
+                return toSubmission(existing.comment, true);
+            }
+            if (!isITTicketCommentableStatus(ticket.status)) {
+                throw new ITTicketNotCommentableError();
+            }
+            return null;
+        });
+        if (replay !== null) return replay;
+    }
+
+    const storedAttachments = preparedAttachments.length === 0
+        ? []
+        : await writeITTicketAttachments(ticketId, preparedAttachments);
+
     try {
-        return await runSerializableTransaction(async (tx) => {
+        const result = await runSerializableTransaction(async (tx) => {
             await assertITActorCurrentWorkforce(tx, context);
             await assertCommentAuthority(tx, context, side);
             const ticket = await findConversationTicket(
@@ -188,6 +252,26 @@ async function postITTicketComment(
                 body,
             });
 
+            if (storedAttachments.length > 0) {
+                await createITTicketAttachmentRows(tx, storedAttachments.map((attachment) => ({
+                    id: attachment.id,
+                    ticketId,
+                    commentId: comment.id,
+                    uploaderUserId: authorUserId,
+                    position: attachment.position,
+                    storageKey: attachment.storageKey,
+                    originalName: attachment.originalName,
+                    contentType: attachment.contentType,
+                    contentSha256: attachment.contentSha256,
+                    sizeBytes: attachment.sizeBytes,
+                    width: attachment.width,
+                    height: attachment.height,
+                })));
+            }
+            const persistedComment = storedAttachments.length === 0
+                ? comment
+                : await findITTicketCommentById(tx, comment.id);
+
             if (side === ITTicketCommentKind.OPERATOR) {
                 await claimITTicketFirstResponse(tx, ticketId, comment.createdAt);
             }
@@ -206,9 +290,20 @@ async function postITTicketComment(
                 throw error;
             }
 
-            return toSubmission(comment, false);
+            return toSubmission(persistedComment, false);
         });
+        if (result.replayed && storedAttachments.length > 0) {
+            await deleteITTicketAttachmentFiles(
+                storedAttachments.map((attachment) => attachment.storageKey),
+            );
+        }
+        return result;
     } catch (error) {
+        if (storedAttachments.length > 0) {
+            await deleteITTicketAttachmentFiles(
+                storedAttachments.map((attachment) => attachment.storageKey),
+            );
+        }
         const idempotencyRace = error instanceof ITTicketCommentIdempotencyRaceError;
         const serializationRace = hasPrismaErrorCode(error, "P2034");
         if (!idempotencyRace && !serializationRace) throw error;
@@ -244,3 +339,5 @@ export function postITOperatorTicketComment(
 ): Promise<ITTicketCommentSubmission> {
     return postITTicketComment(context, input, options, ITTicketCommentKind.OPERATOR);
 }
+
+export { ITTicketAttachmentValidationError };

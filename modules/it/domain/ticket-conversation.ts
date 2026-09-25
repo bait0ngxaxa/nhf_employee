@@ -7,6 +7,10 @@ export interface CanonicalITTicketCommentInput {
     readonly ticketId: number;
     readonly authorSide: ITTicketCommentKind;
     readonly body: string;
+    readonly attachments?: readonly {
+        readonly originalName: string;
+        readonly contentSha256: string;
+    }[];
 }
 
 export function isITTicketCommentableStatus(status: ITTicketStatus): boolean {
@@ -16,11 +20,23 @@ export function isITTicketCommentableStatus(status: ITTicketStatus): boolean {
 export function createITTicketCommentRequestHash(
     input: CanonicalITTicketCommentInput,
 ): string {
-    const canonicalPayload = JSON.stringify({
-        ticketId: input.ticketId,
-        authorSide: input.authorSide,
-        body: input.body,
-    });
+    const canonicalPayload = input.attachments?.length
+        ? JSON.stringify({
+            version: 2,
+            ticketId: input.ticketId,
+            authorSide: input.authorSide,
+            body: input.body,
+            attachments: input.attachments.map((attachment, position) => ({
+                position,
+                originalName: attachment.originalName,
+                contentSha256: attachment.contentSha256,
+            })),
+        })
+        : JSON.stringify({
+            ticketId: input.ticketId,
+            authorSide: input.authorSide,
+            body: input.body,
+        });
     return createHash("sha256").update(canonicalPayload).digest("hex");
 }
 

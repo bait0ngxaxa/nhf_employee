@@ -70,6 +70,7 @@ function postedCommentResponse(replayed = false): Response {
             authorDisplayName: "ผู้แจ้งตัวอย่าง",
             authorSide: "REQUESTER",
             body: "ขออัปเดตผลตรวจสอบค่ะ",
+            attachments: [],
         },
     }, replayed ? 200 : 201);
 }
@@ -306,8 +307,8 @@ describe("IT Ticket requester detail", () => {
         expect(screen.getByText("รอข้อมูลจากผู้แจ้ง")).toBeInTheDocument();
         const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
         expect(postCalls).toHaveLength(2);
-        expect((postCalls[0][1]?.headers as Record<string, string>)["Idempotency-Key"])
-            .toBe((postCalls[1][1]?.headers as Record<string, string>)["Idempotency-Key"]);
+        expect((postCalls[0][1]?.headers as Headers).get("Idempotency-Key"))
+            .toBe((postCalls[1][1]?.headers as Headers).get("Idempotency-Key"));
         expect(JSON.parse(String(postCalls[0][1]?.body))).toEqual({ body: "ขออัปเดตผลตรวจสอบค่ะ" });
     });
 
@@ -334,8 +335,8 @@ describe("IT Ticket requester detail", () => {
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
 
         const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
-        const firstKey = (postCalls[0][1]?.headers as Record<string, string>)["Idempotency-Key"];
-        const secondKey = (postCalls[1][1]?.headers as Record<string, string>)["Idempotency-Key"];
+        const firstKey = (postCalls[0][1]?.headers as Headers).get("Idempotency-Key");
+        const secondKey = (postCalls[1][1]?.headers as Headers).get("Idempotency-Key");
         expect(firstKey).toBe("it-comment-key-a");
         expect(secondKey).toBe("it-comment-key-b");
     });

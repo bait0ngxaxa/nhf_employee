@@ -216,6 +216,7 @@ describe("IT operator Ticket detail presentation", () => {
                         authorDisplayName: "เจ้าหน้าที่ IT",
                         authorSide: "OPERATOR",
                         body: "กำลังตรวจสอบให้ค่ะ",
+                        attachments: [],
                     },
                 }, 201);
             }

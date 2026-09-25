@@ -8,6 +8,7 @@ import {
     isITOperatorMutationVersionConflict,
     readITOperatorError,
     mergeITTicketTimelineItems,
+    parseITTicketTimelineItem,
     parseITTicketTimelinePage,
 } from "./ticket-presentation";
 
@@ -126,6 +127,7 @@ describe("IT Ticket timeline presentation contracts", () => {
                     authorDisplayName: "อารี ใจเย็น",
                     authorSide: "OPERATOR",
                     body: "ตรวจสอบให้แล้วค่ะ",
+                    attachments: [],
                     author: { password: "private" },
                 },
             ],
@@ -149,6 +151,7 @@ describe("IT Ticket timeline presentation contracts", () => {
                     authorDisplayName: "อารี ใจเย็น",
                     authorSide: "OPERATOR",
                     body: "ตรวจสอบให้แล้วค่ะ",
+                    attachments: [],
                 },
             ],
             olderCursor: "eyJzb3VyY2UiOiJFVkVOVCJ9",
@@ -174,6 +177,7 @@ describe("IT Ticket timeline presentation contracts", () => {
                 authorDisplayName: "ผู้แจ้ง",
                 authorSide: "REQUESTER",
                 body: "ข้อความ",
+                attachments: [],
             },
             { type: "CREATED", id: 8, createdAt: at, actorDisplayName: "ก" },
             { type: "STATUS_CHANGED", id: 4, createdAt: at, actorDisplayName: "ข", fromStatus: "OPEN", toStatus: "IN_PROGRESS" },
@@ -184,6 +188,7 @@ describe("IT Ticket timeline presentation contracts", () => {
                 authorDisplayName: "เจ้าหน้าที่",
                 authorSide: "OPERATOR",
                 body: "ข้อความ",
+                attachments: [],
             },
             { type: "CREATED", id: 7, createdAt: at, actorDisplayName: "ค" },
         ]);
@@ -195,5 +200,50 @@ describe("IT Ticket timeline presentation contracts", () => {
             "COMMENT:cm01",
             "COMMENT:cm02",
         ]);
+    });
+
+    it("validates attachment summaries before exposing private image URLs to presentation", () => {
+        const comment = {
+            type: "COMMENT",
+            id: "cmtest123",
+            createdAt: "2026-09-01T02:00:00.000Z",
+            authorDisplayName: "ผู้แจ้ง",
+            authorSide: "REQUESTER",
+            body: "มีภาพประกอบ",
+            attachments: [{
+                id: "a".repeat(32),
+                originalName: "หลักฐาน.png",
+                contentType: "image/webp",
+                sizeBytes: 12_345,
+                width: 800,
+                height: 600,
+                position: 0,
+                storageKey: "it/19/private.webp",
+            }],
+        };
+        const parsed = parseITTicketTimelineItem(comment);
+        expect(parsed).toMatchObject({
+            type: "COMMENT",
+            attachments: [{ id: "a".repeat(32), originalName: "หลักฐาน.png" }],
+        });
+        expect(parsed).not.toHaveProperty("attachments.0.storageKey");
+
+        for (const invalidAttachment of [
+            { ...comment.attachments[0], id: "../private" },
+            { ...comment.attachments[0], contentType: "image/png" },
+            { ...comment.attachments[0], position: 3 },
+            { ...comment.attachments[0], sizeBytes: 0 },
+            { ...comment.attachments[0], width: 2401 },
+            { ...comment.attachments[0], originalName: "../proof.png" },
+            { ...comment.attachments[0], originalName: "   " },
+            { ...comment.attachments[0], originalName: " proof.png " },
+            { ...comment.attachments[0], originalName: "proof\u0085.png" },
+        ]) {
+            expect(parseITTicketTimelineItem({
+                ...comment,
+                attachments: [invalidAttachment],
+            })).toBeNull();
+        }
+        expect(parseITTicketTimelineItem({ ...comment, attachments: undefined })).toBeNull();
     });
 });

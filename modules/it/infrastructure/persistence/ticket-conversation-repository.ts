@@ -2,7 +2,11 @@ import type { ITTicketStatus, Prisma } from "@prisma/client";
 
 export type ITTicketConversationPersistenceContext = Pick<
     Prisma.TransactionClient,
-    "iTTicket" | "iTTicketComment" | "iTTicketCommentIdempotency" | "iTTicketEvent"
+    | "iTTicket"
+    | "iTTicketComment"
+    | "iTTicketCommentIdempotency"
+    | "iTTicketEvent"
+    | "iTTicketAttachment"
 >;
 
 export const IT_TICKET_COMMENT_SELECT = {
@@ -19,6 +23,18 @@ export const IT_TICKET_COMMENT_SELECT = {
                 select: { firstName: true, lastName: true, nickname: true },
             },
         },
+    },
+    attachments: {
+        select: {
+            id: true,
+            originalName: true,
+            contentType: true,
+            sizeBytes: true,
+            width: true,
+            height: true,
+            position: true,
+        },
+        orderBy: { position: "asc" },
     },
 } satisfies Prisma.ITTicketCommentSelect;
 
@@ -115,6 +131,24 @@ export async function createITTicketComment(
 ): Promise<ITTicketCommentRecord> {
     return tx.iTTicketComment.create({
         data,
+        select: IT_TICKET_COMMENT_SELECT,
+    });
+}
+
+export async function createITTicketAttachmentRows(
+    tx: ITTicketConversationPersistenceContext,
+    data: Prisma.ITTicketAttachmentCreateManyInput[],
+): Promise<void> {
+    if (data.length === 0) return;
+    await tx.iTTicketAttachment.createMany({ data });
+}
+
+export async function findITTicketCommentById(
+    tx: ITTicketConversationPersistenceContext,
+    id: string,
+): Promise<ITTicketCommentRecord> {
+    return tx.iTTicketComment.findUniqueOrThrow({
+        where: { id },
         select: IT_TICKET_COMMENT_SELECT,
     });
 }

@@ -23,6 +23,13 @@ describe("mutation rate limit", () => {
         vi.useRealTimers();
     });
 
+    it("uses the approved process-local IT multipart budgets", () => {
+        expect(PRE_AUTH_IP_RATE_LIMIT_POLICIES["it-ticket-comment-attachment"])
+            .toEqual({ windowMs: 15 * 60 * 1000, maxRequests: 60 });
+        expect(AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES["it-ticket-comment-attachment"])
+            .toEqual({ windowMs: 60 * 1000, maxRequests: 10 });
+    });
+
     it("blocks a pre-auth flood from the same IP before authentication", async () => {
         const request = createRequest("203.0.113.10");
         const policy =

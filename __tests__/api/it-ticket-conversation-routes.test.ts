@@ -39,6 +39,7 @@ const commentSubmission = {
         authorDisplayName: "ผู้ใช้งานตัวอย่าง",
         authorSide: "REQUESTER",
         body: "ข้อความตอบกลับ",
+        attachments: [],
     },
     replayed: false,
 };
@@ -55,7 +56,7 @@ function request(
 ): NextRequest {
     return new NextRequest(url, {
         method,
-        headers,
+        headers: body === undefined ? headers : { "Content-Type": "application/json", ...headers },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
 }
@@ -191,12 +192,12 @@ describe("IT Ticket conversation HTTP routes", () => {
         expect(mocks.requesterPost).toHaveBeenCalledWith(
             context,
             { ticketId: 19, body: "ขอความช่วยเหลือค่ะ" },
-            { idempotencyKey: "same-key" },
+            { idempotencyKey: "same-key", attachments: [] },
         );
         expect(mocks.operatorPost).toHaveBeenCalledWith(
             context,
             { ticketId: 19, body: "กำลังตรวจสอบค่ะ" },
-            { idempotencyKey: "operator-key" },
+            { idempotencyKey: "operator-key", attachments: [] },
         );
         expect(await requesterResponse.json()).toMatchObject({ success: true, replayed: false });
     });
