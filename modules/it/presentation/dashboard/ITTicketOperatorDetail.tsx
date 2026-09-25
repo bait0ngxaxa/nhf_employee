@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { ITTicketConversation } from "./ITTicketConversation";
 
 import {
     IT_TICKET_STATUS_LABELS,
@@ -413,6 +414,13 @@ export function ITTicketOperatorDetail({
                                 </dl>
                             </CardContent>
                         </Card>
+
+                        <ITTicketConversation
+                            ticketId={ticket.id}
+                            status={ticket.status}
+                            canComment={capabilities.canCommentAllTickets}
+                            operator
+                        />
 
                         {canManage ? (
                             <section aria-labelledby="it-ticket-operator-actions-heading" className="space-y-4 rounded-xl border border-border-neutral bg-surface-subtle p-4 md:p-5">

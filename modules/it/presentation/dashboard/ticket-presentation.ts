@@ -2,6 +2,9 @@ import {
     IT_OPERATOR_QUEUE_MAX_LIMIT,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
+    type ITTicketCommentSubmission,
+    type ITTicketTimelineItem,
+    type ITTicketTimelinePage,
     type ITAssignableOperator,
     type ITOperatorReferenceData,
     type ITOperatorTicket,
@@ -329,4 +332,161 @@ export function formatITTicketDate(value: string): string {
         dateStyle: "medium",
         timeStyle: "short",
     }).format(date);
+}
+
+function isISODateTime(value: unknown): value is string {
+    return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function isNullableITTicketStatus(value: unknown): value is ITTicketStatus | null {
+    return value === null || isITTicketStatus(value);
+}
+
+function isNullableDisplayName(value: unknown): value is string | null {
+    return value === null || typeof value === "string";
+}
+
+export function parseITTicketTimelineItem(value: unknown): ITTicketTimelineItem | null {
+    if (!isITTicketResponseRecord(value)
+        || !isISODateTime(value.createdAt)) {
+        return null;
+    }
+
+    if (value.type === "COMMENT") {
+        if (typeof value.id !== "string"
+            || typeof value.authorDisplayName !== "string"
+            || (value.authorSide !== "REQUESTER" && value.authorSide !== "OPERATOR")
+            || typeof value.body !== "string") {
+            return null;
+        }
+        return {
+            type: "COMMENT",
+            id: value.id,
+            createdAt: value.createdAt,
+            authorDisplayName: value.authorDisplayName,
+            authorSide: value.authorSide,
+            body: value.body,
+        };
+    }
+
+    if (!isPositiveSafeInteger(value.id) || typeof value.actorDisplayName !== "string") {
+        return null;
+    }
+    const base = {
+        id: value.id,
+        createdAt: value.createdAt,
+        actorDisplayName: value.actorDisplayName,
+    };
+
+    if (value.type === "CREATED") return { type: "CREATED", ...base };
+    if (value.type === "ASSIGNED" || value.type === "UNASSIGNED") {
+        if (!isNullableDisplayName(value.fromAssigneeDisplayName)
+            || !isNullableDisplayName(value.toAssigneeDisplayName)) {
+            return null;
+        }
+        return {
+            type: value.type,
+            ...base,
+            fromAssigneeDisplayName: value.fromAssigneeDisplayName,
+            toAssigneeDisplayName: value.toAssigneeDisplayName,
+        };
+    }
+    if (value.type === "STATUS_CHANGED") {
+        if (!isNullableITTicketStatus(value.fromStatus)
+            || !isNullableITTicketStatus(value.toStatus)) {
+            return null;
+        }
+        return {
+            type: "STATUS_CHANGED",
+            ...base,
+            fromStatus: value.fromStatus,
+            toStatus: value.toStatus,
+        };
+    }
+    if (value.type === "CATEGORY_CHANGED") {
+        if (!isNullableDisplayName(value.fromCategoryName)
+            || !isNullableDisplayName(value.toCategoryName)) {
+            return null;
+        }
+        return {
+            type: "CATEGORY_CHANGED",
+            ...base,
+            fromCategoryName: value.fromCategoryName,
+            toCategoryName: value.toCategoryName,
+        };
+    }
+    return null;
+}
+
+export function parseITTicketTimelinePage(value: unknown): ITTicketTimelinePage | null {
+    if (!isITTicketResponseRecord(value)
+        || value.success !== true
+        || !Array.isArray(value.items)
+        || (value.olderCursor !== null && typeof value.olderCursor !== "string")
+        || typeof value.hasMore !== "boolean"
+        || (value.hasMore && typeof value.olderCursor !== "string")) {
+        return null;
+    }
+    const items = value.items.map(parseITTicketTimelineItem);
+    if (items.some((item) => item === null)) return null;
+    return {
+        items: items.filter((item): item is ITTicketTimelineItem => item !== null),
+        olderCursor: value.olderCursor,
+        hasMore: value.hasMore,
+    };
+}
+
+export function parseITTicketCommentSubmission(value: unknown): ITTicketCommentSubmission | null {
+    if (!isITTicketResponseRecord(value)
+        || value.success !== true
+        || typeof value.replayed !== "boolean") {
+        return null;
+    }
+    const comment = parseITTicketTimelineItem(value.comment);
+    if (comment === null || comment.type !== "COMMENT") return null;
+    return { comment, replayed: value.replayed };
+}
+
+export function mergeITTicketTimelineItems(
+    ...groups: readonly (readonly ITTicketTimelineItem[])[]
+): ITTicketTimelineItem[] {
+    const unique = new Map<string, ITTicketTimelineItem>();
+    for (const item of groups.flat()) {
+        unique.set(`${item.type}:${item.id}`, item);
+    }
+    return [...unique.values()].sort((left, right) => {
+        const timeDifference = Date.parse(left.createdAt) - Date.parse(right.createdAt);
+        if (timeDifference !== 0) return timeDifference;
+        const leftIsEvent = left.type !== "COMMENT";
+        const rightIsEvent = right.type !== "COMMENT";
+        if (leftIsEvent !== rightIsEvent) return leftIsEvent ? -1 : 1;
+        if (typeof left.id === "number" && typeof right.id === "number") {
+            return left.id - right.id;
+        }
+        const leftId = String(left.id);
+        const rightId = String(right.id);
+        return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+    });
+}
+
+export function readITTicketConversationError(
+    payload: unknown,
+    status: number,
+    operator: boolean,
+): string {
+    if (status === 401) return "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง";
+    if (status === 403) return "สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงไม่สามารถดำเนินการได้";
+    if (status === 404) return operator
+        ? "ไม่พบ Ticket ที่ระบุ"
+        : "ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้";
+    if (status === 409 && isITTicketResponseRecord(payload)
+        && typeof payload.error === "string") {
+        return payload.error;
+    }
+    if (isITTicketResponseRecord(payload) && typeof payload.error === "string") {
+        return payload.error;
+    }
+    return status >= 500
+        ? "ระบบขัดข้องชั่วคราว กรุณาลองอีกครั้ง"
+        : "ไม่สามารถดำเนินการได้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง";
 }

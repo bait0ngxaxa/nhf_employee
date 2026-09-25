@@ -70,9 +70,24 @@ function referenceResponse(): Response {
     return apiResponse({ success: true, ...reference });
 }
 
+function timelineResponse(): Response {
+    return apiResponse({
+        success: true,
+        items: [{
+            type: "CREATED",
+            id: 1,
+            createdAt: ticket.createdAt,
+            actorDisplayName: ticket.requester.displayName,
+        }],
+        olderCursor: null,
+        hasMore: false,
+    });
+}
+
 beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("crypto", { randomUUID: () => "it-operator-comment-key" });
 });
 
 afterEach(() => {
@@ -136,7 +151,7 @@ describe("IT operator Ticket detail presentation", () => {
     it("keeps a read-only ALL operator from receiving mutation controls", async () => {
         fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
             ? referenceResponse()
-            : detailResponse(ticket));
+            : String(input).includes("/timeline") ? timelineResponse() : detailResponse(ticket));
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={requesterCapabilities} />);
 
@@ -145,6 +160,75 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.getByText("หน้าเข้าสู่ระบบแสดงข้อผิดพลาด")).toBeInTheDocument();
         expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "เริ่มดำเนินการ" })).not.toBeInTheDocument();
+    });
+
+    it("shows a reply composer for comment ALL without manage ALL", async () => {
+        const commentOnlyCapabilities: ITPresentationCapabilities = {
+            ...requesterCapabilities,
+            canCommentAllTickets: true,
+            canManageTickets: false,
+        };
+        fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
+            ? referenceResponse()
+            : String(input).includes("/timeline") ? timelineResponse() : detailResponse(ticket));
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={commentOnlyCapabilities} />);
+
+        expect(await screen.findByLabelText("ตอบกลับ")).toBeInTheDocument();
+        expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
+    });
+
+    it("does not show a reply composer for manage ALL without comment ALL", async () => {
+        fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
+            ? referenceResponse()
+            : String(input).includes("/timeline") ? timelineResponse() : detailResponse(ticket));
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        expect(await screen.findByRole("heading", { name: "ดำเนินการกับ Ticket" })).toBeInTheDocument();
+        expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
+    });
+
+    it("posts the shared operator reply and leaves the workflow status alone", async () => {
+        fetchMock.mockImplementation(async (input, init) => {
+            if (String(input).includes("/reference")) return referenceResponse();
+            if (String(input).includes("/timeline")) return timelineResponse();
+            if (init?.method === "POST") {
+                return apiResponse({
+                    success: true,
+                    replayed: false,
+                    comment: {
+                        type: "COMMENT",
+                        id: "cm-operator-reply",
+                        createdAt: "2026-09-03T01:00:00.000Z",
+                        authorDisplayName: "เจ้าหน้าที่ IT",
+                        authorSide: "OPERATOR",
+                        body: "กำลังตรวจสอบให้ค่ะ",
+                    },
+                }, 201);
+            }
+            return detailResponse(ticket);
+        });
+        const commentOnlyCapabilities: ITPresentationCapabilities = {
+            ...requesterCapabilities,
+            canCommentAllTickets: true,
+            canManageTickets: false,
+        };
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={commentOnlyCapabilities} />);
+        await screen.findByText("อารี ใจเย็น สร้าง Ticket");
+        fireEvent.change(screen.getByLabelText("ตอบกลับ"), {
+            target: { value: "  กำลังตรวจสอบให้ค่ะ  " },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+
+        expect(await screen.findByText("ส่งข้อความเรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(screen.getByText("กำลังตรวจสอบให้ค่ะ")).toBeInTheDocument();
+        expect(screen.getByText("รับเรื่องแล้ว")).toBeInTheDocument();
+        const postCall = fetchMock.mock.calls.find(([, options]) => options?.method === "POST");
+        expect(postCall?.[0]).toBe("/api/it/operator/tickets/19/comments");
+        expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({ body: "กำลังตรวจสอบให้ค่ะ" });
     });
 
     it("sends the displayed version and requires review after loading a stale conflict", async () => {
@@ -165,6 +249,7 @@ describe("IT operator Ticket detail presentation", () => {
         fetchMock.mockImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("/timeline")) return timelineResponse();
             if (init?.method === "PATCH") {
                 patchBodies.push(JSON.parse(String(init.body)) as unknown);
                 patchCount += 1;

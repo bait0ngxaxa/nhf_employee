@@ -152,7 +152,7 @@ describe("Dashboard IT Ticket route authorization", () => {
         });
 
         await expect(requireDashboardITSelfServiceAccess()).resolves.toEqual(capabilities);
-        await expect(requireDashboardITReadAccess()).resolves.toBeUndefined();
+        await expect(requireDashboardITReadAccess()).resolves.toEqual(capabilities);
     });
 
     it("requires read ALL for operator routes regardless of system role", async () => {

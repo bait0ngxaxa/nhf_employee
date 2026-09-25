@@ -76,9 +76,10 @@ export async function requireDashboardITOperatorReadAccess(): Promise<ITPresenta
     return capabilities;
 }
 
-export async function requireDashboardITReadAccess(): Promise<void> {
+export async function requireDashboardITReadAccess(): Promise<ITPresentationCapabilities> {
     const capabilities = await requireDashboardITSelfServiceAccess();
     if (!capabilities.canReadOwnTickets) redirect(APP_ROUTES.accessDenied);
+    return capabilities;
 }
 
 export async function requireDashboardAuthorizationAdministration(): Promise<

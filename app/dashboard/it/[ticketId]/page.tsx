@@ -13,11 +13,11 @@ export default async function ITTicketDetailPage({
 }: {
     readonly params: Promise<{ readonly ticketId: string }>;
 }): Promise<React.ReactElement> {
-    await requireDashboardITReadAccess();
+    const capabilities = await requireDashboardITReadAccess();
     const { ticketId: rawTicketId } = await params;
     if (!/^[1-9]\d*$/.test(rawTicketId)) notFound();
     const ticketId = Number(rawTicketId);
     if (!Number.isSafeInteger(ticketId)) notFound();
 
-    return <ITTicketDetail ticketId={ticketId} />;
+    return <ITTicketDetail ticketId={ticketId} canCommentOwnTickets={capabilities.canCommentOwnTickets} />;
 }

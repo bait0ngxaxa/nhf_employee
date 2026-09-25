@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { ITTicketConversation } from "./ITTicketConversation";
 
 import {
     IT_TICKET_STATUS_LABELS,
@@ -26,7 +27,13 @@ type ITRequesterDetailState =
     | { readonly key: string; readonly kind: "loaded"; readonly ticket: ITRequesterTicket }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
 
-export function ITTicketDetail({ ticketId }: { ticketId: number }): ReactElement {
+export function ITTicketDetail({
+    ticketId,
+    canCommentOwnTickets,
+}: {
+    readonly ticketId: number;
+    readonly canCommentOwnTickets: boolean;
+}): ReactElement {
     const [detailState, setDetailState] = useState<ITRequesterDetailState | null>(null);
     const [retryKey, setRetryKey] = useState(0);
     const requestKey = `${ticketId}:${retryKey}`;
@@ -131,6 +138,12 @@ export function ITTicketDetail({ ticketId }: { ticketId: number }): ReactElement
                                 </dl>
                             </CardContent>
                         </Card>
+                        <ITTicketConversation
+                            ticketId={ticket.id}
+                            status={ticket.status}
+                            canComment={canCommentOwnTickets}
+                            operator={false}
+                        />
                     </>
                 ) : null}
             </div>

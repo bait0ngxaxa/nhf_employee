@@ -7,9 +7,11 @@ import {
     ITTicketAssigneeNotEligibleError,
     ITTicketCategoryInactiveError,
     ITTicketCategoryNotFoundError,
+    ITTicketIdempotencyConflictError,
     ITTicketInputValidationError,
     ITTicketInvalidTransitionError,
     ITTicketMutationConflictError,
+    ITTicketNotCommentableError,
     ITTicketNotFoundError,
     ITWorkforceDeniedError,
 } from "@/modules/it";
@@ -29,6 +31,9 @@ export function mapITOperatorRouteError(error: unknown): NextResponse | null {
     if (error instanceof ITTicketInputValidationError) {
         return jsonError(error.message, 400, { success: false });
     }
+    if (error instanceof ITTicketIdempotencyConflictError) {
+        return jsonError(error.message, 409, { success: false, code: error.code });
+    }
     if (error instanceof ITTicketNotFoundError || error instanceof ITTicketCategoryNotFoundError) {
         return notFound({ success: false });
     }
@@ -43,6 +48,7 @@ export function mapITOperatorRouteError(error: unknown): NextResponse | null {
         error instanceof ITTicketAssigneeNotEligibleError
         || error instanceof ITTicketCategoryInactiveError
         || error instanceof ITTicketInvalidTransitionError
+        || error instanceof ITTicketNotCommentableError
     ) {
         return jsonError(error.message, 409, { success: false, code: error.code });
     }

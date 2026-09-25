@@ -47,6 +47,33 @@ function createdTicketResponse(): Response {
     return apiResponse({ success: true, ticket, replayed: false }, 201);
 }
 
+function timelineResponse(items: readonly unknown[] = [], options: {
+    readonly olderCursor?: string | null;
+    readonly hasMore?: boolean;
+} = {}): Response {
+    return apiResponse({
+        success: true,
+        items,
+        olderCursor: options.olderCursor ?? null,
+        hasMore: options.hasMore ?? false,
+    });
+}
+
+function postedCommentResponse(replayed = false): Response {
+    return apiResponse({
+        success: true,
+        replayed,
+        comment: {
+            type: "COMMENT",
+            id: "cm-new-comment",
+            createdAt: "2026-09-03T01:00:00.000Z",
+            authorDisplayName: "ผู้แจ้งตัวอย่าง",
+            authorSide: "REQUESTER",
+            body: "ขออัปเดตผลตรวจสอบค่ะ",
+        },
+    }, replayed ? 200 : 201);
+}
+
 async function openCreateDialog(): Promise<void> {
     await screen.findByText("ยังไม่มี Ticket");
     fireEvent.click(screen.getByRole("button", { name: "สร้าง Ticket" }));
@@ -175,12 +202,11 @@ describe("IT Ticket requester detail", () => {
         ["CLOSED", "ปิดงานแล้ว"],
         ["CANCELLED", "ยกเลิกแล้ว"],
     ] as const)("renders %s status as %s", async (status, label) => {
-        fetchMock.mockResolvedValue(apiResponse({
-            success: true,
-            ticket: { ...ticket, status },
-        }));
+        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
+            ? timelineResponse()
+            : apiResponse({ success: true, ticket: { ...ticket, status } }));
 
-        render(<ITTicketDetail ticketId={19} />);
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
 
         expect(await screen.findByRole("heading", { name: "Ticket #19" })).toBeInTheDocument();
         expect(screen.getByText(label)).toBeInTheDocument();
@@ -190,10 +216,127 @@ describe("IT Ticket requester detail", () => {
     it("shows a non-leaking not-found error for a direct foreign Ticket URL", async () => {
         fetchMock.mockResolvedValue(apiResponse({ error: "Not found" }, 404));
 
-        render(<ITTicketDetail ticketId={900} />);
+        render(<ITTicketDetail ticketId={900} canCommentOwnTickets />);
 
         expect(await screen.findByRole("alert"))
             .toHaveTextContent("ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้");
         expect(fetchMock).toHaveBeenCalledWith("/api/it/tickets/900", expect.anything());
+    });
+
+    it("shows timeline loading, empty, retry, and event history states", async () => {
+        fetchMock.mockImplementation(async (input) => {
+            if (String(input).includes("/timeline")) {
+                return new Promise<Response>(() => undefined);
+            }
+            return apiResponse({ success: true, ticket });
+        });
+        const { unmount } = render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+        expect(await screen.findByRole("status", { name: "กำลังโหลดประวัติ Ticket" }))
+            .toBeInTheDocument();
+        unmount();
+
+        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
+            ? timelineResponse([
+                { type: "CREATED", id: 1, createdAt: ticket.createdAt, actorDisplayName: "สมชาย" },
+                { type: "ASSIGNED", id: 2, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromAssigneeDisplayName: null, toAssigneeDisplayName: "วิชัย" },
+                { type: "UNASSIGNED", id: 3, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromAssigneeDisplayName: "วิชัย", toAssigneeDisplayName: null },
+                { type: "STATUS_CHANGED", id: 4, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromStatus: "OPEN", toStatus: "IN_PROGRESS" },
+                { type: "CATEGORY_CHANGED", id: 5, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromCategoryName: null, toCategoryName: "ระบบเครือข่าย" },
+            ])
+            : apiResponse({ success: true, ticket }));
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+        expect(await screen.findByText("สมชาย สร้าง Ticket")).toBeInTheDocument();
+        expect(screen.getByText("อารี เปลี่ยนผู้รับผิดชอบจาก ไม่มีผู้รับผิดชอบ เป็น วิชัย"))
+            .toBeInTheDocument();
+        expect(screen.getByText("อารี นำความรับผิดชอบของ วิชัย ออก")).toBeInTheDocument();
+        expect(screen.getByText("อารี เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ"))
+            .toBeInTheDocument();
+        expect(screen.getByText("อารี เปลี่ยนหมวดหมู่จาก ไม่จัดหมวดหมู่ เป็น ระบบเครือข่าย"))
+            .toBeInTheDocument();
+    });
+
+    it("shows requester reply only for projected comment authority and commentable status", async () => {
+        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
+            ? timelineResponse()
+            : apiResponse({ success: true, ticket }));
+        const { rerender, unmount } = render(
+            <ITTicketDetail ticketId={19} canCommentOwnTickets={false} />,
+        );
+        expect(await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ"))
+            .toBeInTheDocument();
+        expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
+
+        rerender(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+        expect(await screen.findByLabelText("ตอบกลับ")).toBeInTheDocument();
+
+        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
+            ? timelineResponse()
+            : apiResponse({ success: true, ticket: { ...ticket, status: "RESOLVED" } }));
+        unmount();
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+        expect(await screen.findByText(/สถานะ “แก้ไขแล้ว” จึงอ่านประวัติได้อย่างเดียว/))
+            .toBeInTheDocument();
+        expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
+    });
+
+    it("reuses the idempotency key after an uncertain retry of the same canonical body", async () => {
+        fetchMock.mockImplementation(async (input, init) => {
+            if (init?.method === "POST") {
+                return fetchMock.mock.calls.filter(([, options]) => options?.method === "POST").length === 1
+                    ? Promise.reject(new Error("network result uncertain"))
+                    : postedCommentResponse(true);
+            }
+            return String(input).includes("/timeline")
+                ? timelineResponse()
+                : apiResponse({ success: true, ticket: { ...ticket, status: "WAITING_REQUESTER" } });
+        });
+
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+        await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ");
+        const composer = screen.getByLabelText("ตอบกลับ");
+        fireEvent.change(composer, { target: { value: "  ขออัปเดตผลตรวจสอบค่ะ  " } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("network result uncertain");
+        expect(screen.getByText("การตอบกลับจะไม่เปลี่ยนสถานะ Ticket อัตโนมัติ"))
+            .toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+
+        expect(await screen.findByText("ข้อความนี้ถูกส่งเรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(screen.getByText("ขออัปเดตผลตรวจสอบค่ะ")).toBeInTheDocument();
+        expect(screen.getByText("รอข้อมูลจากผู้แจ้ง")).toBeInTheDocument();
+        const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
+        expect(postCalls).toHaveLength(2);
+        expect((postCalls[0][1]?.headers as Record<string, string>)["Idempotency-Key"])
+            .toBe((postCalls[1][1]?.headers as Record<string, string>)["Idempotency-Key"]);
+        expect(JSON.parse(String(postCalls[0][1]?.body))).toEqual({ body: "ขออัปเดตผลตรวจสอบค่ะ" });
+    });
+
+    it("uses a new idempotency key when the canonical body changes after uncertainty", async () => {
+        randomUUID.mockReturnValueOnce("it-comment-key-a").mockReturnValueOnce("it-comment-key-b");
+        fetchMock.mockImplementation(async (input, init) => {
+            if (init?.method === "POST") {
+                const count = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST").length;
+                return count === 1
+                    ? Promise.reject(new Error("network result uncertain"))
+                    : postedCommentResponse();
+            }
+            return String(input).includes("/timeline")
+                ? timelineResponse()
+                : apiResponse({ success: true, ticket });
+        });
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+        await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ");
+        fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความแรก" } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByRole("alert");
+        fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความใหม่" } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
+
+        const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
+        const firstKey = (postCalls[0][1]?.headers as Record<string, string>)["Idempotency-Key"];
+        const secondKey = (postCalls[1][1]?.headers as Record<string, string>)["Idempotency-Key"];
+        expect(firstKey).toBe("it-comment-key-a");
+        expect(secondKey).toBe("it-comment-key-b");
     });
 });

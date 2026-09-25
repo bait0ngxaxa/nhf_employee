@@ -7,7 +7,8 @@ export type ITTicketErrorCode =
     | "IDEMPOTENCY_CONFLICT"
     | "ASSIGNEE_NOT_ELIGIBLE"
     | "CATEGORY_NOT_FOUND"
-    | "CATEGORY_INACTIVE";
+    | "CATEGORY_INACTIVE"
+    | "TICKET_NOT_COMMENTABLE";
 
 export class ITTicketError extends Error {
     readonly code: ITTicketErrorCode;
@@ -61,7 +62,7 @@ export class ITTicketMutationConflictError extends ITTicketError {
 
 export class ITTicketIdempotencyConflictError extends ITTicketError {
     constructor() {
-        super("IDEMPOTENCY_CONFLICT", "Idempotency-Key นี้ถูกใช้กับข้อมูล Ticket อื่นแล้ว");
+        super("IDEMPOTENCY_CONFLICT", "Idempotency-Key นี้ถูกใช้กับคำขออื่นแล้ว");
         this.name = "ITTicketIdempotencyConflictError";
     }
 }
@@ -84,5 +85,12 @@ export class ITTicketCategoryInactiveError extends ITTicketError {
     constructor() {
         super("CATEGORY_INACTIVE", "หมวดหมู่ Ticket นี้ปิดใช้งานแล้ว");
         this.name = "ITTicketCategoryInactiveError";
+    }
+}
+
+export class ITTicketNotCommentableError extends ITTicketError {
+    constructor() {
+        super("TICKET_NOT_COMMENTABLE", "สถานะปัจจุบันไม่อนุญาตให้ตอบกลับ Ticket นี้");
+        this.name = "ITTicketNotCommentableError";
     }
 }

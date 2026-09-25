@@ -1,7 +1,20 @@
-import type { ITTicketStatus, ITTicketType } from "@prisma/client";
+import type {
+    ITTicketCommentKind,
+    ITTicketStatus,
+    ITTicketType,
+} from "@prisma/client";
 
 export const IT_TICKET_TITLE_MAX_LENGTH = 200;
 export const IT_TICKET_DESCRIPTION_MAX_LENGTH = 10_000;
+/** Technical safety bound pending an IT-specific product maximum. */
+export const IT_TICKET_COMMENT_MAX_LENGTH = IT_TICKET_DESCRIPTION_MAX_LENGTH;
+export const IT_TICKET_TIMELINE_DEFAULT_LIMIT = 25;
+export const IT_TICKET_TIMELINE_MAX_LIMIT = 100;
+export const IT_TICKET_COMMENTABLE_STATUSES = Object.freeze([
+    "OPEN",
+    "IN_PROGRESS",
+    "WAITING_REQUESTER",
+] as const satisfies readonly ITTicketStatus[]);
 export const IT_TICKET_LIST_DEFAULT_PAGE = 1;
 export const IT_TICKET_LIST_DEFAULT_LIMIT = 10;
 export const IT_TICKET_LIST_MAX_LIMIT = 100;
@@ -84,6 +97,61 @@ export interface ITOperatorTicketMutationSnapshot {
     readonly assignedToUserId: number | null;
     readonly categoryId: number | null;
     readonly updatedAt: string;
+}
+
+export interface ITTicketTimelineComment {
+    readonly type: "COMMENT";
+    readonly id: string;
+    readonly createdAt: string;
+    readonly authorDisplayName: string;
+    readonly authorSide: ITTicketCommentKind;
+    readonly body: string;
+}
+
+export type ITTicketTimelineEvent =
+    | {
+        readonly type: "CREATED";
+        readonly id: number;
+        readonly createdAt: string;
+        readonly actorDisplayName: string;
+    }
+    | {
+        readonly type: "ASSIGNED" | "UNASSIGNED";
+        readonly id: number;
+        readonly createdAt: string;
+        readonly actorDisplayName: string;
+        readonly fromAssigneeDisplayName: string | null;
+        readonly toAssigneeDisplayName: string | null;
+    }
+    | {
+        readonly type: "STATUS_CHANGED";
+        readonly id: number;
+        readonly createdAt: string;
+        readonly actorDisplayName: string;
+        readonly fromStatus: ITTicketStatus | null;
+        readonly toStatus: ITTicketStatus | null;
+    }
+    | {
+        readonly type: "CATEGORY_CHANGED";
+        readonly id: number;
+        readonly createdAt: string;
+        readonly actorDisplayName: string;
+        readonly fromCategoryName: string | null;
+        readonly toCategoryName: string | null;
+    };
+
+export type ITTicketTimelineItem = ITTicketTimelineComment | ITTicketTimelineEvent;
+
+export interface ITTicketTimelinePage {
+    /** Chronological order; the first page contains the latest bounded slice. */
+    readonly items: readonly ITTicketTimelineItem[];
+    readonly olderCursor: string | null;
+    readonly hasMore: boolean;
+}
+
+export interface ITTicketCommentSubmission {
+    readonly comment: ITTicketTimelineComment;
+    readonly replayed: boolean;
 }
 
 export interface ITAssignableOperator {

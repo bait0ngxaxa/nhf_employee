@@ -13,10 +13,11 @@ The repository-wide K0 ownership audit, K1 closure, and deferred-boundary
 inventory are recorded in [final-repository-audit.md](./final-repository-audit.md).
 K1 closed the three Stock findings. IT1 established the `modules/it` server
 authorization foundation, IT2 added IT-owned Ticket persistence and domain
-commands, IT3 added requester-only Ticket API and Dashboard presentation, and
-IT4 added the separate read-ALL operator queue/API and processing surface.
-Comments, attachments, notifications, and Email Request migration remain
-deferred.
+commands, IT3 added requester-only Ticket API and Dashboard presentation, IT4
+added the separate read-ALL operator queue/API and processing surface, and
+IT5A adds shared conversation and a bounded merged timeline. IT5B private
+attachments remain pending product requirements; notifications and Email
+Request migration remain deferred.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -116,7 +117,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT module Ticket services and operator processing (IT1/IT2/IT3/IT4)
+## IT module Ticket services and operator processing (IT1/IT2/IT3/IT4/IT5A)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -144,8 +145,18 @@ The root server entry exposes stable application contracts;
 `@/modules/it/client` is the browser-safe presentation entry. Dashboard
 navigation and route guards use the server-derived capability projection,
 while API/query boundaries independently revalidate workforce and authority.
-IT4 adds no category administration, production grant configuration,
-conversation, comments, attachments, or notification producer. See
+
+IT5A adds immutable comments, actor-side classification, comment idempotency,
+`firstRespondedAt`, and a bounded merged timeline in the IT application and
+persistence layers. Requester timeline/comment queries always include the
+authenticated requester predicate; operator timeline reads require current
+read ALL and replies independently require comment ALL. The requester and
+operator routes select their authority path server-side. Both existing
+Dashboard detail surfaces use the browser-safe IT client entry. Comments add
+no Ticket events, notifications/outbox writes, or Audit rows. No attachment
+schema, route, storage, or UI is introduced; IT5B awaits product decisions.
+IT5A adds no category administration, production grant configuration,
+attachments, notification producer, or Email Request migration. See
 [it-module-design.md](./it-module-design.md) for the phase contract and
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.

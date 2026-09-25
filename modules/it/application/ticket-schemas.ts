@@ -3,11 +3,17 @@ import { z } from "zod";
 
 import {
     IT_TICKET_DESCRIPTION_MAX_LENGTH,
+    IT_TICKET_COMMENT_MAX_LENGTH,
     IT_TICKET_DATABASE_INT_MAX,
     IT_TICKET_TITLE_MAX_LENGTH,
 } from "../contracts";
+import { isWellFormedITCommentText } from "../domain/ticket-conversation";
 
-export { IT_TICKET_DESCRIPTION_MAX_LENGTH, IT_TICKET_TITLE_MAX_LENGTH };
+export {
+    IT_TICKET_COMMENT_MAX_LENGTH,
+    IT_TICKET_DESCRIPTION_MAX_LENGTH,
+    IT_TICKET_TITLE_MAX_LENGTH,
+};
 
 export const createITTicketInputSchema = z.object({
     type: z.nativeEnum(ITTicketType),
@@ -46,9 +52,23 @@ export const setITTicketCategoryBodySchema = setITTicketCategoryInputSchema.omit
     ticketId: true,
 });
 
+export const createITTicketCommentInputSchema = z.object({
+    ticketId: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
+    body: z.string()
+        .trim()
+        .min(1, "กรุณาระบุข้อความตอบกลับ")
+        .max(IT_TICKET_COMMENT_MAX_LENGTH, "ข้อความตอบกลับยาวเกินขีดจำกัดของระบบ")
+        .refine(isWellFormedITCommentText, "ข้อความตอบกลับมีรูปแบบอักขระไม่ถูกต้อง"),
+}).strict();
+
+export const createITTicketCommentBodySchema = createITTicketCommentInputSchema.omit({
+    ticketId: true,
+});
+
 export type CreateITTicketInput = z.infer<typeof createITTicketInputSchema>;
 export type TransitionITTicketStatusInput = z.infer<
     typeof transitionITTicketStatusInputSchema
 >;
 export type AssignITTicketInput = z.infer<typeof assignITTicketInputSchema>;
 export type SetITTicketCategoryInput = z.infer<typeof setITTicketCategoryInputSchema>;
+export type CreateITTicketCommentInput = z.infer<typeof createITTicketCommentInputSchema>;

@@ -42,6 +42,8 @@ model User {
   fromITTicketAssigneeEvents  ITTicketEvent[]               @relation("ITTicketEventFromAssignee")
   toITTicketAssigneeEvents    ITTicketEvent[]               @relation("ITTicketEventToAssignee")
   itTicketCreateIdempotencies ITTicketCreateIdempotency[]   @relation("ITTicketCreateIdempotencyRequester")
+  authoredITTicketComments    ITTicketComment[]             @relation("ITTicketCommentAuthor")
+  itTicketCommentIdempotencies ITTicketCommentIdempotency[] @relation("ITTicketCommentIdempotencyAuthor")
 
   @@map("users")
 }
@@ -240,6 +242,11 @@ enum ITTicketEventKind {
   CATEGORY_CHANGED
 }
 
+enum ITTicketCommentKind {
+  REQUESTER
+  OPERATOR
+}
+
 model ITTicket {
   id                              Int            @id @default(autoincrement())
   type                            ITTicketType
@@ -253,6 +260,7 @@ model ITTicket {
   requesterDepartmentNameSnapshot String?        @db.VarChar(191)
   version                         Int            @default(1)
   resolvedAt                      DateTime?
+  firstRespondedAt                DateTime?
   createdAt                       DateTime       @default(now())
   updatedAt                       DateTime       @updatedAt
 
@@ -262,6 +270,7 @@ model ITTicket {
   category          ITTicketCategory?  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   events            ITTicketEvent[]
   createIdempotency ITTicketCreateIdempotency?
+  comments          ITTicketComment[]
 
   @@index([requesterUserId, createdAt, id])
   @@index([createdAt, id])
@@ -330,6 +339,37 @@ model ITTicketCreateIdempotency {
 
   @@unique([requesterUserId, idempotencyKey])
   @@map("it_ticket_create_idempotency")
+}
+
+model ITTicketComment {
+  id           String              @id @default(cuid()) @db.VarChar(30)
+  ticketId     Int
+  authorUserId Int
+  kind         ITTicketCommentKind
+  body         String              @db.Text
+  createdAt    DateTime            @default(now())
+
+  ticket      ITTicket                    @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  author      User                        @relation("ITTicketCommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  idempotency ITTicketCommentIdempotency?
+
+  @@index([ticketId, createdAt, id])
+  @@map("it_ticket_comments")
+}
+
+model ITTicketCommentIdempotency {
+  id             Int      @id @default(autoincrement())
+  authorUserId   Int
+  idempotencyKey String   @db.VarChar(255)
+  requestHash    String   @db.Char(64)
+  commentId      String   @unique @db.VarChar(30)
+  createdAt      DateTime @default(now())
+
+  author  User            @relation("ITTicketCommentIdempotencyAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  comment ITTicketComment @relation(fields: [commentId], references: [id], onDelete: Restrict)
+
+  @@unique([authorUserId, idempotencyKey])
+  @@map("it_ticket_comment_idempotency")
 }
 
 enum NotificationOutboxType {

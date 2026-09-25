@@ -18,8 +18,6 @@ export type {
 } from "./application/authorization";
 export { evaluateITAssigneeEligibility } from "./application/assignee-eligibility";
 export {
-    IT_TICKET_DESCRIPTION_MAX_LENGTH,
-    IT_TICKET_TITLE_MAX_LENGTH,
     assignITTicketBodySchema,
     createITTicketInputSchema,
     setITTicketCategoryBodySchema,
@@ -44,7 +42,27 @@ export {
     listITRequesterTicketsInputSchema,
     listITOperatorTickets,
 } from "./application/ticket-queries";
-export { IT_TICKET_DATABASE_INT_MAX } from "./contracts";
+export {
+    getITOperatorTicketTimeline,
+    getITRequesterTicketTimeline,
+} from "./application/ticket-timeline-queries";
+export {
+    postITOperatorTicketComment,
+    postITRequesterTicketComment,
+} from "./application/ticket-comment-commands";
+export {
+    createITTicketCommentBodySchema,
+    createITTicketCommentInputSchema,
+} from "./application/ticket-schemas";
+export {
+    IT_TICKET_COMMENTABLE_STATUSES,
+    IT_TICKET_COMMENT_MAX_LENGTH,
+    IT_TICKET_DATABASE_INT_MAX,
+    IT_TICKET_DESCRIPTION_MAX_LENGTH,
+    IT_TICKET_TIMELINE_DEFAULT_LIMIT,
+    IT_TICKET_TIMELINE_MAX_LIMIT,
+    IT_TICKET_TITLE_MAX_LENGTH,
+} from "./contracts";
 export { toITOperatorTicket, toITRequesterTicket } from "./application/ticket-dto";
 export {
     ITTicketAssigneeNotEligibleError,
@@ -55,12 +73,22 @@ export {
     ITTicketInputValidationError,
     ITTicketInvalidTransitionError,
     ITTicketMutationConflictError,
+    ITTicketNotCommentableError,
     ITTicketNotFoundError,
     ITWorkforceDeniedError,
 } from "./application/ticket-errors";
 export { isAllowedITTicketTransition } from "./domain/ticket-workflow";
 export { getAllowedITTicketTransitions } from "./domain/ticket-workflow";
-export { ITTicketEventKind, ITTicketStatus, ITTicketType } from "@prisma/client";
+export {
+    createITTicketCommentRequestHash,
+    isITTicketCommentableStatus,
+} from "./domain/ticket-conversation";
+export {
+    ITTicketCommentKind,
+    ITTicketEventKind,
+    ITTicketStatus,
+    ITTicketType,
+} from "@prisma/client";
 export type {
     ITAssigneeEligibilityEvidence,
     ITPresentationCapabilities,
@@ -85,6 +113,7 @@ export type {
     SetITTicketCategoryInput,
     TransitionITTicketStatusInput,
 } from "./application/ticket-schemas";
+export type { ITTicketCommentSubmission, ITTicketTimelinePage, ITTicketTimelineItem } from "./contracts";
 export type {
     CreateITTicketResult,
     ITTicketMutationResult,

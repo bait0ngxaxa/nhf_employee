@@ -1,3 +1,5 @@
 export const STOCK_JSON_MUTATION_MAX_BYTES = 32 * 1024;
 export const LEAVE_JSON_MUTATION_MAX_BYTES = 32 * 1024;
 export const ROUTINE_MAX_REQUEST_BYTES = 64 * 1024;
+// Technical JSON envelope for bounded IT comment text, including escaped input.
+export const IT_TICKET_COMMENT_MAX_REQUEST_BYTES = 64 * 1024;

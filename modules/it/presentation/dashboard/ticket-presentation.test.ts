@@ -7,6 +7,8 @@ import {
     parseITOperatorTicketMutationSnapshot,
     isITOperatorMutationVersionConflict,
     readITOperatorError,
+    mergeITTicketTimelineItems,
+    parseITTicketTimelinePage,
 } from "./ticket-presentation";
 
 const operatorTicket = {
@@ -102,5 +104,96 @@ describe("IT operator presentation contracts", () => {
             reason: "STALE_VERSION",
         })).toBe(true);
         expect(isITOperatorMutationVersionConflict({ code: "CATEGORY_INACTIVE" })).toBe(false);
+    });
+});
+
+describe("IT Ticket timeline presentation contracts", () => {
+    it("parses only browser-safe comment and event fields", () => {
+        const payload = {
+            success: true,
+            items: [
+                {
+                    type: "CREATED",
+                    id: 4,
+                    createdAt: "2026-09-01T01:00:00.000Z",
+                    actorDisplayName: "สมชาย ใจดี",
+                    actor: { email: "private@example.test" },
+                },
+                {
+                    type: "COMMENT",
+                    id: "cmtest123",
+                    createdAt: "2026-09-01T02:00:00.000Z",
+                    authorDisplayName: "อารี ใจเย็น",
+                    authorSide: "OPERATOR",
+                    body: "ตรวจสอบให้แล้วค่ะ",
+                    author: { password: "private" },
+                },
+            ],
+            olderCursor: "eyJzb3VyY2UiOiJFVkVOVCJ9",
+            hasMore: true,
+        };
+        const page = parseITTicketTimelinePage(payload);
+
+        expect(page).toEqual({
+            items: [
+                {
+                    type: "CREATED",
+                    id: 4,
+                    createdAt: "2026-09-01T01:00:00.000Z",
+                    actorDisplayName: "สมชาย ใจดี",
+                },
+                {
+                    type: "COMMENT",
+                    id: "cmtest123",
+                    createdAt: "2026-09-01T02:00:00.000Z",
+                    authorDisplayName: "อารี ใจเย็น",
+                    authorSide: "OPERATOR",
+                    body: "ตรวจสอบให้แล้วค่ะ",
+                },
+            ],
+            olderCursor: "eyJzb3VyY2UiOiJFVkVOVCJ9",
+            hasMore: true,
+        });
+        expect(page?.items[0]).not.toHaveProperty("actor");
+        expect(page?.items[1]).not.toHaveProperty("author");
+        expect(parseITTicketTimelinePage({
+            success: true,
+            items: [],
+            olderCursor: null,
+            hasMore: true,
+        })).toBeNull();
+    });
+
+    it("uses timestamp, event-before-comment, and stable source-id ordering for ties", () => {
+        const at = "2026-09-01T01:00:00.000Z";
+        const items = mergeITTicketTimelineItems([
+            {
+                type: "COMMENT",
+                id: "cm02",
+                createdAt: at,
+                authorDisplayName: "ผู้แจ้ง",
+                authorSide: "REQUESTER",
+                body: "ข้อความ",
+            },
+            { type: "CREATED", id: 8, createdAt: at, actorDisplayName: "ก" },
+            { type: "STATUS_CHANGED", id: 4, createdAt: at, actorDisplayName: "ข", fromStatus: "OPEN", toStatus: "IN_PROGRESS" },
+            {
+                type: "COMMENT",
+                id: "cm01",
+                createdAt: at,
+                authorDisplayName: "เจ้าหน้าที่",
+                authorSide: "OPERATOR",
+                body: "ข้อความ",
+            },
+            { type: "CREATED", id: 7, createdAt: at, actorDisplayName: "ค" },
+        ]);
+
+        expect(items.map((item) => `${item.type}:${item.id}`)).toEqual([
+            "STATUS_CHANGED:4",
+            "CREATED:7",
+            "CREATED:8",
+            "COMMENT:cm01",
+            "COMMENT:cm02",
+        ]);
     });
 });

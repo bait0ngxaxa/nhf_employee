@@ -409,10 +409,16 @@ export const API_ROUTES = {
     itTickets: {
         list: "/api/it/tickets",
         byId: (id: number | string): string => `/api/it/tickets/${id}`,
+        timelineById: (id: number | string): string => `/api/it/tickets/${id}/timeline`,
+        commentsById: (id: number | string): string => `/api/it/tickets/${id}/comments`,
     },
     itOperatorTickets: {
         list: "/api/it/operator/tickets",
         byId: (id: number | string): string => `/api/it/operator/tickets/${id}`,
+        timelineById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/timeline`,
+        commentsById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/comments`,
         reference: "/api/it/operator/reference",
         assigneeById: (id: number | string): string =>
             `/api/it/operator/tickets/${id}/assignee`,
