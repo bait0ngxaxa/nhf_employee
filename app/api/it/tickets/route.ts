@@ -14,6 +14,7 @@ import {
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 
 import { mapITTicketRouteError } from "./_lib/response";
+import { scheduleITTicketOutboxWakeup } from "../_lib/outbox";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const result = await createITTicket(context, parsed.data, {
             idempotencyKey: idempotencyKey.data,
         });
+        if (!result.replayed) scheduleITTicketOutboxWakeup();
 
         return NextResponse.json(
             {

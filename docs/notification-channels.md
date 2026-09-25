@@ -1,7 +1,7 @@
 # Notification Channel Architecture
 
 เอกสารนี้เป็น source of truth เชิงปฏิบัติการสำหรับช่องทางแจ้งเตือนของ NHF Employee
-ครอบคลุม Leave, Routine และ Stock ในช่วงที่ระบบกำลังเพิ่ม NHFapp LINE OA แบบค่อยเป็นค่อยไป
+ครอบคลุม Leave, Routine, Stock และ IT Ticket ในช่วงที่ระบบกำลังเพิ่ม NHFapp LINE OA แบบค่อยเป็นค่อยไป
 
 หลักการที่ต้องคงไว้:
 
@@ -74,9 +74,17 @@ LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel �
 | Stock request self-cancellation | มีเดิม | ไม่เพิ่ม/ไม่เปลี่ยน behavior เดิม | requester ที่ active และมี link → Stock LIFF | ไม่ใช้ |
 | Stock new request for operations | มีเดิม | ตาม behavior เดิมของระบบ | ยังไม่ใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` |
 | Low-stock alert | มีเดิม | ตาม behavior เดิมของระบบ | ยังไม่ใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` |
+| IT Ticket created / assigned / comment / waiting / resolved | มีผ่าน `IT_TICKET_IN_APP` | ยังไม่ใช้ | ยังไม่ใช้ | ไม่ใช้ |
 
 คำว่า “มี parent เดิม” หมายถึงไม่เปลี่ยน notification record, dedupe, read/unread,
 หรือ email workflow เดิมของ event นั้น LINE เป็น child delivery เพิ่มเติม
+
+IT6 ใช้ In-app เท่านั้น โดย `modules/it` เป็นเจ้าของความหมาย ผู้รับ ข้อความ
+ปลายทาง และการตรวจสถานะ Ticket; `modules/notification` เป็นเจ้าของ Inbox;
+shared outbox เป็นเจ้าของ claim/retry/backoff/dead-letter/supersede และ processor
+composition. Email เลื่อนไป IT8; NHFapp LINE และ IT LIFF รอการตัดสินใจผลิตภัณฑ์
+ของ IT. ค่า `TICKET_*` เดิมคงไว้เพื่ออ่านข้อมูลย้อนหลัง ไม่ใช่ค่า dispatch ใหม่
+และไม่เปลี่ยนความหมายของข้อมูลเดิม
 
 ## Leave LINE flows
 

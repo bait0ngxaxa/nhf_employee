@@ -39,6 +39,34 @@ describe("NotificationIcon", () => {
             "text-notification-contract-expiry-icon",
         );
     });
+
+    it("renders IT_TICKET distinctly while retaining historical Ticket fallbacks", () => {
+        render(
+            <div>
+                <span data-testid="it-ticket">
+                    <NotificationIcon type="IT_TICKET" />
+                </span>
+                <span data-testid="legacy-created">
+                    <NotificationIcon type="TICKET_CREATED" />
+                </span>
+                <span data-testid="legacy-comment">
+                    <NotificationIcon type="NEW_COMMENT" />
+                </span>
+                <span data-testid="legacy-updated">
+                    <NotificationIcon type="TICKET_UPDATED" />
+                </span>
+            </div>,
+        );
+
+        expect(screen.getByTestId("it-ticket").querySelector("svg")).toHaveClass(
+            "text-status-info-solid",
+        );
+        for (const testId of ["legacy-created", "legacy-comment", "legacy-updated"]) {
+            expect(screen.getByTestId(testId).querySelector("svg")).toHaveClass(
+                "text-content-muted",
+            );
+        }
+    });
 });
 
 describe("normalizeNotificationActionUrl", () => {

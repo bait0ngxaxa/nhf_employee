@@ -11,6 +11,9 @@ import {
     type ITAuthorizationContext,
 } from "./authorization";
 import { assertITActorCurrentWorkforce } from "./workforce";
+import { findITOperatorAudience } from "./operator-audience";
+import type { ITTicketNotificationPayloadV1 } from "../domain/ticket-notification";
+import { enqueueITTicketNotificationIntents } from "../infrastructure/notifications/outbox";
 import {
     ITTicketIdempotencyConflictError,
     ITTicketInputValidationError,
@@ -39,6 +42,7 @@ import {
     findOperatorITTicketConversationState,
     findRequesterITTicketConversationState,
     type ITTicketCommentRecord,
+    type ITTicketConversationState,
     type ITTicketConversationPersistenceContext,
 } from "../infrastructure/persistence/ticket-conversation-repository";
 import type { ITTicketCommentSubmission } from "../contracts";
@@ -158,6 +162,47 @@ async function readReplay(
         throw new ITTicketIdempotencyConflictError();
     }
     return toSubmission(existing.comment, true);
+}
+
+async function enqueueCommentNotificationIntents(
+    tx: Prisma.TransactionClient,
+    ticket: ITTicketConversationState,
+    commentId: string,
+    authorUserId: number,
+    side: ITTicketCommentSide,
+): Promise<void> {
+    const recipients: Array<{
+        readonly userId: number;
+        readonly audience: "REQUESTER" | "ASSIGNEE" | "OPERATOR_QUEUE";
+    }> = side === ITTicketCommentKind.OPERATOR
+        ? ticket.requesterUserId === authorUserId
+            ? []
+            : [{ userId: ticket.requesterUserId, audience: "REQUESTER" }]
+        : ticket.assignedToUserId !== null
+            ? ticket.assignedToUserId === authorUserId
+                ? []
+                : [{ userId: ticket.assignedToUserId, audience: "ASSIGNEE" }]
+            : (await findITOperatorAudience(tx))
+                .filter((operator) => operator.userId !== authorUserId)
+                .map((operator) => ({
+                    userId: operator.userId,
+                    audience: "OPERATOR_QUEUE" as const,
+                }));
+
+    const event = side === ITTicketCommentKind.OPERATOR
+        ? "OPERATOR_COMMENTED"
+        : "REQUESTER_COMMENTED";
+    const payloads: ITTicketNotificationPayloadV1[] = recipients.map(
+        (recipient) => ({
+            version: 1,
+            event,
+            ticketId: ticket.id,
+            recipientUserId: recipient.userId,
+            audience: recipient.audience,
+            source: { kind: "COMMENT", id: commentId },
+        }),
+    );
+    await enqueueITTicketNotificationIntents(tx, payloads);
 }
 
 async function postITTicketComment(
@@ -289,6 +334,14 @@ async function postITTicketComment(
                 }
                 throw error;
             }
+
+            await enqueueCommentNotificationIntents(
+                tx,
+                ticket,
+                comment.id,
+                authorUserId,
+                side,
+            );
 
             return toSubmission(persistedComment, false);
         });

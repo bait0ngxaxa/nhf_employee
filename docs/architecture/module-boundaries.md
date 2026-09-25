@@ -15,9 +15,9 @@ K1 closed the three Stock findings. IT1 established the `modules/it` server
 authorization foundation, IT2 added IT-owned Ticket persistence and domain
 commands, IT3 added requester-only Ticket API and Dashboard presentation, IT4
 added the separate read-ALL operator queue/API and processing surface, IT5A
-added shared conversation and a bounded merged timeline, and IT5B adds
-comment-owned private image attachments. Notifications and Email Request
-migration remain deferred.
+added shared conversation and a bounded merged timeline, IT5B added
+comment-owned private image attachments, and IT6 implements in-app Ticket
+notifications. Email Request migration remains deferred to IT8.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -117,7 +117,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT module Ticket services and operator processing (IT1/IT2/IT3/IT4/IT5A/IT5B)
+## IT module Ticket services, operator processing, and notifications (IT1/IT2/IT3/IT4/IT5A/IT5B/IT6)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -155,12 +155,13 @@ conversation paths always include the authenticated requester predicate;
 operator replies/uploads require read ALL and comment ALL, while downloads
 require read ALL. The requester and operator routes select their authority
 path server-side. Both Dashboard detail surfaces use the browser-safe IT client
-entry. Comments and their images add no Ticket events, notifications/outbox
-writes, or Audit rows. IT-owned attachment code does not import Leave storage
+entry. IT5B attachment storage does not create separate Ticket events, Audit
+rows, or notification content; IT6 adds transactional notification intents for
+the defined Ticket facts. IT-owned attachment code does not import Leave storage
 or business logic. Attachments are images-only, normalized to WEBP, retained
 with Ticket history; committed retention duration is deferred to IT9. IT5B
-adds no category administration, production grant configuration, notification
-producer, or Email Request migration. See
+adds no category administration, production grant configuration, or Email
+Request migration. See
 [it-module-design.md](./it-module-design.md) for the phase contract and
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.
@@ -242,10 +243,12 @@ The module must receive explicit recipients and semantic payloads. Leave,
 Stock, Routine, and Email Request retain ownership of their current triggering
 events, recipient policy, notification type, title/message, action URL,
 reference ID, channel choice, and event-specific dedupe or supersede semantics.
-IT owns no Ticket event or producer in IT1; Ticket notification meaning remains
-a later IT phase. Notification must not grow audience APIs such as “notify
-all Stock admins” or become a workflow owner for another module. Leave, Stock,
-and Routine use only `@/modules/notification` for Inbox persistence; physical
+IT owns Ticket event meaning, recipient policy, strict payload, destination,
+event identity, and stale-domain validation. IT6 uses only in-app delivery:
+Email is deferred, and LINE remains deferred pending an IT LIFF/product
+decision. Notification must not grow audience APIs such as “notify all Stock
+admins” or become a workflow owner for another module. Leave, Stock, Routine,
+and IT use only `@/modules/notification` for Inbox persistence; physical
 Prisma `Notification` delegate operations are owned exclusively by
 `modules/notification/infrastructure/**` in production. Phase 13A/13A.1
 updates Routine, Stock, and Email Request audience selection to configured
@@ -265,7 +268,10 @@ dispatch contract owns any transaction context; the global processor does not
 pass a transaction client directly to Notification. A direct
 processor-to-Notification dispatch is reserved for a future generic
 Notification-owned event with a fully resolved command payload, not current
-Leave, Stock, Routine, or deferred Email Request events.
+Leave, Stock, Routine, IT Ticket, or deferred Email Request events. IT enqueues
+`IT_TICKET_IN_APP` with its Ticket mutation transaction and exports the narrow
+server-only dispatcher from `@/modules/it`; the global processor calls it.
+The outbox wakeup remains in the API adapter after the business transaction.
 
 The four existing `app/api/notifications/**` routes remain app HTTP delivery
 composition and now delegate their query/read behavior through

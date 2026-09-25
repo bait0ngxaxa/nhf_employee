@@ -437,6 +437,7 @@ enum NotificationOutboxType {
   ROUTINE_CONTRACT_EXPIRY_IN_APP
   ROUTINE_CONTRACT_EXPIRY_EMAIL
   ROUTINE_CONTRACT_EXPIRY_LINE
+  IT_TICKET_IN_APP
 }
 
 enum NotificationOutboxStatus {
@@ -661,6 +662,7 @@ enum NotificationType {
   STOCK_CANCELLED           @map("STOCK_REJECTED")
   ROUTINE_REMINDER
   ROUTINE_CONTRACT_EXPIRY
+  IT_TICKET
 }
 
 // ==========================================

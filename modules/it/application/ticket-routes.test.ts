@@ -9,10 +9,14 @@ const mocks = vi.hoisted(() => ({
     createTicket: vi.fn(),
     listTickets: vi.fn(),
     getTicket: vi.fn(),
+    wakeOutbox: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({
     requireApiSession: mocks.requireApiSession,
+}));
+vi.mock("@/app/api/it/_lib/outbox", () => ({
+    scheduleITTicketOutboxWakeup: mocks.wakeOutbox,
 }));
 
 vi.mock("@/modules/it", async (importOriginal) => {
@@ -147,6 +151,20 @@ describe("IT requester Ticket API adapters", () => {
         expect(body.ticket).not.toHaveProperty("requesterUserId");
         expect(body.ticket).not.toHaveProperty("version");
         expect(body.ticket).not.toHaveProperty("assignedToUserId");
+        expect(mocks.wakeOutbox).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not wake the outbox for an idempotent creation replay", async () => {
+        mocks.createTicket.mockResolvedValueOnce({ ticket: ticketRecord, replayed: true });
+
+        const response = await postTicket(postRequest({
+            type: "INCIDENT",
+            title: "หัวข้อ",
+            description: "รายละเอียด",
+        }, "same-logical-attempt"));
+
+        expect(response.status).toBe(200);
+        expect(mocks.wakeOutbox).not.toHaveBeenCalled();
     });
 
     it("requires a valid Idempotency-Key before calling the creation command", async () => {

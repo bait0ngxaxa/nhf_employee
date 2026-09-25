@@ -4,6 +4,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { buildCurrentITAuthorizationContext, type ITTicketMutationResult } from "@/modules/it";
 import type { ITAuthorizationContext } from "@/modules/it";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
+import { scheduleITTicketOutboxWakeup } from "../../_lib/outbox";
 
 import { mapITOperatorRouteError, parseITOperatorTicketId } from "./response";
 
@@ -18,12 +19,17 @@ type ITTicketMutation<TBody extends object> = (
     input: TBody & { readonly ticketId: number },
 ) => Promise<ITTicketMutationResult>;
 
+interface ITTicketMutationOptions<TBody extends object> {
+    readonly shouldWakeOutbox?: (input: TBody, actorUserId: number) => boolean;
+}
+
 /** Adapts one strict HTTP body into an existing IT2 command. */
 export async function patchITOperatorTicket<TBody extends object>(
     request: NextRequest,
     rawTicketId: string,
     schema: SafeParseSchema<TBody>,
     mutate: ITTicketMutation<TBody>,
+    options: ITTicketMutationOptions<TBody> = {},
 ): Promise<NextResponse> {
     try {
         const auth = await requireApiSession({
@@ -50,6 +56,15 @@ export async function patchITOperatorTicket<TBody extends object>(
 
         const context = await buildCurrentITAuthorizationContext(auth.user);
         const result = await mutate(context, { ...parsed.data, ticketId });
+        if (
+            result.changed
+            && options.shouldWakeOutbox?.(
+                parsed.data,
+                context.authorizationActor.userId,
+            )
+        ) {
+            scheduleITTicketOutboxWakeup();
+        }
         return NextResponse.json({
             success: true,
             changed: result.changed,

@@ -1,13 +1,13 @@
 import type { ITTicket as PrismaITTicket, Prisma } from "@prisma/client";
 
-import { getCurrentWorkforceDepartmentSnapshotInTransaction } from "@/modules/employee";
-import { hasConfiguredCapabilityScopeForUser } from "@/modules/authorization";
 import {
     resolveITCapabilityInTransaction,
     ITCapabilityDeniedError,
     type ITAuthorizationContext,
 } from "./authorization";
-import { evaluateITAssigneeEligibility } from "./assignee-eligibility";
+import { findITOperatorAudience } from "./operator-audience";
+import type { ITTicketNotificationPayloadV1 } from "../domain/ticket-notification";
+import { enqueueITTicketNotificationIntents } from "../infrastructure/notifications/outbox";
 import { assertITActorCurrentWorkforce } from "./workforce";
 import {
     ITTicketAssigneeNotEligibleError,
@@ -172,7 +172,7 @@ export async function createITTicket(
                 updatedAt: occurredAt,
             });
 
-            await createITTicketEvent(tx, {
+            const eventId = await createITTicketEvent(tx, {
                 ticketId: ticket.id,
                 actorUserId: requesterUserId,
                 kind: "CREATED",
@@ -193,6 +193,20 @@ export async function createITTicket(
                 }
                 throw error;
             }
+
+            const operatorAudience = await findITOperatorAudience(tx);
+            const notifications: ITTicketNotificationPayloadV1[] =
+                operatorAudience
+                    .filter((operator) => operator.userId !== requesterUserId)
+                    .map((operator) => ({
+                        version: 1,
+                        event: "CREATED",
+                        ticketId: ticket.id,
+                        recipientUserId: operator.userId,
+                        audience: "OPERATOR_QUEUE",
+                        source: { kind: "EVENT", id: eventId },
+                    }));
+            await enqueueITTicketNotificationIntents(tx, notifications);
 
             return { ticket: toITTicketRecord(ticket), replayed: false };
         });
@@ -262,6 +276,7 @@ async function saveMutationAndEvent(
         Prisma.ITTicketEventUncheckedCreateInput,
         "ticketId" | "actorUserId"
     >,
+    afterEvent?: (eventId: number) => Promise<void>,
 ): Promise<ITTicketMutationResult> {
     const updated = await updateITTicketIfVersionMatches(
         tx,
@@ -271,12 +286,13 @@ async function saveMutationAndEvent(
     );
     if (!updated) throw new ITTicketMutationConflictError("CONCURRENT_WRITE");
 
-    await createITTicketEvent(tx, {
+    const eventId = await createITTicketEvent(tx, {
         ...event,
         ticketId: ticket.id,
         actorUserId,
         occurredAt,
     });
+    if (afterEvent) await afterEvent(eventId);
     const updatedTicket = await findITTicketForMutation(tx, ticket.id);
     if (updatedTicket === null) throw new ITTicketNotFoundError();
 
@@ -301,6 +317,11 @@ export async function transitionITTicketStatus(
         }
 
         const occurredAt = new Date();
+        const shouldNotifyRequester =
+            (command.targetStatus === "WAITING_REQUESTER"
+                || command.targetStatus === "RESOLVED")
+            && ticket.requesterUserId !== context.authorizationActor.userId;
+
         return saveMutationAndEvent(
             tx,
             ticket,
@@ -318,6 +339,18 @@ export async function transitionITTicketStatus(
                 fromStatus: ticket.status,
                 toStatus: command.targetStatus,
             },
+            shouldNotifyRequester
+                ? (eventId) => enqueueITTicketNotificationIntents(tx, [{
+                    version: 1,
+                    event: command.targetStatus === "WAITING_REQUESTER"
+                        ? "WAITING_REQUESTER"
+                        : "RESOLVED",
+                    ticketId: ticket.id,
+                    recipientUserId: ticket.requesterUserId,
+                    audience: "REQUESTER",
+                    source: { kind: "EVENT", id: eventId },
+                }])
+                : undefined,
         );
     });
 }
@@ -326,34 +359,9 @@ async function assertEligibleAssignee(
     tx: Prisma.TransactionClient,
     assigneeUserId: number,
 ): Promise<void> {
-    const workforce = await getCurrentWorkforceDepartmentSnapshotInTransaction(
-        tx,
-        assigneeUserId,
+    const eligible = (await findITOperatorAudience(tx)).some(
+        (operator) => operator.userId === assigneeUserId,
     );
-    const hasConfiguredReadAll = await hasConfiguredCapabilityScopeForUser({
-        userId: assigneeUserId,
-        capability: "it.ticket.read",
-        scope: "ALL",
-        channel: "DASHBOARD",
-    }, tx);
-    const hasConfiguredCommentAll = await hasConfiguredCapabilityScopeForUser({
-        userId: assigneeUserId,
-        capability: "it.ticket.comment",
-        scope: "ALL",
-        channel: "DASHBOARD",
-    }, tx);
-    const hasConfiguredManageAll = await hasConfiguredCapabilityScopeForUser({
-        userId: assigneeUserId,
-        capability: "it.ticket.manage",
-        scope: "ALL",
-        channel: "DASHBOARD",
-    }, tx);
-    const eligible = evaluateITAssigneeEligibility({
-        activeWorkforce: workforce !== null,
-        hasConfiguredReadAll,
-        hasConfiguredCommentAll,
-        hasConfiguredManageAll,
-    });
     if (!eligible) throw new ITTicketAssigneeNotEligibleError();
 }
 
@@ -378,6 +386,11 @@ export async function assignITTicket(
         }
 
         const occurredAt = new Date();
+        const actorUserId = context.authorizationActor.userId;
+        const newAssigneeUserId = command.assigneeUserId;
+        const notifyNewAssignee = newAssigneeUserId !== null
+            && newAssigneeUserId !== actorUserId;
+
         return saveMutationAndEvent(
             tx,
             ticket,
@@ -390,6 +403,16 @@ export async function assignITTicket(
                 fromAssigneeUserId: ticket.assignedToUserId,
                 toAssigneeUserId: command.assigneeUserId,
             },
+            notifyNewAssignee
+                ? (eventId) => enqueueITTicketNotificationIntents(tx, [{
+                    version: 1,
+                    event: "ASSIGNED",
+                    ticketId: ticket.id,
+                    recipientUserId: newAssigneeUserId,
+                    audience: "ASSIGNEE",
+                    source: { kind: "EVENT", id: eventId },
+                }])
+                : undefined,
         );
     });
 }

@@ -13,5 +13,15 @@ export async function PATCH(
     routeContext: OperatorTicketRouteContext,
 ): Promise<NextResponse> {
     const { ticketId } = await routeContext.params;
-    return patchITOperatorTicket(request, ticketId, transitionITTicketStatusBodySchema, transitionITTicketStatus);
+    return patchITOperatorTicket(
+        request,
+        ticketId,
+        transitionITTicketStatusBodySchema,
+        transitionITTicketStatus,
+        {
+            shouldWakeOutbox: (input) => "targetStatus" in input
+                && (input.targetStatus === "WAITING_REQUESTER"
+                    || input.targetStatus === "RESOLVED"),
+        },
+    );
 }

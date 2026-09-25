@@ -13,5 +13,16 @@ export async function PATCH(
     routeContext: OperatorTicketRouteContext,
 ): Promise<NextResponse> {
     const { ticketId } = await routeContext.params;
-    return patchITOperatorTicket(request, ticketId, assignITTicketBodySchema, assignITTicket);
+    return patchITOperatorTicket(
+        request,
+        ticketId,
+        assignITTicketBodySchema,
+        assignITTicket,
+        {
+            shouldWakeOutbox: (input, actorUserId) =>
+                "assigneeUserId" in input
+                && typeof input.assigneeUserId === "number"
+                && input.assigneeUserId !== actorUserId,
+        },
+    );
 }

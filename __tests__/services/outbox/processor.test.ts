@@ -25,6 +25,7 @@ import {
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
 import {
     MAX_OUTBOX_ATTEMPTS,
+    OUTBOX_NOTIFICATION_TYPES,
     OUTBOX_RETRY_BASE_DELAY_MS,
     STALE_OUTBOX_PROCESSING_MINUTES,
 } from "@/lib/services/outbox/types";
@@ -168,6 +169,30 @@ describe("processOutbox", () => {
         prismaMock.$transaction.mockImplementation((async (
             callback: (tx: typeof prismaMock) => Promise<unknown>,
         ) => callback(prismaMock)) as never);
+    });
+
+    it("keeps historical Ticket outbox values non-dispatchable", async () => {
+        const historicalTypes = [
+            "TICKET_CREATED",
+            "TICKET_UPDATED",
+            "TICKET_CREATED_IN_APP",
+            "TICKET_CREATED_LINE",
+            "TICKET_CREATED_EMAIL_REPORTER",
+            "TICKET_CREATED_EMAIL_IT",
+            "TICKET_UPDATED_IN_APP_REPORTER",
+            "TICKET_UPDATED_EMAIL_REPORTER",
+            "TICKET_UPDATED_LINE",
+            "TICKET_COMMENT_IN_APP",
+        ] as const;
+
+        for (const type of historicalTypes) {
+            expect(OUTBOX_NOTIFICATION_TYPES).not.toContain(type);
+            await expect(dispatchNotification(
+                buildNotification(1, type, "{}"),
+            )).rejects.toThrow(`Unknown notification type: ${type}`);
+        }
+
+        expect(OUTBOX_NOTIFICATION_TYPES).toContain("IT_TICKET_IN_APP");
     });
 
     it("returns early when no pending notifications", async () => {

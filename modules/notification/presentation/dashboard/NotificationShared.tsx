@@ -99,6 +99,8 @@ export function NotificationIcon({
             return <ClipboardCheck className={cn("text-notification-routine-icon", className)} />;
         case "ROUTINE_CONTRACT_EXPIRY":
             return <CalendarClock className={cn("text-notification-contract-expiry-icon", className)} />;
+        case "IT_TICKET":
+            return <Bell className={cn("text-status-info-solid", className)} />;
         case "STOCK_ISSUED":
         case "LEAVE_APPROVED":
         case "LEAVE_NOT_TAKEN_CONFIRMED":

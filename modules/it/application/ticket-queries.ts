@@ -3,8 +3,7 @@ import { ITTicketStatus, ITTicketType } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
-import { findCurrentEmployeeDisplayProjections, getEmployeeDisplayName } from "@/modules/employee";
-import { findActiveUsersWithConfiguredCapabilityScope } from "@/modules/authorization";
+import { getEmployeeDisplayName } from "@/modules/employee";
 import {
     ITCapabilityDeniedError,
     resolveITCapabilityInTransaction,
@@ -12,6 +11,7 @@ import {
 } from "./authorization";
 import { ITTicketInputValidationError, ITTicketNotFoundError } from "./ticket-errors";
 import { assertITActorCurrentWorkforce } from "./workforce";
+import { findITOperatorAudience } from "./operator-audience";
 import { toITRequesterTicket } from "./ticket-dto";
 import { toITOperatorTicket } from "./ticket-dto";
 import {
@@ -298,29 +298,12 @@ export async function getITOperatorReferenceData(
         );
         assertOperatorReadScope(authorization.scopes);
 
-        const [categories, readUsers, commentUsers, manageUsers] = await Promise.all([
+        const [categories, eligibleOperators] = await Promise.all([
             findActiveITTicketCategories(tx),
-            findActiveUsersWithConfiguredCapabilityScope({
-                capability: "it.ticket.read",
-                scope: "ALL",
-            }, tx),
-            findActiveUsersWithConfiguredCapabilityScope({
-                capability: "it.ticket.comment",
-                scope: "ALL",
-            }, tx),
-            findActiveUsersWithConfiguredCapabilityScope({
-                capability: "it.ticket.manage",
-                scope: "ALL",
-            }, tx),
+            findITOperatorAudience(tx),
         ]);
 
-        const commentUserIds = new Set(commentUsers);
-        const manageUserIds = new Set(manageUsers);
-        const eligibleUserIds = readUsers.filter((userId) =>
-            commentUserIds.has(userId) && manageUserIds.has(userId),
-        );
-        const employees = await findCurrentEmployeeDisplayProjections(eligibleUserIds, tx);
-        const assignableOperators: ITAssignableOperator[] = employees
+        const assignableOperators: ITAssignableOperator[] = eligibleOperators
             .map((employee) => ({
                 userId: employee.userId,
                 employeeId: employee.employeeId,

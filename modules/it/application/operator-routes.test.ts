@@ -12,9 +12,13 @@ const mocks = vi.hoisted(() => ({
     assign: vi.fn(),
     setCategory: vi.fn(),
     transition: vi.fn(),
+    wakeOutbox: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: mocks.requireApiSession }));
+vi.mock("@/app/api/it/_lib/outbox", () => ({
+    scheduleITTicketOutboxWakeup: mocks.wakeOutbox,
+}));
 
 vi.mock("@/modules/it", async (importOriginal) => {
     const actual = await importOriginal<typeof ITModule>();
@@ -288,6 +292,7 @@ describe("IT operator API adapters", () => {
             expectedVersion: 6,
         });
         expect((await assign.json()).ticket).toMatchObject({ id: 19, version: 5 });
+        expect(mocks.wakeOutbox).toHaveBeenCalledTimes(2);
     });
 
     it("supports category set and clear through the IT2 command", async () => {

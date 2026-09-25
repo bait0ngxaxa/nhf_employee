@@ -9,9 +9,13 @@ const mocks = vi.hoisted(() => ({
     operatorTimeline: vi.fn(),
     requesterPost: vi.fn(),
     operatorPost: vi.fn(),
+    wakeOutbox: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: mocks.session }));
+vi.mock("@/app/api/it/_lib/outbox", () => ({
+    scheduleITTicketOutboxWakeup: mocks.wakeOutbox,
+}));
 vi.mock("@/modules/it", async () => {
     const actual = await vi.importActual<typeof ITModule>("@/modules/it");
     return {
@@ -200,6 +204,7 @@ describe("IT Ticket conversation HTTP routes", () => {
             { idempotencyKey: "operator-key", attachments: [] },
         );
         expect(await requesterResponse.json()).toMatchObject({ success: true, replayed: false });
+        expect(mocks.wakeOutbox).toHaveBeenCalledTimes(2);
     });
 
     it("returns the original comment as a successful replay", async () => {

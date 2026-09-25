@@ -83,6 +83,7 @@ export type ITTicketEventTimelineRecord = Prisma.ITTicketEventGetPayload<{
 export interface ITTicketConversationState {
     readonly id: number;
     readonly requesterUserId: number;
+    readonly assignedToUserId: number | null;
     readonly status: ITTicketStatus;
     readonly firstRespondedAt: Date | null;
 }
@@ -94,7 +95,13 @@ export async function findRequesterITTicketConversationState(
 ): Promise<ITTicketConversationState | null> {
     return tx.iTTicket.findFirst({
         where: { id: ticketId, requesterUserId },
-        select: { id: true, requesterUserId: true, status: true, firstRespondedAt: true },
+        select: {
+            id: true,
+            requesterUserId: true,
+            assignedToUserId: true,
+            status: true,
+            firstRespondedAt: true,
+        },
     });
 }
 
@@ -104,7 +111,13 @@ export async function findOperatorITTicketConversationState(
 ): Promise<ITTicketConversationState | null> {
     return tx.iTTicket.findUnique({
         where: { id: ticketId },
-        select: { id: true, requesterUserId: true, status: true, firstRespondedAt: true },
+        select: {
+            id: true,
+            requesterUserId: true,
+            assignedToUserId: true,
+            status: true,
+            firstRespondedAt: true,
+        },
     });
 }
 

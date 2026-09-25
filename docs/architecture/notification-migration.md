@@ -71,7 +71,7 @@ channels.
 | Concern | Owner at target | Boundary decision |
 | --- | --- | --- |
 | In-app Notification / Inbox | `modules/notification/` | Owns the `Notification` persistence boundary, generic durable create-to-user mechanics, inbox queries, unread/read commands, the H1 server/application contract, and the H2 browser presentation/client seam. |
-| Business-owned notification semantics | Leave, Stock, Routine, Email Request while deferred, and future IT/business modules | Owns why an event is noteworthy, who receives it, its semantic type, title, message, action URL, reference ID, channel selection, and event-specific dedupe/supersede rules. |
+| Business-owned notification semantics | Leave, Stock, Routine, IT Ticket, and Email Request while deferred | Owns why an event is noteworthy, who receives it, its semantic type, title, message, action URL, reference ID, channel selection, and event-specific dedupe/supersede rules. |
 | Reliable asynchronous delivery / NotificationOutbox | Shared/platform outbox infrastructure | Owns `NotificationOutbox` lifecycle, claim/retry/dead-letter/supersede behavior, scheduling/wakeup, and processor composition. Business modules may enqueue rows transactionally but must not import the processor. |
 | Provider/channel integrations | Shared/platform transports plus business-owned payload composers | Email and LINE transports remain generic platform infrastructure. Leave, Stock, Routine, and the deferred Email Request capability continue to own channel-specific event payload and message meaning. |
 
@@ -224,10 +224,12 @@ the existing stored-history comments:
 | `STOCK_CANCELLED @map("STOCK_REJECTED")` | Active Stock semantic | Requester/admin notification that a Stock request was cancelled; database value remains mapped to `STOCK_REJECTED`. |
 | `ROUTINE_REMINDER` | Active Routine semantic | Routine task reminder delivered through the global outbox. |
 | `ROUTINE_CONTRACT_EXPIRY` | Active Routine semantic | Routine contract-expiry reminder delivered through the global outbox. |
+| `IT_TICKET` | Active IT Ticket semantic | IT6 in-app Ticket notification; IT owns event meaning, audience, content, action URL, and dedupe. |
 
-The three `TICKET_*` Notification values are not evidence that an IT Support
-feature should return. They remain only so historical Notification rows can be
-read by the existing model and future Inbox queries.
+The three historical `TICKET_*` Notification values are not evidence that the
+legacy IT Support feature should return. They remain so old Notification rows
+can be read. IT6 uses the separate `IT_TICKET` semantic and leaves those rows
+and values unchanged.
 
 ## Current Notification HTTP behavior
 
@@ -473,12 +475,13 @@ intentionally deferred until the IT capability boundary is re-established so
 the same feature is not migrated twice. H0 does not move, redesign, or clean
 up these paths.
 
-### Legacy IT Support
+### Legacy IT Support and current IT Ticket
 
 The repository contains historical `TICKET_*` values in both notification
 enums, but no current production producer for those values was found. They
-remain for stored-history compatibility. H0 does not restore an IT Support
-module, recreate ticket behavior, delete enum values, or reinterpret old rows.
+remain for stored-history compatibility. IT6 adds a separate `IT_TICKET` Inbox
+semantic and does not restore the legacy IT Support module, delete old enum
+values, or reinterpret old rows.
 
 ## Shared in-app helper audit
 
@@ -560,7 +563,12 @@ ROUTINE_REMINDER_LINE
 ROUTINE_CONTRACT_EXPIRY_IN_APP
 ROUTINE_CONTRACT_EXPIRY_EMAIL
 ROUTINE_CONTRACT_EXPIRY_LINE
+IT_TICKET_IN_APP
 ```
+
+`IT_TICKET_IN_APP` is the only active IT outbox type. The historical `TICKET_*`
+outbox values above remain absent from the runtime whitelist and are never
+reinterpreted by the IT6 dispatcher.
 
 All six outbox status values are active runtime lifecycle states. The enum
 comparison is intentional: storage compatibility is broader than the current
@@ -574,8 +582,8 @@ component. It currently:
 - recovers stale `PROCESSING` rows after the configured ten-minute threshold;
 - claims due `PENDING`/`FAILED` rows with attempts below the configured maximum
   of three;
-- dispatches business-specific events through the public Leave, Stock, and
-  Routine contracts and the deferred Email Request adapter;
+- dispatches business-specific events through the public Leave, Stock, Routine,
+  and IT contracts plus the deferred Email Request adapter;
 - marks successful work `SENT`, stale business work `SUPERSEDED`, and
   exhausted failures `DEAD`;
 - retries failures with the existing exponential delays and stores the last
@@ -937,6 +945,8 @@ Processor.
 
 Notification H0-H3 migration complete. L4 separately closed the equal-
 timestamp history continuation defect with a deterministic composite cursor;
-legacy timestamp cursors retain their historical limitation. Email Request/IT
-remains deferred, and the global Outbox Processor plus Email/LINE delivery
+legacy timestamp cursors retain their historical limitation. IT6 adds in-app
+Ticket notifications through the IT public dispatcher and `IT_TICKET_IN_APP`;
+Email Request migration remains deferred to IT8. IT6 does not enable Ticket
+Email, LINE, or IT LIFF. The global Outbox Processor plus Email/LINE delivery
 remain outside Notification.

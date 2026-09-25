@@ -5,13 +5,16 @@ Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. IT1, IT2, and IT3 are closed under `modules/it/`; its server entry
-is `@/modules/it` and its browser-safe Dashboard presentation entry is
+boundaries. IT1 through IT5B are closed under `modules/it/`; IT6 notifications
+are implemented with closure verification pending. Its server entry is
+`@/modules/it` and its browser-safe Dashboard presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and
-idempotency, requester-scoped list/detail queries, approved workflow,
-assignment, classification, and event history. IT3 supplies the internal
-requester API and self-service Dashboard only; operator workflows remain
-deferred. Email Request migration remains deferred to IT8. Audit Phase I3 is
+idempotency, requester and operator queries, approved workflow, assignment,
+classification, conversation, attachments, and event history. IT6 adds Ticket
+notification meaning, recipient policy, payload interpretation, action
+destination, and dispatch through a transactional shared-outbox intent and the
+public Notification Inbox command. Email Request migration remains deferred to
+IT8. Audit Phase I3 is
 closed with generic
 server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in
@@ -20,7 +23,7 @@ producer, entity-history query, and Dashboard presentation ownership in
 `modules/audit/presentation/dashboard/**`. Production physical AuditLog
 delegates are exclusive to `modules/audit/infrastructure/**`; Employee, Leave,
 Stock, and Routine retain event meaning and consume only the public Audit
-server entry. Email Request migration remains deferred to IT8. Phase J0
+server entry. Phase J0
 Auth / Session / Identity discovery and boundary definition is closed, Phase
 J1 Auth / Session server and persistence ownership is closed, and Phase J2
 Auth identity projection and browser presentation ownership is closed, and
@@ -187,11 +190,11 @@ without interpreting business state. The former
 `createAdminInAppNotificationsOnce` helper was removed. The generic
 `createInAppNotificationOnce` adapter remains only for deferred Email Request
 and has no audience lookup.
-Leave, Stock, and Routine own their current event meaning, recipients,
+Leave, Stock, Routine, and IT own their event meaning, recipients,
 titles/messages, action/reference values, channel choices, and event-specific
-dedupe or supersede rules. IT owns `ITTicketEvent` as operational history but
-has no Ticket notification producer. Leave, Stock, and
-Routine now use `@/modules/notification` for Inbox writes. Physical
+dedupe or supersede rules. IT owns `ITTicketEvent` as operational history and
+the IT Ticket notification producer. Leave, Stock, Routine, and IT use
+`@/modules/notification` for Inbox writes. Physical
 Notification persistence is owned only by
 `modules/notification/infrastructure/**`; Stock's two intentionally different
 admin eligibility policies remain Stock-owned.
@@ -208,9 +211,11 @@ for an in-app write. The business dispatch contract owns any transaction-bound
 persistence context; the global processor does not pass a transaction client
 directly to Notification. A direct processor-to-Notification dispatch is
 reserved for a future truly Notification-owned generic event with a fully
-resolved command payload; no current production event uses that shape.
-Email Request migration remains deferred until IT8. IT1-IT3 add no Ticket
-notification producer. See
+resolved command payload; no current production event uses that shape. IT
+enqueues `IT_TICKET_IN_APP` transactionally and exports its server-only dispatch
+contract through `@/modules/it`; app API adapters wake the global processor only
+after successful mutations. IT6 is in-app only. Email is deferred to IT8, and
+LINE/IT LIFF are deferred pending an IT product decision. See
 [notification-migration.md](../docs/architecture/notification-migration.md)
 for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices. H3
 producer integration and compatibility cleanup are complete. NotificationOutbox
@@ -224,9 +229,12 @@ Phase H2 CLOSED — Notification presentation ownership complete.
 Phase H3 CLOSED — Notification producer integration and final migration audit complete.
 
 Notification H0-H3 migration complete. IT1 authorization foundation, IT2
-Ticket persistence/workflow, and IT3 requester self-service are closed.
-Operator workflows, comments/attachments, notifications, and Email Request
-migration remain deferred.
+Ticket persistence/workflow, IT3 requester self-service, IT4 operator
+processing, IT5A conversation/timeline, and IT5B private attachments are closed.
+IT6 in-app notifications are implemented with final closure verification
+pending because the repository-wide test run had resource-sensitive timeouts in
+unrelated existing UI/architecture tests. Email Request migration remains
+deferred to IT8.
 
 ## Stock K1 ownership closure
 
@@ -243,5 +251,6 @@ Messaging channel and `LINE_STOCK_CHANNEL_ACCESS_TOKEN`.
 
 The shared Outbox Processor remains platform-owned and delegates Stock event
 interpretation through `@/modules/stock`; it continues to own claim, retry,
-stale-processing, dead-letter, and supersede lifecycle. Email Request migration
-and IT operator/notification workflows remain deferred.
+stale-processing, dead-letter, and supersede lifecycle. IT6 adds in-app Ticket
+notifications through the IT dispatcher; Email Request migration remains
+deferred to IT8.

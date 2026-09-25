@@ -5,6 +5,7 @@ import { createOutboxLineRetryKey } from "./provider-key";
 import type { EmailRequestData } from "@/types/api";
 import { createEmailRequestInAppNotification } from "@/lib/services/email-request/notifications";
 import { dispatchStockOutbox } from "@/modules/stock";
+import { dispatchITTicketNotificationOutbox } from "@/modules/it";
 import {
     parseLeaveActionPayload,
     parseLeaveCancellationRequestedPayload,
@@ -256,6 +257,9 @@ export async function dispatchNotification(
 
     const stockOutcome = await dispatchStockOutbox(notification);
     if (stockOutcome) return stockOutcome;
+
+    const itOutcome = await dispatchITTicketNotificationOutbox(notification);
+    if (itOutcome !== null) return itOutcome;
 
     let payload: unknown;
     try {

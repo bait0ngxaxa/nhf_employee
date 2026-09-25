@@ -38,8 +38,12 @@ export async function createITTicketRecord(
 export async function createITTicketEvent(
     tx: ITTicketPersistenceContext,
     data: Prisma.ITTicketEventUncheckedCreateInput,
-): Promise<void> {
-    await tx.iTTicketEvent.create({ data, select: { id: true } });
+): Promise<number> {
+    const event = await tx.iTTicketEvent.create({
+        data,
+        select: { id: true },
+    });
+    return event.id;
 }
 
 export async function createITTicketCreationIdempotency(

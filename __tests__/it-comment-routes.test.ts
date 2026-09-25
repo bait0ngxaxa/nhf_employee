@@ -10,9 +10,13 @@ const mocks = vi.hoisted(() => ({
     operatorPost: vi.fn(),
     preAuthLimit: vi.fn(),
     authenticatedLimit: vi.fn(),
+    wakeOutbox: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: mocks.requireApiSession }));
+vi.mock("@/app/api/it/_lib/outbox", () => ({
+    scheduleITTicketOutboxWakeup: mocks.wakeOutbox,
+}));
 vi.mock("@/lib/security/mutation-rate-limit", () => ({
     enforcePreAuthIpRateLimit: mocks.preAuthLimit,
     enforceAuthenticatedMutationRateLimit: mocks.authenticatedLimit,
@@ -115,6 +119,7 @@ describe.each([
         );
         expect(mocks.preAuthLimit).not.toHaveBeenCalled();
         expect(mocks.authenticatedLimit).not.toHaveBeenCalled();
+        expect(mocks.wakeOutbox).toHaveBeenCalledTimes(1);
     });
 
     it("accepts missing or empty Content-Type as legacy JSON, trims the body, and skips upload limiters", async () => {
@@ -136,6 +141,7 @@ describe.each([
         expect(target.mock.calls[1]?.[1]).toEqual({ ticketId: 19, body: "ตรวจสอบให้หน่อย" });
         expect(mocks.preAuthLimit).not.toHaveBeenCalled();
         expect(mocks.authenticatedLimit).not.toHaveBeenCalled();
+        expect(mocks.wakeOutbox).toHaveBeenCalledTimes(2);
     });
 
     it("still requires Idempotency-Key and strictly validates missing-Content-Type JSON", async () => {

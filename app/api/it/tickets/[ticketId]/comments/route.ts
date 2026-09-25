@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { scheduleITTicketOutboxWakeup } from "../../../_lib/outbox";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { contentLengthExceedsLimit } from "@/lib/server/request-body";
@@ -93,6 +94,7 @@ export async function POST(
             { ticketId, body: parsed.body },
             { idempotencyKey, attachments: parsed.attachments },
         );
+        if (!result.replayed) scheduleITTicketOutboxWakeup();
         return NextResponse.json(
             { success: true, ...result },
             { status: result.replayed ? 200 : 201 },
