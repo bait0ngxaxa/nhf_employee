@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
     IT_TICKET_DESCRIPTION_MAX_LENGTH,
+    IT_TICKET_DATABASE_INT_MAX,
     IT_TICKET_TITLE_MAX_LENGTH,
 } from "../contracts";
 
@@ -21,22 +22,29 @@ export const createITTicketInputSchema = z.object({
 }).strict();
 
 export const transitionITTicketStatusInputSchema = z.object({
-    ticketId: z.number().int().positive(),
+    ticketId: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
     targetStatus: z.nativeEnum(ITTicketStatus),
-    expectedVersion: z.number().int().positive(),
+    expectedVersion: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
 }).strict();
 
 export const assignITTicketInputSchema = z.object({
-    ticketId: z.number().int().positive(),
-    assigneeUserId: z.number().int().positive().nullable(),
-    expectedVersion: z.number().int().positive(),
+    ticketId: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
+    assigneeUserId: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX).nullable(),
+    expectedVersion: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
 }).strict();
 
 export const setITTicketCategoryInputSchema = z.object({
-    ticketId: z.number().int().positive(),
-    categoryId: z.number().int().positive().nullable(),
-    expectedVersion: z.number().int().positive(),
+    ticketId: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
+    categoryId: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX).nullable(),
+    expectedVersion: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
 }).strict();
+
+export const transitionITTicketStatusBodySchema =
+    transitionITTicketStatusInputSchema.omit({ ticketId: true });
+export const assignITTicketBodySchema = assignITTicketInputSchema.omit({ ticketId: true });
+export const setITTicketCategoryBodySchema = setITTicketCategoryInputSchema.omit({
+    ticketId: true,
+});
 
 export type CreateITTicketInput = z.infer<typeof createITTicketInputSchema>;
 export type TransitionITTicketStatusInput = z.infer<

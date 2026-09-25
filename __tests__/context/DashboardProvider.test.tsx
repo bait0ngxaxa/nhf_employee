@@ -588,6 +588,70 @@ describe("DashboardProvider navigation state", () => {
         );
     });
 
+    it("gates operator queue navigation on read ALL without requiring manage", () => {
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            role: "USER",
+            itCapabilities: {
+                canReadOwnTickets: true,
+                canReadAllTickets: false,
+                canCreateOwnTickets: true,
+                canCommentOwnTickets: true,
+                canCommentAllTickets: false,
+                canManageTickets: true,
+                canReadAnalytics: false,
+            },
+        };
+
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return (
+                <button type="button" onClick={() => handleMenuClick("it-ticket-queue")}>
+                    IT Ticket queue
+                </button>
+            );
+        }
+
+        const { rerender } = render(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("it-tickets");
+        expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent("it-ticket-queue");
+        fireEvent.click(screen.getByRole("button", { name: "IT Ticket queue" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+
+        navigationMocks.router.push.mockReset();
+        navigationMocks.user = {
+            ...navigationMocks.user,
+            itCapabilities: {
+                canReadOwnTickets: true,
+                canReadAllTickets: true,
+                canCreateOwnTickets: true,
+                canCommentOwnTickets: true,
+                canCommentAllTickets: false,
+                canManageTickets: false,
+                canReadAnalytics: false,
+            },
+        };
+        rerender(
+            <DashboardProvider>
+                <DashboardMenuState />
+                <NavigationProbe />
+            </DashboardProvider>,
+        );
+
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("it-ticket-queue");
+        fireEvent.click(screen.getByRole("button", { name: "IT Ticket queue" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/it/queue",
+            { scroll: false },
+        );
+    });
+
     it("keeps Authorization Administration explicitly ADMIN-only", () => {
         navigationMocks.user = { ...navigationMocks.user, role: "USER" };
 

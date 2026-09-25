@@ -6,6 +6,7 @@ export {
 } from "./schemas/employee";
 export {
     hasEligibleCurrentEmployeeForUser,
+    findCurrentEmployeeDisplayProjections,
     findCurrentEmployeeProjection,
     getCurrentWorkforceDepartmentSnapshotInTransaction,
     findLiffEmployeeByUserId,
@@ -56,6 +57,7 @@ export type {
     EmployeeAccountLifecycleProvider,
     EmployeeAccountLifecycleRecord,
     CurrentEmployeeProjection,
+    CurrentEmployeeDisplayProjection,
     CurrentWorkforceDepartmentSnapshot,
     EmployeePresentationCapabilities,
     LiffEmployeeIdentity,

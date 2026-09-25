@@ -170,7 +170,7 @@ describe("IT Ticket requester detail", () => {
     it.each([
         ["OPEN", "รับเรื่องแล้ว"],
         ["IN_PROGRESS", "กำลังดำเนินการ"],
-        ["WAITING_REQUESTER", "รอข้อมูลเพิ่มเติม"],
+        ["WAITING_REQUESTER", "รอข้อมูลจากผู้แจ้ง"],
         ["RESOLVED", "แก้ไขแล้ว"],
         ["CLOSED", "ปิดงานแล้ว"],
         ["CANCELLED", "ยกเลิกแล้ว"],

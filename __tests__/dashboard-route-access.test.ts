@@ -17,6 +17,7 @@ import {
     requireDashboardAuditCapability,
     requireDashboardAuthorizationAdministration,
     requireDashboardITReadAccess,
+    requireDashboardITOperatorReadAccess,
     requireDashboardITSelfServiceAccess,
 } from "@/app/dashboard/_lib/route-access";
 
@@ -152,5 +153,44 @@ describe("Dashboard IT Ticket route authorization", () => {
 
         await expect(requireDashboardITSelfServiceAccess()).resolves.toEqual(capabilities);
         await expect(requireDashboardITReadAccess()).resolves.toBeUndefined();
+    });
+
+    it("requires read ALL for operator routes regardless of system role", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "ADMIN",
+            itCapabilities: {
+                canReadOwnTickets: true,
+                canReadAllTickets: false,
+                canCreateOwnTickets: true,
+                canCommentOwnTickets: true,
+                canCommentAllTickets: false,
+                canManageTickets: true,
+                canReadAnalytics: false,
+            },
+        });
+
+        await expect(requireDashboardITOperatorReadAccess()).rejects.toThrow(
+            "NEXT_REDIRECT:/access-denied",
+        );
+    });
+
+    it("allows read ALL without manage authority to reach operator routes", async () => {
+        const capabilities = {
+            canReadOwnTickets: true,
+            canReadAllTickets: true,
+            canCreateOwnTickets: true,
+            canCommentOwnTickets: true,
+            canCommentAllTickets: false,
+            canManageTickets: false,
+            canReadAnalytics: false,
+        };
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "USER",
+            itCapabilities: capabilities,
+        });
+
+        await expect(requireDashboardITOperatorReadAccess()).resolves.toEqual(capabilities);
     });
 });

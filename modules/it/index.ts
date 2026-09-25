@@ -20,7 +20,10 @@ export { evaluateITAssigneeEligibility } from "./application/assignee-eligibilit
 export {
     IT_TICKET_DESCRIPTION_MAX_LENGTH,
     IT_TICKET_TITLE_MAX_LENGTH,
+    assignITTicketBodySchema,
     createITTicketInputSchema,
+    setITTicketCategoryBodySchema,
+    transitionITTicketStatusBodySchema,
 } from "./application/ticket-schemas";
 export {
     assignITTicket,
@@ -29,14 +32,20 @@ export {
     transitionITTicketStatus,
 } from "./application/ticket-commands";
 export {
+    getITOperatorReferenceData,
+    getITOperatorTicket,
     getITRequesterTicket,
+    IT_OPERATOR_QUEUE_DEFAULT_LIMIT,
+    IT_OPERATOR_QUEUE_MAX_LIMIT,
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_LIST_DEFAULT_PAGE,
     IT_TICKET_LIST_MAX_LIMIT,
     listITRequesterTickets,
     listITRequesterTicketsInputSchema,
+    listITOperatorTickets,
 } from "./application/ticket-queries";
-export { toITRequesterTicket } from "./application/ticket-dto";
+export { IT_TICKET_DATABASE_INT_MAX } from "./contracts";
+export { toITOperatorTicket, toITRequesterTicket } from "./application/ticket-dto";
 export {
     ITTicketAssigneeNotEligibleError,
     ITTicketCategoryInactiveError,
@@ -50,6 +59,7 @@ export {
     ITWorkforceDeniedError,
 } from "./application/ticket-errors";
 export { isAllowedITTicketTransition } from "./domain/ticket-workflow";
+export { getAllowedITTicketTransitions } from "./domain/ticket-workflow";
 export { ITTicketEventKind, ITTicketStatus, ITTicketType } from "@prisma/client";
 export type {
     ITAssigneeEligibilityEvidence,
@@ -60,6 +70,14 @@ export type {
     ITRequesterTicket,
     ITRequesterTicketList,
     ITRequesterTicketPagination,
+} from "./contracts";
+export type {
+    ITAssignableOperator,
+    ITOperatorReferenceData,
+    ITOperatorTicket,
+    ITOperatorTicketList,
+    ITOperatorTicketMutationSnapshot,
+    ITTicketOperatorIdentity,
 } from "./contracts";
 export type {
     AssignITTicketInput,

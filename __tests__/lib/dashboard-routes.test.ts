@@ -26,6 +26,9 @@ describe("dashboard route SSOT", () => {
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itTickets)).toBe(
             APP_ROUTES.dashboardIT,
         );
+        expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itTicketQueue)).toBe(
+            APP_ROUTES.dashboardITQueue,
+        );
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.routine)).toBe(
             APP_ROUTES.dashboardRoutine,
         );
@@ -55,6 +58,9 @@ describe("dashboard route SSOT", () => {
         );
         expect(getDashboardMenuIdFromPathname(APP_ROUTES.dashboardIT)).toBe(
             APP_DASHBOARD_TABS.itTickets,
+        );
+        expect(getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardITQueue}/19`)).toBe(
+            APP_DASHBOARD_TABS.itTicketQueue,
         );
         expect(
             getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardEmployees}/new`),

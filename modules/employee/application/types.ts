@@ -81,6 +81,14 @@ export interface CurrentEmployeeProjection {
     isManager: boolean;
 }
 
+export interface CurrentEmployeeDisplayProjection {
+    readonly userId: number;
+    readonly employeeId: number;
+    readonly firstName: string;
+    readonly lastName: string;
+    readonly nickname: string | null;
+}
+
 export interface CurrentWorkforceDepartmentSnapshot {
     readonly employeeId: number;
     readonly departmentId: number;

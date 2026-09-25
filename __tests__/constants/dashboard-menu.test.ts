@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     canAccessLeaveDashboard,
     canAccessEmployeeDashboard,
+    canAccessITTicketQueue,
     DASHBOARD_MENU_GROUPS,
     DASHBOARD_MENU_ITEMS,
     getLeaveDashboardTabVisibility,
@@ -161,7 +162,7 @@ describe("dashboard menu", () => {
             group.label,
             group.items.map((item) => item.id),
         ])).toEqual([
-            ["บริการภายใน", ["leave-management", "stock", "routine", "it-tickets"]],
+            ["บริการภายใน", ["leave-management", "stock", "routine", "it-tickets", "it-ticket-queue"]],
             ["บุคลากร", ["employee-management", "add-employee", "email-request"]],
             ["ระบบและสิทธิ์", ["audit-logs", "authorization-administration"]],
         ]);
@@ -190,6 +191,10 @@ describe("dashboard menu", () => {
         expect(menuItem("it-tickets")).toMatchObject({
             label: "IT Ticket",
             sidebarLabel: "ขอความช่วยเหลือด้าน IT",
+        });
+        expect(menuItem("it-ticket-queue")).toMatchObject({
+            label: "คิว IT Ticket",
+            sidebarLabel: "คิวงาน IT",
         });
         expect(getDashboardPageLabel("routine")).toBe("NHF Routine");
     });
@@ -290,6 +295,39 @@ describe("dashboard menu", () => {
 
         expect(noCapabilityMenuIds).not.toContain("it-tickets");
         expect(requesterMenuIds).toContain("it-tickets");
+    });
+
+    it("shows the operator queue only with read ALL capability", () => {
+        const ownWithManage = getAvailableMenuGroups(
+            true,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            { ...itReadCapabilities, canManageTickets: true },
+        ).flatMap((group) => group.items.map((item) => item.id));
+        const readAllOnlyCapabilities = {
+            ...itReadCapabilities,
+            canReadAllTickets: true,
+            canManageTickets: false,
+        } satisfies ITPresentationCapabilities;
+        const readAll = getAvailableMenuGroups(
+            false,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            readAllOnlyCapabilities,
+        ).flatMap((group) => group.items.map((item) => item.id));
+
+        expect(canAccessITTicketQueue({ ...itReadCapabilities, canManageTickets: true })).toBe(false);
+        expect(ownWithManage).toContain("it-tickets");
+        expect(ownWithManage).not.toContain("it-ticket-queue");
+        expect(readAll).toContain("it-ticket-queue");
     });
 
     it("keeps CSV import route available but hides it from dashboard menus", () => {

@@ -18,3 +18,17 @@ export function isAllowedITTicketTransition(
             return false;
     }
 }
+
+/** Returns only approved operator destinations for the current status. */
+export function getAllowedITTicketTransitions(
+    from: ITTicketStatus,
+): readonly ITTicketStatus[] {
+    const operatorTargets: readonly ITTicketStatus[] = [
+        "IN_PROGRESS",
+        "WAITING_REQUESTER",
+        "RESOLVED",
+    ];
+    return operatorTargets.filter((target) =>
+        isAllowedITTicketTransition(from, target),
+    );
+}

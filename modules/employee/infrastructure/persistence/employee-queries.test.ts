@@ -5,6 +5,7 @@ import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
 import {
     createEmployeeWhereClause,
+    findCurrentEmployeeDisplayProjections,
     findCurrentEmployeeProjection,
     getEmployeeStats,
     hasEligibleCurrentEmployeeForUser,
@@ -104,5 +105,39 @@ describe("Employee query compatibility", () => {
         } as never);
 
         await expect(findCurrentEmployeeProjection(41)).resolves.toBeNull();
+    });
+
+    it("returns only active workforce identity fields for requested users", async () => {
+        prismaMock.employee.findMany.mockResolvedValueOnce([{
+            id: 101,
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            nickname: "ชาย",
+            user: { id: 41 },
+        }] as never);
+
+        await expect(findCurrentEmployeeDisplayProjections([41, 41, 42])).resolves.toEqual([
+            {
+                userId: 41,
+                employeeId: 101,
+                firstName: "สมชาย",
+                lastName: "ใจดี",
+                nickname: "ชาย",
+            },
+        ]);
+        expect(prismaMock.employee.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: {
+                status: "ACTIVE",
+                deletedAt: null,
+                user: { id: { in: [41, 42] }, isActive: true, deletedAt: null },
+            },
+            select: expect.objectContaining({
+                id: true,
+                firstName: true,
+                lastName: true,
+                nickname: true,
+                user: { select: { id: true } },
+            }),
+        }));
     });
 });

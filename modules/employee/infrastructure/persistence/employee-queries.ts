@@ -7,11 +7,14 @@ import { hasEligibleEmployeeLifecycle } from "../../domain/lifecycle";
 import type {
     CurrentWorkforceDepartmentSnapshot,
     CurrentEmployeeProjection,
+    CurrentEmployeeDisplayProjection,
     EmployeeFilters,
     EmployeeRecord,
     LiffEmployeeIdentity,
     PaginatedEmployeesResult,
 } from "../../application/types";
+
+type EmployeeDisplayPersistenceContext = Pick<Prisma.TransactionClient, "employee">;
 
 export async function getCurrentWorkforceDepartmentSnapshotInTransaction(
     tx: Prisma.TransactionClient,
@@ -102,6 +105,46 @@ export async function findCurrentEmployeeProjection(
         departmentName: employee.dept?.name ?? null,
         isManager: employee.subordinates.length > 0,
     };
+}
+
+/** Returns only active linked workforce identities for a batch of known users. */
+export async function findCurrentEmployeeDisplayProjections(
+    userIds: readonly number[],
+    persistenceContext?: EmployeeDisplayPersistenceContext,
+): Promise<readonly CurrentEmployeeDisplayProjection[]> {
+    const uniqueUserIds = [...new Set(userIds)];
+    if (uniqueUserIds.length === 0) return [];
+
+    const client: EmployeeDisplayPersistenceContext = persistenceContext ?? prisma;
+    const employees = await client.employee.findMany({
+        where: {
+            status: "ACTIVE",
+            deletedAt: null,
+            user: {
+                id: { in: uniqueUserIds },
+                isActive: true,
+                deletedAt: null,
+            },
+        },
+        select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            nickname: true,
+            user: { select: { id: true } },
+        },
+        orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { id: "asc" }],
+    });
+
+    return employees.flatMap((employee) => employee.user === null
+        ? []
+        : [{
+            userId: employee.user.id,
+            employeeId: employee.id,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            nickname: employee.nickname,
+        }]);
 }
 
 export async function findLiffEmployeeByUserId(

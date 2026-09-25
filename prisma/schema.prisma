@@ -264,8 +264,10 @@ model ITTicket {
   createIdempotency ITTicketCreateIdempotency?
 
   @@index([requesterUserId, createdAt, id])
+  @@index([createdAt, id])
   @@index([status, createdAt, id])
   @@index([assignedToUserId, status, createdAt])
+  @@index([assignedToUserId, createdAt, id])
   @@index([type, createdAt])
   @@index([categoryId, createdAt])
   @@index([requesterDepartmentId])

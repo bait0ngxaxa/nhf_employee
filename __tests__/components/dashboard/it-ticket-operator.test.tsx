@@ -1,0 +1,224 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+    ITTicketOperatorDetail,
+    ITTicketOperatorQueue,
+    type ITOperatorReferenceData,
+    type ITOperatorTicket,
+    type ITPresentationCapabilities,
+} from "@/modules/it/client";
+
+const requesterCapabilities: ITPresentationCapabilities = {
+    canReadOwnTickets: true,
+    canReadAllTickets: true,
+    canCreateOwnTickets: true,
+    canCommentOwnTickets: true,
+    canCommentAllTickets: false,
+    canManageTickets: false,
+    canReadAnalytics: false,
+};
+
+const operatorCapabilities: ITPresentationCapabilities = {
+    ...requesterCapabilities,
+    canManageTickets: true,
+};
+
+const ticket: ITOperatorTicket = {
+    id: 19,
+    type: "INCIDENT",
+    title: "เข้าใช้งานระบบไม่ได้",
+    description: "หน้าเข้าสู่ระบบแสดงข้อผิดพลาด",
+    status: "OPEN",
+    requester: {
+        userId: 41,
+        displayName: "อารี ใจเย็น",
+        departmentId: 9,
+        departmentNameSnapshot: "แผนกตัวอย่าง",
+    },
+    assignee: null,
+    category: null,
+    version: 4,
+    createdAt: "2026-09-01T01:00:00.000Z",
+    updatedAt: "2026-09-02T02:00:00.000Z",
+    resolvedAt: null,
+};
+
+const reference: ITOperatorReferenceData = {
+    categories: [{ id: 4, key: "NETWORK", name: "เครือข่าย" }],
+    assignableOperators: [{ userId: 51, employeeId: 91, displayName: "สมชาย ใจดี" }],
+};
+
+const fetchMock = vi.fn<typeof fetch>();
+
+function apiResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+    });
+}
+
+function queueResponse(tickets: readonly ITOperatorTicket[] = []): Response {
+    return apiResponse({ success: true, tickets, nextCursor: null, limit: 25 });
+}
+
+function detailResponse(value: ITOperatorTicket): Response {
+    return apiResponse({ success: true, ticket: value });
+}
+
+function referenceResponse(): Response {
+    return apiResponse({ success: true, ...reference });
+}
+
+beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+    vi.unstubAllGlobals();
+});
+
+describe("IT operator queue presentation", () => {
+    it("shows bounded queue loading, empty, and retry states", async () => {
+        fetchMock
+            .mockImplementationOnce(() => new Promise<Response>(() => undefined))
+            .mockResolvedValueOnce(referenceResponse());
+
+        const { unmount } = render(<ITTicketOperatorQueue />);
+        expect(await screen.findByRole("status", { name: "กำลังโหลดคิว IT Ticket" }))
+            .toBeInTheDocument();
+        unmount();
+
+        fetchMock
+            .mockResolvedValueOnce(apiResponse({ error: "temporary" }, 500))
+            .mockResolvedValueOnce(referenceResponse())
+            .mockResolvedValueOnce(queueResponse())
+            .mockResolvedValueOnce(referenceResponse());
+        render(<ITTicketOperatorQueue />);
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("temporary");
+        fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
+        expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
+    });
+
+    it("renders operational identity and submits filters to the server", async () => {
+        fetchMock.mockImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("status=IN_PROGRESS")) return queueResponse([]);
+            return queueResponse([ticket]);
+        });
+
+        render(<ITTicketOperatorQueue />);
+
+        expect(await screen.findAllByRole("link", { name: /เข้าใช้งานระบบไม่ได้/ }))
+            .toHaveLength(2);
+        expect(screen.getAllByText("อารี ใจเย็น")).toHaveLength(2);
+        expect(screen.getAllByText("ยังไม่มีผู้รับผิดชอบ").length).toBeGreaterThan(1);
+        expect(screen.getAllByText("ยังไม่จัดหมวดหมู่").length).toBeGreaterThan(0);
+
+        fireEvent.change(screen.getByLabelText("กรองตามสถานะ"), {
+            target: { value: "IN_PROGRESS" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ใช้ตัวกรอง" }));
+
+        await waitFor(() => {
+            expect(fetchMock.mock.calls.some(([input]) =>
+                String(input).includes("status=IN_PROGRESS"),
+            )).toBe(true);
+        });
+        expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
+    });
+});
+
+describe("IT operator Ticket detail presentation", () => {
+    it("keeps a read-only ALL operator from receiving mutation controls", async () => {
+        fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
+            ? referenceResponse()
+            : detailResponse(ticket));
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={requesterCapabilities} />);
+
+        expect(await screen.findByRole("heading", { name: "Ticket #19" })).toBeInTheDocument();
+        expect(screen.getByText("แผนกตัวอย่าง")).toBeInTheDocument();
+        expect(screen.getByText("หน้าเข้าสู่ระบบแสดงข้อผิดพลาด")).toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "เริ่มดำเนินการ" })).not.toBeInTheDocument();
+    });
+
+    it("sends the displayed version and requires review after loading a stale conflict", async () => {
+        let detailReadCount = 0;
+        const latestTicket: ITOperatorTicket = {
+            ...ticket,
+            status: "IN_PROGRESS",
+            assignee: { userId: 62, displayName: "ผู้รับผิดชอบปัจจุบัน" },
+            version: 5,
+        };
+        const confirmedTicket: ITOperatorTicket = {
+            ...latestTicket,
+            assignee: { userId: 51, displayName: "สมชาย ใจดี" },
+            version: 6,
+        };
+        const patchBodies: unknown[] = [];
+        let patchCount = 0;
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (init?.method === "PATCH") {
+                patchBodies.push(JSON.parse(String(init.body)) as unknown);
+                patchCount += 1;
+                if (patchCount === 1) {
+                    return apiResponse({
+                        success: false,
+                        error: "Ticket ถูกเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลล่าสุด",
+                        code: "MUTATION_CONFLICT",
+                        reason: "STALE_VERSION",
+                    }, 409);
+                }
+                return apiResponse({
+                    success: true,
+                    changed: true,
+                    ticket: {
+                        id: 19,
+                        version: 6,
+                        status: "IN_PROGRESS",
+                        assignedToUserId: 51,
+                        categoryId: null,
+                        updatedAt: "2026-09-03T02:00:00.000Z",
+                    },
+                });
+            }
+            detailReadCount += 1;
+            return detailResponse(detailReadCount === 1
+                ? ticket
+                : detailReadCount === 2 ? latestTicket : confirmedTicket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        expect(await screen.findByLabelText("ผู้รับผิดชอบ Ticket")).toBeInTheDocument();
+        expect(screen.getByLabelText("หมวดหมู่ Ticket")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "บันทึกหมวดหมู่" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ปิดงานแล้ว" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ยกเลิกแล้ว" })).not.toBeInTheDocument();
+
+        fireEvent.click(await screen.findByRole("button", { name: "เริ่มดำเนินการ" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("Ticket เปลี่ยนแปลงโดยผู้ใช้อื่นแล้ว");
+        await waitFor(() => expect(screen.getByLabelText("ผู้รับผิดชอบ Ticket")).toHaveValue("62"));
+        expect(screen.getByText("รุ่น 5")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "รอข้อมูลจากผู้แจ้ง" })).toBeDisabled();
+        expect(patchBodies[0]).toEqual({ targetStatus: "IN_PROGRESS", expectedVersion: 4 });
+
+        fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบข้อมูลล่าสุดแล้ว" }));
+        fireEvent.change(screen.getByLabelText("ผู้รับผิดชอบ Ticket"), {
+            target: { value: "51" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+
+        await waitFor(() => expect(patchBodies).toHaveLength(2));
+        expect(patchBodies[1]).toEqual({ assigneeUserId: 51, expectedVersion: 5 });
+        expect(await screen.findByText("รุ่น 6")).toBeInTheDocument();
+    });
+});

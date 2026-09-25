@@ -55,6 +55,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         description: "แจ้งปัญหาและติดตามคำขอรับบริการจากทีมไอที",
     },
     {
+        id: "it-ticket-queue",
+        label: "คิว IT Ticket",
+        sidebarLabel: "คิวงาน IT",
+        icon: Headset,
+        description: "ตรวจสอบและดำเนินการ Ticket ตามสิทธิ์ที่ได้รับ",
+    },
+    {
         id: "email-request",
         label: "ส่งคำร้องพนักงานใหม่",
         sidebarLabel: "คำร้องบริการ IT",
@@ -131,6 +138,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
             getDashboardMenuItem("stock"),
             getDashboardMenuItem("routine"),
             getDashboardMenuItem("it-tickets"),
+            getDashboardMenuItem("it-ticket-queue"),
         ],
     },
     {
@@ -182,6 +190,12 @@ export function canAccessITTicketDashboard(
 ): boolean {
     return capabilities?.canReadOwnTickets === true
         || capabilities?.canCreateOwnTickets === true;
+}
+
+export function canAccessITTicketQueue(
+    capabilities?: ITPresentationCapabilities,
+): boolean {
+    return capabilities?.canReadAllTickets === true;
 }
 
 export const LEAVE_DASHBOARD_TABS = [
@@ -282,6 +296,9 @@ export function getAvailableMenuGroups(
             if (item.id === "it-tickets") {
                 return canAccessITTicketDashboard(itCapabilities);
             }
+            if (item.id === "it-ticket-queue") {
+                return canAccessITTicketQueue(itCapabilities);
+            }
             return !item.requiredRole
                 || (item.requiredRole === "ADMIN" && isAdmin);
         })
@@ -336,6 +353,7 @@ export const getMenuTheme = (menuId: string) => {
                 glow: "from-indigo-400 via-violet-400 to-purple-400",
             };
         case "it-tickets":
+        case "it-ticket-queue":
             return {
                 gradient: "from-sky-600 to-cyan-700",
                 lightBg: "bg-sky-50",

@@ -13,9 +13,10 @@ The repository-wide K0 ownership audit, K1 closure, and deferred-boundary
 inventory are recorded in [final-repository-audit.md](./final-repository-audit.md).
 K1 closed the three Stock findings. IT1 established the `modules/it` server
 authorization foundation, IT2 added IT-owned Ticket persistence and domain
-commands, and IT3 added requester-only Ticket API and Dashboard presentation.
-Operator queue, comments, attachments, notifications, and Email Request
-migration remain deferred.
+commands, IT3 added requester-only Ticket API and Dashboard presentation, and
+IT4 added the separate read-ALL operator queue/API and processing surface.
+Comments, attachments, notifications, and Email Request migration remain
+deferred.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -115,7 +116,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT module foundation and Ticket self-service (IT1/IT2/IT3)
+## IT module Ticket services and operator processing (IT1/IT2/IT3/IT4)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -130,12 +131,21 @@ IT2 adds new `it_*` Ticket, category, event, and creation-idempotency tables,
 validated server commands, transaction-time workforce/configured-authority
 checks, version concurrency, and the approved workflow. IT3 adds requester
 list/detail queries whose database predicates always include the authenticated
-requester, internal Dashboard API handlers, and a requester-safe DTO. The root
-server entry exposes stable application contracts; `@/modules/it/client` is the
-browser-safe presentation entry. Dashboard navigation and route guards use the
-server-derived capability projection, while API/query boundaries independently
-revalidate workforce and read authority. IT3 adds no operator queue, comments,
-attachments, notification producer, or production grant configuration. See
+requester, internal Dashboard API handlers, and a requester-safe DTO. IT4 adds
+separate operator queue/detail/reference queries that require effective
+`it.ticket.read / ALL` before broad Ticket reads. Its internal PATCH adapters
+delegate to existing IT2 commands; those commands revalidate manage ALL,
+expected version, workforce, and assignee eligibility transactionally.
+
+IT4 consumes Authorization's configured-scope recipient query and Employee's
+public `findCurrentEmployeeDisplayProjections()` contract for safe active
+assignment candidates; it does not read either module's private persistence.
+The root server entry exposes stable application contracts;
+`@/modules/it/client` is the browser-safe presentation entry. Dashboard
+navigation and route guards use the server-derived capability projection,
+while API/query boundaries independently revalidate workforce and authority.
+IT4 adds no category administration, production grant configuration,
+conversation, comments, attachments, or notification producer. See
 [it-module-design.md](./it-module-design.md) for the phase contract and
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.

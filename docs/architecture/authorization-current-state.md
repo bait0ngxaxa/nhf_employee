@@ -1,7 +1,7 @@
 # NHF Employee — Current Authorization State
 
 > **Current repository state (Phase 12H-I, notification-recipient
-> Phase 13A/13A.1/13A.2, and IT1/IT2/IT3):** ADMIN is an Auth/control-plane role only. Business
+> Phase 13A/13A.1/13A.2, and IT1/IT2/IT3/IT4):** ADMIN is an Auth/control-plane role only. Business
 > authorization is the domain Default Domain Policy plus
 > configured Team, TeamRole, and exceptional direct User grants. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load and
@@ -30,12 +30,12 @@
 > confirmed production collision preflight and migration deployment PASSED.
 > The Routine recipient persistence transition is CLOSED.
 >
-> IT1, IT2, and IT3 are CLOSED. The `it` domain and its five Dashboard-only
-> capabilities remain role-neutral; Ticket persistence, server-side commands,
-> requester-only queries, and the self-service API/Dashboard surface exist.
-> `AUTHORIZATION_SEED_CONFIGURATION` remains empty, with no IT Team,
-> membership, role, or grant mapping. Operator Ticket workflows and Email
-> Request migration remain deferred.
+> IT1, IT2, IT3, and IT4 are CLOSED. The `it` domain and its five
+> Dashboard-only capabilities remain role-neutral; Ticket persistence,
+> server-side commands, requester-only queries, and a separate read-ALL
+> operator API/Dashboard surface exist. `AUTHORIZATION_SEED_CONFIGURATION`
+> remains empty, with no IT Team, membership, role, or grant mapping. Email
+> Request migration remains deferred.
 >
 > The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
@@ -50,20 +50,20 @@ The current production source of truth after Phase 12H-I is:
 | Account/control plane | `User.role` / `Role.ADMIN` remains the Auth system role for authentication, Authorization Administration, bootstrap, role management, and last-eligible-ADMIN protection. |
 | Business authority | Domain-owned Default Domain Policy plus configured `TEAM`, `TEAM_ROLE`, and exceptional direct `USER` grants. |
 | Resolver | `createAuthorizationResolver()` is the canonical constructor; USER and ADMIN load configured persistence equally. `systemRole` never creates a business grant. |
-| IT authorization | IT1 registers `it.ticket.read/create/comment/manage` and `it.analytics.read`, all for `DASHBOARD`; defaults are read/create/comment `OWN`, while manage and analytics require configured grants. IT2 commands and IT3 requester queries revalidate current workforce and authority at their application boundaries; requester Ticket data is always owner-scoped in SQL. Assignee checks use configured exact-user scopes only. Ticket ownership remains requester-based. |
+| IT authorization | IT1 registers `it.ticket.read/create/comment/manage` and `it.analytics.read`, all for `DASHBOARD`; defaults are read/create/comment `OWN`, while manage and analytics require configured grants. IT2 commands, IT3 requester queries, and IT4 operator queries revalidate current workforce and authority at their application boundaries. Requester Ticket data remains owner-scoped in SQL; complete queue/detail reads require read ALL before Ticket rows are queried, and mutations recheck manage ALL transactionally. Assignee checks use configured exact-user scopes only. Ticket ownership remains requester-based. |
 | Administration presentation | Account/system role is shown separately from business grant sources. Business explanations contain only Team, TeamRole, and direct User origins. |
 | Routine provenance | Future mutation classification uses effective business authority; historical `ownershipMode: "ADMIN"` audit JSON remains readable and is not rewritten. |
 | Fail-closed behavior | Unknown, inactive, revoked, malformed, unsupported, or structurally invalid configured sources remain denied or surface the existing configuration error. |
 
 The current registry contains 45 capabilities across the nine authorization
 domains: `employee`, `department`, `routine`, `stock`, `leave`, `audit`,
-`email`, `notification`, and `it`. IT1/IT2/IT3 add no production authorization
-configuration: `AUTHORIZATION_SEED_CONFIGURATION` remains empty. The IT
-assignee contract requires active workforce plus configured read, comment, and
-manage `ALL`; Default Domain Policy and analytics authority do not satisfy
-those requirements. Ticket persistence, requester queries, API, and Dashboard
-self-service exist; operator queue/workflows remain deferred to IT4 and Email
-Request migration remains deferred to IT8.
+`email`, `notification`, and `it`. IT1/IT2/IT3/IT4 add no production
+authorization configuration: `AUTHORIZATION_SEED_CONFIGURATION` remains
+empty. The IT assignee contract requires active workforce plus configured
+read, comment, and manage `ALL`; Default Domain Policy and analytics authority
+do not satisfy those requirements. Ticket persistence, requester queries, operator queue,
+API, and Dashboard surfaces exist; Email Request migration remains deferred to
+IT8.
 
 The detailed matrices and phase notes below include historical evidence from
 before this final cleanup. They are retained for traceability and must not be

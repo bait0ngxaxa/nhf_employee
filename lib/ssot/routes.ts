@@ -11,6 +11,7 @@ export const APP_ROUTES = {
     dashboardRoutine: "/dashboard/routine",
     dashboardEmailRequest: "/dashboard/email-request",
     dashboardIT: "/dashboard/it",
+    dashboardITQueue: "/dashboard/it/queue",
     dashboardEmployees: "/dashboard/employees",
     dashboardEmployeeNew: "/dashboard/employees/new",
     dashboardEmployeeImport: "/dashboard/employees/import",
@@ -50,6 +51,7 @@ export const APP_DASHBOARD_TABS = {
     sessions: "sessions",
     itEquipment: "it-equipment",
     itTickets: "it-tickets",
+    itTicketQueue: "it-ticket-queue",
     authorizationAdministration: "authorization-administration",
 } as const;
 
@@ -64,6 +66,7 @@ export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     stock: APP_ROUTES.dashboardStock,
     "it-equipment": APP_ROUTES.dashboardStock,
     "it-tickets": APP_ROUTES.dashboardIT,
+    "it-ticket-queue": APP_ROUTES.dashboardITQueue,
     routine: APP_ROUTES.dashboardRoutine,
     "email-request": APP_ROUTES.dashboardEmailRequest,
     "employee-management": APP_ROUTES.dashboardEmployees,
@@ -85,6 +88,7 @@ const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     [APP_ROUTES.dashboardStock, APP_DASHBOARD_TABS.stock],
     [APP_ROUTES.dashboardRoutine, APP_DASHBOARD_TABS.routine],
     [APP_ROUTES.dashboardEmailRequest, APP_DASHBOARD_TABS.emailRequest],
+    [APP_ROUTES.dashboardITQueue, APP_DASHBOARD_TABS.itTicketQueue],
     [APP_ROUTES.dashboardIT, APP_DASHBOARD_TABS.itTickets],
     [APP_ROUTES.dashboardAudit, APP_DASHBOARD_TABS.auditLogs],
     [APP_ROUTES.dashboardNotifications, APP_DASHBOARD_TABS.notifications],
@@ -405,6 +409,17 @@ export const API_ROUTES = {
     itTickets: {
         list: "/api/it/tickets",
         byId: (id: number | string): string => `/api/it/tickets/${id}`,
+    },
+    itOperatorTickets: {
+        list: "/api/it/operator/tickets",
+        byId: (id: number | string): string => `/api/it/operator/tickets/${id}`,
+        reference: "/api/it/operator/reference",
+        assigneeById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/assignee`,
+        categoryById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/category`,
+        statusById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/status`,
     },
     line: {
         accountLink: "/api/line/account-link",

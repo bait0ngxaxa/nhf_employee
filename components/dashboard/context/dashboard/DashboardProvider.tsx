@@ -12,6 +12,7 @@ import {
     DASHBOARD_MENU_ITEMS,
     canAccessEmailRequestDashboard,
     canAccessITTicketDashboard,
+    canAccessITTicketQueue,
     canAccessEmployeeDashboard,
     canAccessLeaveDashboard,
     canAccessStockDashboard,
@@ -165,6 +166,13 @@ export function DashboardProvider({
             if (
                 menuId === "it-tickets"
                 && !canAccessITTicketDashboard(user?.itCapabilities)
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
+            if (
+                menuId === "it-ticket-queue"
+                && !canAccessITTicketQueue(user?.itCapabilities)
             ) {
                 router.push(APP_ROUTES.accessDenied);
                 return;
