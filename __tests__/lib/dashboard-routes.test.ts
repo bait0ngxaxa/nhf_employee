@@ -29,6 +29,9 @@ describe("dashboard route SSOT", () => {
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itTicketQueue)).toBe(
             APP_ROUTES.dashboardITQueue,
         );
+        expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itAnalytics)).toBe(
+            APP_ROUTES.dashboardITAnalytics,
+        );
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.routine)).toBe(
             APP_ROUTES.dashboardRoutine,
         );
@@ -58,6 +61,12 @@ describe("dashboard route SSOT", () => {
         );
         expect(getDashboardMenuIdFromPathname(APP_ROUTES.dashboardIT)).toBe(
             APP_DASHBOARD_TABS.itTickets,
+        );
+        expect(getDashboardMenuIdFromPathname(APP_ROUTES.dashboardITAnalytics)).toBe(
+            APP_DASHBOARD_TABS.itAnalytics,
+        );
+        expect(getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardITAnalytics}/details`)).toBe(
+            APP_DASHBOARD_TABS.itAnalytics,
         );
         expect(getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardITQueue}/19`)).toBe(
             APP_DASHBOARD_TABS.itTicketQueue,
@@ -127,6 +136,10 @@ describe("dashboard route SSOT", () => {
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itEquipment)).toBe(
             APP_ROUTES.dashboardStock,
         );
+    });
+
+    it("centralizes the internal IT analytics API path", () => {
+        expect(API_ROUTES.itAnalytics.dashboard).toBe("/api/it/analytics");
     });
 });
 

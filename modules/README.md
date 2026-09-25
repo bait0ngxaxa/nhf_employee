@@ -5,16 +5,19 @@ Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. IT1 through IT5B are closed under `modules/it/`; IT6 notifications
-are implemented with closure verification pending. Its server entry is
+boundaries. IT1 through IT7 are closed under `modules/it/`. Its server entry is
 `@/modules/it` and its browser-safe Dashboard presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and
 idempotency, requester and operator queries, approved workflow, assignment,
-classification, conversation, attachments, and event history. IT6 adds Ticket
-notification meaning, recipient policy, payload interpretation, action
-destination, and dispatch through a transactional shared-outbox intent and the
-public Notification Inbox command. Email Request migration remains deferred to
-IT8. Audit Phase I3 is
+classification, conversation, attachments, event history, and aggregate-only
+operational analytics. IT6 adds Ticket notification meaning, recipient policy,
+payload interpretation, action destination, and dispatch through a
+transactional shared-outbox intent and the public Notification Inbox command.
+IT7 adds the independently authorized `it.analytics.read / ALL` query and Thai
+Dashboard at `/dashboard/it/analytics`; it uses Asia/Bangkok 7D/30D/90D periods,
+one consistent MySQL read snapshot, and no analytics table or index. Analytics
+does not grant individual Ticket access. Email Request migration remains
+deferred to IT8. Audit Phase I3 is
 closed with generic
 server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in

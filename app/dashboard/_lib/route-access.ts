@@ -76,6 +76,14 @@ export async function requireDashboardITOperatorReadAccess(): Promise<ITPresenta
     return capabilities;
 }
 
+export async function requireDashboardITAnalyticsAccess(): Promise<void> {
+    const user = await getCurrentUserProjection();
+    if (!user) redirect(APP_ROUTES.login);
+    if (user.itCapabilities?.canReadAnalytics !== true) {
+        redirect(APP_ROUTES.accessDenied);
+    }
+}
+
 export async function requireDashboardITReadAccess(): Promise<ITPresentationCapabilities> {
     const capabilities = await requireDashboardITSelfServiceAccess();
     if (!capabilities.canReadOwnTickets) redirect(APP_ROUTES.accessDenied);

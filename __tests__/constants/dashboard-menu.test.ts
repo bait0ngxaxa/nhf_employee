@@ -3,6 +3,7 @@ import {
     canAccessLeaveDashboard,
     canAccessEmployeeDashboard,
     canAccessITTicketQueue,
+    canAccessITAnalytics,
     DASHBOARD_MENU_GROUPS,
     DASHBOARD_MENU_ITEMS,
     getLeaveDashboardTabVisibility,
@@ -162,7 +163,7 @@ describe("dashboard menu", () => {
             group.label,
             group.items.map((item) => item.id),
         ])).toEqual([
-            ["บริการภายใน", ["leave-management", "stock", "routine", "it-tickets", "it-ticket-queue"]],
+            ["บริการภายใน", ["leave-management", "stock", "routine", "it-tickets", "it-ticket-queue", "it-analytics"]],
             ["บุคลากร", ["employee-management", "add-employee", "email-request"]],
             ["ระบบและสิทธิ์", ["audit-logs", "authorization-administration"]],
         ]);
@@ -196,6 +197,12 @@ describe("dashboard menu", () => {
             label: "คิว IT Ticket",
             sidebarLabel: "คิวงาน IT",
         });
+        expect(menuItem("it-analytics")).toMatchObject({
+            label: "รายงาน IT",
+            sidebarLabel: "รายงาน IT",
+            description: "ดูภาพรวมและสถิติการให้บริการ IT",
+        });
+        expect(getMenuTheme("it-analytics").text).toBe("text-sky-700");
         expect(getDashboardPageLabel("routine")).toBe("NHF Routine");
     });
 
@@ -328,6 +335,41 @@ describe("dashboard menu", () => {
         expect(ownWithManage).toContain("it-tickets");
         expect(ownWithManage).not.toContain("it-ticket-queue");
         expect(readAll).toContain("it-ticket-queue");
+    });
+
+    it("shows analytics only with the independent analytics capability", () => {
+        const analyticsOnly: ITPresentationCapabilities = {
+            canReadOwnTickets: false,
+            canReadAllTickets: false,
+            canCreateOwnTickets: false,
+            canCommentOwnTickets: false,
+            canCommentAllTickets: false,
+            canManageTickets: false,
+            canReadAnalytics: true,
+        };
+        const ticketReadOnly = {
+            ...analyticsOnly,
+            canReadAllTickets: true,
+            canReadAnalytics: false,
+        } satisfies ITPresentationCapabilities;
+        const idsFor = (capabilities?: ITPresentationCapabilities) =>
+            getAvailableMenuGroups(
+                false,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                capabilities,
+            ).flatMap((group) => group.items.map((item) => item.id));
+
+        expect(canAccessITAnalytics()).toBe(false);
+        expect(canAccessITAnalytics(ticketReadOnly)).toBe(false);
+        expect(idsFor(ticketReadOnly)).not.toContain("it-analytics");
+        expect(idsFor(analyticsOnly)).toContain("it-analytics");
+        expect(idsFor(analyticsOnly)).not.toContain("it-tickets");
+        expect(idsFor(analyticsOnly)).not.toContain("it-ticket-queue");
     });
 
     it("keeps CSV import route available but hides it from dashboard menus", () => {

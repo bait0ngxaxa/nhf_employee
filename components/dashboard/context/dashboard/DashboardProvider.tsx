@@ -13,6 +13,7 @@ import {
     canAccessEmailRequestDashboard,
     canAccessITTicketDashboard,
     canAccessITTicketQueue,
+    canAccessITAnalytics,
     canAccessEmployeeDashboard,
     canAccessLeaveDashboard,
     canAccessStockDashboard,
@@ -173,6 +174,13 @@ export function DashboardProvider({
             if (
                 menuId === "it-ticket-queue"
                 && !canAccessITTicketQueue(user?.itCapabilities)
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
+            if (
+                menuId === "it-analytics"
+                && !canAccessITAnalytics(user?.itCapabilities)
             ) {
                 router.push(APP_ROUTES.accessDenied);
                 return;

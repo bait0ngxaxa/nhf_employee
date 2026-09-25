@@ -5,6 +5,7 @@ export { ITTicketConversation } from "./presentation/dashboard/ITTicketConversat
 export { ITTicketOperatorDetail } from "./presentation/dashboard/ITTicketOperatorDetail";
 export { ITTicketOperatorQueue } from "./presentation/dashboard/ITTicketOperatorQueue";
 export { ITTicketSelfService } from "./presentation/dashboard/ITTicketSelfService";
+export { ITAnalyticsDashboard } from "./presentation/dashboard/ITAnalyticsDashboard";
 export {
     IT_OPERATOR_QUEUE_DEFAULT_LIMIT,
     IT_OPERATOR_QUEUE_MAX_LIMIT,
@@ -24,6 +25,9 @@ export {
     IT_TICKET_TITLE_MAX_LENGTH,
     IT_TICKET_TYPE_LABELS,
     IT_TICKET_TYPE_OPTIONS,
+    IT_TICKET_STATUS_OPTIONS,
+    IT_ANALYTICS_PERIODS,
+    IT_ANALYTICS_TIME_ZONE,
 } from "./contracts";
 export type {
     ITAssignableOperator,
@@ -42,5 +46,7 @@ export type {
     ITTicketTimelineEvent,
     ITTicketTimelineItem,
     ITTicketTimelinePage,
+    ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
+    ITAnalyticsPeriod,
 } from "./contracts";
 export { getAllowedITTicketTransitions } from "./domain/ticket-workflow";

@@ -10,6 +10,7 @@ export const APP_ROUTES = {
     dashboardStock: "/dashboard/stock",
     dashboardRoutine: "/dashboard/routine",
     dashboardEmailRequest: "/dashboard/email-request",
+    dashboardITAnalytics: "/dashboard/it/analytics",
     dashboardIT: "/dashboard/it",
     dashboardITQueue: "/dashboard/it/queue",
     dashboardEmployees: "/dashboard/employees",
@@ -52,6 +53,7 @@ export const APP_DASHBOARD_TABS = {
     itEquipment: "it-equipment",
     itTickets: "it-tickets",
     itTicketQueue: "it-ticket-queue",
+    itAnalytics: "it-analytics",
     authorizationAdministration: "authorization-administration",
 } as const;
 
@@ -67,6 +69,7 @@ export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     "it-equipment": APP_ROUTES.dashboardStock,
     "it-tickets": APP_ROUTES.dashboardIT,
     "it-ticket-queue": APP_ROUTES.dashboardITQueue,
+    "it-analytics": APP_ROUTES.dashboardITAnalytics,
     routine: APP_ROUTES.dashboardRoutine,
     "email-request": APP_ROUTES.dashboardEmailRequest,
     "employee-management": APP_ROUTES.dashboardEmployees,
@@ -88,6 +91,7 @@ const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     [APP_ROUTES.dashboardStock, APP_DASHBOARD_TABS.stock],
     [APP_ROUTES.dashboardRoutine, APP_DASHBOARD_TABS.routine],
     [APP_ROUTES.dashboardEmailRequest, APP_DASHBOARD_TABS.emailRequest],
+    [APP_ROUTES.dashboardITAnalytics, APP_DASHBOARD_TABS.itAnalytics],
     [APP_ROUTES.dashboardITQueue, APP_DASHBOARD_TABS.itTicketQueue],
     [APP_ROUTES.dashboardIT, APP_DASHBOARD_TABS.itTickets],
     [APP_ROUTES.dashboardAudit, APP_DASHBOARD_TABS.auditLogs],
@@ -426,6 +430,9 @@ export const API_ROUTES = {
             `/api/it/operator/tickets/${id}/category`,
         statusById: (id: number | string): string =>
             `/api/it/operator/tickets/${id}/status`,
+    },
+    itAnalytics: {
+        dashboard: "/api/it/analytics",
     },
     itTicketAttachments: {
         byId: (id: string): string => `/api/it/attachments/${id}`,

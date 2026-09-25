@@ -11,6 +11,7 @@ import {
     ClipboardCheck,
     KeyRound,
     Headset,
+    BarChart3,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -60,6 +61,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         sidebarLabel: "คิวงาน IT",
         icon: Headset,
         description: "ตรวจสอบและดำเนินการ Ticket ตามสิทธิ์ที่ได้รับ",
+    },
+    {
+        id: "it-analytics",
+        label: "รายงาน IT",
+        sidebarLabel: "รายงาน IT",
+        icon: BarChart3,
+        description: "ดูภาพรวมและสถิติการให้บริการ IT",
     },
     {
         id: "email-request",
@@ -139,6 +147,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
             getDashboardMenuItem("routine"),
             getDashboardMenuItem("it-tickets"),
             getDashboardMenuItem("it-ticket-queue"),
+            getDashboardMenuItem("it-analytics"),
         ],
     },
     {
@@ -196,6 +205,12 @@ export function canAccessITTicketQueue(
     capabilities?: ITPresentationCapabilities,
 ): boolean {
     return capabilities?.canReadAllTickets === true;
+}
+
+export function canAccessITAnalytics(
+    capabilities?: ITPresentationCapabilities,
+): boolean {
+    return capabilities?.canReadAnalytics === true;
 }
 
 export const LEAVE_DASHBOARD_TABS = [
@@ -299,6 +314,9 @@ export function getAvailableMenuGroups(
             if (item.id === "it-ticket-queue") {
                 return canAccessITTicketQueue(itCapabilities);
             }
+            if (item.id === "it-analytics") {
+                return canAccessITAnalytics(itCapabilities);
+            }
             return !item.requiredRole
                 || (item.requiredRole === "ADMIN" && isAdmin);
         })
@@ -354,6 +372,7 @@ export const getMenuTheme = (menuId: string) => {
             };
         case "it-tickets":
         case "it-ticket-queue":
+        case "it-analytics":
             return {
                 gradient: "from-sky-600 to-cyan-700",
                 lightBg: "bg-sky-50",

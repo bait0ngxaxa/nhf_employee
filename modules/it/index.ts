@@ -52,6 +52,12 @@ export {
     postITRequesterTicketComment,
 } from "./application/ticket-comment-commands";
 export { getITTicketAttachmentForDownload } from "./application/ticket-attachment-queries";
+export {
+    getITAnalyticsDashboard,
+    ITAnalyticsInputValidationError,
+    parseITAnalyticsPeriod,
+} from "./application/analytics";
+export type { ITAnalyticsPeriod } from "./contracts";
 export { cleanupOrphanedITTicketAttachments } from "./infrastructure/attachments/cleanup-orphans";
 export { readITTicketAttachment } from "./infrastructure/attachments/storage";
 export { ITTicketAttachmentValidationError } from "./infrastructure/attachments/validation";
@@ -110,6 +116,7 @@ export type {
     ITPresentationCapabilities,
     ITTicketResourceScope,
 } from "./application/types";
+export type { ITAnalyticsDashboard as ITAnalyticsDashboardDTO } from "./contracts";
 export type {
     ITRequesterTicket,
     ITRequesterTicketList,

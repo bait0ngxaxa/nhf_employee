@@ -36,6 +36,11 @@ export const IT_TICKET_ATTACHMENT_ACCEPTED_TYPES = Object.freeze([
     "image/webp",
 ] as const);
 
+export const IT_ANALYTICS_PERIODS = Object.freeze(["7D", "30D", "90D"] as const);
+export const IT_ANALYTICS_TIME_ZONE = "Asia/Bangkok" as const;
+
+export type ITAnalyticsPeriod = (typeof IT_ANALYTICS_PERIODS)[number];
+
 export interface ITPresentationCapabilities {
     readonly canReadOwnTickets: boolean;
     readonly canReadAllTickets: boolean;
@@ -44,6 +49,52 @@ export interface ITPresentationCapabilities {
     readonly canCommentAllTickets: boolean;
     readonly canManageTickets: boolean;
     readonly canReadAnalytics: boolean;
+}
+
+export interface ITAnalyticsDashboard {
+    readonly generatedAt: string;
+    readonly timeZone: typeof IT_ANALYTICS_TIME_ZONE;
+    readonly period: {
+        readonly key: ITAnalyticsPeriod;
+        readonly startAt: string;
+        readonly endAt: string;
+    };
+    readonly summary: {
+        readonly currentBacklog: number;
+        readonly waitingRequester: number;
+        readonly unassignedBacklog: number;
+        readonly oldestUnresolvedAgeMinutes: number | null;
+        readonly newTickets: number;
+        readonly resolvedTickets: number;
+        readonly firstRespondedTickets: number;
+        readonly averageFirstResponseMinutes: number | null;
+        readonly averageResolutionMinutes: number | null;
+    };
+    readonly trend: readonly {
+        readonly date: string;
+        readonly created: number;
+        readonly resolved: number;
+    }[];
+    readonly statusDistribution: readonly {
+        readonly status: ITTicketStatus;
+        readonly count: number;
+    }[];
+    readonly typeDistribution: readonly {
+        readonly type: ITTicketType;
+        readonly count: number;
+    }[];
+    readonly categoryBacklog: readonly {
+        readonly label: string;
+        readonly count: number;
+    }[];
+    readonly assigneeBacklog: readonly {
+        readonly label: string;
+        readonly count: number;
+    }[];
+    readonly departmentCreated: readonly {
+        readonly label: string;
+        readonly count: number;
+    }[];
 }
 
 /** Safe requester-facing representation. Never includes ownership or operator data. */
@@ -199,6 +250,15 @@ export const IT_TICKET_TYPE_OPTIONS = [
     { value: "SERVICE_REQUEST", label: "ขอรับบริการหรือความช่วยเหลือ" },
     { value: "SUGGESTION", label: "เสนอแนะการปรับปรุง" },
 ] as const satisfies readonly { value: ITTicketType; label: string }[];
+
+export const IT_TICKET_STATUS_OPTIONS = [
+    { value: "OPEN", label: "รับเรื่องแล้ว" },
+    { value: "IN_PROGRESS", label: "กำลังดำเนินการ" },
+    { value: "WAITING_REQUESTER", label: "รอข้อมูลจากผู้แจ้ง" },
+    { value: "RESOLVED", label: "แก้ไขแล้ว" },
+    { value: "CLOSED", label: "ปิดงานแล้ว" },
+    { value: "CANCELLED", label: "ยกเลิกแล้ว" },
+] as const satisfies readonly { value: ITTicketStatus; label: string }[];
 
 export const IT_TICKET_TYPE_LABELS: Readonly<Record<ITTicketType, string>> = {
     INCIDENT: "ปัญหาที่พบ",

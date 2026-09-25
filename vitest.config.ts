@@ -44,6 +44,8 @@ const DOM_TESTS = [
     "modules/notification/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/authorization/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "modules/authorization/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/it/presentation/dashboard/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
+    "modules/it/presentation/dashboard/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
 export default defineConfig({

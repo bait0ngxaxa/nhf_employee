@@ -16,8 +16,9 @@ authorization foundation, IT2 added IT-owned Ticket persistence and domain
 commands, IT3 added requester-only Ticket API and Dashboard presentation, IT4
 added the separate read-ALL operator queue/API and processing surface, IT5A
 added shared conversation and a bounded merged timeline, IT5B added
-comment-owned private image attachments, and IT6 implements in-app Ticket
-notifications. Email Request migration remains deferred to IT8.
+comment-owned private image attachments, IT6 implements in-app Ticket
+notifications, and IT7 adds an aggregate-only analytics query and Dashboard.
+Email Request migration remains deferred to IT8.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -117,7 +118,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT module Ticket services, operator processing, and notifications (IT1/IT2/IT3/IT4/IT5A/IT5B/IT6)
+## IT module Ticket services, operator processing, notifications, and analytics (IT1/IT2/IT3/IT4/IT5A/IT5B/IT6/IT7)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -161,7 +162,24 @@ the defined Ticket facts. IT-owned attachment code does not import Leave storage
 or business logic. Attachments are images-only, normalized to WEBP, retained
 with Ticket history; committed retention duration is deferred to IT9. IT5B
 adds no category administration, production grant configuration, or Email
-Request migration. See
+Request migration.
+
+IT7 adds the server-only analytics application query and IT-owned persistence
+aggregates, plus the Thai Dashboard presentation through `@/modules/it/client`.
+Analytics independently requires current active workforce and configured
+`it.analytics.read / ALL`; the presentation `canReadAnalytics` projection only
+controls route/menu visibility. Ticket read/manage, ADMIN, Department, Team,
+and TeamRole do not grant analytics. The query returns aggregate-only data and
+does not expose Ticket IDs/content, requester identity, comment text,
+attachment metadata, or raw events. Periods are 7D/30D/90D (default 30D),
+bounded and bucketed in `Asia/Bangkok`, using one deterministic date helper.
+Ticket and event aggregates are read inside one MySQL `REPEATABLE READ`
+transaction snapshot. Department reporting groups by the immutable creation-
+time requester Department name snapshot; active Employee display identity is
+resolved only through the public projection contract, with a safe fallback
+that preserves historical assignee counts. Analytics adds no schema or index;
+the measured integration EXPLAIN is recorded in `it-module-design.md`.
+Deferred metric policy and Email Request ownership remain outside IT7. See
 [it-module-design.md](./it-module-design.md) for the phase contract and
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.

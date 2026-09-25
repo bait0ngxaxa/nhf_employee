@@ -19,6 +19,7 @@ import {
     requireDashboardITReadAccess,
     requireDashboardITOperatorReadAccess,
     requireDashboardITSelfServiceAccess,
+    requireDashboardITAnalyticsAccess,
 } from "@/app/dashboard/_lib/route-access";
 
 describe("Dashboard Audit route authorization", () => {
@@ -192,5 +193,32 @@ describe("Dashboard IT Ticket route authorization", () => {
         });
 
         await expect(requireDashboardITOperatorReadAccess()).resolves.toEqual(capabilities);
+    });
+
+    it("guards the analytics page from the projected analytics capability alone", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue(null);
+        await expect(requireDashboardITAnalyticsAccess()).rejects.toThrow(
+            "NEXT_REDIRECT:/login",
+        );
+
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "ADMIN",
+            itCapabilities: { canReadAnalytics: false, canReadAllTickets: true },
+        });
+        await expect(requireDashboardITAnalyticsAccess()).rejects.toThrow(
+            "NEXT_REDIRECT:/access-denied",
+        );
+
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "42",
+            role: "USER",
+            itCapabilities: {
+                canReadAnalytics: true,
+                canReadAllTickets: false,
+                canManageTickets: false,
+            },
+        });
+        await expect(requireDashboardITAnalyticsAccess()).resolves.toBeUndefined();
     });
 });
