@@ -45,6 +45,31 @@ export function findITTicketNotificationEventSource(
     });
 }
 
+export function findLatestITTicketAssignmentGeneration(
+    tx: ITTicketNotificationReadContext,
+    ticketId: number,
+): Promise<{ readonly id: number } | null> {
+    return tx.iTTicketEvent.findFirst({
+        where: {
+            ticketId,
+            kind: { in: ["ASSIGNED", "UNASSIGNED"] },
+        },
+        orderBy: { id: "desc" },
+        select: { id: true },
+    });
+}
+
+export function findLatestITTicketStatusGeneration(
+    tx: ITTicketNotificationReadContext,
+    ticketId: number,
+): Promise<{ readonly id: number } | null> {
+    return tx.iTTicketEvent.findFirst({
+        where: { ticketId, kind: "STATUS_CHANGED" },
+        orderBy: { id: "desc" },
+        select: { id: true },
+    });
+}
+
 export function findITTicketNotificationCommentSource(
     tx: ITTicketNotificationReadContext,
     commentId: string,

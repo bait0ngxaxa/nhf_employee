@@ -2,8 +2,10 @@ import type { NotificationOutbox, Prisma } from "@prisma/client";
 
 import { getCurrentWorkforceDepartmentSnapshotInTransaction } from "@/modules/employee";
 import { createForUserOnce } from "@/modules/notification";
-import { prisma } from "@/lib/db/prisma";
-import { hasPrismaErrorCode } from "@/lib/db/transaction";
+import {
+    hasPrismaErrorCode,
+    runSerializableTransaction,
+} from "@/lib/db/transaction";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 import { findITOperatorAudience } from "../operator-audience";
@@ -16,6 +18,8 @@ import {
     findITTicketNotificationCommentSource,
     findITTicketNotificationEventSource,
     findITTicketNotificationResource,
+    findLatestITTicketAssignmentGeneration,
+    findLatestITTicketStatusGeneration,
     type ITTicketNotificationCommentSource,
     type ITTicketNotificationEventSource,
 } from "../../infrastructure/persistence/ticket-notification-repository";
@@ -109,11 +113,13 @@ async function isCurrentlyApplicable(
 
     if (payload.audience === "REQUESTER") {
         if (ticket.requesterUserId !== payload.recipientUserId) return false;
-        if (
-            payload.event === "WAITING_REQUESTER"
-            && ticket.status !== "WAITING_REQUESTER"
-        ) {
-            return false;
+        if (payload.event === "WAITING_REQUESTER") {
+            if (ticket.status !== "WAITING_REQUESTER" || payload.source.kind !== "EVENT") {
+                return false;
+            }
+            const latestStatusGeneration =
+                await findLatestITTicketStatusGeneration(tx, payload.ticketId);
+            if (latestStatusGeneration?.id !== payload.source.id) return false;
         }
         return (await getCurrentWorkforceDepartmentSnapshotInTransaction(
             tx,
@@ -127,7 +133,11 @@ async function isCurrentlyApplicable(
     if (!operatorIsEligible) return false;
 
     if (payload.event === "ASSIGNED") {
-        return ticket.assignedToUserId === payload.recipientUserId;
+        if (payload.source.kind !== "EVENT") return false;
+        const latestAssignmentGeneration =
+            await findLatestITTicketAssignmentGeneration(tx, payload.ticketId);
+        return ticket.assignedToUserId === payload.recipientUserId
+            && latestAssignmentGeneration?.id === payload.source.id;
     }
     if (payload.event === "REQUESTER_COMMENTED") {
         return payload.audience === "ASSIGNEE"
@@ -203,7 +213,7 @@ export async function dispatchITTicketNotificationOutbox(
     }
 
     try {
-        return await prisma.$transaction(async (tx) => {
+        return await runSerializableTransaction(async (tx) => {
             const source = await loadSource(tx, payload);
             const sourceActorUserId = assertSourceMatchesPayload(source, payload);
             if (!(await isCurrentlyApplicable(tx, payload, sourceActorUserId))) {

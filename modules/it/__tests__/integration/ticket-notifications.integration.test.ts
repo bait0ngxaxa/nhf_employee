@@ -629,6 +629,106 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         )).resolves.toBe("SUPERSEDED");
     });
 
+    it("supersedes an earlier assignment when the Ticket returns to the same assignee", async () => {
+        const fixture = await createTicketFixture("assignment-generations");
+        const operatorA = await createOperator(fixture, "assignment-generation-a");
+        const operatorB = await createOperator(fixture, "assignment-generation-b");
+        const manager = await createOperator(fixture, "assignment-generation-manager");
+        const created = await createTicket(fixture.requester, "assignment-generations");
+
+        const firstAssignment = await assignITTicket(manager.context, {
+            ticketId: created.ticket.id,
+            expectedVersion: created.ticket.version,
+            assigneeUserId: operatorA.userId,
+        });
+        const firstARow = (await getOutboxRows(created.ticket.id)).find(
+            ({ payload }) => payload.event === "ASSIGNED"
+                && payload.recipientUserId === operatorA.userId,
+        );
+        expect(firstARow).toBeDefined();
+
+        const assignmentB = await assignITTicket(manager.context, {
+            ticketId: created.ticket.id,
+            expectedVersion: firstAssignment.ticket.version,
+            assigneeUserId: operatorB.userId,
+        });
+        const latestAssignmentA = await assignITTicket(manager.context, {
+            ticketId: created.ticket.id,
+            expectedVersion: assignmentB.ticket.version,
+            assigneeUserId: operatorA.userId,
+        });
+        expect(latestAssignmentA.ticket.assignedToUserId).toBe(operatorA.userId);
+
+        const assignmentARows = (await getOutboxRows(created.ticket.id)).filter(
+            ({ payload }) => payload.event === "ASSIGNED"
+                && payload.recipientUserId === operatorA.userId,
+        );
+        expect(assignmentARows).toHaveLength(2);
+        const latestARow = assignmentARows[1];
+        expect(latestARow?.row.eventKey).not.toBe(firstARow?.row.eventKey);
+
+        await expect(dispatchITTicketNotificationOutbox(
+            firstARow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SUPERSEDED");
+        await expect(dispatchITTicketNotificationOutbox(
+            latestARow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SENT");
+
+        const inbox = await getTicketInbox(created.ticket.id, operatorA.userId);
+        expect(inbox).toHaveLength(1);
+        expect(inbox[0]?.dedupeKey).toBe(latestARow?.row.eventKey);
+    });
+
+    it("supersedes an earlier WAITING_REQUESTER generation after the status returns", async () => {
+        const fixture = await createTicketFixture("waiting-generations");
+        const operator = await createOperator(fixture, "waiting-generation-operator");
+        const created = await createTicket(fixture.requester, "waiting-generations");
+        const started = await transitionITTicketStatus(operator.context, {
+            ticketId: created.ticket.id,
+            expectedVersion: created.ticket.version,
+            targetStatus: "IN_PROGRESS",
+        });
+        const firstWaiting = await transitionITTicketStatus(operator.context, {
+            ticketId: started.ticket.id,
+            expectedVersion: started.ticket.version,
+            targetStatus: "WAITING_REQUESTER",
+        });
+        const firstWaitingRow = (await getOutboxRows(created.ticket.id)).find(
+            ({ payload }) => payload.event === "WAITING_REQUESTER",
+        );
+        expect(firstWaitingRow).toBeDefined();
+
+        const resumed = await transitionITTicketStatus(operator.context, {
+            ticketId: firstWaiting.ticket.id,
+            expectedVersion: firstWaiting.ticket.version,
+            targetStatus: "IN_PROGRESS",
+        });
+        const secondWaiting = await transitionITTicketStatus(operator.context, {
+            ticketId: resumed.ticket.id,
+            expectedVersion: resumed.ticket.version,
+            targetStatus: "WAITING_REQUESTER",
+        });
+        expect(secondWaiting.ticket.status).toBe("WAITING_REQUESTER");
+
+        const waitingRows = (await getOutboxRows(created.ticket.id)).filter(
+            ({ payload }) => payload.event === "WAITING_REQUESTER",
+        );
+        expect(waitingRows).toHaveLength(2);
+        const latestWaitingRow = waitingRows[1];
+        expect(latestWaitingRow?.row.eventKey).not.toBe(firstWaitingRow?.row.eventKey);
+
+        await expect(dispatchITTicketNotificationOutbox(
+            firstWaitingRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SUPERSEDED");
+        await expect(dispatchITTicketNotificationOutbox(
+            latestWaitingRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SENT");
+
+        const inbox = await getTicketInbox(created.ticket.id, fixture.requester.userId);
+        expect(inbox).toHaveLength(1);
+        expect(inbox[0]?.dedupeKey).toBe(latestWaitingRow?.row.eventKey);
+    });
+
     it("rolls back Ticket, assignment, status, comment, and idempotency facts when outbox persistence fails", async () => {
         const fixture = await createTicketFixture("outbox-rollback");
         const operator = await createOperator(fixture, "rollback-operator");
