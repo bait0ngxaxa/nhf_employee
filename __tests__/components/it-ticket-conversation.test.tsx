@@ -19,19 +19,35 @@ function jsonResponse(value: unknown, status = 200): Response {
     });
 }
 
-function submittedComment(attachments: readonly Record<string, unknown>[] = []) {
+function submittedComment(
+    attachments: readonly Record<string, unknown>[] = [],
+    body = "ช่วยตรวจสอบด้วยค่ะ",
+    id = "cmtest123",
+) {
     return {
         success: true,
         replayed: false,
         comment: {
             type: "COMMENT",
-            id: "cmtest123",
+            id,
             createdAt: "2026-09-01T02:00:00.000Z",
             authorDisplayName: "พนักงานทดสอบ",
             authorSide: "REQUESTER",
-            body: "ช่วยตรวจสอบด้วยค่ะ",
+            body,
             attachments,
         },
+    };
+}
+
+function attachmentSummary(id: string, originalName: string) {
+    return {
+        id,
+        originalName,
+        contentType: "image/webp",
+        sizeBytes: 8_000,
+        width: 320,
+        height: 240,
+        position: 0,
     };
 }
 
@@ -194,37 +210,123 @@ describe("IT Ticket conversation attachment UI", () => {
         expect(await screen.findByRole("alert")).toHaveTextContent("สูงสุด 3");
     });
 
-    it("reuses the idempotency key after an uncertain failure and changes it with the files", async () => {
+    it("reuses the same key for a direct retry and renders only one local timeline comment", async () => {
         const keys: string[] = [];
         let postCount = 0;
         setupFetch(async (init) => {
             const headers = new Headers(init.headers);
             keys.push(headers.get("Idempotency-Key") ?? "");
             postCount += 1;
-            if (postCount === 1 || postCount === 3) throw new Error("network unavailable");
-            return jsonResponse(submittedComment());
+            if (postCount === 1) throw new Error("network unavailable");
+            return jsonResponse(submittedComment([], "ข้อความเดิม", "cm-replayed"));
+        });
+        renderConversation();
+        fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความเดิม" } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByRole("alert");
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
+        expect(keys[0]).not.toBe("");
+        expect(keys[0]).toBe(keys[1]);
+        expect(screen.getAllByText("ข้อความเดิม")).toHaveLength(1);
+    });
+
+    it("reuses the key when an uncertain body plus image returns to the same canonical request", async () => {
+        const keys: string[] = [];
+        let postCount = 0;
+        const proof = file("proof.png", "same-image-content");
+        setupFetch(async (init) => {
+            const headers = new Headers(init.headers);
+            keys.push(headers.get("Idempotency-Key") ?? "");
+            postCount += 1;
+            if (postCount === 1) throw new Error("network result uncertain");
+            return jsonResponse(submittedComment(
+                [attachmentSummary(`${postCount}`.padStart(32, "a"), "proof.png")],
+                "ข้อความเดิม",
+                `cm-post-${postCount}`,
+            ));
+        });
+        renderConversation();
+        const input = await screen.findByLabelText("รูปภาพประกอบ (ไม่บังคับ)") as HTMLInputElement;
+        const bodyField = screen.getByLabelText("ตอบกลับ") as HTMLTextAreaElement;
+        fireEvent.change(bodyField, { target: { value: "ข้อความเดิม" } });
+        fireEvent.change(input, { target: { files: [proof] } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByRole("alert");
+        expect(bodyField.value).toBe("ข้อความเดิม");
+        expect(await screen.findByAltText("ตัวอย่างรูปภาพ proof.png")).toBeTruthy();
+
+        fireEvent.change(bodyField, { target: { value: " \nข้อความเดิม\t " } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
+        expect(keys[0]).toBe(keys[1]);
+        expect(bodyField.value).toBe("");
+        expect(screen.queryByAltText("ตัวอย่างรูปภาพ proof.png")).toBeNull();
+        expect(screen.getAllByText("ข้อความเดิม")).toHaveLength(1);
+        expect(screen.getByRole("img", { name: "ภาพแนบจาก พนักงานทดสอบ: proof.png" })).toBeTruthy();
+
+        fireEvent.change(bodyField, { target: { value: " ข้อความเดิม " } });
+        fireEvent.change(input, { target: { files: [proof] } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await waitFor(() => expect(keys).toHaveLength(3));
+        await waitFor(() => expect(screen.getAllByText("ข้อความเดิม")).toHaveLength(2));
+        expect(keys[2]).not.toBe(keys[1]);
+        expect(bodyField.value).toBe("");
+        expect(screen.queryByAltText("ตัวอย่างรูปภาพ proof.png")).toBeNull();
+    });
+
+    it("uses a new key when the canonical body changes after an uncertain request", async () => {
+        const keys: string[] = [];
+        let postCount = 0;
+        const proof = file("proof.png", "same-image-content");
+        setupFetch(async (init) => {
+            keys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+            postCount += 1;
+            if (postCount === 1) throw new Error("network result uncertain");
+            return jsonResponse(submittedComment(
+                [attachmentSummary("b".repeat(32), "proof.png")],
+                "ข้อความใหม่",
+                "cm-updated-body",
+            ));
+        });
+        renderConversation();
+        const input = await screen.findByLabelText("รูปภาพประกอบ (ไม่บังคับ)") as HTMLInputElement;
+        const bodyField = screen.getByLabelText("ตอบกลับ");
+        fireEvent.change(bodyField, { target: { value: "ข้อความเดิม" } });
+        fireEvent.change(input, { target: { files: [proof] } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByRole("alert");
+        fireEvent.change(bodyField, { target: { value: "ข้อความใหม่" } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
+        expect(keys).toHaveLength(2);
+        expect(keys[1]).not.toBe(keys[0]);
+    });
+
+    it("uses a new key when attachment content changes after an uncertain request", async () => {
+        const keys: string[] = [];
+        let postCount = 0;
+        setupFetch(async (init) => {
+            keys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+            postCount += 1;
+            if (postCount === 1) throw new Error("network result uncertain");
+            return jsonResponse(submittedComment(
+                [attachmentSummary("c".repeat(32), "proof.png")],
+                "ข้อความเดิม",
+                "cm-updated-attachment",
+            ));
         });
         renderConversation();
         const input = await screen.findByLabelText("รูปภาพประกอบ (ไม่บังคับ)") as HTMLInputElement;
         fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความเดิม" } });
-        fireEvent.change(input, { target: { files: [file("first.png", "one")] } });
+        fireEvent.change(input, { target: { files: [file("proof.png", "first-content")] } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByRole("alert");
-        expect((screen.getByLabelText("ตอบกลับ") as HTMLTextAreaElement).value).toBe("ข้อความเดิม");
-        expect(await screen.findByAltText("ตัวอย่างรูปภาพ first.png")).toBeTruthy();
-
+        fireEvent.click(screen.getByRole("button", { name: "นำรูป proof.png ออก" }));
+        fireEvent.change(input, { target: { files: [file("proof.png", "changed-content")] } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
-        expect(keys[0]).toBe(keys[1]);
-
-        fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความใหม่" } });
-        fireEvent.change(input, { target: { files: [file("second.png", "two")] } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
-        await screen.findByRole("alert");
-        fireEvent.click(screen.getByRole("button", { name: "นำรูป second.png ออก" }));
-        fireEvent.change(input, { target: { files: [file("third.png", "three")] } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
-        await waitFor(() => expect(keys).toHaveLength(4));
-        expect(keys[2]).not.toBe(keys[3]);
+        expect(keys).toHaveLength(2);
+        expect(keys[1]).not.toBe(keys[0]);
     });
 });

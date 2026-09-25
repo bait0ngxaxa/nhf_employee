@@ -56,8 +56,8 @@ function request(
 ): NextRequest {
     return new NextRequest(url, {
         method,
-        headers: body === undefined ? headers : { "Content-Type": "application/json", ...headers },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        headers,
+        ...(body === undefined ? {} : { body: new TextEncoder().encode(JSON.stringify(body)) }),
     });
 }
 

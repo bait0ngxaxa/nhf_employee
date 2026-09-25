@@ -53,14 +53,19 @@ const comment = {
     attachments: [],
 };
 
-function jsonRequest(operator: boolean, body: unknown, idempotencyKey = "comment-key"): NextRequest {
+function jsonRequest(
+    operator: boolean,
+    body: unknown,
+    idempotencyKey: string | null = "comment-key",
+    contentType: string | null = "application/json",
+): NextRequest {
+    const headers = new Headers();
+    if (idempotencyKey !== null) headers.set("Idempotency-Key", idempotencyKey);
+    if (contentType !== null) headers.set("Content-Type", contentType);
     return new NextRequest(`http://localhost/api/it/${operator ? "operator/" : ""}tickets/19/comments`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": idempotencyKey,
-        },
-        body: JSON.stringify(body),
+        headers,
+        body: new TextEncoder().encode(JSON.stringify(body)),
     });
 }
 
@@ -108,6 +113,49 @@ describe.each([
             { ticketId: 19, body: "ตรวจสอบให้หน่อย" },
             { idempotencyKey: "comment-key", attachments: [] },
         );
+        expect(mocks.preAuthLimit).not.toHaveBeenCalled();
+        expect(mocks.authenticatedLimit).not.toHaveBeenCalled();
+    });
+
+    it("accepts missing or empty Content-Type as legacy JSON, trims the body, and skips upload limiters", async () => {
+        const requests = [
+            jsonRequest(operator, { body: "  ตรวจสอบให้หน่อย  " }, "legacy-key", null),
+            jsonRequest(operator, { body: "  ตรวจสอบให้หน่อย  " }, "legacy-key", ""),
+        ];
+        expect(requests[0]?.headers.has("content-type")).toBe(false);
+        expect(requests[1]?.headers.get("content-type")).toBe("");
+
+        for (const request of requests) {
+            expect((await post()(request, { params: Promise.resolve({ ticketId: "19" }) })).status)
+                .toBe(201);
+        }
+
+        const target = operator ? mocks.operatorPost : mocks.requesterPost;
+        expect(target).toHaveBeenCalledTimes(2);
+        expect(target.mock.calls[0]?.[1]).toEqual({ ticketId: 19, body: "ตรวจสอบให้หน่อย" });
+        expect(target.mock.calls[1]?.[1]).toEqual({ ticketId: 19, body: "ตรวจสอบให้หน่อย" });
+        expect(mocks.preAuthLimit).not.toHaveBeenCalled();
+        expect(mocks.authenticatedLimit).not.toHaveBeenCalled();
+    });
+
+    it("still requires Idempotency-Key and strictly validates missing-Content-Type JSON", async () => {
+        const missingKey = await post()(jsonRequest(operator, { body: "ข้อความ" }, null, null), {
+            params: Promise.resolve({ ticketId: "19" }),
+        });
+        const emptyBody = await post()(jsonRequest(operator, { body: "  \n " }, "comment-key", null), {
+            params: Promise.resolve({ ticketId: "19" }),
+        });
+        const forgedSide = await post()(jsonRequest(
+            operator,
+            { body: "ข้อความ", authorSide: "OPERATOR" },
+            "comment-key",
+            null,
+        ), { params: Promise.resolve({ ticketId: "19" }) });
+
+        expect(missingKey.status).toBe(400);
+        expect(emptyBody.status).toBe(400);
+        expect(forgedSide.status).toBe(400);
+        expect(operator ? mocks.operatorPost : mocks.requesterPost).not.toHaveBeenCalled();
         expect(mocks.preAuthLimit).not.toHaveBeenCalled();
         expect(mocks.authenticatedLimit).not.toHaveBeenCalled();
     });

@@ -17,10 +17,10 @@ export interface ParsedITTicketCommentHttpInput {
 }
 
 export function getITTicketCommentMediaType(request: Request): ITTicketCommentMediaType {
-    const mediaType = request.headers.get("content-type")
-        ?.split(";", 1)[0]
-        ?.trim()
-        .toLowerCase();
+    const contentType = request.headers.get("content-type");
+    if (contentType === null || contentType.trim() === "") return "json";
+
+    const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
     if (mediaType === "application/json") return "json";
     if (mediaType === "multipart/form-data") return "multipart";
     return "unsupported";

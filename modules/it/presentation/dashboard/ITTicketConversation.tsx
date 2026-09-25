@@ -264,7 +264,6 @@ export function ITTicketConversation({
     };
 
     const handleDraftChange = (value: string): void => {
-        idempotencyAttempt.current = null;
         setDraft(value);
         setPostError(null);
         setPostMessage(null);
@@ -285,7 +284,6 @@ export function ITTicketConversation({
             return;
         }
 
-        idempotencyAttempt.current = null;
         setAttachmentError(null);
         updateSelectedAttachments([
             ...selectedAttachmentsRef.current,
@@ -300,7 +298,6 @@ export function ITTicketConversation({
         const removed = current[index];
         if (!removed) return;
         URL.revokeObjectURL(removed.previewUrl);
-        idempotencyAttempt.current = null;
         updateSelectedAttachments(current.filter((_, currentIndex) => currentIndex !== index));
         setAttachmentError(null);
         setPostError(null);
