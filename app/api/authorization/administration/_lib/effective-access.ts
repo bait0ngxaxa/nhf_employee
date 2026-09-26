@@ -6,7 +6,7 @@ import {
     type AuthorizationAdministrationEffectiveAccessProviderInput,
 } from "@/modules/authorization";
 import { inspectAuditEffectiveAccess } from "@/modules/audit";
-import { inspectEmailRequestEffectiveAccess } from "@/lib/services/email-request/authorization";
+import { inspectEmailRequestEffectiveAccess } from "@/modules/it";
 import { inspectDepartmentEffectiveAccess } from "@/modules/department";
 import { inspectEmployeeEffectiveAccess } from "@/modules/employee";
 import { inspectLeaveEffectiveAccess } from "@/modules/leave";

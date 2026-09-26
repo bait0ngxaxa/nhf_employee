@@ -5,7 +5,9 @@ Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. IT1 through IT7 are closed under `modules/it/`. Its server entry is
+boundaries. IT1 through IT8 are closed under `modules/it/`. IT8 moved Email
+Request ownership into the module while preserving its compatibility contract.
+Its server entry is
 `@/modules/it` and its browser-safe Dashboard presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and
 idempotency, requester and operator queries, approved workflow, assignment,
@@ -16,8 +18,11 @@ transactional shared-outbox intent and the public Notification Inbox command.
 IT7 adds the independently authorized `it.analytics.read / ALL` query and Thai
 Dashboard at `/dashboard/it/analytics`; it uses Asia/Bangkok 7D/30D/90D periods,
 one consistent MySQL read snapshot, and no analytics table or index. Analytics
-does not grant individual Ticket access. Email Request migration remains
-deferred to IT8. Audit Phase I3 is
+does not grant individual Ticket access. IT8 moved the existing structured
+Email Request subdomain under IT while preserving `/dashboard/email-request`,
+`/api/email-request`, its stored rows and authorization contracts. Email
+Request remains separate from `ITTicket`; no automatic Ticket creation or
+capability inheritance is introduced. Audit Phase I3 is
 closed with generic
 server/application/persistence,
 producer, entity-history query, and Dashboard presentation ownership in
@@ -37,6 +42,9 @@ authoritative record is
 The repository-wide K0 ownership map, K1 closure, and deferred-boundary
 inventory are recorded in
 [`docs/architecture/final-repository-audit.md`](../docs/architecture/final-repository-audit.md).
+The deferral statements in the historical IT6 and Stock K1 closure notes below
+record their original phase boundaries; the current IT8 ownership state is
+closed and is summarized above.
 The runtime Auth capability is `modules/auth/`, with
 `@/modules/auth` as its server public entry and `@/modules/auth/client` as its
 browser public entry. It
@@ -190,14 +198,15 @@ the module; generic Dashboard skeleton primitives remain shared.
 `createForUserOnce` is the idempotent command that catches only `P2002`.
 `markUnreadByReferenceForUser` persists business-driven unread transitions
 without interpreting business state. The former
-`createAdminInAppNotificationsOnce` helper was removed. The generic
-`createInAppNotificationOnce` adapter remains only for deferred Email Request
-and has no audience lookup.
+`createAdminInAppNotificationsOnce` helper was removed. IT8 removed the
+Email Request-only `createInAppNotificationOnce` compatibility adapter;
+Email Request calls Notification's public `createForUserOnce` command with its
+configured-authority recipient set.
 Leave, Stock, Routine, and IT own their event meaning, recipients,
 titles/messages, action/reference values, channel choices, and event-specific
 dedupe or supersede rules. IT owns `ITTicketEvent` as operational history and
-the IT Ticket notification producer. Leave, Stock, Routine, and IT use
-`@/modules/notification` for Inbox writes. Physical
+the IT Ticket and Email Request notification producers. Leave, Stock, Routine,
+and IT use `@/modules/notification` for Inbox writes. Physical
 Notification persistence is owned only by
 `modules/notification/infrastructure/**`; Stock's two intentionally different
 admin eligibility policies remain Stock-owned.

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-    sendEmailRequestNotification,
     sendLineMessage,
     sendLineBroadcast,
     sendStockLineBroadcast,
@@ -27,19 +26,8 @@ const flexMessage: LineFlexMessage = {
 };
 
 const webhookData = {
-    type: "email_request" as const,
-    emailRequest: {
-        thaiName: "Test",
-        englishName: "Test",
-        phone: "123",
-        nickname: "",
-        position: "IT",
-        department: "IT",
-        replyEmail: "test@example.com",
-        needsDocumentSystem: false,
-        sharedDriveAccess: [],
-        requestedAt: "2026-07-01T03:00:00.000Z",
-    },
+    type: "compatibility" as const,
+    payload: { reference: "test-reference" },
     flexMessage,
 };
 
@@ -274,24 +262,11 @@ describe("LINE Notification Service", () => {
         });
     });
 
-    it("treats a keyed 409 after provider acceptance as the same request across retryable channels", async () => {
+    it("treats a keyed 409 after provider acceptance as the same request across shared LINE channels", async () => {
         const retryKey = "123e4567-e89b-52d3-a456-426614174000";
-        const emailRequest = {
-            thaiName: "Test",
-            englishName: "Test",
-            phone: "123",
-            nickname: "",
-            position: "IT",
-            department: "IT",
-            replyEmail: "test@example.com",
-            needsDocumentSystem: false,
-            sharedDriveAccess: [],
-            requestedAt: "2026-07-01T03:00:00.000Z",
-        };
         const retryableRequests = [
             () => sendLineAppMessage("app-user", flexMessage, retryKey),
             () => sendStockLineBroadcast(flexMessage, retryKey),
-            () => sendEmailRequestNotification(emailRequest, retryKey),
         ];
 
         for (const sendRequest of retryableRequests) {

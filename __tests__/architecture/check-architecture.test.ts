@@ -2360,4 +2360,113 @@ describe("architecture checker module boundaries", () => {
             );
         },
     );
+
+    it.each([
+        ["EmailRequest", "await prisma.emailRequest.findMany();"],
+        ["EmailRequest aggregate", "await prisma.emailRequest.aggregate({ _count: true });"],
+        ["EmailRequest throwing read", "await prisma.emailRequest.findUniqueOrThrow({ where: { id: 1 } });"],
+        ["EmailRequestIdempotency", "await tx.emailRequestIdempotency.create({ data: {} });"],
+        [
+            "aliased EmailRequest delegate",
+            [
+                "const requestRows = prisma.emailRequest;",
+                "await requestRows.findMany();",
+            ].join("\n"),
+        ],
+        [
+            "destructured EmailRequestIdempotency delegate",
+            [
+                "const { emailRequestIdempotency } = prisma;",
+                "await emailRequestIdempotency.findUnique();",
+            ].join("\n"),
+        ],
+    ])("rejects production %s persistence outside IT", async (_label, source) => {
+        const result = await checkFixture("app/api/example.ts", source);
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "direct EmailRequest/EmailRequestIdempotency Prisma delegate access must be owned by modules/it/infrastructure/",
+        );
+    });
+
+    it("allows Email Request delegates in IT infrastructure and test support", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/it/infrastructure/persistence/email-request.ts": [
+                "await prisma.emailRequest.findMany();",
+                "await tx.emailRequestIdempotency.create({ data: {} });",
+            ].join("\n"),
+            "test-support/email-request-fixtures.ts":
+                "await prisma.emailRequest.deleteMany();",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toEqual([]);
+    });
+
+    it("requires the Email Request API route to use the IT server entry", async () => {
+        const result = await checkFixture(
+            "app/api/email-request/route.ts",
+            "export async function POST() {}\n",
+        );
+
+        expect(result.violations).toContain(
+            "app/api/email-request/route.ts must consume Email Request through @/modules/it.",
+        );
+    });
+
+    it("requires Email Request Dashboard routes to use the IT client entry", async () => {
+        const result = await checkFixture(
+            "app/dashboard/email-request/page.tsx",
+            'import { EmailRequestSection } from "@/components/dashboard/sections/EmailRequestSection";\n',
+        );
+
+        expect(result.violations).toContain(
+            "app/dashboard/email-request/page.tsx must consume Email Request presentation through @/modules/it/client.",
+        );
+    });
+
+    it("prevents the IT client graph from reaching the server entry or infrastructure", async () => {
+        const rootPath = await createFixture({
+            ...fixtureFiles,
+            "modules/it/index.ts": "export const serverValue = 1;\n",
+            "modules/it/client.ts": [
+                '"use client";',
+                'export { serverValue } from "@/modules/it";',
+                'export { command } from "./application/email-request/commands";',
+            ].join("\n"),
+            "modules/it/application/email-request/commands.ts":
+                "export const command = 1;\n",
+        });
+        const result = checkArchitecture({ repositoryRoot: rootPath });
+
+        expect(result.violations).toHaveLength(2);
+        expect(result.violations).toEqual(expect.arrayContaining([
+            expect.stringContaining("must not import the IT server entry"),
+            expect.stringContaining("Server-only runtime dependency is reachable from @/modules/it/client"),
+        ]));
+    });
+
+    it("requires the shared Outbox Processor to delegate Email Request semantics publicly", async () => {
+        const result = await checkFixture(
+            "lib/services/outbox/processor.ts",
+            "export async function processOutbox() {}\n",
+        );
+
+        expect(result.violations).toContain(
+            "The shared Outbox Processor must delegate Email Request semantics through the public @/modules/it dispatcher.",
+        );
+    });
+
+    it("rejects reintroduced Email Request business ownership in retired paths", async () => {
+        const result = await checkFixture(
+            "lib/services/email-request/queries.ts",
+            "export const getEmailRequests = () => [];\n",
+        );
+
+        expect(result.violations).toHaveLength(1);
+        expect(result.violations[0]).toContain(
+            "is a retired Email Request ownership path; use modules/it.",
+        );
+    });
 });

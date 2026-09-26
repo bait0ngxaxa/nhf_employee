@@ -18,7 +18,7 @@ import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
-import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { EmailRequestPresentationCapabilities } from "@/modules/it/client";
 import type { ITPresentationCapabilities } from "@/modules/it/client";
 
 const originalRoutineFlag = process.env.NEXT_PUBLIC_FEATURE_ROUTINE;

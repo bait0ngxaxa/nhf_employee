@@ -1,7 +1,7 @@
 # NHF Employee — Current Authorization State
 
 > **Current repository state (Phase 12H-I, notification-recipient
-> Phase 13A/13A.1/13A.2, and IT1/IT2/IT3/IT4/IT5A/IT5B):** ADMIN is an Auth/control-plane role only. Business
+> Phase 13A/13A.1/13A.2, IT1-IT8 closed):** ADMIN is an Auth/control-plane role only. Business
 > authorization is the domain Default Domain Policy plus
 > configured Team, TeamRole, and exceptional direct User grants. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load and
@@ -42,8 +42,10 @@
 > `it.ticket.read` authority for private download; requester OWN access remains
 > constrained to the requester's Ticket. No attachment capability was added.
 > `AUTHORIZATION_SEED_CONFIGURATION` remains empty, with no IT Team,
-> membership, role, or grant mapping. Email Request migration remains
-> deferred.
+> membership, role, or grant mapping. IT8 moved Email Request ownership without
+> changing its existing authorization keys, scopes, defaults,
+> session/workforce eligibility, or route behavior. Earlier deferral statements
+> below are historical phase records and do not describe the current state.
 >
 > The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
@@ -59,6 +61,7 @@ The current production source of truth after Phase 12H-I is:
 | Business authority | Domain-owned Default Domain Policy plus configured `TEAM`, `TEAM_ROLE`, and exceptional direct `USER` grants. |
 | Resolver | `createAuthorizationResolver()` is the canonical constructor; USER and ADMIN load configured persistence equally. `systemRole` never creates a business grant. |
 | IT authorization | IT1 registers `it.ticket.read/create/comment/manage` and `it.analytics.read`, all for `DASHBOARD`; defaults are read/create/comment `OWN`, while manage and analytics require configured grants. IT5B adds no capability: upload uses current comment authority (requester OWN through requester-only resource scope; operator read ALL plus comment ALL), while each private download re-resolves current read OWN/ALL and checks the Ticket requester relation. Assignment, comment authorship, manage, and comment ALL alone do not grant download. Queue/detail reads require read ALL before broad Ticket rows are queried, and workflow mutations recheck manage ALL transactionally. Assignee checks use configured exact-user scopes only. Ticket ownership remains requester-based. |
+| Email Request authorization | Existing `email.request.read` (`OWN|ALL`) and `email.request.create` (`ALL`) remain unchanged. Default scopes are empty; POST requires effective create ALL, and GET applies OWN as `requestedBy = authenticated userId` in the database. Actor is `DASHBOARD` with `employeeId: null`. No `it.ticket.*`, `it.analytics.read`, ADMIN role, Department, Team, or TeamRole mapping grants Email Request access. |
 | Administration presentation | Account/system role is shown separately from business grant sources. Business explanations contain only Team, TeamRole, and direct User origins. |
 | Routine provenance | Future mutation classification uses effective business authority; historical `ownershipMode: "ADMIN"` audit JSON remains readable and is not rewritten. |
 | Fail-closed behavior | Unknown, inactive, revoked, malformed, unsupported, or structurally invalid configured sources remain denied or surface the existing configuration error. |
@@ -69,10 +72,12 @@ domains: `employee`, `department`, `routine`, `stock`, `leave`, `audit`,
 authorization configuration: `AUTHORIZATION_SEED_CONFIGURATION` remains
 empty. The IT assignee contract requires active workforce plus configured
 read, comment, and manage `ALL`; Default Domain Policy and analytics authority
-do not satisfy those requirements. Ticket persistence, requester queries, operator queue,
-requester/operator timelines and replies, private comment attachments,
-read-authorized attachment access, API, and Dashboard surfaces exist; Email
-Request migration remains deferred to IT8.
+do not satisfy those requirements. IT8 adds no capability key, grant
+configuration, or Email Request default. Ticket persistence, requester
+queries, operator queue, requester/operator timelines and replies, private
+comment attachments, read-authorized attachment access, API, and Dashboard
+surfaces exist. Email Request remains a structured domain with independent
+configured authority and is not mapped to an IT Ticket.
 
 The detailed matrices and phase notes below include historical evidence from
 before this final cleanup. They are retained for traceability and must not be

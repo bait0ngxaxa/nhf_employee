@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/app/_lib/auth/current-user", () => ({
     getCurrentUserProjection: mocks.getCurrentUserProjection,
 }));
-vi.mock("@/components/dashboard/feedback/EmailRequestSectionSkeleton", () => ({
+vi.mock("@/modules/it/client", () => ({
     EmailRequestSectionSkeleton: () => <div data-testid="email-request-skeleton" />,
 }));
 vi.mock("@/components/dashboard/sections/EmailRequestSection", () => ({

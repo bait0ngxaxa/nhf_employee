@@ -50,3 +50,22 @@ export type {
     ITAnalyticsPeriod,
 } from "./contracts";
 export { getAllowedITTicketTransitions } from "./domain/ticket-workflow";
+export {
+    EmailRequestSection,
+    EmailRequestSectionSkeleton,
+    EmailRequestForm,
+    EmailRequestHistory,
+    EmailRequestAccessFields,
+} from "./presentation/dashboard/email-request";
+export {
+    isSharedDriveOption,
+    SHARED_DRIVE_OPTIONS,
+} from "./domain/email-request/constants";
+export type {
+    EmailRequest,
+    EmailRequestFormData,
+    EmailRequestListResponse,
+    EmailRequestPresentationCapabilities,
+    Pagination,
+} from "./domain/email-request/contracts";
+export type { SharedDriveOption } from "./domain/email-request/constants";

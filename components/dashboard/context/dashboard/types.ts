@@ -7,7 +7,7 @@ import type { EmployeePresentationCapabilities } from "@/modules/employee/client
 import type { DepartmentPresentationCapabilities } from "@/modules/department";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 import type { NotificationPresentationCapabilities } from "@/modules/notification/client";
-import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { EmailRequestPresentationCapabilities } from "@/modules/it/client";
 import type { ITPresentationCapabilities } from "@/modules/it/client";
 import type { UserTeamPresentation } from "@/shared/identity/team-presentation";
 

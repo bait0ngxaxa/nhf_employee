@@ -12,6 +12,12 @@ This Phase 1 document remains a historical vocabulary/registry record, but its
 current source-of-truth boundary is now the final role-neutral model: ADMIN is
 an Auth/control-plane role, not a business grant source.
 
+> IT8 note: statements below that Email Request remained deferred record the
+> policy boundary at the phase named there. The current keys, scopes, empty
+> defaults, and IT-owned adapter are recorded in
+> [authorization-current-state.md](./authorization-current-state.md) and
+> [it-module-design.md](./it-module-design.md).
+
 This document defines the code-level authorization vocabulary for the next
 authorization phases. It does not replace or rewrite the current behavior
 baseline in [authorization-current-state.md](./authorization-current-state.md).

@@ -1,10 +1,4 @@
-import {
-    type EmailRequestData,
-    type LineFlexMessage,
-} from "@/types/api";
-import { type LineWebhookData } from "./types";
-import { generateEmailRequestFlexMessage } from "./flex-messages/email-request";
-import { getPublicOrigin } from "@/lib/network/public-url";
+import type { LineFlexMessage } from "@/types/api";
 import {
     sendLineApiRequest,
     sendLineAppMessage,
@@ -16,8 +10,6 @@ const getConfig = () => ({
     channelAccessToken: process.env.LINE_IT_CHANNEL_ACCESS_TOKEN || "",
     stockChannelAccessToken: process.env.LINE_STOCK_CHANNEL_ACCESS_TOKEN || "",
     lineWebhookUrl: process.env.LINE_WEBHOOK_URL || "",
-    baseUrl: getPublicOrigin(),
-    itTeamUserId: process.env.LINE_IT_TEAM_USER_ID || "",
 });
 
 export async function sendLineMessage(
@@ -61,11 +53,9 @@ export async function sendStockLineBroadcast(
  * Send the retained legacy outbound webhook compatibility payload.
  *
  * This is separate from the inbound signature-verification route at
- * /api/line/webhook. The current Email Request dispatcher uses the IT LINE
- * Messaging API path; this helper remains for an externally configured
- * compatibility integration.
+ * /api/line/webhook and remains for an externally configured integration.
  */
-export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
+export async function sendLineWebhook(data: unknown): Promise<boolean> {
     const { lineWebhookUrl } = getConfig();
 
     if (!lineWebhookUrl) {
@@ -98,39 +88,12 @@ export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
     }
 }
 
-async function sendToITTeamOrBroadcast(
-    flexMessage: LineFlexMessage,
-    retryKey?: string,
-): Promise<boolean> {
-    const { itTeamUserId } = getConfig();
-
-    if (itTeamUserId) {
-        return await sendLineMessage(itTeamUserId, flexMessage, retryKey);
-    } else {
-        return await sendLineBroadcast(flexMessage, retryKey);
-    }
-}
-
-export async function sendEmailRequestNotification(
-    emailRequestData: EmailRequestData,
-    retryKey?: string,
-): Promise<boolean> {
-    const { baseUrl } = getConfig();
-    const flexMessage = generateEmailRequestFlexMessage(
-        emailRequestData,
-        baseUrl
-    );
-
-    return await sendToITTeamOrBroadcast(flexMessage, retryKey);
-}
-
 // Export as object for backward compatibility
 export const lineNotificationService = {
     sendLineMessage,
     sendLineBroadcast,
     sendStockLineBroadcast,
     sendLineWebhook,
-    sendEmailRequestNotification,
 };
 
 export { sendLineAppMessage, sendLinePushMessage };
@@ -139,4 +102,3 @@ export {
     type AppLineNotificationResult,
     type SendAppLineNotificationInput,
 } from "./app-notification";
-export type { LineWebhookData };

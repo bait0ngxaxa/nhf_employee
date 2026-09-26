@@ -10,7 +10,8 @@ Stock, Routine, Leave, and Employee are migrated examples; Employee
 server/business and active presentation ownership are migrated as well.
 
 The repository-wide K0 ownership audit, K1 closure, and deferred-boundary
-inventory are recorded in [final-repository-audit.md](./final-repository-audit.md).
+inventory are historical records in [final-repository-audit.md](./final-repository-audit.md);
+the current Email Request ownership overlay is recorded there separately.
 K1 closed the three Stock findings. IT1 established the `modules/it` server
 authorization foundation, IT2 added IT-owned Ticket persistence and domain
 commands, IT3 added requester-only Ticket API and Dashboard presentation, IT4
@@ -18,7 +19,8 @@ added the separate read-ALL operator queue/API and processing surface, IT5A
 added shared conversation and a bounded merged timeline, IT5B added
 comment-owned private image attachments, IT6 implements in-app Ticket
 notifications, and IT7 adds an aggregate-only analytics query and Dashboard.
-Email Request migration remains deferred to IT8.
+IT8 moved the existing structured Email Request subdomain into IT and is
+closed; its compatibility and verification record is below.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -184,6 +186,39 @@ Deferred metric policy and Email Request ownership remain outside IT7. See
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.
 
+## IT8 Email Request ownership — CLOSED
+
+Email Request is a structured IT service-request subdomain and remains a
+separate model from `ITTicket`. IT owns its application commands and queries,
+authorization adapter, validation and contracts, production Prisma delegates,
+Dashboard form/history/provider, Inbox meaning, LINE Flex/destination, outbox
+payload interpretation, and Audit event construction. Existing IDs and rows
+remain in `EmailRequest` and `EmailRequestIdempotency`; no schema migration,
+backfill, Ticket conversion, or capability mapping is part of IT8.
+
+The public server entry is `@/modules/it`; browser presentation and safe
+contracts use `@/modules/it/client`. `/api/email-request` and
+`/dashboard/email-request` remain unchanged. Capability keys remain
+`email.request.read` (`OWN|ALL`) and `email.request.create` (`ALL`), with empty
+defaults. OWN is enforced in the database by `requestedBy`; create requires
+effective ALL. The API keeps the current session and Employee eligibility
+boundary, and the Email Request actor remains `DASHBOARD` with
+`employeeId: null`. Ticket and analytics authority, role names, Department,
+Team, and TeamRole do not imply Email Request authority.
+
+New request rows, idempotency rows, and the `EMAIL_REQUEST` outbox intent commit
+together. IT dispatches both new and historical `EMAIL_REQUEST` payloads through
+its public server contract; the shared processor retains claim/retry/backoff,
+stale recovery, and terminal state changes. Notification Inbox persistence,
+Audit persistence, shared outbox lifecycle, generic LINE provider transport,
+and App Router request metadata remain with their existing owners. The small
+Dashboard section wrapper remains only to bind shared Dashboard navigation.
+
+Closure verification passed `npm run architecture:check` (1,248 source files),
+`npm run lint:strict`, `npm run typecheck`, the dedicated MySQL Email Request
+integration suite (22 files; 153 tests), and the final `npm run test`
+(365 files; 3,515 passed, 1 skipped). No Prisma schema or migration changed.
+
 ## Authorization Administration boundary (Phase 10C + Phase 12E)
 
 `modules/authorization/` owns the Authorization Administration application
@@ -262,16 +297,17 @@ Stock, Routine, and Email Request retain ownership of their current triggering
 events, recipient policy, notification type, title/message, action URL,
 reference ID, channel choice, and event-specific dedupe or supersede semantics.
 IT owns Ticket event meaning, recipient policy, strict payload, destination,
-event identity, and stale-domain validation. IT6 uses only in-app delivery:
-Email is deferred, and LINE remains deferred pending an IT LIFF/product
-decision. Notification must not grow audience APIs such as “notify all Stock
+event identity, and stale-domain validation. IT6 Ticket delivery uses only
+in-app notifications; Ticket email and LINE remain deferred pending an IT
+product decision. Notification must not grow audience APIs such as “notify all Stock
 admins” or become a workflow owner for another module. Leave, Stock, Routine,
 and IT use only `@/modules/notification` for Inbox persistence; physical
 Prisma `Notification` delegate operations are owned exclusively by
 `modules/notification/infrastructure/**` in production. Phase 13A/13A.1
 updates Routine, Stock, and Email Request audience selection to configured
-capabilities; each producer still owns its event and recipient policy. The
-legacy generic adapter remains solely for deferred Email Request.
+capabilities; each producer still owns its event and recipient policy. IT8
+removed the Email Request-only generic `createInAppNotificationOnce` adapter;
+Email Request calls the public Notification command directly.
 
 `NotificationOutbox` is a separate shared/platform boundary. The global
 outbox owns reliable asynchronous delivery, event claim and status lifecycle,
@@ -286,9 +322,10 @@ dispatch contract owns any transaction context; the global processor does not
 pass a transaction client directly to Notification. A direct
 processor-to-Notification dispatch is reserved for a future generic
 Notification-owned event with a fully resolved command payload, not current
-Leave, Stock, Routine, IT Ticket, or deferred Email Request events. IT enqueues
-`IT_TICKET_IN_APP` with its Ticket mutation transaction and exports the narrow
-server-only dispatcher from `@/modules/it`; the global processor calls it.
+Leave, Stock, Routine, IT Ticket, or Email Request events. IT enqueues
+`IT_TICKET_IN_APP` with its Ticket mutation transaction and `EMAIL_REQUEST`
+with the Email Request creation transaction; the public IT server entry
+exports both narrow dispatchers for the global processor.
 The outbox wakeup remains in the API adapter after the business transaction.
 
 The four existing `app/api/notifications/**` routes remain app HTTP delivery
@@ -583,8 +620,9 @@ Auth producer routes now call `appendAuditBestEffort()` directly from
 and selected-session-revoke details use the truncated `familyCorrelation`
 representation; new relevant Audit rows do not persist raw runtime
 `familyId`. The generic Audit capability does not interpret Auth meaning.
-`lib/server/audit.ts` remains only for Email Request, Employee export, Leave
-export, and Audit Log export compatibility consumers.
+`lib/server/audit.ts` remains the thin trusted-request-metadata and best-effort
+Audit composition seam for Email Request and Employee, Leave, and Audit Log
+export consumers; Email Request event meaning is constructed by IT.
 
 ## Shared/platform ownership
 
@@ -594,7 +632,7 @@ network/request metadata primitives, notification or LINE delivery, uploads,
 and generic UI primitives. Phase I1 resolves the cohesive Audit capability's
 physical persistence and generic query/retention owner as `modules/audit/`,
 not `shared/audit/`; existing lib/ Audit code remains only as compatibility
-adapters for deferred Email Request and export consumers. Audit producer and
+adapters for Email Request and export consumers. Audit producer and
 presentation migrations are complete.
 
 Feature-specific validation, policies, calculations, status semantics,

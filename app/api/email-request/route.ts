@@ -4,20 +4,20 @@ import { requireApiSession } from "@/lib/auth/api";
 import { createAuditLog } from "@/lib/server/audit";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import {
-    emailRequestService,
+    buildEmailRequestCreationAuditEvent,
     assertEmailRequestCapability,
     buildEmailRequestAuthorizationContext,
+    createEmailRequest,
     EmailRequestIdempotencyConflictError,
     EmailRequestCapabilityDeniedError,
-    toEmailRequestReadAuthorization,
-    type EmailRequestFilters,
-} from "@/lib/services/email-request";
-import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
-import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
-import {
     emailRequestFiltersSchema,
     emailRequestSchema,
-} from "@/lib/validations/email-request";
+    getEmailRequests,
+    toEmailRequestReadAuthorization,
+    type EmailRequestFilters,
+} from "@/modules/it";
+import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
+import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             );
         }
 
-        const result = await emailRequestService.createEmailRequest(
+        const result = await createEmailRequest(
             validation.data,
             auth.user,
             { idempotencyKey: parsedIdempotencyKey.data },
@@ -75,23 +75,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         if (!result.replayed) {
-            await createAuditLog({
-                action: "EMAIL_REQUEST",
-                entityType: "EmailRequest",
-                entityId: result.emailRequest.id,
-                userId: auth.user.id,
-                userEmail: auth.user.email,
-                details: {
-                    after: {
-                        thaiName: validation.data.thaiName,
-                        englishName: validation.data.englishName,
-                        position: validation.data.position,
-                        department: validation.data.department,
-                        needsDocumentSystem: validation.data.needsDocumentSystem,
-                        sharedDriveAccess: validation.data.sharedDriveAccess,
-                    },
-                },
-            });
+            await createAuditLog(buildEmailRequestCreationAuditEvent(
+                validation.data,
+                auth.user,
+                result.emailRequest.id,
+            ));
 
             after(async () => {
                 processOutbox().catch((err) =>
@@ -157,7 +145,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         }
         const filters: EmailRequestFilters = parsedFilters.data;
 
-        const result = await emailRequestService.getEmailRequests(
+        const result = await getEmailRequests(
             filters,
             readAuthorization,
         );

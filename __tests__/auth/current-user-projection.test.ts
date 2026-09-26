@@ -93,11 +93,9 @@ vi.mock("@/modules/notification", () => ({
     buildNotificationAuthorizationContext: notificationContextMock,
     getNotificationPresentationCapabilities: notificationProjectionMock,
 }));
-vi.mock("@/lib/services/email-request/authorization", () => ({
+vi.mock("@/modules/it", () => ({
     buildEmailRequestAuthorizationContext: emailRequestContextMock,
     getEmailRequestPresentationCapabilities: emailRequestCapabilitiesMock,
-}));
-vi.mock("@/modules/it", () => ({
     buildITAuthorizationContext: itContextMock,
     getITPresentationCapabilities: itCapabilitiesMock,
 }));

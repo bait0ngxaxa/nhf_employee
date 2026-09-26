@@ -1,11 +1,11 @@
 import type { NotificationOutbox } from "@prisma/client";
-import { lineNotificationService } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import { createOutboxLineRetryKey } from "./provider-key";
-import type { EmailRequestData } from "@/types/api";
-import { createEmailRequestInAppNotification } from "@/lib/services/email-request/notifications";
 import { dispatchStockOutbox } from "@/modules/stock";
-import { dispatchITTicketNotificationOutbox } from "@/modules/it";
+import {
+    dispatchITEmailRequestOutbox,
+    dispatchITTicketNotificationOutbox,
+} from "@/modules/it";
 import {
     parseLeaveActionPayload,
     parseLeaveCancellationRequestedPayload,
@@ -24,10 +24,6 @@ import {
     sendLeaveNotTakenRequestedNotifications,
     sendLeaveNotTakenConfirmedNotifications,
 } from "@/modules/leave";
-import {
-    isSharedDriveOption,
-    type SharedDriveOption,
-} from "@/constants/email-request";
 import {
     dispatchRoutineReminderOutbox,
     dispatchRoutineContractExpiryOutbox,
@@ -76,77 +72,11 @@ function emitOutboxOperationalEvent(
     console.warn(event, { event, ...metadata });
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
-}
-
 function parsePayload(payload: string): unknown {
     try {
         return JSON.parse(payload) as unknown;
     } catch {
         throw new Error("Invalid payload JSON");
-    }
-}
-
-function parseSharedDriveAccess(
-    payload: Record<string, unknown>,
-): EmailRequestData["sharedDriveAccess"] {
-    const value = payload.sharedDriveAccess;
-
-    if (value === undefined || value === null) {
-        return [];
-    }
-
-    if (
-        !Array.isArray(value) ||
-        !value.every(
-            (item) =>
-                typeof item === "string" && isSharedDriveOption(item),
-        )
-    ) {
-        throw new Error("Invalid EMAIL_REQUEST sharedDriveAccess payload");
-    }
-
-    return value as SharedDriveOption[];
-}
-
-function parseEmailRequestPayload(payload: unknown): EmailRequestData {
-    if (
-        !isRecord(payload) ||
-        typeof payload.thaiName !== "string" ||
-        typeof payload.englishName !== "string" ||
-        typeof payload.phone !== "string" ||
-        typeof payload.position !== "string" ||
-        typeof payload.department !== "string" ||
-        typeof payload.replyEmail !== "string" ||
-        typeof payload.requestedAt !== "string"
-    ) {
-        throw new Error("Invalid EMAIL_REQUEST payload");
-    }
-
-    return {
-        thaiName: payload.thaiName,
-        englishName: payload.englishName,
-        phone: payload.phone,
-        nickname: typeof payload.nickname === "string" ? payload.nickname : "",
-        position: payload.position,
-        department: payload.department,
-        replyEmail: payload.replyEmail,
-        needsDocumentSystem:
-            typeof payload.needsDocumentSystem === "boolean"
-                ? payload.needsDocumentSystem
-                : false,
-        sharedDriveAccess: parseSharedDriveAccess(payload),
-        requestedAt: payload.requestedAt,
-    };
-}
-
-async function assertLineSent(
-    isSent: boolean,
-    label: string,
-): Promise<void> {
-    if (!isSent) {
-        throw new Error(`${label} failed`);
     }
 }
 
@@ -261,6 +191,16 @@ export async function dispatchNotification(
     const itOutcome = await dispatchITTicketNotificationOutbox(notification);
     if (itOutcome !== null) return itOutcome;
 
+    const emailRequestOutcome = await dispatchITEmailRequestOutbox(
+        notification,
+        createOutboxLineRetryKey(
+            notification.type,
+            notification.id,
+            notification.eventKey,
+        ),
+    );
+    if (emailRequestOutcome !== null) return emailRequestOutcome;
+
     let payload: unknown;
     try {
         payload = parsePayload(notification.payload);
@@ -301,22 +241,6 @@ export async function dispatchNotification(
     if (leaveLineOutcome) return leaveLineOutcome;
 
     switch (notification.type) {
-        case "EMAIL_REQUEST": {
-            const parsedPayload = parseEmailRequestPayload(payload);
-            await createEmailRequestInAppNotification(parsedPayload);
-            await assertLineSent(
-                await lineNotificationService.sendEmailRequestNotification(
-                    parsedPayload,
-                    createOutboxLineRetryKey(
-                        notification.type,
-                        notification.id,
-                        notification.eventKey,
-                    ),
-                ),
-                "LINE email request notification",
-            );
-            return "SENT";
-        }
         case "LEAVE_ACTION": {
             const parsedLeaveAction = parseLeaveActionPayload(payload);
             return dispatchCurrentLeaveAction(notification.id, parsedLeaveAction);

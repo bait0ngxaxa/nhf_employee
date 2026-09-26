@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 
 import { EmailRequestSection } from "@/components/dashboard/sections/EmailRequestSection";
-import { EmailRequestSectionSkeleton } from "@/components/dashboard/feedback/EmailRequestSectionSkeleton";
+import { EmailRequestSectionSkeleton } from "@/modules/it/client";
 import { requireDashboardEmailRequestAccess } from "@/app/dashboard/_lib/route-access";
 
 export const metadata: Metadata = {

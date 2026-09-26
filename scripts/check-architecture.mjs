@@ -1360,6 +1360,123 @@ const notificationDelegateOperations = new Set([
     "upsert",
 ]);
 
+const emailRequestDelegateOperations = new Set([
+    "aggregate",
+    "create",
+    "createMany",
+    "createManyAndReturn",
+    "update",
+    "updateMany",
+    "updateManyAndReturn",
+    "findMany",
+    "findFirst",
+    "findFirstOrThrow",
+    "findUnique",
+    "findUniqueOrThrow",
+    "count",
+    "delete",
+    "deleteMany",
+    "groupBy",
+    "upsert",
+]);
+
+function getEmailRequestDelegateAccess(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+    const delegateNames = new Set(["emailRequest", "emailRequestIdempotency"]);
+    const delegateAliases = new Set();
+    let accessNode = null;
+
+    function collectAliases(node) {
+        if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+            if (ts.isIdentifier(node.name)
+                && (ts.isPropertyAccessExpression(node.initializer)
+                    || ts.isElementAccessExpression(node.initializer))
+                && delegateNames.has(getStaticPropertyName(node.initializer))) {
+                delegateAliases.add(node.name.text);
+            } else if (ts.isObjectBindingPattern(node.name)
+                && ts.isIdentifier(node.initializer)) {
+                for (const element of node.name.elements) {
+                    let propertyName = ts.isIdentifier(element.name)
+                        ? element.name.text
+                        : null;
+                    if (element.propertyName !== undefined) {
+                        propertyName = ts.isIdentifier(element.propertyName)
+                            || ts.isStringLiteralLike(element.propertyName)
+                            ? element.propertyName.text
+                            : null;
+                    }
+                    if (propertyName !== null
+                        && delegateNames.has(propertyName)
+                        && ts.isIdentifier(element.name)) {
+                        delegateAliases.add(element.name.text);
+                    }
+                }
+            }
+        }
+
+        ts.forEachChild(node, collectAliases);
+    }
+
+    collectAliases(sourceFile);
+
+    function visit(node) {
+        if (accessNode !== null) return;
+        if (ts.isCallExpression(node)
+            && (ts.isPropertyAccessExpression(node.expression)
+                || ts.isElementAccessExpression(node.expression))
+            && emailRequestDelegateOperations.has(getStaticPropertyName(node.expression))) {
+            const delegate = node.expression.expression;
+            const delegateName = getStaticPropertyName(delegate);
+            if ((delegateName !== null && delegateNames.has(delegateName))
+                || (ts.isIdentifier(delegate) && delegateAliases.has(delegate.text))) {
+                accessNode = node.expression;
+                return;
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return accessNode;
+}
+
+function getEmailRequestPersistenceViolation(filePath, rootPath) {
+    const emailRequestInfrastructureRoot = resolve(rootPath, "modules/it/infrastructure");
+    const prismaRoot = resolve(rootPath, "prisma");
+    const supportSegments = relativeFilePath(filePath, rootPath)
+        .split("/")
+        .map((segment) => segment.toLowerCase());
+    const isFixtureOrSupportSource = supportSegments.some((segment) => [
+        "fixture",
+        "fixtures",
+        "__fixtures__",
+        "test-support",
+        "test-utils",
+    ].includes(segment));
+    if (pathIsWithin(filePath, emailRequestInfrastructureRoot)
+        || pathIsWithin(filePath, prismaRoot)
+        || isTestSource(filePath, rootPath)
+        || isFixtureOrSupportSource) {
+        return null;
+    }
+
+    const accessNode = getEmailRequestDelegateAccess(filePath);
+    if (accessNode === null) return null;
+
+    const line = accessNode.getSourceFile().getLineAndCharacterOfPosition(
+        accessNode.getStart(accessNode.getSourceFile()),
+    ).line + 1;
+    return `${relativeFilePath(filePath, rootPath)}:${line} direct EmailRequest/EmailRequestIdempotency Prisma delegate access must be owned by modules/it/infrastructure/.`;
+}
+
 function getNotificationDelegateAccess(filePath) {
     const contents = readFileSync(filePath, "utf8");
     const sourceFile = ts.createSourceFile(
@@ -2640,6 +2757,83 @@ function getRoutineClientGraphViolations(rootPath, getRuntimeImports) {
     return violations;
 }
 
+function getITClientGraphViolations(rootPath, getRuntimeImports) {
+    const entryPath = resolve(rootPath, "modules/it/client.ts");
+    if (!existsSync(entryPath)) return [];
+
+    const itServerRoot = resolve(rootPath, "modules/it");
+    const pending = [entryPath];
+    const visited = new Set();
+    const violations = [];
+    const serverPackages = [
+        "@prisma/client",
+        "nodemailer",
+        "@line/bot-sdk",
+        "server-only",
+        "next/server",
+        "next/headers",
+        "next/cache",
+    ];
+    const serverDirectories = [
+        "lib/db",
+        "lib/server",
+        "lib/email",
+        "lib/services/outbox",
+        "modules/it/application",
+        "modules/it/infrastructure",
+    ];
+
+    while (pending.length > 0) {
+        const filePath = pending.pop();
+        if (filePath === undefined || visited.has(filePath)) continue;
+        visited.add(filePath);
+
+        for (const record of getRuntimeImports(filePath)) {
+            const specifier = record.moduleSpecifier;
+            const { importTarget, sourcePath } = getRuntimeImportTarget(
+                specifier,
+                filePath,
+                rootPath,
+            );
+            const reachesITServerEntry = importTarget === itServerRoot
+                || (sourcePath !== null
+                    && pathIsWithin(sourcePath, itServerRoot)
+                    && /^index\.[cm]?[jt]sx?$/.test(relative(itServerRoot, sourcePath)));
+            const reachesITServerDirectory = [importTarget, sourcePath].some((target) =>
+                target !== null && serverDirectories.some((directory) =>
+                    pathIsWithin(target, resolve(rootPath, directory)),
+                ),
+            );
+
+            if (reachesITServerEntry) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Client-reachable runtime code must not import the IT server entry.",
+                ));
+                continue;
+            }
+
+            if (isBuiltin(specifier)
+                || serverPackages.some((name) => hasImportPrefix(specifier, name))
+                || reachesITServerDirectory) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    record,
+                    "Server-only runtime dependency is reachable from @/modules/it/client.",
+                ));
+                continue;
+            }
+
+            if (sourcePath !== null) pending.push(sourcePath);
+        }
+    }
+
+    return violations;
+}
+
 function relativeFilePath(filePath, rootPath) {
     return relative(rootPath, filePath).split(sep).join("/");
 }
@@ -2650,8 +2844,93 @@ const capabilityRecipientPolicyFiles = Object.freeze([
     "modules/routine/application/reminders.ts",
     "modules/stock/infrastructure/notifications/notifications.ts",
     "modules/stock/infrastructure/notifications/outbox.ts",
-    "lib/services/email-request/notifications.ts",
+    "modules/it/application/email-request/notifications.ts",
 ]);
+
+const legacyEmailRequestOwnershipPrefixes = Object.freeze([
+    "components/email",
+    "components/dashboard/context/email-request",
+    "components/dashboard/feedback/EmailRequestSectionSkeleton.tsx",
+    "constants/email-request.ts",
+    "hooks/useEmailRequestHistory.ts",
+    "lib/line/flex-messages/email-request.ts",
+    "lib/services/email-request",
+    "lib/validations/email-request.ts",
+    "types/email-request.ts",
+]);
+
+function getLegacyEmailRequestOwnershipViolation(filePath, rootPath) {
+    if (isTestSource(filePath, rootPath)) return null;
+
+    const relativePath = relativeFilePath(filePath, rootPath);
+    const legacyPrefix = legacyEmailRequestOwnershipPrefixes.find((prefix) =>
+        relativePath === prefix || relativePath.startsWith(`${prefix}/`),
+    );
+    if (legacyPrefix === undefined) return null;
+
+    return `${relativePath} is a retired Email Request ownership path; use modules/it.`;
+}
+
+function normalizeImportSpecifier(filePath, rootPath, moduleSpecifier) {
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    return resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+}
+
+function getEmailRequestCompositionViolations(rootPath, sourceFiles) {
+    const violations = [];
+    const serverRoutePath = resolve(rootPath, "app/api/email-request/route.ts");
+    if (sourceFiles.includes(serverRoutePath)) {
+        const normalizedImports = getImports(serverRoutePath).map((record) =>
+            normalizeImportSpecifier(serverRoutePath, rootPath, record.moduleSpecifier),
+        );
+        if (!normalizedImports.includes("@/modules/it")
+            && !normalizedImports.includes("@/modules/it/index")) {
+            violations.push(
+                "app/api/email-request/route.ts must consume Email Request through @/modules/it.",
+            );
+        }
+    }
+
+    for (const routePath of [
+        "app/dashboard/email-request/page.tsx",
+        "app/dashboard/email-request/loading.tsx",
+        "components/dashboard/sections/EmailRequestSection.tsx",
+    ]) {
+        const filePath = resolve(rootPath, routePath);
+        if (!sourceFiles.includes(filePath)) continue;
+
+        const normalizedImports = getImports(filePath).map((record) =>
+            normalizeImportSpecifier(filePath, rootPath, record.moduleSpecifier),
+        );
+        if (!normalizedImports.includes("@/modules/it/client")) {
+            violations.push(
+                `${routePath} must consume Email Request presentation through @/modules/it/client.`,
+            );
+        }
+    }
+
+    return violations;
+}
+
+function getEmailRequestOutboxProcessorViolation(rootPath) {
+    const filePath = resolve(rootPath, "lib/services/outbox/processor.ts");
+    if (!existsSync(filePath)) return null;
+
+    const source = readFileSync(filePath, "utf8");
+    const hasPublicDispatcherImport = /import\s*\{[^}]*\bdispatchITEmailRequestOutbox\b[^}]*\}\s*from\s*["']@\/modules\/it["']/.test(source);
+    const callsPublicDispatcher = /\bdispatchITEmailRequestOutbox\s*\(/.test(source);
+    const ownsEmailRequestSemantics = /\b(?:EmailRequestData|parseEmailRequestOutboxPayload|generateEmailRequestFlexMessage|LINE_IT_TEAM_USER_ID|needsDocumentSystem|sharedDriveAccess|replyEmail)\b/.test(source);
+
+    if (hasPublicDispatcherImport && callsPublicDispatcher && !ownsEmailRequestSemantics) {
+        return null;
+    }
+
+    return "The shared Outbox Processor must delegate Email Request semantics through the public @/modules/it dispatcher.";
+}
 
 function getCapabilityRecipientRoleViolations(rootPath, sourceFiles) {
     const forbiddenRolePatterns = [
@@ -2750,6 +3029,20 @@ function checkArchitecture(options = {}) {
     const sourceFiles = getSourceFiles(rootPath).sort();
 
     for (const filePath of sourceFiles) {
+        const legacyEmailRequestOwnershipViolation =
+            getLegacyEmailRequestOwnershipViolation(filePath, rootPath);
+        if (legacyEmailRequestOwnershipViolation !== null) {
+            violations.push(legacyEmailRequestOwnershipViolation);
+        }
+
+        const emailRequestPersistenceViolation = getEmailRequestPersistenceViolation(
+            filePath,
+            rootPath,
+        );
+        if (emailRequestPersistenceViolation !== null) {
+            violations.push(emailRequestPersistenceViolation);
+        }
+
         const departmentPersistenceViolation = getDepartmentPersistenceViolation(
             filePath,
             rootPath,
@@ -3277,6 +3570,12 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getCapabilityRecipientRoleViolations(rootPath, sourceFiles));
+    violations.push(...getEmailRequestCompositionViolations(rootPath, sourceFiles));
+    const emailRequestOutboxProcessorViolation =
+        getEmailRequestOutboxProcessorViolation(rootPath);
+    if (emailRequestOutboxProcessorViolation !== null) {
+        violations.push(emailRequestOutboxProcessorViolation);
+    }
     violations.push(...getEmployeeDashboardRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getAuditApiRouteCompositionViolations(rootPath, sourceFiles));
     violations.push(...getAuditDashboardRouteCompositionViolations(rootPath, sourceFiles));
@@ -3298,6 +3597,7 @@ function checkArchitecture(options = {}) {
     violations.push(...getLineClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getStockClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getRoutineClientGraphViolations(rootPath, getRuntimeImports));
+    violations.push(...getITClientGraphViolations(rootPath, getRuntimeImports));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "leave", getRuntimeImports));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "employee", getRuntimeImports));
     violations.push(...getClientReachableServerEntryViolations(rootPath, sourceFiles, "department", getRuntimeImports, null));

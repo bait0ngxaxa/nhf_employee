@@ -7,7 +7,7 @@ import type {
 } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { sendEmail } from "@/lib/email/transport";
-import { lineNotificationService, sendStockLineBroadcast } from "@/lib/line";
+import { sendStockLineBroadcast } from "@/lib/line";
 import { prisma } from "@/lib/db/prisma";
 import {
     dispatchNotification,
@@ -47,6 +47,7 @@ vi.mock("@/lib/db/prisma", () => ({
 
 const sendEmailMock = vi.hoisted(() => vi.fn());
 const sendStockLineBroadcastMock = vi.hoisted(() => vi.fn());
+const emailRequestDispatchMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/email/transport", () => ({
     sendEmail: sendEmailMock,
@@ -61,10 +62,11 @@ vi.mock("@/modules/leave", async (importOriginal) => {
 });
 
 vi.mock("@/lib/line", () => ({
-    lineNotificationService: {
-        sendEmailRequestNotification: vi.fn(),
-    },
     sendStockLineBroadcast: sendStockLineBroadcastMock,
+}));
+vi.mock("@/modules/it", () => ({
+    dispatchITEmailRequestOutbox: emailRequestDispatchMock,
+    dispatchITTicketNotificationOutbox: vi.fn().mockResolvedValue(null),
 }));
 
 const prismaMock = prisma as unknown as ReturnType<
@@ -155,6 +157,9 @@ describe("processOutbox", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         vi.clearAllMocks();
+        emailRequestDispatchMock.mockImplementation(async (notification: NotificationOutbox) => (
+            notification.type === "EMAIL_REQUEST" ? "SENT" : null
+        ));
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
         prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
         prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
@@ -205,9 +210,6 @@ describe("processOutbox", () => {
     });
 
     it("processes EMAIL_REQUEST successfully", async () => {
-        vi.mocked(
-            lineNotificationService.sendEmailRequestNotification,
-        ).mockResolvedValue(true);
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
@@ -229,16 +231,9 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 1, failed: 0 });
-        expect(
-            lineNotificationService.sendEmailRequestNotification,
-        ).toHaveBeenCalledTimes(1);
-        expect(
-            lineNotificationService.sendEmailRequestNotification,
-        ).toHaveBeenCalledWith(
-            expect.objectContaining({
-                needsDocumentSystem: false,
-                sharedDriveAccess: [],
-            }),
+        expect(emailRequestDispatchMock).toHaveBeenCalledTimes(1);
+        expect(emailRequestDispatchMock).toHaveBeenCalledWith(
+            expect.objectContaining({ type: "EMAIL_REQUEST", id: 102 }),
             createOutboxLineRetryKey("EMAIL_REQUEST", 102),
         );
     });
@@ -246,9 +241,6 @@ describe("processOutbox", () => {
     it("characterizes crash-after-IT-LINE acceptance with the same retry key", async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
-        vi.mocked(
-            lineNotificationService.sendEmailRequestNotification,
-        ).mockResolvedValue(true);
         const payload = JSON.stringify({
             thaiName: "Test",
             englishName: "Test",
@@ -286,20 +278,11 @@ describe("processOutbox", () => {
             const result = await processOutbox();
 
             expect(result).toEqual({ processed: 1, failed: 0 });
-            expect(
-                lineNotificationService.sendEmailRequestNotification,
-            ).toHaveBeenCalledTimes(2);
-            expect(
-                vi.mocked(lineNotificationService.sendEmailRequestNotification)
-                    .mock.calls[0]?.[1],
-            ).toBe(
-                vi.mocked(lineNotificationService.sendEmailRequestNotification)
-                    .mock.calls[1]?.[1],
+            expect(emailRequestDispatchMock).toHaveBeenCalledTimes(2);
+            expect(emailRequestDispatchMock.mock.calls[0]?.[1]).toBe(
+                emailRequestDispatchMock.mock.calls[1]?.[1],
             );
-            expect(
-                vi.mocked(lineNotificationService.sendEmailRequestNotification)
-                    .mock.calls[0]?.[1],
-            ).toBe(createOutboxLineRetryKey(
+            expect(emailRequestDispatchMock.mock.calls[0]?.[1]).toBe(createOutboxLineRetryKey(
                 "EMAIL_REQUEST",
                 150,
                 "email-request:150:created",
@@ -419,16 +402,10 @@ describe("processOutbox", () => {
         }
     });
 
-    it("creates email request in-app notification for configured readers before failed LINE delivery", async () => {
-        vi.mocked(
-            lineNotificationService.sendEmailRequestNotification,
-        ).mockResolvedValue(false);
-        prismaMock.user.findMany.mockResolvedValue(asNever([{ id: 10 }, { id: 11 }]));
-        prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([
-            { userId: 10, capabilityKey: "email.request.read", scope: "ALL" },
-            { userId: 11, capabilityKey: "email.request.read", scope: "ALL" },
-        ]));
-        prismaMock.notification.create.mockResolvedValue(asNever({ id: "n-1" }));
+    it("records an IT Email Request dispatch failure through the shared lifecycle", async () => {
+        emailRequestDispatchMock.mockRejectedValueOnce(
+            new Error("LINE email request notification failed"),
+        );
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
@@ -450,40 +427,10 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 1 });
-        expect(prismaMock.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({
-                isActive: true,
-                deletedAt: null,
-                OR: expect.arrayContaining([
-                    expect.objectContaining({
-                        userCapabilityGrants: {
-                            some: {
-                                capabilityKey: "email.request.read",
-                                scope: "ALL",
-                            },
-                        },
-                    }),
-                ]),
-            }),
-            select: { id: true },
-            orderBy: { id: "asc" },
-        }));
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                userId: 10,
-                type: "SYSTEM_ALERT",
-                title: "มีคำขออีเมลพนักงานใหม่",
-                referenceId: "somchai@nhf.or.th",
-            }),
-        });
-        expect(prismaMock.notification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({
-                userId: 11,
-                type: "SYSTEM_ALERT",
-                title: "มีคำขออีเมลพนักงานใหม่",
-                referenceId: "somchai@nhf.or.th",
-            }),
-        });
+        expect(emailRequestDispatchMock).toHaveBeenCalledWith(
+            expect.objectContaining({ type: "EMAIL_REQUEST", id: 112 }),
+            createOutboxLineRetryKey("EMAIL_REQUEST", 112),
+        );
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: 112, status: "PROCESSING" },
@@ -494,14 +441,12 @@ describe("processOutbox", () => {
             }),
         );
 
-        const inAppOrder = prismaMock.notification.create.mock.invocationCallOrder[0];
-        const lineOrder =
-            vi.mocked(lineNotificationService.sendEmailRequestNotification).mock
-                .invocationCallOrder[0];
-        expect(inAppOrder).toBeLessThan(lineOrder);
     });
 
     it("marks EMAIL_REQUEST failed for invalid shared drive payload", async () => {
+        emailRequestDispatchMock.mockRejectedValueOnce(
+            new Error("Invalid EMAIL_REQUEST sharedDriveAccess payload"),
+        );
         prismaMock.notificationOutbox.findMany.mockResolvedValue(
             asNever([
                 buildNotification(
@@ -524,9 +469,7 @@ describe("processOutbox", () => {
         const result = await processOutbox();
 
         expect(result).toEqual({ processed: 0, failed: 1 });
-        expect(
-            lineNotificationService.sendEmailRequestNotification,
-        ).not.toHaveBeenCalled();
+        expect(emailRequestDispatchMock).toHaveBeenCalledTimes(1);
         expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: 104, status: "PROCESSING" },

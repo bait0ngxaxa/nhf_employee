@@ -1,5 +1,3 @@
-import type { SharedDriveOption } from '@/constants/email-request';
-
 export interface EmailRequestBody {
   email: string;
   subject?: string;
@@ -8,19 +6,6 @@ export interface EmailRequestBody {
 export interface EmailResponse {
   success: boolean;
   message: string;
-}
-
-export interface EmailRequestData {
-  thaiName: string;
-  englishName: string;
-  phone: string;
-  nickname: string;
-  position: string;
-  department: string;
-  replyEmail: string;
-  needsDocumentSystem: boolean;
-  sharedDriveAccess: SharedDriveOption[];
-  requestedAt: string;
 }
 
 // LINE Flex Message type definitions

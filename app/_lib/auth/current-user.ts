@@ -32,7 +32,7 @@ import {
 import {
     buildEmailRequestAuthorizationContext,
     getEmailRequestPresentationCapabilities,
-} from "@/lib/services/email-request/authorization";
+} from "@/modules/it";
 import {
     buildITAuthorizationContext,
     getITPresentationCapabilities,

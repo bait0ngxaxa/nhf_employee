@@ -147,3 +147,56 @@ export type {
     ITTicketErrorCode,
     ITTicketMutationConflictReason,
 } from "./application/ticket-errors";
+export {
+    assertEmailRequestCapability,
+    assertEmailRequestCapabilityScope,
+    buildEmailRequestAuthorizationActor,
+    buildEmailRequestAuthorizationContext,
+    defaultEmailRequestScopes,
+    EMAIL_REQUEST_CAPABILITIES,
+    EmailRequestCapabilityDeniedError,
+    getEmailRequestPresentationCapabilities,
+    inspectEmailRequestEffectiveAccess,
+    resolveEmailRequestCapability,
+    toEmailRequestReadAuthorization,
+} from "./application/email-request/authorization";
+export type {
+    EmailRequestAuthorizationActor,
+    EmailRequestAuthorizationContext,
+    EmailRequestCapability,
+    EmailRequestCapabilityAuthorization,
+} from "./application/email-request/authorization";
+export {
+    createEmailRequest,
+} from "./application/email-request/commands";
+export {
+    getEmailRequests,
+} from "./application/email-request/queries";
+export {
+    EmailRequestIdempotencyConflictError,
+} from "./application/email-request/idempotency";
+export {
+    buildEmailRequestCreationAuditEvent,
+} from "./application/email-request/audit";
+export type {
+    EmailRequestCreationAuditEvent,
+} from "./application/email-request/audit";
+export {
+    dispatchITEmailRequestOutbox,
+} from "./application/email-request/dispatch";
+export {
+    emailRequestFiltersSchema,
+    emailRequestSchema,
+} from "./domain/email-request/validation";
+export type {
+    CreateEmailRequestData,
+    CreateEmailRequestOptions,
+    CreateEmailRequestResult,
+    EmailRequestFilters,
+    EmailRequestReadAuthorization,
+    EmailRequestWithUser,
+    PaginatedEmailRequestsResult,
+    UserContext,
+} from "./application/email-request/types";
+export type { EmailRequestData } from "./domain/email-request/contracts";
+export type { EmailRequestInput } from "./domain/email-request/validation";

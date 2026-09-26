@@ -8,7 +8,7 @@ import {
     type AuthorizationAdministrationPrincipal,
 } from "@/modules/authorization";
 import type { EmployeePresentationCapabilities } from "@/modules/employee";
-import type { EmailRequestPresentationCapabilities } from "@/types/email-request";
+import type { EmailRequestPresentationCapabilities } from "@/modules/it/client";
 import type { ITPresentationCapabilities } from "@/modules/it";
 import {
     canAccessITTicketDashboard,

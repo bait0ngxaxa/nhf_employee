@@ -1,24 +1,45 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
-import type * as EmailRequestServiceModule from "@/lib/services/email-request";
 
 import { GET, POST } from "@/app/api/email-request/route";
 import { requireApiSession } from "@/lib/auth/api";
 import { createAuditLog } from "@/lib/server/audit";
 import {
     EmailRequestIdempotencyConflictError,
-} from "@/lib/services/email-request/idempotency";
-import {
-    emailRequestService,
     EmailRequestCapabilityDeniedError,
-} from "@/lib/services/email-request";
+} from "@/modules/it";
 import { processOutbox } from "@/lib/services/outbox/processor";
 
 const authorizationMocks = vi.hoisted(() => ({
     assertEmailRequestCapability: vi.fn(),
     toEmailRequestReadAuthorization: vi.fn(),
+    createEmailRequest: vi.fn(),
+    getEmailRequests: vi.fn(),
+    EmailRequestIdempotencyConflictError: class extends Error {
+        constructor() {
+            super("Idempotency-Key นี้ถูกใช้กับข้อมูลคำขออื่นแล้ว");
+            this.name = "EmailRequestIdempotencyConflictError";
+        }
+    },
+    EmailRequestCapabilityDeniedError: class extends Error {
+        readonly authorizationReason: string;
+        readonly capability: string;
+        readonly statusCode = 403;
+
+        constructor(capability: string, reason: string) {
+            super("คุณไม่มีสิทธิ์ดำเนินการ");
+            this.name = "EmailRequestCapabilityDeniedError";
+            this.capability = capability;
+            this.authorizationReason = reason;
+        }
+    },
 }));
+
+const emailRequestService = {
+    createEmailRequest: authorizationMocks.createEmailRequest,
+    getEmailRequests: authorizationMocks.getEmailRequests,
+};
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -29,16 +50,24 @@ vi.mock("@/lib/auth/api", () => ({
 }));
 vi.mock("@/lib/server/audit", () => ({ createAuditLog: vi.fn() }));
 vi.mock("@/lib/services/outbox/processor", () => ({ processOutbox: vi.fn() }));
-vi.mock("@/lib/services/email-request", async (importOriginal) => {
-    const actual = await importOriginal<
-        typeof EmailRequestServiceModule
-    >();
+vi.mock("@/modules/it", async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
     return {
         ...actual,
-        emailRequestService: {
-            createEmailRequest: vi.fn(),
-            getEmailRequests: vi.fn(),
-        },
+        createEmailRequest: authorizationMocks.createEmailRequest,
+        getEmailRequests: authorizationMocks.getEmailRequests,
+        EmailRequestIdempotencyConflictError:
+            authorizationMocks.EmailRequestIdempotencyConflictError,
+        EmailRequestCapabilityDeniedError:
+            authorizationMocks.EmailRequestCapabilityDeniedError,
+        buildEmailRequestAuthorizationContext: (user: { id: number; role: string }) => ({
+            authorizationActor: {
+                userId: user.id,
+                employeeId: null,
+                systemRole: user.role,
+                channel: "DASHBOARD",
+            },
+        }),
         assertEmailRequestCapability: authorizationMocks.assertEmailRequestCapability,
         toEmailRequestReadAuthorization: authorizationMocks.toEmailRequestReadAuthorization,
     };
@@ -104,6 +133,26 @@ describe("/api/email-request", () => {
         vi.mocked(processOutbox).mockResolvedValue({ processed: 0, failed: 0 });
     });
 
+    it("keeps unauthenticated POST and GET responses at the existing 401 boundary", async () => {
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: false,
+            response: NextResponse.json({ success: false }, { status: 401 }),
+        } as never);
+
+        const postResponse = await POST(new NextRequest(
+            "http://localhost/api/email-request",
+            { method: "POST", body: JSON.stringify(VALID_BODY) },
+        ));
+        const getResponse = await GET(new NextRequest(
+            "http://localhost/api/email-request",
+        ));
+
+        expect(postResponse.status).toBe(401);
+        expect(getResponse.status).toBe(401);
+        expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
+        expect(emailRequestService.getEmailRequests).not.toHaveBeenCalled();
+    });
+
     it("rejects a missing Idempotency-Key before creating a request", async () => {
         const response = await POST(new NextRequest(
             "http://localhost/api/email-request",
@@ -114,6 +163,20 @@ describe("/api/email-request", () => {
         expect(await response.json()).toMatchObject({
             error: expect.stringContaining("Idempotency-Key"),
         });
+        expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid Idempotency-Key with 400 before creating a request", async () => {
+        const response = await POST(new NextRequest(
+            "http://localhost/api/email-request",
+            {
+                method: "POST",
+                body: JSON.stringify(VALID_BODY),
+                headers: { "Idempotency-Key": "x".repeat(256) },
+            },
+        ));
+
+        expect(response.status).toBe(400);
         expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
     });
 
@@ -139,6 +202,23 @@ describe("/api/email-request", () => {
             USER,
             { idempotencyKey: "email-key" },
         );
+        expect(createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+            action: "EMAIL_REQUEST",
+            entityType: "EmailRequest",
+            entityId: EXISTING_EMAIL_REQUEST.id,
+            userId: USER.id,
+            userEmail: USER.email,
+            details: {
+                after: {
+                    thaiName: VALID_BODY.thaiName,
+                    englishName: VALID_BODY.englishName,
+                    position: VALID_BODY.position,
+                    department: VALID_BODY.department,
+                    needsDocumentSystem: VALID_BODY.needsDocumentSystem,
+                    sharedDriveAccess: VALID_BODY.sharedDriveAccess,
+                },
+            },
+        }));
         expect(processOutbox).toHaveBeenCalledTimes(1);
     });
 
@@ -189,6 +269,21 @@ describe("/api/email-request", () => {
         ));
 
         expect(response.status).toBe(201);
+        expect(await response.json()).toEqual({
+            success: true,
+            message: expect.any(String),
+            data: {
+                id: EXISTING_EMAIL_REQUEST.id,
+                thaiName: EXISTING_EMAIL_REQUEST.thaiName,
+                englishName: EXISTING_EMAIL_REQUEST.englishName,
+                nickname: EXISTING_EMAIL_REQUEST.nickname,
+                position: EXISTING_EMAIL_REQUEST.position,
+                department: EXISTING_EMAIL_REQUEST.department,
+                needsDocumentSystem: EXISTING_EMAIL_REQUEST.needsDocumentSystem,
+                sharedDriveAccess: EXISTING_EMAIL_REQUEST.sharedDriveAccess,
+                requestedAt: EXISTING_EMAIL_REQUEST.createdAt.toISOString(),
+            },
+        });
         expect(emailRequestService.createEmailRequest).toHaveBeenCalledWith(
             expect.objectContaining({ phone: "081-2345678" }),
             configuredUser,
@@ -217,6 +312,25 @@ describe("/api/email-request", () => {
         expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
     });
 
+    it("denies create before inspecting a missing key when capability is absent", async () => {
+        authorizationMocks.assertEmailRequestCapability.mockRejectedValueOnce(
+            new EmailRequestCapabilityDeniedError(
+                "email.request.create",
+                "NO_APPLICABLE_GRANT",
+            ),
+        );
+
+        const response = await POST(new NextRequest(
+            "http://localhost/api/email-request",
+            { method: "POST", body: JSON.stringify(VALID_BODY) },
+        ));
+
+        expect(response.status).toBe(403);
+        expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
+        expect(createAuditLog).not.toHaveBeenCalled();
+        expect(processOutbox).not.toHaveBeenCalled();
+    });
+
     it("returns 200 for replay without processing the outbox again", async () => {
         vi.mocked(emailRequestService.createEmailRequest).mockResolvedValue({
             success: true,
@@ -234,13 +348,19 @@ describe("/api/email-request", () => {
         ));
 
         expect(response.status).toBe(200);
-        expect(await response.json()).toMatchObject({
+        const responseBody = await response.json();
+        expect(responseBody).toMatchObject({
             data: {
                 id: EXISTING_EMAIL_REQUEST.id,
                 thaiName: EXISTING_EMAIL_REQUEST.thaiName,
                 sharedDriveAccess: EXISTING_EMAIL_REQUEST.sharedDriveAccess,
             },
         });
+        expect(responseBody).toMatchObject({
+            success: true,
+            message: expect.any(String),
+        });
+        expect(createAuditLog).not.toHaveBeenCalled();
         expect(processOutbox).not.toHaveBeenCalled();
     });
 
@@ -281,8 +401,11 @@ describe("/api/email-request", () => {
 
     it("accepts valid pagination", async () => {
         vi.mocked(emailRequestService.getEmailRequests).mockResolvedValue({
-            emailRequests: [],
-            pagination: { page: 2, limit: 100, total: 0, totalPages: 0 },
+            emailRequests: [{
+                ...EXISTING_EMAIL_REQUEST,
+                user: { id: USER.id, name: USER.name, email: USER.email },
+            }],
+            pagination: { page: 2, limit: 100, total: 101, totalPages: 2 },
         });
 
         const response = await GET(new NextRequest(
@@ -290,6 +413,16 @@ describe("/api/email-request", () => {
         ));
 
         expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            success: true,
+            emailRequests: [{
+                ...EXISTING_EMAIL_REQUEST,
+                createdAt: EXISTING_EMAIL_REQUEST.createdAt.toISOString(),
+                updatedAt: EXISTING_EMAIL_REQUEST.updatedAt.toISOString(),
+                user: { id: USER.id, name: USER.name, email: USER.email },
+            }],
+            pagination: { page: 2, limit: 100, total: 101, totalPages: 2 },
+        });
         expect(emailRequestService.getEmailRequests).toHaveBeenCalledWith(
             { page: 2, limit: 100 },
             { userId: USER.id, scopes: ["ALL"] },

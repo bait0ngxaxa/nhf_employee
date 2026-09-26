@@ -23,6 +23,51 @@ L-series runtime/security/reliability record is preserved in
 and H0 closure metadata are authoritative in the
 [H0 baseline](./pre-it-hardening-h0-baseline.md).
 
+## Current ownership overlay — IT8 Email Request migration (CLOSED)
+
+The K0/K1/L6 findings below describe their original repository boundaries and
+remain historical evidence. IT8 moved the existing structured Email
+Request subdomain under `modules/it`; it does not convert requests to
+`ITTicket`. The target employee remains in the structured request fields, and
+`requestedBy` remains the authenticated requester.
+
+IT owns Email Request application commands/queries, authorization adapter,
+validation/contracts, `EmailRequest` and `EmailRequestIdempotency` production
+Prisma access, Dashboard presentation, Inbox semantics, stored-payload parsing,
+LINE Flex/destination, and Audit event construction. The App Router keeps
+`/api/email-request` and `/dashboard/email-request`; response DTOs and
+pagination remain compatible. The server entry is `@/modules/it`; browser
+presentation uses `@/modules/it/client`. The small
+`components/dashboard/sections/EmailRequestSection.tsx` composition wrapper
+remains to provide shared Dashboard navigation. The request-metadata seam
+`lib/server/audit.ts` remains for trusted IP/user-agent enrichment and
+best-effort invocation of Audit's public command.
+
+Authorization retains `email.request.read` (`OWN|ALL`) and
+`email.request.create` (`ALL`) with empty defaults. OWN is a database
+`requestedBy` predicate; create requires effective ALL. No Ticket/analytics,
+ADMIN, Department, Team, or TeamRole inference is added. API session eligibility
+and the broad current-user Employee projection are unchanged.
+
+The existing user-scoped SHA-256 idempotency contract remains: canonical
+`sharedDriveAccess` sorting and `nickname ?? ""`, serializable request +
+idempotency + `EMAIL_REQUEST` outbox commit, same-payload replay, changed-payload
+409, and P2002 rollback/readback race convergence. The event key remains
+`email-request:<id>:created`; historical optional payload fields still parse.
+Notification Inbox wording/dedupe and LINE target-user/broadcast/retry-key
+behavior remain unchanged. No schema migration, backfill, or data rewrite was
+needed or applied.
+
+The architecture checker now guards production Email Request delegate
+ownership, API/server and Dashboard/client public entries, the IT client graph,
+the IT-owned outbox dispatcher, and retired duplicate ownership paths. It
+continues to enforce Notification and Audit persistence ownership separately.
+
+IT8 is **CLOSED**. Final gates passed: `npm run architecture:check` checked
+1,248 source files; `npm run lint:strict`; `npm run typecheck`; the dedicated
+MySQL Email Request integration suite passed 22 files/153 tests; and the one
+final `npm run test` passed 365 files with 3,515 tests passed and 1 skipped.
+
 The audit treats tests, fixtures, generated output, Prisma migrations, and
 operator tooling as non-production surfaces unless they affect a production
 contract or reveal an ownership exception.

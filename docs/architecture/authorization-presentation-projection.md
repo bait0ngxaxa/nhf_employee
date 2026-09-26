@@ -9,6 +9,19 @@
 > remain historical boundary records. Current cleanup evidence is in
 > [authorization-phase-12hi-compatibility-debt-removal.md](authorization-phase-12hi-compatibility-debt-removal.md).
 
+## IT8 CLOSED — current Email Request projection
+
+Email Request's browser-safe projection is owned by `modules/it` and remains
+the independent `{ canReadRequests, canCreateRequests }` contract. The page is
+available when either field is true; the form uses create authority and
+history uses read authority. The provider does not issue a list request when
+read authority is absent. The App Router page guard and `/api/email-request`
+continue to enforce server authorization independently. The current-user
+projection keeps its existing broad Employee lifecycle behavior, and the API
+keeps its existing authenticated-session eligibility boundary. No Ticket or
+analytics capability is used to derive Email Request access. Presentation
+booleans remain visibility hints, not an authorization boundary.
+
 Phase 12H-A target note: these projection records include historical boundary
 evidence. Presentation visibility is never authority. The final role-neutral
 runtime model and migration ledger are authoritative in

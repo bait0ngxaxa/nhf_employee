@@ -1,0 +1,282 @@
+"use client";
+
+import {
+    useMemo,
+    type ChangeEvent,
+    type FormEvent,
+    type ReactElement,
+} from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { AlertCircle, Loader2, Send } from "lucide-react";
+import { EmailRequestAccessFields } from "./EmailRequestAccessFields";
+import { useEmailRequestContext } from "./EmailRequestContext";
+import type { EmailRequestFormData } from "./types";
+import type { SharedDriveOption } from "../../../domain/email-request/constants";
+
+interface EmailRequestFormProps {
+    onCancel?: () => void;
+    onSuccess?: () => void;
+}
+
+type EmailRequestTextFieldId = Exclude<
+    keyof EmailRequestFormData,
+    "needsDocumentSystem" | "sharedDriveAccess"
+>;
+
+type EmailRequestFieldProps = {
+    id: EmailRequestTextFieldId;
+    label: string;
+    value: string;
+    error?: string;
+    placeholder: string;
+    type?: string;
+    autoComplete?: string;
+    inputMode?: "email" | "tel" | "text";
+    maxLength?: number;
+    disabled: boolean;
+    onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+};
+
+function EmailRequestField({
+    id,
+    label,
+    value,
+    error,
+    placeholder,
+    type = "text",
+    autoComplete,
+    inputMode,
+    maxLength,
+    disabled,
+    onChange,
+}: EmailRequestFieldProps): ReactElement {
+    const errorId = `${id}-error`;
+
+    return (
+        <div className="min-w-0 space-y-2">
+            <Label
+                htmlFor={id}
+                className={error ? "text-status-error-foreground [overflow-wrap:anywhere]" : "[overflow-wrap:anywhere]"}
+            >
+                {label} <span className="text-status-error-muted">*</span>
+            </Label>
+            <Input
+                id={id}
+                name={id}
+                type={type}
+                value={value}
+                onChange={onChange}
+                required
+                placeholder={placeholder}
+                autoComplete={autoComplete}
+                inputMode={inputMode}
+                maxLength={maxLength}
+                disabled={disabled}
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? errorId : undefined}
+                className={error ? "border-status-error-focus focus-visible:ring-status-error-focus" : ""}
+            />
+            {error ? (
+                <p id={errorId} className="text-xs leading-5 text-status-error-foreground [overflow-wrap:anywhere]">
+                    {error}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps) {
+    const {
+        formData,
+        isFormLoading: isLoading,
+        formError: error,
+        fieldErrors,
+        handleInputChange,
+        handleSubmit,
+    } = useEmailRequestContext();
+
+    async function submitEmailRequest(event: FormEvent): Promise<void> {
+        const isSuccess = await handleSubmit(event);
+        if (isSuccess) {
+            onSuccess?.();
+        }
+    }
+
+    const selectedDrives = useMemo<ReadonlySet<SharedDriveOption>>(
+        () => new Set(formData.sharedDriveAccess),
+        [formData.sharedDriveAccess],
+    );
+
+    return (
+        <div className="space-y-6">
+            <Card className="rounded-xl border-border-subtle bg-surface-raised shadow-none">
+                <CardContent className="p-6 md:p-8">
+                    {error && (
+                        <div
+                            className="mb-6 flex items-start gap-3 rounded-xl border border-status-error-border bg-status-error-surface p-4 text-status-error-strong"
+                            role="alert"
+                            aria-live="assertive"
+                        >
+                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-error-muted" />
+                            <p className="text-sm leading-6 [overflow-wrap:anywhere]">
+                                {error}
+                            </p>
+                        </div>
+                    )}
+
+                    <form
+                        onSubmit={submitEmailRequest}
+                        className="space-y-8"
+                        noValidate
+                        aria-busy={isLoading}
+                    >
+                        <fieldset className="space-y-4">
+                            <legend className="text-base font-semibold text-content-heading">
+                                ข้อมูลพนักงานใหม่
+                            </legend>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <EmailRequestField
+                                    id="thaiName"
+                                    label="ชื่อ-นามสกุล (ไทย)"
+                                    value={formData.thaiName}
+                                    error={fieldErrors.thaiName}
+                                    placeholder="เช่น นาย สมชาย ใจดี"
+                                    autoComplete="name"
+                                    maxLength={120}
+                                    disabled={isLoading}
+                                    onChange={handleInputChange}
+                                />
+                                <EmailRequestField
+                                    id="englishName"
+                                    label="ชื่อ-นามสกุล (อังกฤษ)"
+                                    value={formData.englishName}
+                                    error={fieldErrors.englishName}
+                                    placeholder="e.g. Mr. Somchai Jaidee"
+                                    autoComplete="name"
+                                    maxLength={120}
+                                    disabled={isLoading}
+                                    onChange={handleInputChange}
+                                />
+                                <EmailRequestField
+                                    id="nickname"
+                                    label="ชื่อเล่น"
+                                    value={formData.nickname}
+                                    error={fieldErrors.nickname}
+                                    placeholder="เช่น ชาย"
+                                    autoComplete="nickname"
+                                    maxLength={80}
+                                    disabled={isLoading}
+                                    onChange={handleInputChange}
+                                />
+                                <EmailRequestField
+                                    id="phone"
+                                    label="เบอร์โทรศัพท์"
+                                    value={formData.phone}
+                                    error={fieldErrors.phone}
+                                    placeholder="เช่น 081-234-5678"
+                                    autoComplete="tel"
+                                    inputMode="tel"
+                                    maxLength={20}
+                                    disabled={isLoading}
+                                    onChange={handleInputChange}
+                                />
+                                <EmailRequestField
+                                    id="position"
+                                    label="ตำแหน่ง"
+                                    value={formData.position}
+                                    error={fieldErrors.position}
+                                    placeholder="เช่น เจ้าหน้าที่บัญชี"
+                                    autoComplete="organization-title"
+                                    maxLength={120}
+                                    disabled={isLoading}
+                                    onChange={handleInputChange}
+                                />
+                                <EmailRequestField
+                                    id="department"
+                                    label="สังกัด"
+                                    value={formData.department}
+                                    error={fieldErrors.department}
+                                    placeholder="เช่น มสช. สพบ."
+                                    autoComplete="organization"
+                                    maxLength={120}
+                                    disabled={isLoading}
+                                    onChange={handleInputChange}
+                                />
+                                <div className="md:col-span-2">
+                                    <EmailRequestField
+                                        id="replyEmail"
+                                        label="อีเมลที่ต้องการให้ส่งตอบกลับ"
+                                        value={formData.replyEmail}
+                                        error={fieldErrors.replyEmail}
+                                        placeholder="ระบุอีเมลที่ต้องการให้แจ้งกลับเมื่อสำเร็จ"
+                                        type="email"
+                                        autoComplete="email"
+                                        inputMode="email"
+                                        maxLength={254}
+                                        disabled={isLoading}
+                                        onChange={handleInputChange}
+                                    />
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <EmailRequestAccessFields
+                            needsDocumentSystem={formData.needsDocumentSystem}
+                            selectedDrives={selectedDrives}
+                            disabled={isLoading}
+                            onChange={handleInputChange}
+                        />
+
+
+                        <div className="flex flex-col-reverse gap-3 border-t border-border-subtle pt-5 sm:flex-row sm:justify-end">
+                            {onCancel && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onCancel}
+                                    className="h-11 rounded-xl px-6"
+                                    disabled={isLoading}
+                                >
+                                    ยกเลิก
+                                </Button>
+                            )}
+                            <Button
+                                type="submit"
+                                disabled={isLoading}
+                                className="h-11 rounded-xl px-8"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        กำลังส่งข้อมูล...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="mr-2 h-4 w-4" />
+                                        ส่งคำร้อง
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+
+                    <div className="border-t border-border-subtle pt-5">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-content-heading">
+                                หมายเหตุ
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
+                                เมื่อส่งคำร้องแล้ว ทีมไอทีจะได้รับแจ้งเตือนผ่าน
+                                LINE และจะดำเนินการเรื่องอีเมล ระบบสารบรรณ และ
+                                พื้นที่จัดเก็บไฟล์ตามข้อมูลที่ระบุไว้
+                            </p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
