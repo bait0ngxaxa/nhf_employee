@@ -134,7 +134,7 @@ describe("IT requester Ticket LINE outbox dispatch", () => {
             buildLineOutbox(operatorComment, {
                 payload: JSON.stringify(payloadWithPrivateText),
             }),
-        )).rejects.toThrow("Invalid IT_TICKET_IN_APP payload");
+        )).rejects.toThrow("Invalid IT Ticket notification payload");
 
         await expect(dispatchITTicketNotificationOutbox(
             buildLineOutbox(operatorComment, {

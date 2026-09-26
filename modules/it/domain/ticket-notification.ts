@@ -86,7 +86,7 @@ export function parseITTicketNotificationPayload(
 ): ITTicketNotificationPayloadV1 {
     const parsed = itTicketNotificationPayloadSchema.safeParse(payload);
     if (!parsed.success) {
-        throw new Error("Invalid IT_TICKET_IN_APP payload");
+        throw new Error("Invalid IT Ticket notification payload");
     }
     return parsed.data;
 }

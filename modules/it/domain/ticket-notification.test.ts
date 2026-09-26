@@ -48,15 +48,15 @@ describe("IT Ticket notification payload", () => {
         expect(() => parseITTicketNotificationPayload({
             ...base,
             body: "private comment text",
-        })).toThrow("Invalid IT_TICKET_IN_APP payload");
+        })).toThrow("Invalid IT Ticket notification payload");
         expect(() => parseITTicketNotificationPayload({
             ...base,
             attachmentStorageKey: "private/key",
-        })).toThrow("Invalid IT_TICKET_IN_APP payload");
+        })).toThrow("Invalid IT Ticket notification payload");
         expect(() => parseITTicketNotificationPayload({
             ...base,
             capability: "it.ticket.manage",
-        })).toThrow("Invalid IT_TICKET_IN_APP payload");
+        })).toThrow("Invalid IT Ticket notification payload");
     });
 
     it("rejects source and audience combinations that conflict with the event", () => {
@@ -67,7 +67,7 @@ describe("IT Ticket notification payload", () => {
             recipientUserId: 42,
             audience: "OPERATOR_QUEUE",
             source: { kind: "COMMENT", id: "cmr-comment-1" },
-        })).toThrow("Invalid IT_TICKET_IN_APP payload");
+        })).toThrow("Invalid IT Ticket notification payload");
     });
 
     it("builds a stable identity from each persisted source and recipient", () => {

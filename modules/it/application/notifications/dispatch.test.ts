@@ -65,7 +65,7 @@ describe("IT Ticket notification dispatch payload boundary", () => {
             audience: "REQUESTER",
             source: { kind: "COMMENT", id: "cmr-comment" },
             body: "ข้อความส่วนตัว",
-        })))).rejects.toThrow("Invalid IT_TICKET_IN_APP payload");
+        })))).rejects.toThrow("Invalid IT Ticket notification payload");
     });
 
     it("rejects an event key that does not identify the parsed business fact", async () => {
