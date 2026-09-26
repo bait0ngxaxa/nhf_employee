@@ -1,6 +1,6 @@
 # IT Module Architecture and Domain Contract
 
-Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to Requester LIFF CLOSED; IT9E IT Product E2E + Android/iPhone Acceptance OPEN / next phase; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
+Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to Requester LIFF CLOSED; IT9E-A repository E2E/acceptance readiness COMPLETE; IT9E-B Android/iPhone device acceptance NOT RUN / next human acceptance step; IT9E IN PROGRESS; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
 
 ## 1. Product scope and terminology
 
@@ -337,7 +337,7 @@ These questions are intentionally unresolved; later slices must close their depe
 | IT9B — LIFF Self-Service UI + Conversation + Attachments (**CLOSED**) | Add the requester-facing LIFF experience over the IT9A APIs. | LIFF presentation only; preserve requester-only policy and shared Ticket/application contracts. No Home/navigation/Rich Menu integration or LINE delivery. | Corrective commit `415c9d6cb21d7510e4e610c4e8d4541add60f1f3` passed independent review. Closure verification is recorded in section 25; device acceptance remains IT9E. |
 | IT9C — LIFF Home / Navigation / Deep Link / Rich Menu Integration (**CLOSED**) | Add IT to LIFF shell entry points and connect notification-ready Ticket destinations. | Home modules, bottom navigation, external deep-link producers, and Rich Menu integration. | Independent review covered the fixed `LIFF_SELF_SERVICE` capability projection, Home requester visibility, shared Home/card/header/Bottom Nav integration, canonical requester LIFF root/detail destinations, the Unified Rich Menu four-area contract, retained Dashboard Inbox destination, and absence of IT9D delivery leakage. |
 | IT9D — IT Ticket personal LINE to requester LIFF (**CLOSED**) | Add personal NHFapp LINE delivery for requester-facing Ticket events only. | `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` use requester LIFF; operator-facing events remain in-app only. Reuse IT6 payload and shared processor; add one forward-only outbox enum value. | Independent review passed on implementation commit `9474a54aefd86014fbd77cfdfed542bd049fb1e9` with no P1/P2 blocker. Final focused tests: 7 files/79 tests; real-MySQL integration: 22 files/154 tests; Prisma validation, architecture, lint, and typecheck passed. No live provider or device acceptance. |
-| IT9E — IT Product E2E + Android/iPhone Acceptance (**OPEN / next phase**) | Validate the complete IT requester product on supported devices. | End-to-end requester flows and Android/iPhone acceptance. | Product E2E, responsive/accessibility, and device acceptance. |
+| IT9E — IT Product E2E + Android/iPhone Acceptance (**IN PROGRESS**) | Prepare repository-side E2E/acceptance evidence, then complete human Android/iPhone acceptance. | IT9E-A repository audit/automated readiness is complete; IT9E-B real-device acceptance remains pending. | IT9E-A COMPLETE; IT9E-B NOT RUN. |
 | IT10 — Final Hardening + Compatibility + Retention Audit (**OPEN / deferred**) | Review deployed legacy rows, retention, operational failure modes and final ownership. | Only approved compatibility cleanup/migrations; explicit decision before any enum or grant change. | Architecture/security regression, relevant broad suite and deployment data review. |
 
 Each phase needs its own stable diff and relevant verification; no phase is implicitly authorized by IT0. Split a phase further if a product question blocks only part of it. IT0 closed when this document recorded ownership, current compatibility, locked invariants and the open decision ledger. It did not claim future product policies were approved.
@@ -576,3 +576,36 @@ Messaging API call or production delivery acceptance was performed; the IT
 integration transport was mocked.
 The repository full suite was not run. IT9E is OPEN / next phase and was not
 started; smartphone or device acceptance has not been performed.
+
+## 28. IT9E-A repository E2E and acceptance readiness
+
+IT9E-A is **COMPLETE**. The repository audit traced LIFF Home entry through the
+requester list, create, direct detail, conversation/reply, private attachment
+read, return navigation, session recovery, requester authorization, canonical
+Ticket links, and IT9D personal LINE destinations. Existing focused coverage
+exercises those boundaries without adding a browser E2E framework. Home
+visibility remains presentation-only; requester APIs enforce ownership.
+
+The mobile/source review confirmed responsive width containment, Thai text
+wrapping, mobile-sized form controls, existing safe-area shell behavior,
+loading/error/empty/retry states, status semantics, active navigation, private
+Blob URL handling, and reduced-motion alternatives. It found one P2
+accessibility issue: create-form title and description character counters were
+not associated with their fields. The counters now use `aria-describedby`, with
+a focused RTL assertion. No other concrete runtime defect was identified.
+Impeccable's mechanical detector reported no findings for the changed UI file.
+This source audit does not prove real viewport rendering, contrast measurements,
+LINE in-app behavior, native keyboard/picker behavior, or provider delivery.
+
+Focused repository verification passed **15 files / 130 tests**, covering LIFF
+Home/navigation, requester UI/API, safe session recovery without mutation
+replay, authorization isolation, canonical links, and IT LINE composition and
+dispatch. `architecture:check` passed for 1,269 source files; `lint:strict`,
+`typecheck`, and one production `build` passed. The build generated all 99
+static pages and included `/liff/it` and `/liff/it/[ticketId]`. MySQL integration
+and the full repository suite were not run because IT9E-A changed no persisted
+behavior and the focused selection covered the changed runtime path.
+
+No Android/iPhone acceptance or live LINE provider call was performed. No Rich
+Menu was applied, changed, or deleted. IT9E-B remains **NOT RUN / next human
+acceptance step**; IT9E remains **IN PROGRESS**. IT10 remains **OPEN / deferred**.

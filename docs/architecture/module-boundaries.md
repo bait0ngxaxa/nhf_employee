@@ -28,9 +28,10 @@ verification. IT9C is **CLOSED** after independent review and owns LIFF
 Home/module projection, service card, shared navigation, canonical requester
 deep links, and Unified Rich Menu integration. IT9D is **CLOSED** after
 independent review and adds requester-facing Ticket LINE for the approved event
-matrix. IT9E is **OPEN / next phase** and owns full product/device acceptance.
-IT10 hardening remains **OPEN / deferred**. Compatibility and verification
-records follow.
+matrix. IT9E-A is **COMPLETE** for repository E2E/acceptance readiness; IT9E-B
+Android/iPhone device acceptance is **NOT RUN / next human acceptance step**.
+IT9E remains in progress. IT10 hardening remains **OPEN / deferred**.
+Compatibility and verification records follow.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).

@@ -4,12 +4,13 @@
 
 รายการ manual/production/smartphone ทุกแถวเริ่มเป็น `NOT RUN` ห้ามเปลี่ยนเป็น `PASS` จนกว่าจะทดสอบจริงและแนบ evidence
 
-IT9D requester Ticket LINE has been implemented, but this document contains no
-live LINE provider acceptance evidence: no Ticket push was sent with production
-configuration in this work. Smartphone/device acceptance remains IT9E and has
-not been performed. OPS-18 and the `IT Messaging API Channel ID` field below
-refer only to the retained legacy Email Request/IT LINE integration; requester
-Ticket LINE uses the shared NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` path.
+IT9D requester Ticket LINE has been implemented. IT9E-A completes repository
+audit and automated acceptance readiness only; no real-device acceptance or
+live LINE provider acceptance is claimed, and no Ticket push was sent with
+production configuration in this work. IT9E-B remains NOT RUN. OPS-18 and the
+`IT Messaging API Channel ID` field below refer only to the retained legacy
+Email Request/IT LINE integration; requester Ticket LINE uses the shared
+NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` path.
 
 ## 1. วิธีบันทึกผล
 
@@ -24,6 +25,13 @@ Ticket LINE uses the shared NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` path.
 | `AUTOMATED COVERAGE` | ใช้ได้เฉพาะแถวที่อ้างอิง repository test ไม่ใช่ผลยืนยัน production หรือ smartphone |
 
 Evidence ควรเป็น commit/log/response status/screenshot/หน้าจอ device/เวลา/ผู้ทดสอบ โดยห้ามแนบ secret, ID token, session cookie, password หรือ Authorization header
+
+สำหรับ IT9E-B ให้บันทึก Android และ iPhone แยกกันในทุกแถว พร้อม device/model,
+OS version, LINE app version, timestamp/timezone, commit SHA และ Ticket/test
+identity reference ที่ปลอดภัยต่อการแชร์ ใช้ screenshot/screen recording,
+หรือ redacted server/outbox observation ได้ ห้ามบันทึก channel access token,
+channel secret, ID token, session cookie, Authorization header, password,
+หรือ private attachment storage key/filesystem path
 
 ## 2. Acceptance metadata
 
@@ -58,6 +66,12 @@ Evidence ควรเป็น commit/log/response status/screenshot/หน้�
 - [ ] Unlinked LINE User — LINE identity ที่ยังไม่มี `LineAccountLink`
 - [ ] Dedicated Routine task/occurrence สำหรับ reminder, email และ LINE test
 - [ ] Dedicated test images บน Android และ iPhone สำหรับ Leave attachment
+- [ ] Dedicated IT requester A ที่มี `LineAccountLink` และ Ticket ของตนเอง
+- [ ] Dedicated IT requester B ที่มี Ticket สำหรับ authorization isolation
+- [ ] IT operator ที่มี current `read/comment/manage ALL` ตาม authorization configuration
+- [ ] Ticket ของ requester A ในสถานะ `OPEN`, Ticket สำหรับ `WAITING_REQUESTER` และ Ticket สำหรับ `RESOLVED`
+- [ ] Safe test JPG/PNG/WEBP, ไฟล์เกิน 8 MiB, ชุดไฟล์เกิน 3 รูป/20 MiB รวม และไฟล์ non-image/unsupported
+- [ ] Optional unlinked requester identity สำหรับตรวจ `SUPERSEDED` เฉพาะเมื่อมี controlled test identity
 
 ## 4. Release, configuration และ operational gate
 
@@ -201,6 +215,43 @@ Provider evidence ต้องเป็น safe identifiers เท่านั�
 | DL-09 | Routine | task/occurrence ที่เข้าถึงไม่ได้หรือ malformed ID | ปฏิเสธ/concealment โดยไม่เปิดข้อมูล | `NOT RUN` |  |
 | DL-10 | Routine | occurrence ของ task A แล้วเปิด task B | occurrence focus ของ task A ไม่รั่วไป task B | `NOT RUN` |  |
 
+## 11A. IT requester Ticket deep-link acceptance (IT9E-B)
+
+ทดสอบด้วย requester identity ที่ควบคุมได้ โดยเปิดผล Android และ iPhone
+แยกกัน ห้ามใช้ข้อมูล Ticket ของผู้ใช้จริงใน evidence
+
+| ID | Scenario | Expected | Android result / evidence | iPhone result / evidence |
+| --- | --- | --- | --- | --- |
+| IT-DL-01 | เปิด `/liff/it/<own-ticket-id>` | แสดง Ticket ที่ถูกต้อง, active navigation เป็น IT และ conversation โหลดได้ | `NOT RUN` | `NOT RUN` |
+| IT-DL-02 | เปิด Ticket ของ requester คนอื่น | conceal/not-found behavior และไม่มีข้อมูลต่างเจ้าของ | `NOT RUN` | `NOT RUN` |
+| IT-DL-03 | เปิด ID malformed, negative, zero หรือ overflow | แสดง invalid/not-found อย่างปลอดภัย ไม่ crash และไม่รั่วข้อมูล | `NOT RUN` | `NOT RUN` |
+| IT-DL-04 | เปิด Ticket A แล้วเปิด Ticket B | timeline, error และ attachment state ของ A ไม่ปรากฏใน B | `NOT RUN` | `NOT RUN` |
+| IT-DL-05 | เปิด URL จาก `buildITTicketLiffUrl(ticketId)` | resolve ไป canonical requester Ticket detail ที่ถูกต้อง | `NOT RUN` | `NOT RUN` |
+| IT-DL-06 | เปิด Ticket จาก personal LINE notification ของ IT9D | LINE เปิด LIFF ไป Ticket ที่ถูกต้องและ requester-linked; ไม่ redirect ไป Dashboard | `NOT RUN` | `NOT RUN` |
+
+## 11B. IT requester smartphone acceptance (IT9E-B)
+
+ทุกผล Android/iPhone ด้านล่างเริ่ม `NOT RUN` และเปลี่ยนได้หลังทดสอบจริงใน
+LINE in-app LIFF พร้อม evidence ของอุปกรณ์นั้นเท่านั้น
+
+| ID | Scenario | Expected | Android result / evidence | iPhone result / evidence |
+| --- | --- | --- | --- | --- |
+| IT-01 | Home → IT → list → Home | route และ active nav ถูกต้องทุกขั้น | `NOT RUN` | `NOT RUN` |
+| IT-02 | โหลดรายการ Ticket ของตนเอง, scroll, pagination, empty/error/retry | แสดงเฉพาะ Ticket ของตน; pagination และทุก state ใช้งานได้ | `NOT RUN` | `NOT RUN` |
+| IT-03 | สร้าง `INCIDENT` และ `SERVICE_REQUEST` ด้วยข้อความไทย | เปิดฟอร์ม, กรอก, ส่งสำเร็จ และ Ticket ใหม่ปรากฏในรายการพร้อมทางเข้ารายละเอียด | `NOT RUN` | `NOT RUN` |
+| IT-04 | เปิด keyboard ในหัวข้อ, รายละเอียด และช่องตอบกลับ | keyboard ไม่บังจนใช้หรือเข้าถึง primary action ไม่ได้ | `NOT RUN` | `NOT RUN` |
+| IT-05 | แตะส่งซ้ำเร็ว ๆ และ retry หลังผลลัพธ์กำกวม | สร้าง Ticket เพียงรายการเดียวต่อ logical submission | `NOT RUN` | `NOT RUN` |
+| IT-06 | เปิดรายละเอียด Ticket | type/status, description, created/updated/resolved time และ timeline ถูกต้อง | `NOT RUN` | `NOT RUN` |
+| IT-07 | Operator ตอบผ่าน Dashboard แล้ว requester refresh/open LIFF | เห็นคำตอบที่ระบุว่าเป็นการสื่อสารจากเจ้าหน้าที่ IT; private comment ไม่ถูกคัดลอกไป notification ที่ไม่เกี่ยวข้อง | `NOT RUN` | `NOT RUN` |
+| IT-08 | Requester ส่งข้อความตอบกลับปกติ | ข้อความใหม่ปรากฏใน timeline เพียงครั้งเดียว | `NOT RUN` | `NOT RUN` |
+| IT-09 | ตอบ Ticket สถานะ `WAITING_REQUESTER` | ข้อความปรากฏ แต่สถานะไม่เปลี่ยนกลับอัตโนมัติ | `NOT RUN` | `NOT RUN` |
+| IT-10 | เลือก JPG/PNG/WEBP, preview, remove/reselect, ส่ง และเปิด private attachment | preview/การส่ง/โหลดภาพทำงาน; บันทึก MIME/type จริงที่ device picker ส่งกลับ | `NOT RUN` | `NOT RUN` |
+| IT-11 | เลือกไฟล์เกิน 8 MiB, เกิน 3 รูป, รวมเกิน 20 MiB และ unsupported/non-image | ปฏิเสธอย่างปลอดภัยและแก้รายการเพื่อส่งใหม่ได้ | `NOT RUN` | `NOT RUN` |
+| IT-12 | เปิด Ticket ของ requester คนอื่นโดยตรง | ไม่เปิดเผยข้อมูลและแสดง conceal/not-found behavior | `NOT RUN` | `NOT RUN` |
+| IT-13 | เปิด Ticket ที่ resolve แล้ว | อ่านรายละเอียด/timeline ได้ แต่ไม่มี reply UI | `NOT RUN` | `NOT RUN` |
+| IT-14 | รับ personal LINE events `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, `RESOLVED` | ได้รับแต่ละข้อความและแต่ละลิงก์เปิด Ticket ของ requester ที่ถูกต้อง | `NOT RUN` | `NOT RUN` |
+| IT-15 | ทดสอบ requester ที่ไม่มี `LineAccountLink` เมื่อมี controlled identity | ไม่มี retry loop; repository behavior เป็น `SUPERSEDED`; device/provider evidence optional | `NOT RUN` | `NOT RUN` |
+
 ## 12. Feature flags และ cross-module navigation
 
 | ID | Surface | Scenario | Expected | Result | Evidence |
@@ -277,11 +328,12 @@ Provider evidence ต้องเป็น safe identifiers เท่านั�
 
 | ID | Check | Expected | Result | Evidence |
 | --- | --- | --- | --- | --- |
-| AUTO-01 | staged verification: `architecture:check`, `lint:strict`, `typecheck` และ targeted tests; ใช้ `npm run test` เมื่อ full-suite evidence มีเหตุผลรองรับ | checks และ Vitest ผ่านตาม scope | `NOT RUN` |  |
-| AUTO-02 | `npm run build` | production build ผ่านด้วย local/non-secret configuration หรือมี blocker ระบุชัด | `NOT RUN` |  |
+| AUTO-01 | staged verification: `architecture:check`, `lint:strict`, `typecheck` และ targeted tests; ใช้ `npm run test` เมื่อ full-suite evidence มีเหตุผลรองรับ | checks และ Vitest ผ่านตาม scope | `PASS` | architecture:check checked 1,269 source files; lint:strict, typecheck และ focused tests passed |
+| AUTO-02 | `npm run build` | production build ผ่านด้วย local/non-secret configuration หรือมี blocker ระบุชัด | `PASS` | Next.js production build completed; generated 99 static pages and included requester IT routes |
 | AUTO-03 | `npm run line:richmenu:provision` | dry-run ผ่าน/ระบุ missing config และไม่มี LINE mutation | `NOT RUN` |  |
 | AUTO-04 | `npm run line:richmenu:status` ใน isolated/local environment | redacted status; หากไม่มี credential ให้บันทึก blocked ไม่ใช้ production token | `NOT RUN` |  |
 | AUTO-05 | Rich Menu unit/operational tests | dry-run ไม่มี fetch, apply ต้อง explicit, ID validate, error redacted, verify หลัง set default และไม่มี delete | `NOT RUN` |  |
+| AUTO-06 | focused IT requester repository tests | Home/navigation, requester list/create/detail/conversation, attachments, session recovery, API isolation, deep links และ Ticket LINE destination/composition | `PASS` | 15 files / 130 tests; no full repository suite or MySQL integration run |
 
 ## 18. Final evidence และ GO / NO-GO
 
@@ -302,10 +354,20 @@ Previous default richMenuId:
 New richMenuId:
 Monitoring window / owner:
 
-Automated test result:
-Build result:
+Automated test result: PASS — 15 files / 130 tests
+Build result: PASS
 Android acceptance:
 iOS acceptance:
+Requester IT smoke: IT9E-A COMPLETE; IT9E-B NOT RUN
+Requester IT Android: NOT RUN
+Requester IT iPhone: NOT RUN
+IT Ticket deep link Android: NOT RUN
+IT Ticket deep link iPhone: NOT RUN
+IT requester LINE delivery Android: NOT RUN
+IT requester LINE delivery iPhone: NOT RUN
+Rich Menu mutation: NOT RUN (not performed during IT9E-A)
+MySQL integration: NOT RUN (no persistence behavior changed in IT9E-A)
+Full repository test suite: NOT RUN (focused verification matched this scope)
 External browser fallback (optional):
 Scheduler smoke:
 Outbox smoke:
@@ -330,6 +392,10 @@ Notes / blockers:
 - [ ] scheduler และ outbox มี owner/ความถี่/timeout ที่บันทึกแล้วและไม่ duplicate
 - [ ] identity, session recovery และ authorization boundary ผ่าน
 - [ ] Stock, Leave, Routine, requester IT และ deep links ผ่านบน Android + iPhone ใน LINE
+- [ ] requester IT Android PASS พร้อม evidence แยกอุปกรณ์
+- [ ] requester IT iPhone PASS พร้อม evidence แยกอุปกรณ์
+- [ ] IT Ticket deep link PASS และ IT requester LINE delivery PASS เมื่อ event นั้นอยู่ใน acceptance scope
+- [ ] ไม่มี critical authorization หรือ data-integrity defect
 - [ ] attachment storage/retrieval/limits ผ่าน
 - [ ] Rich Menu status/dry-run ผ่าน และ previous default rollback target ถูกบันทึก
 - [ ] new Rich Menu ถูก apply โดย human operator เท่านั้น หลัง acceptance ครบ

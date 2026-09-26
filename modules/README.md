@@ -18,8 +18,10 @@ destinations, the Unified Rich Menu four-area contract, the retained Dashboard
 Inbox destination, and no IT9D delivery leakage. IT9D is **CLOSED** after
 independent review and adds requester personal LINE for
 `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED`; operator-facing
-events remain in-app only because operator LIFF does not exist. IT9E is
-OPEN / next phase for full product/device acceptance. IT10 remains OPEN/deferred.
+events remain in-app only because operator LIFF does not exist. IT9E-A is
+COMPLETE for repository E2E/acceptance readiness; IT9E-B device acceptance is
+NOT RUN / next human acceptance step. IT9E remains in progress. IT10 remains
+OPEN / deferred.
 The LIFF Home projection consumes IT's centralized presentation capabilities
 through `LIFF_SELF_SERVICE`; its requester read/create rule is presentation-only
 and does not change the existing API authorization boundary.
