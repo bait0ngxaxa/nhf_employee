@@ -1894,11 +1894,12 @@ Menu integration, Ticket LINE notifications, operator LIFF, or analytics LIFF.
 
 ## Current IT requester LIFF phase status
 
-IT9A is CLOSED and owns the requester-only LIFF authorization/API foundation
-described above. IT9B requester presentation exists at `/liff/it` and
-`/liff/it/[ticketId]` through the browser-safe `@/modules/it/client` entry;
-IT9B is **IMPLEMENTED; closure pending independent review** of the corrective
-diff. IT9C still owns LIFF Home/module registration, bottom navigation,
-external deep-link producer integration, and Rich Menu integration. IT9D owns
-Ticket LINE delivery. IT9E owns full product/device acceptance. No IT9C–IT9E
-work is included in the current IT9B presentation.
+IT9A is **CLOSED** and owns the requester-only LIFF authorization/API
+foundation described above. IT9B requester presentation exists at `/liff/it`
+and `/liff/it/[ticketId]` through the browser-safe `@/modules/it/client` entry
+and is **CLOSED** after independent review and final verification. IT9C is
+**OPEN / next phase** and owns LIFF Home/module registration, bottom
+navigation, external deep-link producer integration, and Rich Menu integration.
+IT9D is **OPEN** and owns Ticket LINE delivery. IT9E is **OPEN** and owns full
+product/device acceptance. IT10 hardening remains deferred/open. None of that
+later-phase work is included in IT9B.

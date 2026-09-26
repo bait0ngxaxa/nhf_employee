@@ -23,12 +23,12 @@ IT8 moved the existing structured Email Request subdomain into IT and is
 closed; IT9A adds requester-only LIFF authorization and API adapters over the
 same IT application and is CLOSED as the requester-only authorization/API
 foundation. IT9B requester presentation exists at `/liff/it` and
-`/liff/it/[ticketId]` and is **IMPLEMENTED; closure pending independent review**
-of the corrective diff. IT9C owns LIFF Home/module registration, bottom
-navigation, external deep-link producer integration, and Rich Menu
-integration. IT9D owns Ticket LINE delivery; IT9E owns full product/device
-acceptance. IT10 hardening remains deferred. Compatibility and verification
-records follow.
+`/liff/it/[ticketId]` and is **CLOSED** after independent review and final
+verification. IT9C is **OPEN / next phase** and owns LIFF Home/module
+registration, bottom navigation, external deep-link producer integration, and
+Rich Menu integration. IT9D is **OPEN** and owns Ticket LINE delivery; IT9E is
+**OPEN** and owns full product/device acceptance. IT10 hardening remains
+OPEN/deferred. Compatibility and verification records follow.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -221,12 +221,13 @@ IT9B implements requester list, creation, detail, conversation, and private
 attachment presentation at `/liff/it` and `/liff/it/[ticketId]`. The App Router
 pages use `@/modules/it/client`; IT-specific presentation is owned by
 `modules/it/presentation/liff/**` and calls only the existing requester
-`/api/line/it/**` routes. IT9B is **IMPLEMENTED; closure pending independent
-review** of the corrective diff. IT9A remains the CLOSED requester-only
-authorization/API foundation. IT9C still owns LIFF Home/module registration,
+`/api/line/it/**` routes. IT9B is **CLOSED** after independent review and final
+verification. IT9A remains the CLOSED requester-only authorization/API
+foundation. IT9C is **OPEN / next phase** and owns LIFF Home/module registration,
 bottom navigation, external deep-link producer integration, and Rich Menu
-integration; IT9D owns Ticket LINE delivery; IT9E owns full product/device
-acceptance. None of those phases is complete through IT9B.
+integration; IT9D is OPEN for Ticket LINE delivery; IT9E is OPEN for full
+product/device acceptance. IT10 hardening remains OPEN/deferred. None of that
+later-phase work was included in IT9B.
 
 ## IT8 Email Request ownership — CLOSED
 
