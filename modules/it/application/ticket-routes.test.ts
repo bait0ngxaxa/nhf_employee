@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
+import type * as MutationRateLimit from "@/lib/security/mutation-rate-limit";
 
 const mocks = vi.hoisted(() => ({
     requireApiSession: vi.fn(),
@@ -10,11 +11,20 @@ const mocks = vi.hoisted(() => ({
     listTickets: vi.fn(),
     getTicket: vi.fn(),
     wakeOutbox: vi.fn(),
+    enforceCreateRateLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/api", () => ({
     requireApiSession: mocks.requireApiSession,
 }));
+vi.mock("@/lib/security/mutation-rate-limit", async (importOriginal) => {
+    const actual = await importOriginal<typeof MutationRateLimit>();
+    return {
+        ...actual,
+        enforceAuthenticatedMutationRateLimit: mocks.enforceCreateRateLimit,
+    };
+});
+
 vi.mock("@/lib/server/it-ticket-outbox-wakeup", () => ({
     scheduleITTicketOutboxWakeup: mocks.wakeOutbox,
 }));
@@ -91,6 +101,7 @@ function postFormRequest(formData: FormData, idempotencyKey: string): NextReques
 describe("IT requester Ticket API adapters", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mocks.enforceCreateRateLimit.mockReturnValue(null);
         authenticated();
         mocks.createTicket.mockResolvedValue({ ticket: ticketRecord, replayed: false });
         mocks.listTickets.mockResolvedValue({
@@ -125,6 +136,28 @@ describe("IT requester Ticket API adapters", () => {
         expect(mocks.createTicket).not.toHaveBeenCalled();
     });
 
+    it("returns the authenticated create limit before reading multipart evidence", async () => {
+        const limitedResponse = NextResponse.json({ error: "rate limited" }, { status: 429 });
+        mocks.enforceCreateRateLimit.mockReturnValueOnce(limitedResponse);
+        const formData = new FormData();
+        formData.set("type", "INCIDENT");
+        formData.set("title", "หัวข้อพร้อมภาพ");
+        formData.set("description", "รายละเอียดพร้อมภาพ");
+        formData.append("attachments", new File(["image-bytes"], "screen.png", {
+            type: "image/png",
+        }));
+        const request = postFormRequest(formData, "rate-limited-create");
+
+        const response = await postTicket(request);
+
+        expect(mocks.enforceCreateRateLimit).toHaveBeenCalledWith("it-ticket-create", user.id);
+        expect(response).toBe(limitedResponse);
+        expect(request.bodyUsed).toBe(false);
+        expect(mocks.buildContext).not.toHaveBeenCalled();
+        expect(mocks.createTicket).not.toHaveBeenCalled();
+        expect(mocks.wakeOutbox).not.toHaveBeenCalled();
+    });
+
     it("rejects requester-owned fields instead of accepting client-selected ownership", async () => {
         const response = await postTicket(postRequest({
             type: "INCIDENT",
@@ -146,6 +179,7 @@ describe("IT requester Ticket API adapters", () => {
         const body = await response.json();
 
         expect(response.status).toBe(201);
+        expect(mocks.enforceCreateRateLimit).toHaveBeenCalledWith("it-ticket-create", user.id);
         expect(mocks.createTicket).toHaveBeenCalledWith(
             actorContext,
             {
@@ -191,6 +225,7 @@ describe("IT requester Ticket API adapters", () => {
         const options = mocks.createTicket.mock.calls[0]?.[2];
 
         expect(response.status).toBe(201);
+        expect(mocks.enforceCreateRateLimit).toHaveBeenCalledWith("it-ticket-create", user.id);
         expect(options).toMatchObject({ idempotencyKey: "multipart-image" });
         expect(options.attachments).toHaveLength(1);
         expect(options.attachments[0]).toMatchObject({

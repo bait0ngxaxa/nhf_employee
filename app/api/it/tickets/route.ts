@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
+import { enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import {
     buildCurrentITAuthorizationContext,
@@ -25,6 +26,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             forbiddenResponse: () => forbidden({ success: false }),
         });
         if (!auth.ok) return auth.response;
+        const principalRateLimitResponse = enforceAuthenticatedMutationRateLimit(
+            "it-ticket-create",
+            auth.user.id,
+        );
+        if (principalRateLimitResponse) return principalRateLimitResponse;
 
         const idempotencyKey = idempotencyKeySchema.safeParse(
             request.headers.get("Idempotency-Key"),
