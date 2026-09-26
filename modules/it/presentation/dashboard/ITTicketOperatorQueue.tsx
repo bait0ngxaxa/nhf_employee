@@ -347,8 +347,8 @@ export function ITTicketOperatorQueue(): ReactElement {
     const retry = (): void => setRefreshKey((current) => current + 1);
 
     return (
-        <section className="min-h-[calc(100dvh-6rem)] p-4 md:p-8">
-            <div className="space-y-6">
+        <section className="min-h-[calc(100dvh-6rem)]">
+            <div className="mx-auto max-w-7xl space-y-6">
                 <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
                     <div className="min-w-0 space-y-1">
                         <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
@@ -407,7 +407,7 @@ export function ITTicketOperatorQueue(): ReactElement {
                     ) : null}
                     {!loading && !queueError && list && list.tickets.length > 0 ? (
                         <>
-                            <Card className="hidden overflow-hidden py-0 md:block">
+                            <Card className="hidden overflow-hidden py-0 2xl:block">
                                 <CardContent className="overflow-x-auto px-0 py-0">
                                     <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
                                         <thead className="bg-surface-subtle text-xs font-semibold text-content-secondary">
@@ -450,7 +450,7 @@ export function ITTicketOperatorQueue(): ReactElement {
                                     </table>
                                 </CardContent>
                             </Card>
-                            <ul aria-label="รายการ Ticket สำหรับหน้าจอขนาดเล็ก" className="space-y-3 md:hidden">
+                            <ul aria-label="รายการ Ticket สำหรับหน้าจอขนาดเล็ก" className="space-y-3 2xl:hidden">
                                 {list.tickets.map((ticket) => (
                                     <li key={ticket.id}>
                                         <Link

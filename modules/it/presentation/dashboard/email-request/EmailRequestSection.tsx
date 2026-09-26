@@ -17,7 +17,7 @@ function EmailRequestContent({
 }): ReactElement {
     return (
         <section className="min-h-[calc(100dvh-6rem)]">
-            <div className="space-y-8 p-4 md:p-8">
+            <div className="mx-auto max-w-6xl space-y-8">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
                     <div className="min-w-0 space-y-1">
                         <h1

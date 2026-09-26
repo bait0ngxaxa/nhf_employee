@@ -274,7 +274,7 @@ export function ITTicketOperatorDetail({
     const fieldClassName = "mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-content-body outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60";
 
     return (
-        <section className="min-h-[calc(100dvh-6rem)] p-4 md:p-8">
+        <section className="min-h-[calc(100dvh-6rem)]">
             <div className="mx-auto max-w-6xl space-y-5">
                 <Link href={APP_ROUTES.dashboardITQueue} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                     <ArrowLeft aria-hidden="true" className="size-4" />

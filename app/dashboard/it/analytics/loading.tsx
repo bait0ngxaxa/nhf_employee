@@ -7,7 +7,7 @@ export default function ITAnalyticsLoading(): ReactElement {
         <section
             aria-label="กำลังโหลดรายงาน IT"
             aria-busy="true"
-            className="w-full space-y-5 p-4 sm:p-6"
+            className="mx-auto w-full max-w-7xl space-y-5"
         >
             <Skeleton className="h-9 w-52" />
             <Skeleton className="h-11 w-full max-w-sm" />

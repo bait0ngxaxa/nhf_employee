@@ -188,7 +188,7 @@ export function ITTicketSelfService({
 
     return (
         <section className="min-h-[calc(100dvh-6rem)]">
-            <div className="space-y-7 p-4 md:p-8">
+            <div className="mx-auto max-w-6xl space-y-7">
                 <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                     <div className="min-w-0 space-y-1">
                         <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
@@ -275,14 +275,14 @@ export function ITTicketSelfService({
                                                     className="flex min-w-0 flex-col gap-3 p-4 outline-none transition-colors hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:flex-row sm:items-center sm:justify-between sm:px-5"
                                                 >
                                                     <span className="min-w-0 space-y-1">
-                                                        <span className="block truncate font-semibold text-content-heading">
+                                                        <span className="block break-words font-semibold text-content-heading [overflow-wrap:anywhere]">
                                                             #{ticket.id} · {ticket.title}
                                                         </span>
                                                         <span className="block text-sm text-content-secondary">
                                                             {IT_TICKET_TYPE_LABELS[ticket.type]} · สร้างเมื่อ {formatITTicketDate(ticket.createdAt)}
                                                         </span>
                                                     </span>
-                                                    <span className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                                                    <span className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 sm:shrink-0 sm:justify-end">
                                                         <TicketStatus status={ticket.status} />
                                                         <span className="text-xs text-content-muted">อัปเดต {formatITTicketDate(ticket.updatedAt)}</span>
                                                     </span>
@@ -339,59 +339,61 @@ export function ITTicketSelfService({
                             ระบุประเภท หัวข้อ และรายละเอียด ระบบจะบันทึก Ticket ในนามบัญชีของคุณ
                         </DialogDescription>
                     </DialogHeader>
-                    <form className="min-h-0 space-y-4 overflow-y-auto" onSubmit={handleCreate}>
-                        <div className="space-y-2">
-                            <label htmlFor="it-ticket-type" className="text-sm font-medium text-content-heading">ประเภท Ticket</label>
-                            <select
-                                id="it-ticket-type"
-                                value={ticketType}
-                                onChange={(event) => {
-                                    if (isITTicketType(event.target.value)) {
-                                        setTicketType(event.target.value);
-                                    }
-                                }}
-                                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-content-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                            >
-                                {IT_TICKET_TYPE_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
+                    <form className="min-h-0 flex flex-1 flex-col" onSubmit={handleCreate}>
+                        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+                            <div className="space-y-2">
+                                <label htmlFor="it-ticket-type" className="text-sm font-medium text-content-heading">ประเภท Ticket</label>
+                                <select
+                                    id="it-ticket-type"
+                                    value={ticketType}
+                                    onChange={(event) => {
+                                        if (isITTicketType(event.target.value)) {
+                                            setTicketType(event.target.value);
+                                        }
+                                    }}
+                                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-content-body outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                >
+                                    {IT_TICKET_TYPE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label htmlFor="it-ticket-title" className="text-sm font-medium text-content-heading">หัวข้อ</label>
+                                <Input
+                                    id="it-ticket-title"
+                                    autoFocus
+                                    required
+                                    maxLength={IT_TICKET_TITLE_MAX_LENGTH}
+                                    value={title}
+                                    onChange={(event) => setTitle(event.target.value)}
+                                    placeholder="สรุปปัญหาหรือสิ่งที่ต้องการ"
+                                    aria-describedby="it-ticket-title-count"
+                                />
+                                <p id="it-ticket-title-count" className="text-right text-xs text-content-muted">
+                                    {title.length}/{IT_TICKET_TITLE_MAX_LENGTH}
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <label htmlFor="it-ticket-description" className="text-sm font-medium text-content-heading">รายละเอียด</label>
+                                <Textarea
+                                    id="it-ticket-description"
+                                    required
+                                    maxLength={IT_TICKET_DESCRIPTION_MAX_LENGTH}
+                                    rows={6}
+                                    value={description}
+                                    onChange={(event) => setDescription(event.target.value)}
+                                    placeholder="อธิบายสิ่งที่เกิดขึ้นหรือความช่วยเหลือที่ต้องการ"
+                                    aria-describedby="it-ticket-description-count"
+                                    className="max-h-60 min-h-32 resize-y"
+                                />
+                                <p id="it-ticket-description-count" className="text-right text-xs text-content-muted">
+                                    {description.length}/{IT_TICKET_DESCRIPTION_MAX_LENGTH}
+                                </p>
+                            </div>
+                            {createError ? <p role="alert" className="text-sm font-medium text-rose-700 dark:text-rose-300">{createError}</p> : null}
                         </div>
-                        <div className="space-y-2">
-                            <label htmlFor="it-ticket-title" className="text-sm font-medium text-content-heading">หัวข้อ</label>
-                            <Input
-                                id="it-ticket-title"
-                                autoFocus
-                                required
-                                maxLength={IT_TICKET_TITLE_MAX_LENGTH}
-                                value={title}
-                                onChange={(event) => setTitle(event.target.value)}
-                                placeholder="สรุปปัญหาหรือสิ่งที่ต้องการ"
-                                aria-describedby="it-ticket-title-count"
-                            />
-                            <p id="it-ticket-title-count" className="text-right text-xs text-content-muted">
-                                {title.length}/{IT_TICKET_TITLE_MAX_LENGTH}
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <label htmlFor="it-ticket-description" className="text-sm font-medium text-content-heading">รายละเอียด</label>
-                            <Textarea
-                                id="it-ticket-description"
-                                required
-                                maxLength={IT_TICKET_DESCRIPTION_MAX_LENGTH}
-                                rows={6}
-                                value={description}
-                                onChange={(event) => setDescription(event.target.value)}
-                                placeholder="อธิบายสิ่งที่เกิดขึ้นหรือความช่วยเหลือที่ต้องการ"
-                                aria-describedby="it-ticket-description-count"
-                                className="max-h-60 min-h-32 resize-y"
-                            />
-                            <p id="it-ticket-description-count" className="text-right text-xs text-content-muted">
-                                {description.length}/{IT_TICKET_DESCRIPTION_MAX_LENGTH}
-                            </p>
-                        </div>
-                        {createError ? <p role="alert" className="text-sm font-medium text-rose-700 dark:text-rose-300">{createError}</p> : null}
-                        <DialogFooter className="border-t border-border-neutral pt-4">
+                        <DialogFooter className="mt-4 shrink-0 border-t border-border-neutral pt-4">
                             <Button type="button" variant="outline" disabled={creating} onClick={() => setDialogOpen(false)}>
                                 ยกเลิก
                             </Button>

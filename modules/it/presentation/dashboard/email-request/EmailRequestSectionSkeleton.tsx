@@ -39,7 +39,7 @@ function AccessSkeleton(): ReactElement {
 function FormSkeleton(): ReactElement {
     return (
         <div className="rounded-xl border border-border-subtle bg-surface-raised p-6 shadow-none md:p-8">
-            <div className="space-y-8">
+            <div className="mx-auto max-w-6xl space-y-8">
                 <div className="space-y-4">
                     <Skeleton className="h-5 w-36" />
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -75,21 +75,31 @@ function HistorySkeleton(): ReactElement {
                 </div>
                 <Skeleton className="h-10 w-24" />
             </div>
-            <div className="mt-6 overflow-hidden rounded-lg border border-border-subtle">
-                <div className="grid grid-cols-6 gap-4 border-b border-border-subtle bg-surface-subtle p-4">
-                    {Array.from({ length: 6 }).map((_, index) => (
+            <div className="mt-6 hidden overflow-hidden rounded-lg border border-border-subtle xl:block">
+                <div className="grid grid-cols-7 gap-4 border-b border-border-subtle bg-surface-subtle p-4">
+                    {Array.from({ length: 7 }).map((_, index) => (
                         <Skeleton key={index} className="h-4" />
                     ))}
                 </div>
                 <div className="space-y-4 p-4">
                     {Array.from({ length: 4 }).map((_, rowIndex) => (
-                        <div key={rowIndex} className="grid grid-cols-6 gap-4">
-                            {Array.from({ length: 6 }).map((_, colIndex) => (
+                        <div key={rowIndex} className="grid grid-cols-7 gap-4">
+                            {Array.from({ length: 7 }).map((_, colIndex) => (
                                 <Skeleton key={colIndex} className="h-8" />
                             ))}
                         </div>
                     ))}
                 </div>
+            </div>
+            <div className="mt-6 space-y-3 xl:hidden">
+                {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="space-y-3 rounded-lg border border-border-subtle p-4">
+                        <Skeleton className="h-5 w-2/3" />
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -104,7 +114,7 @@ export function EmailRequestSectionSkeleton(): ReactElement {
             aria-busy="true"
             aria-label="กำลังโหลดหน้าส่งคำร้องพนักงานใหม่"
         >
-            <div className="space-y-8 p-4 md:p-8">
+            <div className="space-y-8">
                 <div className="flex min-w-0 items-center gap-4">
                     <Skeleton className="h-12 w-12 rounded-2xl" />
                     <div className="min-w-0 space-y-2">

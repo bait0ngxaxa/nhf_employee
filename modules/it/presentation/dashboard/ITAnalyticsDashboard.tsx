@@ -65,7 +65,7 @@ function BacklogOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
     return (
         <section
             aria-labelledby="it-analytics-backlog-title"
-            className="grid min-w-0 gap-5 rounded-xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-900 dark:bg-sky-950/30 sm:p-5 xl:grid-cols-[minmax(13rem,0.8fr)_minmax(0,2fr)]"
+            className="grid min-w-0 gap-5 rounded-xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-900 dark:bg-sky-950/30 sm:p-5"
         >
             <div className="min-w-0">
                 <h2 id="it-analytics-backlog-title" className="text-sm font-semibold text-sky-950 dark:text-sky-100">
@@ -424,7 +424,7 @@ export function ITAnalyticsDashboard(): ReactElement {
 
     const reportState = visibleState;
     return (
-        <section className="w-full min-w-0 space-y-5 p-4 sm:p-6 xl:p-8">
+        <section className="mx-auto w-full max-w-7xl min-w-0 space-y-5">
             <header className="flex min-w-0 flex-col gap-4 border-b border-border-neutral pb-5 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
                     <h1 data-page-heading tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">

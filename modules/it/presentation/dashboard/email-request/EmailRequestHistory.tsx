@@ -129,7 +129,7 @@ export function EmailRequestHistory(): ReactElement | null {
                     </div>
                 ) : (
                     <>
-                        <div className="overflow-x-auto overscroll-x-contain rounded-lg border border-border-subtle">
+                        <div className="hidden overflow-x-auto overscroll-x-contain rounded-lg border border-border-subtle xl:block">
                             <Table className="min-w-[860px] tabular-nums">
                                 <TableHeader>
                                     <TableRow className="bg-surface-subtle">
@@ -227,6 +227,61 @@ export function EmailRequestHistory(): ReactElement | null {
                                 </TableBody>
                             </Table>
                         </div>
+
+                        <ul aria-label="ประวัติคำร้องพนักงานใหม่สำหรับหน้าจอขนาดเล็ก" className="space-y-3 xl:hidden">
+                            {emailRequests.map((request) => (
+                                <li key={request.id} className="min-w-0 rounded-lg border border-border-subtle bg-surface-raised p-4">
+                                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-content-heading [overflow-wrap:anywhere]">
+                                                {request.thaiName}
+                                            </p>
+                                            <p className="text-sm text-content-secondary [overflow-wrap:anywhere]">
+                                                {request.englishName}
+                                            </p>
+                                        </div>
+                                        <Badge className="flex w-fit shrink-0 items-center gap-1 bg-status-positive-surface-strong text-status-positive-strong hover:bg-status-positive-surface-strong">
+                                            <CheckCircle aria-hidden="true" className="h-3 w-3" />
+                                            เสร็จสิ้น
+                                        </Badge>
+                                    </div>
+
+                                    <dl className="mt-4 grid min-w-0 gap-x-4 gap-y-3 border-t border-border-subtle pt-3 text-sm sm:grid-cols-2">
+                                        <div className="min-w-0">
+                                            <dt className="text-xs text-content-muted">ตำแหน่ง</dt>
+                                            <dd className="mt-1 break-words text-content-body">{request.position}</dd>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <dt className="text-xs text-content-muted">สังกัด</dt>
+                                            <dd className="mt-1 break-words text-content-body">{request.department}</dd>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <dt className="text-xs text-content-muted">อีเมลตอบกลับ</dt>
+                                            <dd className="mt-1 [overflow-wrap:anywhere]">
+                                                <a href={`mailto:${request.replyEmail}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                                                    {request.replyEmail}
+                                                </a>
+                                            </dd>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <dt className="text-xs text-content-muted">สิทธิ์ระบบ</dt>
+                                            <dd className="mt-1 space-y-1 [overflow-wrap:anywhere]">
+                                                <p className="text-content-body">
+                                                    สารบรรณ: {request.needsDocumentSystem ? "ต้องการ" : "ไม่ต้องการ"}
+                                                </p>
+                                                <p className="text-content-secondary">
+                                                    พื้นที่ไฟล์: {formatSharedDriveAccess(request.sharedDriveAccess)}
+                                                </p>
+                                            </dd>
+                                        </div>
+                                        <div className="min-w-0 sm:col-span-2">
+                                            <dt className="text-xs text-content-muted">วันที่ขอ</dt>
+                                            <dd className="mt-1 text-content-body">{formatThaiDateTime(request.createdAt)}</dd>
+                                        </div>
+                                    </dl>
+                                </li>
+                            ))}
+                        </ul>
 
                         {pagination.totalPages > 1 && (
                             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
