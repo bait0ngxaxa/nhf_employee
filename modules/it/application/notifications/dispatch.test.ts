@@ -1,5 +1,35 @@
 import type { NotificationOutbox } from "@prisma/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+    createInbox: vi.fn(),
+    currentWorkforce: vi.fn(),
+    commentSource: vi.fn(),
+    ticketResource: vi.fn(),
+}));
+
+vi.mock("@/modules/employee", () => ({
+    getCurrentWorkforceDepartmentSnapshotInTransaction: mocks.currentWorkforce,
+}));
+vi.mock("@/modules/notification", () => ({
+    createForUserOnce: mocks.createInbox,
+}));
+vi.mock("@/lib/db/transaction", () => ({
+    hasPrismaErrorCode: vi.fn(() => false),
+    runSerializableTransaction: vi.fn(async (
+        operation: (tx: object) => Promise<unknown>,
+    ) => operation({})),
+}));
+vi.mock("../operator-audience", () => ({
+    findITOperatorAudience: vi.fn(),
+}));
+vi.mock("../../infrastructure/persistence/ticket-notification-repository", () => ({
+    findITTicketNotificationCommentSource: mocks.commentSource,
+    findITTicketNotificationEventSource: vi.fn(),
+    findITTicketNotificationResource: mocks.ticketResource,
+    findLatestITTicketAssignmentGeneration: vi.fn(),
+    findLatestITTicketStatusGeneration: vi.fn(),
+}));
 
 import { dispatchITTicketNotificationOutbox } from "./dispatch";
 
@@ -54,5 +84,38 @@ describe("IT Ticket notification dispatch payload boundary", () => {
         await expect(dispatchITTicketNotificationOutbox(row)).rejects.toThrow(
             "IT_TICKET_IN_APP event identity mismatch",
         );
+    });
+
+    it("keeps requester Inbox actions on Dashboard Ticket detail", async () => {
+        mocks.commentSource.mockResolvedValueOnce({
+            ticketId: 123,
+            kind: "OPERATOR",
+            authorUserId: 7,
+        });
+        mocks.ticketResource.mockResolvedValueOnce({
+            requesterUserId: 42,
+            assignedToUserId: null,
+            status: "OPEN",
+        });
+        mocks.currentWorkforce.mockResolvedValueOnce({ userId: 42 });
+
+        const payload = {
+            version: 1,
+            event: "OPERATOR_COMMENTED",
+            ticketId: 123,
+            recipientUserId: 42,
+            audience: "REQUESTER",
+            source: { kind: "COMMENT", id: "cmr-comment" },
+        };
+
+        await expect(dispatchITTicketNotificationOutbox(
+            buildOutbox(JSON.stringify(payload)),
+        )).resolves.toBe("SENT");
+
+        expect(mocks.createInbox.mock.calls[0]?.[0]).toMatchObject({
+            userId: 42,
+            type: "IT_TICKET",
+            actionUrl: "/dashboard/it/123",
+        });
     });
 });

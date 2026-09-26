@@ -23,14 +23,15 @@ function printProvisioningPlan(result: NhfRichMenuProvisionResult): void {
     console.log(`  Stock LIFF URL: ${result.liffUrls.stock}`);
     console.log(`  Leave LIFF URL: ${result.liffUrls.leave}`);
     console.log(`  Routine LIFF URL: ${result.liffUrls.routine}`);
+    console.log(`  IT LIFF URL: ${result.liffUrls.it}`);
     console.log(`  Image: ${result.imagePath}`);
     console.log(
         `  Image details: ${result.image.width}x${result.image.height}, ${result.image.format.toUpperCase()}, ${result.image.bytes} bytes`,
     );
     console.log(
-        `  Modules: stock=${result.modules.stock.status}, leave=${result.modules.leave.status}, routine=${result.modules.routine.status}`,
+        `  Modules: stock=${result.modules.stock.status}, leave=${result.modules.leave.status}, routine=${result.modules.routine.status}, it=${result.modules.it.status}`,
     );
-    console.log("  Areas: three equal mobile destinations → Stock | Leave | Routine");
+    console.log("  Areas: four equal mobile destinations → Stock | Leave | Routine | IT");
 }
 
 function printStatus(status: NhfRichMenuStatus): void {
@@ -47,9 +48,11 @@ function printStatus(status: NhfRichMenuStatus): void {
     console.log(`  Stock module: ${status.modules.stock.status}`);
     console.log(`  Leave module: ${status.modules.leave.status}`);
     console.log(`  Routine module: ${status.modules.routine.status}`);
+    console.log(`  IT module: ${status.modules.it.status}`);
     console.log(`  Stock LIFF URL: ${status.liffUrls?.stock ?? "not available"}`);
     console.log(`  Leave LIFF URL: ${status.liffUrls?.leave ?? "not available"}`);
     console.log(`  Routine LIFF URL: ${status.liffUrls?.routine ?? "not available"}`);
+    console.log(`  IT LIFF URL: ${status.liffUrls?.it ?? "not available"}`);
 
     switch (status.defaultRichMenuStatus) {
         case "configured":

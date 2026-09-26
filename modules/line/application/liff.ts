@@ -4,6 +4,10 @@ import type { NextResponse } from "next/server";
 import { findAccountIdentityById } from "@/modules/auth";
 import { findLiffEmployeeByUserId } from "@/modules/employee";
 import {
+    buildITAuthorizationContext,
+    getITPresentationCapabilities,
+} from "@/modules/it";
+import {
     buildLeaveAuthorizationContext,
     getLeavePresentationCapabilities,
     getLiffLeaveRelationshipProjection,
@@ -100,6 +104,13 @@ export async function getLiffCapabilities(
             "LIFF_SELF_SERVICE",
         ),
     );
+    const itCapabilities = await getITPresentationCapabilities(
+        buildITAuthorizationContext(
+            session.user,
+            session.employeeId,
+            "LIFF_SELF_SERVICE",
+        ),
+    );
 
     return {
         stockCapabilities,
@@ -118,6 +129,7 @@ export async function getLiffCapabilities(
         leaveCapabilities,
         canCreateOwnRoutine: routineEnabled && routineCapabilities.canCreateTasks,
         routineCapabilities,
+        itCapabilities,
     };
 }
 

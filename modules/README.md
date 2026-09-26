@@ -9,10 +9,14 @@ boundaries. IT1 through IT9B are closed under `modules/it/`. IT8 moved Email
 Request ownership into the module while preserving its compatibility seam.
 IT9A is CLOSED and owns the requester-only LIFF authorization/API foundation.
 IT9B is CLOSED and provides requester presentation at `/liff/it` and
-`/liff/it/[ticketId]`. IT9C is OPEN / next phase and owns LIFF Home/module
-registration, bottom navigation, external deep-link producer integration, and
-Rich Menu integration. IT9D is OPEN for Ticket LINE delivery; IT9E is OPEN for
-full product/device acceptance. IT10 hardening remains OPEN/deferred.
+`/liff/it/[ticketId]`. IT9C is **IMPLEMENTED; closure pending independent
+review** and owns the LIFF Home/module projection, service card, shared
+navigation, canonical requester deep links, and Unified Rich Menu destination.
+IT9D is OPEN for Ticket LINE delivery; IT9E is OPEN for full product/device
+acceptance. IT10 hardening remains OPEN/deferred.
+The LIFF Home projection consumes IT's centralized presentation capabilities
+through `LIFF_SELF_SERVICE`; its requester read/create rule is presentation-only
+and does not change the existing API authorization boundary.
 Its server entry is
 `@/modules/it` and its browser-safe Dashboard and LIFF presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and

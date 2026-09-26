@@ -24,6 +24,10 @@ function getSectionLabel(pathname: string | null): string {
         || pathname?.startsWith(`${APP_ROUTES.line.routine}/`)) {
         return "งานประจำ";
     }
+    if (pathname === APP_ROUTES.line.it
+        || pathname?.startsWith(`${APP_ROUTES.line.it}/`)) {
+        return "บริการ IT";
+    }
     return "บริการของฉัน";
 }
 

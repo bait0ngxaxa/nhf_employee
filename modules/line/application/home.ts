@@ -19,6 +19,11 @@ type LiffHomeLeaveCapabilities = Pick<
     "canReadOwnRequests" | "canReadAssignedApprovals"
 >;
 
+type LiffHomeITCapabilities = Pick<
+    LiffCapabilities["itCapabilities"],
+    "canReadOwnTickets" | "canCreateOwnTickets"
+>;
+
 export function getLiffConfiguredModules(): LiffHomeResponse["modules"] {
     const leaveEnabled = isFeatureEnabled(FEATURE_KEYS.leave);
     const routineEnabled = isFeatureEnabled(FEATURE_KEYS.routine);
@@ -33,6 +38,7 @@ export function getLiffConfiguredModules(): LiffHomeResponse["modules"] {
             enabled: routineEnabled,
             status: routineEnabled ? "available" : "unavailable",
         },
+        it: { enabled: true, status: "available" },
     };
 }
 
@@ -41,6 +47,7 @@ export function getLiffHomeModules(
         leaveCapabilities: LiffHomeLeaveCapabilities;
         routineCapabilities: LiffHomeRoutineReadCapabilities;
         stockCapabilities: LiffHomeStockCapabilities;
+        itCapabilities: LiffHomeITCapabilities;
     },
 ): LiffHomeResponse["modules"] {
     const configuredModules = getLiffConfiguredModules();
@@ -57,6 +64,11 @@ export function getLiffHomeModules(
             capabilities.leaveCapabilities.canReadOwnRequests
             || capabilities.leaveCapabilities.canReadAssignedApprovals
         );
+    const itEnabled = configuredModules.it.enabled
+        && (
+            capabilities.itCapabilities.canReadOwnTickets
+            || capabilities.itCapabilities.canCreateOwnTickets
+        );
 
     return {
         ...configuredModules,
@@ -71,6 +83,10 @@ export function getLiffHomeModules(
         leave: {
             enabled: leaveEnabled,
             status: leaveEnabled ? "available" : "unavailable",
+        },
+        it: {
+            enabled: itEnabled,
+            status: itEnabled ? "available" : "unavailable",
         },
     };
 }

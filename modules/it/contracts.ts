@@ -19,6 +19,13 @@ export const IT_TICKET_LIST_DEFAULT_PAGE = 1;
 export const IT_TICKET_LIST_DEFAULT_LIMIT = 10;
 export const IT_TICKET_LIST_MAX_LIMIT = 100;
 export const IT_TICKET_DATABASE_INT_MAX = 2_147_483_647;
+
+export function isValidITTicketId(value: number): boolean {
+    return Number.isSafeInteger(value)
+        && value > 0
+        && value <= IT_TICKET_DATABASE_INT_MAX;
+}
+
 export const IT_OPERATOR_QUEUE_DEFAULT_LIMIT = 25;
 export const IT_OPERATOR_QUEUE_MAX_LIMIT = 100;
 export const IT_TICKET_ATTACHMENT_MAX_FILES = 3;

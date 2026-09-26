@@ -201,7 +201,7 @@ Provider evidence ต้องเป็น safe identifiers เท่านั�
 | FF-01 | Leave | production build ตั้ง `NEXT_PUBLIC_FEATURE_LEAVE=false` | Home แสดง unavailable, direct `/liff/leave` และ Leave API ปฏิเสธ/disabled สอดคล้องกัน | `NOT RUN` |  |
 | FF-02 | Routine | production build ตั้ง `NEXT_PUBLIC_FEATURE_ROUTINE=false` | Home, direct `/liff/routine` และ Routine API disabled สอดคล้องกัน; scheduler successful no-op | `NOT RUN` |  |
 | FF-03 | Stock | ตรวจ configuration ที่ไม่มี Stock flag | Stock ยัง available ตาม implementation ปัจจุบัน ไม่สร้าง assumption ว่ามี flag | `NOT RUN` |  |
-| NAV-01 | Mobile LIFF | Home → Stock → Leave → Routine → Home | route, active bottom-nav state และ back/navigation behavior ถูกต้องตาม feature state | `NOT RUN` |  |
+| NAV-01 | Mobile LIFF | Home → Stock → Leave → Routine → IT → Home | route, active bottom-nav state และ back/navigation behavior ถูกต้องตาม feature state | `NOT RUN` |  |
 | NAV-02 | Mobile LIFF | สลับ module หลังเปิด sheet/dialog หรือมี toast | ไม่มี stuck sheet/dialog, body-scroll lock leakage หรือ stale toast จาก module เดิม | `NOT RUN` |  |
 | NAV-03 | Mobile LIFF | ตรวจแต่ละ module ที่มี form/cart | ไม่มี horizontal overflow, primary action ไม่ถูกบังด้วย LINE/browser chrome | `NOT RUN` |  |
 
@@ -211,8 +211,8 @@ Provider evidence ต้องเป็น safe identifiers เท่านั�
 
 | ID | Device/browser | Scenario | Expected | Result | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| DEV-01 | Android + LINE in-app LIFF | เรียก Home, account link, Stock, Leave, Routine | critical flows ใช้งานได้และไม่มี console-visible failure ที่ทำให้ flow หยุด | `NOT RUN` |  |
-| DEV-02 | iPhone + LINE in-app LIFF | เรียก Home, account link, Stock, Leave, Routine | critical flows ใช้งานได้และ safe-area/keyboard ถูกต้อง | `NOT RUN` |  |
+| DEV-01 | Android + LINE in-app LIFF | เรียก Home, account link, Stock, Leave, Routine และ requester IT | critical flows ใช้งานได้และไม่มี console-visible failure ที่ทำให้ flow หยุด | `NOT RUN` |  |
+| DEV-02 | iPhone + LINE in-app LIFF | เรียก Home, account link, Stock, Leave, Routine และ requester IT | critical flows ใช้งานได้และ safe-area/keyboard ถูกต้อง | `NOT RUN` |  |
 | DEV-03 | Android external Chrome | เปิด LIFF URL โดยตรงเป็น fallback | behavior อยู่ในขอบเขตที่รองรับ; บันทึกข้อจำกัดถ้ามี | `NOT RUN` |  |
 | DEV-04 | iOS Safari | เปิด LIFF URL โดยตรงเป็น fallback | behavior อยู่ในขอบเขตที่รองรับ; บันทึกข้อจำกัดถ้ามี | `NOT RUN` |  |
 | DEV-05 | Android + LINE | viewport ประมาณ 320 px และ 360 px | ไม่มี horizontal overflow, touch target หลักอย่างน้อย 44px, ไทยยาวไม่ล้น | `NOT RUN` |  |
@@ -322,7 +322,7 @@ Notes / blockers:
 - [ ] production env/LINE Console/OA configuration ผ่านโดยไม่เปิดเผย secret
 - [ ] scheduler และ outbox มี owner/ความถี่/timeout ที่บันทึกแล้วและไม่ duplicate
 - [ ] identity, session recovery และ authorization boundary ผ่าน
-- [ ] Stock, Leave, Routine และ deep links ผ่านบน Android + iPhone ใน LINE
+- [ ] Stock, Leave, Routine, requester IT และ deep links ผ่านบน Android + iPhone ใน LINE
 - [ ] attachment storage/retrieval/limits ผ่าน
 - [ ] Rich Menu status/dry-run ผ่าน และ previous default rollback target ถูกบันทึก
 - [ ] new Rich Menu ถูก apply โดย human operator เท่านั้น หลัง acceptance ครบ

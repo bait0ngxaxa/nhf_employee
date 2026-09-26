@@ -5,6 +5,7 @@ import {
     Boxes,
     CalendarRange,
     ClipboardCheck,
+    Headset,
     LockKeyhole,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -66,6 +67,15 @@ const MODULE_CARDS: readonly ModuleCardConfig[] = [
         href: APP_ROUTES.line.routine,
         icon: ClipboardCheck,
         accentClassName: "text-module-routine-badge-foreground",
+    },
+    {
+        key: "it",
+        label: "IT",
+        title: "แจ้งปัญหา IT",
+        description: "ขอความช่วยเหลือและติดตาม Ticket ของคุณ",
+        href: APP_ROUTES.line.it,
+        icon: Headset,
+        accentClassName: "text-brand-solid",
     },
 ];
 

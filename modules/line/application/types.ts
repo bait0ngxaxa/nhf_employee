@@ -1,4 +1,5 @@
 import type { LeavePresentationCapabilities } from "@/modules/leave";
+import type { ITPresentationCapabilities } from "@/modules/it";
 import type { RoutinePresentationCapabilities } from "@/modules/routine";
 import type { StockPresentationCapabilities } from "@/modules/stock";
 
@@ -41,6 +42,7 @@ export interface LiffHomeModules {
     stock: LiffHomeModule;
     leave: LiffHomeModule;
     routine: LiffHomeModule;
+    it: LiffHomeModule;
 }
 
 export interface LiffCapabilities {
@@ -52,6 +54,7 @@ export interface LiffCapabilities {
     leaveCapabilities: LeavePresentationCapabilities;
     canCreateOwnRoutine: boolean;
     routineCapabilities: RoutinePresentationCapabilities;
+    itCapabilities: ITPresentationCapabilities;
 }
 
 export interface LiffHomeResponse {

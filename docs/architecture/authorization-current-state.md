@@ -63,6 +63,13 @@
 > evidence are recorded in
 > [pre-it-hardening-h0-baseline.md](pre-it-hardening-h0-baseline.md).
 
+Current IT9C presentation integration consumes `getITPresentationCapabilities()`
+from the verified LIFF workforce identity with fixed `LIFF_SELF_SERVICE` context.
+The Home module is shown only for requester own-ticket read or create projection;
+this presentation state adds no capability or authorization grant, and direct IT
+API checks remain authoritative. `it.ticket.manage` and `it.analytics.read`
+remain unsupported through LIFF.
+
 ## Current final authorization model
 
 The current production source of truth, including IT9A, is:
@@ -1898,8 +1905,10 @@ IT9A is **CLOSED** and owns the requester-only LIFF authorization/API
 foundation described above. IT9B requester presentation exists at `/liff/it`
 and `/liff/it/[ticketId]` through the browser-safe `@/modules/it/client` entry
 and is **CLOSED** after independent review and final verification. IT9C is
-**OPEN / next phase** and owns LIFF Home/module registration, bottom
-navigation, external deep-link producer integration, and Rich Menu integration.
+**IMPLEMENTED; closure pending independent review** and owns the shared LIFF
+Home/module projection, service card, navigation, canonical requester deep
+links, and Unified Rich Menu integration.
 IT9D is **OPEN** and owns Ticket LINE delivery. IT9E is **OPEN** and owns full
-product/device acceptance. IT10 hardening remains deferred/open. None of that
-later-phase work is included in IT9B.
+product/device acceptance. IT10 hardening remains deferred/open. IT9C changes no
+authorization capability or API enforcement; device acceptance and IT9D remain
+outside this implementation.

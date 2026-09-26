@@ -34,6 +34,7 @@ const HOME = {
         stock: { enabled: true, status: "available" as const },
         leave: { enabled: false, status: "unavailable" as const },
         routine: { enabled: true, status: "available" as const },
+        it: { enabled: true, status: "available" as const },
     },
     capabilities: {
         stockCapabilities: {
@@ -78,6 +79,15 @@ const HOME = {
             canReadAllSummary: false,
             canReadReference: true,
         },
+        itCapabilities: {
+            canReadOwnTickets: true,
+            canReadAllTickets: false,
+            canCreateOwnTickets: true,
+            canCommentOwnTickets: true,
+            canCommentAllTickets: false,
+            canManageTickets: false,
+            canReadAnalytics: false,
+        },
     },
 };
 
@@ -112,8 +122,38 @@ describe("LIFF home", () => {
             "href",
             "/liff/routine",
         );
+        expect(screen.getByRole("link", { name: /แจ้งปัญหา IT/ })).toHaveAttribute(
+            "href",
+            "/liff/it",
+        );
         expect(screen.getByText("บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณ")).toBeInTheDocument();
         expect(screen.getByText("บริการของฉัน")).toBeInTheDocument();
+    });
+
+    it("renders IT as a disabled non-link when requester entry is unavailable", async () => {
+        mocks.fetchLiffHome.mockResolvedValueOnce({
+            ...HOME,
+            modules: {
+                ...HOME.modules,
+                it: { enabled: false as const, status: "unavailable" as const },
+            },
+            capabilities: {
+                ...HOME.capabilities,
+                itCapabilities: {
+                    ...HOME.capabilities.itCapabilities,
+                    canReadOwnTickets: false,
+                    canCreateOwnTickets: false,
+                },
+            },
+        });
+
+        render(<LiffHomeApp />);
+
+        await waitFor(() => {
+            expect(screen.queryByRole("link", { name: /แจ้งปัญหา IT/ })).not.toBeInTheDocument();
+        });
+        expect(screen.getByText("แจ้งปัญหา IT")).toBeInTheDocument();
+        expect(screen.getAllByText("บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณ")).toHaveLength(2);
     });
 
     it("keeps the Routine card navigable for a read-only actor", async () => {

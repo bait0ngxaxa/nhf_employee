@@ -11,7 +11,7 @@ import {
     ITTicketNotFoundError,
     ITWorkforceDeniedError,
 } from "../../application/ticket-errors";
-import { IT_TICKET_DATABASE_INT_MAX } from "../../contracts";
+import { isValidITTicketId } from "../../contracts";
 import { ITTicketAttachmentValidationError } from "../../infrastructure/attachments/validation";
 
 export function mapITTicketRouteError(error: unknown): NextResponse | null {
@@ -42,9 +42,7 @@ export function mapITTicketRouteError(error: unknown): NextResponse | null {
 export function parseITRequesterTicketId(value: string): number | null {
     if (!/^[1-9]\d*$/.test(value)) return null;
     const ticketId = Number(value);
-    return Number.isSafeInteger(ticketId) && ticketId <= IT_TICKET_DATABASE_INT_MAX
-        ? ticketId
-        : null;
+    return isValidITTicketId(ticketId) ? ticketId : null;
 }
 
 export function readITTicketTimelineQuery(

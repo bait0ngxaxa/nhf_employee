@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const usePathnameMock = vi.hoisted(() => vi.fn());
@@ -47,6 +47,56 @@ describe("LIFF application shell navigation", () => {
             "aria-current",
             "page",
         );
+        expect(screen.getByRole("link", { name: "IT" })).toHaveAttribute(
+            "href",
+            APP_ROUTES.line.it,
+        );
+        expect(screen.getAllByRole("link")).toHaveLength(6);
         expect(screen.getAllByText("งานประจำ")).toHaveLength(2);
+    });
+
+    it.each([
+        APP_ROUTES.line.it,
+        APP_ROUTES.line.itTicket(42),
+        `${APP_ROUTES.line.it}/future/child`,
+    ])("keeps requester IT active at %s", (pathname) => {
+        usePathnameMock.mockReturnValue(pathname);
+
+        render(
+            <LiffAppShell>
+                <main id="main">IT content</main>
+            </LiffAppShell>,
+        );
+
+        expect(screen.getByRole("link", { name: "IT" })).toHaveAttribute(
+            "href",
+            APP_ROUTES.line.it,
+        );
+        expect(screen.getByRole("link", { name: "IT" })).toHaveAttribute(
+            "aria-current",
+            "page",
+        );
+        expect(screen.getByText("บริการ IT")).toBeInTheDocument();
+    });
+
+    it.each([
+        [APP_ROUTES.line.root, "หน้าหลัก", "บริการของฉัน"],
+        [APP_ROUTES.line.stock, "วัสดุ", "บริการวัสดุ"],
+        [APP_ROUTES.line.leave, "วันลา", "บริการวันลา"],
+        [APP_ROUTES.line.routine, "งานประจำ", "งานประจำ"],
+    ])("preserves the %s navigation section", (pathname, label, section) => {
+        usePathnameMock.mockReturnValue(pathname);
+
+        render(
+            <LiffAppShell>
+                <main id="main">Module content</main>
+            </LiffAppShell>,
+        );
+
+        expect(screen.getByRole("link", { name: label })).toHaveAttribute(
+            "aria-current",
+            "page",
+        );
+        expect(within(screen.getByRole("banner")).getByText(section)).toBeInTheDocument();
     });
 });

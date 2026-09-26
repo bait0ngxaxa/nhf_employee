@@ -157,6 +157,7 @@ export interface NhfRichMenuPreparation {
         stock: string;
         leave: string;
         routine: string;
+        it: string;
     };
     definition: NhfRichMenuDefinition;
     imagePath: string;
@@ -425,6 +426,7 @@ export interface NhfRichMenuDestinations {
     stock?: string;
     leave?: string;
     routine?: string;
+    it?: string;
 }
 
 export function buildNhfRichMenuDefinition(
@@ -434,18 +436,17 @@ export function buildNhfRichMenuDefinition(
         stock: destinations.stock ?? buildLiffUrl(APP_ROUTES.line.stock),
         leave: destinations.leave ?? buildLiffUrl(APP_ROUTES.line.leave),
         routine: destinations.routine ?? buildLiffUrl(APP_ROUTES.line.routine),
+        it: destinations.it ?? buildLiffUrl(APP_ROUTES.line.it),
     };
     const menuWidth = NHF_RICH_MENU_WIDTH;
-    const firstAreaWidth = Math.floor(menuWidth / 3);
-    const secondAreaWidth = firstAreaWidth;
-    const thirdAreaWidth = menuWidth - firstAreaWidth - secondAreaWidth;
+    const areaWidth = menuWidth / 4;
 
     const areas = [
         {
             bounds: {
                 x: 0,
                 y: 0,
-                width: firstAreaWidth,
+                width: areaWidth,
                 height: NHF_RICH_MENU_HEIGHT,
             },
             action: {
@@ -456,9 +457,9 @@ export function buildNhfRichMenuDefinition(
         },
         {
             bounds: {
-                x: firstAreaWidth,
+                x: areaWidth,
                 y: 0,
-                width: secondAreaWidth,
+                width: areaWidth,
                 height: NHF_RICH_MENU_HEIGHT,
             },
             action: {
@@ -469,15 +470,28 @@ export function buildNhfRichMenuDefinition(
         },
         {
             bounds: {
-                x: firstAreaWidth + secondAreaWidth,
+                x: areaWidth * 2,
                 y: 0,
-                width: thirdAreaWidth,
+                width: areaWidth,
                 height: NHF_RICH_MENU_HEIGHT,
             },
             action: {
                 type: "uri" as const,
                 label: "งานของฉัน",
                 uri: liffUrls.routine,
+            },
+        },
+        {
+            bounds: {
+                x: areaWidth * 3,
+                y: 0,
+                width: areaWidth,
+                height: NHF_RICH_MENU_HEIGHT,
+            },
+            action: {
+                type: "uri" as const,
+                label: "แจ้ง IT",
+                uri: liffUrls.it,
             },
         },
     ];
@@ -499,6 +513,30 @@ export function buildNhfRichMenuDefinition(
 export function validateNhfRichMenuDefinition(
     definition: NhfRichMenuDefinition,
 ): void {
+    const hasExpectedImageSize = definition.size.width === NHF_RICH_MENU_WIDTH
+        && definition.size.height === NHF_RICH_MENU_HEIGHT;
+    if (!hasExpectedImageSize) {
+        throw new RichMenuProvisioningError(
+            "configuration",
+            "NHFapp Rich Menu must use 2500x843 dimensions",
+        );
+    }
+
+    const areaWidth = NHF_RICH_MENU_WIDTH / 4;
+    const hasFourEqualHorizontalAreas = definition.areas.length === 4
+        && definition.areas.every((area, index) => (
+            area.bounds.x === index * areaWidth
+            && area.bounds.y === 0
+            && area.bounds.width === areaWidth
+            && area.bounds.height === NHF_RICH_MENU_HEIGHT
+        ));
+    if (!hasFourEqualHorizontalAreas) {
+        throw new RichMenuProvisioningError(
+            "configuration",
+            "NHFapp Rich Menu must have four equal horizontal areas",
+        );
+    }
+
     validateRichMenuDefinition(definition, "NHFapp Rich Menu");
 }
 
@@ -775,6 +813,7 @@ export async function prepareNhfRichMenu(
         stock: buildLiffUrl(APP_ROUTES.line.stock),
         leave: buildLiffUrl(APP_ROUTES.line.leave),
         routine: buildLiffUrl(APP_ROUTES.line.routine),
+        it: buildLiffUrl(APP_ROUTES.line.it),
     };
     const definition = buildNhfRichMenuDefinition(liffUrls);
     validateNhfRichMenuDefinition(definition);
@@ -960,6 +999,7 @@ export async function getNhfRichMenuStatus(
               stock: buildLiffUrl(APP_ROUTES.line.stock),
               leave: buildLiffUrl(APP_ROUTES.line.leave),
               routine: buildLiffUrl(APP_ROUTES.line.routine),
+              it: buildLiffUrl(APP_ROUTES.line.it),
           }
         : null;
 

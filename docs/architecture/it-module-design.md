@@ -335,7 +335,7 @@ These questions are intentionally unresolved; later slices must close their depe
 | IT8 — Email Request migration (**CLOSED**) | Move existing structured capability into IT without changing API/DTO/idempotency/user behavior. | Transfer Prisma delegate, validation, presentation, notification/Flex and Audit producer ownership behind IT public entries; keep URL/rows/keys/grants. | Existing Email Request API, UI, MySQL idempotency, outbox, LINE, Audit compatibility suites; final architecture, lint, typecheck, and repository-suite gates passed. |
 | IT9A — LIFF Authorization + API Foundation (**CLOSED**) | Add requester-only LIFF authorization and compatibility-safe API adapters over the shared IT application. | `LIFF_SELF_SERVICE` supports read/create/comment with effective OWN only; manage and analytics remain Dashboard-only. Add no schema or migration; no UI, Home/navigation/Rich Menu integration, or Ticket LINE delivery. | Registry/resolver and channel-policy tests, LIFF route tests, focused MySQL channel-isolation regression, architecture, lint/typecheck, and one final full suite. |
 | IT9B — LIFF Self-Service UI + Conversation + Attachments (**CLOSED**) | Add the requester-facing LIFF experience over the IT9A APIs. | LIFF presentation only; preserve requester-only policy and shared Ticket/application contracts. No Home/navigation/Rich Menu integration or LINE delivery. | Corrective commit `415c9d6cb21d7510e4e610c4e8d4541add60f1f3` passed independent review. Closure verification is recorded in section 25; device acceptance remains IT9E. |
-| IT9C — LIFF Home / Navigation / Deep Link / Rich Menu Integration (**OPEN / next phase**) | Add IT to LIFF shell entry points and connect notification-ready Ticket destinations. | Home modules, bottom navigation, external deep-link producers, and Rich Menu integration. | Route, shell navigation, deep-link, and Rich Menu contract checks. |
+| IT9C — LIFF Home / Navigation / Deep Link / Rich Menu Integration (**IMPLEMENTED; closure pending independent review**) | Add IT to LIFF shell entry points and connect notification-ready Ticket destinations. | Home modules, bottom navigation, external deep-link producers, and Rich Menu integration. | Route, shell navigation, deep-link, and Rich Menu contract checks. |
 | IT9D — IT Ticket LINE Notifications to LIFF (**OPEN**) | Add Ticket LINE delivery through the approved LIFF destination. | Reuse IT6 business event semantics and shared outbox; no duplicate Ticket event model. | Delivery, destination, retry/idempotency, privacy, and stale-recipient checks. |
 | IT9E — IT Product E2E + Android/iPhone Acceptance (**OPEN**) | Validate the complete IT requester product on supported devices. | End-to-end requester flows and Android/iPhone acceptance. | Product E2E, responsive/accessibility, and device acceptance. |
 | IT10 — Final Hardening + Compatibility + Retention Audit (**OPEN / deferred**) | Review deployed legacy rows, retention, operational failure modes and final ownership. | Only approved compatibility cleanup/migrations; explicit decision before any enum or grant change. | Architecture/security regression, relevant broad suite and deployment data review. |
@@ -469,3 +469,44 @@ The independently reviewed corrective commit was `415c9d6cb21d7510e4e610c4e8d454
 passed **9 test files / 76 tests**. It covered requester presentation and mutations, idempotency fallback/retry, timeline pagination, private attachment validation and explicit tap-to-load with retry and Blob cleanup, shared LIFF session recovery without unsafe mutation replay, requester API/security, and route constants.
 
 The following final gates also passed from that HEAD: `npm.cmd run architecture:check` (1,263 repository source files), `npm.cmd run lint:strict`, `npm.cmd run typecheck`, and one `npm.cmd run build`. The production build compiled successfully, generated all 99 static pages, and included `/liff/it` and `/liff/it/[ticketId]`. A full repository test suite was not run; it was not required for this scoped closure. No backend, API, authorization, domain, schema, or workflow behavior changed in the corrective commit.
+
+## 26. IT9C implementation status — Shared LIFF integration
+
+IT9C is **IMPLEMENTED; closure pending independent review**. This current-state
+record follows the IT9B phase-boundary record above; it does not change the
+historical scope or verification recorded there.
+
+`modules/line` now includes IT's canonical `ITPresentationCapabilities` in the
+Home capability response. It builds the IT context from the verified LIFF
+workforce identity using the fixed `LIFF_SELF_SERVICE` channel, then delegates
+projection to `getITPresentationCapabilities()` in `modules/it`. No LINE-owned
+IT capability model or role-based visibility rule was added. The requester Home
+module is product-configured as available without a feature flag and becomes
+enabled only when `canReadOwnTickets` or `canCreateOwnTickets` is true. Home
+visibility remains presentation-only; direct IT APIs retain authorization.
+
+LIFF Home adds the requester card `แจ้งปัญหา IT`, with `ขอความช่วยเหลือและติดตาม
+Ticket ของคุณ`, linked to `/liff/it`. The shared Bottom Navigation adds IT as its
+fifth item and the shared header identifies `/liff/it/**` as `บริการ IT`,
+including Ticket details and future nested routes. No operator navigation is
+present.
+
+The IT server entry exports `buildITLiffUrl()` and
+`buildITTicketLiffUrl(ticketId)`. Both use the shared `buildLiffUrl()` LIFF origin
+contract and `APP_ROUTES.line`; the Ticket helper validates a positive safe
+integer through the existing IT database ID boundary. These are external LIFF
+destinations for future IT9D delivery. Existing IT requester Dashboard Inbox
+notifications continue to use `/dashboard/it/:ticketId`.
+
+The unified `2500×843` Rich Menu has four adjacent, non-overlapping `625×843`
+areas in this order: Stock, Leave, Routine, IT. The IT action label is `แจ้ง IT`
+and its URI targets the canonical LIFF requester root. The four-panel PNG is
+generated by `scripts/generate-nhf-rich-menu.ts` as a `2500×843` PNG of 82,028
+bytes; the Routine-only compatibility entry points remain available. IT9C does
+not send Ticket LINE notifications,
+change authorization capabilities or defaults, add a feature flag, alter Ticket
+workflow, or change schema/migrations.
+
+IT9D remains **OPEN** for Ticket LINE delivery; IT9E remains **OPEN** for product
+and Android/iPhone acceptance; IT10 remains **OPEN / deferred**. Device
+acceptance has not been performed.

@@ -36,7 +36,7 @@ NHFapp HttpOnly LIFF session
         ↓
 Shared LIFF Shell
         ↓
-Stock | Leave | Routine
+Stock | Leave | Routine | IT
 ```
 
 Application identity flow:
@@ -88,10 +88,11 @@ ID token เป็น identity assertion ที่อายุสั้น ใ�
 
 | Module | Route | พฤติกรรม production |
 | --- | --- | --- |
-| Home | `/liff` | แสดง workforce identity และสถานะ Stock, Leave, Routine |
+| Home | `/liff` | แสดง workforce identity และสถานะ Stock, Leave, Routine, IT ตาม capability projection |
 | Stock | `/liff/stock` | catalog, search/filter, variants, cart, availability reconciliation, submit request, My Requests, detail, cancellation และ processor flow ตามสิทธิ์ |
 | Leave | `/liff/leave` | quota, create, validation, attachment, history, detail, cancellation, not-taken และ approver flow ตาม flag/สิทธิ์ |
 | Routine | `/liff/routine` | summary, timing filters, pagination, detail, own-task create/edit/delete, occurrence reads, version conflict และ reminder deep link ตาม flag/สิทธิ์ |
+| IT requester | `/liff/it`, `/liff/it/[ticketId]` | แจ้งปัญหา สร้าง/ติดตาม Ticket และสนทนาใน Ticket ตาม requester capability; ไม่มี operator navigation |
 
 ทุก route ใช้ shared shell และ bootstrap/session boundary เดียวกัน:
 
@@ -257,10 +258,10 @@ scripts/line-rich-menu.ts
 เมนู Unified มี layout คงที่:
 
 ```text
-Stock | Leave | Routine
+Stock | Leave | Routine | IT
 ```
 
-ต้องคง validation: PNG/JPEG ที่อ่านได้, asset ปัจจุบันเป็น PNG, `2500×843` pixels, ไม่เกิน `1,000,000` bytes, tappable areas อยู่ใน bounds และทุก action เป็น `https://liff.line.me/<LIFF_ID>/...`
+แบ่งเป็นสี่พื้นที่แนวนอนเท่ากัน ขนาดละ `625×843` pixels ที่ x=`0`, `625`, `1250`, `1875`; พื้นที่ IT เปิด requester root `/liff/it` ผ่าน LIFF URL มาตรฐาน. ต้องคง validation: PNG/JPEG ที่อ่านได้, asset ปัจจุบันเป็น PNG, `2500×843` pixels, ไม่เกิน `1,000,000` bytes, tappable areas อยู่ใน bounds และไม่ทับกัน และทุก action เป็น `https://liff.line.me/<LIFF_ID>/...`
 
 ### คำสั่ง
 
@@ -463,7 +464,7 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 13. ตรวจ process/service health จาก origin เช่น `curl --fail http://127.0.0.1:3000/`
 14. ตรวจ public HTTPS และเปิด `/liff` โดยตรงก่อน Rich Menu
 15. ตรวจ `npm run line:richmenu:status` แบบ read-only ใน production operator environment
-16. ตรวจ `npm run line:richmenu:provision` แบบ dry-run และตรวจ URL/image/three areas
+16. ตรวจ `npm run line:richmenu:provision` แบบ dry-run และตรวจ URL/image/four areas
 17. Configure external owner ของ Routine scheduler และ Notification outbox แยกกัน
 18. ตรวจ scheduler/outbox smoke ตาม contract และตรวจ HTTP monitoring
 19. ทดสอบ unlinked LINE account และ account-link flow
@@ -569,7 +570,7 @@ Inactive Employee
 Unlinked LINE User
 ```
 
-กรอกผลละเอียดใน [LIFF Production Acceptance](./liff-production-acceptance.md) ซึ่งครอบคลุม identity/session, Stock, Leave, Routine, deep links, device/browser, scheduler/outbox, attachment, monitoring และ rollback
+กรอกผลละเอียดใน [LIFF Production Acceptance](./liff-production-acceptance.md) ซึ่งครอบคลุม identity/session, Stock, Leave, Routine, requester IT, deep links, device/browser, scheduler/outbox, attachment, monitoring และ rollback
 
 ## 13. Final decision
 

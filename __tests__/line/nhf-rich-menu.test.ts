@@ -33,7 +33,7 @@ describe("NHFapp Rich Menu definition", () => {
         vi.unstubAllEnvs();
     });
 
-    it("creates three bounded tappable areas for the shared LIFF app", () => {
+    it("creates four bounded tappable areas for the shared LIFF app", () => {
         const definition = buildNhfRichMenuDefinition();
 
         expect(definition).toMatchObject({
@@ -41,16 +41,18 @@ describe("NHFapp Rich Menu definition", () => {
             name: "NHFapp",
             chatBarText: "เลือกบริการ",
         });
-        expect(definition.areas).toHaveLength(3);
+        expect(definition.areas).toHaveLength(4);
         expect(definition.areas.map((area) => area.action.uri)).toEqual([
             "https://liff.line.me/nhfapp-liff-id/stock",
             "https://liff.line.me/nhfapp-liff-id/leave",
             "https://liff.line.me/nhfapp-liff-id/routine",
+            "https://liff.line.me/nhfapp-liff-id/it",
         ]);
         expect(definition.areas.map((area) => area.bounds)).toEqual([
-            { x: 0, y: 0, width: 833, height: 843 },
-            { x: 833, y: 0, width: 833, height: 843 },
-            { x: 1666, y: 0, width: 834, height: 843 },
+            { x: 0, y: 0, width: 625, height: 843 },
+            { x: 625, y: 0, width: 625, height: 843 },
+            { x: 1250, y: 0, width: 625, height: 843 },
+            { x: 1875, y: 0, width: 625, height: 843 },
         ]);
         validateNhfRichMenuDefinition(definition);
     });
@@ -61,6 +63,24 @@ describe("NHFapp Rich Menu definition", () => {
                 stock: "https://attacker.example/redirect",
             }),
         ).toThrow("LIFF URL");
+    });
+
+    it("rejects a unified menu without all four bounded areas", () => {
+        const definition = buildNhfRichMenuDefinition();
+
+        expect(() => validateNhfRichMenuDefinition({
+            ...definition,
+            areas: definition.areas.slice(0, 3),
+        })).toThrow("four equal horizontal areas");
+    });
+
+    it("keeps the existing unified image dimensions", () => {
+        const definition = buildNhfRichMenuDefinition();
+
+        expect(() => validateNhfRichMenuDefinition({
+            ...definition,
+            size: { ...definition.size, height: 900 },
+        })).toThrow("2500x843 dimensions");
     });
 
     it("validates the generated image dimensions and provider size limit", async () => {
@@ -102,8 +122,42 @@ describe("NHFapp Rich Menu provisioning", () => {
             stock: "https://liff.line.me/nhfapp-liff-id/stock",
             leave: "https://liff.line.me/nhfapp-liff-id/leave",
             routine: "https://liff.line.me/nhfapp-liff-id/routine",
+            it: "https://liff.line.me/nhfapp-liff-id/it",
         });
+        expect(result.modules.it).toEqual({ enabled: true, status: "available" });
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("prints the IT destination and four-area layout in dry-run output", async () => {
+        const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+        try {
+            await expect(runNhfRichMenuCli(["provision"])).resolves.toBe(0);
+
+            const output = logSpy.mock.calls.flat().join(" ");
+            expect(output).toContain("IT LIFF URL: https://liff.line.me/nhfapp-liff-id/it");
+            expect(output).toContain("four equal mobile destinations");
+            expect(fetchMock).not.toHaveBeenCalled();
+        } finally {
+            logSpy.mockRestore();
+        }
+    });
+
+    it("prints the IT module and destination in status output", async () => {
+        fetchMock.mockResolvedValueOnce(jsonResponse({ richMenuId: "richmenu-current" }));
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(fetchMock);
+        const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+        try {
+            await expect(runNhfRichMenuCli(["status"])).resolves.toBe(0);
+
+            const output = logSpy.mock.calls.flat().join(" ");
+            expect(output).toContain("IT module: available");
+            expect(output).toContain("IT LIFF URL: https://liff.line.me/nhfapp-liff-id/it");
+        } finally {
+            logSpy.mockRestore();
+            fetchSpy.mockRestore();
+        }
     });
 
     it("allows unified Rich Menu apply when Leave is disabled", async () => {
@@ -125,7 +179,7 @@ describe("NHFapp Rich Menu provisioning", () => {
             enabled: false,
             status: "unavailable",
         });
-        expect(result.definition.areas).toHaveLength(3);
+        expect(result.definition.areas).toHaveLength(4);
         expect(fetchMock).toHaveBeenCalledTimes(5);
     });
 
@@ -148,7 +202,7 @@ describe("NHFapp Rich Menu provisioning", () => {
             enabled: false,
             status: "unavailable",
         });
-        expect(result.definition.areas).toHaveLength(3);
+        expect(result.definition.areas).toHaveLength(4);
         expect(fetchMock).toHaveBeenCalledTimes(5);
     });
 
@@ -173,11 +227,23 @@ describe("NHFapp Rich Menu provisioning", () => {
         expect(fetchMock).toHaveBeenCalledTimes(5);
         const definitionBody = JSON.parse(
             String(fetchMock.mock.calls[0]?.[1]?.body),
-        ) as { areas: Array<{ action: { uri: string } }> };
+        ) as {
+            areas: Array<{
+                bounds: { x: number; y: number; width: number; height: number };
+                action: { uri: string };
+            }>;
+        };
         expect(definitionBody.areas.map((area) => area.action.uri)).toEqual([
             "https://liff.line.me/nhfapp-liff-id/stock",
             "https://liff.line.me/nhfapp-liff-id/leave",
             "https://liff.line.me/nhfapp-liff-id/routine",
+            "https://liff.line.me/nhfapp-liff-id/it",
+        ]);
+        expect(definitionBody.areas.map((area) => area.bounds)).toEqual([
+            { x: 0, y: 0, width: 625, height: 843 },
+            { x: 625, y: 0, width: 625, height: 843 },
+            { x: 1250, y: 0, width: 625, height: 843 },
+            { x: 1875, y: 0, width: 625, height: 843 },
         ]);
     });
 

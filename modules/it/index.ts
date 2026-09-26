@@ -10,6 +10,7 @@ export {
     resolveITCapabilityInTransaction,
 } from "./application/authorization";
 export { buildCurrentITAuthorizationContext } from "./application/workforce";
+export { buildITLiffUrl, buildITTicketLiffUrl } from "./application/liff-links";
 export { dispatchITTicketNotificationOutbox } from "./application/notifications/dispatch";
 export type {
     ITAuthorizationActor,

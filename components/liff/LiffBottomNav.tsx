@@ -2,6 +2,7 @@ import {
     Boxes,
     CalendarRange,
     ClipboardCheck,
+    Headset,
     House,
 } from "lucide-react";
 import Link from "next/link";
@@ -39,6 +40,12 @@ const NAV_ITEMS = [
         label: "งานประจำ",
         icon: ClipboardCheck,
     },
+    {
+        key: "it",
+        href: APP_ROUTES.line.it,
+        label: "IT",
+        icon: Headset,
+    },
 ] as const;
 
 function getActiveNavKey(pathname: string | null): string | null {
@@ -50,6 +57,8 @@ function getActiveNavKey(pathname: string | null): string | null {
         || pathname === APP_ROUTES.line.leave) return "leave";
     if (pathname.startsWith(`${APP_ROUTES.line.routine}/`)
         || pathname === APP_ROUTES.line.routine) return "routine";
+    if (pathname.startsWith(`${APP_ROUTES.line.it}/`)
+        || pathname === APP_ROUTES.line.it) return "it";
     return null;
 }
 
@@ -61,7 +70,7 @@ export function LiffBottomNav({ pathname }: LiffBottomNavProps): ReactElement {
             aria-label="เมนูบริการ NHFapp ผ่าน LINE"
             className="sticky bottom-0 z-30 border-t border-border-subtle/80 bg-surface/98 px-[max(0.5rem,env(safe-area-inset-left))] pb-[calc(0.625rem+env(safe-area-inset-bottom))] pt-1.5 pr-[max(0.5rem,env(safe-area-inset-right))]"
         >
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-5 gap-1">
                 {NAV_ITEMS.map((item) => {
                     const active = item.key === activeKey;
                     const Icon = item.icon;
@@ -71,7 +80,7 @@ export function LiffBottomNav({ pathname }: LiffBottomNavProps): ReactElement {
                             href={item.href}
                             aria-current={active ? "page" : undefined}
                             className={cn(
-                                "relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
+                                "relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
                                 active
                                     ? "text-brand-solid"
                                     : "text-content-muted hover:bg-surface-subtle hover:text-content-body",

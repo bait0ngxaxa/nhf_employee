@@ -35,6 +35,7 @@ const MODULES = {
     stock: { enabled: true, status: "coming-soon" as const },
     leave: { enabled: true, status: "available" as const },
     routine: { enabled: true, status: "available" as const },
+    it: { enabled: true, status: "available" as const },
 };
 
 const CAPABILITIES = {
@@ -79,6 +80,15 @@ const CAPABILITIES = {
         canReadSummary: true,
         canReadAllSummary: false,
         canReadReference: true,
+    },
+    itCapabilities: {
+        canReadOwnTickets: true,
+        canReadAllTickets: false,
+        canCreateOwnTickets: true,
+        canCommentOwnTickets: true,
+        canCommentAllTickets: false,
+        canManageTickets: false,
+        canReadAnalytics: false,
     },
 };
 

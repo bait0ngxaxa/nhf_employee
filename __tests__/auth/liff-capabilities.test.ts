@@ -6,12 +6,16 @@ const {
     leaveRequestFindFirstMock,
     leaveProjectionMock,
     routineProjectionMock,
+    itContextMock,
+    itProjectionMock,
     stockContextMock,
     stockProjectionMock,
 } = vi.hoisted(() => ({
     leaveRequestFindFirstMock: vi.fn(),
     leaveProjectionMock: vi.fn(),
     routineProjectionMock: vi.fn(),
+    itContextMock: vi.fn(),
+    itProjectionMock: vi.fn(),
     stockContextMock: vi.fn(),
     stockProjectionMock: vi.fn(),
 }));
@@ -32,6 +36,10 @@ vi.mock("@/modules/leave", async () => {
 });
 vi.mock("@/modules/routine", () => ({
     getRoutinePresentationCapabilities: routineProjectionMock,
+}));
+vi.mock("@/modules/it", () => ({
+    buildITAuthorizationContext: itContextMock,
+    getITPresentationCapabilities: itProjectionMock,
 }));
 vi.mock("@/modules/stock", () => ({
     buildStockAuthorizationContext: stockContextMock,
@@ -95,6 +103,16 @@ const LEAVE_CAPABILITIES = {
     canManageRecovery: false,
 } as const;
 
+const IT_CAPABILITIES = {
+    canReadOwnTickets: true,
+    canReadAllTickets: false,
+    canCreateOwnTickets: true,
+    canCommentOwnTickets: true,
+    canCommentAllTickets: false,
+    canManageTickets: false,
+    canReadAnalytics: false,
+} as const;
+
 function expectActionableApproverQuery(): void {
     expect(leaveRequestFindFirstMock).toHaveBeenCalledWith({
         where: {
@@ -113,6 +131,8 @@ describe("LIFF capability derivation", () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
         vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "true");
         routineProjectionMock.mockResolvedValue(ROUTINE_CAPABILITIES);
+        itContextMock.mockReturnValue({ authorizationActor: "it-actor" });
+        itProjectionMock.mockResolvedValue(IT_CAPABILITIES);
         leaveProjectionMock.mockResolvedValue(LEAVE_CAPABILITIES);
         stockContextMock.mockReturnValue({ authorizationActor: "stock-actor" });
         stockProjectionMock.mockResolvedValue(STOCK_CAPABILITIES);
@@ -135,6 +155,7 @@ describe("LIFF capability derivation", () => {
         expect(capabilities.leaveCapabilities).toEqual(LEAVE_CAPABILITIES);
         expect(capabilities.leaveCapabilities.canDecideAssignedCancellations).toBe(false);
         expect(capabilities.canCreateOwnRoutine).toBe(true);
+        expect(capabilities.itCapabilities).toEqual(IT_CAPABILITIES);
         expect(routineProjectionMock).toHaveBeenCalledWith({
             id: SESSION.user.id,
             role: SESSION.user.role,
@@ -149,6 +170,14 @@ describe("LIFF capability derivation", () => {
         expect(stockProjectionMock).toHaveBeenCalledWith({
             authorizationActor: "stock-actor",
         });
+        expect(itContextMock).toHaveBeenCalledWith(
+            SESSION.user,
+            SESSION.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        expect(itProjectionMock).toHaveBeenCalledWith({
+            authorizationActor: "it-actor",
+        });
         expect(leaveProjectionMock).toHaveBeenCalledWith({
             authorizationActor: {
                 userId: SESSION.user.id,
@@ -158,6 +187,20 @@ describe("LIFF capability derivation", () => {
             },
         });
         expectActionableApproverQuery();
+    });
+
+    it("projects IT from verified LIFF workforce identity without operator authority", async () => {
+        const capabilities = await getLiffCapabilities(SESSION);
+
+        expect(itContextMock).toHaveBeenCalledWith(
+            SESSION.user,
+            SESSION.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        expect(capabilities.itCapabilities.canReadOwnTickets).toBe(true);
+        expect(capabilities.itCapabilities.canCreateOwnTickets).toBe(true);
+        expect(capabilities.itCapabilities.canManageTickets).toBe(false);
+        expect(capabilities.itCapabilities.canReadAnalytics).toBe(false);
     });
 
     it("grants approval capability to an exception approver with actionable work", async () => {
