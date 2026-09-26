@@ -191,6 +191,7 @@ const auditApiRouteFiles = [
     "app/api/audit-logs/route.ts",
     "app/api/audit-logs/cleanup/route.ts",
 ];
+const lineITApiRouteDirectory = "app/api/line/it";
 const auditDashboardRouteFiles = [
     "app/dashboard/audit/page.tsx",
     "app/dashboard/audit/loading.tsx",
@@ -417,6 +418,35 @@ function getStockRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
     }
 
     return null;
+}
+
+function getLineITApiRouteDependencyViolation(filePath, rootPath, moduleSpecifier) {
+    if (!pathIsWithin(filePath, resolve(rootPath, lineITApiRouteDirectory))) {
+        return null;
+    }
+
+    const resolvedImport = moduleSpecifier.startsWith("@/")
+        ? resolve(rootPath, moduleSpecifier.slice(2))
+        : getImportSourcePath(moduleSpecifier, filePath, rootPath);
+    const normalizedSpecifier = resolvedImport === null
+        ? moduleSpecifier
+        : `@/${relativeFilePath(resolvedImport, rootPath).replace(/\.[cm]?[jt]sx?$/, "")}`;
+    const forbiddenPrefixes = [
+        "@/modules/it/application",
+        "@/modules/it/infrastructure",
+        "@/modules/notification",
+        "@/modules/audit",
+        "@/lib/db/prisma",
+        "@/lib/services/outbox/processor",
+        "@/app/api/it",
+    ];
+    const forbiddenPrefix = forbiddenPrefixes.find((prefix) =>
+        hasImportPrefix(normalizedSpecifier, prefix),
+    );
+
+    return forbiddenPrefix === undefined
+        ? null
+        : `LIFF IT API routes must not import "${forbiddenPrefix}"; use the IT public application seam and approved shared route infrastructure.`;
 }
 
 function getStockLiffRouteCompositionViolations(rootPath, sourceFiles) {
@@ -3084,6 +3114,22 @@ function checkArchitecture(options = {}) {
         const owner = getOwner(filePath, modulesRoot, sharedRoot);
 
         for (const importRecord of getImports(filePath)) {
+            const lineITApiRouteDependencyViolation =
+                getLineITApiRouteDependencyViolation(
+                    filePath,
+                    rootPath,
+                    importRecord.moduleSpecifier,
+                );
+            if (lineITApiRouteDependencyViolation !== null) {
+                violations.push(describeViolation(
+                    filePath,
+                    rootPath,
+                    importRecord,
+                    lineITApiRouteDependencyViolation,
+                ));
+                continue;
+            }
+
             const auditApiRouteDependencyViolation = getAuditApiRouteDependencyViolation(
                 filePath,
                 rootPath,

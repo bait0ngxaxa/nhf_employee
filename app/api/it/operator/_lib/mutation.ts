@@ -4,7 +4,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { buildCurrentITAuthorizationContext, type ITTicketMutationResult } from "@/modules/it";
 import type { ITAuthorizationContext } from "@/modules/it";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
-import { scheduleITTicketOutboxWakeup } from "../../_lib/outbox";
+import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";
 
 import { mapITOperatorRouteError, parseITOperatorTicketId } from "./response";
 

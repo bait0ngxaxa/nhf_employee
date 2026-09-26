@@ -125,15 +125,15 @@ describe("authorization contracts", () => {
         ]);
         expect(CAPABILITY_REGISTRY.get("it.ticket.read")).toEqual(expect.objectContaining({
             scopes: ["OWN", "ALL"],
-            channels: ["DASHBOARD"],
+            channels: ["DASHBOARD", "LIFF_SELF_SERVICE"],
         }));
         expect(CAPABILITY_REGISTRY.get("it.ticket.create")).toEqual(expect.objectContaining({
             scopes: ["OWN"],
-            channels: ["DASHBOARD"],
+            channels: ["DASHBOARD", "LIFF_SELF_SERVICE"],
         }));
         expect(CAPABILITY_REGISTRY.get("it.ticket.comment")).toEqual(expect.objectContaining({
             scopes: ["OWN", "ALL"],
-            channels: ["DASHBOARD"],
+            channels: ["DASHBOARD", "LIFF_SELF_SERVICE"],
         }));
         expect(CAPABILITY_REGISTRY.get("it.ticket.manage")).toEqual(expect.objectContaining({
             scopes: ["ALL"],

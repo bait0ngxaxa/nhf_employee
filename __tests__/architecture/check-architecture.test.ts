@@ -2415,6 +2415,41 @@ describe("architecture checker module boundaries", () => {
         );
     });
 
+    it.each([
+        "@/modules/it/application/ticket-commands",
+        "@/modules/it/infrastructure/persistence/ticket-repository",
+        "@/modules/it/infrastructure/attachments/storage",
+        "@/modules/notification/infrastructure/persistence/repository",
+        "@/modules/audit/infrastructure/persistence/audit-log-repository",
+        "@/lib/db/prisma",
+        "@/lib/services/outbox/processor",
+        "@/app/api/it/tickets/_lib/response",
+    ])("keeps LIFF IT route adapters out of private implementation %s", async (specifier) => {
+        const result = await checkFixture(
+            "app/api/line/it/tickets/route.ts",
+            `import { value } from "${specifier}";\n`,
+        );
+
+        expect(result.violations).toEqual(expect.arrayContaining([
+            expect.stringContaining("LIFF IT API routes must not import"),
+        ]));
+    });
+
+    it("allows LIFF IT route composition through the public modules and shared route infrastructure", async () => {
+        const result = await checkFixture(
+            "app/api/line/it/tickets/route.ts",
+            [
+                'import { requireLiffWorkforceSession } from "@/modules/line";',
+                'import { createITTicket } from "@/modules/it";',
+                'import { jsonError } from "@/lib/ssot/http";',
+                'import { enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";',
+                'import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";',
+            ].join("\n"),
+        );
+
+        expect(result.violations).toEqual([]);
+    });
+
     it("requires Email Request Dashboard routes to use the IT client entry", async () => {
         const result = await checkFixture(
             "app/dashboard/email-request/page.tsx",

@@ -1,16 +1,18 @@
 import type { NextResponse } from "next/server";
 
 import { forbidden, jsonError, notFound } from "@/lib/ssot/http";
+
+import { ITCapabilityDeniedError } from "../../application/authorization";
 import {
-    ITCapabilityDeniedError,
-    IT_TICKET_DATABASE_INT_MAX,
     ITTicketIdempotencyConflictError,
     ITTicketInputValidationError,
+    ITTicketMutationConflictError,
     ITTicketNotCommentableError,
     ITTicketNotFoundError,
-    ITTicketAttachmentValidationError,
     ITWorkforceDeniedError,
-} from "@/modules/it";
+} from "../../application/ticket-errors";
+import { IT_TICKET_DATABASE_INT_MAX } from "../../contracts";
+import { ITTicketAttachmentValidationError } from "../../infrastructure/attachments/validation";
 
 export function mapITTicketRouteError(error: unknown): NextResponse | null {
     if (error instanceof ITCapabilityDeniedError || error instanceof ITWorkforceDeniedError) {
@@ -29,6 +31,9 @@ export function mapITTicketRouteError(error: unknown): NextResponse | null {
         return notFound({ success: false });
     }
     if (error instanceof ITTicketNotCommentableError) {
+        return jsonError(error.message, 409, { success: false, code: error.code });
+    }
+    if (error instanceof ITTicketMutationConflictError) {
         return jsonError(error.message, 409, { success: false, code: error.code });
     }
     return null;
@@ -54,4 +59,26 @@ export function readITTicketTimelineQuery(
         result[key] = value;
     }
     return result;
+}
+
+function safeErrorMetadata(error: unknown): { errorType: string; errorCode?: string } {
+    const rawErrorType = error instanceof Error ? error.name : "UnknownError";
+    const errorType = /^[A-Za-z][A-Za-z0-9]{0,63}$/.test(rawErrorType)
+        ? rawErrorType
+        : "UnknownError";
+    const rawErrorCode = typeof error === "object" && error !== null && "code" in error
+        && typeof error.code === "string"
+        ? error.code
+        : undefined;
+    const errorCode = rawErrorCode !== undefined && /^[A-Z0-9_]{1,64}$/.test(rawErrorCode)
+        ? rawErrorCode
+        : undefined;
+    return { errorType, ...(errorCode === undefined ? {} : { errorCode }) };
+}
+
+export function logITTicketRouteFailure(
+    message: string,
+    error: unknown,
+): void {
+    console.error(`${message}:`, safeErrorMetadata(error));
 }

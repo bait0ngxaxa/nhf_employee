@@ -1084,41 +1084,78 @@ describe("production resolver target path", () => {
         expect(loadMany).toHaveBeenCalledTimes(0);
     });
 
-    it.each(["LIFF_SELF_SERVICE", "SYSTEM"] as const)(
-        "rejects every IT capability through the %s channel before persistence",
-        async (channel) => {
-            const load = vi.fn<AuthorizationResolutionRepository["load"]>(
-                async () => resolution(),
-            );
-            const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
-                async () => resolution(),
-            );
-            const resolver = createAuthorizationResolver({
-                repository: { load, loadMany },
+    it("supports only requester IT capabilities through LIFF before persistence", async () => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => resolution(),
+        );
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution(),
+        );
+        const resolver = createAuthorizationResolver({
+            repository: { load, loadMany },
+        });
+        const liffActor = actor({ channel: "LIFF_SELF_SERVICE" });
+
+        for (const capability of [
+            "it.ticket.read",
+            "it.ticket.create",
+            "it.ticket.comment",
+        ]) {
+            await expect(
+                resolver.resolve(liffActor, capability),
+            ).resolves.toMatchObject({
+                capability,
+                allowed: false,
+                scopes: [],
+                reason: "NO_APPLICABLE_GRANT",
             });
-            const actorWithUnsupportedChannel = actor({ channel });
+        }
+        for (const capability of ["it.ticket.manage", "it.analytics.read"]) {
+            await expect(
+                resolver.resolve(liffActor, capability),
+            ).resolves.toMatchObject({
+                capability,
+                allowed: false,
+                scopes: [],
+                reason: "CHANNEL_NOT_SUPPORTED",
+            });
+        }
+        expect(load).toHaveBeenCalledTimes(3);
+        expect(loadMany).not.toHaveBeenCalled();
+    });
 
-            for (const capability of [
-                "it.ticket.read",
-                "it.ticket.create",
-                "it.ticket.comment",
-                "it.ticket.manage",
-                "it.analytics.read",
-            ]) {
-                await expect(
-                    resolver.resolve(actorWithUnsupportedChannel, capability),
-                ).resolves.toMatchObject({
-                    capability,
-                    allowed: false,
-                    scopes: [],
-                    reason: "CHANNEL_NOT_SUPPORTED",
-                });
-            }
+    it("rejects every IT capability through SYSTEM before persistence", async () => {
+        const load = vi.fn<AuthorizationResolutionRepository["load"]>(
+            async () => resolution(),
+        );
+        const loadMany = vi.fn<AuthorizationResolutionRepository["loadMany"]>(
+            async () => resolution(),
+        );
+        const resolver = createAuthorizationResolver({
+            repository: { load, loadMany },
+        });
+        const actorWithUnsupportedChannel = actor({ channel: "SYSTEM" });
 
-            expect(load).not.toHaveBeenCalled();
-            expect(loadMany).not.toHaveBeenCalled();
-        },
-    );
+        for (const capability of [
+            "it.ticket.read",
+            "it.ticket.create",
+            "it.ticket.comment",
+            "it.ticket.manage",
+            "it.analytics.read",
+        ]) {
+            await expect(
+                resolver.resolve(actorWithUnsupportedChannel, capability),
+            ).resolves.toMatchObject({
+                capability,
+                allowed: false,
+                scopes: [],
+                reason: "CHANNEL_NOT_SUPPORTED",
+            });
+        }
+
+        expect(load).not.toHaveBeenCalled();
+        expect(loadMany).not.toHaveBeenCalled();
+    });
 
     it("fails closed on malformed ADMIN target persistence", async () => {
         const resolver = createAuthorizationResolver({

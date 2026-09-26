@@ -2,14 +2,16 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
-import { buildCurrentITAuthorizationContext, getITOperatorTicketTimeline } from "@/modules/it";
+import {
+    buildCurrentITAuthorizationContext,
+    getITOperatorTicketTimeline,
+    readITTicketTimelineQuery,
+} from "@/modules/it";
 
 import {
     mapITOperatorRouteError,
     parseITOperatorTicketId,
 } from "../../../_lib/response";
-import { readITTicketTimelineQuery } from "../../../../tickets/_lib/response";
-
 export async function GET(
     request: NextRequest,
     context: { readonly params: Promise<{ readonly ticketId: string }> },

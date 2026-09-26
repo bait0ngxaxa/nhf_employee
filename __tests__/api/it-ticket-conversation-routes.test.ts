@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: mocks.session }));
-vi.mock("@/app/api/it/_lib/outbox", () => ({
+vi.mock("@/lib/server/it-ticket-outbox-wakeup", () => ({
     scheduleITTicketOutboxWakeup: mocks.wakeOutbox,
 }));
 vi.mock("@/modules/it", async () => {

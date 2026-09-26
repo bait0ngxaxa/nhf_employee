@@ -27,6 +27,7 @@ export type PreAuthRateLimitScope =
     | "routine-task-update"
     | "routine-task-delete"
     | "routine-occurrence-admin"
+    | "it-ticket-create"
     | "it-ticket-comment-attachment";
 
 export type AuthenticatedMutationRateLimitScope = Exclude<
@@ -49,6 +50,7 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
     "routine-task-update": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
     "routine-task-delete": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
     "routine-occurrence-admin": { windowMs: 15 * 60 * 1000, maxRequests: 180 },
+    "it-ticket-create": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
     "it-ticket-comment-attachment": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
 } as const satisfies Record<PreAuthRateLimitScope, MutationRateLimitPolicy>;
 
@@ -65,12 +67,14 @@ export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
     "routine-task-update": { windowMs: 60 * 1000, maxRequests: 40 },
     "routine-task-delete": { windowMs: 60 * 1000, maxRequests: 20 },
     "routine-occurrence-admin": { windowMs: 60 * 1000, maxRequests: 60 },
+    "it-ticket-create": { windowMs: 60 * 1000, maxRequests: 10 },
     "it-ticket-comment-attachment": { windowMs: 60 * 1000, maxRequests: 10 },
 } as const satisfies Record<
     AuthenticatedMutationRateLimitScope,
     MutationRateLimitPolicy
 >;
 
+// This shared limiter is process-local; scopes use the same in-memory store.
 const rateLimitEntries = new Map<string, RateLimitEntry>();
 const UNKNOWN_CLIENT = "unknown";
 const CLEANUP_INTERVAL_MS = 60 * 1000;

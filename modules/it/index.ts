@@ -13,6 +13,7 @@ export { buildCurrentITAuthorizationContext } from "./application/workforce";
 export { dispatchITTicketNotificationOutbox } from "./application/notifications/dispatch";
 export type {
     ITAuthorizationActor,
+    ITAuthorizationChannel,
     ITAuthorizationContext,
     ITCapability,
     ITCapabilityAuthorization,
@@ -52,6 +53,21 @@ export {
     postITRequesterTicketComment,
 } from "./application/ticket-comment-commands";
 export { getITTicketAttachmentForDownload } from "./application/ticket-attachment-queries";
+export {
+    getITTicketCommentMediaType,
+    isITTicketCommentParseFailure,
+    parseITTicketCommentHttpInput,
+} from "./presentation/http/comment-request";
+export type {
+    ITTicketCommentMediaType,
+    ParsedITTicketCommentHttpInput,
+} from "./presentation/http/comment-request";
+export {
+    logITTicketRouteFailure,
+    mapITTicketRouteError,
+    parseITRequesterTicketId,
+    readITTicketTimelineQuery,
+} from "./presentation/http/ticket-routes";
 export {
     getITAnalyticsDashboard,
     ITAnalyticsInputValidationError,

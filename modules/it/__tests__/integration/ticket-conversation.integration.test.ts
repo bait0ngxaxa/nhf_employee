@@ -6,6 +6,8 @@ import {
     assignITTicket,
     buildITAuthorizationContext,
     createITTicket,
+    getITOperatorTicket,
+    getITRequesterTicket,
     getITOperatorTicketTimeline,
     getITRequesterTicketTimeline,
     ITCapabilityDeniedError,
@@ -336,6 +338,44 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
             { ticketId: ownTicket.ticket.id, body: "พนักงานถูกปิดแล้ว" },
             { idempotencyKey: nextFixtureKey("inactive-requester-comment") },
         )).rejects.toMatchObject({ code: "WORKFORCE_DENIED" });
+    });
+
+    it("keeps LIFF requester self-service separate from the same user's Dashboard ALL authority", async () => {
+        const fixture = await createFixture("liff-channel-isolation");
+        await grant(fixture.operator.userId, "it.ticket.manage");
+        const liffContext = buildITAuthorizationContext(
+            { id: fixture.operator.userId, role: Role.USER },
+            fixture.operator.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        const ownTicket = await createITTicket(liffContext, {
+            type: "INCIDENT",
+            title: "LIFF self-service ticket",
+            description: "Created through the requester channel",
+        }, { idempotencyKey: nextFixtureKey("liff-own-create") });
+        const foreignRequester = await createWorkforceUser(
+            "liff-channel-foreign-requester",
+            fixture.departmentId,
+        );
+        const foreignTicket = await createTicket(foreignRequester, "liff-channel-foreign");
+
+        await expect(getITRequesterTicket(liffContext, ownTicket.ticket.id))
+            .resolves.toMatchObject({ id: ownTicket.ticket.id });
+        await expect(getITRequesterTicket(liffContext, foreignTicket.ticket.id))
+            .rejects.toBeInstanceOf(ITTicketNotFoundError);
+        await expect(postITRequesterTicketComment(
+            liffContext,
+            { ticketId: foreignTicket.ticket.id, body: "LIFF must not comment on this" },
+            { idempotencyKey: nextFixtureKey("liff-foreign-comment") },
+        )).rejects.toBeInstanceOf(ITTicketNotFoundError);
+
+        await expect(getITOperatorTicket(fixture.operator.context, foreignTicket.ticket.id))
+            .resolves.toMatchObject({ id: foreignTicket.ticket.id });
+        await expect(postITOperatorTicketComment(
+            fixture.operator.context,
+            { ticketId: foreignTicket.ticket.id, body: "Dashboard operator reply" },
+            { idempotencyKey: nextFixtureKey("dashboard-foreign-comment") },
+        )).resolves.toMatchObject({ comment: { authorSide: ITTicketCommentKind.OPERATOR } });
     });
 
     it("requires read ALL and comment ALL independently and rechecks current authority and workforce", async () => {

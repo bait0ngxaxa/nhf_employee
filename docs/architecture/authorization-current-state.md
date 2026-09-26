@@ -1834,3 +1834,35 @@ again inside the transaction after locking. The security change adds no schema
 or migration and does not claim production deployment evidence.
 Focused API, application, and real-MySQL regression evidence is recorded in
 [pre-it-hardening-h0-baseline.md](pre-it-hardening-h0-baseline.md).
+
+## IT9A channel policy current state
+
+IT9A extends the central IT capability registry by channel:
+
+| Capability | `DASHBOARD` | `LIFF_SELF_SERVICE` | `SYSTEM` |
+| --- | --- | --- | --- |
+| `it.ticket.read` | Supported | Supported, effective scope clamped to `OWN` | Unsupported |
+| `it.ticket.create` | Supported | Supported, effective scope clamped to `OWN` | Unsupported |
+| `it.ticket.comment` | Supported | Supported, effective scope clamped to `OWN` | Unsupported |
+| `it.ticket.manage` | Supported | Unsupported | Unsupported |
+| `it.analytics.read` | Supported | Unsupported | Unsupported |
+
+The IT Default Domain Policy supplies `read/create/comment / OWN` to eligible
+active workforce through both Dashboard and LIFF, independent of `systemRole`.
+`manage` and `analytics.read` have no defaults. Dashboard continues composing
+configured Team, TeamRole, and direct User authority additively. In the LIFF
+channel, IT applies its own requester policy after central resolver and default
+composition: the effective scope for read/create/comment is `OWN`, even when
+configured authority resolves to `ALL`. The configured decision remains
+available as configured evidence and is not rewritten to claim that a grant
+originated from the default policy. USER and ADMIN follow the same rule.
+
+This narrowing is IT channel policy; the central resolver knows only that the
+three requester capabilities are registered for `LIFF_SELF_SERVICE`. IT
+`SYSTEM` actors remain unsupported, and `systemRole` alone never grants IT
+business authority. `/api/line/it/**` builds context from the verified LIFF
+workforce session and calls the same IT application operations as Dashboard.
+The requester query and mutation resource predicates remain authoritative; a
+LIFF operator with configured ALL cannot read or comment on another
+requester's Ticket or attachment. Dashboard configured ALL remains available
+according to existing operator rules.

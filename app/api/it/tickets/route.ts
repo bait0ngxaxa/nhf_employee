@@ -9,12 +9,12 @@ import {
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_LIST_DEFAULT_PAGE,
     listITRequesterTickets,
+    logITTicketRouteFailure,
+    mapITTicketRouteError,
     toITRequesterTicket,
 } from "@/modules/it";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
-
-import { mapITTicketRouteError } from "./_lib/response";
-import { scheduleITTicketOutboxWakeup } from "../_lib/outbox";
+import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         const expected = mapITTicketRouteError(error);
         if (expected) return expected;
-        console.error("Error creating IT Ticket:", error);
+        logITTicketRouteFailure("Error creating IT Ticket", error);
         return operationFailed(500, { success: false });
     }
 }
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         const expected = mapITTicketRouteError(error);
         if (expected) return expected;
-        console.error("Error listing IT Tickets:", error);
+        logITTicketRouteFailure("Error listing IT Tickets", error);
         return operationFailed(500, { success: false });
     }
 }

@@ -6,18 +6,19 @@ import {
     type CurrentWorkforceDepartmentSnapshot,
 } from "@/modules/employee";
 
-import type { ITAuthorizationContext } from "./authorization";
+import type { ITAuthorizationChannel, ITAuthorizationContext } from "./authorization";
 import { buildITAuthorizationContext } from "./authorization";
 import { ITWorkforceDeniedError } from "./ticket-errors";
 
 /** Builds IT identity from a trusted authenticated account and current Employee link. */
 export async function buildCurrentITAuthorizationContext(
     user: { readonly id: number; readonly role: string },
+    channel: ITAuthorizationChannel = "DASHBOARD",
 ): Promise<ITAuthorizationContext> {
     const employee = await findCurrentEmployeeProjection(user.id);
     if (employee === null) throw new ITWorkforceDeniedError();
 
-    return buildITAuthorizationContext(user, employee.id);
+    return buildITAuthorizationContext(user, employee.id, channel);
 }
 
 /** Revalidates that the trusted actor still has the same active workforce identity. */

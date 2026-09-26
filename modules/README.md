@@ -5,8 +5,10 @@ Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. IT1 through IT8 are closed under `modules/it/`. IT8 moved Email
-Request ownership into the module while preserving its compatibility seam.
+boundaries. IT1 through IT9A are closed under `modules/it/`. IT8 moved Email
+Request ownership into the module while preserving its compatibility seam;
+IT9A added the requester-only LIFF authorization and API foundation without
+adding a LIFF UI or shell entry.
 Its server entry is
 `@/modules/it` and its browser-safe Dashboard presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and
@@ -231,8 +233,14 @@ reserved for a future truly Notification-owned generic event with a fully
 resolved command payload; no current production event uses that shape. IT
 enqueues `IT_TICKET_IN_APP` transactionally and exports its server-only dispatch
 contract through `@/modules/it`; app API adapters wake the global processor only
-after successful mutations. IT6 is in-app only. Email is deferred to IT8, and
-LINE/IT LIFF are deferred pending an IT product decision. See
+after successful mutations. IT6 implements in-app Ticket notifications.
+IT9A adds the LIFF requester API foundation; Ticket LINE delivery remains
+deferred to IT9D, after the UI deep-link destination exists. Ticket Email
+remains a product decision/deferred. The Ticket creation rate-limit scope is
+`it-ticket-create` (60 requests per IP per 15 minutes; 10 per authenticated
+principal per minute); like the shared mutation limiter, it is currently
+process-local. Attachment-bearing comments reuse
+`it-ticket-comment-attachment` with the same budgets. See
 [notification-migration.md](../docs/architecture/notification-migration.md)
 for the H0 evidence, exhaustive ledger, invariants, and H1-H3 slices. H3
 producer integration and compatibility cleanup are complete. NotificationOutbox

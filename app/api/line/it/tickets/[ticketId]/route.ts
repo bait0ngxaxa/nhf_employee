@@ -1,41 +1,40 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { requireApiSession } from "@/lib/auth/api";
-import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
+import { jsonError, operationFailed } from "@/lib/ssot/http";
+import { requireLiffWorkforceSession } from "@/modules/line";
 import {
-    buildCurrentITAuthorizationContext,
+    buildITAuthorizationContext,
     getITRequesterTicket,
     logITTicketRouteFailure,
     mapITTicketRouteError,
     parseITRequesterTicketId,
 } from "@/modules/it";
 
+interface RouteContext {
+    readonly params: Promise<{ readonly ticketId: string }>;
+}
+
 export async function GET(
     _request: NextRequest,
-    context: { readonly params: Promise<{ readonly ticketId: string }> },
+    { params }: RouteContext,
 ): Promise<NextResponse> {
-    try {
-        const auth = await requireApiSession({
-            unauthorizedResponse: () => unauthorized({ success: false }),
-            forbiddenResponse: () => forbidden({ success: false }),
-        });
-        if (!auth.ok) return auth.response;
+    const auth = await requireLiffWorkforceSession();
+    if (!auth.ok) return auth.response;
 
-        const { ticketId: rawTicketId } = await context.params;
-        const ticketId = parseITRequesterTicketId(rawTicketId);
+    try {
+        const ticketId = parseITRequesterTicketId((await params).ticketId);
         if (ticketId === null) {
             return jsonError("หมายเลข Ticket ไม่ถูกต้อง", 400, { success: false });
         }
-
         const ticket = await getITRequesterTicket(
-            await buildCurrentITAuthorizationContext(auth.user),
+            buildITAuthorizationContext(auth.user, auth.employeeId, "LIFF_SELF_SERVICE"),
             ticketId,
         );
         return NextResponse.json({ success: true, ticket });
     } catch (error) {
         const expected = mapITTicketRouteError(error);
         if (expected) return expected;
-        logITTicketRouteFailure("Error fetching IT Ticket", error);
+        logITTicketRouteFailure("Error fetching LIFF IT Ticket", error);
         return operationFailed(500, { success: false });
     }
 }

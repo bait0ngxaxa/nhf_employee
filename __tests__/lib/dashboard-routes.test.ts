@@ -133,6 +133,14 @@ describe("dashboard route SSOT", () => {
     it("centralizes internal IT Ticket API routes without changing the Stock alias", () => {
         expect(API_ROUTES.itTickets.list).toBe("/api/it/tickets");
         expect(API_ROUTES.itTickets.byId(27)).toBe("/api/it/tickets/27");
+        expect(API_ROUTES.line.itTickets).toBe("/api/line/it/tickets");
+        expect(API_ROUTES.line.itTicketById(27)).toBe("/api/line/it/tickets/27");
+        expect(API_ROUTES.line.itTicketTimelineById(27))
+            .toBe("/api/line/it/tickets/27/timeline");
+        expect(API_ROUTES.line.itTicketCommentsById(27))
+            .toBe("/api/line/it/tickets/27/comments");
+        expect(API_ROUTES.line.itAttachmentById("attachment-id"))
+            .toBe("/api/line/it/attachments/attachment-id");
         expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itEquipment)).toBe(
             APP_ROUTES.dashboardStock,
         );

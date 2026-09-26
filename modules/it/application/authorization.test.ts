@@ -20,6 +20,7 @@ import {
     IT_CAPABILITIES,
     resolveITCapability,
     resolveITCapabilityInTransaction,
+    type ITAuthorizationChannel,
     type ITAuthorizationContext,
 } from "./authorization";
 
@@ -44,8 +45,9 @@ vi.mock("@/modules/authorization", async (importOriginal) => {
 
 function context(
     role: "ADMIN" | "USER" = "USER",
+    channel: ITAuthorizationChannel = "DASHBOARD",
 ): ITAuthorizationContext {
-    return buildITAuthorizationContext({ id: 7, role }, 21);
+    return buildITAuthorizationContext({ id: 7, role }, 21, channel);
 }
 
 function decision(
@@ -84,6 +86,15 @@ describe("IT authorization adapter", () => {
         } satisfies AuthorizationActor);
     });
 
+    it("builds an explicit LIFF actor without accepting general authorization channels", () => {
+        expect(context("USER", "LIFF_SELF_SERVICE").authorizationActor).toEqual({
+            userId: 7,
+            employeeId: 21,
+            systemRole: "USER",
+            channel: "LIFF_SELF_SERVICE",
+        } satisfies AuthorizationActor);
+    });
+
     it.each([
         ["it.ticket.read", ["OWN"]],
         ["it.ticket.create", ["OWN"]],
@@ -101,29 +112,42 @@ describe("IT authorization adapter", () => {
                 context("ADMIN").authorizationActor,
                 capability,
             )).toEqual(expectedScopes);
+            expect(defaultITScopes(
+                context("USER", "LIFF_SELF_SERVICE").authorizationActor,
+                capability,
+            )).toEqual(expectedScopes);
+            expect(defaultITScopes(
+                context("ADMIN", "LIFF_SELF_SERVICE").authorizationActor,
+                capability,
+            )).toEqual(expectedScopes);
         },
     );
 
     it.each(["USER", "ADMIN"] as const)(
-        "composes only the approved defaults for %s",
+        "composes requester defaults for %s in Dashboard and LIFF",
         async (role) => {
             mocks.resolve.mockImplementation(async (
                 _actor: AuthorizationActor,
                 capability: string,
             ) => noGrantDecision(capability));
 
-            for (const capability of [
-                "it.ticket.read",
-                "it.ticket.create",
-                "it.ticket.comment",
-            ] as const) {
-                const result = await resolveITCapability(context(role), capability);
-                expect(result.defaultScopes).toEqual(["OWN"]);
-                expect(result.scopes).toEqual(["OWN"]);
-                expect(result.decision).toMatchObject({
-                    allowed: false,
-                    reason: "NO_APPLICABLE_GRANT",
-                });
+            for (const channel of ["DASHBOARD", "LIFF_SELF_SERVICE"] as const) {
+                for (const capability of [
+                    "it.ticket.read",
+                    "it.ticket.create",
+                    "it.ticket.comment",
+                ] as const) {
+                    const result = await resolveITCapability(
+                        context(role, channel),
+                        capability,
+                    );
+                    expect(result.defaultScopes).toEqual(["OWN"]);
+                    expect(result.scopes).toEqual(["OWN"]);
+                    expect(result.decision).toMatchObject({
+                        allowed: false,
+                        reason: "NO_APPLICABLE_GRANT",
+                    });
+                }
             }
 
             for (const capability of [
@@ -140,52 +164,131 @@ describe("IT authorization adapter", () => {
         },
     );
 
-    it("preserves additive configured ALL authority over an OWN default", async () => {
+    it.each([
+        "it.ticket.read",
+        "it.ticket.comment",
+    ] as const)("preserves Dashboard %s ALL authority", async (capability) => {
         mocks.resolve.mockResolvedValue(decision(
-            "it.ticket.read",
+            capability,
             true,
             ["ALL"],
             undefined,
             [{
-                capability: "it.ticket.read",
+                capability,
                 scope: "ALL",
                 source: { type: "USER", userId: 7 },
             }],
         ));
 
-        const result = await resolveITCapability(context(), "it.ticket.read");
+        const result = await resolveITCapability(context(), capability);
 
         expect(result.defaultScopes).toEqual(["OWN"]);
         expect(result.decision.scopes).toEqual(["ALL"]);
         expect(result.scopes).toEqual(["ALL"]);
     });
 
-    it("keeps unsupported channel decisions denied for every IT capability", async () => {
-        for (const channel of ["LIFF_SELF_SERVICE", "SYSTEM"] as const) {
-            for (const capability of IT_CAPABILITIES) {
-                const unsupportedContext = {
-                    authorizationActor: {
-                        ...context().authorizationActor,
-                        channel,
-                    },
-                } as unknown as ITAuthorizationContext;
-                mocks.resolve.mockResolvedValueOnce(
-                    decision(capability, false, [], "CHANNEL_NOT_SUPPORTED"),
-                );
+    it.each(["it.ticket.manage", "it.analytics.read"] as const)(
+        "preserves Dashboard %s ALL authority",
+        async (capability) => {
+            mocks.resolve.mockResolvedValue(decision(capability, true, ["ALL"]));
 
-                await expect(
-                    resolveITCapability(unsupportedContext, capability),
-                ).rejects.toMatchObject({
-                    name: "ITCapabilityDeniedError",
-                    authorizationReason: "CHANNEL_NOT_SUPPORTED",
-                });
+            await expect(resolveITCapability(context(), capability)).resolves.toMatchObject({
+                capability,
+                defaultScopes: [],
+                scopes: ["ALL"],
+            });
+        },
+    );
+
+    it.each(["USER", "ADMIN"] as const)(
+        "keeps LIFF %s on requester defaults despite configured ALL grants",
+        async (role) => {
+            for (const capability of ["it.ticket.read", "it.ticket.comment"] as const) {
+                const grant: EffectiveAuthorizationGrant = {
+                    capability,
+                    scope: "ALL",
+                    source: { type: "USER", userId: 7 },
+                };
+                mocks.resolve.mockResolvedValueOnce(decision(
+                    capability,
+                    true,
+                    ["ALL"],
+                    undefined,
+                    [grant],
+                ));
+
+                const result = await resolveITCapability(
+                    context(role, "LIFF_SELF_SERVICE"),
+                    capability,
+                );
+                expect(result.decision).toMatchObject({ allowed: true, scopes: ["ALL"] });
+                expect(result.decision.grants).toEqual([grant]);
+                expect(result.defaultScopes).toEqual(["OWN"]);
+                expect(result.scopes).toEqual(["OWN"]);
             }
         }
+    );
 
-        expect(mocks.resolve).toHaveBeenCalledTimes(IT_CAPABILITIES.length * 2);
+    it("keeps a configured LIFF requester grant additive with its default", async () => {
+        const grant: EffectiveAuthorizationGrant = {
+            capability: "it.ticket.read",
+            scope: "OWN",
+            source: { type: "USER", userId: 7 },
+        };
+        mocks.resolve.mockResolvedValue(decision(
+            "it.ticket.read",
+            true,
+            ["OWN"],
+            undefined,
+            [grant],
+        ));
+
+        const result = await resolveITCapability(
+            context("USER", "LIFF_SELF_SERVICE"),
+            "it.ticket.read",
+        );
+
+        expect(result.defaultScopes).toEqual(["OWN"]);
+        expect(result.decision.grants).toEqual([grant]);
+        expect(result.scopes).toEqual(["OWN"]);
+    });
+
+    it.each(["it.ticket.manage", "it.analytics.read"] as const)(
+        "rejects %s through LIFF even if the resolver reports ALL",
+        async (capability) => {
+            mocks.resolve.mockResolvedValue(decision(capability, true, ["ALL"]));
+            await expect(resolveITCapability(
+                context("ADMIN", "LIFF_SELF_SERVICE"),
+                capability,
+            )).rejects.toMatchObject({
+                name: "ITCapabilityDeniedError",
+                authorizationReason: "CHANNEL_NOT_SUPPORTED",
+            });
+        },
+    );
+
+    it("rejects every IT capability through SYSTEM", async () => {
+        for (const capability of IT_CAPABILITIES) {
+            const systemContext = {
+                authorizationActor: {
+                    ...context().authorizationActor,
+                    channel: "SYSTEM",
+                },
+            } as unknown as ITAuthorizationContext;
+            mocks.resolve.mockResolvedValueOnce(
+                decision(capability, false, [], "CHANNEL_NOT_SUPPORTED"),
+            );
+
+            await expect(
+                resolveITCapability(systemContext, capability),
+            ).rejects.toMatchObject({
+                name: "ITCapabilityDeniedError",
+                authorizationReason: "CHANNEL_NOT_SUPPORTED",
+            });
+        }
+        expect(mocks.resolve).toHaveBeenCalledTimes(IT_CAPABILITIES.length);
         expect(mocks.resolve.mock.calls.map(([actor]) => actor.channel)).toEqual(
-            [...IT_CAPABILITIES.map(() => "LIFF_SELF_SERVICE"),
-                ...IT_CAPABILITIES.map(() => "SYSTEM")],
+            IT_CAPABILITIES.map(() => "SYSTEM"),
         );
     });
 

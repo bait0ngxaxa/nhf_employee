@@ -467,6 +467,15 @@ export const API_ROUTES = {
         routineReference: "/api/line/routine/reference",
         routineTaskById: (id: number | string): string =>
             `/api/line/routine/tasks/${id}`,
+        itTickets: "/api/line/it/tickets",
+        itTicketById: (id: number | string): string =>
+            `/api/line/it/tickets/${id}`,
+        itTicketTimelineById: (id: number | string): string =>
+            `/api/line/it/tickets/${id}/timeline`,
+        itTicketCommentsById: (id: number | string): string =>
+            `/api/line/it/tickets/${id}/comments`,
+        itAttachmentById: (id: string): string =>
+            `/api/line/it/attachments/${id}`,
     },
     stock: {
         categories: "/api/stock/categories",

@@ -26,8 +26,10 @@ export const IT_CAPABILITIES = Object.freeze([
 
 export type ITCapability = (typeof IT_CAPABILITIES)[number];
 
+export type ITAuthorizationChannel = "DASHBOARD" | "LIFF_SELF_SERVICE";
+
 export type ITAuthorizationActor = AuthorizationActor & {
-    readonly channel: "DASHBOARD";
+    readonly channel: ITAuthorizationChannel;
 };
 
 export interface ITAuthorizationContext {
@@ -37,8 +39,11 @@ export interface ITAuthorizationContext {
 export interface ITCapabilityAuthorization {
     readonly actor: ITAuthorizationActor;
     readonly capability: ITCapability;
+    /** Central resolver evidence, before IT defaults or channel policy. */
     readonly decision: AuthorizationDecision;
+    /** IT Default Domain Policy scopes, before resolver composition. */
     readonly defaultScopes: readonly AuthorizationScope[];
+    /** Effective scopes after configured grants, defaults, and IT channel policy. */
     readonly scopes: readonly AuthorizationScope[];
 }
 
@@ -74,21 +79,23 @@ function parseUserRole(role: string): UserRole {
 export function buildITAuthorizationActor(
     user: { readonly id: number; readonly role: string },
     employeeId: number | null,
+    channel: ITAuthorizationChannel = "DASHBOARD",
 ): ITAuthorizationActor {
     return Object.freeze({
         userId: user.id,
         employeeId,
         systemRole: parseUserRole(user.role),
-        channel: "DASHBOARD" as const,
+        channel,
     });
 }
 
 export function buildITAuthorizationContext(
     user: { readonly id: number; readonly role: string },
     employeeId: number | null,
+    channel: ITAuthorizationChannel = "DASHBOARD",
 ): ITAuthorizationContext {
     return Object.freeze({
-        authorizationActor: buildITAuthorizationActor(user, employeeId),
+        authorizationActor: buildITAuthorizationActor(user, employeeId, channel),
     });
 }
 
@@ -126,13 +133,37 @@ function buildITCapabilityAuthorization(
         );
     }
 
+    const scopes = applyITChannelPolicy(actor, capability, authority.scopes);
+
     return Object.freeze({
         actor,
         capability,
         decision: authority.configuredDecision,
         defaultScopes: authority.defaultScopes,
-        scopes: authority.scopes,
+        scopes,
     });
+}
+
+/** LIFF is a requester channel; configured operator scopes never widen IT self-service. */
+function applyITChannelPolicy(
+    actor: ITAuthorizationActor,
+    capability: ITCapability,
+    composedScopes: readonly AuthorizationScope[],
+): readonly AuthorizationScope[] {
+    if (actor.channel === "DASHBOARD") return composedScopes;
+    if (actor.channel !== "LIFF_SELF_SERVICE") {
+        throw new ITCapabilityDeniedError(capability, "CHANNEL_NOT_SUPPORTED");
+    }
+
+    switch (capability) {
+        case "it.ticket.read":
+        case "it.ticket.create":
+        case "it.ticket.comment":
+            return OWN_DEFAULT_SCOPES;
+        case "it.ticket.manage":
+        case "it.analytics.read":
+            throw new ITCapabilityDeniedError(capability, "CHANNEL_NOT_SUPPORTED");
+    }
 }
 
 function composeITCapabilityAuthorization(

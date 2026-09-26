@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { scheduleITTicketOutboxWakeup } from "../../../../_lib/outbox";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { contentLengthExceedsLimit } from "@/lib/server/request-body";
@@ -12,13 +11,12 @@ import { IT_TICKET_COMMENT_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 import {
     buildCurrentITAuthorizationContext,
     IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES,
-    postITOperatorTicketComment,
-} from "@/modules/it";
-import {
     getITTicketCommentMediaType,
     isITTicketCommentParseFailure,
     parseITTicketCommentHttpInput,
-} from "../../../../_lib/comment-request";
+    postITOperatorTicketComment,
+} from "@/modules/it";
+import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";
 
 import {
     mapITOperatorRouteError,

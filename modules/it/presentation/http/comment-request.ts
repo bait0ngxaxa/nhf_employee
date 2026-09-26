@@ -2,12 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { readBoundedBytes, readBoundedJsonBody } from "@/lib/server/request-body";
 import { jsonError } from "@/lib/ssot/http";
-import {
-    createITTicketCommentBodySchema,
-    IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES,
-    type ITTicketAttachmentSource,
-} from "@/modules/it";
 import { IT_TICKET_COMMENT_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
+
+import { createITTicketCommentBodySchema } from "../../application/ticket-schemas";
+import {
+    IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES,
+} from "../../contracts";
+import type { ITTicketAttachmentSource } from "../../infrastructure/attachments/validation";
 
 export type ITTicketCommentMediaType = "json" | "multipart" | "unsupported";
 

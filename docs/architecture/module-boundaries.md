@@ -20,7 +20,10 @@ added shared conversation and a bounded merged timeline, IT5B added
 comment-owned private image attachments, IT6 implements in-app Ticket
 notifications, and IT7 adds an aggregate-only analytics query and Dashboard.
 IT8 moved the existing structured Email Request subdomain into IT and is
-closed; its compatibility and verification record is below.
+closed; IT9A adds requester-only LIFF authorization and API adapters over the
+same IT application. IT9A is closed; its UI, LIFF shell/Rich Menu integration,
+Ticket LINE delivery, product acceptance, and final hardening remain in IT9B–
+IT10. Its compatibility and verification record is below.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -120,7 +123,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT module Ticket services, operator processing, notifications, and analytics (IT1/IT2/IT3/IT4/IT5A/IT5B/IT6/IT7)
+## IT module Ticket services, operator processing, notifications, analytics, and LIFF APIs (IT1/IT2/IT3/IT4/IT5A/IT5B/IT6/IT7/IT9A)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -130,7 +133,10 @@ central `@/modules/authorization` resolver. `systemRole`, Department, Team
 names, TeamRole names, and assignment do not create IT authority or requester
 ownership.
 
-IT1 adds the `it` authorization domain and five Dashboard-only capabilities.
+IT1 adds the `it` authorization domain and five capabilities. IT9A makes
+`it.ticket.read`, `it.ticket.create`, and `it.ticket.comment` available to
+`LIFF_SELF_SERVICE`; `it.ticket.manage` and `it.analytics.read` remain
+Dashboard-only, and all IT capabilities remain unsupported on `SYSTEM`.
 IT2 adds new `it_*` Ticket, category, event, and creation-idempotency tables,
 validated server commands, transaction-time workforce/configured-authority
 checks, version concurrency, and the approved workflow. IT3 adds requester
@@ -162,7 +168,7 @@ entry. IT5B attachment storage does not create separate Ticket events, Audit
 rows, or notification content; IT6 adds transactional notification intents for
 the defined Ticket facts. IT-owned attachment code does not import Leave storage
 or business logic. Attachments are images-only, normalized to WEBP, retained
-with Ticket history; committed retention duration is deferred to IT9. IT5B
+with Ticket history; committed retention duration is deferred to IT10. IT5B
 adds no category administration, production grant configuration, or Email
 Request migration.
 
@@ -185,6 +191,23 @@ Deferred metric policy and Email Request ownership remain outside IT7. See
 [it-module-design.md](./it-module-design.md) for the phase contract and
 [authorization-current-state.md](./authorization-current-state.md) for the
 live authorization model.
+
+IT9A adds requester-only `/api/line/it/**` adapters that authenticate through
+`requireLiffWorkforceSession()` and reuse the same IT commands, requester
+queries, timeline, comment/attachment, and download operations. Its IT-owned
+channel policy clamps effective LIFF read/create/comment authority to OWN for
+USER and ADMIN even when configured authority is ALL; configured decision
+evidence remains distinct, Dashboard configured ALL remains unchanged, and
+SYSTEM plus LIFF manage/analytics are unsupported. These adapters may compose
+the public IT/LINE boundaries and shared HTTP/security infrastructure, but do
+not reach IT/Notification/Audit persistence, Dashboard private API helpers, or
+the global Outbox Processor. Accepted non-replayed mutations keep IT6's
+transactional in-app outbox behavior and use the shared route-layer wakeup.
+Ticket creation uses the dedicated process-local `it-ticket-create` limit;
+attachment comments reuse `it-ticket-comment-attachment`. IT9A adds no schema
+or migration, UI, shell/Rich Menu changes, operator LIFF API, or Ticket LINE
+delivery. Ticket LINE is deferred to IT9D; Ticket Email remains a product
+decision/deferred.
 
 ## IT8 Email Request ownership — CLOSED
 
@@ -307,9 +330,10 @@ Stock, Routine, and Email Request retain ownership of their current triggering
 events, recipient policy, notification type, title/message, action URL,
 reference ID, channel choice, and event-specific dedupe or supersede semantics.
 IT owns Ticket event meaning, recipient policy, strict payload, destination,
-event identity, and stale-domain validation. IT6 Ticket delivery uses only
-in-app notifications; Ticket email and LINE remain deferred pending an IT
-product decision. Notification must not grow audience APIs such as “notify all Stock
+event identity, and stale-domain validation. IT6 implements in-app Ticket
+notifications. IT9A adds the requester LIFF API foundation but does not enable
+Ticket LINE delivery; that remains deferred to IT9D. Ticket Email remains a
+product decision/deferred. Notification must not grow audience APIs such as “notify all Stock
 admins” or become a workflow owner for another module. Leave, Stock, Routine,
 and IT use only `@/modules/notification` for Inbox persistence; physical
 Prisma `Notification` delegate operations are owned exclusively by
