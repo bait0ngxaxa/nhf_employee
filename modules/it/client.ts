@@ -1,5 +1,6 @@
 "use client";
 
+export { LiffITApp } from "./presentation/liff/LiffITApp";
 export { ITTicketDetail } from "./presentation/dashboard/ITTicketDetail";
 export { ITTicketConversation } from "./presentation/dashboard/ITTicketConversation";
 export { ITTicketOperatorDetail } from "./presentation/dashboard/ITTicketOperatorDetail";

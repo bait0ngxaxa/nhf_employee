@@ -28,6 +28,8 @@ export const APP_ROUTES = {
         stock: "/liff/stock",
         leave: "/liff/leave",
         routine: "/liff/routine",
+        it: "/liff/it",
+        itTicket: (id: number | string): string => `/liff/it/${id}`,
     },
 } as const;
 

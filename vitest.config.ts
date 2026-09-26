@@ -46,6 +46,7 @@ const DOM_TESTS = [
     "modules/authorization/presentation/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/it/presentation/dashboard/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "modules/it/presentation/dashboard/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
+    "modules/it/presentation/liff/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
 ];
 
 const ARCHITECTURE_TEST = "__tests__/architecture/check-architecture.test.ts";
