@@ -48,6 +48,8 @@ const DOM_TESTS = [
     "modules/it/presentation/dashboard/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
 ];
 
+const ARCHITECTURE_TEST = "__tests__/architecture/check-architecture.test.ts";
+
 export default defineConfig({
     plugins: [react()],
     test: {
@@ -66,7 +68,7 @@ export default defineConfig({
                     name: "node",
                     environment: "node",
                     include: [...NODE_TESTS],
-                    exclude: [...DOM_TESTS],
+                    exclude: [...DOM_TESTS, ARCHITECTURE_TEST],
                 },
             },
             {
@@ -76,6 +78,16 @@ export default defineConfig({
                     environment: "jsdom",
                     setupFiles: "./vitest.setup.ts",
                     include: [...DOM_TESTS],
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: "architecture",
+                    environment: "node",
+                    include: [ARCHITECTURE_TEST],
+                    fileParallelism: false,
+                    sequence: { groupOrder: 1 },
                 },
             },
         ],
