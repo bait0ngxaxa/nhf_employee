@@ -196,7 +196,23 @@ At creation, IT2 resolves Department from the authenticated User's current Emplo
 
 ## 11. Dashboard and LIFF boundary
 
-**LOCKED.** Generic Dashboard shell/menu and App Router composition remain under `components/dashboard`, `constants/dashboard.ts`, `lib/ssot/routes.ts`, and `app/dashboard/**`. IT-specific self-service form/list, operator queue, detail/conversation/timeline, analytics views, and Email Request form/history live under `modules/it/presentation/dashboard/**` and are exposed through browser-safe `@/modules/it/client`. The analytics page route is `/dashboard/it/analytics`; its specific pathname mapping precedes the generic `/dashboard/it` root. Presentation uses server-derived `canReadAnalytics`; the API/application query independently verifies current workforce and `it.analytics.read / ALL`. Analytics does not require ticket read/manage, ADMIN, Department, Team, or TeamRole. The Email Request routes remain `/dashboard/email-request` and `/api/email-request`. Capability projections may hide or reveal menu/actions but are never server authorization. `LIFF_SELF_SERVICE` is not registered for IT without a product requirement; current initial surface is Dashboard only.
+**LOCKED.** Generic Dashboard shell/menu and App Router composition remain under `components/dashboard`, `constants/dashboard.ts`, `lib/ssot/routes.ts`, and `app/dashboard/**`. IT-specific Dashboard requester self-service form/list, operator queue, detail/conversation/timeline, analytics views, and Email Request form/history live under `modules/it/presentation/dashboard/**` and are exposed through browser-safe `@/modules/it/client`. The analytics page route is `/dashboard/it/analytics`; its specific pathname mapping precedes the generic `/dashboard/it` root. Presentation uses server-derived `canReadAnalytics`; the API/application query independently verifies current workforce and `it.analytics.read / ALL`. Analytics does not require ticket read/manage, ADMIN, Department, Team, or TeamRole. The Email Request routes remain `/dashboard/email-request` and `/api/email-request`. Capability projections may hide or reveal menu/actions but are never server authorization.
+
+The current channel boundary is:
+
+- **`DASHBOARD`:** requester self-service, operator queue/detail/workflow, analytics, and the Email Request Dashboard.
+- **`LIFF_SELF_SERVICE`:** requester self-service only. Effective `it.ticket.read`, `it.ticket.create`, and `it.ticket.comment` scopes are always `OWN`, including when configured authority resolves to `ALL`.
+- LIFF does not expose the operator queue, assignment, category/status mutation, `it.ticket.manage`, or `it.analytics.read`.
+
+IT9A currently provides only the server/API foundation:
+
+- `GET` and `POST /api/line/it/tickets`
+- `GET /api/line/it/tickets/:id`
+- `GET /api/line/it/tickets/:id/timeline`
+- `POST /api/line/it/tickets/:id/comments`
+- `GET /api/line/it/attachments/:id`
+
+The `/liff/it` UI is pending IT9B. LIFF Home, Bottom Nav, deep-link, and Rich Menu integration are pending IT9C. Ticket LINE delivery is pending IT9D.
 
 ## 12. Existing Email Request: IT8 ownership and compatibility
 
