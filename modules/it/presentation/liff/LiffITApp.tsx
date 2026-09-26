@@ -1,11 +1,14 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- Selected attachments use local object URLs for previews. */
+
 import {
     useEffect,
     useRef,
     useState,
     type FormEvent,
     type ReactElement,
+    type ChangeEvent,
 } from "react";
 import Link from "next/link";
 import {
@@ -16,6 +19,7 @@ import {
     Plus,
     RefreshCw,
     TicketCheck,
+    X,
 } from "lucide-react";
 import type { ITTicketStatus, ITTicketType } from "@prisma/client";
 
@@ -27,19 +31,31 @@ import { APP_ROUTES } from "@/lib/ssot/routes";
 import { LiffApiError } from "@/modules/line/client";
 import {
     IT_TICKET_DESCRIPTION_MAX_LENGTH,
+    IT_TICKET_ATTACHMENT_ACCEPTED_TYPES,
+    IT_TICKET_ATTACHMENT_MAX_BYTES,
+    IT_TICKET_ATTACHMENT_MAX_FILES,
+    IT_TICKET_ATTACHMENT_MAX_TOTAL_BYTES,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TITLE_MAX_LENGTH,
     IT_TICKET_TYPE_LABELS,
     IT_TICKET_TYPE_OPTIONS,
     type ITRequesterTicket,
+    type ITRequesterTicketDetail,
     type ITRequesterTicketList,
 } from "../../contracts";
 import {
     fetchLiffITTicket,
+    fetchLiffITAttachment,
     fetchLiffITTickets,
     createLiffITTicket,
 } from "./api";
 import { LiffITConversation } from "./LiffITConversation";
+import { ITTicketInitialAttachments } from "../dashboard/ITTicketInitialAttachments";
+import {
+    createITTicketCreationAttemptSignature,
+    validateITTicketAttachmentSelection,
+    type SelectedITTicketAttachment,
+} from "../dashboard/ticket-attachment-client";
 import {
     formatITTicketDate,
     IT_TICKET_STATUS_STYLES,
@@ -83,11 +99,24 @@ function LiffITTicketList(): ReactElement {
     const [ticketType, setTicketType] = useState<ITTicketType>("INCIDENT");
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
+    const [selectedAttachments, setSelectedAttachments] = useState<SelectedITTicketAttachment[]>([]);
     const [createError, setCreateError] = useState<string | null>(null);
     const [createdTicket, setCreatedTicket] = useState<ITRequesterTicket | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const createAttemptRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
     const createInFlightRef = useRef(false);
+    const selectedAttachmentsRef = useRef<SelectedITTicketAttachment[]>([]);
+
+    const updateSelectedAttachments = (next: SelectedITTicketAttachment[]): void => {
+        selectedAttachmentsRef.current = next;
+        setSelectedAttachments(next);
+    };
+
+    useEffect(() => () => {
+        for (const attachment of selectedAttachmentsRef.current) {
+            URL.revokeObjectURL(attachment.previewUrl);
+        }
+    }, []);
 
     const requestKey = `${page}:${retry}`;
     const currentList = listState?.key === requestKey ? listState : null;
@@ -119,12 +148,34 @@ function LiffITTicketList(): ReactElement {
         description: description.trim(),
     });
 
-    const clearChangedAttempt = (
-        next: { readonly type: ITTicketType; readonly title: string; readonly description: string },
-    ): void => {
-        if (createAttemptRef.current?.signature !== JSON.stringify(next)) {
-            createAttemptRef.current = null;
+    const handleAttachmentSelection = (event: ChangeEvent<HTMLInputElement>): void => {
+        const input = event.currentTarget;
+        const incoming = Array.from(input.files ?? []);
+        input.value = "";
+        if (incoming.length === 0) return;
+
+        const validationError = validateITTicketAttachmentSelection(
+            selectedAttachmentsRef.current.map((attachment) => attachment.file),
+            incoming,
+        );
+        if (validationError !== null) {
+            setCreateError(validationError);
+            return;
         }
+        createAttemptRef.current = null;
+        setCreateError(null);
+        updateSelectedAttachments([
+            ...selectedAttachmentsRef.current,
+            ...incoming.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+        ]);
+    };
+
+    const removeAttachment = (previewUrl: string): void => {
+        const current = selectedAttachmentsRef.current;
+        const removed = current.find((attachment) => attachment.previewUrl === previewUrl);
+        if (removed) URL.revokeObjectURL(removed.previewUrl);
+        createAttemptRef.current = null;
+        updateSelectedAttachments(current.filter((attachment) => attachment.previewUrl !== previewUrl));
     };
 
     const handleCreate = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -137,22 +188,37 @@ function LiffITTicketList(): ReactElement {
             return;
         }
 
-        const signature = JSON.stringify(payload);
-        let attempt = createAttemptRef.current;
-        if (attempt === null || attempt.signature !== signature) {
-            attempt = { signature, key: createIdempotencyKey() };
-            createAttemptRef.current = attempt;
-        }
-
         createInFlightRef.current = true;
         setSubmitting(true);
         setCreateError(null);
+        const selectedFiles = selectedAttachmentsRef.current.map((attachment) => attachment.file);
         try {
-            const created = await createLiffITTicket(payload, attempt.key);
+            let signature: string;
+            try {
+                signature = await createITTicketCreationAttemptSignature(payload, selectedFiles);
+            } catch {
+                setCreateError("อ่านรูปภาพที่เลือกไม่ได้ กรุณาเลือกรูปภาพอีกครั้ง");
+                return;
+            }
+            let attempt = createAttemptRef.current;
+            if (attempt === null || attempt.signature !== signature) {
+                attempt = { signature, key: createIdempotencyKey() };
+                createAttemptRef.current = attempt;
+            }
+
+            const created = await createLiffITTicket(
+                payload,
+                selectedFiles,
+                attempt.key,
+            );
             createAttemptRef.current = null;
             setTitle("");
             setDescription("");
             setTicketType("INCIDENT");
+            for (const attachment of selectedAttachmentsRef.current) {
+                URL.revokeObjectURL(attachment.previewUrl);
+            }
+            updateSelectedAttachments([]);
             setCreating(false);
             setCreatedTicket(created);
 
@@ -206,6 +272,7 @@ function LiffITTicketList(): ReactElement {
                 <button
                     type="button"
                     onClick={() => setCreating(false)}
+                    disabled={submitting}
                     className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-semibold text-content-secondary underline-offset-4 hover:text-content-heading hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ArrowLeft aria-hidden="true" className="size-4" />
@@ -213,7 +280,7 @@ function LiffITTicketList(): ReactElement {
                 </button>
                 <section className="space-y-5">
                     <div className="space-y-2">
-                        <h1 className="text-2xl font-bold leading-tight tracking-tight text-content-heading">สร้าง Ticket</h1>
+                        <h1 className="text-2xl font-bold leading-tight tracking-tight text-content-heading">แจ้งปัญหา / ขอความช่วยเหลือ</h1>
                         <p className="text-sm leading-6 text-content-secondary">
                             แจ้งรายละเอียดที่ช่วยให้เจ้าหน้าที่ IT เข้าใจเรื่องที่ต้องการให้ช่วยได้ชัดเจน
                         </p>
@@ -226,7 +293,7 @@ function LiffITTicketList(): ReactElement {
                                 value={ticketType}
                                 onChange={(event) => {
                                     const nextType = event.currentTarget.value as ITTicketType;
-                                    clearChangedAttempt({ ...currentPayload(), type: nextType });
+                                    createAttemptRef.current = null;
                                     setTicketType(nextType);
                                     setCreateError(null);
                                 }}
@@ -245,7 +312,7 @@ function LiffITTicketList(): ReactElement {
                                 value={title}
                                 onChange={(event) => {
                                     const nextTitle = event.currentTarget.value;
-                                    clearChangedAttempt({ ...currentPayload(), title: nextTitle.trim() });
+                                    createAttemptRef.current = null;
                                     setTitle(nextTitle);
                                     setCreateError(null);
                                 }}
@@ -266,7 +333,7 @@ function LiffITTicketList(): ReactElement {
                                 value={description}
                                 onChange={(event) => {
                                     const nextDescription = event.currentTarget.value;
-                                    clearChangedAttempt({ ...currentPayload(), description: nextDescription.trim() });
+                                    createAttemptRef.current = null;
                                     setDescription(nextDescription);
                                     setCreateError(null);
                                 }}
@@ -280,15 +347,44 @@ function LiffITTicketList(): ReactElement {
                             />
                             <p id="liff-it-ticket-description-count" className="text-right text-xs tabular-nums text-content-muted">{description.length}/{IT_TICKET_DESCRIPTION_MAX_LENGTH}</p>
                         </div>
+                        <div className="space-y-2">
+                            <label htmlFor="liff-it-ticket-attachments" className="block text-sm font-semibold text-content-heading">
+                                รูปภาพประกอบ <span className="font-normal text-content-muted">(ไม่บังคับ)</span>
+                            </label>
+                            <p id="liff-it-ticket-attachment-limits" className="text-xs leading-5 text-content-secondary">
+                                JPG, PNG หรือ WEBP · ไม่เกิน {IT_TICKET_ATTACHMENT_MAX_FILES} รูป · รูปละ {(IT_TICKET_ATTACHMENT_MAX_BYTES / (1024 * 1024)).toLocaleString("th-TH")} MiB รวมไม่เกิน {(IT_TICKET_ATTACHMENT_MAX_TOTAL_BYTES / (1024 * 1024)).toLocaleString("th-TH")} MiB
+                            </p>
+                            <Input
+                                id="liff-it-ticket-attachments"
+                                type="file"
+                                accept={IT_TICKET_ATTACHMENT_ACCEPTED_TYPES.join(",")}
+                                multiple
+                                disabled={submitting || selectedAttachments.length >= IT_TICKET_ATTACHMENT_MAX_FILES}
+                                onChange={handleAttachmentSelection}
+                                aria-describedby="liff-it-ticket-attachment-limits"
+                                className="min-h-12 text-base file:mr-3 file:min-h-9 file:rounded-md file:border-0 file:bg-surface-subtle file:px-3 file:text-sm file:font-medium"
+                            />
+                            {selectedAttachments.length > 0 ? (
+                                <ul aria-label="รูปภาพที่เลือก" className="grid grid-cols-2 gap-3">
+                                    {selectedAttachments.map((attachment) => (
+                                        <li key={attachment.previewUrl} className="min-w-0 space-y-2 rounded-lg border border-border-neutral p-2">
+                                            <img src={attachment.previewUrl} alt={`ตัวอย่างรูป ${attachment.file.name}`} loading="lazy" className="aspect-[4/3] max-h-40 w-full rounded-md bg-surface-subtle object-contain" />
+                                            <p className="break-words text-xs leading-5 text-content-secondary">{attachment.file.name}</p>
+                                            <Button type="button" variant="outline" className="min-h-11 w-full" disabled={submitting} onClick={() => removeAttachment(attachment.previewUrl)}>
+                                                <X aria-hidden="true" className="size-4" />
+                                                นำรูปออก
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
+                        </div>
                         {createError ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">{createError}</p> : null}
                         <div className="flex flex-col gap-3 pt-1">
                             <Button type="submit" disabled={submitting} className="min-h-12 w-full text-base">
                                 {submitting ? <RefreshCw aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" /> : <Plus aria-hidden="true" className="size-4" />}
                                 {submitting ? "กำลังส่ง Ticket…" : "ส่ง Ticket"}
                             </Button>
-                            <p aria-live="polite" className="text-center text-xs leading-5 text-content-muted">
-                                การส่ง Ticket จะไม่แนบรูปภาพ รูปภาพหลักฐานส่งเพิ่มได้ในหน้าการสนทนา
-                            </p>
                         </div>
                     </form>
                 </section>
@@ -305,7 +401,7 @@ function LiffITTicketList(): ReactElement {
                 setCreating(true);
             }}>
                 <Plus aria-hidden="true" className="size-5" />
-                สร้าง Ticket
+                แจ้งปัญหา / ขอความช่วยเหลือ
             </Button>
 
             {createdTicket ? (
@@ -410,7 +506,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
     const [refreshVersion, setRefreshVersion] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
     const [ticketState, setTicketState] = useState<
-        | { readonly kind: "loaded"; readonly ticket: ITRequesterTicket }
+        | { readonly kind: "loaded"; readonly ticket: ITRequesterTicketDetail }
         | { readonly kind: "error"; readonly message: string }
         | null
     >(null);
@@ -483,6 +579,10 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                         <section aria-labelledby="liff-it-ticket-description-heading" className="space-y-2 border-t border-border-neutral pt-4">
                             <h2 id="liff-it-ticket-description-heading" className="text-sm font-semibold text-content-heading">รายละเอียด</h2>
                             <p className="whitespace-pre-wrap break-words text-sm leading-7 text-content-body">{ticket.description}</p>
+                            <ITTicketInitialAttachments
+                                attachments={ticket.initialAttachments}
+                                loadBlob={fetchLiffITAttachment}
+                            />
                         </section>
                         <dl className="grid grid-cols-1 gap-3 border-t border-border-neutral pt-4 text-sm sm:grid-cols-2">
                             <div className="space-y-1">

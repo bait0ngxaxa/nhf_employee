@@ -13,18 +13,19 @@ import { ITTicketConversation } from "./ITTicketConversation";
 import {
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
-    type ITRequesterTicket,
+    type ITRequesterTicketDetail,
 } from "../../contracts";
 import {
     formatITTicketDate,
     IT_TICKET_STATUS_STYLES,
     isITTicketResponseRecord,
-    parseITRequesterTicket,
+    parseITRequesterTicketDetail,
     readITRequesterError,
 } from "./ticket-presentation";
+import { ITTicketInitialAttachments } from "./ITTicketInitialAttachments";
 
 type ITRequesterDetailState =
-    | { readonly key: string; readonly kind: "loaded"; readonly ticket: ITRequesterTicket }
+    | { readonly key: string; readonly kind: "loaded"; readonly ticket: ITRequesterTicketDetail }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
 
 export function ITTicketDetail({
@@ -51,7 +52,7 @@ export function ITTicketDetail({
                 if (!isITTicketResponseRecord(payload) || payload.success !== true) {
                     throw new Error("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 }
-                const parsed = parseITRequesterTicket(payload.ticket);
+                const parsed = parseITRequesterTicketDetail(payload.ticket);
                 if (parsed === null) throw new Error("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 if (controller.signal.aborted) return;
                 setDetailState({ key: requestKey, kind: "loaded", ticket: parsed });
@@ -120,6 +121,7 @@ export function ITTicketDetail({
                                         {ticket.description}
                                     </p>
                                 </div>
+                                <ITTicketInitialAttachments attachments={ticket.initialAttachments} />
                                 <dl className="grid gap-x-6 gap-y-4 border-t border-border-neutral pt-5 sm:grid-cols-2">
                                     <div>
                                         <dt className="text-xs font-semibold text-content-muted">สร้างเมื่อ</dt>

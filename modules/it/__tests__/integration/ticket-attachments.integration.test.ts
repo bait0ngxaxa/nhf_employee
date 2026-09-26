@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 
 import { Role } from "@prisma/client";
 import sharp from "sharp";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
 import {
     buildITAuthorizationContext,
     createITTicket,
+    getITOperatorTicket,
+    getITRequesterTicket,
     getITRequesterTicketTimeline,
     getITTicketAttachmentForDownload,
     ITTicketAttachmentValidationError,
@@ -27,6 +29,8 @@ import {
     listITTicketAttachmentFiles,
     readITTicketAttachment,
 } from "../../infrastructure/attachments/storage";
+import * as attachmentStorage from "../../infrastructure/attachments/storage";
+import * as attachmentPersistence from "../../infrastructure/persistence/ticket-attachment-repository";
 
 const TEST_PREFIX = "it5b-ticket-attachment";
 let fixtureSequence = 0;
@@ -215,6 +219,183 @@ describe.sequential("IT5B private Ticket attachments with real MySQL", () => {
     afterAll(async () => {
         await cleanFixtures();
         await prisma.$disconnect();
+    });
+
+    it("persists initial creation evidence at Ticket level and replays without duplicate files or comments", async () => {
+        const fixture = await createFixture("initial-evidence");
+        const key = nextFixtureKey("initial-create-key");
+        const input = {
+            type: "INCIDENT" as const,
+            title: "หน้าจอระบบแสดงข้อผิดพลาด",
+            description: "เกิดหลังจากกดเข้าสู่ระบบ",
+        };
+        const images = [
+            await imageSource("หลักฐาน.jpg", { r: 20, g: 50, b: 90 }, "jpeg"),
+            await imageSource("หน้าเว็บ.png", { r: 90, g: 50, b: 20 }, "png"),
+            await imageSource("ข้อความแจ้งเตือน.webp", { r: 30, g: 80, b: 45 }, "webp"),
+        ] as const;
+        const create = () => createITTicket(fixture.requester.context, input, {
+            idempotencyKey: key,
+            attachments: images,
+        });
+
+        const first = await create();
+        const firstFiles = await filesForTicket(first.ticket.id);
+        const replay = await create();
+        const rows = await prisma.iTTicketAttachment.findMany({
+            where: { ticketId: first.ticket.id },
+            orderBy: { position: "asc" },
+        });
+        const requesterDetail = await getITRequesterTicket(fixture.requester.context, first.ticket.id);
+        const operatorDetail = await getITOperatorTicket(fixture.operator.context, first.ticket.id);
+
+        expect(first.replayed).toBe(false);
+        expect(replay).toMatchObject({ replayed: true, ticket: { id: first.ticket.id } });
+        expect(rows).toHaveLength(3);
+        expect(rows.map(({ commentId }) => commentId)).toEqual([null, null, null]);
+        expect(rows.map(({ position }) => position)).toEqual([0, 1, 2]);
+        expect(rows.map(({ uploaderUserId }) => uploaderUserId)).toEqual([
+            fixture.requester.userId,
+            fixture.requester.userId,
+            fixture.requester.userId,
+        ]);
+        expect(await prisma.iTTicketComment.count({ where: { ticketId: first.ticket.id } })).toBe(0);
+        expect(await prisma.iTTicketEvent.count({ where: { ticketId: first.ticket.id } })).toBe(1);
+        expect(await filesForTicket(first.ticket.id)).toEqual(firstFiles);
+        expect(firstFiles).toHaveLength(3);
+        expect(requesterDetail.initialAttachments).toHaveLength(3);
+        expect(operatorDetail.initialAttachments).toEqual(requesterDetail.initialAttachments);
+        expect(JSON.stringify(requesterDetail.initialAttachments))
+            .not.toMatch(/storageKey|contentSha256|uploaderUserId|filesystem/i);
+
+        for (const row of rows) {
+            expect(row.contentType).toBe("image/webp");
+            const stored = await readITTicketAttachment(row.storageKey, first.ticket.id);
+            expect((await sharp(stored).metadata()).format).toBe("webp");
+            expect(stored.byteLength).toBe(row.sizeBytes);
+        }
+
+        const changedImage = await imageSource("หลักฐาน.jpg", { r: 160, g: 50, b: 90 }, "jpeg");
+        await expect(createITTicket(fixture.requester.context, input, {
+            idempotencyKey: key,
+            attachments: [changedImage, images[1], images[2]],
+        })).rejects.toBeInstanceOf(ITTicketIdempotencyConflictError);
+        await expect(createITTicket(fixture.requester.context, {
+            ...input,
+            title: "เปลี่ยนหัวข้อ",
+        }, { idempotencyKey: key, attachments: images }))
+            .rejects.toBeInstanceOf(ITTicketIdempotencyConflictError);
+        await expect(createITTicket(fixture.requester.context, {
+            ...input,
+            description: "เปลี่ยนรายละเอียด",
+        }, { idempotencyKey: key, attachments: images }))
+            .rejects.toBeInstanceOf(ITTicketIdempotencyConflictError);
+        await expect(createITTicket(fixture.requester.context, {
+            ...input,
+            type: "SERVICE_REQUEST" as const,
+        }, { idempotencyKey: key, attachments: images }))
+            .rejects.toBeInstanceOf(ITTicketIdempotencyConflictError);
+        expect(await prisma.iTTicket.count({ where: { requesterUserId: fixture.requester.userId } })).toBe(1);
+        expect(await prisma.iTTicketAttachment.count({ where: { ticketId: first.ticket.id } })).toBe(3);
+        expect(await filesForTicket(first.ticket.id)).toHaveLength(3);
+    });
+
+    it("rolls back the Ticket and removes new private files when attachment persistence fails", async () => {
+        const fixture = await createFixture("initial-evidence-rollback");
+        const filesBefore = new Set((await listITTicketAttachmentFiles()).map(({ storageKey }) => storageKey));
+        const createRows = vi.spyOn(attachmentPersistence, "createITTicketAttachmentRows")
+            .mockRejectedValueOnce(new Error("simulated attachment row persistence failure"));
+
+        try {
+            await expect(createITTicket(fixture.requester.context, {
+                type: "INCIDENT",
+                title: "หลักฐานสำหรับทดสอบ rollback",
+                description: "ต้องไม่มี Ticket หรือไฟล์ค้างเมื่อบันทึกแถวรูปไม่สำเร็จ",
+            }, {
+                idempotencyKey: nextFixtureKey("initial-evidence-rollback"),
+                attachments: [await imageSource("หลักฐาน.png", { r: 35, g: 75, b: 125 })],
+            })).rejects.toThrow("simulated attachment row persistence failure");
+        } finally {
+            createRows.mockRestore();
+        }
+
+        expect(await prisma.iTTicket.count({ where: { requesterUserId: fixture.requester.userId } })).toBe(0);
+        expect(await prisma.iTTicketCreateIdempotency.count({
+            where: { requesterUserId: fixture.requester.userId },
+        })).toBe(0);
+        const filesAfter = await listITTicketAttachmentFiles();
+        expect(filesAfter.filter(({ storageKey }) => !filesBefore.has(storageKey))).toEqual([]);
+    });
+
+    it("creates no Ticket or file when an initial image fails validation", async () => {
+        const fixture = await createFixture("initial-evidence-validation");
+        const filesBefore = new Set((await listITTicketAttachmentFiles()).map(({ storageKey }) => storageKey));
+
+        await expect(createITTicket(fixture.requester.context, {
+            type: "INCIDENT",
+            title: "ภาพที่อ่านไม่ได้",
+            description: "ระบบต้องปฏิเสธรูปที่เสียหาย",
+        }, {
+            idempotencyKey: nextFixtureKey("initial-evidence-invalid-image"),
+            attachments: [sourceWithBytes("เสียหาย.png", "image/png", Buffer.from("not an image"))],
+        })).rejects.toBeInstanceOf(ITTicketAttachmentValidationError);
+
+        expect(await prisma.iTTicket.count({ where: { requesterUserId: fixture.requester.userId } })).toBe(0);
+        expect(await prisma.iTTicketAttachment.count({
+            where: { ticket: { requesterUserId: fixture.requester.userId } },
+        })).toBe(0);
+        const filesAfter = await listITTicketAttachmentFiles();
+        expect(filesAfter.filter(({ storageKey }) => !filesBefore.has(storageKey))).toEqual([]);
+    });
+
+    it("reports storage failure without leaving a Ticket or private image", async () => {
+        const fixture = await createFixture("initial-evidence-storage-failure");
+        const filesBefore = new Set((await listITTicketAttachmentFiles()).map(({ storageKey }) => storageKey));
+        const writeFiles = vi.spyOn(attachmentStorage, "writeITTicketAttachments")
+            .mockRejectedValueOnce(new Error("simulated private storage failure"));
+
+        try {
+            await expect(createITTicket(fixture.requester.context, {
+                type: "INCIDENT",
+                title: "ระบบจัดเก็บภาพขัดข้อง",
+                description: "ห้ามแจ้งว่าสร้าง Ticket สำเร็จเมื่อจัดเก็บรูปไม่สำเร็จ",
+            }, {
+                idempotencyKey: nextFixtureKey("initial-evidence-storage-failure"),
+                attachments: [await imageSource("หลักฐาน.png", { r: 55, g: 85, b: 115 })],
+            })).rejects.toThrow("simulated private storage failure");
+        } finally {
+            writeFiles.mockRestore();
+        }
+
+        expect(await prisma.iTTicket.count({ where: { requesterUserId: fixture.requester.userId } })).toBe(0);
+        const filesAfter = await listITTicketAttachmentFiles();
+        expect(filesAfter.filter(({ storageKey }) => !filesBefore.has(storageKey))).toEqual([]);
+    });
+
+    it("authorizes initial evidence downloads through current Ticket OWN and ALL access", async () => {
+        const fixture = await createFixture("initial-evidence-read");
+        const created = await createITTicket(fixture.requester.context, {
+            type: "INCIDENT",
+            title: "สิทธิ์รูปเริ่มต้น",
+            description: "ทดสอบสิทธิ์อ่านรูป",
+        }, {
+            idempotencyKey: nextFixtureKey("initial-read-create"),
+            attachments: [await imageSource("ข้อมูลส่วนตัว.png", { r: 10, g: 20, b: 30 })],
+        });
+        const attachment = await prisma.iTTicketAttachment.findFirstOrThrow({
+            where: { ticketId: created.ticket.id },
+            select: { id: true },
+        });
+        const foreignRequester = await createWorkforceUser("initial-evidence-foreign", fixture.departmentId);
+        const authorizedOperator = await createWorkforceUser("initial-evidence-operator", fixture.departmentId);
+        await grant(authorizedOperator.userId, "it.ticket.read");
+
+        await expect(getITTicketAttachmentForDownload(fixture.requester.context, attachment.id))
+            .resolves.toMatchObject({ ticketId: created.ticket.id, contentType: "image/webp" });
+        await expect(getITTicketAttachmentForDownload(foreignRequester.context, attachment.id))
+            .rejects.toBeInstanceOf(ITTicketNotFoundError);
+        await expect(getITTicketAttachmentForDownload(authorizedOperator.context, attachment.id))
+            .resolves.toMatchObject({ ticketId: created.ticket.id, contentType: "image/webp" });
     });
 
     it("stores requester images under their own comment with deterministic metadata and private bytes", async () => {

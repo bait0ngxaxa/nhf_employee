@@ -14,6 +14,7 @@ import {
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type {
     ITRequesterTicket,
+    ITRequesterTicketDetail,
     ITRequesterTicketList,
     ITTicketCommentSubmission,
     ITTicketTimelinePage,
@@ -25,6 +26,7 @@ import {
 import {
     isITTicketResponseRecord,
     parseITRequesterTicket,
+    parseITRequesterTicketDetail,
     parseITRequesterTicketList,
     parseITTicketCommentSubmission,
     parseITTicketTimelinePage,
@@ -114,7 +116,7 @@ export async function fetchLiffITTickets(
 export async function fetchLiffITTicket(
     ticketId: number,
     signal?: AbortSignal,
-): Promise<ITRequesterTicket> {
+): Promise<ITRequesterTicketDetail> {
     const payload = await unwrapITResponse(
         await apiGet<unknown>(
             API_ROUTES.line.itTicketById(ticketId),
@@ -123,7 +125,7 @@ export async function fetchLiffITTicket(
         "detail",
     );
     const parsed = isITTicketResponseRecord(payload) && payload.success === true
-        ? parseITRequesterTicket(payload.ticket)
+        ? parseITRequesterTicketDetail(payload.ticket)
         : null;
     if (parsed === null) {
         throw invalidResponse("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
@@ -160,12 +162,24 @@ export async function createLiffITTicket(
         readonly title: string;
         readonly description: string;
     },
+    files: readonly File[],
     idempotencyKey: string,
 ): Promise<ITRequesterTicket> {
+    let requestBody: Record<string, string> | FormData;
+    if (files.length > 0) {
+        const formData = new FormData();
+        formData.set("type", input.type);
+        formData.set("title", input.title);
+        formData.set("description", input.description);
+        for (const file of files) formData.append("attachments", file, file.name);
+        requestBody = formData;
+    } else {
+        requestBody = input;
+    }
     const payload = await unwrapITResponse(
         await apiPost<unknown>(
             API_ROUTES.line.itTickets,
-            input,
+            requestBody,
             {
                 ...LIFF_API_REQUEST_OPTIONS,
                 headers: { "Idempotency-Key": idempotencyKey },

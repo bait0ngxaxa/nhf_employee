@@ -80,6 +80,14 @@ function postRequest(body: unknown, idempotencyKey?: string): NextRequest {
     });
 }
 
+function postFormRequest(formData: FormData, idempotencyKey: string): NextRequest {
+    return new NextRequest("http://localhost/api/it/tickets", {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: formData,
+    });
+}
+
 describe("IT requester Ticket API adapters", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -152,6 +160,60 @@ describe("IT requester Ticket API adapters", () => {
         expect(body.ticket).not.toHaveProperty("version");
         expect(body.ticket).not.toHaveProperty("assignedToUserId");
         expect(mocks.wakeOutbox).toHaveBeenCalledTimes(1);
+    });
+
+    it("accepts multipart creation without files and keeps the JSON service contract", async () => {
+        const formData = new FormData();
+        formData.set("type", "INCIDENT");
+        formData.set("title", "หัวข้อ multipart");
+        formData.set("description", "รายละเอียด multipart");
+
+        const response = await postTicket(postFormRequest(formData, "multipart-empty"));
+
+        expect(response.status).toBe(201);
+        expect(mocks.createTicket).toHaveBeenCalledWith(actorContext, {
+            type: "INCIDENT",
+            title: "หัวข้อ multipart",
+            description: "รายละเอียด multipart",
+        }, { idempotencyKey: "multipart-empty" });
+    });
+
+    it("passes multipart image sources to the creation command", async () => {
+        const formData = new FormData();
+        formData.set("type", "INCIDENT");
+        formData.set("title", "หัวข้อพร้อมภาพ");
+        formData.set("description", "รายละเอียดพร้อมภาพ");
+        formData.append("attachments", new File(["image-bytes"], "screen.png", {
+            type: "image/png",
+        }));
+
+        const response = await postTicket(postFormRequest(formData, "multipart-image"));
+        const options = mocks.createTicket.mock.calls[0]?.[2];
+
+        expect(response.status).toBe(201);
+        expect(options).toMatchObject({ idempotencyKey: "multipart-image" });
+        expect(options.attachments).toHaveLength(1);
+        expect(options.attachments[0]).toMatchObject({
+            name: "screen.png",
+            type: "image/png",
+            size: 11,
+        });
+    });
+
+    it("rejects explicit unsupported content types", async () => {
+        const request = new NextRequest("http://localhost/api/it/tickets", {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain",
+                "Idempotency-Key": "unsupported-content-type",
+            },
+            body: "not json",
+        });
+
+        const response = await postTicket(request);
+
+        expect(response.status).toBe(415);
+        expect(mocks.createTicket).not.toHaveBeenCalled();
     });
 
     it("does not wake the outbox for an idempotent creation replay", async () => {

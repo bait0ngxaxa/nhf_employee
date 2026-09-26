@@ -14,6 +14,7 @@ import {
     canAccessITTicketDashboard,
     canAccessITTicketQueue,
     canAccessITAnalytics,
+    canAccessITWorkspaceDashboard,
     canAccessEmployeeDashboard,
     canAccessLeaveDashboard,
     canAccessStockDashboard,
@@ -160,6 +161,13 @@ export function DashboardProvider({
             if (
                 menuId === "email-request"
                 && !canAccessEmailRequestDashboard(user?.emailRequestCapabilities)
+            ) {
+                router.push(APP_ROUTES.accessDenied);
+                return;
+            }
+            if (
+                menuId === "it-workspace"
+                && !canAccessITWorkspaceDashboard(user?.itCapabilities)
             ) {
                 router.push(APP_ROUTES.accessDenied);
                 return;

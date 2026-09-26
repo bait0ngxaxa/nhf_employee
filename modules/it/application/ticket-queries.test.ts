@@ -95,7 +95,7 @@ describe("IT requester Ticket queries", () => {
         mocks.assertWorkforce.mockResolvedValue({ employeeId: 84 });
         mocks.count.mockResolvedValue(11);
         mocks.findMany.mockResolvedValue([ticket]);
-        mocks.findFirst.mockResolvedValue(ticket);
+        mocks.findFirst.mockResolvedValue({ ...ticket, attachments: [] });
         mocks.findCategories.mockResolvedValue([]);
         mocks.findConfiguredRecipients.mockImplementation(async ({ capability }: { capability: string }) =>
             capability === "it.ticket.read" ? [51, 52]
@@ -240,6 +240,7 @@ describe("IT requester Ticket queries", () => {
         mocks.authorize.mockResolvedValueOnce({ scopes: ["ALL"] });
         mocks.findFirst.mockResolvedValueOnce({
             ...ticket,
+            attachments: [],
             category: { id: 7, key: "OLD", name: "หมวดหมู่เดิม", isActive: false },
         });
 

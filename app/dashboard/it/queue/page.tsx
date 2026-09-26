@@ -1,13 +1,7 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { requireDashboardITOperatorReadAccess } from "@/app/dashboard/_lib/route-access";
-import { ITTicketOperatorQueue } from "@/modules/it/client";
+import { IT_DASHBOARD_TABS, toDashboardITTabPath } from "@/lib/ssot/routes";
 
-export const metadata: Metadata = {
-    title: "คิว IT Ticket | NHFapp",
-};
-
-export default async function ITTicketOperatorQueuePage(): Promise<React.ReactElement> {
-    await requireDashboardITOperatorReadAccess();
-    return <ITTicketOperatorQueue />;
+export default function ITTicketOperatorQueueCompatibilityPage(): never {
+    redirect(toDashboardITTabPath(IT_DASHBOARD_TABS.queue));
 }

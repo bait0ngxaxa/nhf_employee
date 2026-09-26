@@ -7,6 +7,7 @@ import {
     type ITOperatorReferenceData,
     type ITOperatorTicket,
     type ITPresentationCapabilities,
+    type ITTicketAttachmentSummary,
 } from "@/modules/it/client";
 
 const requesterCapabilities: ITPresentationCapabilities = {
@@ -50,6 +51,11 @@ const reference: ITOperatorReferenceData = {
 };
 
 const fetchMock = vi.fn<typeof fetch>();
+let objectUrlSequence = 0;
+const createObjectUrl = vi.fn(() => `blob:operator-${++objectUrlSequence}`);
+const revokeObjectUrl = vi.fn();
+const originalCreateObjectUrl = URL.createObjectURL;
+const originalRevokeObjectUrl = URL.revokeObjectURL;
 
 function apiResponse(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
@@ -62,8 +68,11 @@ function queueResponse(tickets: readonly ITOperatorTicket[] = []): Response {
     return apiResponse({ success: true, tickets, nextCursor: null, limit: 25 });
 }
 
-function detailResponse(value: ITOperatorTicket): Response {
-    return apiResponse({ success: true, ticket: value });
+function detailResponse(
+    value: ITOperatorTicket,
+    initialAttachments: readonly ITTicketAttachmentSummary[] = [],
+): Response {
+    return apiResponse({ success: true, ticket: { ...value, initialAttachments } });
 }
 
 function referenceResponse(): Response {
@@ -97,12 +106,27 @@ function timelineResponse(withStatusChange = false): Response {
 
 beforeEach(() => {
     fetchMock.mockReset();
+    objectUrlSequence = 0;
+    createObjectUrl.mockClear();
+    revokeObjectUrl.mockClear();
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("crypto", { randomUUID: () => "it-operator-comment-key" });
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl, writable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectUrl, writable: true });
 });
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    if (originalCreateObjectUrl) {
+        Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
+    } else {
+        Reflect.deleteProperty(URL, "createObjectURL");
+    }
+    if (originalRevokeObjectUrl) {
+        Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
+    } else {
+        Reflect.deleteProperty(URL, "revokeObjectURL");
+    }
 });
 
 describe("IT operator queue presentation", () => {
@@ -159,6 +183,38 @@ describe("IT operator queue presentation", () => {
 });
 
 describe("IT operator Ticket detail presentation", () => {
+    it("shows initial requester evidence in the operator Ticket detail", async () => {
+        const attachment: ITTicketAttachmentSummary = {
+            id: "b".repeat(32),
+            originalName: "ภาพปัญหาของผู้แจ้ง.png",
+            contentType: "image/webp",
+            sizeBytes: 2048,
+            width: 40,
+            height: 30,
+            position: 0,
+        };
+        fetchMock.mockImplementation(async (input) => {
+            if (String(input).includes("/attachments/")) {
+                return new Response(new Blob(["private image"], { type: "image/webp" }), {
+                    status: 200,
+                    headers: { "Content-Type": "image/webp" },
+                });
+            }
+            if (String(input).includes("/reference")) return referenceResponse();
+            if (String(input).includes("/timeline")) return timelineResponse();
+            return detailResponse(ticket, [attachment]);
+        });
+
+        const view = render(<ITTicketOperatorDetail ticketId={19} capabilities={requesterCapabilities} />);
+
+        expect(await screen.findByRole("img", {
+            name: `รูปภาพประกอบ: ${attachment.originalName}`,
+        })).toHaveAttribute("src", expect.stringContaining("blob:operator-"));
+        expect(screen.getByRole("region", { name: "รูปภาพประกอบ" })).toBeInTheDocument();
+        view.unmount();
+        expect(revokeObjectUrl).toHaveBeenCalled();
+    });
+
     it("keeps a read-only ALL operator from receiving mutation controls", async () => {
         fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
             ? referenceResponse()
@@ -167,6 +223,10 @@ describe("IT operator Ticket detail presentation", () => {
         render(<ITTicketOperatorDetail ticketId={19} capabilities={requesterCapabilities} />);
 
         expect(await screen.findByRole("heading", { name: "Ticket #19" })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "กลับไปยังคิว IT Ticket" })).toHaveAttribute(
+            "href",
+            "/dashboard/it?itTab=queue",
+        );
         expect(screen.getByText("แผนกตัวอย่าง")).toBeInTheDocument();
         expect(screen.getByText("หน้าเข้าสู่ระบบแสดงข้อผิดพลาด")).toBeInTheDocument();
         expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();

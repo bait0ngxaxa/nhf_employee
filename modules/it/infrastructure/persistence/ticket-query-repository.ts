@@ -77,6 +77,42 @@ const REQUESTER_TICKET_SELECT = {
     resolvedAt: true,
 } satisfies Prisma.ITTicketSelect;
 
+const INITIAL_ATTACHMENT_SELECT = {
+    id: true,
+    originalName: true,
+    contentType: true,
+    sizeBytes: true,
+    width: true,
+    height: true,
+    position: true,
+} satisfies Prisma.ITTicketAttachmentSelect;
+
+const REQUESTER_TICKET_DETAIL_SELECT = {
+    ...REQUESTER_TICKET_SELECT,
+    attachments: {
+        where: { commentId: null },
+        select: INITIAL_ATTACHMENT_SELECT,
+        orderBy: { position: "asc" },
+    },
+} satisfies Prisma.ITTicketSelect;
+
+const OPERATOR_TICKET_DETAIL_SELECT = {
+    ...IT_OPERATOR_TICKET_SELECT,
+    attachments: {
+        where: { commentId: null },
+        select: INITIAL_ATTACHMENT_SELECT,
+        orderBy: { position: "asc" },
+    },
+} satisfies Prisma.ITTicketSelect;
+
+export type ITRequesterTicketDetailRecord = Prisma.ITTicketGetPayload<{
+    select: typeof REQUESTER_TICKET_DETAIL_SELECT;
+}>;
+
+export type ITOperatorTicketDetailRecord = Prisma.ITTicketGetPayload<{
+    select: typeof OPERATOR_TICKET_DETAIL_SELECT;
+}>;
+
 export async function countRequesterITTickets(
     tx: ITTicketReadPersistenceContext,
     requesterUserId: number,
@@ -109,6 +145,17 @@ export async function findRequesterITTicketById(
     });
 }
 
+export async function findRequesterITTicketDetailById(
+    tx: ITTicketReadPersistenceContext,
+    ticketId: number,
+    requesterUserId: number,
+): Promise<ITRequesterTicketDetailRecord | null> {
+    return tx.iTTicket.findFirst({
+        where: { id: ticketId, requesterUserId },
+        select: REQUESTER_TICKET_DETAIL_SELECT,
+    });
+}
+
 /** Operator rows are queried only after the application checks read ALL. */
 export async function findOperatorITTickets(
     tx: ITTicketReadPersistenceContext,
@@ -131,6 +178,16 @@ export async function findOperatorITTicketById(
     return tx.iTTicket.findFirst({
         where: { id: ticketId },
         select: IT_OPERATOR_TICKET_SELECT,
+    });
+}
+
+export async function findOperatorITTicketDetailById(
+    tx: ITTicketReadPersistenceContext,
+    ticketId: number,
+): Promise<ITOperatorTicketDetailRecord | null> {
+    return tx.iTTicket.findFirst({
+        where: { id: ticketId },
+        select: OPERATOR_TICKET_DETAIL_SELECT,
     });
 }
 

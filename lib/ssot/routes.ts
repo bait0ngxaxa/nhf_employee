@@ -53,6 +53,7 @@ export const APP_DASHBOARD_TABS = {
     notifications: "notifications",
     sessions: "sessions",
     itEquipment: "it-equipment",
+    itWorkspace: "it-workspace",
     itTickets: "it-tickets",
     itTicketQueue: "it-ticket-queue",
     itAnalytics: "it-analytics",
@@ -62,6 +63,18 @@ export const APP_DASHBOARD_TABS = {
 export type DashboardMenuId =
     (typeof APP_DASHBOARD_TABS)[keyof typeof APP_DASHBOARD_TABS];
 
+export const IT_DASHBOARD_TAB_QUERY_KEY = "itTab" as const;
+export const IT_DASHBOARD_TABS = Object.freeze({
+    myTickets: "my-tickets",
+    queue: "queue",
+    analytics: "analytics",
+} as const);
+export type ITDashboardTab = (typeof IT_DASHBOARD_TABS)[keyof typeof IT_DASHBOARD_TABS];
+
+export function toDashboardITTabPath(tab: ITDashboardTab): string {
+    return `${APP_ROUTES.dashboardIT}?${IT_DASHBOARD_TAB_QUERY_KEY}=${tab}`;
+}
+
 export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     dashboard: APP_ROUTES.dashboard,
     "leave-management": APP_ROUTES.dashboardLeave,
@@ -69,6 +82,7 @@ export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     "manager-approval": `${APP_ROUTES.dashboardLeave}?leaveTab=approvals`,
     stock: APP_ROUTES.dashboardStock,
     "it-equipment": APP_ROUTES.dashboardStock,
+    "it-workspace": APP_ROUTES.dashboardIT,
     "it-tickets": APP_ROUTES.dashboardIT,
     "it-ticket-queue": APP_ROUTES.dashboardITQueue,
     "it-analytics": APP_ROUTES.dashboardITAnalytics,
@@ -93,9 +107,9 @@ const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     [APP_ROUTES.dashboardStock, APP_DASHBOARD_TABS.stock],
     [APP_ROUTES.dashboardRoutine, APP_DASHBOARD_TABS.routine],
     [APP_ROUTES.dashboardEmailRequest, APP_DASHBOARD_TABS.emailRequest],
-    [APP_ROUTES.dashboardITAnalytics, APP_DASHBOARD_TABS.itAnalytics],
-    [APP_ROUTES.dashboardITQueue, APP_DASHBOARD_TABS.itTicketQueue],
-    [APP_ROUTES.dashboardIT, APP_DASHBOARD_TABS.itTickets],
+    [APP_ROUTES.dashboardITAnalytics, APP_DASHBOARD_TABS.itWorkspace],
+    [APP_ROUTES.dashboardITQueue, APP_DASHBOARD_TABS.itWorkspace],
+    [APP_ROUTES.dashboardIT, APP_DASHBOARD_TABS.itWorkspace],
     [APP_ROUTES.dashboardAudit, APP_DASHBOARD_TABS.auditLogs],
     [APP_ROUTES.dashboardNotifications, APP_DASHBOARD_TABS.notifications],
     [APP_ROUTES.dashboardSessions, APP_DASHBOARD_TABS.sessions],

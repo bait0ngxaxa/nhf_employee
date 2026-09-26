@@ -484,6 +484,7 @@
     --module-stock-tab: #ea580c;
     --module-stock-solid: #ea580c;
     --module-stock-solid-hover: #c2410c;
+    --module-it-tab: #0369a1;
     --module-routine-badge-surface: #f0fdfa;
     --module-routine-badge-foreground: #0f766e;
     --module-routine-badge-border: #ccfbf1;
@@ -760,6 +761,7 @@
     --module-stock-tab: #fb923c;
     --module-stock-solid: #c2410c;
     --module-stock-solid-hover: #9a3412;
+    --module-it-tab: #7dd3fc;
     --module-routine-badge-surface: color-mix(in oklch, #14b8a6 12%, var(--background));
     --module-routine-badge-foreground: #5eead4;
     --module-routine-badge-border: color-mix(in oklch, #2dd4bf 28%, var(--background));

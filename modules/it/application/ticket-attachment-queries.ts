@@ -45,10 +45,15 @@ export async function getITTicketAttachmentForDownload(
             parsedId.data,
             canReadAll ? undefined : context.authorizationActor.userId,
         );
+        const commentIsConsistent = attachment !== null
+            && (attachment.commentId === null
+                ? attachment.comment === null
+                : attachment.comment !== null
+                    && attachment.ticketId === attachment.comment.ticketId
+                    && attachment.commentId === attachment.comment.id);
         if (
             attachment === null
-            || attachment.ticketId !== attachment.comment.ticketId
-            || attachment.commentId !== attachment.comment.id
+            || !commentIsConsistent
             || (!canReadAll && attachment.ticket.requesterUserId !== context.authorizationActor.userId)
         ) {
             throw new ITTicketNotFoundError();

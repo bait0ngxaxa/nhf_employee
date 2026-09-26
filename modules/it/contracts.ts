@@ -116,6 +116,10 @@ export interface ITRequesterTicket {
     readonly resolvedAt: string | null;
 }
 
+export interface ITRequesterTicketDetail extends ITRequesterTicket {
+    readonly initialAttachments: readonly ITTicketAttachmentSummary[];
+}
+
 export interface ITRequesterTicketPagination {
     readonly page: number;
     readonly limit: number;
@@ -154,6 +158,10 @@ export interface ITOperatorTicket {
     readonly createdAt: string;
     readonly updatedAt: string;
     readonly resolvedAt: string | null;
+}
+
+export interface ITOperatorTicketDetail extends ITOperatorTicket {
+    readonly initialAttachments: readonly ITTicketAttachmentSummary[];
 }
 
 export interface ITOperatorTicketList {

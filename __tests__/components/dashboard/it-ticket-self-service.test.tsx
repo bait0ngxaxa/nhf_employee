@@ -24,9 +24,27 @@ const ticket: ITRequesterTicket = {
     updatedAt: "2026-09-02T02:00:00.000Z",
     resolvedAt: null,
 };
+const ticketDetail = { ...ticket, initialAttachments: [] };
 
 const fetchMock = vi.fn<typeof fetch>();
 const randomUUID = vi.fn(() => "it-ticket-key-001");
+let objectUrlSequence = 0;
+const createObjectUrl = vi.fn(() => `blob:dashboard-${++objectUrlSequence}`);
+const revokeObjectUrl = vi.fn();
+const originalCreateObjectUrl = URL.createObjectURL;
+const originalRevokeObjectUrl = URL.revokeObjectURL;
+
+function digestSelectedFile(_algorithm: AlgorithmIdentifier, input: BufferSource): Promise<ArrayBuffer> {
+    const bytes = input instanceof ArrayBuffer
+        ? new Uint8Array(input)
+        : new Uint8Array(input.buffer as ArrayBuffer, input.byteOffset, input.byteLength);
+    const result = new Uint8Array(32);
+    bytes.forEach((byte, index) => {
+        const position = index % result.length;
+        result[position] = ((result[position] ?? 0) + byte) % 256;
+    });
+    return Promise.resolve(result.buffer);
+}
 
 function apiResponse(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
@@ -77,7 +95,7 @@ function postedCommentResponse(replayed = false): Response {
 
 async function openCreateDialog(): Promise<void> {
     await screen.findByText("ยังไม่มี Ticket");
-    fireEvent.click(screen.getByRole("button", { name: "สร้าง Ticket" }));
+    fireEvent.click(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" }));
     fireEvent.change(screen.getByLabelText("หัวข้อ"), {
         target: { value: "  ขอความช่วยเหลือระบบงาน  " },
     });
@@ -90,12 +108,27 @@ beforeEach(() => {
     fetchMock.mockReset();
     randomUUID.mockReset();
     randomUUID.mockReturnValue("it-ticket-key-001");
+    objectUrlSequence = 0;
+    createObjectUrl.mockClear();
+    revokeObjectUrl.mockClear();
     vi.stubGlobal("fetch", fetchMock);
-    vi.stubGlobal("crypto", { randomUUID });
+    vi.stubGlobal("crypto", { randomUUID, subtle: { digest: digestSelectedFile } } as unknown as Crypto);
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl, writable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectUrl, writable: true });
 });
 
 afterEach(() => {
     vi.unstubAllGlobals();
+    if (originalCreateObjectUrl) {
+        Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
+    } else {
+        Reflect.deleteProperty(URL, "createObjectURL");
+    }
+    if (originalRevokeObjectUrl) {
+        Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
+    } else {
+        Reflect.deleteProperty(URL, "revokeObjectURL");
+    }
 });
 
 describe("IT Ticket self-service presentation", () => {
@@ -114,7 +147,7 @@ describe("IT Ticket self-service presentation", () => {
         render(<ITTicketSelfService capabilities={capabilities} />);
 
         expect(await screen.findByText("ยังไม่มี Ticket")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "สร้าง Ticket แรก" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" })).toBeInTheDocument();
     });
 
     it("shows list failures with a retry action", async () => {
@@ -192,9 +225,78 @@ describe("IT Ticket self-service presentation", () => {
             description: "ระบบแจ้งข้อผิดพลาดเมื่อเข้าสู่ระบบ",
         });
     });
+
+    it("previews and removes selected images, then sends retained evidence as multipart", async () => {
+        fetchMock.mockImplementation((_input, init) => init?.method === "POST"
+            ? Promise.resolve(createdTicketResponse())
+            : Promise.resolve(emptyListResponse()));
+
+        render(<ITTicketSelfService capabilities={capabilities} />);
+        await openCreateDialog();
+        const firstFile = new File(["first image"], "ภาพเดิม.png", { type: "image/png" });
+        fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
+            target: { files: [firstFile] },
+        });
+
+        expect(screen.getByRole("img", { name: "ตัวอย่างรูป ภาพเดิม.png" })).toHaveAttribute(
+            "src",
+            expect.stringContaining("blob:dashboard"),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "นำรูปออก" }));
+        expect(screen.queryByRole("img", { name: "ตัวอย่างรูป ภาพเดิม.png" })).not.toBeInTheDocument();
+        expect(revokeObjectUrl).toHaveBeenCalledOnce();
+
+        const selectedFile = new File(["current image"], "หน้าจอปัจจุบัน.webp", { type: "image/webp" });
+        fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
+            target: { files: [selectedFile] },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+
+        expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
+        const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+        const body = postCall?.[1]?.body;
+        expect(body).toBeInstanceOf(FormData);
+        if (!(body instanceof FormData)) throw new Error("Expected multipart create body");
+        expect(body.get("attachments")).toMatchObject({
+            name: "หน้าจอปัจจุบัน.webp",
+            type: "image/webp",
+        });
+        expect(postCall?.[1]?.headers).not.toHaveProperty("Content-Type");
+    });
 });
 
 describe("IT Ticket requester detail", () => {
+    it("loads creation evidence for the requester detail through a private image fetch", async () => {
+        const attachment = {
+            id: "a".repeat(32),
+            originalName: "หลักฐานหน้าจอ.png",
+            contentType: "image/webp",
+            sizeBytes: 1024,
+            width: 24,
+            height: 16,
+            position: 0,
+        };
+        fetchMock.mockImplementation(async (input) => {
+            if (String(input).includes("/attachments/")) {
+                return new Response(new Blob(["private image"], { type: "image/webp" }), {
+                    status: 200,
+                    headers: { "Content-Type": "image/webp" },
+                });
+            }
+            return String(input).includes("/timeline")
+                ? timelineResponse()
+                : apiResponse({ success: true, ticket: { ...ticketDetail, initialAttachments: [attachment] } });
+        });
+
+        const view = render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+
+        expect(await screen.findByRole("img", { name: "รูปภาพประกอบ: หลักฐานหน้าจอ.png" }))
+            .toHaveAttribute("src", expect.stringContaining("blob:dashboard"));
+        expect(screen.getByRole("region", { name: "รูปภาพประกอบ" })).toBeInTheDocument();
+        view.unmount();
+        expect(revokeObjectUrl).toHaveBeenCalled();
+    });
+
     it.each([
         ["OPEN", "รับเรื่องแล้ว"],
         ["IN_PROGRESS", "กำลังดำเนินการ"],
@@ -205,7 +307,7 @@ describe("IT Ticket requester detail", () => {
     ] as const)("renders %s status as %s", async (status, label) => {
         fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
             ? timelineResponse()
-            : apiResponse({ success: true, ticket: { ...ticket, status } }));
+            : apiResponse({ success: true, ticket: { ...ticketDetail, status } }));
 
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
 
@@ -229,7 +331,7 @@ describe("IT Ticket requester detail", () => {
             if (String(input).includes("/timeline")) {
                 return new Promise<Response>(() => undefined);
             }
-            return apiResponse({ success: true, ticket });
+            return apiResponse({ success: true, ticket: ticketDetail });
         });
         const { unmount } = render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
         expect(await screen.findByRole("status", { name: "กำลังโหลดประวัติ Ticket" }))
@@ -244,7 +346,7 @@ describe("IT Ticket requester detail", () => {
                 { type: "STATUS_CHANGED", id: 4, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromStatus: "OPEN", toStatus: "IN_PROGRESS" },
                 { type: "CATEGORY_CHANGED", id: 5, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromCategoryName: null, toCategoryName: "ระบบเครือข่าย" },
             ])
-            : apiResponse({ success: true, ticket }));
+            : apiResponse({ success: true, ticket: ticketDetail }));
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
         expect(await screen.findByText("สมชาย สร้าง Ticket")).toBeInTheDocument();
         expect(screen.getByText("อารี เปลี่ยนผู้รับผิดชอบจาก ไม่มีผู้รับผิดชอบ เป็น วิชัย"))
@@ -259,7 +361,7 @@ describe("IT Ticket requester detail", () => {
     it("shows requester reply only for projected comment authority and commentable status", async () => {
         fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
             ? timelineResponse()
-            : apiResponse({ success: true, ticket }));
+            : apiResponse({ success: true, ticket: ticketDetail }));
         const { rerender, unmount } = render(
             <ITTicketDetail ticketId={19} canCommentOwnTickets={false} />,
         );
@@ -272,7 +374,7 @@ describe("IT Ticket requester detail", () => {
 
         fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
             ? timelineResponse()
-            : apiResponse({ success: true, ticket: { ...ticket, status: "RESOLVED" } }));
+            : apiResponse({ success: true, ticket: { ...ticketDetail, status: "RESOLVED" } }));
         unmount();
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
         expect(await screen.findByText(/สถานะ “แก้ไขแล้ว” จึงอ่านประวัติได้อย่างเดียว/))
@@ -289,7 +391,7 @@ describe("IT Ticket requester detail", () => {
             }
             return String(input).includes("/timeline")
                 ? timelineResponse()
-                : apiResponse({ success: true, ticket: { ...ticket, status: "WAITING_REQUESTER" } });
+                : apiResponse({ success: true, ticket: { ...ticketDetail, status: "WAITING_REQUESTER" } });
         });
 
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
@@ -323,7 +425,7 @@ describe("IT Ticket requester detail", () => {
             }
             return String(input).includes("/timeline")
                 ? timelineResponse()
-                : apiResponse({ success: true, ticket });
+                : apiResponse({ success: true, ticket: ticketDetail });
         });
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
         await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ");

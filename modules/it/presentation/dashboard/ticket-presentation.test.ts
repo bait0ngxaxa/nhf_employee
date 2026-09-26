@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     parseITOperatorReferenceData,
     parseITOperatorTicket,
+    parseITOperatorTicketDetail,
     parseITOperatorTicketList,
     parseITOperatorTicketMutationSnapshot,
     isITOperatorMutationVersionConflict,
@@ -10,6 +11,7 @@ import {
     mergeITTicketTimelineItems,
     parseITTicketTimelineItem,
     parseITTicketTimelinePage,
+    parseITRequesterTicketDetail,
 } from "./ticket-presentation";
 
 const operatorTicket = {
@@ -44,6 +46,44 @@ describe("IT operator presentation contracts", () => {
             requester: { userId: 41 },
         })).toBeNull();
         expect(parseITOperatorTicket({ ...operatorTicket, version: 0 })).toBeNull();
+    });
+
+    it("parses initial Ticket evidence through the detail-only safe summary", () => {
+        const initialAttachments = [{
+            id: "a".repeat(32),
+            originalName: "หน้าจอ.png",
+            contentType: "image/webp",
+            sizeBytes: 2048,
+            width: 640,
+            height: 480,
+            position: 0,
+            storageKey: "it/private/path.webp",
+            uploaderUserId: 41,
+        }];
+        const requester = parseITRequesterTicketDetail({
+            ...operatorTicket,
+            requester: undefined,
+            initialAttachments,
+            createdAt: operatorTicket.createdAt,
+            resolvedAt: null,
+        });
+        const operator = parseITOperatorTicketDetail({ ...operatorTicket, initialAttachments });
+
+        expect(requester?.initialAttachments).toEqual([{
+            id: "a".repeat(32),
+            originalName: "หน้าจอ.png",
+            contentType: "image/webp",
+            sizeBytes: 2048,
+            width: 640,
+            height: 480,
+            position: 0,
+        }]);
+        expect(operator?.initialAttachments).toEqual(requester?.initialAttachments);
+        expect(JSON.stringify(requester)).not.toMatch(/storageKey|uploaderUserId/);
+        expect(parseITRequesterTicketDetail({
+            ...operatorTicket,
+            initialAttachments: [{ ...initialAttachments[0], width: 2401 }],
+        })).toBeNull();
     });
 
     it("parses a bounded cursor list and rejects an unbounded or malformed response", () => {

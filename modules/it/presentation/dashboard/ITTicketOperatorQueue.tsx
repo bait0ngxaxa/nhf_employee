@@ -219,7 +219,7 @@ function QueueFiltersForm({
     );
 }
 
-export function ITTicketOperatorQueue(): ReactElement {
+export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?: boolean } = {}): ReactElement {
     const [filters, setFilters] = useState<QueueFilters>({});
     const [draft, setDraft] = useState<QueueFilters>({});
     const [refreshKey, setRefreshKey] = useState(0);
@@ -347,17 +347,17 @@ export function ITTicketOperatorQueue(): ReactElement {
     const retry = (): void => setRefreshKey((current) => current + 1);
 
     return (
-        <section className="min-h-[calc(100dvh-6rem)]">
+        <section className={embedded ? "" : "min-h-[calc(100dvh-6rem)]"}>
             <div className="mx-auto max-w-7xl space-y-6">
                 <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                    <div className="min-w-0 space-y-1">
+                    {!embedded ? <div className="min-w-0 space-y-1">
                         <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
                             คิว IT Ticket
                         </h1>
                         <p className="max-w-[70ch] text-sm leading-6 text-content-secondary">
                             ตรวจสอบผู้แจ้ง สถานะ ผู้รับผิดชอบ และหมวดหมู่ แล้วเปิดรายการเพื่อดำเนินการ
                         </p>
-                    </div>
+                    </div> : null}
                     <Button type="button" variant="outline" onClick={retry}>
                         <RefreshCw aria-hidden="true" />
                         โหลดข้อมูลใหม่

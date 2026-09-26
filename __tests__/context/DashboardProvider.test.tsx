@@ -588,7 +588,7 @@ describe("DashboardProvider navigation state", () => {
         );
     });
 
-    it("gates operator queue navigation on read ALL without requiring manage", () => {
+    it("exposes one IT workspace navigation item for requester and operator actors", () => {
         navigationMocks.user = {
             ...navigationMocks.user,
             role: "USER",
@@ -606,8 +606,8 @@ describe("DashboardProvider navigation state", () => {
         function NavigationProbe(): ReactElement {
             const { handleMenuClick } = useDashboardUIContext();
             return (
-                <button type="button" onClick={() => handleMenuClick("it-ticket-queue")}>
-                    IT Ticket queue
+                <button type="button" onClick={() => handleMenuClick("it-workspace")}>
+                    IT workspace
                 </button>
             );
         }
@@ -619,19 +619,22 @@ describe("DashboardProvider navigation state", () => {
             </DashboardProvider>,
         );
 
-        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("it-tickets");
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("it-workspace");
         expect(screen.getByTestId("available-menu-ids")).not.toHaveTextContent("it-ticket-queue");
-        fireEvent.click(screen.getByRole("button", { name: "IT Ticket queue" }));
-        expect(navigationMocks.router.push).toHaveBeenCalledWith("/access-denied");
+        fireEvent.click(screen.getByRole("button", { name: "IT workspace" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+            "/dashboard/it",
+            { scroll: false },
+        );
 
         navigationMocks.router.push.mockReset();
         navigationMocks.user = {
             ...navigationMocks.user,
             itCapabilities: {
-                canReadOwnTickets: true,
                 canReadAllTickets: true,
-                canCreateOwnTickets: true,
-                canCommentOwnTickets: true,
+                canReadOwnTickets: false,
+                canCreateOwnTickets: false,
+                canCommentOwnTickets: false,
                 canCommentAllTickets: false,
                 canManageTickets: false,
                 canReadAnalytics: false,
@@ -644,10 +647,10 @@ describe("DashboardProvider navigation state", () => {
             </DashboardProvider>,
         );
 
-        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("it-ticket-queue");
-        fireEvent.click(screen.getByRole("button", { name: "IT Ticket queue" }));
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("it-workspace");
+        fireEvent.click(screen.getByRole("button", { name: "IT workspace" }));
         expect(navigationMocks.router.push).toHaveBeenCalledWith(
-            "/dashboard/it/queue",
+            "/dashboard/it",
             { scroll: false },
         );
     });

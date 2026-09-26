@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { requireDashboardITSelfServiceAccess } from "@/app/dashboard/_lib/route-access";
-import { ITTicketSelfService } from "@/modules/it/client";
+import { requireDashboardITWorkspaceAccess } from "@/app/dashboard/_lib/route-access";
+import { ITWorkspace } from "@/modules/it/client";
 
 export const metadata: Metadata = {
-    title: "IT Ticket | NHFapp",
+    title: "บริการ IT | NHFapp",
 };
 
-export default async function ITTicketDashboardPage(): Promise<React.ReactElement> {
-    const capabilities = await requireDashboardITSelfServiceAccess();
-    return <ITTicketSelfService capabilities={capabilities} />;
+export default async function ITDashboardPage(): Promise<React.ReactElement> {
+    const capabilities = await requireDashboardITWorkspaceAccess();
+    return (
+        <Suspense fallback={<p role="status" className="py-5 text-sm text-content-secondary">กำลังโหลดบริการ IT…</p>}>
+            <ITWorkspace capabilities={capabilities} />
+        </Suspense>
+    );
 }

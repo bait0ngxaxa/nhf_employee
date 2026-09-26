@@ -12,14 +12,18 @@ import {
 import { ITTicketInputValidationError, ITTicketNotFoundError } from "./ticket-errors";
 import { assertITActorCurrentWorkforce } from "./workforce";
 import { findITOperatorAudience } from "./operator-audience";
-import { toITRequesterTicket } from "./ticket-dto";
-import { toITOperatorTicket } from "./ticket-dto";
+import {
+    toITOperatorTicket,
+    toITOperatorTicketDetail,
+    toITRequesterTicket,
+    toITRequesterTicketDetail,
+} from "./ticket-dto";
 import {
     countRequesterITTickets,
     findActiveITTicketCategories,
-    findOperatorITTicketById,
+    findOperatorITTicketDetailById,
     findOperatorITTickets,
-    findRequesterITTicketById,
+    findRequesterITTicketDetailById,
     findRequesterITTickets,
 } from "../infrastructure/persistence/ticket-query-repository";
 import {
@@ -32,8 +36,9 @@ import {
     type ITAssignableOperator,
     type ITOperatorReferenceData,
     type ITOperatorTicket,
+    type ITOperatorTicketDetail,
     type ITOperatorTicketList,
-    type ITRequesterTicket,
+    type ITRequesterTicketDetail,
     type ITRequesterTicketList,
 } from "../contracts";
 
@@ -196,7 +201,7 @@ export async function listITRequesterTickets(
 export async function getITRequesterTicket(
     context: ITAuthorizationContext,
     ticketId: unknown,
-): Promise<ITRequesterTicket> {
+): Promise<ITRequesterTicketDetail> {
     const parsedId = ticketIdSchema.safeParse(ticketId);
     if (!parsedId.success) throw new ITTicketInputValidationError();
 
@@ -209,13 +214,13 @@ export async function getITRequesterTicket(
         );
         assertRequesterReadScope(authorization.scopes, "it.ticket.read");
 
-        const ticket = await findRequesterITTicketById(
+        const ticket = await findRequesterITTicketDetailById(
             tx,
             parsedId.data,
             context.authorizationActor.userId,
         );
         if (ticket === null) throw new ITTicketNotFoundError();
-        return toITRequesterTicket(ticket);
+        return toITRequesterTicketDetail(ticket);
     });
 }
 
@@ -266,7 +271,7 @@ export async function listITOperatorTickets(
 export async function getITOperatorTicket(
     context: ITAuthorizationContext,
     ticketId: unknown,
-): Promise<ITOperatorTicket> {
+): Promise<ITOperatorTicketDetail> {
     const parsedId = ticketIdSchema.safeParse(ticketId);
     if (!parsedId.success) throw new ITTicketInputValidationError();
 
@@ -279,9 +284,9 @@ export async function getITOperatorTicket(
         );
         assertOperatorReadScope(authorization.scopes);
 
-        const ticket = await findOperatorITTicketById(tx, parsedId.data);
+        const ticket = await findOperatorITTicketDetailById(tx, parsedId.data);
         if (ticket === null) throw new ITTicketNotFoundError();
-        return toITOperatorTicket(ticket);
+        return toITOperatorTicketDetail(ticket);
     });
 }
 

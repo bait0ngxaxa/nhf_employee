@@ -7,14 +7,18 @@ import { ArrowLeft, CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import {
+    API_ROUTES,
+    IT_DASHBOARD_TABS,
+    toDashboardITTabPath,
+} from "@/lib/ssot/routes";
 import { ITTicketConversation } from "./ITTicketConversation";
 
 import {
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
     type ITOperatorReferenceData,
-    type ITOperatorTicket,
+    type ITOperatorTicketDetail,
     type ITPresentationCapabilities,
 } from "../../contracts";
 import type { ITTicketStatus } from "@prisma/client";
@@ -25,13 +29,14 @@ import {
     isITOperatorMutationVersionConflict,
     isITTicketResponseRecord,
     parseITOperatorReferenceData,
-    parseITOperatorTicket,
+    parseITOperatorTicketDetail,
     parseITOperatorTicketMutationSnapshot,
     readITOperatorError,
 } from "./ticket-presentation";
+import { ITTicketInitialAttachments } from "./ITTicketInitialAttachments";
 
 type DetailState =
-    | { readonly key: string; readonly kind: "loaded"; readonly ticket: ITOperatorTicket }
+    | { readonly key: string; readonly kind: "loaded"; readonly ticket: ITOperatorTicketDetail }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
 
 type ReferenceState =
@@ -94,7 +99,7 @@ export function ITTicketOperatorDetail({
                 if (!isITTicketResponseRecord(payload) || payload.success !== true) {
                     throw new Error("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 }
-                const parsed = parseITOperatorTicket(payload.ticket);
+                const parsed = parseITOperatorTicketDetail(payload.ticket);
                 if (parsed === null) throw new Error("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 if (controller.signal.aborted) return;
                 if (parsed.version < requiredVersionRef.current) {
@@ -276,7 +281,7 @@ export function ITTicketOperatorDetail({
     return (
         <section className="min-h-[calc(100dvh-6rem)]">
             <div className="mx-auto max-w-6xl space-y-5">
-                <Link href={APP_ROUTES.dashboardITQueue} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                <Link href={toDashboardITTabPath(IT_DASHBOARD_TABS.queue)} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                     <ArrowLeft aria-hidden="true" className="size-4" />
                     กลับไปยังคิว IT Ticket
                 </Link>
@@ -383,6 +388,7 @@ export function ITTicketOperatorDetail({
                                         {ticket.description}
                                     </p>
                                 </div>
+                                <ITTicketInitialAttachments attachments={ticket.initialAttachments} />
                                 <dl className="grid gap-x-6 gap-y-4 border-t border-border-neutral pt-5 sm:grid-cols-2 lg:grid-cols-4">
                                     <div>
                                         <dt className="text-xs font-semibold text-content-muted">ผู้แจ้ง</dt>

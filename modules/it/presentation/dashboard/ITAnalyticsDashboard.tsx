@@ -377,7 +377,7 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
     );
 }
 
-export function ITAnalyticsDashboard(): ReactElement {
+export function ITAnalyticsDashboard({ embedded = false }: { readonly embedded?: boolean } = {}): ReactElement {
     const [period, setPeriod] = useState<ITAnalyticsPeriod>("30D");
     const [retryCount, setRetryCount] = useState(0);
     const [requestState, setRequestState] = useState<RequestState | null>(null);
@@ -425,15 +425,17 @@ export function ITAnalyticsDashboard(): ReactElement {
     const reportState = visibleState;
     return (
         <section className="mx-auto w-full max-w-7xl min-w-0 space-y-5">
-            <header className="flex min-w-0 flex-col gap-4 border-b border-border-neutral pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <header className={`flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between ${embedded ? "" : "border-b border-border-neutral pb-5"}`}>
                 <div className="min-w-0">
-                    <h1 data-page-heading tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
-                        <BarChart3 aria-hidden="true" className="size-7 shrink-0 text-sky-700" />
-                        รายงาน IT
-                    </h1>
-                    <p className="mt-2 max-w-[70ch] text-sm leading-6 text-content-secondary">
-                        ภาพรวมงานค้างและผลการให้บริการ IT ตามช่วงเวลาที่เลือก
-                    </p>
+                    {!embedded ? <>
+                        <h1 data-page-heading tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
+                            <BarChart3 aria-hidden="true" className="size-7 shrink-0 text-sky-700" />
+                            รายงาน IT
+                        </h1>
+                        <p className="mt-2 max-w-[70ch] text-sm leading-6 text-content-secondary">
+                            ภาพรวมงานค้างและผลการให้บริการ IT ตามช่วงเวลาที่เลือก
+                        </p>
+                    </> : null}
                     {reportState?.kind === "loaded" ? (
                         <p className="mt-1 text-xs leading-5 text-content-muted">
                             {formatITAnalyticsDateTime(reportState.data.period.startAt)} – {formatITAnalyticsDateTime(reportState.data.period.endAt)} น.

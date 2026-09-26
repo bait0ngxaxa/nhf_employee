@@ -163,7 +163,7 @@ describe("dashboard menu", () => {
             group.label,
             group.items.map((item) => item.id),
         ])).toEqual([
-            ["บริการภายใน", ["leave-management", "stock", "routine", "it-tickets", "it-ticket-queue", "it-analytics"]],
+            ["บริการภายใน", ["leave-management", "stock", "routine", "it-workspace"]],
             ["บุคลากร", ["employee-management", "add-employee", "email-request"]],
             ["ระบบและสิทธิ์", ["audit-logs", "authorization-administration"]],
         ]);
@@ -189,20 +189,14 @@ describe("dashboard menu", () => {
             label: "ส่งคำร้องพนักงานใหม่",
             sidebarLabel: "คำร้องบริการ IT",
         });
-        expect(menuItem("it-tickets")).toMatchObject({
-            label: "IT Ticket",
-            sidebarLabel: "ขอความช่วยเหลือด้าน IT",
+        expect(menuItem("it-workspace")).toMatchObject({
+            label: "บริการ IT",
+            sidebarLabel: "บริการ IT",
+            description: "แจ้งปัญหา ติดตามคำขอ และจัดการงานบริการ IT",
         });
-        expect(menuItem("it-ticket-queue")).toMatchObject({
-            label: "คิว IT Ticket",
-            sidebarLabel: "คิวงาน IT",
-        });
-        expect(menuItem("it-analytics")).toMatchObject({
-            label: "รายงาน IT",
-            sidebarLabel: "รายงาน IT",
-            description: "ดูภาพรวมและสถิติการให้บริการ IT",
-        });
-        expect(getMenuTheme("it-analytics").text).toBe("text-sky-700");
+        expect(DASHBOARD_MENU_ITEMS.filter((item) => item.id.startsWith("it-")).map((item) => item.id))
+            .toEqual(["it-workspace"]);
+        expect(getMenuTheme("it-workspace").text).toBe("text-sky-700");
         expect(getDashboardPageLabel("routine")).toBe("NHF Routine");
     });
 
@@ -300,8 +294,8 @@ describe("dashboard menu", () => {
             itReadCapabilities,
         ).flatMap((group) => group.items.map((item) => item.id));
 
-        expect(noCapabilityMenuIds).not.toContain("it-tickets");
-        expect(requesterMenuIds).toContain("it-tickets");
+        expect(noCapabilityMenuIds).not.toContain("it-workspace");
+        expect(requesterMenuIds).toContain("it-workspace");
     });
 
     it("shows the operator queue only with read ALL capability", () => {
@@ -332,9 +326,8 @@ describe("dashboard menu", () => {
         ).flatMap((group) => group.items.map((item) => item.id));
 
         expect(canAccessITTicketQueue({ ...itReadCapabilities, canManageTickets: true })).toBe(false);
-        expect(ownWithManage).toContain("it-tickets");
-        expect(ownWithManage).not.toContain("it-ticket-queue");
-        expect(readAll).toContain("it-ticket-queue");
+        expect(ownWithManage).toContain("it-workspace");
+        expect(readAll).toContain("it-workspace");
     });
 
     it("shows analytics only with the independent analytics capability", () => {
@@ -366,10 +359,8 @@ describe("dashboard menu", () => {
 
         expect(canAccessITAnalytics()).toBe(false);
         expect(canAccessITAnalytics(ticketReadOnly)).toBe(false);
-        expect(idsFor(ticketReadOnly)).not.toContain("it-analytics");
-        expect(idsFor(analyticsOnly)).toContain("it-analytics");
-        expect(idsFor(analyticsOnly)).not.toContain("it-tickets");
-        expect(idsFor(analyticsOnly)).not.toContain("it-ticket-queue");
+        expect(idsFor(ticketReadOnly)).toContain("it-workspace");
+        expect(idsFor(analyticsOnly)).toContain("it-workspace");
     });
 
     it("keeps CSV import route available but hides it from dashboard menus", () => {

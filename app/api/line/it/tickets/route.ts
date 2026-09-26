@@ -11,12 +11,14 @@ import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     buildITAuthorizationContext,
     createITTicket,
-    createITTicketInputSchema,
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_LIST_DEFAULT_PAGE,
     listITRequesterTickets,
     logITTicketRouteFailure,
     mapITTicketRouteError,
+    getITTicketCreateMediaType,
+    isITTicketCreateParseFailure,
+    parseITTicketCreateHttpInput,
     toITRequesterTicket,
 } from "@/modules/it";
 
@@ -62,23 +64,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return jsonError("กรุณาระบุ Idempotency-Key ที่ถูกต้อง", 400, { success: false });
     }
 
-    let body: unknown;
-    try {
-        body = await request.json();
-    } catch {
-        return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false });
+    const mediaType = getITTicketCreateMediaType(request);
+    if (mediaType === "unsupported") {
+        return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 415, { success: false });
     }
-    const parsed = createITTicketInputSchema.safeParse(body);
-    if (!parsed.success) {
-        return jsonError("กรุณาตรวจสอบประเภท หัวข้อ และรายละเอียด Ticket", 400, {
-            success: false,
-        });
-    }
+    const parsed = await parseITTicketCreateHttpInput(request, mediaType);
+    if (isITTicketCreateParseFailure(parsed)) return parsed;
     try {
         const result = await createITTicket(
             buildITAuthorizationContext(auth.user, auth.employeeId, "LIFF_SELF_SERVICE"),
-            parsed.data,
-            { idempotencyKey: idempotencyKey.data },
+            parsed.input,
+            {
+                idempotencyKey: idempotencyKey.data,
+                ...(parsed.attachments.length > 0 ? { attachments: parsed.attachments } : {}),
+            },
         );
         if (!result.replayed) scheduleITTicketOutboxWakeup();
 

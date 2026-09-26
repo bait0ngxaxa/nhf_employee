@@ -32,6 +32,16 @@ const TICKET = {
     updatedAt: "2026-09-26T03:00:00.000Z",
     resolvedAt: null,
 };
+const TICKET_DETAIL = { ...TICKET, initialAttachments: [] };
+const INITIAL_ATTACHMENT = {
+    id: "a".repeat(32),
+    originalName: "หลักฐานหน้าแจ้งปัญหา.png",
+    contentType: "image/webp" as const,
+    sizeBytes: 1024,
+    width: 24,
+    height: 16,
+    position: 0,
+};
 
 const LIST = {
     tickets: [TICKET],
@@ -48,10 +58,28 @@ function deferred<T>() {
     return { promise, resolve, reject };
 }
 
+function digestSelectedFile(_algorithm: AlgorithmIdentifier, input: BufferSource): Promise<ArrayBuffer> {
+    const bytes = input instanceof ArrayBuffer
+        ? new Uint8Array(input)
+        : new Uint8Array(input.buffer as ArrayBuffer, input.byteOffset, input.byteLength);
+    const result = new Uint8Array(32);
+    bytes.forEach((byte, index) => {
+        const position = index % result.length;
+        result[position] = ((result[position] ?? 0) + byte) % 256;
+    });
+    return Promise.resolve(result.buffer);
+}
+
+let objectUrlSequence = 0;
+const createObjectUrl = vi.fn(() => `blob:liff-${++objectUrlSequence}`);
+const revokeObjectUrl = vi.fn();
+const originalCreateObjectUrl = URL.createObjectURL;
+const originalRevokeObjectUrl = URL.revokeObjectURL;
+
 async function openCreateForm(): Promise<void> {
     await screen.findByRole("heading", { name: "IT Ticket ของฉัน" });
-    fireEvent.click(screen.getByRole("button", { name: "สร้าง Ticket" }));
-    await screen.findByRole("heading", { name: "สร้าง Ticket" });
+    fireEvent.click(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" }));
+    await screen.findByRole("heading", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" });
 }
 
 function fillCreateForm(title = "ขอความช่วยเหลือเรื่องระบบ"): void {
@@ -70,15 +98,34 @@ describe("LiffITApp requester experience", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.fetchTickets.mockResolvedValue(LIST);
-        mocks.fetchTicket.mockResolvedValue(TICKET);
+        mocks.fetchTicket.mockResolvedValue(TICKET_DETAIL);
         mocks.createTicket.mockResolvedValue(TICKET);
         mocks.fetchTimeline.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
         mocks.postComment.mockResolvedValue(undefined);
         mocks.fetchAttachment.mockResolvedValue(new Blob(["image"], { type: "image/webp" }));
+        objectUrlSequence = 0;
+        createObjectUrl.mockClear();
+        revokeObjectUrl.mockClear();
+        Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl, writable: true });
+        Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectUrl, writable: true });
+        vi.stubGlobal("crypto", {
+            randomUUID: () => "liff-create-key",
+            subtle: { digest: digestSelectedFile },
+        } as unknown as Crypto);
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        if (originalCreateObjectUrl) {
+            Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
+        } else {
+            Reflect.deleteProperty(URL, "createObjectURL");
+        }
+        if (originalRevokeObjectUrl) {
+            Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
+        } else {
+            Reflect.deleteProperty(URL, "revokeObjectURL");
+        }
     });
 
     it("shows a loading state and then only requester ticket fields", async () => {
@@ -166,8 +213,9 @@ describe("LiffITApp requester experience", () => {
         const successMessage = await screen.findByRole("status");
         expect(successMessage).toHaveTextContent("ส่ง Ticket #73 เรียบร้อยแล้ว");
         expect(mocks.createTicket).toHaveBeenCalledTimes(2);
-        expect(mocks.createTicket.mock.calls[0]?.[1]).toBe("create-key-1");
-        expect(mocks.createTicket.mock.calls[1]?.[1]).toBe("create-key-1");
+        expect(mocks.createTicket.mock.calls[0]?.[2]).toBe("create-key-1");
+        expect(mocks.createTicket.mock.calls[1]?.[2]).toBe("create-key-1");
+        expect(mocks.createTicket.mock.calls[0]?.[1]).toEqual([]);
         expect(mocks.createTicket.mock.calls[0]?.[0]).toEqual({
             type: "SERVICE_REQUEST",
             title: "ขอความช่วยเหลือเรื่องระบบ",
@@ -186,7 +234,7 @@ describe("LiffITApp requester experience", () => {
         fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
 
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
-        expect(mocks.createTicket.mock.calls[0]?.[1]).toMatch(/^idem_\d+_[a-z0-9]+$/);
+        expect(mocks.createTicket.mock.calls[0]?.[2]).toMatch(/^idem_\d+_[a-z0-9]+$/);
     });
 
     it("creates a new idempotency attempt when the logical create payload changes", async () => {
@@ -206,8 +254,46 @@ describe("LiffITApp requester experience", () => {
         });
         fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(2));
-        expect(mocks.createTicket.mock.calls[0]?.[1]).toBe("changed-key-1");
-        expect(mocks.createTicket.mock.calls[1]?.[1]).toBe("changed-key-2");
+        expect(mocks.createTicket.mock.calls[0]?.[2]).toBe("changed-key-1");
+        expect(mocks.createTicket.mock.calls[1]?.[2]).toBe("changed-key-2");
+    });
+
+    it("previews creation evidence, reuses the key on retry, and changes it when the file changes", async () => {
+        let keyIndex = 0;
+        vi.stubGlobal("crypto", {
+            randomUUID: () => `file-key-${++keyIndex}`,
+            subtle: { digest: digestSelectedFile },
+        } as unknown as Crypto);
+        mocks.createTicket.mockRejectedValue(new LiffApiError("ลองส่งรายการเดิมอีกครั้ง", 503));
+        render(<LiffITApp />);
+        await openCreateForm();
+        fillCreateForm();
+
+        const firstFile = new File(["first content"], "หน้าจอ.png", { type: "image/png" });
+        fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), { target: { files: [firstFile] } });
+        expect(screen.getByRole("img", { name: "ตัวอย่างรูป หน้าจอ.png" })).toHaveAttribute(
+            "src",
+            expect.stringContaining("blob:liff-"),
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        await screen.findByRole("alert");
+        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(2));
+
+        expect(mocks.createTicket.mock.calls[0]?.[2]).toBe("file-key-1");
+        expect(mocks.createTicket.mock.calls[1]?.[2]).toBe("file-key-1");
+        expect(mocks.createTicket.mock.calls[0]?.[1]).toEqual([firstFile]);
+
+        fireEvent.click(screen.getByRole("button", { name: "นำรูปออก" }));
+        expect(revokeObjectUrl).toHaveBeenCalledWith("blob:liff-1");
+        const changedFile = new File(["different content"], "หน้าจอ.png", { type: "image/png" });
+        fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), { target: { files: [changedFile] } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(3));
+
+        expect(mocks.createTicket.mock.calls[2]?.[2]).toBe("file-key-2");
+        expect(mocks.createTicket.mock.calls[2]?.[1]).toEqual([changedFile]);
     });
 
     it("prevents double submit and updates the visible list without a page reload", async () => {
@@ -223,7 +309,7 @@ describe("LiffITApp requester experience", () => {
 
         fireEvent.submit(form);
         fireEvent.submit(form);
-        expect(mocks.createTicket).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
         await act(async () => pending.resolve({ ...TICKET, id: 91, title: "ขอความช่วยเหลือเรื่องระบบ" }));
         expect(await screen.findByRole("heading", { name: "ขอความช่วยเหลือเรื่องระบบ" })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "เปิดรายละเอียดและการสนทนา" })).toHaveAttribute("href", "/liff/it/91");
@@ -231,7 +317,7 @@ describe("LiffITApp requester experience", () => {
     });
 
     it("loads requester detail and conversation, keeps WAITING_REQUESTER unchanged after a reply", async () => {
-        mocks.fetchTicket.mockResolvedValue(TICKET);
+        mocks.fetchTicket.mockResolvedValue(TICKET_DETAIL);
         mocks.fetchTimeline.mockResolvedValue({
             items: [{
                 type: "COMMENT",
@@ -281,11 +367,25 @@ describe("LiffITApp requester experience", () => {
         expect(mocks.fetchTicket).toHaveBeenCalledTimes(1);
     });
 
+    it("shows initial creation images through the authenticated Blob loader", async () => {
+        mocks.fetchTicket.mockResolvedValue({ ...TICKET_DETAIL, initialAttachments: [INITIAL_ATTACHMENT] });
+        const view = render(<LiffITApp ticketId="42" />);
+
+        expect(await screen.findByRole("img", {
+            name: `รูปภาพประกอบ: ${INITIAL_ATTACHMENT.originalName}`,
+        })).toHaveAttribute("src", expect.stringContaining("blob:liff-"));
+        expect(mocks.fetchAttachment).toHaveBeenCalledWith(INITIAL_ATTACHMENT.id, expect.any(AbortSignal));
+
+        view.unmount();
+        expect(revokeObjectUrl).toHaveBeenCalled();
+    });
+
     it("shows the resolved timestamp and keeps a resolved conversation read-only", async () => {
         mocks.fetchTicket.mockResolvedValue({
             ...TICKET,
             status: "RESOLVED",
             resolvedAt: "2026-09-26T04:00:00.000Z",
+            initialAttachments: [],
         });
         render(<LiffITApp ticketId="42" />);
 
@@ -295,15 +395,15 @@ describe("LiffITApp requester experience", () => {
     });
 
     it("protects the visible detail from a stale response for a different Ticket", async () => {
-        const first = deferred<typeof TICKET>();
-        const second = deferred<typeof TICKET>();
+        const first = deferred<typeof TICKET_DETAIL>();
+        const second = deferred<typeof TICKET_DETAIL>();
         mocks.fetchTicket.mockImplementation((id: number) => id === 1 ? first.promise : second.promise);
         const view = render(<LiffITApp ticketId="1" />);
         view.rerender(<LiffITApp ticketId="2" />);
 
-        await act(async () => second.resolve({ ...TICKET, id: 2, title: "รายการล่าสุด" }));
+        await act(async () => second.resolve({ ...TICKET_DETAIL, id: 2, title: "รายการล่าสุด" }));
         expect(await screen.findByRole("heading", { name: "รายการล่าสุด" })).toBeInTheDocument();
-        await act(async () => first.resolve({ ...TICKET, id: 1, title: "รายการเก่า" }));
+        await act(async () => first.resolve({ ...TICKET_DETAIL, id: 1, title: "รายการเก่า" }));
         expect(screen.getByRole("heading", { name: "รายการล่าสุด" })).toBeInTheDocument();
         expect(screen.queryByRole("heading", { name: "รายการเก่า" })).not.toBeInTheDocument();
     });

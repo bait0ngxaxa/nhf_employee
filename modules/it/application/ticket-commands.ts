@@ -1,4 +1,4 @@
-import type { ITTicket as PrismaITTicket, Prisma } from "@prisma/client";
+import { Prisma, type ITTicket as PrismaITTicket } from "@prisma/client";
 
 import {
     resolveITCapabilityInTransaction,
@@ -33,6 +33,16 @@ import type {
 } from "./types";
 import { createITTicketRequestHash } from "../domain/ticket-idempotency";
 import { isAllowedITTicketTransition } from "../domain/ticket-workflow";
+import {
+    deleteITTicketAttachmentFiles,
+    writeITTicketAttachments,
+} from "../infrastructure/attachments/storage";
+import {
+    prepareITTicketAttachments,
+    type ITTicketAttachmentSource,
+} from "../infrastructure/attachments/validation";
+import type { StoredITTicketAttachment } from "../infrastructure/attachments/storage";
+import { createITTicketAttachmentRows } from "../infrastructure/persistence/ticket-attachment-repository";
 import {
     hasPrismaErrorCode,
     runSerializableTransaction,
@@ -91,6 +101,15 @@ async function assertITCapabilityScope(
     }
 }
 
+async function assertITTicketCreationAuthority(
+    tx: Prisma.TransactionClient,
+    context: ITAuthorizationContext,
+) {
+    const workforce = await assertITActorCurrentWorkforce(tx, context);
+    await assertITCapabilityScope(tx, context, "it.ticket.create", "OWN");
+    return workforce;
+}
+
 function parseCreateInput(input: unknown): CreateITTicketInput {
     const parsed = createITTicketInputSchema.safeParse(input);
     if (!parsed.success) throw new ITTicketInputValidationError();
@@ -128,89 +147,189 @@ async function findReplay(
 export async function createITTicket(
     context: ITAuthorizationContext,
     input: unknown,
-    options: { readonly idempotencyKey: string },
+    options: {
+        readonly idempotencyKey: string;
+        readonly attachments?: readonly ITTicketAttachmentSource[];
+    },
 ): Promise<CreateITTicketResult> {
     const canonicalInput = parseCreateInput(input);
     const parsedKey = idempotencyKeySchema.safeParse(options.idempotencyKey);
     if (!parsedKey.success) throw new ITTicketInputValidationError();
     const idempotencyKey = parsedKey.data;
     const requesterUserId = context.authorizationActor.userId;
-    const requestHash = createITTicketRequestHash(canonicalInput);
+    const attachmentSources = options.attachments ?? [];
 
-    try {
-        return await runSerializableTransaction(async (tx) => {
-            const workforce = await assertITActorCurrentWorkforce(tx, context);
-            await assertITCapabilityScope(
-                tx,
-                context,
-                "it.ticket.create",
-                "OWN",
-            );
+    if (attachmentSources.length > 0) {
+        await prisma.$transaction(async (tx) => {
+            await assertITTicketCreationAuthority(tx, context);
+        });
+    }
 
-            const replay = await findReplay(
-                tx,
+    const preparedAttachments = await prepareITTicketAttachments(attachmentSources);
+    const requestHash = createITTicketRequestHash({
+        ...canonicalInput,
+        attachments: preparedAttachments.map((attachment) => ({
+            originalName: attachment.originalName,
+            contentSha256: attachment.contentSha256,
+        })),
+    });
+
+    if (preparedAttachments.length > 0) {
+        const replay = await prisma.$transaction(async (tx) => {
+            await assertITTicketCreationAuthority(tx, context);
+            return findReplay(tx, requesterUserId, idempotencyKey, requestHash);
+        });
+        if (replay !== null) return replay;
+    }
+
+    let storedAttachments: StoredITTicketAttachment[] = [];
+    let transactionCallbackCompleted = false;
+
+    const createWithinTransaction = async (
+        tx: Prisma.TransactionClient,
+    ): Promise<CreateITTicketResult> => {
+        const workforce = await assertITTicketCreationAuthority(tx, context);
+
+        const replay = await findReplay(
+            tx,
+            requesterUserId,
+            idempotencyKey,
+            requestHash,
+        );
+        if (replay !== null) return replay;
+
+        const occurredAt = new Date();
+        const ticket = await createITTicketRecord(tx, {
+            type: canonicalInput.type,
+            title: canonicalInput.title,
+            description: canonicalInput.description,
+            status: "OPEN",
+            requesterUserId,
+            assignedToUserId: null,
+            categoryId: null,
+            requesterDepartmentId: workforce.departmentId,
+            requesterDepartmentNameSnapshot: workforce.departmentName,
+            version: 1,
+            resolvedAt: null,
+            createdAt: occurredAt,
+            updatedAt: occurredAt,
+        });
+
+        const eventId = await createITTicketEvent(tx, {
+            ticketId: ticket.id,
+            actorUserId: requesterUserId,
+            kind: "CREATED",
+            occurredAt,
+        });
+
+        if (preparedAttachments.length > 0) {
+            storedAttachments = await writeITTicketAttachments(ticket.id, preparedAttachments);
+            if (storedAttachments.length !== preparedAttachments.length) {
+                throw new Error("IT Ticket attachment storage returned an incomplete result");
+            }
+            await createITTicketAttachmentRows(tx, storedAttachments.map((attachment) => ({
+                id: attachment.id,
+                ticketId: ticket.id,
+                commentId: null,
+                uploaderUserId: requesterUserId,
+                position: attachment.position,
+                storageKey: attachment.storageKey,
+                originalName: attachment.originalName,
+                contentType: attachment.contentType,
+                contentSha256: attachment.contentSha256,
+                sizeBytes: attachment.sizeBytes,
+                width: attachment.width,
+                height: attachment.height,
+            })));
+        }
+
+        try {
+            await createITTicketCreationIdempotency(tx, {
                 requesterUserId,
                 idempotencyKey,
                 requestHash,
-            );
-            if (replay !== null) return replay;
-
-            const occurredAt = new Date();
-            const ticket = await createITTicketRecord(tx, {
-                type: canonicalInput.type,
-                title: canonicalInput.title,
-                description: canonicalInput.description,
-                status: "OPEN",
-                requesterUserId,
-                assignedToUserId: null,
-                categoryId: null,
-                requesterDepartmentId: workforce.departmentId,
-                requesterDepartmentNameSnapshot: workforce.departmentName,
-                version: 1,
-                resolvedAt: null,
-                createdAt: occurredAt,
-                updatedAt: occurredAt,
-            });
-
-            const eventId = await createITTicketEvent(tx, {
                 ticketId: ticket.id,
-                actorUserId: requesterUserId,
-                kind: "CREATED",
-                occurredAt,
+                createdAt: occurredAt,
             });
-
-            try {
-                await createITTicketCreationIdempotency(tx, {
-                    requesterUserId,
-                    idempotencyKey,
-                    requestHash,
-                    ticketId: ticket.id,
-                    createdAt: occurredAt,
-                });
-            } catch (error) {
-                if (hasPrismaErrorCode(error, "P2002")) {
-                    throw new ITTicketCreateIdempotencyRaceError();
-                }
-                throw error;
+        } catch (error) {
+            if (hasPrismaErrorCode(error, "P2002")) {
+                throw new ITTicketCreateIdempotencyRaceError();
             }
+            throw error;
+        }
 
-            const operatorAudience = await findITOperatorAudience(tx);
-            const notifications: ITTicketNotificationPayloadV1[] =
-                operatorAudience
-                    .filter((operator) => operator.userId !== requesterUserId)
-                    .map((operator) => ({
-                        version: 1,
-                        event: "CREATED",
-                        ticketId: ticket.id,
-                        recipientUserId: operator.userId,
-                        audience: "OPERATOR_QUEUE",
-                        source: { kind: "EVENT", id: eventId },
-                    }));
-            await enqueueITTicketNotificationIntents(tx, notifications);
+        const operatorAudience = await findITOperatorAudience(tx);
+        const notifications: ITTicketNotificationPayloadV1[] = operatorAudience
+            .filter((operator) => operator.userId !== requesterUserId)
+            .map((operator) => ({
+                version: 1,
+                event: "CREATED",
+                ticketId: ticket.id,
+                recipientUserId: operator.userId,
+                audience: "OPERATOR_QUEUE",
+                source: { kind: "EVENT", id: eventId },
+            }));
+        await enqueueITTicketNotificationIntents(tx, notifications);
 
-            return { ticket: toITTicketRecord(ticket), replayed: false };
+        return { ticket: toITTicketRecord(ticket), replayed: false };
+    };
+
+    try {
+        if (preparedAttachments.length === 0) {
+            return await runSerializableTransaction(createWithinTransaction);
+        }
+
+        return await prisma.$transaction(async (tx) => {
+            const result = await createWithinTransaction(tx);
+            transactionCallbackCompleted = true;
+            return result;
+        }, {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            maxWait: 10_000,
+            timeout: 30_000,
         });
     } catch (error) {
+        if (storedAttachments.length > 0) {
+            if (transactionCallbackCompleted) {
+                let committedRows: readonly { readonly storageKey: string }[] | null = null;
+                try {
+                    committedRows = await prisma.iTTicketAttachment.findMany({
+                        where: {
+                            storageKey: { in: storedAttachments.map((attachment) => attachment.storageKey) },
+                        },
+                        select: { storageKey: true },
+                    });
+                } catch {
+                    console.error("Could not verify IT Ticket creation attachment commit");
+                    throw error;
+                }
+
+                const committedKeys = new Set(committedRows.map((row) => row.storageKey));
+                const uncommittedKeys = storedAttachments
+                    .filter((attachment) => !committedKeys.has(attachment.storageKey))
+                    .map((attachment) => attachment.storageKey);
+
+                if (committedRows.length > 0) {
+                    if (uncommittedKeys.length > 0) {
+                        await deleteITTicketAttachmentFiles(uncommittedKeys);
+                    }
+                    if (uncommittedKeys.length === 0) {
+                        const replay = await findReplay(
+                            prisma,
+                            requesterUserId,
+                            idempotencyKey,
+                            requestHash,
+                        );
+                        if (replay !== null) return replay;
+                    }
+                    throw error;
+                }
+            }
+            await deleteITTicketAttachmentFiles(
+                storedAttachments.map((attachment) => attachment.storageKey),
+            );
+        }
+
         const creationRace = error instanceof ITTicketCreateIdempotencyRaceError
             || hasPrismaErrorCode(error, "P2034");
         if (!creationRace) throw error;

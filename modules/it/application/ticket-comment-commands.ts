@@ -35,7 +35,6 @@ import {
 import {
     claimITTicketFirstResponse,
     createITTicketComment,
-    createITTicketAttachmentRows,
     createITTicketCommentIdempotency,
     findITTicketCommentById,
     findITTicketCommentReplay,
@@ -45,6 +44,7 @@ import {
     type ITTicketConversationState,
     type ITTicketConversationPersistenceContext,
 } from "../infrastructure/persistence/ticket-conversation-repository";
+import { createITTicketAttachmentRows } from "../infrastructure/persistence/ticket-attachment-repository";
 import type { ITTicketCommentSubmission } from "../contracts";
 
 interface PostCommentOptions {

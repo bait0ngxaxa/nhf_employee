@@ -4,6 +4,7 @@ import {
     IT_TICKET_ATTACHMENT_MAX_FILES,
     IT_TICKET_ATTACHMENT_MAX_TOTAL_BYTES,
 } from "../../contracts";
+import type { ITTicketType } from "@prisma/client";
 
 export interface SelectedITTicketAttachment {
     readonly file: File;
@@ -81,4 +82,22 @@ export async function createITTicketCommentAttemptSignature(
         };
     }));
     return JSON.stringify({ ticketId, operator, body, attachments });
+}
+
+export async function createITTicketCreationAttemptSignature(
+    input: {
+        readonly type: ITTicketType;
+        readonly title: string;
+        readonly description: string;
+    },
+    files: readonly File[],
+): Promise<string> {
+    const attachments = await Promise.all(files.map(async (file) => {
+        const sourceHash = await globalThis.crypto.subtle.digest("SHA-256", await readFileBytes(file));
+        return {
+            originalName: file.name,
+            contentSha256: toHex(sourceHash),
+        };
+    }));
+    return JSON.stringify({ ...input, attachments });
 }

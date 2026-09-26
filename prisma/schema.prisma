@@ -364,7 +364,7 @@ model ITTicketComment {
 model ITTicketAttachment {
   id             String   @id @db.VarChar(32)
   ticketId       Int
-  commentId      String   @db.VarChar(30)
+  commentId      String?  @db.VarChar(30)
   uploaderUserId Int
   position       Int
   storageKey     String   @unique @db.VarChar(191)
@@ -377,7 +377,7 @@ model ITTicketAttachment {
   createdAt      DateTime @default(now())
 
   ticket   ITTicket        @relation(fields: [ticketId], references: [id], onDelete: Restrict)
-  comment  ITTicketComment @relation(fields: [ticketId, commentId], references: [ticketId, id], onDelete: Restrict)
+  comment  ITTicketComment? @relation(fields: [ticketId, commentId], references: [ticketId, id], onDelete: Restrict)
   uploader User            @relation("ITTicketAttachmentUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
 
   @@unique([commentId, position])

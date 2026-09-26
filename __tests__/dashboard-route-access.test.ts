@@ -20,6 +20,7 @@ import {
     requireDashboardITOperatorReadAccess,
     requireDashboardITSelfServiceAccess,
     requireDashboardITAnalyticsAccess,
+    requireDashboardITWorkspaceAccess,
 } from "@/app/dashboard/_lib/route-access";
 
 describe("Dashboard Audit route authorization", () => {
@@ -101,6 +102,46 @@ describe("Dashboard IT Ticket route authorization", () => {
 
         await expect(requireDashboardITSelfServiceAccess()).rejects.toThrow(
             "NEXT_REDIRECT:/login",
+        );
+    });
+
+    it("allows an operator-only actor into the unified workspace without OWN access", async () => {
+        const capabilities = {
+            canReadOwnTickets: false,
+            canReadAllTickets: true,
+            canCreateOwnTickets: false,
+            canCommentOwnTickets: false,
+            canCommentAllTickets: false,
+            canManageTickets: false,
+            canReadAnalytics: false,
+        };
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "USER",
+            itCapabilities: capabilities,
+        });
+
+        await expect(requireDashboardITWorkspaceAccess()).resolves.toEqual(capabilities);
+        expect(mocks.redirect).not.toHaveBeenCalled();
+    });
+
+    it("denies the unified workspace when no IT presentation surface is available", async () => {
+        mocks.getCurrentUserProjection.mockResolvedValue({
+            id: "41",
+            role: "ADMIN",
+            itCapabilities: {
+                canReadOwnTickets: false,
+                canReadAllTickets: false,
+                canCreateOwnTickets: false,
+                canCommentOwnTickets: false,
+                canCommentAllTickets: false,
+                canManageTickets: true,
+                canReadAnalytics: false,
+            },
+        });
+
+        await expect(requireDashboardITWorkspaceAccess()).rejects.toThrow(
+            "NEXT_REDIRECT:/access-denied",
         );
     });
 

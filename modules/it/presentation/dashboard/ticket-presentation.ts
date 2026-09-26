@@ -12,7 +12,9 @@ import {
     type ITOperatorTicketList,
     type ITOperatorTicketMutationSnapshot,
     type ITRequesterTicket,
+    type ITRequesterTicketDetail,
     type ITRequesterTicketList,
+    type ITOperatorTicketDetail,
 } from "../../contracts";
 import type { ITTicketStatus, ITTicketType } from "@prisma/client";
 
@@ -61,6 +63,24 @@ export function parseITRequesterTicket(value: unknown): ITRequesterTicket | null
         createdAt: value.createdAt,
         updatedAt: value.updatedAt,
         resolvedAt: value.resolvedAt,
+    };
+}
+
+export function parseITRequesterTicketDetail(
+    value: unknown,
+): ITRequesterTicketDetail | null {
+    if (!isITTicketResponseRecord(value) || !Array.isArray(value.initialAttachments)) {
+        return null;
+    }
+    const ticket = parseITRequesterTicket(value);
+    if (ticket === null) return null;
+    const initialAttachments = value.initialAttachments.map(parseITTicketAttachmentSummary);
+    if (initialAttachments.some((attachment) => attachment === null)) return null;
+    return {
+        ...ticket,
+        initialAttachments: initialAttachments.filter(
+            (attachment): attachment is ITTicketAttachmentSummary => attachment !== null,
+        ),
     };
 }
 
@@ -151,6 +171,22 @@ export function parseITOperatorTicket(value: unknown): ITOperatorTicket | null {
         createdAt: value.createdAt,
         updatedAt: value.updatedAt,
         resolvedAt: value.resolvedAt,
+    };
+}
+
+export function parseITOperatorTicketDetail(value: unknown): ITOperatorTicketDetail | null {
+    if (!isITTicketResponseRecord(value) || !Array.isArray(value.initialAttachments)) {
+        return null;
+    }
+    const ticket = parseITOperatorTicket(value);
+    if (ticket === null) return null;
+    const initialAttachments = value.initialAttachments.map(parseITTicketAttachmentSummary);
+    if (initialAttachments.some((attachment) => attachment === null)) return null;
+    return {
+        ...ticket,
+        initialAttachments: initialAttachments.filter(
+            (attachment): attachment is ITTicketAttachmentSummary => attachment !== null,
+        ),
     };
 }
 

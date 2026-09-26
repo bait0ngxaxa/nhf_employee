@@ -6,7 +6,6 @@ export type ITTicketConversationPersistenceContext = Pick<
     | "iTTicketComment"
     | "iTTicketCommentIdempotency"
     | "iTTicketEvent"
-    | "iTTicketAttachment"
 >;
 
 export const IT_TICKET_COMMENT_SELECT = {
@@ -146,14 +145,6 @@ export async function createITTicketComment(
         data,
         select: IT_TICKET_COMMENT_SELECT,
     });
-}
-
-export async function createITTicketAttachmentRows(
-    tx: ITTicketConversationPersistenceContext,
-    data: Prisma.ITTicketAttachmentCreateManyInput[],
-): Promise<void> {
-    if (data.length === 0) return;
-    await tx.iTTicketAttachment.createMany({ data });
 }
 
 export async function findITTicketCommentById(

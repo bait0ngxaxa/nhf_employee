@@ -5,6 +5,9 @@ import {
     APP_ROUTES,
     API_ROUTES,
     getDashboardMenuIdFromPathname,
+    IT_DASHBOARD_TAB_QUERY_KEY,
+    IT_DASHBOARD_TABS,
+    toDashboardITTabPath,
     resolveLegacyDashboardRedirect,
     toDashboardLeaveTabPath,
     toDashboardMenuPath,
@@ -60,16 +63,16 @@ describe("dashboard route SSOT", () => {
             APP_DASHBOARD_TABS.stock,
         );
         expect(getDashboardMenuIdFromPathname(APP_ROUTES.dashboardIT)).toBe(
-            APP_DASHBOARD_TABS.itTickets,
+            APP_DASHBOARD_TABS.itWorkspace,
         );
         expect(getDashboardMenuIdFromPathname(APP_ROUTES.dashboardITAnalytics)).toBe(
-            APP_DASHBOARD_TABS.itAnalytics,
+            APP_DASHBOARD_TABS.itWorkspace,
         );
         expect(getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardITAnalytics}/details`)).toBe(
-            APP_DASHBOARD_TABS.itAnalytics,
+            APP_DASHBOARD_TABS.itWorkspace,
         );
         expect(getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardITQueue}/19`)).toBe(
-            APP_DASHBOARD_TABS.itTicketQueue,
+            APP_DASHBOARD_TABS.itWorkspace,
         );
         expect(
             getDashboardMenuIdFromPathname(`${APP_ROUTES.dashboardEmployees}/new`),
@@ -92,6 +95,20 @@ describe("dashboard route SSOT", () => {
         expect(toDashboardRoutineTaskPath(71, 91)).toBe(
             "/dashboard/routine?taskId=71&occurrenceId=91",
         );
+    });
+
+    it("centralizes the allowed IT tab query values and compatibility destinations", () => {
+        expect(IT_DASHBOARD_TAB_QUERY_KEY).toBe("itTab");
+        expect(toDashboardITTabPath(IT_DASHBOARD_TABS.myTickets))
+            .toBe("/dashboard/it?itTab=my-tickets");
+        expect(toDashboardITTabPath(IT_DASHBOARD_TABS.queue))
+            .toBe("/dashboard/it?itTab=queue");
+        expect(toDashboardITTabPath(IT_DASHBOARD_TABS.analytics))
+            .toBe("/dashboard/it?itTab=analytics");
+        expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itWorkspace))
+            .toBe(APP_ROUTES.dashboardIT);
+        expect(toDashboardMenuPath(APP_DASHBOARD_TABS.itTicketQueue))
+            .toBe(APP_ROUTES.dashboardITQueue);
     });
 
     it("centralizes Authorization Administration API paths", () => {

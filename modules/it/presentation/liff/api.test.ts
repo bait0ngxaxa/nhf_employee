@@ -14,6 +14,7 @@ vi.mock("@/lib/client/api-client", () => ({
 
 import {
     fetchLiffITAttachment,
+    fetchLiffITTicket,
     fetchLiffITTickets,
     createLiffITTicket,
     postLiffITTicketComment,
@@ -81,6 +82,46 @@ describe("IT requester LIFF API adapter", () => {
         unregister();
     });
 
+    it("parses the detail-only initial attachment summary without private storage fields", async () => {
+        apiGetMock.mockResolvedValueOnce(success({
+            success: true,
+            ticket: {
+                id: 42,
+                type: "INCIDENT",
+                title: "เข้าใช้งานระบบไม่ได้",
+                description: "หน้าจอแจ้งข้อผิดพลาด",
+                status: "OPEN",
+                createdAt: "2026-09-25T02:00:00.000Z",
+                updatedAt: "2026-09-25T03:00:00.000Z",
+                resolvedAt: null,
+                initialAttachments: [{
+                    id: "a".repeat(32),
+                    originalName: "หลักฐาน.png",
+                    contentType: "image/webp",
+                    sizeBytes: 1024,
+                    width: 24,
+                    height: 16,
+                    position: 0,
+                    storageKey: "private/hidden.webp",
+                    uploaderUserId: 999,
+                }],
+            },
+        }));
+
+        const detail = await fetchLiffITTicket(42);
+
+        expect(detail.initialAttachments).toEqual([{
+            id: "a".repeat(32),
+            originalName: "หลักฐาน.png",
+            contentType: "image/webp",
+            sizeBytes: 1024,
+            width: 24,
+            height: 16,
+            position: 0,
+        }]);
+        expect(JSON.stringify(detail)).not.toMatch(/storageKey|uploaderUserId/);
+    });
+
     it("keeps a recovered Ticket creation mutation from automatic replay", async () => {
         apiPostMock.mockResolvedValueOnce(failure(401, { recovered: true, replayed: false }));
         const unregister = registerLiffSessionRecovery(async () => true, vi.fn());
@@ -89,7 +130,7 @@ describe("IT requester LIFF API adapter", () => {
             type: "INCIDENT",
             title: "เข้าใช้งานระบบไม่ได้",
             description: "หน้าจอไม่แสดงข้อมูล",
-        }, "create-key")).rejects.toMatchObject({
+        }, [], "create-key")).rejects.toMatchObject({
             name: "LiffApiError",
             status: 401,
             message: "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
@@ -109,6 +150,39 @@ describe("IT requester LIFF API adapter", () => {
         await expect(handler({ endpoint: API_ROUTES.line.itTickets, method: "POST", response: new Response(null, { status: 401 }) }))
             .resolves.toEqual({ recovered: true, replay: false });
         unregister();
+    });
+
+    it("sends creation images as multipart while retaining the caller's idempotency key", async () => {
+        apiPostMock.mockResolvedValueOnce(success({
+            success: true,
+            replayed: false,
+            ticket: {
+                id: 43,
+                type: "INCIDENT",
+                title: "เข้าใช้งานระบบไม่ได้",
+                description: "หน้าจอไม่แสดงข้อมูล",
+                status: "OPEN",
+                createdAt: "2026-09-25T02:00:00.000Z",
+                updatedAt: "2026-09-25T02:00:00.000Z",
+                resolvedAt: null,
+            },
+        }));
+        const file = new File([new Uint8Array([1, 2, 3])], "screen.png", { type: "image/png" });
+
+        await createLiffITTicket({
+            type: "INCIDENT",
+            title: "เข้าใช้งานระบบไม่ได้",
+            description: "หน้าจอไม่แสดงข้อมูล",
+        }, [file], "same-create-key");
+
+        const [, body, options] = apiPostMock.mock.calls[0] ?? [];
+        expect(body).toBeInstanceOf(FormData);
+        if (!(body instanceof FormData)) throw new Error("Expected multipart creation body");
+        expect(body.get("type")).toBe("INCIDENT");
+        expect(body.get("title")).toBe("เข้าใช้งานระบบไม่ได้");
+        expect(body.get("description")).toBe("หน้าจอไม่แสดงข้อมูล");
+        expect(body.get("attachments")).toMatchObject({ name: "screen.png", type: "image/png" });
+        expect(options).toMatchObject({ headers: { "Idempotency-Key": "same-create-key" } });
     });
 
     it("maps authorization, hidden resources, conflicts, size limits, rate limits, and service errors safely", async () => {

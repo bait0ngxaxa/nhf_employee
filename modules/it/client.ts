@@ -6,6 +6,12 @@ export { ITTicketConversation } from "./presentation/dashboard/ITTicketConversat
 export { ITTicketOperatorDetail } from "./presentation/dashboard/ITTicketOperatorDetail";
 export { ITTicketOperatorQueue } from "./presentation/dashboard/ITTicketOperatorQueue";
 export { ITTicketSelfService } from "./presentation/dashboard/ITTicketSelfService";
+export { ITWorkspace } from "./presentation/dashboard/ITWorkspace";
+export {
+    canAccessITWorkspaceDashboard,
+    getVisibleITDashboardTabs,
+    normalizeITDashboardTab,
+} from "./presentation/dashboard/workspace-projection";
 export { ITAnalyticsDashboard } from "./presentation/dashboard/ITAnalyticsDashboard";
 export {
     IT_OPERATOR_QUEUE_DEFAULT_LIMIT,

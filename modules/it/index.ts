@@ -54,6 +54,7 @@ export {
     postITRequesterTicketComment,
 } from "./application/ticket-comment-commands";
 export { getITTicketAttachmentForDownload } from "./application/ticket-attachment-queries";
+export { canAccessITWorkspaceDashboard } from "./presentation/dashboard/workspace-projection";
 export {
     getITTicketCommentMediaType,
     isITTicketCommentParseFailure,
@@ -63,6 +64,15 @@ export type {
     ITTicketCommentMediaType,
     ParsedITTicketCommentHttpInput,
 } from "./presentation/http/comment-request";
+export {
+    getITTicketCreateMediaType,
+    isITTicketCreateParseFailure,
+    parseITTicketCreateHttpInput,
+} from "./presentation/http/ticket-create-request";
+export type {
+    ITTicketCreateMediaType,
+    ParsedITTicketCreateHttpInput,
+} from "./presentation/http/ticket-create-request";
 export {
     logITTicketRouteFailure,
     mapITTicketRouteError,
@@ -102,7 +112,12 @@ export {
     IT_TICKET_TIMELINE_MAX_LIMIT,
     IT_TICKET_TITLE_MAX_LENGTH,
 } from "./contracts";
-export { toITOperatorTicket, toITRequesterTicket } from "./application/ticket-dto";
+export {
+    toITOperatorTicket,
+    toITOperatorTicketDetail,
+    toITRequesterTicket,
+    toITRequesterTicketDetail,
+} from "./application/ticket-dto";
 export {
     ITTicketAssigneeNotEligibleError,
     ITTicketCategoryInactiveError,
@@ -136,6 +151,7 @@ export type {
 export type { ITAnalyticsDashboard as ITAnalyticsDashboardDTO } from "./contracts";
 export type {
     ITRequesterTicket,
+    ITRequesterTicketDetail,
     ITRequesterTicketList,
     ITRequesterTicketPagination,
 } from "./contracts";
@@ -143,6 +159,7 @@ export type {
     ITAssignableOperator,
     ITOperatorReferenceData,
     ITOperatorTicket,
+    ITOperatorTicketDetail,
     ITOperatorTicketList,
     ITOperatorTicketMutationSnapshot,
     ITTicketOperatorIdentity,

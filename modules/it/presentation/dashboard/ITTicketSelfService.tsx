@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "react";
+/* eslint-disable @next/next/no-img-element -- Selected attachments use local object URLs for previews. */
+
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactElement } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CircleAlert, Plus, RefreshCw, TicketCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleAlert, Plus, RefreshCw, TicketCheck, X } from "lucide-react";
 
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { Button } from "@/components/ui/button";
@@ -18,9 +20,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 
 import {
     IT_TICKET_DESCRIPTION_MAX_LENGTH,
+    IT_TICKET_ATTACHMENT_ACCEPTED_TYPES,
+    IT_TICKET_ATTACHMENT_MAX_BYTES,
+    IT_TICKET_ATTACHMENT_MAX_FILES,
+    IT_TICKET_ATTACHMENT_MAX_TOTAL_BYTES,
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TITLE_MAX_LENGTH,
@@ -30,6 +37,11 @@ import {
     type ITPresentationCapabilities,
 } from "../../contracts";
 import type { ITTicketStatus, ITTicketType } from "@prisma/client";
+import {
+    createITTicketCreationAttemptSignature,
+    validateITTicketAttachmentSelection,
+    type SelectedITTicketAttachment,
+} from "./ticket-attachment-client";
 import {
     formatITTicketDate,
     IT_TICKET_STATUS_STYLES,
@@ -67,8 +79,10 @@ function TicketListSkeleton(): ReactElement {
 
 export function ITTicketSelfService({
     capabilities,
+    embedded = false,
 }: {
     capabilities: ITPresentationCapabilities;
+    readonly embedded?: boolean;
 }): ReactElement {
     const [listState, setListState] = useState<ITRequesterListState | null>(null);
     const [page, setPage] = useState(1);
@@ -77,17 +91,60 @@ export function ITTicketSelfService({
     const [ticketType, setTicketType] = useState<ITTicketType>("INCIDENT");
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
+    const [selectedAttachments, setSelectedAttachments] = useState<SelectedITTicketAttachment[]>([]);
     const [createError, setCreateError] = useState<string | null>(null);
     const [createdMessage, setCreatedMessage] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const attemptRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
     const createInFlightRef = useRef(false);
+    const selectedAttachmentsRef = useRef<SelectedITTicketAttachment[]>([]);
+
+    const updateSelectedAttachments = (next: SelectedITTicketAttachment[]): void => {
+        selectedAttachmentsRef.current = next;
+        setSelectedAttachments(next);
+    };
+
+    useEffect(() => () => {
+        for (const attachment of selectedAttachmentsRef.current) {
+            URL.revokeObjectURL(attachment.previewUrl);
+        }
+    }, []);
 
     const requestKey = `${capabilities.canReadOwnTickets}:${page}:${refreshKey}`;
     const currentListState = listState?.key === requestKey ? listState : null;
     const list = currentListState?.kind === "loaded" ? currentListState.list : null;
     const listError = currentListState?.kind === "error" ? currentListState.message : null;
     const loading = capabilities.canReadOwnTickets && currentListState === null;
+
+    const handleAttachmentSelection = (event: ChangeEvent<HTMLInputElement>): void => {
+        const input = event.currentTarget;
+        const incoming = Array.from(input.files ?? []);
+        input.value = "";
+        if (incoming.length === 0) return;
+
+        const error = validateITTicketAttachmentSelection(
+            selectedAttachmentsRef.current.map((attachment) => attachment.file),
+            incoming,
+        );
+        if (error !== null) {
+            setCreateError(error);
+            return;
+        }
+        setCreateError(null);
+        attemptRef.current = null;
+        updateSelectedAttachments([
+            ...selectedAttachmentsRef.current,
+            ...incoming.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
+        ]);
+    };
+
+    const removeAttachment = (previewUrl: string): void => {
+        const current = selectedAttachmentsRef.current;
+        const removed = current.find((attachment) => attachment.previewUrl === previewUrl);
+        if (removed) URL.revokeObjectURL(removed.previewUrl);
+        attemptRef.current = null;
+        updateSelectedAttachments(current.filter((attachment) => attachment.previewUrl !== previewUrl));
+    };
 
     useEffect(() => {
         if (!capabilities.canReadOwnTickets) return;
@@ -139,30 +196,48 @@ export function ITTicketSelfService({
             return;
         }
 
-        const signature = JSON.stringify(payload);
-        let attempt = attemptRef.current;
-        if (attempt === null || attempt.signature !== signature) {
-            attempt = { signature, key: globalThis.crypto.randomUUID() };
-            attemptRef.current = attempt;
-        }
-
-        setCreating(true);
         createInFlightRef.current = true;
+        setCreating(true);
         setCreateError(null);
         setCreatedMessage(null);
+        const selectedFiles = selectedAttachmentsRef.current.map((attachment) => attachment.file);
         try {
+            let signature: string;
+            try {
+                signature = await createITTicketCreationAttemptSignature(payload, selectedFiles);
+            } catch {
+                setCreateError("อ่านรูปภาพที่เลือกไม่ได้ กรุณาเลือกรูปภาพอีกครั้ง");
+                return;
+            }
+
+            let attempt = attemptRef.current;
+            if (attempt === null || attempt.signature !== signature) {
+                attempt = { signature, key: createIdempotencyKey() };
+                attemptRef.current = attempt;
+            }
+
+            let body: BodyInit;
+            const headers: Record<string, string> = { "Idempotency-Key": attempt.key };
+            if (selectedFiles.length === 0) {
+                headers["Content-Type"] = "application/json";
+                body = JSON.stringify(payload);
+            } else {
+                const formData = new FormData();
+                formData.set("type", payload.type);
+                formData.set("title", payload.title);
+                formData.set("description", payload.description);
+                for (const file of selectedFiles) formData.append("attachments", file, file.name);
+                body = formData;
+            }
             const response = await fetch(API_ROUTES.itTickets.list, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Idempotency-Key": attempt.key,
-                },
-                body: JSON.stringify(payload),
+                headers,
+                body,
             });
-            const body: unknown = await response.json().catch(() => null);
-            if (!response.ok) throw new Error(readITRequesterError(body, response.status));
-            const createdTicket = isITTicketResponseRecord(body) && body.success === true
-                ? parseITRequesterTicket(body.ticket)
+            const responseBody: unknown = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(readITRequesterError(responseBody, response.status));
+            const createdTicket = isITTicketResponseRecord(responseBody) && responseBody.success === true
+                ? parseITRequesterTicket(responseBody.ticket)
                 : null;
             if (createdTicket === null) {
                 throw new Error("ระบบตอบกลับข้อมูลไม่ครบถ้วน กรุณาลองส่งรายการเดิมอีกครั้ง");
@@ -172,6 +247,10 @@ export function ITTicketSelfService({
             setTitle("");
             setDescription("");
             setTicketType("INCIDENT");
+            for (const attachment of selectedAttachmentsRef.current) {
+                URL.revokeObjectURL(attachment.previewUrl);
+            }
+            updateSelectedAttachments([]);
             setDialogOpen(false);
             setCreatedMessage(`ส่ง Ticket #${createdTicket.id} เรียบร้อยแล้ว`);
             setPage(1);
@@ -187,17 +266,18 @@ export function ITTicketSelfService({
     };
 
     return (
-        <section className="min-h-[calc(100dvh-6rem)]">
+        <section className={embedded ? "" : "min-h-[calc(100dvh-6rem)]"}>
             <div className="mx-auto max-w-6xl space-y-7">
+                {!embedded || capabilities.canCreateOwnTickets ? (
                 <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                    <div className="min-w-0 space-y-1">
+                    {!embedded ? <div className="min-w-0 space-y-1">
                         <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
-                            IT Ticket ของฉัน
+                            Ticket ของฉัน
                         </h1>
                         <p className="max-w-[70ch] text-sm font-medium leading-6 text-content-secondary">
                             แจ้งปัญหาหรือขอความช่วยเหลือ และติดตามสถานะคำขอของคุณได้ที่นี่
                         </p>
-                    </div>
+                    </div> : null}
                     {capabilities.canCreateOwnTickets ? (
                         <Button className="w-full sm:w-auto" onClick={() => {
                             setCreateError(null);
@@ -205,10 +285,11 @@ export function ITTicketSelfService({
                             setDialogOpen(true);
                         }}>
                             <Plus aria-hidden="true" />
-                            สร้าง Ticket
+                            แจ้งปัญหา / ขอความช่วยเหลือ
                         </Button>
                     ) : null}
                 </header>
+                ) : null}
 
                 {createdMessage ? (
                     <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
@@ -256,12 +337,6 @@ export function ITTicketSelfService({
                                 <p className="mx-auto mt-1 max-w-[52ch] text-sm leading-6 text-content-secondary">
                                     เมื่อส่งคำขอแล้ว คุณจะกลับมาติดตามสถานะได้จากรายการนี้
                                 </p>
-                                {capabilities.canCreateOwnTickets ? (
-                                    <Button className="mt-4" onClick={() => setDialogOpen(true)}>
-                                        <Plus aria-hidden="true" />
-                                        สร้าง Ticket แรก
-                                    </Button>
-                                ) : null}
                             </div>
                         ) : null}
                         {!loading && !listError && list && list.tickets.length > 0 ? (
@@ -334,15 +409,15 @@ export function ITTicketSelfService({
             }}>
                 <DialogContent showCloseButton={!creating}>
                     <DialogHeader>
-                        <DialogTitle>สร้าง IT Ticket</DialogTitle>
+                        <DialogTitle>แจ้งปัญหา / ขอความช่วยเหลือ</DialogTitle>
                         <DialogDescription>
-                            ระบุประเภท หัวข้อ และรายละเอียด ระบบจะบันทึก Ticket ในนามบัญชีของคุณ
+                            ระบุประเภทคำขอ หัวข้อ และรายละเอียด ระบบจะบันทึก Ticket ในนามบัญชีของคุณ
                         </DialogDescription>
                     </DialogHeader>
                     <form className="min-h-0 flex flex-1 flex-col" onSubmit={handleCreate}>
                         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
                             <div className="space-y-2">
-                                <label htmlFor="it-ticket-type" className="text-sm font-medium text-content-heading">ประเภท Ticket</label>
+                                <label htmlFor="it-ticket-type" className="text-sm font-medium text-content-heading">ประเภทคำขอ</label>
                                 <select
                                     id="it-ticket-type"
                                     value={ticketType}
@@ -390,6 +465,38 @@ export function ITTicketSelfService({
                                 <p id="it-ticket-description-count" className="text-right text-xs text-content-muted">
                                     {description.length}/{IT_TICKET_DESCRIPTION_MAX_LENGTH}
                                 </p>
+                            </div>
+                            <div className="space-y-2">
+                                <label htmlFor="it-ticket-attachments" className="text-sm font-medium text-content-heading">
+                                    รูปภาพประกอบ <span className="font-normal text-content-muted">(ไม่บังคับ)</span>
+                                </label>
+                                <p id="it-ticket-attachment-limits" className="text-xs leading-5 text-content-secondary">
+                                    JPG, PNG หรือ WEBP · ไม่เกิน {IT_TICKET_ATTACHMENT_MAX_FILES} รูป · รูปละ {(IT_TICKET_ATTACHMENT_MAX_BYTES / (1024 * 1024)).toLocaleString("th-TH")} MiB รวมไม่เกิน {(IT_TICKET_ATTACHMENT_MAX_TOTAL_BYTES / (1024 * 1024)).toLocaleString("th-TH")} MiB
+                                </p>
+                                <Input
+                                    id="it-ticket-attachments"
+                                    type="file"
+                                    accept={IT_TICKET_ATTACHMENT_ACCEPTED_TYPES.join(",")}
+                                    multiple
+                                    disabled={creating || selectedAttachments.length >= IT_TICKET_ATTACHMENT_MAX_FILES}
+                                    onChange={handleAttachmentSelection}
+                                    aria-describedby="it-ticket-attachment-limits"
+                                    className="h-auto min-h-11 cursor-pointer py-2 file:mr-3 file:min-h-8 file:rounded-md file:border-0 file:bg-surface-subtle file:px-3 file:text-sm file:font-medium file:text-content-heading"
+                                />
+                                {selectedAttachments.length > 0 ? (
+                                    <ul aria-label="รูปภาพที่เลือก" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                        {selectedAttachments.map((attachment) => (
+                                            <li key={attachment.previewUrl} className="min-w-0 space-y-2 rounded-lg border border-border-neutral p-2">
+                                                <img src={attachment.previewUrl} alt={`ตัวอย่างรูป ${attachment.file.name}`} loading="lazy" className="aspect-[4/3] max-h-40 w-full rounded-md bg-surface-subtle object-contain" />
+                                                <p className="break-words text-xs leading-5 text-content-secondary">{attachment.file.name}</p>
+                                                <Button type="button" variant="outline" size="sm" disabled={creating} onClick={() => removeAttachment(attachment.previewUrl)}>
+                                                    <X aria-hidden="true" className="size-4" />
+                                                    นำรูปออก
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : null}
                             </div>
                             {createError ? <p role="alert" className="text-sm font-medium text-rose-700 dark:text-rose-300">{createError}</p> : null}
                         </div>

@@ -1,14 +1,7 @@
-import type { Metadata } from "next";
-import type { ReactElement } from "react";
+import { redirect } from "next/navigation";
 
-import { requireDashboardITAnalyticsAccess } from "@/app/dashboard/_lib/route-access";
-import { ITAnalyticsDashboard } from "@/modules/it/client";
+import { IT_DASHBOARD_TABS, toDashboardITTabPath } from "@/lib/ssot/routes";
 
-export const metadata: Metadata = {
-    title: "รายงาน IT | NHFapp",
-};
-
-export default async function ITAnalyticsPage(): Promise<ReactElement> {
-    await requireDashboardITAnalyticsAccess();
-    return <ITAnalyticsDashboard />;
+export default function ITAnalyticsCompatibilityPage(): never {
+    redirect(toDashboardITTabPath(IT_DASHBOARD_TABS.analytics));
 }

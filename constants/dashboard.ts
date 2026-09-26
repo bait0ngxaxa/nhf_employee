@@ -11,7 +11,6 @@ import {
     ClipboardCheck,
     KeyRound,
     Headset,
-    BarChart3,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -21,7 +20,12 @@ import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 import type { AuditPresentationCapabilities } from "@/modules/audit/client";
 import type { EmailRequestPresentationCapabilities } from "@/modules/it/client";
-import type { ITPresentationCapabilities } from "@/modules/it/client";
+import {
+    canAccessITWorkspaceDashboard,
+    type ITPresentationCapabilities,
+} from "@/modules/it/client";
+
+export { canAccessITWorkspaceDashboard };
 
 /** Flat lookup used by handleMenuClick for feature and capability validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
@@ -49,25 +53,11 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         feature: FEATURE_KEYS.routine,
     },
     {
-        id: "it-tickets",
-        label: "IT Ticket",
-        sidebarLabel: "ขอความช่วยเหลือด้าน IT",
+        id: "it-workspace",
+        label: "บริการ IT",
+        sidebarLabel: "บริการ IT",
         icon: Headset,
-        description: "แจ้งปัญหาและติดตามคำขอรับบริการจากทีมไอที",
-    },
-    {
-        id: "it-ticket-queue",
-        label: "คิว IT Ticket",
-        sidebarLabel: "คิวงาน IT",
-        icon: Headset,
-        description: "ตรวจสอบและดำเนินการ Ticket ตามสิทธิ์ที่ได้รับ",
-    },
-    {
-        id: "it-analytics",
-        label: "รายงาน IT",
-        sidebarLabel: "รายงาน IT",
-        icon: BarChart3,
-        description: "ดูภาพรวมและสถิติการให้บริการ IT",
+        description: "แจ้งปัญหา ติดตามคำขอ และจัดการงานบริการ IT",
     },
     {
         id: "email-request",
@@ -145,9 +135,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
             getDashboardMenuItem("leave-management"),
             getDashboardMenuItem("stock"),
             getDashboardMenuItem("routine"),
-            getDashboardMenuItem("it-tickets"),
-            getDashboardMenuItem("it-ticket-queue"),
-            getDashboardMenuItem("it-analytics"),
+            getDashboardMenuItem("it-workspace"),
         ],
     },
     {
@@ -308,14 +296,8 @@ export function getAvailableMenuGroups(
             if (item.id === "email-request") {
                 return canAccessEmailRequestDashboard(emailRequestCapabilities);
             }
-            if (item.id === "it-tickets") {
-                return canAccessITTicketDashboard(itCapabilities);
-            }
-            if (item.id === "it-ticket-queue") {
-                return canAccessITTicketQueue(itCapabilities);
-            }
-            if (item.id === "it-analytics") {
-                return canAccessITAnalytics(itCapabilities);
+            if (item.id === "it-workspace") {
+                return canAccessITWorkspaceDashboard(itCapabilities);
             }
             return !item.requiredRole
                 || (item.requiredRole === "ADMIN" && isAdmin);
@@ -370,9 +352,7 @@ export const getMenuTheme = (menuId: string) => {
                 activeBg: "bg-indigo-50/80",
                 glow: "from-indigo-400 via-violet-400 to-purple-400",
             };
-        case "it-tickets":
-        case "it-ticket-queue":
-        case "it-analytics":
+        case "it-workspace":
             return {
                 gradient: "from-sky-600 to-cyan-700",
                 lightBg: "bg-sky-50",

@@ -5,12 +5,14 @@ import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/
 import {
     buildCurrentITAuthorizationContext,
     createITTicket,
-    createITTicketInputSchema,
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_LIST_DEFAULT_PAGE,
     listITRequesterTickets,
     logITTicketRouteFailure,
     mapITTicketRouteError,
+    getITTicketCreateMediaType,
+    isITTicketCreateParseFailure,
+    parseITTicketCreateHttpInput,
     toITRequesterTicket,
 } from "@/modules/it";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
@@ -31,22 +33,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return jsonError("กรุณาระบุ Idempotency-Key ที่ถูกต้อง", 400, { success: false });
         }
 
-        let body: unknown;
-        try {
-            body = await request.json();
-        } catch {
-            return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false });
+        const mediaType = getITTicketCreateMediaType(request);
+        if (mediaType === "unsupported") {
+            return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 415, { success: false });
         }
-        const parsed = createITTicketInputSchema.safeParse(body);
-        if (!parsed.success) {
-            return jsonError("กรุณาตรวจสอบประเภท หัวข้อ และรายละเอียด Ticket", 400, {
-                success: false,
-            });
-        }
+        const parsed = await parseITTicketCreateHttpInput(request, mediaType);
+        if (isITTicketCreateParseFailure(parsed)) return parsed;
 
         const context = await buildCurrentITAuthorizationContext(auth.user);
-        const result = await createITTicket(context, parsed.data, {
+        const result = await createITTicket(context, parsed.input, {
             idempotencyKey: idempotencyKey.data,
+            ...(parsed.attachments.length > 0 ? { attachments: parsed.attachments } : {}),
         });
         if (!result.replayed) scheduleITTicketOutboxWakeup();
 

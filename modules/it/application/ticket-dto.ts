@@ -1,7 +1,15 @@
-import type { ITRequesterTicket } from "../contracts";
-import type { ITOperatorTicket } from "../contracts";
+import type {
+    ITRequesterTicket,
+    ITRequesterTicketDetail,
+    ITTicketAttachmentSummary,
+} from "../contracts";
+import type { ITOperatorTicket, ITOperatorTicketDetail } from "../contracts";
 import { getUserDisplayName } from "@/shared/identity/display";
-import type { ITOperatorTicketRecord } from "../infrastructure/persistence/ticket-query-repository";
+import type {
+    ITOperatorTicketDetailRecord,
+    ITOperatorTicketRecord,
+    ITRequesterTicketDetailRecord,
+} from "../infrastructure/persistence/ticket-query-repository";
 import type { ITTicketRecord } from "./types";
 
 export function toITRequesterTicket(
@@ -20,6 +28,42 @@ export function toITRequesterTicket(
         updatedAt: ticket.updatedAt.toISOString(),
         resolvedAt: ticket.resolvedAt?.toISOString() ?? null,
     });
+}
+
+function toInitialAttachmentSummaries(
+    attachments: readonly {
+        readonly id: string;
+        readonly originalName: string;
+        readonly contentType: string;
+        readonly sizeBytes: number;
+        readonly width: number;
+        readonly height: number;
+        readonly position: number;
+    }[],
+): readonly ITTicketAttachmentSummary[] {
+    return attachments.map((attachment) => {
+        if (attachment.contentType !== "image/webp") {
+            throw new Error("Invalid IT Ticket attachment content type");
+        }
+        return {
+            id: attachment.id,
+            originalName: attachment.originalName,
+            contentType: "image/webp",
+            sizeBytes: attachment.sizeBytes,
+            width: attachment.width,
+            height: attachment.height,
+            position: attachment.position,
+        };
+    });
+}
+
+export function toITRequesterTicketDetail(
+    ticket: ITRequesterTicketDetailRecord,
+): ITRequesterTicketDetail {
+    return {
+        ...toITRequesterTicket(ticket),
+        initialAttachments: toInitialAttachmentSummaries(ticket.attachments),
+    };
 }
 
 /** Projects only the operator fields needed to process a Ticket. */
@@ -61,4 +105,13 @@ export function toITOperatorTicket(
         updatedAt: ticket.updatedAt.toISOString(),
         resolvedAt: ticket.resolvedAt?.toISOString() ?? null,
     });
+}
+
+export function toITOperatorTicketDetail(
+    ticket: ITOperatorTicketDetailRecord,
+): ITOperatorTicketDetail {
+    return {
+        ...toITOperatorTicket(ticket),
+        initialAttachments: toInitialAttachmentSummaries(ticket.attachments),
+    };
 }

@@ -10,6 +10,7 @@ import {
 import type { EmployeePresentationCapabilities } from "@/modules/employee";
 import type { EmailRequestPresentationCapabilities } from "@/modules/it/client";
 import type { ITPresentationCapabilities } from "@/modules/it";
+import { canAccessITWorkspaceDashboard } from "@/modules/it";
 import {
     canAccessITTicketDashboard,
     canAccessITTicketQueue,
@@ -52,6 +53,25 @@ export async function requireDashboardITSelfServiceAccess(): Promise<ITPresentat
         canReadAnalytics: false,
     };
     if (!canAccessITTicketDashboard(capabilities)) {
+        redirect(APP_ROUTES.accessDenied);
+    }
+    return capabilities;
+}
+
+export async function requireDashboardITWorkspaceAccess(): Promise<ITPresentationCapabilities> {
+    const user = await getCurrentUserProjection();
+    if (!user) redirect(APP_ROUTES.login);
+
+    const capabilities = user.itCapabilities ?? {
+        canReadOwnTickets: false,
+        canReadAllTickets: false,
+        canCreateOwnTickets: false,
+        canCommentOwnTickets: false,
+        canCommentAllTickets: false,
+        canManageTickets: false,
+        canReadAnalytics: false,
+    };
+    if (!canAccessITWorkspaceDashboard(capabilities)) {
         redirect(APP_ROUTES.accessDenied);
     }
     return capabilities;

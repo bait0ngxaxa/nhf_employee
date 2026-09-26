@@ -21,6 +21,14 @@ export type ITTicketAttachmentReadRecord = Prisma.ITTicketAttachmentGetPayload<{
     select: typeof IT_TICKET_ATTACHMENT_READ_SELECT;
 }>;
 
+export async function createITTicketAttachmentRows(
+    tx: ITTicketAttachmentPersistenceContext,
+    data: Prisma.ITTicketAttachmentCreateManyInput[],
+): Promise<void> {
+    if (data.length === 0) return;
+    await tx.iTTicketAttachment.createMany({ data });
+}
+
 export async function findITTicketAttachmentForRead(
     tx: ITTicketAttachmentPersistenceContext,
     id: string,

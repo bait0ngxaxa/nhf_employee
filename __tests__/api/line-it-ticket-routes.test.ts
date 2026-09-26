@@ -141,6 +141,23 @@ function multipartCommentRequest(): NextRequest {
     });
 }
 
+function multipartCreateRequest(withAttachment: boolean): NextRequest {
+    const form = new FormData();
+    form.set("type", "INCIDENT");
+    form.set("title", "หัวข้อสำหรับส่งพร้อมภาพ");
+    form.set("description", "รายละเอียดพร้อมภาพประกอบ");
+    if (withAttachment) {
+        form.append("attachments", new File([new Uint8Array([1, 2, 3])], "screen.png", {
+            type: "image/png",
+        }));
+    }
+    return new NextRequest("http://localhost/api/line/it/tickets", {
+        method: "POST",
+        headers: { "Idempotency-Key": "multipart-create-key" },
+        body: form,
+    });
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
     mocks.session.mockResolvedValue({ ok: true, user, employeeId });
@@ -235,6 +252,43 @@ describe("LIFF IT Ticket API routes", () => {
             description: "รายละเอียด",
         }, { idempotencyKey: "create-key" });
         expect(mocks.wakeOutbox).toHaveBeenCalledTimes(1);
+    });
+
+    it("accepts multipart creation with and without selected files", async () => {
+        const empty = await createTicket(multipartCreateRequest(false));
+        expect(empty.status).toBe(201);
+        expect(mocks.createTicket).toHaveBeenLastCalledWith(actorContext, {
+            type: "INCIDENT",
+            title: "หัวข้อสำหรับส่งพร้อมภาพ",
+            description: "รายละเอียดพร้อมภาพประกอบ",
+        }, { idempotencyKey: "multipart-create-key" });
+
+        const withFile = await createTicket(multipartCreateRequest(true));
+        const options = mocks.createTicket.mock.calls.at(-1)?.[2];
+        expect(withFile.status).toBe(201);
+        expect(options).toMatchObject({ idempotencyKey: "multipart-create-key" });
+        expect(options.attachments).toHaveLength(1);
+        expect(options.attachments[0]).toMatchObject({
+            name: "screen.png",
+            type: "image/png",
+            size: 3,
+        });
+    });
+
+    it("rejects explicitly unsupported create media types before mutation", async () => {
+        const request = new NextRequest("http://localhost/api/line/it/tickets", {
+            method: "POST",
+            headers: {
+                "Content-Type": "text/plain",
+                "Idempotency-Key": "unsupported-create-key",
+            },
+            body: "not json",
+        });
+
+        const response = await createTicket(request);
+
+        expect(response.status).toBe(415);
+        expect(mocks.createTicket).not.toHaveBeenCalled();
     });
 
     it("rejects caller-selected requester identity and missing or invalid create idempotency", async () => {
