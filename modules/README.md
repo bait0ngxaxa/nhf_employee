@@ -6,7 +6,7 @@ Employee application.
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
 boundaries. IT1 through IT8 are closed under `modules/it/`. IT8 moved Email
-Request ownership into the module while preserving its compatibility contract.
+Request ownership into the module while preserving its compatibility seam.
 Its server entry is
 `@/modules/it` and its browser-safe Dashboard presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and
@@ -44,7 +44,12 @@ inventory are recorded in
 [`docs/architecture/final-repository-audit.md`](../docs/architecture/final-repository-audit.md).
 The deferral statements in the historical IT6 and Stock K1 closure notes below
 record their original phase boundaries; the current IT8 ownership state is
-closed and is summarized above.
+closed and is summarized above. The retained
+`lib/line` outbound webhook (`sendLineWebhook`, its service-object export,
+`LineWebhookData`, and `LINE_WEBHOOK_URL`) remains a separate L6/H0 external
+compatibility seam. Active Email Request delivery continues through IT-owned
+Flex and generic LINE push/broadcast. Its type bridge references IT's
+authoritative payload type.
 The runtime Auth capability is `modules/auth/`, with
 `@/modules/auth` as its server public entry and `@/modules/auth/client` as its
 browser public entry. It

@@ -233,11 +233,34 @@ or historical outbox interpretation. The IT dispatcher accepts the existing
 `EMAIL_REQUEST` type and `email-request:<id>:created` event key, including
 payloads whose historical optional fields are absent.
 
-IT8 is **CLOSED**. Final verification passed `npm run architecture:check`
-(1,248 source files), `npm run lint:strict`, `npm run typecheck`, the dedicated
-MySQL Email Request integration suite (22 files; 153 tests, including OWN/ALL
-queries and concurrent idempotency convergence), and the final `npm run test`
-(365 files; 3,515 passed, 1 skipped). No Prisma schema or migration changed.
+The initial IT8 closure verification is historical evidence from before the
+retained LINE webhook correction: `npm run architecture:check` checked 1,248
+source files; lint, typecheck, the dedicated MySQL Email Request integration
+suite (22 files; 153 tests), and the full suite (365 files; 3,515 passed,
+1 skipped) passed. The correction does not touch persistence or schema.
+
+### Retained LINE webhook compatibility correction
+
+The active Email Request outbox path remains IT-owned:
+`dispatchITEmailRequestOutbox` → IT-owned Flex → generic LINE Messaging
+push/broadcast. Separately, IT8 preserves the formally retained legacy
+outbound webhook seam outside IT: `sendLineWebhook`,
+`lineNotificationService.sendLineWebhook`, `LineWebhookData`, and
+`LINE_WEBHOOK_URL`. `lib/line/types.ts` is a thin type-only bridge to IT's
+authoritative `EmailRequestData`; the historical `email_request` shape and
+direct `@/lib/line/types` import remain available. The webhook returns false
+without a configured URL and posts the unchanged JSON payload when configured.
+It is not connected to the active Email Request outbox. The L6/H0 records are
+unchanged; removal still requires deployment-owner and external-integration
+confirmation.
+
+The focused LINE compatibility tests passed (1 file; 16 tests), IT Email
+Request LINE/dispatcher tests passed (2 files; 7 tests), `architecture:check`
+passed (1,249 source files), and `lint:strict` and `typecheck` passed. The
+correction's one final `npm run test` passed (365 files; 3,515 passed,
+1 skipped). The earlier dedicated MySQL Email Request result remains the
+verified persistence result; this correction made no persistence or schema
+changes. IT8 is **CLOSED**.
 
 ## 13. Historical Ticket compatibility inventory
 

@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+    lineNotificationService,
     sendLineMessage,
     sendLineBroadcast,
     sendStockLineBroadcast,
     sendLineWebhook,
 } from "@/lib/line";
+import type { LineWebhookData } from "@/lib/line";
+import type { LineWebhookData as DirectLineWebhookData } from "@/lib/line/types";
+import type { EmailRequestData } from "@/modules/it";
 import { sendLineAppMessage } from "@/lib/line/messaging";
 import type { LineFlexMessage } from "@/types/api";
 
@@ -25,11 +29,46 @@ const flexMessage: LineFlexMessage = {
     },
 };
 
-const webhookData = {
-    type: "compatibility" as const,
-    payload: { reference: "test-reference" },
+const emailRequestPayload: EmailRequestData = {
+    thaiName: "สมชาย ใจดี",
+    englishName: "Somchai Jaidee",
+    phone: "081-2345678",
+    nickname: "ชาย",
+    position: "เจ้าหน้าที่",
+    department: "มสช.",
+    replyEmail: "somchai@example.com",
+    needsDocumentSystem: false,
+    sharedDriveAccess: ["it"],
+    requestedAt: "2026-09-26T00:00:00.000Z",
+};
+
+const webhookData: LineWebhookData = {
+    type: "email_request",
+    emailRequest: emailRequestPayload,
     flexMessage,
 };
+
+const directWebhookData: DirectLineWebhookData = webhookData;
+
+type Equal<Left, Right> =
+    (<Value>() => Value extends Left ? 1 : 2) extends
+    (<Value>() => Value extends Right ? 1 : 2) ? true : false;
+type Expect<Condition extends true> = Condition;
+type SendLineWebhookParameterContract = Expect<
+    Equal<Parameters<typeof sendLineWebhook>[0], LineWebhookData>
+>;
+type ServiceWebhookParameterContract = Expect<
+    Equal<Parameters<typeof lineNotificationService.sendLineWebhook>[0], LineWebhookData>
+>;
+type DirectTypeContract = Expect<Equal<DirectLineWebhookData, LineWebhookData>>;
+
+void directWebhookData;
+const compatibilityContractChecks: [
+    SendLineWebhookParameterContract,
+    ServiceWebhookParameterContract,
+    DirectTypeContract,
+] = [true, true, true];
+void compatibilityContractChecks;
 
 describe("LINE Notification Service", () => {
     beforeEach(() => {
@@ -190,6 +229,7 @@ describe("LINE Notification Service", () => {
             const result = await sendLineWebhook(webhookData);
 
             expect(result).toBe(true);
+            expect(lineNotificationService.sendLineWebhook).toBe(sendLineWebhook);
             expect(fetchMock).toHaveBeenCalledWith(
                 "https://hooks.example.com/line",
                 {

@@ -63,10 +63,25 @@ ownership, API/server and Dashboard/client public entries, the IT client graph,
 the IT-owned outbox dispatcher, and retired duplicate ownership paths. It
 continues to enforce Notification and Audit persistence ownership separately.
 
-IT8 is **CLOSED**. Final gates passed: `npm run architecture:check` checked
-1,248 source files; `npm run lint:strict`; `npm run typecheck`; the dedicated
-MySQL Email Request integration suite passed 22 files/153 tests; and the one
-final `npm run test` passed 365 files with 3,515 tests passed and 1 skipped.
+The initial IT8 closure suite is retained as historical evidence: its final
+`npm run test` passed 365 files with 3,515 tests passed and 1 skipped. A later
+compatibility review identified that IT8 had removed a formally retained L6
+outbound webhook contract. IT8 now preserves that separate external seam
+outside IT: `lib/line/types.ts :: LineWebhookData`, the `@/lib/line` type
+export, `sendLineWebhook`, `lineNotificationService.sendLineWebhook`, and
+`LINE_WEBHOOK_URL`. The type-only bridge references IT's authoritative
+`EmailRequestData`; the public shape remains `type: "email_request"` with
+`emailRequest` and `flexMessage`. This legacy webhook stays separate from the
+active IT-owned Email Request dispatcher, Flex, and LINE push/broadcast path.
+Historical L6/H0 evidence is unchanged; removal requires deployment-owner and
+external-integration confirmation.
+
+Correction verification: focused LINE compatibility tests passed 16 tests;
+IT Email Request LINE/dispatcher tests passed 7 tests; `npm run architecture:check`
+passed for 1,249 source files; `npm run lint:strict` and
+`npm run typecheck` passed; and the one final `npm run test` passed 365 files
+with 3,515 tests passed and 1 skipped. The dedicated MySQL result above remains
+valid because the correction does not touch persistence. IT8 is **CLOSED**.
 
 The audit treats tests, fixtures, generated output, Prisma migrations, and
 operator tooling as non-production surfaces unless they affect a production

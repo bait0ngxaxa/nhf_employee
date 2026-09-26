@@ -1,4 +1,5 @@
 import type { LineFlexMessage } from "@/types/api";
+import type { LineWebhookData } from "./types";
 import {
     sendLineApiRequest,
     sendLineAppMessage,
@@ -55,7 +56,7 @@ export async function sendStockLineBroadcast(
  * This is separate from the inbound signature-verification route at
  * /api/line/webhook and remains for an externally configured integration.
  */
-export async function sendLineWebhook(data: unknown): Promise<boolean> {
+export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
     const { lineWebhookUrl } = getConfig();
 
     if (!lineWebhookUrl) {
@@ -102,3 +103,4 @@ export {
     type AppLineNotificationResult,
     type SendAppLineNotificationInput,
 } from "./app-notification";
+export type { LineWebhookData } from "./types";

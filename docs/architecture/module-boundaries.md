@@ -217,7 +217,17 @@ Dashboard section wrapper remains only to bind shared Dashboard navigation.
 Closure verification passed `npm run architecture:check` (1,248 source files),
 `npm run lint:strict`, `npm run typecheck`, the dedicated MySQL Email Request
 integration suite (22 files; 153 tests), and the final `npm run test`
-(365 files; 3,515 passed, 1 skipped). No Prisma schema or migration changed.
+(365 files; 3,515 passed, 1 skipped) before the retained LINE webhook
+correction. IT8 preserves `sendLineWebhook`,
+`lineNotificationService.sendLineWebhook`, `LineWebhookData`, and
+`LINE_WEBHOOK_URL` outside IT as a formally retained legacy integration seam.
+The active Email Request outbox continues through IT's dispatcher/Flex and
+generic LINE push/broadcast. The type-only legacy bridge points to IT's single
+authoritative payload contract. Focused LINE (16 tests), IT Email Request
+LINE/dispatcher (7 tests), architecture, lint, and typecheck checks passed;
+the correction's final repository suite passed (365 files; 3,515 passed,
+1 skipped). The earlier dedicated MySQL result remains valid because this
+correction did not touch persistence. No Prisma schema or migration changed.
 
 ## Authorization Administration boundary (Phase 10C + Phase 12E)
 
