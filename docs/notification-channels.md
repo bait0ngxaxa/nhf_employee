@@ -120,9 +120,12 @@ ineligible users are returned as `SUPERSEDED`, without retrying a valid business
 state forever. A provider error propagates into the shared retry lifecycle
 (maximum three attempts, then `DEAD`). This lifecycle is at-least-once; LINE's
 retry key is a finite duplicate-suppression window rather than a guarantee of
-permanent provider or end-user delivery. No live LINE provider acceptance or
-smartphone/device test is claimed; full E2E and device acceptance are IT9E,
-which remains OPEN / next phase.
+permanent provider or end-user delivery. No live LINE provider acceptance is
+claimed and no Android/iPhone acceptance has been performed. IT9E-A repository
+E2E/acceptance readiness is COMPLETE; IT9E-UX-P0 unified IT workspace and
+creation evidence is IMPLEMENTED / review pending. IT9E-B Android/iPhone
+device acceptance is PAUSED / NOT RUN while the POC is under review. IT10 is
+OPEN / deferred.
 
 ## Leave LINE flows
 

@@ -1912,7 +1912,9 @@ Unified Rich Menu integration. The review confirmed the fixed
 authorization capability or API enforcement.
 IT9D is **CLOSED** after independent review and adds requester-only Ticket
 personal LINE without changing authorization capabilities or API enforcement.
-IT9E-A repository E2E/acceptance readiness is **COMPLETE**; IT9E-B
-Android/iPhone device acceptance is **NOT RUN / next human acceptance step**.
-IT9E remains in progress and IT10 hardening remains **OPEN / deferred**. IT9E-A
-made no authorization capability, policy, or enforcement changes.
+IT9E-A repository E2E/acceptance readiness is **COMPLETE**; IT9E-UX-P0
+unified IT workspace and creation evidence is **IMPLEMENTED / review pending**.
+IT9E-B Android/iPhone device acceptance is **PAUSED / NOT RUN** while the POC
+is under review. IT10 hardening remains **OPEN / deferred**. No Android/iPhone
+acceptance or live LINE provider acceptance has occurred. IT9E-A made no
+authorization capability, policy, or enforcement changes.

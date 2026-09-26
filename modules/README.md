@@ -19,9 +19,11 @@ Inbox destination, and no IT9D delivery leakage. IT9D is **CLOSED** after
 independent review and adds requester personal LINE for
 `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED`; operator-facing
 events remain in-app only because operator LIFF does not exist. IT9E-A is
-COMPLETE for repository E2E/acceptance readiness; IT9E-B device acceptance is
-NOT RUN / next human acceptance step. IT9E remains in progress. IT10 remains
-OPEN / deferred.
+COMPLETE for repository E2E/acceptance readiness; IT9E-UX-P0 unified IT
+workspace and creation evidence is IMPLEMENTED / review pending. IT9E-B
+Android/iPhone device acceptance is PAUSED / NOT RUN while the POC is under
+review. IT10 is OPEN / deferred. No Android/iPhone acceptance has been
+performed; no live LINE provider acceptance is claimed.
 The LIFF Home projection consumes IT's centralized presentation capabilities
 through `LIFF_SELF_SERVICE`; its requester read/create rule is presentation-only
 and does not change the existing API authorization boundary.

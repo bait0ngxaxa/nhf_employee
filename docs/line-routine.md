@@ -201,9 +201,11 @@ current requester. `CREATED`, `ASSIGNED`, and `REQUESTER_COMMENTED` remain
 in-app only because there is no operator LIFF destination. The retained
 `LINE_IT_*` configuration and Email Request semantics are unchanged. This
 implementation has no live LINE provider acceptance evidence. IT9E-A
-repository E2E/acceptance readiness is complete; IT9E-B smartphone/device
-acceptance is NOT RUN and remains the next human acceptance step. No provider
-call or Rich Menu mutation is part of IT9E-A.
+repository E2E/acceptance readiness is COMPLETE; IT9E-UX-P0 unified IT
+workspace and creation evidence is IMPLEMENTED / review pending. IT9E-B
+Android/iPhone device acceptance is PAUSED / NOT RUN while the POC is under
+review. IT10 is OPEN / deferred. No Android/iPhone acceptance has been
+performed. No provider call or Rich Menu mutation is part of IT9E-A.
 
 Leave notification ใช้ **in-app และ email** ผ่าน Leave notification/outbox workflow เดิม และเพิ่ม targeted personal LINE ผ่าน NHFapp OA สำหรับ workflow events ตาม [Notification Channel Architecture](./notification-channels.md) โดยไม่เปลี่ยน recipient semantics หรือ authorization ของ Leave
 

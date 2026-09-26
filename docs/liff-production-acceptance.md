@@ -4,10 +4,13 @@
 
 รายการ manual/production/smartphone ทุกแถวเริ่มเป็น `NOT RUN` ห้ามเปลี่ยนเป็น `PASS` จนกว่าจะทดสอบจริงและแนบ evidence
 
-IT9D requester Ticket LINE has been implemented. IT9E-A completes repository
-audit and automated acceptance readiness only; no real-device acceptance or
-live LINE provider acceptance is claimed, and no Ticket push was sent with
-production configuration in this work. IT9E-B remains NOT RUN. OPS-18 and the
+IT9D requester Ticket LINE has been implemented. IT9E-A repository E2E/acceptance
+readiness is COMPLETE. IT9E-UX-P0 unified IT workspace and creation evidence
+is IMPLEMENTED / review pending; IT9E-B Android/iPhone device acceptance is
+PAUSED / NOT RUN while the POC is under review. IT10 is OPEN / deferred.
+No Android/iPhone acceptance has been performed and no live LINE provider
+acceptance is claimed; no Ticket push was sent with production configuration
+during IT9E-A. OPS-18 and the
 `IT Messaging API Channel ID` field below refer only to the retained legacy
 Email Request/IT LINE integration; requester Ticket LINE uses the shared
 NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` path.

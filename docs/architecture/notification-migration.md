@@ -951,8 +951,12 @@ IT9D is **CLOSED** after independent review and adds the
 `IT_TICKET_LINE` outbox type for requester `OPERATOR_COMMENTED`,
 `WAITING_REQUESTER`, and `RESOLVED` events only. It reuses the IT6 strict payload
 and the global processor; Notification does not own Ticket recipient policy,
-Flex composition, LIFF destination, or stale validation. Operator-facing Ticket
-LINE and Ticket Email remain deferred; IT9E is **OPEN / next phase** for full
-product E2E and device acceptance. Email Request's retained legacy LINE
-configuration is unchanged. The global Outbox Processor plus Email/LINE
+Flex composition, LIFF destination, or stale validation. Operator-facing
+Ticket LINE and Ticket Email remain deferred. IT9E-A
+repository E2E/acceptance readiness is **COMPLETE**; IT9E-UX-P0 unified IT
+workspace and creation evidence is **IMPLEMENTED / review pending**. IT9E-B
+Android/iPhone device acceptance is **PAUSED / NOT RUN** while the POC is
+under review. IT10 remains **OPEN / deferred**. No Android/iPhone acceptance
+or live LINE provider acceptance has occurred. Email Request's retained legacy
+LINE configuration is unchanged. The global Outbox Processor plus Email/LINE
 delivery remain outside Notification.
