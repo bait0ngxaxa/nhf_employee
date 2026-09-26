@@ -8,9 +8,14 @@ Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
 boundaries. IT1 through IT9A are closed under `modules/it/`. IT8 moved Email
 Request ownership into the module while preserving its compatibility seam;
 IT9A added the requester-only LIFF authorization and API foundation without
-adding a LIFF UI or shell entry.
+adding a LIFF UI or shell entry. IT9B requester presentation exists at
+`/liff/it` and `/liff/it/[ticketId]` and is **IMPLEMENTED; closure pending
+independent review** of the corrective diff. IT9C still owns LIFF Home/module
+registration, bottom navigation, external deep-link producer integration, and
+Rich Menu integration. IT9D owns Ticket LINE delivery; IT9E owns full
+product/device acceptance.
 Its server entry is
-`@/modules/it` and its browser-safe Dashboard presentation entry is
+`@/modules/it` and its browser-safe Dashboard and LIFF presentation entry is
 `@/modules/it/client`. The module owns Ticket persistence, creation and
 idempotency, requester and operator queries, approved workflow, assignment,
 classification, conversation, attachments, event history, and aggregate-only

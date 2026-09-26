@@ -20,6 +20,7 @@ import type { ITTicketStatus } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { LiffApiError } from "@/modules/line/client";
 import {
     IT_TICKET_ATTACHMENT_ACCEPTED_TYPES,
@@ -80,6 +81,7 @@ function PrivateAttachment({
 }: {
     readonly attachment: ITTicketAttachmentSummary;
 }): ReactElement {
+    const [opened, setOpened] = useState(false);
     const [retry, setRetry] = useState(0);
     const [imageState, setImageState] = useState<
         | { readonly key: string; readonly kind: "loaded"; readonly url: string }
@@ -90,6 +92,8 @@ function PrivateAttachment({
     const currentState = imageState?.key === requestKey ? imageState : null;
 
     useEffect(() => {
+        if (!opened) return;
+
         const controller = new AbortController();
         let objectUrl: string | null = null;
         void fetchLiffITAttachment(attachment.id, controller.signal)
@@ -110,28 +114,48 @@ function PrivateAttachment({
             controller.abort();
             if (objectUrl !== null) URL.revokeObjectURL(objectUrl);
         };
-    }, [attachment.id, requestKey]);
+    }, [attachment.id, opened, requestKey]);
+
+    const hideImage = (): void => {
+        setOpened(false);
+        setImageState(null);
+    };
 
     return (
         <figure className="min-w-0 space-y-2">
             <div className="flex min-h-28 items-center justify-center overflow-hidden rounded-lg border border-border-neutral bg-surface-subtle">
-                {currentState === null ? (
+                {!opened ? (
+                    <div className="space-y-2 px-3 py-4 text-center">
+                        <p className="text-xs leading-5 text-content-muted">รูปภาพส่วนตัว จะแสดงเมื่อคุณเลือกเปิดดู</p>
+                        <Button type="button" variant="outline" className="min-h-11" onClick={() => setOpened(true)}>
+                            ดูรูปภาพ
+                        </Button>
+                    </div>
+                ) : null}
+                {opened && currentState === null ? (
                     <p role="status" className="px-3 py-4 text-center text-xs leading-5 text-content-muted">กำลังโหลดรูปภาพ…</p>
                 ) : null}
-                {currentState?.kind === "loaded" ? (
-                    <img
-                        src={currentState.url}
-                        alt={`รูปภาพประกอบ: ${attachment.originalName}`}
-                        width={attachment.width}
-                        height={attachment.height}
-                        loading="lazy"
-                        className="max-h-64 w-full object-contain"
-                    />
+                {opened && currentState?.kind === "loaded" ? (
+                    <div className="w-full space-y-2 p-2">
+                        <img
+                            src={currentState.url}
+                            alt={`รูปภาพประกอบ: ${attachment.originalName}`}
+                            width={attachment.width}
+                            height={attachment.height}
+                            className="max-h-64 w-full object-contain"
+                        />
+                        <Button type="button" variant="outline" className="min-h-11 w-full" onClick={hideImage}>
+                            ซ่อนรูปภาพ
+                        </Button>
+                    </div>
                 ) : null}
-                {currentState?.kind === "error" ? (
+                {opened && currentState?.kind === "error" ? (
                     <div className="space-y-2 px-3 py-4 text-center">
                         <p role="alert" className="text-xs leading-5 text-rose-800 dark:text-rose-200">{currentState.message}</p>
-                        <Button type="button" size="sm" variant="outline" onClick={() => setRetry((value) => value + 1)}>
+                        <Button type="button" variant="outline" className="min-h-11" onClick={() => {
+                            setImageState(null);
+                            setRetry((value) => value + 1);
+                        }}>
                             <RefreshCw aria-hidden="true" className="size-4" />
                             ลองอีกครั้ง
                         </Button>
@@ -374,7 +398,7 @@ export function LiffITConversation({
             const existingAttempt = commentAttemptRef.current;
             const attempt = existingAttempt?.signature === signature
                 ? existingAttempt
-                : { signature, key: globalThis.crypto.randomUUID() };
+                : { signature, key: createIdempotencyKey() };
             commentAttemptRef.current = attempt;
 
             const result = await postLiffITTicketComment(ticketId, body, files, attempt.key);

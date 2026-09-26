@@ -21,9 +21,14 @@ comment-owned private image attachments, IT6 implements in-app Ticket
 notifications, and IT7 adds an aggregate-only analytics query and Dashboard.
 IT8 moved the existing structured Email Request subdomain into IT and is
 closed; IT9A adds requester-only LIFF authorization and API adapters over the
-same IT application. IT9A is closed; its UI, LIFF shell/Rich Menu integration,
-Ticket LINE delivery, product acceptance, and final hardening remain in IT9B–
-IT10. Its compatibility and verification record is below.
+same IT application and is CLOSED as the requester-only authorization/API
+foundation. IT9B requester presentation exists at `/liff/it` and
+`/liff/it/[ticketId]` and is **IMPLEMENTED; closure pending independent review**
+of the corrective diff. IT9C owns LIFF Home/module registration, bottom
+navigation, external deep-link producer integration, and Rich Menu
+integration. IT9D owns Ticket LINE delivery; IT9E owns full product/device
+acceptance. IT10 hardening remains deferred. Compatibility and verification
+records follow.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -123,7 +128,7 @@ server-side application and Prisma persistence; G2 confirms that it is
 intentionally server-only and has no `client.ts` or Department-owned
 presentation.
 
-## IT module Ticket services, operator processing, notifications, analytics, and LIFF APIs (IT1/IT2/IT3/IT4/IT5A/IT5B/IT6/IT7/IT9A)
+## IT module Ticket services, operator processing, notifications, analytics, and LIFF APIs (IT1/IT2/IT3/IT4/IT5A/IT5B/IT6/IT7/IT9A/IT9B)
 
 `modules/it/index.ts` is the supported IT server entry. The application adapter
 owns IT's role-neutral Default Domain Policy, requester-based Ticket resource
@@ -151,9 +156,10 @@ IT4 consumes Authorization's configured-scope recipient query and Employee's
 public `findCurrentEmployeeDisplayProjections()` contract for safe active
 assignment candidates; it does not read either module's private persistence.
 The root server entry exposes stable application contracts;
-`@/modules/it/client` is the browser-safe presentation entry. Dashboard
-navigation and route guards use the server-derived capability projection,
-while API/query boundaries independently revalidate workforce and authority.
+`@/modules/it/client` is the browser-safe Dashboard and LIFF presentation entry.
+Dashboard navigation and route guards use the server-derived capability
+projection, while API/query boundaries independently revalidate workforce and
+authority.
 
 IT5A adds immutable comments, actor-side classification, comment idempotency,
 `firstRespondedAt`, and a bounded merged timeline in the IT application and
@@ -208,6 +214,19 @@ attachment comments reuse `it-ticket-comment-attachment`. IT9A adds no schema
 or migration, UI, shell/Rich Menu changes, operator LIFF API, or Ticket LINE
 delivery. Ticket LINE is deferred to IT9D; Ticket Email remains a product
 decision/deferred.
+
+### IT9B requester LIFF presentation — current state
+
+IT9B implements requester list, creation, detail, conversation, and private
+attachment presentation at `/liff/it` and `/liff/it/[ticketId]`. The App Router
+pages use `@/modules/it/client`; IT-specific presentation is owned by
+`modules/it/presentation/liff/**` and calls only the existing requester
+`/api/line/it/**` routes. IT9B is **IMPLEMENTED; closure pending independent
+review** of the corrective diff. IT9A remains the CLOSED requester-only
+authorization/API foundation. IT9C still owns LIFF Home/module registration,
+bottom navigation, external deep-link producer integration, and Rich Menu
+integration; IT9D owns Ticket LINE delivery; IT9E owns full product/device
+acceptance. None of those phases is complete through IT9B.
 
 ## IT8 Email Request ownership — CLOSED
 

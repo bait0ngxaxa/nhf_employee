@@ -161,6 +161,18 @@ describe("LiffITApp requester experience", () => {
         expect(screen.getByRole("heading", { name: "ขอความช่วยเหลือเรื่องระบบ" })).toBeInTheDocument();
     });
 
+    it("creates a Ticket when crypto.randomUUID is unavailable", async () => {
+        vi.stubGlobal("crypto", { randomUUID: undefined } as unknown as Crypto);
+        render(<LiffITApp />);
+        await openCreateForm();
+        fillCreateForm();
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+
+        await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
+        expect(mocks.createTicket.mock.calls[0]?.[1]).toMatch(/^idem_\d+_[a-z0-9]+$/);
+    });
+
     it("creates a new idempotency attempt when the logical create payload changes", async () => {
         let keyIndex = 0;
         vi.stubGlobal("crypto", { randomUUID: () => `changed-key-${++keyIndex}` } as unknown as Crypto);

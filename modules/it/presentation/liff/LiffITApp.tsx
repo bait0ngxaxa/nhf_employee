@@ -22,6 +22,7 @@ import type { ITTicketStatus, ITTicketType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { LiffApiError } from "@/modules/line/client";
 import {
@@ -139,7 +140,7 @@ function LiffITTicketList(): ReactElement {
         const signature = JSON.stringify(payload);
         let attempt = createAttemptRef.current;
         if (attempt === null || attempt.signature !== signature) {
-            attempt = { signature, key: globalThis.crypto.randomUUID() };
+            attempt = { signature, key: createIdempotencyKey() };
             createAttemptRef.current = attempt;
         }
 

@@ -1891,3 +1891,14 @@ Every route uses `requireLiffWorkforceSession()` and invokes the shared IT
 requester commands/queries for tickets, timelines, comments, and attachments.
 IT9A does not include a `/liff/it` UI, LIFF Home entry, Bottom Nav entry, Rich
 Menu integration, Ticket LINE notifications, operator LIFF, or analytics LIFF.
+
+## Current IT requester LIFF phase status
+
+IT9A is CLOSED and owns the requester-only LIFF authorization/API foundation
+described above. IT9B requester presentation exists at `/liff/it` and
+`/liff/it/[ticketId]` through the browser-safe `@/modules/it/client` entry;
+IT9B is **IMPLEMENTED; closure pending independent review** of the corrective
+diff. IT9C still owns LIFF Home/module registration, bottom navigation,
+external deep-link producer integration, and Rich Menu integration. IT9D owns
+Ticket LINE delivery. IT9E owns full product/device acceptance. No IT9C–IT9E
+work is included in the current IT9B presentation.

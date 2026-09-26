@@ -155,7 +155,15 @@ describe("LiffITConversation", () => {
                     authorDisplayName: "ผู้แจ้ง",
                     authorSide: "REQUESTER",
                     body: "ข้อความเก่ากว่า",
-                    attachments: [],
+                    attachments: [{
+                        id: "older-private-attachment",
+                        originalName: "หลักฐานเก่า.webp",
+                        contentType: "image/webp",
+                        sizeBytes: 128,
+                        width: 120,
+                        height: 90,
+                        position: 0,
+                    }],
                 }],
                 olderCursor: null,
                 hasMore: false,
@@ -167,6 +175,8 @@ describe("LiffITConversation", () => {
         const older = await screen.findByText("ข้อความเก่ากว่า");
         const latest = screen.getByText("ข้อความล่าสุดจากเจ้าหน้าที่");
         expect(older.compareDocumentPosition(latest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.getByRole("button", { name: "ดูรูปภาพ" })).toBeInTheDocument();
+        expect(mocks.fetchAttachment).not.toHaveBeenCalled();
         expect(mocks.fetchTimeline).toHaveBeenNthCalledWith(2, 42, {
             cursor: "opaque-cursor",
             signal: expect.any(AbortSignal),
@@ -223,6 +233,29 @@ describe("LiffITConversation", () => {
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await waitFor(() => expect(mocks.postComment).toHaveBeenCalledTimes(3));
         expect(mocks.postComment.mock.calls[2]?.[3]).toBe("comment-attempt-2");
+    });
+
+    it("submits and retries a comment when crypto.randomUUID is unavailable", async () => {
+        vi.stubGlobal("crypto", {
+            randomUUID: undefined,
+            subtle: { digest: vi.fn().mockResolvedValue(new Uint8Array([1]).buffer) },
+        } as unknown as Crypto);
+        mocks.postComment
+            .mockRejectedValueOnce(new LiffApiError("ระบบ Ticket ขัดข้องชั่วคราว กรุณาลองอีกครั้ง", 503))
+            .mockResolvedValueOnce({ comment: COMMENT, replayed: false });
+        renderConversation();
+        fireEvent.change(await screen.findByRole("textbox", { name: "ตอบกลับ" }), {
+            target: { value: "ข้อความเดิม" },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("ระบบ Ticket ขัดข้องชั่วคราว");
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+
+        await waitFor(() => expect(mocks.postComment).toHaveBeenCalledTimes(2));
+        const firstKey = mocks.postComment.mock.calls[0]?.[3];
+        expect(firstKey).toMatch(/^idem_\d+_[a-z0-9]+$/);
+        expect(mocks.postComment.mock.calls[1]?.[3]).toBe(firstKey);
     });
 
     it("keeps selected evidence in a failed retry signature and changes the attempt after selection changes", async () => {
@@ -282,7 +315,7 @@ describe("LiffITConversation", () => {
         expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-2");
     });
 
-    it("retrieves private evidence through the LIFF client and revokes the Blob URL", async () => {
+    it("loads private evidence only after the requester asks to view it and revokes the Blob URL on unmount", async () => {
         Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:private-image") });
         const revokeObjectURL = vi.fn();
         Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL });
@@ -309,6 +342,10 @@ describe("LiffITConversation", () => {
         });
         const view = renderConversation();
 
+        expect(await screen.findByText("ดูภาพประกอบ")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "ดูรูปภาพ" })).toBeInTheDocument();
+        expect(mocks.fetchAttachment).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "ดูรูปภาพ" }));
         const image = await screen.findByAltText("รูปภาพประกอบ: หลักฐาน.webp");
         expect(image).toHaveAttribute("src", "blob:private-image");
         expect(mocks.fetchAttachment).toHaveBeenCalledWith(
@@ -317,6 +354,49 @@ describe("LiffITConversation", () => {
         );
         view.unmount();
         expect(revokeObjectURL).toHaveBeenCalledWith("blob:private-image");
+    });
+
+    it("retries an explicitly requested private image and revokes its Blob URL when hidden", async () => {
+        Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:retry-image") });
+        const revokeObjectURL = vi.fn();
+        Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL });
+        mocks.fetchAttachment
+            .mockRejectedValueOnce(new LiffApiError("ไม่สามารถเปิดรูปภาพได้ในขณะนี้ กรุณาลองใหม่", 503))
+            .mockResolvedValueOnce(new Blob(["private image"], { type: "image/webp" }));
+        mocks.fetchTimeline.mockResolvedValueOnce({
+            items: [{
+                type: "COMMENT",
+                id: "comment-image-retry",
+                createdAt: "2026-09-25T03:00:00.000Z",
+                authorDisplayName: "เจ้าหน้าที่ IT",
+                authorSide: "OPERATOR",
+                body: "รูปที่ต้องเปิด",
+                attachments: [{
+                    id: "private-attachment-retry",
+                    originalName: "หลักฐาน.webp",
+                    contentType: "image/webp",
+                    sizeBytes: 128,
+                    width: 120,
+                    height: 90,
+                    position: 0,
+                }],
+            }],
+            olderCursor: null,
+            hasMore: false,
+        });
+        renderConversation();
+        await screen.findByText("รูปที่ต้องเปิด");
+        expect(mocks.fetchAttachment).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "ดูรูปภาพ" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถเปิดรูปภาพได้");
+        fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
+        expect(await screen.findByAltText("รูปภาพประกอบ: หลักฐาน.webp")).toHaveAttribute("src", "blob:retry-image");
+        expect(mocks.fetchAttachment).toHaveBeenCalledTimes(2);
+
+        fireEvent.click(screen.getByRole("button", { name: "ซ่อนรูปภาพ" }));
+        expect(screen.queryByAltText("รูปภาพประกอบ: หลักฐาน.webp")).not.toBeInTheDocument();
+        expect(revokeObjectURL).toHaveBeenCalledWith("blob:retry-image");
     });
 
     it("does not let an older timeline response replace a newer Ticket timeline", async () => {
