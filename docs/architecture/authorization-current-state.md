@@ -1905,10 +1905,11 @@ IT9A is **CLOSED** and owns the requester-only LIFF authorization/API
 foundation described above. IT9B requester presentation exists at `/liff/it`
 and `/liff/it/[ticketId]` through the browser-safe `@/modules/it/client` entry
 and is **CLOSED** after independent review and final verification. IT9C is
-**IMPLEMENTED; closure pending independent review** and owns the shared LIFF
-Home/module projection, service card, navigation, canonical requester deep
-links, and Unified Rich Menu integration.
-IT9D is **OPEN** and owns Ticket LINE delivery. IT9E is **OPEN** and owns full
-product/device acceptance. IT10 hardening remains deferred/open. IT9C changes no
-authorization capability or API enforcement; device acceptance and IT9D remain
-outside this implementation.
+**CLOSED** after independent review and owns the shared LIFF Home/module
+projection, service card, navigation, canonical requester deep links, and
+Unified Rich Menu integration. The review confirmed the fixed
+`LIFF_SELF_SERVICE` IT capability projection and that IT9C changed no
+authorization capability or API enforcement.
+IT9D is **OPEN / next phase** and owns Ticket LINE delivery. IT9E is **OPEN**
+and owns full product/device acceptance. IT10 hardening remains **OPEN / deferred**;
+device acceptance and IT9D remain outside IT9C.

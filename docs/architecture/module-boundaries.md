@@ -24,12 +24,12 @@ closed; IT9A adds requester-only LIFF authorization and API adapters over the
 same IT application and is CLOSED as the requester-only authorization/API
 foundation. IT9B requester presentation exists at `/liff/it` and
 `/liff/it/[ticketId]` and is **CLOSED** after independent review and final
-verification. IT9C is **IMPLEMENTED; closure pending independent review** and
-owns LIFF Home/module projection, service card, shared navigation, canonical
-requester deep links, and Unified Rich Menu integration. IT9D is **OPEN** and
+verification. IT9C is **CLOSED** after independent review and owns LIFF
+Home/module projection, service card, shared navigation, canonical requester
+deep links, and Unified Rich Menu integration. IT9D is **OPEN / next phase** and
 owns Ticket LINE delivery; IT9E is
 **OPEN** and owns full product/device acceptance. IT10 hardening remains
-OPEN/deferred. Compatibility and verification records follow.
+**OPEN / deferred**. Compatibility and verification records follow.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -234,15 +234,19 @@ section records the current implementation state.
 
 ### IT9C shared LIFF integration — current implementation
 
-IT9C is **IMPLEMENTED; closure pending independent review**. The shared LINE
+IT9C is **CLOSED** after independent review. The shared LINE
 Home composition consumes IT's public capability projection from a trusted
 `LIFF_SELF_SERVICE` context; Home visibility is presentation-only and the IT
 server APIs remain authoritative. The shared shell owns Home card and
 Bottom Navigation presentation. IT exports its requester root and Ticket
 detail LIFF URL builders through `@/modules/it`. The platform-owned Unified
 Rich Menu source adds a fourth requester destination. No IT capability, Ticket
-workflow, notification delivery, or schema change was added. IT9D and IT9E
-remain OPEN; IT10 remains OPEN/deferred.
+workflow, notification delivery, or schema change was added. Independent review
+covered the fixed `LIFF_SELF_SERVICE` capability projection, Home requester
+visibility, shared Home/card/header/Bottom Nav integration, canonical requester
+LIFF root/detail destinations, the Unified Rich Menu four-area contract, the
+retained Dashboard Inbox destination, and no IT9D delivery leakage. IT9D is
+OPEN / next phase; IT9E remains OPEN; IT10 remains OPEN/deferred.
 
 ## IT8 Email Request ownership — CLOSED
 
