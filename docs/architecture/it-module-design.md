@@ -1,6 +1,6 @@
 # IT Module Architecture and Domain Contract
 
-Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration OPEN (next phase); IT9D IT Ticket LINE Notifications to LIFF OPEN; IT9E IT Product E2E + Android/iPhone Acceptance OPEN; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
+Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration IMPLEMENTED; closure pending independent review; IT9D IT Ticket LINE Notifications to LIFF OPEN; IT9E IT Product E2E + Android/iPhone Acceptance OPEN; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
 
 ## 1. Product scope and terminology
 
@@ -204,7 +204,7 @@ The current channel boundary is:
 - **`LIFF_SELF_SERVICE`:** requester self-service only. Effective `it.ticket.read`, `it.ticket.create`, and `it.ticket.comment` scopes are always `OWN`, including when configured authority resolves to `ALL`.
 - LIFF does not expose the operator queue, assignment, category/status mutation, `it.ticket.manage`, or `it.analytics.read`.
 
-IT9A currently provides only the server/API foundation:
+IT9A owns the **CLOSED** requester-only authorization/API foundation, including:
 
 - `GET` and `POST /api/line/it/tickets`
 - `GET /api/line/it/tickets/:id`
@@ -212,7 +212,7 @@ IT9A currently provides only the server/API foundation:
 - `POST /api/line/it/tickets/:id/comments`
 - `GET /api/line/it/attachments/:id`
 
-The requester UI is implemented for `/liff/it` and `/liff/it/:ticketId` in IT9B, with phase closure pending independent review. LIFF Home, Bottom Nav, external deep links, and Rich Menu integration remain pending IT9C. Ticket LINE delivery remains deferred to IT9D.
+IT9B owns the **CLOSED** requester LIFF UI at `/liff/it` and `/liff/it/:ticketId`, including conversation and private attachments. IT9C is **IMPLEMENTED; closure pending independent review** and integrates the Home module projection and card, shared Bottom Navigation and header, canonical external requester LIFF destinations, and Unified Rich Menu destination. Home and navigation visibility remain presentation only; server APIs enforce authorization. Ticket LINE delivery remains deferred to IT9D.
 
 ## 12. Existing Email Request: IT8 ownership and compatibility
 
@@ -460,7 +460,7 @@ The conversation reads the merged timeline in the API's order and uses the serve
 
 Private evidence is fetched only from `/api/line/it/attachments/:attachmentId` using authenticated, no-store LIFF reads. The browser renders protected Blob URLs and revokes them on retry, staleness, removal, and unmount. Attachment type, count, per-file size, and total size checks reuse the canonical IT contract; server image processing and authorization remain authoritative. Safe Thai error messages cover expired/recovered sessions, denied or hidden resources, conflicts, oversize requests, rate limits, and service failures. No IT9A backend correction, schema change, migration, capability change, or feature flag was needed.
 
-Phase map: **IT9A = authorization/API foundation (CLOSED); IT9B = requester LIFF presentation (CLOSED); IT9C = LIFF Home/navigation/external deep-link producer/Rich Menu integration (OPEN, next phase).** IT9D remains OPEN for IT Ticket LINE delivery; Ticket Email delivery remains deferred. IT9E remains OPEN for end-to-end and Android/iPhone acceptance. IT10 hardening remains OPEN/deferred. IT9B does not close or include work from IT9C–IT10.
+Historical phase map at the IT9B closure boundary: **IT9A = authorization/API foundation (CLOSED); IT9B = requester LIFF presentation (CLOSED); IT9C was OPEN / next phase** for LIFF Home, navigation, external requester deep links, and Rich Menu integration. IT9D was OPEN for IT Ticket LINE delivery; Ticket Email delivery remained deferred. IT9E was OPEN for end-to-end and Android/iPhone acceptance. IT10 hardening was OPEN/deferred. IT9C–IT10 work was not included in IT9B. Section 26 records the later IT9C implementation and is the current phase state.
 
 ### IT9B closure verification evidence
 

@@ -216,19 +216,21 @@ or migration, UI, shell/Rich Menu changes, operator LIFF API, or Ticket LINE
 delivery. Ticket LINE is deferred to IT9D; Ticket Email remains a product
 decision/deferred.
 
-### IT9B requester LIFF presentation — current state
+### IT9B requester LIFF presentation — IT9B closure record
 
 IT9B implements requester list, creation, detail, conversation, and private
 attachment presentation at `/liff/it` and `/liff/it/[ticketId]`. The App Router
 pages use `@/modules/it/client`; IT-specific presentation is owned by
 `modules/it/presentation/liff/**` and calls only the existing requester
 `/api/line/it/**` routes. IT9B is **CLOSED** after independent review and final
-verification. IT9A remains the CLOSED requester-only authorization/API
-foundation. IT9C is **OPEN / next phase** and owns LIFF Home/module registration,
-bottom navigation, external deep-link producer integration, and Rich Menu
-integration; IT9D is OPEN for Ticket LINE delivery; IT9E is OPEN for full
-product/device acceptance. IT10 hardening remains OPEN/deferred. None of that
-later-phase work was included in IT9B.
+verification. At the IT9B closure boundary, IT9A was CLOSED as the
+requester-only authorization/API foundation and IT9B was CLOSED as the
+requester LIFF presentation phase. IT9C was then **OPEN / next phase** for LIFF
+Home/module registration, shared navigation, external requester deep links, and
+Rich Menu integration; that work was not included in IT9B. IT9D was OPEN for
+Ticket LINE delivery; IT9E was OPEN for full product/device acceptance; IT10
+was OPEN/deferred. This is the historical IT9B boundary; the following IT9C
+section records the current implementation state.
 
 ### IT9C shared LIFF integration — current implementation
 
