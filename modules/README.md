@@ -15,9 +15,11 @@ requester deep links, and Unified Rich Menu destination. The review covered the
 fixed `LIFF_SELF_SERVICE` projection, requester Home visibility, shared
 Home/card/header/Bottom Nav integration, canonical requester LIFF root/detail
 destinations, the Unified Rich Menu four-area contract, the retained Dashboard
-Inbox destination, and no IT9D delivery leakage. IT9D is OPEN / next phase for
-Ticket LINE delivery; IT9E is OPEN for full product/device acceptance. IT10
-remains OPEN/deferred.
+Inbox destination, and no IT9D delivery leakage. IT9D is **IMPLEMENTED; closure
+pending independent review** and adds requester personal LINE for
+`OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED`; operator-facing
+events remain in-app only because operator LIFF does not exist. IT9E is OPEN
+for full product/device acceptance. IT10 remains OPEN/deferred.
 The LIFF Home projection consumes IT's centralized presentation capabilities
 through `LIFF_SELF_SERVICE`; its requester read/create rule is presentation-only
 and does not change the existing API authorization boundary.
@@ -243,12 +245,17 @@ persistence context; the global processor does not pass a transaction client
 directly to Notification. A direct processor-to-Notification dispatch is
 reserved for a future truly Notification-owned generic event with a fully
 resolved command payload; no current production event uses that shape. IT
-enqueues `IT_TICKET_IN_APP` transactionally and exports its server-only dispatch
-contract through `@/modules/it`; app API adapters wake the global processor only
-after successful mutations. IT6 implements in-app Ticket notifications.
-IT9A adds the LIFF requester API foundation; Ticket LINE delivery remains
-deferred to IT9D, after the UI deep-link destination exists. Ticket Email
-remains a product decision/deferred. The Ticket creation rate-limit scope is
+enqueues `IT_TICKET_IN_APP` and eligible `IT_TICKET_LINE` rows in the Ticket
+mutation transaction and exports its server-only dispatch contract through
+`@/modules/it`; app API adapters wake the global processor only after successful
+mutations. IT6 implements in-app Ticket notifications; IT9D reuses the same
+strict semantic payload and adds deterministic LINE event/retry identity,
+`LineAccountLink`, `LINE_APP_CHANNEL_ACCESS_TOKEN`, and the canonical requester
+LIFF Ticket destination. Dashboard Inbox URLs stay unchanged. Unlinked or
+ineligible recipients are superseded; provider failures use the shared
+at-least-once retry/dead-letter lifecycle. No live LINE provider or smartphone
+acceptance was performed. Ticket Email remains a product decision/deferred.
+The Ticket creation rate-limit scope is
 `it-ticket-create` (60 requests per IP per 15 minutes; 10 per authenticated
 principal per minute); like the shared mutation limiter, it is currently
 process-local. Attachment-bearing comments reuse

@@ -48,6 +48,7 @@ vi.mock("@/lib/db/prisma", () => ({
 const sendEmailMock = vi.hoisted(() => vi.fn());
 const sendStockLineBroadcastMock = vi.hoisted(() => vi.fn());
 const emailRequestDispatchMock = vi.hoisted(() => vi.fn());
+const itTicketDispatchMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/email/transport", () => ({
     sendEmail: sendEmailMock,
@@ -66,7 +67,7 @@ vi.mock("@/lib/line", () => ({
 }));
 vi.mock("@/modules/it", () => ({
     dispatchITEmailRequestOutbox: emailRequestDispatchMock,
-    dispatchITTicketNotificationOutbox: vi.fn().mockResolvedValue(null),
+    dispatchITTicketNotificationOutbox: itTicketDispatchMock,
 }));
 
 const prismaMock = prisma as unknown as ReturnType<
@@ -160,6 +161,7 @@ describe("processOutbox", () => {
         emailRequestDispatchMock.mockImplementation(async (notification: NotificationOutbox) => (
             notification.type === "EMAIL_REQUEST" ? "SENT" : null
         ));
+        itTicketDispatchMock.mockResolvedValue(null);
         prismaMock.user.findMany.mockResolvedValue(asNever([]));
         prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
         prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
@@ -198,7 +200,91 @@ describe("processOutbox", () => {
         }
 
         expect(OUTBOX_NOTIFICATION_TYPES).toContain("IT_TICKET_IN_APP");
+        expect(OUTBOX_NOTIFICATION_TYPES).toContain("IT_TICKET_LINE");
     });
+
+    it("delegates IT_TICKET_LINE rows to the IT module dispatcher", async () => {
+        const notification = buildNotification(
+            140,
+            "IT_TICKET_LINE",
+            "{}",
+            "it:ticket:123:comment:cmr-comment:user:42:line",
+        );
+        itTicketDispatchMock.mockResolvedValueOnce("SENT");
+
+        await expect(dispatchNotification(notification)).resolves.toBe("SENT");
+
+        expect(itTicketDispatchMock).toHaveBeenCalledWith(notification);
+    });
+
+    it.each([
+        { outcome: "SENT", expectedStatus: "SENT" },
+        { outcome: "SUPERSEDED", expectedStatus: "SUPERSEDED" },
+    ] as const)("maps IT_TICKET_LINE $outcome to the shared row lifecycle", async ({
+        outcome,
+        expectedStatus,
+    }) => {
+        const notification = buildNotification(
+            142,
+            "IT_TICKET_LINE",
+            "{}",
+            "it:ticket:123:comment:cmr-comment:user:42:line",
+        );
+        itTicketDispatchMock.mockResolvedValueOnce(outcome);
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(
+            asNever([notification]),
+        );
+
+        await expect(processOutbox()).resolves.toEqual({
+            processed: 1,
+            failed: 0,
+        });
+
+        expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: notification.id, status: "PROCESSING" },
+                data: expect.objectContaining({ status: expectedStatus }),
+            }),
+        );
+    });
+
+    it.each([
+        { attempts: 0, expectedStatus: "FAILED" },
+        { attempts: MAX_OUTBOX_ATTEMPTS - 1, expectedStatus: "DEAD" },
+    ] as const)(
+        "uses shared retry/dead-letter transitions for IT_TICKET_LINE provider errors at attempt $attempts",
+        async ({ attempts, expectedStatus }) => {
+            const notification = {
+                ...buildNotification(
+                    141,
+                    "IT_TICKET_LINE",
+                    "{}",
+                    "it:ticket:123:comment:cmr-comment:user:42:line",
+                ),
+                attempts,
+            };
+            prismaMock.notificationOutbox.findMany.mockResolvedValue(
+                asNever([notification]),
+            );
+            itTicketDispatchMock.mockRejectedValueOnce(
+                new Error("NHFapp LINE notification failed"),
+            );
+
+            const result = await processOutbox();
+
+            expect(result).toEqual({ processed: 0, failed: 1 });
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: notification.id, status: "PROCESSING" },
+                    data: expect.objectContaining({
+                        status: expectedStatus,
+                        attempts: { increment: 1 },
+                        lastError: "NHFapp LINE notification failed",
+                    }),
+                }),
+            );
+        },
+    );
 
     it("returns early when no pending notifications", async () => {
         prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([]));

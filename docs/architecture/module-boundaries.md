@@ -26,8 +26,9 @@ foundation. IT9B requester presentation exists at `/liff/it` and
 `/liff/it/[ticketId]` and is **CLOSED** after independent review and final
 verification. IT9C is **CLOSED** after independent review and owns LIFF
 Home/module projection, service card, shared navigation, canonical requester
-deep links, and Unified Rich Menu integration. IT9D is **OPEN / next phase** and
-owns Ticket LINE delivery; IT9E is
+deep links, and Unified Rich Menu integration. IT9D is **IMPLEMENTED; closure
+pending independent review** and adds requester-facing Ticket LINE for the
+approved event matrix; IT9E is
 **OPEN** and owns full product/device acceptance. IT10 hardening remains
 **OPEN / deferred**. Compatibility and verification records follow.
 
@@ -232,7 +233,7 @@ Ticket LINE delivery; IT9E was OPEN for full product/device acceptance; IT10
 was OPEN/deferred. This is the historical IT9B boundary; the following IT9C
 section records the current implementation state.
 
-### IT9C shared LIFF integration — current implementation
+### IT9C shared LIFF integration — closure record
 
 IT9C is **CLOSED** after independent review. The shared LINE
 Home composition consumes IT's public capability projection from a trusted
@@ -245,8 +246,30 @@ workflow, notification delivery, or schema change was added. Independent review
 covered the fixed `LIFF_SELF_SERVICE` capability projection, Home requester
 visibility, shared Home/card/header/Bottom Nav integration, canonical requester
 LIFF root/detail destinations, the Unified Rich Menu four-area contract, the
-retained Dashboard Inbox destination, and no IT9D delivery leakage. IT9D is
-OPEN / next phase; IT9E remains OPEN; IT10 remains OPEN/deferred.
+retained Dashboard Inbox destination, and no IT9D delivery leakage.
+At the IT9C closure boundary, IT9D was OPEN / next phase; IT9E remained OPEN;
+IT10 remained OPEN/deferred.
+
+### IT9D requester Ticket LINE — implementation status
+
+IT9D is **IMPLEMENTED; closure pending independent review**. The Ticket mutation
+transaction enqueues the existing `IT_TICKET_IN_APP` row and, only for requester
+`OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` facts, an
+`IT_TICKET_LINE` row with the same strict IT semantic payload and a distinct
+LINE event key. The global processor keeps ownership of claim/retry/dead-letter
+and delegates both Ticket types to the IT dispatcher. IT revalidates source,
+requester ownership, workforce eligibility, self-suppression, and the current
+`WAITING_REQUESTER` generation before composing the message and using
+`sendAppLineNotification()`.
+
+Personal LINE uses `LineAccountLink` and the shared `LINE_APP_CHANNEL_ACCESS_TOKEN`
+transport. Its CTA is built by `buildITTicketLiffUrl(ticketId)` and opens the
+requester's `/liff/it/[ticketId]` surface. Operator-facing `CREATED`, `ASSIGNED`,
+and `REQUESTER_COMMENTED` events remain in-app only because operator LIFF does
+not exist. Existing requester/operator Dashboard Inbox destinations remain
+unchanged. Unlinked or ineligible users are superseded without retry; provider
+errors use the shared at-least-once retry/dead-letter lifecycle. No live LINE
+provider or smartphone/device acceptance was performed; IT9E remains OPEN.
 
 ## IT8 Email Request ownership — CLOSED
 
@@ -370,9 +393,11 @@ events, recipient policy, notification type, title/message, action URL,
 reference ID, channel choice, and event-specific dedupe or supersede semantics.
 IT owns Ticket event meaning, recipient policy, strict payload, destination,
 event identity, and stale-domain validation. IT6 implements in-app Ticket
-notifications. IT9A adds the requester LIFF API foundation but does not enable
-Ticket LINE delivery; that remains deferred to IT9D. Ticket Email remains a
-product decision/deferred. Notification must not grow audience APIs such as “notify all Stock
+notifications. IT9A adds the requester LIFF API foundation. IT9D adds personal
+NHFapp LINE only for requester `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and
+`RESOLVED`; operator-facing events remain in-app because operator LIFF does not
+exist. Ticket Email remains a product decision/deferred. Notification must not
+grow audience APIs such as “notify all Stock
 admins” or become a workflow owner for another module. Leave, Stock, Routine,
 and IT use only `@/modules/notification` for Inbox persistence; physical
 Prisma `Notification` delegate operations are owned exclusively by
@@ -396,9 +421,11 @@ pass a transaction client directly to Notification. A direct
 processor-to-Notification dispatch is reserved for a future generic
 Notification-owned event with a fully resolved command payload, not current
 Leave, Stock, Routine, IT Ticket, or Email Request events. IT enqueues
-`IT_TICKET_IN_APP` with its Ticket mutation transaction and `EMAIL_REQUEST`
-with the Email Request creation transaction; the public IT server entry
-exports both narrow dispatchers for the global processor.
+`IT_TICKET_IN_APP` and eligible `IT_TICKET_LINE` rows with the same Ticket
+mutation transaction and `EMAIL_REQUEST` with the Email Request creation
+transaction. The public IT server entry exports the Ticket dispatcher for both
+Ticket channel types and the separate Email Request dispatcher for the global
+processor.
 The outbox wakeup remains in the API adapter after the business transaction.
 
 The four existing `app/api/notifications/**` routes remain app HTTP delivery

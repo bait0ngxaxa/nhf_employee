@@ -66,6 +66,21 @@ export type ITTicketNotificationPayloadV1 = z.infer<
     typeof itTicketNotificationPayloadSchema
 >;
 
+export type ITTicketRequesterLineNotificationPayload =
+    ITTicketNotificationPayloadV1 & {
+        readonly audience: "REQUESTER";
+        readonly event: "OPERATOR_COMMENTED" | "WAITING_REQUESTER" | "RESOLVED";
+    };
+
+export function isITTicketRequesterLineNotification(
+    payload: ITTicketNotificationPayloadV1,
+): payload is ITTicketRequesterLineNotificationPayload {
+    return payload.audience === "REQUESTER"
+        && (payload.event === "OPERATOR_COMMENTED"
+            || payload.event === "WAITING_REQUESTER"
+            || payload.event === "RESOLVED");
+}
+
 export function parseITTicketNotificationPayload(
     payload: unknown,
 ): ITTicketNotificationPayloadV1 {
@@ -81,4 +96,11 @@ export function buildITTicketNotificationEventKey(
 ): string {
     const sourceKind = payload.source.kind === "EVENT" ? "event" : "comment";
     return `it:ticket:${payload.ticketId}:${sourceKind}:${payload.source.id}:user:${payload.recipientUserId}:in-app`;
+}
+
+export function buildITTicketLineEventKey(
+    payload: ITTicketNotificationPayloadV1,
+): string {
+    const sourceKind = payload.source.kind === "EVENT" ? "event" : "comment";
+    return `it:ticket:${payload.ticketId}:${sourceKind}:${payload.source.id}:user:${payload.recipientUserId}:line`;
 }

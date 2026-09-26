@@ -69,18 +69,18 @@ try to derive Provider identity from a token.
 | ส่วน | บทบาทใน production |
 | --- | --- |
 | LINE Provider | ต้องเป็นเจ้าของทั้ง LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel ที่ใช้ `LINE_APP_CHANNEL_ACCESS_TOKEN` |
-| NHF Official Account | OA ที่ผู้ใช้เพิ่มเป็นเพื่อน และ associated กับ NHFapp Messaging API Channel; Rich Menu และ personal Leave/Routine/Stock-result push ส่งผ่าน channel นี้ |
+| NHF Official Account | OA ที่ผู้ใช้เพิ่มเป็นเพื่อน และ associated กับ NHFapp Messaging API Channel; Rich Menu และ personal Leave/Routine/Stock-result/IT-requester-Ticket push ส่งผ่าน channel นี้ |
 | LINE Login Channel | ตรวจสอบ LIFF identity และใช้สร้าง LIFF application; `LINE_LOGIN_CHANNEL_ID` ต้องเป็น channel เดียวกับ LIFF app และอยู่ใต้ Provider เดียวกับ NHFapp Messaging API Channel |
-| NHFapp Messaging API Channel | ใช้ `LINE_APP_CHANNEL_ACCESS_TOKEN` สำหรับ Unified Rich Menu และ personal Leave/Routine/Stock-result push; ไม่ใช่ token ของ legacy Stock/IT integrations |
+| NHFapp Messaging API Channel | ใช้ `LINE_APP_CHANNEL_ACCESS_TOKEN` สำหรับ Unified Rich Menu และ personal Leave/Routine/Stock-result/IT requester Ticket push; ไม่ใช่ token ของ legacy Stock/Email Request integrations |
 | Existing Stock Messaging integration | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` สำหรับ Stock request และ low-stock LINE broadcast ตาม integration เดิม |
-| Existing IT Messaging integration | ใช้ `LINE_IT_CHANNEL_ACCESS_TOKEN` สำหรับ IT/email-request LINE notification path ตาม integration เดิม |
+| Existing IT Messaging integration | ใช้ `LINE_IT_CHANNEL_ACCESS_TOKEN` สำหรับ legacy Email Request LINE notification path; IT9D Ticket delivery does not use this integration |
 | LIFF | จุดเข้าใช้งานจาก LINE และส่ง ID token ระยะสั้นให้ server ตรวจสอบ identity |
 | `LiffBootstrap` | เรียก `liff.init`, ตรวจ LINE login, สร้าง/กู้ NHFapp session และนำผู้ใช้ไป account-link เมื่อยังไม่ link |
 | NHFapp HttpOnly LIFF session | cookie `nhf_liff_session` ที่ server เซ็นและตรวจอายุ ใช้ยืนยัน workforce session ของ NHFapp |
 | account linking | ผูก LINE user ID กับ NHFapp user ที่ login ไว้; conflict ต้อง fail และห้ามเขียนทับ link เดิม |
 | feature flags | ควบคุม Leave และ Routine จาก `NEXT_PUBLIC_*`; ค่าถูกฝังตอน build |
 | Routine scheduler | สร้าง occurrence และ enqueue reminder work ลง notification outbox; ไม่ได้ส่งข้อความเอง |
-| Notification outbox | claim/process งานค้างและ dispatch event ตาม channel ที่กำหนด: Routine in-app/email/LINE, Stock personal LINE + legacy LINE, IT legacy LINE และ Leave in-app/email/personal LINE |
+| Notification outbox | claim/process งานค้างและ dispatch event ตาม channel ที่กำหนด: Routine in-app/email/LINE, Stock personal LINE + legacy LINE, requester IT Ticket personal LINE, retained Email Request legacy LINE และ Leave in-app/email/personal LINE |
 
 ID token เป็น identity assertion ที่อายุสั้น ใช้ตรวจสอบกับ LINE แล้วไม่ใช่ NHF session ระยะยาว ห้ามบันทึก ID token, cookie หรือ Authorization header ลง log
 
@@ -113,7 +113,7 @@ ID token เป็น identity assertion ที่อายุสั้น ใ�
 | --- | --- | --- |
 | `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID ที่ client ใช้ `liff.init` และใช้สร้าง Rich Menu URL | LINE Login Console; เป็น identifier ที่เปิดเผยได้และต้องตั้งก่อน build |
 | `LINE_LOGIN_CHANNEL_ID` | channel ID ที่ server ส่งให้ LINE ID-token verification ตรวจ `aud` | LINE Login Channel ใน LINE Developers Console |
-| `LINE_APP_CHANNEL_ACCESS_TOKEN` | token ของ NHFapp Messaging API Channel สำหรับ Unified Rich Menu, targeted Leave/Routine push และ personal Stock request-result push; ไม่ได้กำหนด Stock/IT legacy channel | secret manager / NHFapp Messaging API Channel ของ NHF Official Account |
+| `LINE_APP_CHANNEL_ACCESS_TOKEN` | token ของ NHFapp Messaging API Channel สำหรับ Unified Rich Menu, targeted Leave/Routine push, personal Stock request-result push, และ IT requester Ticket events `OPERATOR_COMMENTED`/`WAITING_REQUESTER`/`RESOLVED`; ไม่ได้กำหนด Stock/Email Request legacy channel | secret manager / NHFapp Messaging API Channel ของ NHF Official Account |
 | `LINE_APP_CHANNEL_SECRET` | channel secret ของ NHFapp Messaging API Channel | LINE Developers Console; เก็บใน secret manager |
 | `LINE_LIFF_SESSION_SECRET` | secret สำหรับเซ็น NHFapp HttpOnly LIFF session | secret manager; production ต้องยาวอย่างน้อย 32 ตัวอักษรและต้องสุ่ม |
 | `LINE_LIFF_SESSION_TTL_SECONDS` | อายุ LIFF session | deployment configuration; integer `1` ถึง `86400` |
@@ -171,7 +171,7 @@ NEXT_PUBLIC_FEATURE_ROUTINE=false
 | Integration | Variables | Current responsibility |
 | --- | --- | --- |
 | Existing Stock Messaging integration | `LINE_STOCK_CHANNEL_ACCESS_TOKEN`, `LINE_STOCK_CHANNEL_SECRET` | Stock request LINE broadcast และ low-stock LINE broadcast |
-| Existing IT Messaging integration | `LINE_IT_CHANNEL_ACCESS_TOKEN`, `LINE_IT_CHANNEL_SECRET`, `LINE_IT_TEAM_USER_ID` | IT/email-request LINE notification; ส่งหา IT team user หรือ broadcast ตาม configuration |
+| Existing IT Messaging integration | `LINE_IT_CHANNEL_ACCESS_TOKEN`, `LINE_IT_CHANNEL_SECRET`, `LINE_IT_TEAM_USER_ID` | Retained Email Request LINE notification; ส่งหา IT team user หรือ broadcast ตาม configuration. ไม่ใช้กับ IT Ticket |
 | Retained legacy outbound webhook compatibility | `LINE_WEBHOOK_URL` | optional external compatibility integration; แยกจาก inbound `/api/line/webhook`, ไม่ใช่ LIFF endpoint และไม่ใช่ `LINE_APP` token; live external usage ต้องยืนยันก่อนถอดออก |
 
 Flow แยกจาก Unified NHFapp Messaging API:
@@ -179,12 +179,29 @@ Flow แยกจาก Unified NHFapp Messaging API:
 ```text
 LINE_IT_CHANNEL_ACCESS_TOKEN
 LINE_IT_CHANNEL_SECRET
-    → Existing IT / email-request LINE notifications
+    → Retained Email Request LINE notification behavior
 
 LINE_STOCK_CHANNEL_ACCESS_TOKEN
 LINE_STOCK_CHANNEL_SECRET
     → Existing Stock LINE broadcasts
 ```
+
+IT9D Ticket delivery is a separate requester-only personal channel:
+
+```text
+IT_TICKET_LINE outbox
+    → shared sendAppLineNotification()
+    → LineAccountLink
+    → LINE_APP_CHANNEL_ACCESS_TOKEN
+    → requester /liff/it/<ticketId>
+```
+
+It sends only `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` to the
+current requester. `CREATED`, `ASSIGNED`, and `REQUESTER_COMMENTED` remain
+in-app only because there is no operator LIFF destination. The retained
+`LINE_IT_*` configuration and Email Request semantics are unchanged. This
+implementation has no live LINE provider acceptance evidence; smartphone/device
+acceptance remains IT9E and has not been performed.
 
 Leave notification ใช้ **in-app และ email** ผ่าน Leave notification/outbox workflow เดิม และเพิ่ม targeted personal LINE ผ่าน NHFapp OA สำหรับ workflow events ตาม [Notification Channel Architecture](./notification-channels.md) โดยไม่เปลี่ยน recipient semantics หรือ authorization ของ Leave
 
@@ -230,7 +247,7 @@ https://liff.line.me/<LIFF_ID>/routine
 
 - [ ] `LINE_APP_CHANNEL_ACCESS_TOKEN` เป็น token ของ NHFapp Messaging API Channel ที่ผูกกับ NHF Official Account ถูกตัว
 - [ ] `LINE_APP_CHANNEL_SECRET` เป็น channel secret ของ NHFapp Messaging API Channel เดียวกัน
-- [ ] token มีสิทธิ์สำหรับ Unified Rich Menu และ personal Leave/Routine/Stock-result push
+- [ ] token มีสิทธิ์สำหรับ Unified Rich Menu และ personal Leave/Routine/Stock-result/IT requester Ticket push
 - [ ] OA ตรงกับ token คือ OA ที่ test identities เพิ่มเป็นเพื่อน
 - [ ] ยืนยันด้วย human console check ว่า LINE Login Channel และ NHFapp Messaging API Channel อยู่ใต้ LINE Provider เดียวกัน
 - [ ] ไม่มี token/channel secret ใน `NEXT_PUBLIC_*`, source control, shell transcript, application log หรือ monitoring payload
@@ -458,7 +475,7 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
    full-suite evidence ให้รัน `npm run test` หลัง checks เหล่านี้ผ่านและ
    diff คงที่แล้ว
 9. รัน `npm run build` ด้วย non-secret/local configuration ที่สอดคล้องกับ production; หาก build local ใช้ production-only credential ไม่ได้ ให้ gate ไว้เป็น pre-deploy operator check
-10. Apply migrations ด้วย `npx prisma migrate deploy` หลัง backup; migration นี้เพิ่มเฉพาะ enum ของ personal LINE child outbox
+10. Apply pending forward-only migrations ด้วย `npx prisma migrate deploy` หลัง backup; IT9D migration adds only `IT_TICKET_LINE` to `NotificationOutboxType` and changes no Ticket or Inbox tables
 11. Deploy artifact/source ที่ตรงกับ commit SHA
 12. Start/restart Next.js ผ่าน supervisor ด้วย working directory, environment และ persistent storage ที่ถูกต้อง
 13. ตรวจ process/service health จาก origin เช่น `curl --fail http://127.0.0.1:3000/`

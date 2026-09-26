@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
 
 import {
+    buildITTicketLineEventKey,
     buildITTicketNotificationEventKey,
+    isITTicketRequesterLineNotification,
     type ITTicketNotificationPayloadV1,
 } from "../../domain/ticket-notification";
 
@@ -16,12 +18,27 @@ export async function enqueueITTicketNotificationIntents(
 ): Promise<void> {
     if (payloads.length === 0) return;
 
-    await tx.notificationOutbox.createMany({
-        data: payloads.map((payload) => ({
-            type: "IT_TICKET_IN_APP",
+    const data = payloads.flatMap((payload) => {
+        const serializedPayload = JSON.stringify(payload);
+        const intents: Prisma.NotificationOutboxCreateManyInput[] = [{
+            type: "IT_TICKET_IN_APP" as const,
             eventKey: buildITTicketNotificationEventKey(payload),
-            payload: JSON.stringify(payload),
-        })),
+            payload: serializedPayload,
+        }];
+
+        if (isITTicketRequesterLineNotification(payload)) {
+            intents.push({
+                type: "IT_TICKET_LINE",
+                eventKey: buildITTicketLineEventKey(payload),
+                payload: serializedPayload,
+            });
+        }
+
+        return intents;
+    });
+
+    await tx.notificationOutbox.createMany({
+        data,
         skipDuplicates: true,
     });
 }

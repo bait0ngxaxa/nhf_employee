@@ -4,6 +4,13 @@
 
 รายการ manual/production/smartphone ทุกแถวเริ่มเป็น `NOT RUN` ห้ามเปลี่ยนเป็น `PASS` จนกว่าจะทดสอบจริงและแนบ evidence
 
+IT9D requester Ticket LINE has been implemented, but this document contains no
+live LINE provider acceptance evidence: no Ticket push was sent with production
+configuration in this work. Smartphone/device acceptance remains IT9E and has
+not been performed. OPS-18 and the `IT Messaging API Channel ID` field below
+refer only to the retained legacy Email Request/IT LINE integration; requester
+Ticket LINE uses the shared NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` path.
+
 ## 1. วิธีบันทึกผล
 
 ใช้ผลลัพธ์ดังนี้:

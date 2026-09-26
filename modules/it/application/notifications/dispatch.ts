@@ -2,18 +2,23 @@ import type { NotificationOutbox, Prisma } from "@prisma/client";
 
 import { getCurrentWorkforceDepartmentSnapshotInTransaction } from "@/modules/employee";
 import { createForUserOnce } from "@/modules/notification";
+import { sendAppLineNotification } from "@/lib/line/app-notification";
 import {
     hasPrismaErrorCode,
     runSerializableTransaction,
 } from "@/lib/db/transaction";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 
 import { findITOperatorAudience } from "../operator-audience";
 import {
+    buildITTicketLineEventKey,
     buildITTicketNotificationEventKey,
+    isITTicketRequesterLineNotification,
     parseITTicketNotificationPayload,
     type ITTicketNotificationPayloadV1,
 } from "../../domain/ticket-notification";
+import { buildITTicketLineFlexMessage } from "../../infrastructure/notifications/line-flex";
 import {
     findITTicketNotificationCommentSource,
     findITTicketNotificationEventSource,
@@ -33,12 +38,22 @@ type ITTicketNotificationSource =
     | { readonly kind: "EVENT"; readonly fact: ITTicketNotificationEventSource }
     | { readonly kind: "COMMENT"; readonly fact: ITTicketNotificationCommentSource };
 
-function parseStoredPayload(payload: string): ITTicketNotificationPayloadV1 {
+class ITTicketNotificationSourceMismatchError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "ITTicketNotificationSourceMismatchError";
+    }
+}
+
+function parseStoredPayload(
+    payload: string,
+    type: "IT_TICKET_IN_APP" | "IT_TICKET_LINE",
+): ITTicketNotificationPayloadV1 {
     let parsed: unknown;
     try {
         parsed = JSON.parse(payload) as unknown;
     } catch {
-        throw new Error("Invalid IT_TICKET_IN_APP payload JSON");
+        throw new Error(`Invalid ${type} payload JSON`);
     }
     return parseITTicketNotificationPayload(parsed);
 }
@@ -50,14 +65,18 @@ async function loadSource(
     if (payload.source.kind === "EVENT") {
         const fact = await findITTicketNotificationEventSource(tx, payload.source.id);
         if (fact === null) {
-            throw new Error("IT_TICKET_IN_APP event source not found");
+            throw new ITTicketNotificationSourceMismatchError(
+                "IT_TICKET_IN_APP event source not found",
+            );
         }
         return { kind: "EVENT", fact };
     }
 
     const fact = await findITTicketNotificationCommentSource(tx, payload.source.id);
     if (fact === null) {
-        throw new Error("IT_TICKET_IN_APP comment source not found");
+        throw new ITTicketNotificationSourceMismatchError(
+            "IT_TICKET_IN_APP comment source not found",
+        );
     }
     return { kind: "COMMENT", fact };
 }
@@ -67,7 +86,9 @@ function assertSourceMatchesPayload(
     payload: ITTicketNotificationPayloadV1,
 ): number {
     if (source.fact.ticketId !== payload.ticketId) {
-        throw new Error("IT_TICKET_IN_APP source Ticket mismatch");
+        throw new ITTicketNotificationSourceMismatchError(
+            "IT_TICKET_IN_APP source Ticket mismatch",
+        );
     }
 
     if (source.kind === "EVENT") {
@@ -85,7 +106,9 @@ function assertSourceMatchesPayload(
                             && fact.toStatus === "RESOLVED"
                         : false;
         if (!matches) {
-            throw new Error("IT_TICKET_IN_APP event source does not match event");
+            throw new ITTicketNotificationSourceMismatchError(
+                "IT_TICKET_IN_APP event source does not match event",
+            );
         }
         return fact.actorUserId;
     }
@@ -96,7 +119,9 @@ function assertSourceMatchesPayload(
             ? "REQUESTER"
             : null;
     if (expectedKind === null || source.fact.kind !== expectedKind) {
-        throw new Error("IT_TICKET_IN_APP comment source does not match event");
+        throw new ITTicketNotificationSourceMismatchError(
+            "IT_TICKET_IN_APP comment source does not match event",
+        );
     }
     return source.fact.authorUserId;
 }
@@ -204,12 +229,43 @@ function composeInboxContent(
 export async function dispatchITTicketNotificationOutbox(
     notification: NotificationOutbox,
 ): Promise<ITTicketNotificationDispatchOutcome> {
-    if (notification.type !== "IT_TICKET_IN_APP") return null;
+    if (
+        notification.type !== "IT_TICKET_IN_APP"
+        && notification.type !== "IT_TICKET_LINE"
+    ) return null;
 
-    const payload = parseStoredPayload(notification.payload);
-    const eventKey = buildITTicketNotificationEventKey(payload);
+    const payload = parseStoredPayload(notification.payload, notification.type);
+    const isLine = notification.type === "IT_TICKET_LINE";
+    const eventKey = isLine
+        ? buildITTicketLineEventKey(payload)
+        : buildITTicketNotificationEventKey(payload);
     if (notification.eventKey !== eventKey) {
-        throw new Error("IT_TICKET_IN_APP event identity mismatch");
+        throw new Error(`${notification.type} event identity mismatch`);
+    }
+
+    if (isLine) {
+        if (!isITTicketRequesterLineNotification(payload)) return "SUPERSEDED";
+
+        const currentlyApplicable = await runSerializableTransaction(async (tx) => {
+            try {
+                const source = await loadSource(tx, payload);
+                const sourceActorUserId = assertSourceMatchesPayload(source, payload);
+                return isCurrentlyApplicable(tx, payload, sourceActorUserId);
+            } catch (error) {
+                if (error instanceof ITTicketNotificationSourceMismatchError) {
+                    return false;
+                }
+                throw error;
+            }
+        });
+        if (!currentlyApplicable) return "SUPERSEDED";
+
+        const result = await sendAppLineNotification({
+            userId: payload.recipientUserId,
+            message: buildITTicketLineFlexMessage(payload),
+            retryKey: createLineRetryKey(eventKey),
+        });
+        return result.status === "SENT" ? "SENT" : "SUPERSEDED";
     }
 
     try {

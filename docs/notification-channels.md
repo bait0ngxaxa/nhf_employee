@@ -74,17 +74,53 @@ LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel �
 | Stock request self-cancellation | มีเดิม | ไม่เพิ่ม/ไม่เปลี่ยน behavior เดิม | requester ที่ active และมี link → Stock LIFF | ไม่ใช้ |
 | Stock new request for operations | มีเดิม | ตาม behavior เดิมของระบบ | ยังไม่ใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` |
 | Low-stock alert | มีเดิม | ตาม behavior เดิมของระบบ | ยังไม่ใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` |
-| IT Ticket created / assigned / comment / waiting / resolved | มีผ่าน `IT_TICKET_IN_APP` | ยังไม่ใช้ | ยังไม่ใช้ | ไม่ใช้ |
+| IT Ticket events | มีผ่าน `IT_TICKET_IN_APP` | ยังไม่ใช้ | เฉพาะ requester events ตาม matrix IT9D ด้านล่าง | ไม่ใช้สำหรับ Ticket |
 
 คำว่า “มี parent เดิม” หมายถึงไม่เปลี่ยน notification record, dedupe, read/unread,
 หรือ email workflow เดิมของ event นั้น LINE เป็น child delivery เพิ่มเติม
 
-IT6 ใช้ In-app เท่านั้น โดย `modules/it` เป็นเจ้าของความหมาย ผู้รับ ข้อความ
-ปลายทาง และการตรวจสถานะ Ticket; `modules/notification` เป็นเจ้าของ Inbox;
-shared outbox เป็นเจ้าของ claim/retry/backoff/dead-letter/supersede และ processor
-composition. Email เลื่อนไป IT8; NHFapp LINE และ IT LIFF รอการตัดสินใจผลิตภัณฑ์
-ของ IT. ค่า `TICKET_*` เดิมคงไว้เพื่ออ่านข้อมูลย้อนหลัง ไม่ใช่ค่า dispatch ใหม่
-และไม่เปลี่ยนความหมายของข้อมูลเดิม
+IT6 retains in-app Ticket notifications. IT9D adds requester-only personal
+NHFapp LINE to the approved events below. IT owns event meaning, recipient,
+payload, message, destination and Ticket stale checks; `modules/notification`
+owns Inbox persistence; the shared outbox owns claim/retry/backoff/dead-letter/
+supersede and processor composition. Ticket Email remains deferred. Retained
+`LINE_IT_*` configuration remains for legacy Email Request behavior and is not
+used by Ticket delivery. Historical `TICKET_*` outbox values remain readable
+compatibility values and are not runtime-dispatchable.
+
+### IT Ticket event matrix — IT9D
+
+| IT event | Current in-app recipient | Personal NHFapp LINE | Destination |
+| --- | --- | --- | --- |
+| `CREATED` | `OPERATOR_QUEUE` | No | — |
+| `ASSIGNED` | `ASSIGNEE` | No | — |
+| `OPERATOR_COMMENTED` | `REQUESTER` | Yes | Requester Ticket LIFF: `/liff/it/<ticketId>` |
+| `REQUESTER_COMMENTED` | `ASSIGNEE` or `OPERATOR_QUEUE` | No | — |
+| `WAITING_REQUESTER` | `REQUESTER` | Yes | Requester Ticket LIFF: `/liff/it/<ticketId>` |
+| `RESOLVED` | `REQUESTER` | Yes | Requester Ticket LIFF: `/liff/it/<ticketId>` |
+
+The `IT_TICKET_LINE` row reuses the strict IT6 semantic payload and is persisted
+in the same Ticket transaction as its in-app row. Its deterministic identity is
+`it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:line`;
+the existing in-app identity keeps its `:in-app` suffix. The LINE retry key is
+`createLineRetryKey(eventKey)`. The CTA is built only through
+`buildITTicketLiffUrl(ticketId)`. No Ticket text, comment body, attachment data,
+Department, assignee detail or other private content is sent in the Flex message.
+
+IT operator-facing personal LINE is not implemented: the current LIFF IT surface
+is requester-only and no operator LIFF destination exists. Operator events
+remain on their current in-app Dashboard routes; IT9D does not substitute a
+Dashboard URL into LINE. Existing requester Inbox actions also remain on
+`/dashboard/it/<ticketId>`.
+
+The shared `sendAppLineNotification()` path resolves application users through
+`LineAccountLink` and uses `LINE_APP_CHANNEL_ACCESS_TOKEN`. Unlinked or
+ineligible users are returned as `SUPERSEDED`, without retrying a valid business
+state forever. A provider error propagates into the shared retry lifecycle
+(maximum three attempts, then `DEAD`). This lifecycle is at-least-once; LINE's
+retry key is a finite duplicate-suppression window rather than a guarantee of
+permanent provider or end-user delivery. No live LINE provider acceptance or
+smartphone/device test is claimed; device acceptance remains IT9E.
 
 ## Leave LINE flows
 

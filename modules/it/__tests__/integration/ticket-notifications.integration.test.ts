@@ -1,6 +1,12 @@
 import { Role } from "@prisma/client";
 import mysql from "mysql2/promise";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const lineTransport = vi.hoisted(() => ({ send: vi.fn() }));
+
+vi.mock("@/lib/line/app-notification", () => ({
+    sendAppLineNotification: lineTransport.send,
+}));
 
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -87,7 +93,7 @@ async function cleanFixtures(): Promise<void> {
     for (const ticketId of ticketIds) {
         await prisma.notificationOutbox.deleteMany({
             where: {
-                type: "IT_TICKET_IN_APP",
+                type: { in: ["IT_TICKET_IN_APP", "IT_TICKET_LINE"] },
                 eventKey: { startsWith: `it:ticket:${ticketId}:` },
             },
         });
@@ -242,6 +248,23 @@ async function getOutboxRows(ticketId: number): Promise<ParsedOutboxRow[]> {
     });
 }
 
+async function getLineOutboxRows(ticketId: number): Promise<ParsedOutboxRow[]> {
+    const rows = await prisma.notificationOutbox.findMany({
+        where: {
+            type: "IT_TICKET_LINE",
+            eventKey: { startsWith: `it:ticket:${ticketId}:` },
+        },
+        orderBy: { id: "asc" },
+    });
+    return rows.map((row) => {
+        const parsed: unknown = JSON.parse(row.payload);
+        return {
+            row,
+            payload: parseITTicketNotificationPayload(parsed),
+        };
+    });
+}
+
 async function getTicketInbox(ticketId: number, userId?: number) {
     return prisma.notification.findMany({
         where: {
@@ -257,16 +280,22 @@ async function latestTicket(ticketId: number) {
     return prisma.iTTicket.findUniqueOrThrow({ where: { id: ticketId } });
 }
 
-describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
+describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
     beforeAll(async () => {
         assertDedicatedDatabase();
+        vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-integration-liff-id");
         await prisma.$connect();
     });
 
-    beforeEach(async () => cleanFixtures());
+    beforeEach(async () => {
+        await cleanFixtures();
+        vi.clearAllMocks();
+        lineTransport.send.mockResolvedValue({ status: "SENT" });
+    });
 
     afterAll(async () => {
         await cleanFixtures();
+        vi.unstubAllEnvs();
         await prisma.$disconnect();
     });
 
@@ -285,6 +314,8 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         const rows = await getOutboxRows(created.ticket.id);
 
         expect(created.replayed).toBe(false);
+        expect(await getLineOutboxRows(created.ticket.id)).toHaveLength(0);
+        expect(lineTransport.send).not.toHaveBeenCalled();
         expect(rows.map(({ payload }) => payload.recipientUserId).sort()).toEqual(
             [operatorA.userId, operatorB.userId].sort(),
         );
@@ -310,6 +341,8 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         });
         expect(replay.replayed).toBe(true);
         expect(await getOutboxRows(created.ticket.id)).toHaveLength(2);
+        expect(await getLineOutboxRows(created.ticket.id)).toHaveLength(0);
+        expect(lineTransport.send).not.toHaveBeenCalled();
     });
 
     it("allows creation with no configured operator audience", async () => {
@@ -389,6 +422,7 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
 
         const assignmentRows = (await getOutboxRows(ticket.id))
             .filter(({ payload }) => payload.event === "ASSIGNED");
+        expect(await getLineOutboxRows(ticket.id)).toHaveLength(0);
         expect(assignmentRows.map(({ payload }) => payload.recipientUserId)).toEqual([
             operatorA.userId,
             operatorB.userId,
@@ -438,6 +472,7 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
             { idempotencyKey: requesterCommentKey },
         );
         const rows = await getOutboxRows(created.ticket.id);
+        const lineRows = await getLineOutboxRows(created.ticket.id);
         const operatorIntent = rows.find(({ payload }) =>
             payload.event === "OPERATOR_COMMENTED",
         );
@@ -456,6 +491,19 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         });
         expect(operatorIntent?.row.payload).not.toContain(operatorBody);
         expect(operatorIntent?.row.payload).not.toContain("attachments");
+        const operatorLineIntent = lineRows.find(({ payload }) =>
+            payload.event === "OPERATOR_COMMENTED",
+        );
+        expect(operatorLineIntent?.payload).toEqual(operatorIntent?.payload);
+        expect(operatorLineIntent?.row.payload).toBe(operatorIntent?.row.payload);
+        expect(operatorLineIntent?.row.eventKey).toBe(
+            `it:ticket:${created.ticket.id}:comment:${operatorComment.comment.id}:user:${fixture.requester.userId}:line`,
+        );
+        expect(operatorLineIntent?.row.eventKey).not.toBe(operatorIntent?.row.eventKey);
+        expect(lineRows.map(({ payload }) => payload.event)).toEqual([
+            "OPERATOR_COMMENTED",
+        ]);
+        expect(lineRows).toHaveLength(1);
         expect(requesterIntent?.row.payload).not.toContain(requesterBody);
         expect(requesterIntent?.row.payload).not.toContain("storageKey");
         expect(await prisma.iTTicketComment.count({
@@ -496,6 +544,8 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
             && payload.recipientUserId !== fixture.requester.userId,
         )).toBe(true);
         expect(queueIntents).toHaveLength(3);
+        expect(await getLineOutboxRows(unassignedTicket.ticket.id)).toHaveLength(0);
+        expect(lineTransport.send).not.toHaveBeenCalled();
     });
 
     it("only notifies on waiting/resolved, supersedes stale waiting, and routes requester Inbox actions", async () => {
@@ -514,7 +564,10 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         });
         const waitingRow = (await getOutboxRows(created.ticket.id))
             .find(({ payload }) => payload.event === "WAITING_REQUESTER");
+        const waitingLineRow = (await getLineOutboxRows(created.ticket.id))
+            .find(({ payload }) => payload.event === "WAITING_REQUESTER");
         expect(waitingRow).toBeDefined();
+        expect(waitingLineRow?.payload).toEqual(waitingRow?.payload);
 
         const resumed = await transitionITTicketStatus(operator.context, {
             ticketId: waiting.ticket.id,
@@ -524,6 +577,10 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         await expect(dispatchITTicketNotificationOutbox(
             waitingRow?.row ?? failMissingOutboxRow(),
         )).resolves.toBe("SUPERSEDED");
+        await expect(dispatchITTicketNotificationOutbox(
+            waitingLineRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SUPERSEDED");
+        expect(lineTransport.send).not.toHaveBeenCalled();
 
         const resolved = await transitionITTicketStatus(operator.context, {
             ticketId: resumed.ticket.id,
@@ -533,15 +590,27 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         expect(resolved.ticket.status).toBe("RESOLVED");
         const rows = (await getOutboxRows(created.ticket.id))
             .filter(({ payload }) => payload.event !== "CREATED");
+        const resolvedLineRow = (await getLineOutboxRows(created.ticket.id))
+            .find(({ payload }) => payload.event === "RESOLVED");
         expect(rows.map(({ payload }) => payload.event)).toEqual([
             "WAITING_REQUESTER",
             "RESOLVED",
         ]);
         const resolvedRow = rows.find(({ payload }) => payload.event === "RESOLVED");
         expect(resolvedRow).toBeDefined();
+        expect(resolvedLineRow?.payload).toEqual(resolvedRow?.payload);
+        expect(lineTransport.send).not.toHaveBeenCalled();
         await expect(dispatchITTicketNotificationOutbox(
             resolvedRow?.row ?? failMissingOutboxRow(),
         )).resolves.toBe("SENT");
+        await expect(dispatchITTicketNotificationOutbox(
+            resolvedLineRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SENT");
+        expect(lineTransport.send).toHaveBeenCalledOnce();
+        expect(lineTransport.send).toHaveBeenCalledWith(expect.objectContaining({
+            userId: fixture.requester.userId,
+            message: expect.objectContaining({ type: "flex" }),
+        }));
 
         const inbox = await getTicketInbox(created.ticket.id, fixture.requester.userId);
         expect(inbox).toHaveLength(1);
@@ -696,7 +765,11 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         const firstWaitingRow = (await getOutboxRows(created.ticket.id)).find(
             ({ payload }) => payload.event === "WAITING_REQUESTER",
         );
+        const firstWaitingLineRow = (await getLineOutboxRows(created.ticket.id)).find(
+            ({ payload }) => payload.event === "WAITING_REQUESTER",
+        );
         expect(firstWaitingRow).toBeDefined();
+        expect(firstWaitingLineRow?.payload).toEqual(firstWaitingRow?.payload);
 
         const resumed = await transitionITTicketStatus(operator.context, {
             ticketId: firstWaiting.ticket.id,
@@ -713,16 +786,31 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
         const waitingRows = (await getOutboxRows(created.ticket.id)).filter(
             ({ payload }) => payload.event === "WAITING_REQUESTER",
         );
+        const waitingLineRows = (await getLineOutboxRows(created.ticket.id)).filter(
+            ({ payload }) => payload.event === "WAITING_REQUESTER",
+        );
         expect(waitingRows).toHaveLength(2);
+        expect(waitingLineRows).toHaveLength(2);
         const latestWaitingRow = waitingRows[1];
+        const latestWaitingLineRow = waitingLineRows[1];
         expect(latestWaitingRow?.row.eventKey).not.toBe(firstWaitingRow?.row.eventKey);
+        expect(latestWaitingLineRow?.row.eventKey).not.toBe(
+            firstWaitingLineRow?.row.eventKey,
+        );
 
         await expect(dispatchITTicketNotificationOutbox(
             firstWaitingRow?.row ?? failMissingOutboxRow(),
         )).resolves.toBe("SUPERSEDED");
         await expect(dispatchITTicketNotificationOutbox(
+            firstWaitingLineRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SUPERSEDED");
+        await expect(dispatchITTicketNotificationOutbox(
             latestWaitingRow?.row ?? failMissingOutboxRow(),
         )).resolves.toBe("SENT");
+        await expect(dispatchITTicketNotificationOutbox(
+            latestWaitingLineRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SENT");
+        expect(lineTransport.send).toHaveBeenCalledOnce();
 
         const inbox = await getTicketInbox(created.ticket.id, fixture.requester.userId);
         expect(inbox).toHaveLength(1);
@@ -820,6 +908,7 @@ describe.sequential("IT6 Ticket in-app notifications with real MySQL", () => {
             where: { authorUserId: operator.userId, idempotencyKey: commentKey },
         })).toBe(0);
         expect((await latestTicket(created.ticket.id)).firstRespondedAt).toBeNull();
+        expect(await getLineOutboxRows(created.ticket.id)).toHaveLength(0);
     });
 });
 

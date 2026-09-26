@@ -1,6 +1,6 @@
 # IT Module Architecture and Domain Contract
 
-Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to LIFF OPEN / next phase; IT9E IT Product E2E + Android/iPhone Acceptance OPEN; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
+Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to Requester LIFF IMPLEMENTED; closure pending independent review; IT9E IT Product E2E + Android/iPhone Acceptance OPEN; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
 
 ## 1. Product scope and terminology
 
@@ -153,18 +153,18 @@ IT business event → IT-owned reason, audience, content, channel, destination,
                        → Notification public command and/or generic SMTP/LINE
 ```
 
-**LOCKED for IT6; current after IT9A.** IT6 implements in-app Ticket notifications. IT9A approves and adds the requester-only LIFF authorization/API foundation, but does not enable Ticket delivery through LINE Messaging API. Ticket LINE delivery, including LIFF deep-link notification, remains deferred to IT9D after the UI destination exists. Ticket Email remains a product decision/deferred. IT owns event meaning, recipient policy, payload interpretation, event identity, action destination, and stale-recipient/domain validation. Notification owns Inbox persistence/read state. Shared outbox infrastructure owns claim, retry/backoff, dead-letter, supersede lifecycle, and processor composition.
+**LOCKED; IT6 in-app and IT9D requester LINE.** IT6 retains the existing in-app Ticket notification semantics and Dashboard destinations. IT9D adds requester-only personal NHFapp LINE for the approved events below, using the requester LIFF Ticket destination completed in IT9C. Ticket Email remains a product decision/deferred. IT owns event meaning, recipient policy, strict payload, event identity, Flex composition, destination, and stale-recipient/domain validation. Notification owns Inbox persistence/read state. Shared outbox infrastructure owns claim, retry/backoff, dead-letter, supersede lifecycle, and processor composition.
 
-| Event | Recipient | Suppression / applicability |
-| --- | --- | --- |
-| `CREATED` | Configured IT operator audience | Active workforce with configured `it.ticket.read`, `it.ticket.comment`, and `it.ticket.manage` ALL; exclude requester/actor. No eligible operators is valid. |
-| `ASSIGNED` | New non-null assignee | Exclude self-assignment and unassignment; dispatch only while still current assignee and eligible operator. |
-| `OPERATOR_COMMENTED` | Requester | Exclude the author; Inbox says IT replied and never copies comment text. |
-| `REQUESTER_COMMENTED` | Current assignee, or configured operator audience while unassigned | Exclude author; suppress if the assignment state no longer matches the selected audience. |
-| `WAITING_REQUESTER` | Requester | Dispatch only while Ticket remains `WAITING_REQUESTER`. |
-| `RESOLVED` | Requester | Enqueue only on a successful transition into `RESOLVED`. |
+| Event | Current in-app recipient | Personal LINE in IT9D | Suppression / applicability |
+| --- | --- | --- | --- |
+| `CREATED` | Configured IT operator audience | No | Active workforce with configured `it.ticket.read`, `it.ticket.comment`, and `it.ticket.manage` ALL; exclude requester/actor. No eligible operators is valid. |
+| `ASSIGNED` | New non-null assignee | No | Exclude self-assignment and unassignment; dispatch only while still current assignee and eligible operator. |
+| `OPERATOR_COMMENTED` | Requester | Yes → requester Ticket LIFF | Exclude the author; the message says IT replied and never copies comment text. |
+| `REQUESTER_COMMENTED` | Current assignee, or configured operator audience while unassigned | No | Exclude author; suppress if the assignment state no longer matches the selected audience. |
+| `WAITING_REQUESTER` | Requester | Yes → requester Ticket LIFF | Dispatch only while Ticket remains in the source `WAITING_REQUESTER` generation and state. |
+| `RESOLVED` | Requester | Yes → requester Ticket LIFF | Enqueue only on a successful transition into `RESOLVED`; later legitimate Ticket state does not invalidate the occurred fact. |
 
-No notification is produced for ordinary `IN_PROGRESS` start/resume, unassignment, no-op/replay, self, or old assignee after reassignment. No behavior is defined here for other workflow states. Persist each `NotificationOutbox` intent in the same transaction as the Ticket/event/comment and applicable idempotency/attachment facts. The versioned IT payload contains only event identity, Ticket/recipient IDs, audience, and the immutable event/comment source ID; it excludes descriptions, comment bodies, attachment data, sensitive Employee data, grants, and client display text. Deterministic keys include IT domain, Ticket, source kind/ID, recipient, and in-app channel. The global processor delegates `IT_TICKET_IN_APP` to the public IT dispatcher; the dispatcher strictly parses the payload, verifies its source and current applicability, then calls Notification's idempotent explicit-user command. Historical `TICKET_*` values remain storage compatibility only and are not runtime-dispatchable.
+No notification is produced for ordinary `IN_PROGRESS` start/resume, unassignment, no-op/replay, self, or old assignee after reassignment. No behavior is defined here for other workflow states. Persist each eligible `IT_TICKET_IN_APP` and `IT_TICKET_LINE` intent in the same transaction as the Ticket/event/comment and applicable idempotency/attachment facts. Both channels reuse the unchanged strict versioned IT payload: event identity, Ticket/recipient IDs, audience, and immutable event/comment source ID only. It excludes descriptions, comment bodies, attachment data, sensitive Employee data, grants, and client display text. The existing in-app event key remains `it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:in-app`; LINE uses the distinct `...:line` suffix. The global processor delegates both types to the public IT dispatcher. The dispatcher validates source and current applicability, keeps requester Inbox actions on `/dashboard/it/<ticketId>` and operator actions on the canonical Dashboard queue route, and sends only requester LINE actions to `buildITTicketLiffUrl(ticketId)`. Historical `TICKET_*` values remain storage compatibility only and are not runtime-dispatchable.
 
 ## 10. Analytics and Department history
 
@@ -212,7 +212,7 @@ IT9A owns the **CLOSED** requester-only authorization/API foundation, including:
 - `POST /api/line/it/tickets/:id/comments`
 - `GET /api/line/it/attachments/:id`
 
-IT9B owns the **CLOSED** requester LIFF UI at `/liff/it` and `/liff/it/:ticketId`, including conversation and private attachments. IT9C is **IMPLEMENTED; closure pending independent review** and integrates the Home module projection and card, shared Bottom Navigation and header, canonical external requester LIFF destinations, and Unified Rich Menu destination. Home and navigation visibility remain presentation only; server APIs enforce authorization. Ticket LINE delivery remains deferred to IT9D.
+IT9B owns the **CLOSED** requester LIFF UI at `/liff/it` and `/liff/it/:ticketId`, including conversation and private attachments. IT9C is **CLOSED** after independent review and integrates the Home module projection and card, shared Bottom Navigation and header, canonical external requester LIFF destinations, and Unified Rich Menu destination. Home and navigation visibility remain presentation only; server APIs enforce authorization. IT9D adds requester Ticket LINE delivery; it does not change authorization or operator destinations.
 
 ## 12. Existing Email Request: IT8 ownership and compatibility
 
@@ -312,7 +312,7 @@ Do not delete, rename, reinterpret, or reuse historical stored values in IT0. At
 7. Is priority part of MVP? Should requester provide a separate urgency signal? Who may set `URGENT`?
 8. Are categories centrally configured by deployment/operator data, or must IT administer them in the app? What initial categories are approved?
 9. Which notification channels and recipients are required for creation, assignment, replies and resolution? Is an unassigned queue broadcast desired?
-10. IT9A establishes requester-only LIFF authorization and APIs. IT9B implements the self-service presentation; shell integration, Ticket LINE delivery, and device acceptance remain sequenced in IT9C–IT9E.
+10. IT9A establishes requester-only LIFF authorization and APIs; IT9B and IT9C provide the requester presentation and shell integration. IT9D's approved Ticket LINE matrix is requester-only (`OPERATOR_COMMENTED`, `WAITING_REQUESTER`, `RESOLVED`); operator-facing LINE requires a separately approved destination. Product/device acceptance remains IT9E.
 11. Are response/resolution targets required now? If so, specify measures before considering any SLA implementation.
 12. Should reporting periods use calendar or fiscal year, which timezone/business-hours convention, and how should reopened/resolved/cancelled cycles count? Should `RESOLVED` be included in backlog?
 13. Are active application accounts without an Employee profile eligible? Current active workforce helper requires an Employee; product wording alone does not settle this exception.
@@ -336,7 +336,7 @@ These questions are intentionally unresolved; later slices must close their depe
 | IT9A — LIFF Authorization + API Foundation (**CLOSED**) | Add requester-only LIFF authorization and compatibility-safe API adapters over the shared IT application. | `LIFF_SELF_SERVICE` supports read/create/comment with effective OWN only; manage and analytics remain Dashboard-only. Add no schema or migration; no UI, Home/navigation/Rich Menu integration, or Ticket LINE delivery. | Registry/resolver and channel-policy tests, LIFF route tests, focused MySQL channel-isolation regression, architecture, lint/typecheck, and one final full suite. |
 | IT9B — LIFF Self-Service UI + Conversation + Attachments (**CLOSED**) | Add the requester-facing LIFF experience over the IT9A APIs. | LIFF presentation only; preserve requester-only policy and shared Ticket/application contracts. No Home/navigation/Rich Menu integration or LINE delivery. | Corrective commit `415c9d6cb21d7510e4e610c4e8d4541add60f1f3` passed independent review. Closure verification is recorded in section 25; device acceptance remains IT9E. |
 | IT9C — LIFF Home / Navigation / Deep Link / Rich Menu Integration (**CLOSED**) | Add IT to LIFF shell entry points and connect notification-ready Ticket destinations. | Home modules, bottom navigation, external deep-link producers, and Rich Menu integration. | Independent review covered the fixed `LIFF_SELF_SERVICE` capability projection, Home requester visibility, shared Home/card/header/Bottom Nav integration, canonical requester LIFF root/detail destinations, the Unified Rich Menu four-area contract, retained Dashboard Inbox destination, and absence of IT9D delivery leakage. |
-| IT9D — IT Ticket LINE Notifications to LIFF (**OPEN**) | Add Ticket LINE delivery through the approved LIFF destination. | Reuse IT6 business event semantics and shared outbox; no duplicate Ticket event model. | Delivery, destination, retry/idempotency, privacy, and stale-recipient checks. |
+| IT9D — IT Ticket personal LINE to requester LIFF (**IMPLEMENTED; closure pending independent review**) | Add personal NHFapp LINE delivery for requester-facing Ticket events only. | `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` use requester LIFF; operator-facing events remain in-app only. Reuse IT6 payload and shared processor; add one forward-only outbox enum value. | Focused event-key/adapter/Flex/dispatcher/processor tests, real-MySQL transaction/idempotency/stale-generation coverage, Prisma, architecture, lint, and typecheck. No live provider or device acceptance. |
 | IT9E — IT Product E2E + Android/iPhone Acceptance (**OPEN**) | Validate the complete IT requester product on supported devices. | End-to-end requester flows and Android/iPhone acceptance. | Product E2E, responsive/accessibility, and device acceptance. |
 | IT10 — Final Hardening + Compatibility + Retention Audit (**OPEN / deferred**) | Review deployed legacy rows, retention, operational failure modes and final ownership. | Only approved compatibility cleanup/migrations; explicit decision before any enum or grant change. | Architecture/security regression, relevant broad suite and deployment data review. |
 
@@ -512,6 +512,56 @@ not send Ticket LINE notifications,
 change authorization capabilities or defaults, add a feature flag, alter Ticket
 workflow, or change schema/migrations.
 
-IT9D is **OPEN / next phase** for Ticket LINE delivery; IT9E remains **OPEN**
-for product and Android/iPhone acceptance; IT10 remains **OPEN / deferred**.
-Device acceptance has not been performed.
+At the IT9C closure boundary, IT9D was **OPEN / next phase**; IT9E remained
+**OPEN** for product and Android/iPhone acceptance; IT10 remained
+**OPEN / deferred**. Device acceptance had not been performed at that boundary.
+
+## 27. IT9D implementation — requester Ticket LINE
+
+IT9D is **IMPLEMENTED; closure pending independent review**. The current
+approved matrix enables personal NHFapp LINE only for requester
+`OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` intents. `CREATED`,
+`ASSIGNED`, and `REQUESTER_COMMENTED` remain in-app only because there is no
+operator LIFF destination. IT9D does not route operator messages to Dashboard
+URLs or change the existing Dashboard Inbox actions.
+
+`IT_TICKET_LINE` extends only `NotificationOutboxType` through the forward-only
+`20260926100000_add_it_ticket_line` migration. Ticket mutations enqueue the
+existing `IT_TICKET_IN_APP` row plus a LINE row for the approved requester
+events in the same transaction. Both rows store the unchanged strict
+`ITTicketNotificationPayloadV1`; no Ticket title, description, comment text,
+attachment data, Department, assignee details, grants, or client-composed text
+is persisted in the LINE payload.
+
+The in-app event key remains
+`it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:in-app`.
+The distinct LINE event key ends in `:line`; the provider retry key is
+`createLineRetryKey(eventKey)`. Duplicate-safe enqueueing preserves one row per
+business source, recipient, and channel. The shared global processor retains
+claim, retry/backoff, `FAILED`/`DEAD`, and final status ownership and delegates
+IT semantics to the IT dispatcher.
+
+IT strictly parses and source-validates both channel payloads. For LINE it
+checks current requester ownership, current workforce eligibility, source
+actor self-suppression, and the current `WAITING_REQUESTER` state/generation.
+`OPERATOR_COMMENTED` and `RESOLVED` remain informational facts and are not
+suppressed solely because the Ticket later advances. The Flex message contains
+only fixed event wording, `Ticket IT #<id>`, and an action URL from
+`buildITTicketLiffUrl(ticketId)`. The shared `sendAppLineNotification()` path
+uses `LineAccountLink` and `LINE_APP_CHANNEL_ACCESS_TOKEN`; IT does not read
+channel tokens directly. `UNLINKED` and `INELIGIBLE` results become
+`SUPERSEDED`. Provider errors propagate to the shared at-least-once retry
+lifecycle (three attempts, then `DEAD`); LINE's retry key does not guarantee
+permanent deduplication or end-user acceptance.
+
+Focused tests passed **7 files / 79 tests** for IT event keys, enqueue policy,
+Flex composition, IT dispatch, unchanged in-app dispatch, transaction boundary,
+and the global processor. The real-MySQL integration workflow applied the new
+migration and passed **22 files / 154 tests**, covering transaction rollback,
+create/comment replay, requester-only row creation, stale waiting generations,
+and unchanged Dashboard Inbox destinations. `npx prisma generate` and
+`npx prisma validate` passed. `npm run architecture:check` passed for 1,269
+source files; `npm run lint:strict` and `npm run typecheck` passed. No live LINE
+Messaging API call or production delivery acceptance was performed; the IT
+integration transport was mocked. The repository full suite was not run. IT9E
+was not started and smartphone or device acceptance has not been performed.
