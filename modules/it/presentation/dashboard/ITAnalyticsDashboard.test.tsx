@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
+import { IT_TICKET_STATUS_LABELS, IT_TICKET_TYPE_LABELS } from "../../contracts";
 import { ITAnalyticsDashboard } from "./ITAnalyticsDashboard";
 
 interface MockResponse {
@@ -77,6 +78,13 @@ async function choosePeriod(label: string): Promise<void> {
     fireEvent.click(await screen.findByRole("option", { name: label }));
 }
 
+async function chooseBreakdown(label: string): Promise<void> {
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "เลือกมิติรายละเอียด" }), {
+        key: "Enter",
+    });
+    fireEvent.click(await screen.findByRole("option", { name: label }));
+}
+
 describe("IT analytics Dashboard presentation", () => {
     const fetchMock = vi.fn();
 
@@ -93,23 +101,78 @@ describe("IT analytics Dashboard presentation", () => {
         vi.unstubAllGlobals();
     });
 
-    it("renders Thai aggregate metrics and the fixed Bangkok reporting window", async () => {
+    it("renders all summary values in a flat overview and the fixed Bangkok reporting window", async () => {
         fetchMock.mockResolvedValue(response(dashboardPayload("30D", 5)));
 
         render(<ITAnalyticsDashboard />);
 
-        expect(await screen.findByRole("region", { name: "งานค้างปัจจุบัน" }))
-            .toHaveTextContent("5");
+        const overview = await screen.findByRole("region", { name: "ภาพรวม" });
+        expect(within(overview).getByText("งานค้าง")).toBeInTheDocument();
+        expect(within(overview).getByText("5", { selector: "dd" })).toBeInTheDocument();
+        expect(within(overview).getByText("รอข้อมูลจากผู้แจ้ง")).toBeInTheDocument();
+        expect(within(overview).getByText("ยังไม่มีผู้รับผิดชอบ")).toBeInTheDocument();
+        expect(within(overview).getAllByText("1", { selector: "dd" })).toHaveLength(2);
+        expect(within(overview).getByText("Ticket ใหม่")).toBeInTheDocument();
+        expect(within(overview).getByText("6", { selector: "dd" })).toBeInTheDocument();
+        expect(within(overview).getByText("แก้ไขแล้ว")).toBeInTheDocument();
+        expect(within(overview).getByText("2", { selector: "dd" })).toBeInTheDocument();
+        expect(within(overview).getByText("เวลาตอบกลับครั้งแรกเฉลี่ย")).toBeInTheDocument();
+        expect(within(overview).getByText("2 ชม. 18 นาที")).toBeInTheDocument();
+        expect(within(overview).getByText("จาก 3 Ticket ที่มีการตอบกลับ")).toBeInTheDocument();
+        expect(within(overview).getByText("เวลาแก้ไขเฉลี่ย")).toBeInTheDocument();
+        expect(within(overview).getByText("ยังไม่มีข้อมูล")).toBeInTheDocument();
+        expect(within(overview).getByText("จาก 2 Ticket ที่มีการแก้ไข")).toBeInTheDocument();
+        expect(within(overview).getByText("งานที่ค้างนานที่สุด 2 ชม. 18 นาที")).toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "งานค้างปัจจุบัน" })).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "รายงาน IT" })).toBeInTheDocument();
         expect(screen.getByText(/เวลาเอเชีย\/กรุงเทพฯ/)).toBeInTheDocument();
-        expect(screen.getByText("2 ชม. 18 นาที")).toBeInTheDocument();
-        expect(screen.getByText("ยังไม่มีข้อมูล")).toBeInTheDocument();
-        expect(screen.getByRole("img", { name: /แนวโน้ม Ticket ใหม่และแก้ไขแล้วรายวัน/ }))
+        const chartRegion = screen.getByRole("region", {
+            name: "กราฟ Ticket ใหม่และแก้ไขแล้ว เลื่อนแนวนอนเพื่อดูข้อมูลทั้งหมด",
+        });
+        expect(chartRegion).toHaveAttribute("tabindex", "0");
+        expect(within(chartRegion).getByRole("img", { name: /แนวโน้ม Ticket ใหม่และแก้ไขแล้วรายวัน/ }))
             .toBeInTheDocument();
+        expect(screen.getByText("ดูตัวเลขรายวัน")).toBeInTheDocument();
         expect(fetchMock).toHaveBeenCalledWith(
             "/api/it/analytics?period=30D",
             expect.objectContaining({ signal: expect.any(AbortSignal) }),
         );
+    });
+
+    it("shows one breakdown by default and makes all five datasets selectable", async () => {
+        fetchMock.mockResolvedValue(response(dashboardPayload("30D", 5)));
+
+        render(<ITAnalyticsDashboard />);
+
+        const breakdown = await screen.findByRole("region", { name: "สถานะ Ticket ปัจจุบัน" });
+        expect(within(breakdown).getByText(IT_TICKET_STATUS_LABELS.OPEN)).toBeInTheDocument();
+        expect(screen.getByRole("combobox", { name: "เลือกมิติรายละเอียด" }))
+            .toHaveTextContent("สถานะ");
+        expect(screen.queryByRole("region", { name: "Ticket ใหม่แยกตามประเภท" }))
+            .not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "งานค้างแยกตามหมวดหมู่" }))
+            .not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "งานค้างแยกตามผู้รับผิดชอบ" }))
+            .not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Ticket ใหม่แยกตามหน่วยงาน" }))
+            .not.toBeInTheDocument();
+
+        await chooseBreakdown("ประเภท");
+        const typeBreakdown = screen.getByRole("region", { name: "Ticket ใหม่แยกตามประเภท" });
+        expect(within(typeBreakdown).getByText(IT_TICKET_TYPE_LABELS.INCIDENT)).toBeInTheDocument();
+        expect(within(typeBreakdown).queryByText(IT_TICKET_STATUS_LABELS.OPEN)).not.toBeInTheDocument();
+
+        await chooseBreakdown("หมวดหมู่");
+        expect(within(screen.getByRole("region", { name: "งานค้างแยกตามหมวดหมู่" }))
+            .getByText("ยังไม่จัดหมวดหมู่")).toBeInTheDocument();
+
+        await chooseBreakdown("ผู้รับผิดชอบ");
+        expect(within(screen.getByRole("region", { name: "งานค้างแยกตามผู้รับผิดชอบ" }))
+            .getByText("ยังไม่มีผู้รับผิดชอบ")).toBeInTheDocument();
+
+        await chooseBreakdown("หน่วยงาน");
+        expect(within(screen.getByRole("region", { name: "Ticket ใหม่แยกตามหน่วยงาน" }))
+            .getByText("ไม่ระบุหน่วยงาน")).toBeInTheDocument();
     });
 
     it("shows zero data as a valid empty dashboard without displaying zero-minute averages", async () => {
@@ -158,6 +221,11 @@ describe("IT analytics Dashboard presentation", () => {
         expect(screen.getAllByText("ยังไม่มีข้อมูล").length).toBeGreaterThanOrEqual(2);
         expect(screen.getAllByText("0").length).toBeGreaterThan(0);
         expect(screen.queryByText("0 นาที")).not.toBeInTheDocument();
+
+        await chooseBreakdown("หมวดหมู่");
+        const emptyBreakdown = screen.getByRole("region", { name: "งานค้างแยกตามหมวดหมู่" });
+        expect(within(emptyBreakdown).getByText("ยังไม่มีข้อมูลในช่วงเวลานี้")).toBeInTheDocument();
+        expect(within(emptyBreakdown).queryByRole("meter")).not.toBeInTheDocument();
     });
 
     it("does not let an older period response overwrite the newest selection", async () => {
@@ -176,7 +244,7 @@ describe("IT analytics Dashboard presentation", () => {
         });
 
         render(<ITAnalyticsDashboard />);
-        await screen.findByRole("region", { name: "งานค้างปัจจุบัน" });
+        await screen.findByRole("region", { name: "ภาพรวม" });
 
         await choosePeriod("7 วัน");
         await waitFor(() => expect(pending).toHaveLength(1));
@@ -188,13 +256,13 @@ describe("IT analytics Dashboard presentation", () => {
         await act(async () => {
             pending[1]?.resolve(response(dashboardPayload("90D", 90)));
         });
-        expect(await screen.findByRole("region", { name: "งานค้างปัจจุบัน" }))
+        expect(await screen.findByRole("region", { name: "ภาพรวม" }))
             .toHaveTextContent("90");
 
         await act(async () => {
             pending[0]?.resolve(response(dashboardPayload("7D", 7)));
         });
-        expect(screen.getByRole("region", { name: "งานค้างปัจจุบัน" }))
+        expect(screen.getByRole("region", { name: "ภาพรวม" }))
             .toHaveTextContent("90");
         expect(screen.getByRole("combobox", { name: "เลือกช่วงเวลารายงาน" }))
             .toHaveTextContent("90 วัน");
@@ -210,7 +278,7 @@ describe("IT analytics Dashboard presentation", () => {
         expect(await screen.findByRole("alert")).toHaveTextContent("ขัดข้องชั่วคราว");
         expect(screen.queryByText("private database connection details")).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
-        expect(await screen.findByRole("region", { name: "งานค้างปัจจุบัน" }))
+        expect(await screen.findByRole("region", { name: "ภาพรวม" }))
             .toHaveTextContent("4");
     });
 });

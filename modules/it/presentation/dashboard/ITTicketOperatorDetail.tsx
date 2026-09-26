@@ -209,7 +209,7 @@ export function ITTicketOperatorDetail({
             }
 
             requiredVersionRef.current = result.ticket.version;
-            setActionMessage(`${successMessage} · รุ่น ${result.ticket.version}`);
+            setActionMessage(successMessage);
             refreshTicket();
         } catch {
             setActionError("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลด Ticket ล่าสุดเพื่อให้ตรวจสอบก่อนดำเนินการต่อ");
@@ -323,16 +323,13 @@ export function ITTicketOperatorDetail({
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
                                 <TicketStatus status={ticket.status} />
-                                <span className="rounded-md border border-border-neutral px-3 py-1.5 text-xs font-medium tabular-nums text-content-secondary">
-                                    รุ่น {ticket.version}
-                                </span>
                             </div>
                         </header>
 
                         {conflictReviewRequired ? (
                             <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
                                 <p>
-                                    Ticket เปลี่ยนแปลงโดยผู้ใช้อื่นแล้ว ระบบโหลดข้อมูลล่าสุดให้ตรวจสอบ กรุณาตรวจสอบสถานะ รุ่น และผู้รับผิดชอบก่อนทำรายการต่อ
+                                    Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ
                                 </p>
                                 <Button
                                     type="button"
@@ -443,7 +440,6 @@ export function ITTicketOperatorDetail({
                             <section aria-labelledby="it-ticket-operator-actions-heading" className="space-y-4 rounded-xl border border-border-neutral bg-surface-subtle p-4 md:p-5">
                                 <div className="space-y-1">
                                     <h2 id="it-ticket-operator-actions-heading" className="text-lg font-semibold text-content-heading">ดำเนินการกับ Ticket</h2>
-                                    <p className="text-sm text-content-secondary">ทุกการบันทึกใช้รุ่น {ticket.version} ที่กำลังแสดงอยู่</p>
                                 </div>
                                 <div className="grid gap-5 lg:grid-cols-2">
                                     <div className="space-y-3">

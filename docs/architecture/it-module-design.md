@@ -612,7 +612,7 @@ No Android/iPhone acceptance or live LINE provider call was performed. No Rich
 Menu was applied, changed, or deleted. IT9E-B remains **NOT RUN / next human
 acceptance step**; IT9E remains **IN PROGRESS**. IT10 remains **OPEN / deferred**.
 
-## 29. IT9E-UX-P0 — Unified IT Workspace + creation evidence (IMPLEMENTED / review pending)
+## 29. IT9E-UX-P0 — Unified IT Workspace + creation evidence (UAT candidate / awaiting UAT feedback)
 
 Runtime implementation commit: `b7ee30c63e20e8236de405c43c92dfda5932a2f4` (baseline `a9395f806e9bae56a455b81d1dfa3d52e0964443`).
 
@@ -626,4 +626,4 @@ Assignee remains nullable. The stored Ticket statuses and executable transition 
 
 Focused repository verification passed **24 files / 232 tests**; after a test-fixture typing correction, the affected initial-image component test passed **1 file / 3 tests**. Focused real-MySQL verification passed **3 files / 38 tests** for attachment creation/replay/authorization/compensation, notifications, and the existing workflow; the migration was applied to the dedicated `employee_nhf_integration` database. `npx prisma generate`, `npx prisma validate`, `architecture:check` (1,278 source files), `lint:strict`, `typecheck`, `git diff --check`, and one `npm run build` passed; the build generated 99 static pages and included the Dashboard compatibility routes and LIFF Ticket pages. The repository-wide test suite was not run because the focused runtime and MySQL selections cover this POC's changed surfaces.
 
-Status: **IT9E-A — COMPLETE; IT9E-UX-P0 — IMPLEMENTED / review pending; IT9E-B — PAUSED / NOT RUN; IT10 — OPEN / deferred.** No smartphone acceptance was started. Section 28 remains the historical IT9E-A boundary record; this section records the current POC state.
+Status: **IT9E-A — COMPLETE; IT9E-UX-P0 — UAT candidate / awaiting UAT feedback; IT9E-UX-P1 — presentation polish complete; IT9E-B — PAUSED / NOT RUN; IT10 — OPEN / deferred.** No smartphone acceptance was started. Section 28 remains the historical IT9E-A boundary record; this section records the current POC state.

@@ -34,86 +34,117 @@ const PERIOD_LABELS: Readonly<Record<ITAnalyticsPeriod, string>> = {
     "90D": "90 วัน",
 };
 
+const BREAKDOWN_OPTIONS = [
+    { value: "status", label: "สถานะ" },
+    { value: "type", label: "ประเภท" },
+    { value: "category", label: "หมวดหมู่" },
+    { value: "assignee", label: "ผู้รับผิดชอบ" },
+    { value: "department", label: "หน่วยงาน" },
+] as const;
+
+type BreakdownDimension = typeof BREAKDOWN_OPTIONS[number]["value"];
+
 function countText(count: number): string {
     return count.toLocaleString("th-TH");
 }
 
 function ReportSkeleton(): ReactElement {
     return (
-        <div role="status" aria-label="กำลังโหลดรายงาน IT" className="space-y-5">
+        <div role="status" aria-label="กำลังโหลดรายงาน IT" className="space-y-6">
             <span className="sr-only">กำลังโหลดรายงาน IT</span>
-            <div className="grid gap-3 xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,2fr)]">
-                <Skeleton className="h-40 w-full rounded-xl" />
-                <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                    {Array.from({ length: 4 }, (_, index) => (
-                        <Skeleton key={index} className="h-40 w-full rounded-xl" />
+            <section className="space-y-5">
+                <Skeleton className="h-6 w-20" />
+                <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
+                    {Array.from({ length: 3 }, (_, index) => (
+                        <Skeleton
+                            key={index}
+                            className={"h-24 w-full " + (index === 0 ? "col-span-2 sm:col-span-1" : "")}
+                        />
                     ))}
                 </div>
+                <div className="grid grid-cols-2 gap-5 border-t border-border-neutral pt-5 sm:grid-cols-4">
+                    {Array.from({ length: 4 }, (_, index) => (
+                        <Skeleton key={index} className="h-20 w-full" />
+                    ))}
+                </div>
+            </section>
+            <div className="border-y border-border-neutral py-5">
+                <Skeleton className="h-80 w-full" />
             </div>
-            <Skeleton className="h-80 w-full rounded-xl" />
-            <div className="grid gap-4 xl:grid-cols-2">
-                {Array.from({ length: 5 }, (_, index) => (
-                    <Skeleton key={index} className="h-64 w-full rounded-xl" />
-                ))}
-            </div>
+            <section className="space-y-4 pt-5">
+                <Skeleton className="h-6 w-44" />
+                <Skeleton className="h-11 w-full sm:w-56" />
+                <Skeleton className="h-44 w-full" />
+            </section>
         </div>
     );
 }
 
-function BacklogOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
-    const { summary } = dashboard;
-    return (
-        <section
-            aria-labelledby="it-analytics-backlog-title"
-            className="grid min-w-0 gap-5 rounded-xl border border-sky-200 bg-sky-50/70 p-4 dark:border-sky-900 dark:bg-sky-950/30 sm:p-5"
-        >
-            <div className="min-w-0">
-                <h2 id="it-analytics-backlog-title" className="text-sm font-semibold text-sky-950 dark:text-sky-100">
-                    งานค้างปัจจุบัน
-                </h2>
-                <p className="mt-1 text-4xl font-bold tabular-nums tracking-tight text-content-heading">
-                    {countText(summary.currentBacklog)}
-                </p>
-                <p className="mt-3 text-sm leading-6 text-content-secondary">
-                    {summary.oldestUnresolvedAgeMinutes === null
-                        ? "ยังไม่มีงานค้าง"
-                        : `งานที่ค้างนานที่สุด ${formatITAnalyticsDuration(summary.oldestUnresolvedAgeMinutes)}`}
-                </p>
-            </div>
-            <dl className="grid min-w-0 grid-cols-2 gap-3 self-stretch">
-                <div className="flex min-w-0 flex-col justify-center rounded-lg border border-sky-200/80 bg-background/80 p-3 dark:border-sky-900 dark:bg-background/60 sm:p-4">
-                    <dt className="text-sm leading-5 text-content-secondary">รอข้อมูลจากผู้แจ้ง</dt>
-                    <dd className="mt-1 text-2xl font-semibold tabular-nums text-content-heading">
-                        {countText(summary.waitingRequester)}
-                    </dd>
-                </div>
-                <div className="flex min-w-0 flex-col justify-center rounded-lg border border-sky-200/80 bg-background/80 p-3 dark:border-sky-900 dark:bg-background/60 sm:p-4">
-                    <dt className="text-sm leading-5 text-content-secondary">ยังไม่มีผู้รับผิดชอบ</dt>
-                    <dd className="mt-1 text-2xl font-semibold tabular-nums text-content-heading">
-                        {countText(summary.unassignedBacklog)}
-                    </dd>
-                </div>
-            </dl>
-        </section>
-    );
-}
-
-function Metric({
+function OverviewMetric({
     label,
     value,
     detail,
+    emphasis = "standard",
 }: {
     readonly label: string;
     readonly value: string;
     readonly detail?: string;
+    readonly emphasis?: "primary" | "standard" | "secondary";
 }): ReactElement {
+    const valueClassName = emphasis === "primary"
+        ? "text-4xl font-bold tracking-tight"
+        : emphasis === "secondary"
+            ? "text-lg font-semibold sm:text-xl"
+            : "text-2xl font-semibold";
+
     return (
-        <section className="min-w-0 rounded-xl border border-border-neutral bg-card p-4 sm:p-5">
-            <h2 className="text-sm font-medium leading-6 text-content-secondary">{label}</h2>
-            <p className="mt-2 break-words text-2xl font-semibold tabular-nums text-content-heading">
+        <div className="min-w-0">
+            <dt className="break-words text-sm leading-6 text-content-secondary">{label}</dt>
+            <dd className={"mt-1 break-words tabular-nums text-content-heading " + valueClassName}>
                 {value}
-            </p>
-            {detail ? <p className="mt-2 text-xs leading-5 text-content-muted">{detail}</p> : null}
+            </dd>
+            {detail ? <p className="mt-1 text-xs leading-5 text-content-muted">{detail}</p> : null}
+        </div>
+    );
+}
+
+function SummaryOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
+    const { summary } = dashboard;
+    return (
+        <section aria-labelledby="it-analytics-overview-title" className="min-w-0 space-y-5">
+            <h2 id="it-analytics-overview-title" className="text-lg font-semibold text-content-heading">
+                ภาพรวม
+            </h2>
+            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
+                <div className="col-span-2 min-w-0 sm:col-span-1">
+                    <OverviewMetric
+                        label="งานค้าง"
+                        value={countText(summary.currentBacklog)}
+                        detail={summary.oldestUnresolvedAgeMinutes === null
+                            ? "ยังไม่มีงานค้าง"
+                            : "งานที่ค้างนานที่สุด " + formatITAnalyticsDuration(summary.oldestUnresolvedAgeMinutes)}
+                        emphasis="primary"
+                    />
+                </div>
+                <OverviewMetric label="รอข้อมูลจากผู้แจ้ง" value={countText(summary.waitingRequester)} />
+                <OverviewMetric label="ยังไม่มีผู้รับผิดชอบ" value={countText(summary.unassignedBacklog)} />
+            </dl>
+            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-5 border-t border-border-neutral pt-5 sm:grid-cols-4">
+                <OverviewMetric label="Ticket ใหม่" value={countText(summary.newTickets)} />
+                <OverviewMetric label="แก้ไขแล้ว" value={countText(summary.resolvedTickets)} />
+                <OverviewMetric
+                    label="เวลาตอบกลับครั้งแรกเฉลี่ย"
+                    value={formatITAnalyticsDuration(summary.averageFirstResponseMinutes)}
+                    detail={"จาก " + countText(summary.firstRespondedTickets) + " Ticket ที่มีการตอบกลับ"}
+                    emphasis="secondary"
+                />
+                <OverviewMetric
+                    label="เวลาแก้ไขเฉลี่ย"
+                    value={formatITAnalyticsDuration(summary.averageResolutionMinutes)}
+                    detail={"จาก " + countText(summary.resolvedTickets) + " Ticket ที่มีการแก้ไข"}
+                    emphasis="secondary"
+                />
+            </dl>
         </section>
     );
 }
@@ -142,7 +173,7 @@ function TrendChart({ trend }: TrendChartProps): ReactElement {
     const hasActivity = createdTotal > 0 || resolvedTotal > 0;
 
     return (
-        <figure className="min-w-0 rounded-xl border border-border-neutral bg-card p-4 sm:p-5">
+        <figure className="min-w-0 border-y border-border-neutral py-5">
             <figcaption className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <h2 className="text-lg font-semibold text-content-heading">Ticket ใหม่และแก้ไขแล้ว</h2>
@@ -168,12 +199,17 @@ function TrendChart({ trend }: TrendChartProps): ReactElement {
                 </p>
             ) : null}
 
-            <div className="mt-3 min-w-0">
+            <div
+                role="region"
+                aria-label="กราฟ Ticket ใหม่และแก้ไขแล้ว เลื่อนแนวนอนเพื่อดูข้อมูลทั้งหมด"
+                tabIndex={0}
+                className="mt-3 min-w-0 overflow-x-auto overscroll-x-contain focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
                 <svg
                     role="img"
                     aria-labelledby="it-analytics-trend-title it-analytics-trend-description"
                     viewBox={`0 0 ${width} ${height}`}
-                    className="block h-auto w-full overflow-visible text-content-muted"
+                    className="block h-auto w-full min-w-[48rem] overflow-visible text-content-muted lg:min-w-0"
                     preserveAspectRatio="xMinYMin meet"
                 >
                     <title id="it-analytics-trend-title">แนวโน้ม Ticket ใหม่และแก้ไขแล้วรายวัน</title>
@@ -243,6 +279,9 @@ function TrendChart({ trend }: TrendChartProps): ReactElement {
                     })}
                 </svg>
             </div>
+            <p className="mt-2 text-xs text-content-muted lg:hidden">
+                เลื่อนกราฟไปด้านข้างเพื่อดูข้อมูล
+            </p>
 
             <details className="mt-2 border-t border-border-neutral">
                 <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-sky-800 underline underline-offset-4 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300">
@@ -275,14 +314,14 @@ function DistributionPanel({
 }): ReactElement {
     const maximum = Math.max(0, ...rows.map((row) => row.count));
     return (
-        <section className="min-w-0 rounded-xl border border-border-neutral bg-card p-4 sm:p-5">
+        <section aria-labelledby="it-analytics-breakdown-title" className="mt-5 min-w-0">
             <div className="min-w-0">
-                <h2 className="text-base font-semibold text-content-heading">{title}</h2>
+                <h3 id="it-analytics-breakdown-title" className="text-base font-semibold text-content-heading">{title}</h3>
                 {description ? <p className="mt-1 text-sm leading-6 text-content-secondary">{description}</p> : null}
             </div>
             {rows.length === 0 ? (
-                <p className="mt-5 rounded-lg bg-surface-subtle px-3 py-4 text-sm text-content-secondary">
-                    ยังไม่มีข้อมูล
+                <p className="mt-4 text-sm text-content-secondary">
+                    ยังไม่มีข้อมูลในช่วงเวลานี้
                 </p>
             ) : (
                 <ul className="mt-4 space-y-4">
@@ -318,7 +357,7 @@ function DistributionPanel({
 }
 
 function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
-    const { summary } = dashboard;
+    const [selectedBreakdown, setSelectedBreakdown] = useState<BreakdownDimension>("status");
     const statusRows = dashboard.statusDistribution.map((row) => ({
         label: IT_TICKET_STATUS_LABELS[row.status],
         count: row.count,
@@ -327,52 +366,74 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
         label: IT_TICKET_TYPE_LABELS[row.type],
         count: row.count,
     }));
+    const breakdowns: Readonly<Record<BreakdownDimension, {
+        readonly title: string;
+        readonly description?: string;
+        readonly rows: readonly { readonly label: string; readonly count: number }[];
+    }>> = {
+        status: {
+            title: "สถานะ Ticket ปัจจุบัน",
+            rows: statusRows,
+        },
+        type: {
+            title: "Ticket ใหม่แยกตามประเภท",
+            description: "นับ Ticket ที่สร้างในช่วงรายงาน",
+            rows: typeRows,
+        },
+        category: {
+            title: "งานค้างแยกตามหมวดหมู่",
+            description: "รวมเฉพาะ Ticket ที่ยังไม่ปิดงาน",
+            rows: dashboard.categoryBacklog,
+        },
+        assignee: {
+            title: "งานค้างแยกตามผู้รับผิดชอบ",
+            description: "รวม Ticket ที่ยังไม่ปิดงาน และแสดงงานที่ยังไม่มีผู้รับผิดชอบ",
+            rows: dashboard.assigneeBacklog,
+        },
+        department: {
+            title: "Ticket ใหม่แยกตามหน่วยงาน",
+            description: "ใช้ชื่อหน่วยงานที่บันทึกไว้เมื่อสร้าง Ticket",
+            rows: dashboard.departmentCreated,
+        },
+    };
+    const breakdown = breakdowns[selectedBreakdown];
+    const handleBreakdownChange = (value: string): void => {
+        const option = BREAKDOWN_OPTIONS.find((item) => item.value === value);
+        if (option) setSelectedBreakdown(option.value);
+    };
 
     return (
-        <div className="space-y-5">
-            <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,2fr)]">
-                <BacklogOverview dashboard={dashboard} />
-                <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
-                    <Metric label="Ticket ใหม่" value={countText(summary.newTickets)} />
-                    <Metric label="แก้ไขแล้ว" value={countText(summary.resolvedTickets)} />
-                    <Metric
-                        label="เวลาตอบกลับครั้งแรกเฉลี่ย"
-                        value={formatITAnalyticsDuration(summary.averageFirstResponseMinutes)}
-                        detail={`จาก ${countText(summary.firstRespondedTickets)} Ticket ที่มีการตอบกลับ`}
-                    />
-                    <Metric
-                        label="เวลาแก้ไขเฉลี่ย"
-                        value={formatITAnalyticsDuration(summary.averageResolutionMinutes)}
-                        detail={`จาก ${countText(summary.resolvedTickets)} Ticket ที่มีการแก้ไข`}
-                    />
-                </div>
-            </div>
-
+        <div className="space-y-6">
+            <SummaryOverview dashboard={dashboard} />
             <TrendChart trend={dashboard.trend} />
 
-            <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-                <DistributionPanel title="สถานะ Ticket ปัจจุบัน" rows={statusRows} />
+            <section aria-labelledby="it-analytics-breakdowns-heading" className="min-w-0 pt-5">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <h2 id="it-analytics-breakdowns-heading" className="text-lg font-semibold text-content-heading">
+                        รายละเอียดเพิ่มเติม
+                    </h2>
+                    <label className="flex w-full min-w-0 flex-col gap-1.5 text-sm font-medium text-content-secondary sm:w-56">
+                        <span>แสดงตาม</span>
+                        <Select value={selectedBreakdown} onValueChange={handleBreakdownChange}>
+                            <SelectTrigger aria-label="เลือกมิติรายละเอียด" className="min-h-11 w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {BREAKDOWN_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </label>
+                </div>
                 <DistributionPanel
-                    title="งานค้างแยกตามหมวดหมู่"
-                    description="รวมเฉพาะ Ticket ที่ยังไม่ปิดงาน"
-                    rows={dashboard.categoryBacklog}
+                    title={breakdown.title}
+                    description={breakdown.description}
+                    rows={breakdown.rows}
                 />
-                <DistributionPanel
-                    title="งานค้างแยกตามผู้รับผิดชอบ"
-                    description="รวม Ticket ที่ยังไม่ปิดงาน และแสดงงานที่ยังไม่มีผู้รับผิดชอบ"
-                    rows={dashboard.assigneeBacklog}
-                />
-                <DistributionPanel
-                    title="Ticket ใหม่แยกตามประเภท"
-                    description="นับ Ticket ที่สร้างในช่วงรายงาน"
-                    rows={typeRows}
-                />
-                <DistributionPanel
-                    title="Ticket ใหม่แยกตามหน่วยงาน"
-                    description="ใช้ชื่อหน่วยงานที่บันทึกไว้เมื่อสร้าง Ticket"
-                    rows={dashboard.departmentCreated}
-                />
-            </div>
+            </section>
         </div>
     );
 }

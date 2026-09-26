@@ -229,6 +229,7 @@ describe("IT operator Ticket detail presentation", () => {
         );
         expect(screen.getByText("แผนกตัวอย่าง")).toBeInTheDocument();
         expect(screen.getByText("หน้าเข้าสู่ระบบแสดงข้อผิดพลาด")).toBeInTheDocument();
+        expect(screen.queryByText("รุ่น 4")).not.toBeInTheDocument();
         expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "เริ่มดำเนินการ" })).not.toBeInTheDocument();
     });
@@ -258,6 +259,8 @@ describe("IT operator Ticket detail presentation", () => {
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
         expect(await screen.findByRole("heading", { name: "ดำเนินการกับ Ticket" })).toBeInTheDocument();
+        expect(screen.queryByText("รุ่น 4")).not.toBeInTheDocument();
+        expect(screen.queryByText(/ทุกการบันทึกใช้รุ่น/)).not.toBeInTheDocument();
         expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
     });
 
@@ -305,7 +308,7 @@ describe("IT operator Ticket detail presentation", () => {
         expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "PATCH")).toHaveLength(0);
     });
 
-    it("reloads the latest timeline after a successful workflow version change", async () => {
+    it("reloads the latest timeline after a successful workflow change", async () => {
         let detailReadCount = 0;
         let timelineReadCount = 0;
         const progressedTicket: ITOperatorTicket = {
@@ -343,7 +346,8 @@ describe("IT operator Ticket detail presentation", () => {
         expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "เริ่มดำเนินการ" }));
 
-        expect(await screen.findByText("รุ่น 5")).toBeInTheDocument();
+        expect(await screen.findByText("เปลี่ยนสถานะเป็นกำลังดำเนินการแล้ว")).toBeInTheDocument();
+        expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
         expect(await screen.findByText(
             "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
         )).toBeInTheDocument();
@@ -458,9 +462,16 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.queryByRole("button", { name: "ยกเลิกแล้ว" })).not.toBeInTheDocument();
 
         fireEvent.click(await screen.findByRole("button", { name: "เริ่มดำเนินการ" }));
-        expect(await screen.findByRole("alert")).toHaveTextContent("Ticket เปลี่ยนแปลงโดยผู้ใช้อื่นแล้ว");
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+            "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
+        );
         await waitFor(() => expect(screen.getByLabelText("ผู้รับผิดชอบ Ticket")).toHaveValue("62"));
-        expect(screen.getByText("รุ่น 5")).toBeInTheDocument();
+        const conflictAlert = screen.getByRole("alert");
+        expect(conflictAlert).toHaveTextContent(
+            "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
+        );
+        expect(conflictAlert).not.toHaveTextContent(/รุ่น|version|revision/i);
+        expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
         expect(await screen.findByText(
             "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
         )).toBeInTheDocument();
@@ -476,6 +487,7 @@ describe("IT operator Ticket detail presentation", () => {
 
         await waitFor(() => expect(patchBodies).toHaveLength(2));
         expect(patchBodies[1]).toEqual({ assigneeUserId: 51, expectedVersion: 5 });
-        expect(await screen.findByText("รุ่น 6")).toBeInTheDocument();
+        expect(await screen.findByText("บันทึกผู้รับผิดชอบแล้ว")).toBeInTheDocument();
+        expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
     });
 });
