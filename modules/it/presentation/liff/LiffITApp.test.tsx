@@ -133,6 +133,22 @@ describe("LiffITApp requester experience", () => {
         expect(mocks.fetchTickets).toHaveBeenNthCalledWith(2, 2, expect.any(AbortSignal));
     });
 
+    it("associates the create form character counters with their fields", async () => {
+        render(<LiffITApp />);
+        await openCreateForm();
+
+        expect(screen.getByRole("textbox", { name: "หัวข้อ" })).toHaveAttribute(
+            "aria-describedby",
+            "liff-it-ticket-title-count",
+        );
+        expect(screen.getByRole("textbox", { name: "รายละเอียด" })).toHaveAttribute(
+            "aria-describedby",
+            "liff-it-ticket-description-count",
+        );
+        expect(document.getElementById("liff-it-ticket-title-count")).toBeInTheDocument();
+        expect(document.getElementById("liff-it-ticket-description-count")).toBeInTheDocument();
+    });
+
     it("preserves a create idempotency key after a failed attempt and links to the new Ticket", async () => {
         let keyIndex = 0;
         vi.stubGlobal("crypto", { randomUUID: () => `create-key-${++keyIndex}` } as unknown as Crypto);

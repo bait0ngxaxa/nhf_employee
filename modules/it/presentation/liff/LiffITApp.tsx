@@ -253,10 +253,11 @@ function LiffITTicketList(): ReactElement {
                                 required
                                 disabled={submitting}
                                 autoComplete="off"
+                                aria-describedby="liff-it-ticket-title-count"
                                 placeholder="เช่น เข้าใช้งานระบบไม่ได้"
                                 className="min-h-12 text-base"
                             />
-                            <p className="text-right text-xs tabular-nums text-content-muted">{title.length}/{IT_TICKET_TITLE_MAX_LENGTH}</p>
+                            <p id="liff-it-ticket-title-count" className="text-right text-xs tabular-nums text-content-muted">{title.length}/{IT_TICKET_TITLE_MAX_LENGTH}</p>
                         </div>
                         <div className="space-y-2">
                             <label htmlFor="liff-it-ticket-description" className="block text-sm font-semibold text-content-heading">รายละเอียด</label>
@@ -273,10 +274,11 @@ function LiffITTicketList(): ReactElement {
                                 rows={6}
                                 required
                                 disabled={submitting}
+                                aria-describedby="liff-it-ticket-description-count"
                                 placeholder="อธิบายสิ่งที่พบหรือบริการที่ต้องการ"
                                 className="min-h-36 resize-y text-base leading-7"
                             />
-                            <p className="text-right text-xs tabular-nums text-content-muted">{description.length}/{IT_TICKET_DESCRIPTION_MAX_LENGTH}</p>
+                            <p id="liff-it-ticket-description-count" className="text-right text-xs tabular-nums text-content-muted">{description.length}/{IT_TICKET_DESCRIPTION_MAX_LENGTH}</p>
                         </div>
                         {createError ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">{createError}</p> : null}
                         <div className="flex flex-col gap-3 pt-1">
