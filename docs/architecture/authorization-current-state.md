@@ -1,7 +1,7 @@
 # NHF Employee — Current Authorization State
 
-> **Current repository state (Phase 12H-I, notification-recipient
-> Phase 13A/13A.1/13A.2, IT1-IT8 closed):** ADMIN is an Auth/control-plane role only. Business
+> **Current repository state (authorization Phase 12H-I,
+> notification-recipient Phase 13A/13A.1/13A.2, IT1–IT9A CLOSED):** ADMIN is an Auth/control-plane role only. Business
 > authorization is the domain Default Domain Policy plus
 > configured Team, TeamRole, and exceptional direct User grants. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load and
@@ -30,22 +30,34 @@
 > confirmed production collision preflight and migration deployment PASSED.
 > The Routine recipient persistence transition is CLOSED.
 >
-> IT1, IT2, IT3, and IT4 are CLOSED. IT5A and IT5B are CLOSED after the
-> integrated final repository suite passed (354 files; 3,449 tests passed,
-> 1 skipped). The `it` domain and its five
-> Dashboard-only capabilities remain role-neutral; Ticket persistence,
-> server-side commands, requester OWN queries/conversation, a separate
-> read-ALL operator API/Dashboard surface, operator read-ALL/comment-ALL
-> conversation, and a merged timeline exist. Requester conversation always
-> applies its owner predicate, even when an actor has ALL authority. IT5B
-> attachments use the same comment authority for upload and current
-> `it.ticket.read` authority for private download; requester OWN access remains
-> constrained to the requester's Ticket. No attachment capability was added.
+> IT1–IT9A are CLOSED. The `it` domain has five role-neutral capabilities:
+> `it.ticket.read`, `it.ticket.create`, and `it.ticket.comment` are supported on
+> `DASHBOARD` and `LIFF_SELF_SERVICE`; `it.ticket.manage` and
+> `it.analytics.read` are `DASHBOARD`-only. All five are unsupported on
+> `SYSTEM`. Dashboard keeps the requester `OWN` defaults and additive configured
+> authority. LIFF is requester-only: effective read/create/comment scopes are
+> always `OWN` for both USER and ADMIN, even when configured authority resolves
+> to `ALL`; Dashboard configured `ALL` behavior is unchanged.
+>
+> Ticket persistence, shared application commands and queries, requester
+> OWN-constrained reads/conversation, a separate read-ALL operator
+> API/Dashboard surface, operator read-ALL/comment-ALL conversation, and a
+> merged timeline exist. IT5B attachments use current comment authority for
+> upload and current `it.ticket.read` authority for private download; requester
+> access remains constrained to the requester's Ticket. No attachment
+> capability was added. IT9A adds `/api/line/it/tickets` (list/create),
+> `/api/line/it/tickets/:id`, `/api/line/it/tickets/:id/timeline`,
+> `/api/line/it/tickets/:id/comments`, and
+> `/api/line/it/attachments/:id`. These routes use
+> `requireLiffWorkforceSession()` and the shared IT requester commands/queries.
+> IT9A does not add a `/liff/it` UI, LIFF Home or Bottom Nav entry, Rich Menu
+> integration, Ticket LINE notifications, operator LIFF, or analytics LIFF.
 > `AUTHORIZATION_SEED_CONFIGURATION` remains empty, with no IT Team,
 > membership, role, or grant mapping. IT8 moved Email Request ownership without
 > changing its existing authorization keys, scopes, defaults,
-> session/workforce eligibility, or route behavior. Earlier deferral statements
-> below are historical phase records and do not describe the current state.
+> session/workforce eligibility, or route behavior. Earlier IT phase statements
+> below preserve the decisions at their phase boundaries; this document's IT9A
+> note records the current LIFF authorization and API scope.
 >
 > The audited-source pre-IT hardening baseline and its remaining transition
 > evidence are recorded in
@@ -53,14 +65,14 @@
 
 ## Current final authorization model
 
-The current production source of truth after Phase 12H-I is:
+The current production source of truth, including IT9A, is:
 
 | Concern | Final rule |
 |---|---|
 | Account/control plane | `User.role` / `Role.ADMIN` remains the Auth system role for authentication, Authorization Administration, bootstrap, role management, and last-eligible-ADMIN protection. |
 | Business authority | Domain-owned Default Domain Policy plus configured `TEAM`, `TEAM_ROLE`, and exceptional direct `USER` grants. |
 | Resolver | `createAuthorizationResolver()` is the canonical constructor; USER and ADMIN load configured persistence equally. `systemRole` never creates a business grant. |
-| IT authorization | IT1 registers `it.ticket.read/create/comment/manage` and `it.analytics.read`, all for `DASHBOARD`; defaults are read/create/comment `OWN`, while manage and analytics require configured grants. IT5B adds no capability: upload uses current comment authority (requester OWN through requester-only resource scope; operator read ALL plus comment ALL), while each private download re-resolves current read OWN/ALL and checks the Ticket requester relation. Assignment, comment authorship, manage, and comment ALL alone do not grant download. Queue/detail reads require read ALL before broad Ticket rows are queried, and workflow mutations recheck manage ALL transactionally. Assignee checks use configured exact-user scopes only. Ticket ownership remains requester-based. |
+| IT authorization | **Dashboard:** `it.ticket.read/create/comment` default to `OWN`, and configured Team, TeamRole, and direct User authority is additive; `it.ticket.manage` and `it.analytics.read` have no defaults and require configured `ALL`. **LIFF_SELF_SERVICE:** read/create/comment are supported with effective `OWN` only for USER and ADMIN, even when configured authority resolves to `ALL`; manage and analytics are unsupported. **SYSTEM:** all five IT capabilities are unsupported. `systemRole`, Department, and Team/TeamRole names do not grant IT business authority; configured grants remain resolver evidence. Requester reads, comments, and attachment downloads retain the requester Ticket predicate in LIFF. IT5B upload uses current comment authority (requester OWN through requester-only resource scope; operator read ALL plus comment ALL), while each private download re-resolves current read OWN/ALL and checks the Ticket requester relation. Assignment, comment authorship, manage, and comment ALL alone do not grant download. Dashboard queue/detail reads require read ALL before broad Ticket rows are queried, workflow mutations recheck manage ALL transactionally, and assignee checks use configured exact-user scopes only. Ticket ownership remains requester-based. |
 | Email Request authorization | Existing `email.request.read` (`OWN|ALL`) and `email.request.create` (`ALL`) remain unchanged. Default scopes are empty; POST requires effective create ALL, and GET applies OWN as `requestedBy = authenticated userId` in the database. Actor is `DASHBOARD` with `employeeId: null`. No `it.ticket.*`, `it.analytics.read`, ADMIN role, Department, Team, or TeamRole mapping grants Email Request access. |
 | Administration presentation | Account/system role is shown separately from business grant sources. Business explanations contain only Team, TeamRole, and direct User origins. |
 | Routine provenance | Future mutation classification uses effective business authority; historical `ownershipMode: "ADMIN"` audit JSON remains readable and is not rewritten. |
@@ -1866,3 +1878,16 @@ The requester query and mutation resource predicates remain authoritative; a
 LIFF operator with configured ALL cannot read or comment on another
 requester's Ticket or attachment. Dashboard configured ALL remains available
 according to existing operator rules.
+
+The IT9A requester API surface is:
+
+- `GET` and `POST /api/line/it/tickets`
+- `GET /api/line/it/tickets/:id`
+- `GET /api/line/it/tickets/:id/timeline`
+- `POST /api/line/it/tickets/:id/comments`
+- `GET /api/line/it/attachments/:id`
+
+Every route uses `requireLiffWorkforceSession()` and invokes the shared IT
+requester commands/queries for tickets, timelines, comments, and attachments.
+IT9A does not include a `/liff/it` UI, LIFF Home entry, Bottom Nav entry, Rich
+Menu integration, Ticket LINE notifications, operator LIFF, or analytics LIFF.
