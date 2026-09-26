@@ -1,7 +1,7 @@
 # NHF Employee — Current Authorization State
 
 > **Current repository state (authorization Phase 12H-I,
-> notification-recipient Phase 13A/13A.1/13A.2, IT1–IT9A CLOSED):** ADMIN is an Auth/control-plane role only. Business
+> notification-recipient Phase 13A/13A.1/13A.2, IT1–IT9D CLOSED):** ADMIN is an Auth/control-plane role only. Business
 > authorization is the domain Default Domain Policy plus
 > configured Team, TeamRole, and exceptional direct User grants. The normal
 > `authorization` singleton and `createAuthorizationResolver()` load and
@@ -30,7 +30,7 @@
 > confirmed production collision preflight and migration deployment PASSED.
 > The Routine recipient persistence transition is CLOSED.
 >
-> IT1–IT9A are CLOSED. The `it` domain has five role-neutral capabilities:
+> IT1–IT9D are CLOSED. The `it` domain has five role-neutral capabilities:
 > `it.ticket.read`, `it.ticket.create`, and `it.ticket.comment` are supported on
 > `DASHBOARD` and `LIFF_SELF_SERVICE`; `it.ticket.manage` and
 > `it.analytics.read` are `DASHBOARD`-only. All five are unsupported on
