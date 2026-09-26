@@ -1910,7 +1910,7 @@ projection, service card, navigation, canonical requester deep links, and
 Unified Rich Menu integration. The review confirmed the fixed
 `LIFF_SELF_SERVICE` IT capability projection and that IT9C changed no
 authorization capability or API enforcement.
-IT9D is **IMPLEMENTED; closure pending independent review** and adds requester-
-only Ticket personal LINE without changing authorization capabilities or API
-enforcement. IT9E is **OPEN** and owns full product/device acceptance. IT10
+IT9D is **CLOSED** after independent review and adds requester-only Ticket
+personal LINE without changing authorization capabilities or API enforcement.
+IT9E is **OPEN / next phase** and owns full product/device acceptance. IT10
 hardening remains **OPEN / deferred**; device acceptance has not been performed.

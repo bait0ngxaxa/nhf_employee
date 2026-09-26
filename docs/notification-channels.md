@@ -79,9 +79,10 @@ LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel �
 คำว่า “มี parent เดิม” หมายถึงไม่เปลี่ยน notification record, dedupe, read/unread,
 หรือ email workflow เดิมของ event นั้น LINE เป็น child delivery เพิ่มเติม
 
-IT6 retains in-app Ticket notifications. IT9D adds requester-only personal
-NHFapp LINE to the approved events below. IT owns event meaning, recipient,
-payload, message, destination and Ticket stale checks; `modules/notification`
+IT6 retains in-app Ticket notifications. IT9D is **CLOSED** after independent
+review and delivers requester-only personal NHFapp LINE for the approved events
+below. IT owns event meaning, recipient, payload, message, destination and
+Ticket stale checks; `modules/notification`
 owns Inbox persistence; the shared outbox owns claim/retry/backoff/dead-letter/
 supersede and processor composition. Ticket Email remains deferred. Retained
 `LINE_IT_*` configuration remains for legacy Email Request behavior and is not
@@ -120,7 +121,8 @@ state forever. A provider error propagates into the shared retry lifecycle
 (maximum three attempts, then `DEAD`). This lifecycle is at-least-once; LINE's
 retry key is a finite duplicate-suppression window rather than a guarantee of
 permanent provider or end-user delivery. No live LINE provider acceptance or
-smartphone/device test is claimed; device acceptance remains IT9E.
+smartphone/device test is claimed; full E2E and device acceptance are IT9E,
+which remains OPEN / next phase.
 
 ## Leave LINE flows
 

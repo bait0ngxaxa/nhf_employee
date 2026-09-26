@@ -1,6 +1,6 @@
 # IT Module Architecture and Domain Contract
 
-Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to Requester LIFF IMPLEMENTED; closure pending independent review; IT9E IT Product E2E + Android/iPhone Acceptance OPEN; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
+Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to Requester LIFF CLOSED; IT9E IT Product E2E + Android/iPhone Acceptance OPEN / next phase; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
 
 ## 1. Product scope and terminology
 
@@ -336,8 +336,8 @@ These questions are intentionally unresolved; later slices must close their depe
 | IT9A — LIFF Authorization + API Foundation (**CLOSED**) | Add requester-only LIFF authorization and compatibility-safe API adapters over the shared IT application. | `LIFF_SELF_SERVICE` supports read/create/comment with effective OWN only; manage and analytics remain Dashboard-only. Add no schema or migration; no UI, Home/navigation/Rich Menu integration, or Ticket LINE delivery. | Registry/resolver and channel-policy tests, LIFF route tests, focused MySQL channel-isolation regression, architecture, lint/typecheck, and one final full suite. |
 | IT9B — LIFF Self-Service UI + Conversation + Attachments (**CLOSED**) | Add the requester-facing LIFF experience over the IT9A APIs. | LIFF presentation only; preserve requester-only policy and shared Ticket/application contracts. No Home/navigation/Rich Menu integration or LINE delivery. | Corrective commit `415c9d6cb21d7510e4e610c4e8d4541add60f1f3` passed independent review. Closure verification is recorded in section 25; device acceptance remains IT9E. |
 | IT9C — LIFF Home / Navigation / Deep Link / Rich Menu Integration (**CLOSED**) | Add IT to LIFF shell entry points and connect notification-ready Ticket destinations. | Home modules, bottom navigation, external deep-link producers, and Rich Menu integration. | Independent review covered the fixed `LIFF_SELF_SERVICE` capability projection, Home requester visibility, shared Home/card/header/Bottom Nav integration, canonical requester LIFF root/detail destinations, the Unified Rich Menu four-area contract, retained Dashboard Inbox destination, and absence of IT9D delivery leakage. |
-| IT9D — IT Ticket personal LINE to requester LIFF (**IMPLEMENTED; closure pending independent review**) | Add personal NHFapp LINE delivery for requester-facing Ticket events only. | `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` use requester LIFF; operator-facing events remain in-app only. Reuse IT6 payload and shared processor; add one forward-only outbox enum value. | Focused event-key/adapter/Flex/dispatcher/processor tests, real-MySQL transaction/idempotency/stale-generation coverage, Prisma, architecture, lint, and typecheck. No live provider or device acceptance. |
-| IT9E — IT Product E2E + Android/iPhone Acceptance (**OPEN**) | Validate the complete IT requester product on supported devices. | End-to-end requester flows and Android/iPhone acceptance. | Product E2E, responsive/accessibility, and device acceptance. |
+| IT9D — IT Ticket personal LINE to requester LIFF (**CLOSED**) | Add personal NHFapp LINE delivery for requester-facing Ticket events only. | `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` use requester LIFF; operator-facing events remain in-app only. Reuse IT6 payload and shared processor; add one forward-only outbox enum value. | Independent review passed on implementation commit `9474a54aefd86014fbd77cfdfed542bd049fb1e9` with no P1/P2 blocker. Final focused tests: 7 files/79 tests; real-MySQL integration: 22 files/154 tests; Prisma validation, architecture, lint, and typecheck passed. No live provider or device acceptance. |
+| IT9E — IT Product E2E + Android/iPhone Acceptance (**OPEN / next phase**) | Validate the complete IT requester product on supported devices. | End-to-end requester flows and Android/iPhone acceptance. | Product E2E, responsive/accessibility, and device acceptance. |
 | IT10 — Final Hardening + Compatibility + Retention Audit (**OPEN / deferred**) | Review deployed legacy rows, retention, operational failure modes and final ownership. | Only approved compatibility cleanup/migrations; explicit decision before any enum or grant change. | Architecture/security regression, relevant broad suite and deployment data review. |
 
 Each phase needs its own stable diff and relevant verification; no phase is implicitly authorized by IT0. Split a phase further if a product question blocks only part of it. IT0 closed when this document recorded ownership, current compatibility, locked invariants and the open decision ledger. It did not claim future product policies were approved.
@@ -516,10 +516,12 @@ At the IT9C closure boundary, IT9D was **OPEN / next phase**; IT9E remained
 **OPEN** for product and Android/iPhone acceptance; IT10 remained
 **OPEN / deferred**. Device acceptance had not been performed at that boundary.
 
-## 27. IT9D implementation — requester Ticket LINE
+## 27. IT9D closure — requester Ticket LINE
 
-IT9D is **IMPLEMENTED; closure pending independent review**. The current
-approved matrix enables personal NHFapp LINE only for requester
+IT9D is **CLOSED**. Independent review of implementation commit
+`9474a54aefd86014fbd77cfdfed542bd049fb1e9` passed with no P1/P2 runtime,
+authorization, privacy, delivery, retry, persistence, or architecture blocker.
+The approved matrix enables personal NHFapp LINE only for requester
 `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` intents. `CREATED`,
 `ASSIGNED`, and `REQUESTER_COMMENTED` remain in-app only because there is no
 operator LIFF destination. IT9D does not route operator messages to Dashboard
@@ -554,14 +556,23 @@ channel tokens directly. `UNLINKED` and `INELIGIBLE` results become
 lifecycle (three attempts, then `DEAD`); LINE's retry key does not guarantee
 permanent deduplication or end-user acceptance.
 
-Focused tests passed **7 files / 79 tests** for IT event keys, enqueue policy,
-Flex composition, IT dispatch, unchanged in-app dispatch, transaction boundary,
-and the global processor. The real-MySQL integration workflow applied the new
-migration and passed **22 files / 154 tests**, covering transaction rollback,
-create/comment replay, requester-only row creation, stale waiting generations,
-and unchanged Dashboard Inbox destinations. `npx prisma generate` and
-`npx prisma validate` passed. `npm run architecture:check` passed for 1,269
-source files; `npm run lint:strict` and `npm run typecheck` passed. No live LINE
+The semantic parser now reports the channel-neutral error
+`Invalid IT Ticket notification payload`; strict Zod validation and the
+accepted payload shape are unchanged. The diagnostic correction is in commit
+`d395cf8a5e2b681e760250686ec11b71c93086bb`. Directly affected tests passed
+**3 files / 26 tests**. The final focused suite passed **7 files / 79 tests**
+for IT event keys, enqueue policy, Flex composition, IT dispatch, unchanged
+in-app dispatch, transaction boundary, and the global processor. The final
+real-MySQL integration run passed **22 files / 154 tests** and found no pending
+migrations; the IT9D migration was applied during implementation verification.
+Coverage includes transaction rollback, create/comment replay, requester-only
+row creation, stale waiting generations, and unchanged Dashboard Inbox
+destinations. Final closure gates
+`npx prisma validate`, `npm run architecture:check`, `npm run lint:strict`, and
+`npm run typecheck` passed; architecture checked 1,269 source files. Prisma
+generation (`npx prisma generate`) passed during implementation; it was not
+rerun at closure because the Prisma schema did not change. No live LINE
 Messaging API call or production delivery acceptance was performed; the IT
-integration transport was mocked. The repository full suite was not run. IT9E
-was not started and smartphone or device acceptance has not been performed.
+integration transport was mocked.
+The repository full suite was not run. IT9E is OPEN / next phase and was not
+started; smartphone or device acceptance has not been performed.

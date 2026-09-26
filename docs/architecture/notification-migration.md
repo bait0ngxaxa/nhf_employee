@@ -947,11 +947,12 @@ Notification H0-H3 migration complete. L4 separately closed the equal-
 timestamp history continuation defect with a deterministic composite cursor;
 legacy timestamp cursors retain their historical limitation. IT6 added in-app
 Ticket notifications through the IT public dispatcher and `IT_TICKET_IN_APP`.
-IT9D is implemented with closure pending independent review and adds the
+IT9D is **CLOSED** after independent review and adds the
 `IT_TICKET_LINE` outbox type for requester `OPERATOR_COMMENTED`,
 `WAITING_REQUESTER`, and `RESOLVED` events only. It reuses the IT6 strict payload
 and the global processor; Notification does not own Ticket recipient policy,
 Flex composition, LIFF destination, or stale validation. Operator-facing Ticket
-LINE and Ticket Email remain deferred. Email Request's retained legacy LINE
+LINE and Ticket Email remain deferred; IT9E is **OPEN / next phase** for full
+product E2E and device acceptance. Email Request's retained legacy LINE
 configuration is unchanged. The global Outbox Processor plus Email/LINE
 delivery remain outside Notification.

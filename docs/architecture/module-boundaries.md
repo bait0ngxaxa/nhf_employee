@@ -26,11 +26,11 @@ foundation. IT9B requester presentation exists at `/liff/it` and
 `/liff/it/[ticketId]` and is **CLOSED** after independent review and final
 verification. IT9C is **CLOSED** after independent review and owns LIFF
 Home/module projection, service card, shared navigation, canonical requester
-deep links, and Unified Rich Menu integration. IT9D is **IMPLEMENTED; closure
-pending independent review** and adds requester-facing Ticket LINE for the
-approved event matrix; IT9E is
-**OPEN** and owns full product/device acceptance. IT10 hardening remains
-**OPEN / deferred**. Compatibility and verification records follow.
+deep links, and Unified Rich Menu integration. IT9D is **CLOSED** after
+independent review and adds requester-facing Ticket LINE for the approved event
+matrix. IT9E is **OPEN / next phase** and owns full product/device acceptance.
+IT10 hardening remains **OPEN / deferred**. Compatibility and verification
+records follow.
 
 The authoritative Auth boundary record is
 [auth-session-identity-migration.md](./auth-session-identity-migration.md).
@@ -250,14 +250,16 @@ retained Dashboard Inbox destination, and no IT9D delivery leakage.
 At the IT9C closure boundary, IT9D was OPEN / next phase; IT9E remained OPEN;
 IT10 remained OPEN/deferred.
 
-### IT9D requester Ticket LINE — implementation status
+### IT9D requester Ticket LINE — closed phase
 
-IT9D is **IMPLEMENTED; closure pending independent review**. The Ticket mutation
-transaction enqueues the existing `IT_TICKET_IN_APP` row and, only for requester
-`OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED` facts, an
-`IT_TICKET_LINE` row with the same strict IT semantic payload and a distinct
-LINE event key. The global processor keeps ownership of claim/retry/dead-letter
-and delegates both Ticket types to the IT dispatcher. IT revalidates source,
+IT9D is **CLOSED** after independent review of implementation commit
+`9474a54aefd86014fbd77cfdfed542bd049fb1e9`; no P1/P2 blocker was found. The
+Ticket mutation transaction enqueues the existing `IT_TICKET_IN_APP` row and
+an `IT_TICKET_LINE` row only for requester `OPERATOR_COMMENTED`,
+`WAITING_REQUESTER`, and `RESOLVED` facts. Both rows use the same strict IT
+semantic payload and distinct channel event keys. The global processor keeps
+ownership of claim/retry/dead-letter and delegates both Ticket types to the IT
+dispatcher. IT revalidates source,
 requester ownership, workforce eligibility, self-suppression, and the current
 `WAITING_REQUESTER` generation before composing the message and using
 `sendAppLineNotification()`.
@@ -269,7 +271,7 @@ and `REQUESTER_COMMENTED` events remain in-app only because operator LIFF does
 not exist. Existing requester/operator Dashboard Inbox destinations remain
 unchanged. Unlinked or ineligible users are superseded without retry; provider
 errors use the shared at-least-once retry/dead-letter lifecycle. No live LINE
-provider or smartphone/device acceptance was performed; IT9E remains OPEN.
+provider or smartphone/device acceptance was performed; IT9E is OPEN / next phase.
 
 ## IT8 Email Request ownership — CLOSED
 
@@ -393,10 +395,11 @@ events, recipient policy, notification type, title/message, action URL,
 reference ID, channel choice, and event-specific dedupe or supersede semantics.
 IT owns Ticket event meaning, recipient policy, strict payload, destination,
 event identity, and stale-domain validation. IT6 implements in-app Ticket
-notifications. IT9A adds the requester LIFF API foundation. IT9D adds personal
-NHFapp LINE only for requester `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and
-`RESOLVED`; operator-facing events remain in-app because operator LIFF does not
-exist. Ticket Email remains a product decision/deferred. Notification must not
+notifications. IT9A adds the requester LIFF API foundation. IT9D delivers
+personal NHFapp LINE only for requester `OPERATOR_COMMENTED`,
+`WAITING_REQUESTER`, and `RESOLVED`; operator-facing events remain in-app
+because operator LIFF does not exist. Ticket Email remains a product
+decision/deferred. Notification must not
 grow audience APIs such as “notify all Stock
 admins” or become a workflow owner for another module. Leave, Stock, Routine,
 and IT use only `@/modules/notification` for Inbox persistence; physical
