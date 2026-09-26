@@ -28,9 +28,9 @@ verification. IT9C is **CLOSED** after independent review and owns LIFF
 Home/module projection, service card, shared navigation, canonical requester
 deep links, and Unified Rich Menu integration. IT9D is **CLOSED** after
 independent review and adds requester-facing Ticket LINE for the approved event
-matrix. IT9E-A is **COMPLETE** for repository E2E/acceptance readiness; IT9E-B
-Android/iPhone device acceptance is **NOT RUN / next human acceptance step**.
-IT9E remains in progress. IT10 hardening remains **OPEN / deferred**.
+matrix. IT9E-A is **COMPLETE** for repository E2E/acceptance readiness; IT9E-UX-P0
+unified Dashboard workspace and initial Ticket evidence is **IMPLEMENTED / review pending**.
+IT9E-B Android/iPhone device acceptance is **PAUSED / NOT RUN**. IT10 hardening remains **OPEN / deferred**.
 Compatibility and verification records follow.
 
 The authoritative Auth boundary record is
@@ -163,6 +163,13 @@ The root server entry exposes stable application contracts;
 Dashboard navigation and route guards use the server-derived capability
 projection, while API/query boundaries independently revalidate workforce and
 authority.
+
+IT9E-UX-P0 composes one capability-driven `/dashboard/it` workspace through
+`@/modules/it/client`; legacy queue/analytics pages redirect to canonical
+tabs, while the Ticket detail route remains available. Tab/menu visibility is
+presentation only. Initial Ticket evidence uses the existing private IT image
+pipeline and a nullable attachment `commentId`; comment attachments and their
+read authorization retain the existing contract.
 
 IT5A adds immutable comments, actor-side classification, comment idempotency,
 `firstRespondedAt`, and a bounded merged timeline in the IT application and
