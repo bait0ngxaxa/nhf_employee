@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, CircleAlert, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     API_ROUTES,
@@ -312,12 +312,14 @@ export function ITTicketOperatorDetail({
 
                 {!detailError && ticket ? (
                     <>
-                        <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                            <div className="min-w-0 space-y-1">
-                                <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
-                                    Ticket #{ticket.id}
+                        <header className="flex min-w-0 flex-col justify-between gap-3 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:flex-row sm:items-start sm:p-6">
+                            <div className="min-w-0 space-y-2">
+                                <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold leading-tight tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
+                                    {ticket.title}
                                 </h1>
-                                <p className="text-sm text-content-secondary">{IT_TICKET_TYPE_LABELS[ticket.type]}</p>
+                                <p className="text-sm font-medium leading-6 text-content-secondary">
+                                    Ticket #{ticket.id}<span aria-hidden="true" className="mx-2">·</span>{IT_TICKET_TYPE_LABELS[ticket.type]}
+                                </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
                                 <TicketStatus status={ticket.status} />
@@ -355,18 +357,10 @@ export function ITTicketOperatorDetail({
                         ) : null}
 
                         <Card>
-                            <CardHeader className="gap-4 border-b border-border-neutral sm:flex-row sm:items-center sm:justify-between">
-                                <div className="min-w-0 space-y-1">
-                                    <p className="text-xs font-semibold text-content-muted">หัวข้อ</p>
-                                    <CardTitle className="text-xl leading-7 text-content-heading [overflow-wrap:anywhere]">
-                                        {ticket.title}
-                                    </CardTitle>
-                                </div>
-                            </CardHeader>
                             <CardContent className="space-y-6">
                                 <div>
-                                    <h2 className="text-sm font-semibold text-content-heading">รายละเอียด</h2>
-                                    <p className="mt-2 max-w-[75ch] whitespace-pre-wrap break-words text-sm leading-7 text-content-body">
+                                    <h2 className="text-base font-semibold text-content-heading">รายละเอียด</h2>
+                                    <p className="mt-2 max-w-[70ch] whitespace-pre-wrap break-words text-base leading-7 text-content-body">
                                         {ticket.description}
                                     </p>
                                 </div>

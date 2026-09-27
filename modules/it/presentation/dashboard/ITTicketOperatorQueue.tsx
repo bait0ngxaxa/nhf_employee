@@ -105,7 +105,11 @@ function QueueFiltersForm({
     const fieldClassName = "mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-content-body outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50";
 
     return (
-        <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-border-neutral bg-surface-subtle p-4 md:p-5">
+        <form onSubmit={onSubmit} aria-labelledby="it-ticket-queue-filters-heading" className="space-y-4 rounded-xl border border-border-neutral bg-surface-subtle p-4 md:p-5">
+            <div className="space-y-1">
+                <h2 id="it-ticket-queue-filters-heading" className="text-base font-semibold text-content-heading">ตัวกรองคิว Ticket</h2>
+                <p className="text-sm leading-6 text-content-secondary">เลือกเงื่อนไขแล้วกดใช้ตัวกรองเพื่อค้นหารายการ</p>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <label className="min-w-0 text-sm font-medium text-content-secondary">
                     สถานะ
@@ -378,12 +382,15 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                     onSubmit={handleFilterSubmit}
                 />
 
-                <section aria-label="รายการ Ticket">
-                    {list ? (
-                        <p className="mb-3 text-sm text-content-secondary">
-                            แสดง {list.tickets.length} รายการ
-                        </p>
-                    ) : null}
+                <section aria-labelledby="it-ticket-queue-results-heading">
+                    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <h2 id="it-ticket-queue-results-heading" className="text-lg font-semibold text-content-heading">รายการ Ticket</h2>
+                        {list ? (
+                            <p aria-live="polite" className="text-sm text-content-secondary">
+                                แสดง {list.tickets.length} รายการ
+                            </p>
+                        ) : null}
+                    </div>
                     {loading ? (
                         <Card><QueueSkeleton /></Card>
                     ) : null}
@@ -424,7 +431,7 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                                         <tbody className="divide-y divide-border-neutral">
                                             {list.tickets.map((ticket) => (
                                                 <tr key={ticket.id} className="align-top hover:bg-surface-subtle">
-                                                    <td className="max-w-[22rem] px-4 py-4">
+                                                    <td className="max-w-[22rem] px-4 py-4 [overflow-wrap:anywhere]">
                                                         <Link
                                                             href={`${APP_ROUTES.dashboardITQueue}/${ticket.id}`}
                                                             className="font-semibold text-content-heading underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -433,15 +440,15 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                                                         </Link>
                                                         <p className="mt-1 text-xs text-content-secondary">{IT_TICKET_TYPE_LABELS[ticket.type]}</p>
                                                     </td>
-                                                    <td className="max-w-48 px-4 py-4">
-                                                        <p className="font-medium text-content-body">{ticket.requester.displayName}</p>
+                                                    <td className="max-w-48 px-4 py-4 [overflow-wrap:anywhere]">
+                                                        <p className="font-medium text-content-body [overflow-wrap:anywhere]">{ticket.requester.displayName}</p>
                                                         <p className="mt-1 text-xs text-content-muted">
                                                             {ticket.requester.departmentNameSnapshot ?? "ไม่ระบุแผนก"}
                                                         </p>
                                                     </td>
                                                     <td className="px-4 py-4"><TicketStatus status={ticket.status} /></td>
-                                                    <td className="max-w-48 px-4 py-4"><TicketAssignment ticket={ticket} /></td>
-                                                    <td className="max-w-40 px-4 py-4"><TicketCategory ticket={ticket} /></td>
+                                                    <td className="max-w-48 px-4 py-4 [overflow-wrap:anywhere]"><TicketAssignment ticket={ticket} /></td>
+                                                    <td className="max-w-40 px-4 py-4 [overflow-wrap:anywhere]"><TicketCategory ticket={ticket} /></td>
                                                     <td className="whitespace-nowrap px-4 py-4 text-xs text-content-secondary">{formatITTicketDate(ticket.createdAt)}</td>
                                                     <td className="whitespace-nowrap px-4 py-4 text-xs text-content-secondary">{formatITTicketDate(ticket.updatedAt)}</td>
                                                 </tr>

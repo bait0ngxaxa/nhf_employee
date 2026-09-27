@@ -437,7 +437,7 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.getByRole("alert")).toContainElement(screen.getByRole("button", { name: "โหลดอีกครั้ง" }));
         expect(toast.error).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole("button", { name: "โหลดอีกครั้ง" }));
-        expect(await screen.findByRole("heading", { name: "Ticket #19" })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
     });
 
     it("keeps reference load errors inline with a retry action", async () => {
@@ -467,7 +467,7 @@ describe("IT operator Ticket detail presentation", () => {
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={requesterCapabilities} />);
 
-        expect(await screen.findByRole("heading", { name: "Ticket #19" })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "กลับไปยังคิว IT Ticket" })).toHaveAttribute(
             "href",
             "/dashboard/it?itTab=queue",

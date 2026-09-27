@@ -417,7 +417,7 @@ export function ITTicketSelfService({
                     <form className="min-h-0 flex flex-1 flex-col" onSubmit={handleCreate}>
                         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
                             <div className="space-y-2">
-                                <label htmlFor="it-ticket-type" className="text-sm font-medium text-content-heading">ประเภทคำขอ</label>
+                                <label htmlFor="it-ticket-type" className="block text-sm font-medium text-content-heading">ประเภทคำขอ</label>
                                 <select
                                     id="it-ticket-type"
                                     value={ticketType}
@@ -434,7 +434,7 @@ export function ITTicketSelfService({
                                 </select>
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="it-ticket-title" className="text-sm font-medium text-content-heading">หัวข้อ</label>
+                                <label htmlFor="it-ticket-title" className="block text-sm font-medium text-content-heading">หัวข้อ</label>
                                 <Input
                                     id="it-ticket-title"
                                     autoFocus
@@ -450,7 +450,7 @@ export function ITTicketSelfService({
                                 </p>
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="it-ticket-description" className="text-sm font-medium text-content-heading">รายละเอียด</label>
+                                <label htmlFor="it-ticket-description" className="block text-sm font-medium text-content-heading">รายละเอียด</label>
                                 <Textarea
                                     id="it-ticket-description"
                                     required
@@ -467,7 +467,7 @@ export function ITTicketSelfService({
                                 </p>
                             </div>
                             <div className="space-y-2">
-                                <label htmlFor="it-ticket-attachments" className="text-sm font-medium text-content-heading">
+                                <label htmlFor="it-ticket-attachments" className="block text-sm font-medium text-content-heading">
                                     รูปภาพประกอบ <span className="font-normal text-content-muted">(ไม่บังคับ)</span>
                                 </label>
                                 <p id="it-ticket-attachment-limits" className="text-xs leading-5 text-content-secondary">

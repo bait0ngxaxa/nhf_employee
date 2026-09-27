@@ -311,7 +311,7 @@ describe("IT Ticket requester detail", () => {
 
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
 
-        expect(await screen.findByRole("heading", { name: "Ticket #19" })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
         expect(screen.getByText(label)).toBeInTheDocument();
         expect(screen.getByText("หน้าเข้าสู่ระบบแสดงข้อผิดพลาด")).toBeInTheDocument();
     });

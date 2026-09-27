@@ -111,12 +111,12 @@ function OverviewMetric({
 function SummaryOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
     const { summary } = dashboard;
     return (
-        <section aria-labelledby="it-analytics-overview-title" className="min-w-0 space-y-5">
+        <section aria-labelledby="it-analytics-overview-title" className="min-w-0 space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:p-6">
             <h2 id="it-analytics-overview-title" className="text-lg font-semibold text-content-heading">
                 ภาพรวม
             </h2>
             <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
-                <div className="col-span-2 min-w-0 sm:col-span-1">
+                <div className="col-span-2 min-w-0 border-b border-border-neutral pb-4 sm:col-span-1 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-5">
                     <OverviewMetric
                         label="งานค้าง"
                         value={countText(summary.currentBacklog)}
@@ -173,7 +173,7 @@ function TrendChart({ trend }: TrendChartProps): ReactElement {
     const hasActivity = createdTotal > 0 || resolvedTotal > 0;
 
     return (
-        <figure className="min-w-0 border-y border-border-neutral py-5">
+        <figure className="min-w-0 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:p-6">
             <figcaption className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <h2 className="text-lg font-semibold text-content-heading">Ticket ใหม่และแก้ไขแล้ว</h2>
@@ -228,7 +228,7 @@ function TrendChart({ trend }: TrendChartProps): ReactElement {
                         return (
                             <g key={tick}>
                                 <line x1={left} x2={width - right} y1={y} y2={y} className="stroke-border-neutral" strokeWidth="1" />
-                                <text x={left - 8} y={y + 4} textAnchor="end" className="fill-content-muted" fontSize="11">
+                                <text x={left - 8} y={y + 4} textAnchor="end" className="fill-content-muted" fontSize="12">
                                     {countText(tick)}
                                 </text>
                             </g>
@@ -269,7 +269,7 @@ function TrendChart({ trend }: TrendChartProps): ReactElement {
                                         y={height - 12}
                                         textAnchor="middle"
                                         className="fill-content-muted"
-                                        fontSize="10"
+                                        fontSize="11"
                                     >
                                         {`${row.date.slice(8, 10)}/${row.date.slice(5, 7)}`}
                                     </text>
@@ -407,7 +407,7 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
             <SummaryOverview dashboard={dashboard} />
             <TrendChart trend={dashboard.trend} />
 
-            <section aria-labelledby="it-analytics-breakdowns-heading" className="min-w-0 pt-5">
+            <section aria-labelledby="it-analytics-breakdowns-heading" className="min-w-0 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:p-6">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <h2 id="it-analytics-breakdowns-heading" className="text-lg font-semibold text-content-heading">
                         รายละเอียดเพิ่มเติม
