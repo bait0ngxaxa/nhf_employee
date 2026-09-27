@@ -146,9 +146,9 @@ components:
 
 **Creative North Star: "The Trusted Operations Desk"**
 
-NHFapp is an Operate-first internal work surface. Its visual language should feel calm, structured, and dependable: a cool pale canvas, raised work surfaces, restrained borders, and high-contrast Thai typography make dense administrative tasks easier to scan. Sky blue and blue-cyan carry NHF's identity and the next clear action, while indigo, orange, and teal distinguish the major service modules without turning the interface into a marketing page.
+NHFapp is an Operate-first internal work surface. Its visual language should feel calm, structured, and dependable: a cool pale canvas, raised work surfaces, restrained borders, and high-contrast Thai typography make dense administrative tasks easier to scan. Sky blue and blue-cyan carry NHF's identity. Rich Menu blue distinguishes IT; indigo, orange, and teal identify leave, stock, and routine without turning the interface into a marketing page.
 
-The same language spans the desktop dashboard and the LINE/LIFF mobile experience. Desktop uses a persistent sidebar and sticky utility bar; mobile uses safe-area-aware sticky header and bottom navigation. The dashboard home intentionally gives the three core modules richer, lifted cards, while ordinary management sections remain quieter and information-first. Dark mode keeps the same semantic relationships with charcoal surfaces and brighter text, borders, and accents.
+The same language spans the desktop dashboard and the LINE/LIFF mobile experience. Desktop uses a persistent sidebar and sticky utility bar; mobile uses safe-area-aware sticky header and bottom navigation. The dashboard home intentionally gives the four core service modules richer, lifted cards, while ordinary management sections remain quieter and information-first. Dark mode keeps the same semantic relationships with charcoal surfaces and brighter text, borders, and accents.
 
 **Key Characteristics:**
 
@@ -305,7 +305,7 @@ State panels use a raised surface, a rounded border, an icon or shape tile, plai
 
 ### Module Quick-Action Card
 
-The dashboard's featured cards are the signature component. Each card combines a module-specific solid surface, a translucent sheen/corner, a compact icon tile, a `Quick action` marker, a two-line heading, supporting copy, and an arrow control. Stock, leave, and routine use their own semantic tokens; the composition stays shared so the modules feel related rather than like separate products.
+The dashboard's featured cards are the signature component. Each card combines a module-specific solid surface, a translucent sheen/corner, a compact icon tile, a `Quick action` marker, a two-line heading, supporting copy, and an arrow control. Stock, leave, routine, and IT use their own semantic tokens; the composition stays shared so the modules feel related rather than like separate products.
 
 ## Do's and Don'ts
 

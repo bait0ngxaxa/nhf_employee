@@ -87,6 +87,21 @@ const MENU_ITEM_CONFIG: Record<
         featuredCorner: "bg-module-routine-dashboard-corner/40",
         featuredFocus: "focus-visible:ring-module-routine-dashboard-focus",
     },
+    "it-workspace": {
+        text: "text-module-it-badge-foreground",
+        featured: true,
+        icon: "text-module-it-dashboard-control-foreground",
+        featuredSurface: "bg-module-it-dashboard-surface",
+        featuredControlSurface: "bg-dashboard-featured-control-surface",
+        featuredBorder: "border-module-it-dashboard-accent hover:border-module-it-dashboard-accent-hover",
+        featuredShadow: "shadow-module-it-dashboard-strong/15 hover:shadow-module-it-dashboard-strong/20",
+        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-it-badge-foreground",
+        featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
+        featuredBadge: "text-module-it-badge-foreground",
+        featuredDescription: "text-module-it-dashboard-muted",
+        featuredCorner: "bg-module-it-dashboard-corner/40",
+        featuredFocus: "focus-visible:ring-module-it-dashboard-focus",
+    },
     "email-request": {
         text: "text-dashboard-menu-email",
     },
@@ -176,7 +191,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                     </span>
                 </div>
                 <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-content-on-brand [overflow-wrap:anywhere] @min-[72rem]:min-h-[4.6875rem] @min-[72rem]:text-3xl">
-                    {item.label}
+                    {item.id === "it-workspace" ? "NHF IT-TICKET" : item.label}
                 </h3>
                 <p
                     className={cn(
@@ -264,6 +279,7 @@ const FEATURED_ORDER = new Map([
     ["stock", 0],
     ["leave-management", 1],
     ["routine", 2],
+    ["it-workspace", 3],
 ]);
 
 function getFeaturedRank(id: string): number {
