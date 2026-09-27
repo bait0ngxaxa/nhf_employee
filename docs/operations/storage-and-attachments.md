@@ -4,8 +4,8 @@
 
 ## Shared production contract
 
-- `.uploads/` ต้องอยู่บน persistent disk และอยู่ใน backup/restore set เดียวกับ MySQL จากช่วงเวลาที่สอดคล้องกัน ห้ามลบระหว่าง deploy/restart
-- ให้ Next.js process เดียวที่รันด้วย non-root user และ working directory คงที่เป็นเจ้าของไฟล์; Nginx ห้ามเสิร์ฟหรือ alias `.uploads/private` โดยตรง และการอ่านไฟล์ต้องผ่าน route ที่ตรวจ authentication/authorization ฝั่ง server
+- `.uploads/` ครอบคลุม Stock uploads และ private attachments ใต้ `.uploads/private/leave/` กับ `.uploads/private/it/`; ทั้งหมดต้องอยู่บน persistent disk และอยู่ใน backup/restore set เดียวกับ MySQL จากช่วงเวลาที่สอดคล้องกัน ห้ามลบระหว่าง deploy/restart
+- ให้ Next.js process เดียวที่รันด้วย non-root user และ working directory คงที่เป็นเจ้าของไฟล์; Nginx ห้ามเสิร์ฟหรือ alias `.uploads/private` โดยตรง การอ่าน **private attachments** ต้องผ่าน route ที่ตรวจ authentication/authorization ฝั่ง server
 - Cloudflare Tunnel ต้องผ่าน Nginx ก่อน Next.js `127.0.0.1:3000`; คง `client_max_body_size 25m;` และ `client_body_timeout 30s;` ตาม configuration ปัจจุบัน ไม่เปิด port 3000 สู่ Internet
 - Restore ใน maintenance window: กู้ database และ filesystem จาก backup set เดียวกัน ตรวจ metadata เทียบไฟล์จริงและสิทธิ์อ่านก่อนเปิด traffic; ไฟล์ที่หายต้องกู้จาก backup ไม่สร้าง public copy
 - Orphan cleanup ของแต่ละ domain ต้องใช้ external scheduler, secret แยก และ dry-run ก่อนเปิดลบจริง; ห้าม log secret, storage key, path หรือ private bytes
@@ -13,7 +13,7 @@
 
 ## Leave-specific rules and procedures
 
-## Storage boundary และ permission
+### Storage boundary และ permission
 
 - ไฟล์สุดท้ายอยู่ใต้ `.uploads/private/leave/<leaveRequestId>/<random-id>.webp`
 - client อ้างอิงเฉพาะ attachment ID และอ่านผ่าน `GET /api/leave/attachments/[attachmentId]` ซึ่งตรวจ session, owner, stored approver หรือ ADMIN ก่อนอ่านไฟล์
@@ -28,7 +28,7 @@ sudo install -d -o app -g app -m 0750 /srv/employee_nhf/.uploads/private/leave
 sudo chown -R app:app /srv/employee_nhf/.uploads/private
 ```
 
-## Persistent disk, backup และ restore
+### Persistent disk, backup และ restore
 
 `.uploads/private/leave` เป็น stateful data เช่นเดียวกับ `leave_attachments` ใน MySQL ต้องใช้ persistent disk ที่ไม่ถูกลบ
 ตอน deploy/restart และต้อง snapshot สองส่วนจากเวลาใกล้เคียงกัน:
@@ -41,7 +41,7 @@ Restore ให้หยุด traffic หรือทำ maintenance window, res
 ตรวจว่า `storageKey` ทุกตัวชี้ไปยังไฟล์ที่มีอยู่ และตรวจ endpoint ด้วย owner/approver test ก่อนเปิด traffic
 หากไฟล์จริงหาย ระบบตอบ 404 แบบปลอดภัยและไม่คืน path ภายใน; ให้กู้จาก backup แทนการสร้าง public copy
 
-## Reverse proxy และ process supervisor
+### Reverse proxy และ process supervisor
 
 คำขอ multipart มีไฟล์รวมได้ 20 MB และ overhead ของ multipart จึงต้องตั้ง body limit อย่างน้อย:
 
@@ -66,7 +66,7 @@ PM2/systemd ต้อง:
 - รันด้วย non-root user ที่อ่าน/เขียน `.uploads/private/leave` ได้
 - restart เมื่อ process ล้มเหลวหรือเครื่อง reboot โดยไม่ลบ directory
 
-## Request size และ memory limitation
+### Request size และ memory limitation
 
 server ใช้ `Content-Length` เป็นเพียง fast path แล้วอ่าน stream ของ multipart แบบจำกัดไม่เกิน 25 MB ก่อนสร้าง
 `FormData`; body ที่ไม่มีหรือมี `Content-Length` ไม่ถูกต้องจึงยังถูกปฏิเสธด้วย 413 โดยไม่พึ่ง header อย่างเดียว
@@ -75,7 +75,7 @@ Next.js/undici ยัง buffer body ที่ถูกจำกัดแล้�
 และขนาดรวม 20 MB ยังคงเป็น defense-in-depth และ deployment boundary ที่ต้องตรวจใน Phase 5B หากต้องรองรับ
 concurrent upload สูงมากให้ย้ายไป streaming/object storage ใน phase ถัดไป
 
-## Orphan cleanup
+### Orphan cleanup
 
 ระหว่าง request ไฟล์ถูกเขียนก่อน Serializable transaction เพื่อไม่ให้ Sharp/filesystem อยู่ใน transaction หาก
 business validation หรือ transaction ล้มเหลว route ลบไฟล์ที่เขียนใน request นั้นด้วย `Promise.allSettled` แต่ process
@@ -103,7 +103,7 @@ cleanup ปัจจุบันอ่านรายการ metadata แล�
 0 3 * * * curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup"
 ```
 
-## Multi-instance และ rollback
+### Multi-instance และ rollback
 
 ในเชิง storage การเก็บไฟล์แบบ local disk รองรับ single instance หรือหลาย instance ที่ mount shared filesystem เดียวกันและมี
 permission/locking ที่สอดคล้องกันเท่านั้น แต่ full production deployment ของ L2 ยังรองรับหนึ่ง app process เท่านั้น
@@ -117,7 +117,7 @@ rollback application หลัง `migrate deploy` ให้รัน build ร�
 และเก็บไฟล์/metadata ไว้ ห้าม drop ตารางหรือย้อน migration ด้วยคำสั่ง destructive; หากจำเป็นต้องเปลี่ยน schema ให้
 สร้าง forward migration ใหม่และทดสอบกับสำเนา production
 
-## Legacy `attachmentUrl` cleanup plan
+### Legacy `attachmentUrl` cleanup plan
 
 การค้นหา source ปัจจุบันยืนยันว่า code ใหม่ไม่เขียน `attachmentUrl`; พบ field ใน Prisma schema, migration เดิม และ
 fixture/test ที่จำลองข้อมูลเดิมเท่านั้น ก่อนลบในอนาคตต้อง:
@@ -127,7 +127,7 @@ fixture/test ที่จำลองข้อมูลเดิมเท่า�
 3. ตรวจ client/report/export ที่อาจพึ่ง field นี้ใน production build และ backup ข้อมูล
 4. deploy migration ลบ column แยกต่างหากหลังยืนยันว่าไม่มีข้อมูลที่ต้องย้าย และทดสอบ rollback plan
 
-## Privacy, authorization และ observability
+### Privacy, authorization และ observability
 
 attachment endpoint ใช้ `Cache-Control: private, no-store`, `Content-Disposition: inline` และ `X-Content-Type-Options:
 nosniff`; list APIs ส่งเฉพาะ summary และไม่ส่ง binary/storage key notification หรือ email/LINE ไม่แนบไฟล์
@@ -147,7 +147,7 @@ authorization matrix ที่ต้องคงไว้:
 
 ## IT-specific rules and procedures
 
-## Storage boundary
+### Storage boundary
 
 - ไฟล์อยู่ใต้ `.uploads/private/it/<ticketId>/<random-id>.webp` โดย `<random-id>` เป็น hexadecimal 32 ตัวที่ระบบสุ่มสร้าง
 - Database เก็บ storage key; client ได้เฉพาะ attachment ID และอ่านผ่าน `GET /api/it/attachments/[attachmentId]`
@@ -164,7 +164,7 @@ sudo install -d -o app -g app -m 0750 /srv/employee_nhf/.uploads/private/it
 
 Node สร้าง directory ของ Ticket ด้วย mode `0750` และสร้าง file ด้วย mode `0640` และ exclusive create ภายใต้ owner/group ของ process
 
-## Request boundary และ reverse proxy
+### Request boundary และ reverse proxy
 
 ไฟล์ที่รับได้คือ JPG/JPEG, PNG และ WEBP เท่านั้น ระบบ decode เนื้อหาจริง, จำกัด input 8 MiB/file, 3 files/comment, 20 MiB รวม, 40 ล้าน decoded pixels และ resize/แปลงเป็น WEBP ก่อนเขียนไฟล์ถาวร
 
@@ -174,7 +174,7 @@ Nginx ใน `deployment/nginx/employee_nhf.cloudflare-origin.conf` ตั้ง
 
 Rate limiter ใช้ shared mutation-rate-limit implementation แบบ process-local: multipart IT pre-auth IP 60 requests/15 นาที และ authenticated principal 10 requests/นาที จึงไม่กระจายข้ามหลาย process/host และไม่คงอยู่หลัง restart ห้ามถือว่า IT5B รองรับหลาย application hosts ที่ใช้ local disk
 
-## Persistent data, backup และ restore
+### Persistent data, backup และ restore
 
 `.uploads/private/it/` เป็น stateful persistent data เช่นเดียวกับ `it_ticket_attachments` ใน MySQL ต้องสำรองทั้งสองส่วนจากจุดเวลาที่สอดคล้องกัน:
 
@@ -186,7 +186,7 @@ Restore ให้หยุด traffic หรือใช้ maintenance window �
 
 อย่าใส่ private image bytes ใน Git, Docker image, logs, database blobs, Audit payloads, Notification, email หรือ LINE
 
-## Orphan cleanup
+### Orphan cleanup
 
 ไฟล์ถูกเขียนก่อน transaction เพื่อไม่ให้ decode/เขียนไฟล์ขนาดใหญ่ระหว่างถือ DB transaction ความล้มเหลวปกติจะลบเฉพาะไฟล์ที่ request นั้นสร้าง; process crash อาจทิ้ง orphan ไว้ จึงมี maintenance route ที่รับเฉพาะ secret `IT_ATTACHMENT_CLEANUP_SECRET`:
 
@@ -209,7 +209,7 @@ Cleanup สแกนเฉพาะ `.uploads/private/it`, ตรวจ storage-
 
 Committed attachment ไม่มี application delete หรือ age-based cleanup ใน IT5B; เก็บพร้อม Ticket history จนกว่าจะมี policy ที่อนุมัติใน IT9 ไม่มีการกำหนด retention duration ใน IT5B
 
-## Deployment topology และ rollback
+### Deployment topology และ rollback
 
 Deployment ที่รองรับใน IT5B ใช้ local persistent disk และ working directory คงที่ของ Node/PM2 process เดียวกันกับที่เขียนไฟล์ การ deploy/restart ต้องไม่ลบ `.uploads/private/it` และ Node process ต้องมี read/write permission ตามข้างต้น
 

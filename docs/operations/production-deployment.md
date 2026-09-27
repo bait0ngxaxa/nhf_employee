@@ -160,11 +160,12 @@ NEXT_PUBLIC_FEATURE_ROUTINE=false
 | Variable/asset | ใช้เมื่อ |
 | --- | --- |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Routine reminder/contract expiry, Leave notification email และ notification email เดิม; Routine/Leave email acceptance ต้องตั้งครบ |
-| `.uploads/` | รูป Stock และ private leave attachments; ต้องอยู่บน persistent disk |
+| `.uploads/` | รูป Stock และ private attachments ของ Leave/IT; ต้องอยู่บน persistent disk (`.uploads/private/leave/` และ `.uploads/private/it/` ต้องไม่เปิดเป็น public files) |
 | `LEAVE_ATTACHMENT_CLEANUP_SECRET` | เปิด scheduled orphan cleanup ของ private leave attachments |
+| `IT_ATTACHMENT_CLEANUP_SECRET` | ป้องกัน scheduled orphan cleanup ของ private IT attachments |
 | `AUTH_CLEANUP_SECRET`, `AUDIT_LOG_CLEANUP_SECRET` | เปิด maintenance endpoint ของ auth/audit ตาม deployment policy |
 
-รายละเอียด permission, backup, restore, reverse proxy และ cleanup ของ leave attachment อยู่ใน [Storage and attachment operations](./storage-and-attachments.md)
+รายละเอียด permission, backup, restore, reverse proxy และ cleanup ของ Leave/IT attachments อยู่ใน [Storage and attachment operations](./storage-and-attachments.md)
 
 ### Existing notification integrations
 
@@ -786,6 +787,7 @@ NOTIFICATION_OUTBOX_CRON_SECRET="replace-with-production-secret"
 AUDIT_LOG_CLEANUP_SECRET="replace-with-production-secret"
 AUTH_CLEANUP_SECRET="replace-with-production-secret"
 LEAVE_ATTACHMENT_CLEANUP_SECRET="replace-with-production-secret"
+IT_ATTACHMENT_CLEANUP_SECRET="replace-with-production-secret"
 ```
 
 ตั้ง permission เป็น `600` และใช้ secret คนละค่ากันทุกตัว `APP_BASE_URL` ต้องเป็น HTTPS origin เดียวกับ
@@ -855,6 +857,26 @@ curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LE
 
 งานนี้ scan เฉพาะ private leave directory, เทียบ `storageKey` กับฐานข้อมูล และลบเฉพาะไฟล์ที่เก่ากว่า safety
 window 24 ชั่วโมง จึงไม่ควรลบไฟล์ที่อยู่ระหว่าง request; endpoint ต้องมี header secret เสมอและไม่คืนชื่อไฟล์หรือ path
+
+### IT attachment orphan cleanup — ตัวอย่างรายวัน
+
+ก่อนเปิด job ที่ลบจริง ให้ operator โหลด cron environment แล้วรัน dry-run ด้วยตนเองและตรวจผล:
+
+```bash
+set -a
+. /etc/employee_nhf/cron.env
+set +a
+curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/it/attachments/cleanup?dryRun=true"
+```
+
+เมื่อผล dry-run ถูกต้องจึงเปิดตัวอย่าง job ของ external scheduler นี้:
+
+```cron
+45 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/it/attachments/cleanup?dryRun=true"
+0 3 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/it/attachments/cleanup"
+```
+
+ตัวอย่างนี้คงเวลา dry-run `02:45` และ cleanup `03:00` จาก [Storage and attachment operations](./storage-and-attachments.md). Job ต้องมี external owner และใช้ `POST` กับ header `x-cleanup-secret`; ทำงานเฉพาะ `.uploads/private/it/` และห้ามเปิดเผยชื่อไฟล์, storage key หรือ private path. Secret ไม่ได้ตั้งจะตอบ `503`; secret ผิดจะตอบ `403`. รายละเอียดการคัดเลือก orphan และข้อจำกัด storage อยู่ในเอกสาร storage ข้างต้น
 
 ทุก endpoint ตอบ `503` เมื่อไม่ได้ตั้ง secret และ `403` เมื่อ header secret ไม่ตรง Routine scheduler ตอบ `500` พร้อม
 counters เมื่อบางรายการทำงานไม่สำเร็จ `curl --fail` จึงทำให้ cron run นั้นล้มและสามารถแจ้งเตือนผ่านระบบ monitoring ภายนอกได้
