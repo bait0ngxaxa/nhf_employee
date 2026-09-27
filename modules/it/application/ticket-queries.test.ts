@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { IT_TICKET_CATEGORY_SEEDS } from "@/shared/it-ticket-category-seeds";
 import type * as AuthorizationModule from "./authorization";
 
 const mocks = vi.hoisted(() => ({
@@ -354,11 +355,14 @@ describe("IT requester Ticket queries", () => {
         expect(mocks.transaction).not.toHaveBeenCalled();
     });
 
-    it("shows only active categories and the intersection of configured operator grants", async () => {
+    it("returns canonical active categories with safe fields and configured operator grants", async () => {
         mocks.authorize.mockResolvedValueOnce({ scopes: ["ALL"] });
-        mocks.findCategories.mockResolvedValueOnce([
-            { id: 4, key: "NETWORK", name: "เครือข่าย" },
-        ]);
+        const categories = IT_TICKET_CATEGORY_SEEDS.map(({ key, name }, index) => ({
+            id: index + 1,
+            key,
+            name,
+        }));
+        mocks.findCategories.mockResolvedValueOnce(categories);
 
         const result = await getITOperatorReferenceData(actorContext);
 
@@ -367,9 +371,14 @@ describe("IT requester Ticket queries", () => {
             select: { id: true, key: true, name: true },
             orderBy: [{ name: "asc" }, { id: "asc" }],
         });
+        expect(result.categories).toEqual(categories);
+        expect(result.categories).toHaveLength(IT_TICKET_CATEGORY_SEEDS.length);
+        expect(result.categories.every((category) =>
+            Object.keys(category).sort().join(",") === "id,key,name",
+        )).toBe(true);
         expect(mocks.findConfiguredRecipients).toHaveBeenCalledTimes(3);
         expect(result).toEqual({
-            categories: [{ id: 4, key: "NETWORK", name: "เครือข่าย" }],
+            categories,
             assignableOperators: [{
                 userId: 51,
                 employeeId: 91,

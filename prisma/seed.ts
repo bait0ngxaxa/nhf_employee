@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { seedAuthorizationConfiguration } from "@/modules/authorization";
+import { IT_TICKET_CATEGORY_SEEDS } from "@/shared/it-ticket-category-seeds";
 
 function getPrimaryBootstrapAdminEmail(): string {
     const raw = process.env.BOOTSTRAP_ADMIN_EMAILS;
@@ -103,6 +104,18 @@ async function main() {
     );
     // eslint-disable-next-line no-console
     console.log("✅ สร้างหน่วยงานและหมวดหมู่ NHF Routine สำเร็จ");
+
+    await Promise.all(
+        IT_TICKET_CATEGORY_SEEDS.map((category) =>
+            prisma.iTTicketCategory.upsert({
+                where: { key: category.key },
+                update: category,
+                create: category,
+            }),
+        ),
+    );
+    // eslint-disable-next-line no-console
+    console.log("✅ สร้างหมวดหมู่ IT Ticket สำเร็จ");
 
     await seedAuthorizationConfiguration();
     // eslint-disable-next-line no-console

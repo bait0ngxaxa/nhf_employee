@@ -21,10 +21,12 @@ import {
     assignITTicket,
     buildITAuthorizationContext,
     createITTicket,
+    getITOperatorReferenceData,
     setITTicketCategory,
     transitionITTicketStatus,
 } from "@/modules/it";
 import type { ITAuthorizationContext } from "@/modules/it";
+import { IT_TICKET_CATEGORY_SEEDS } from "@/shared/it-ticket-category-seeds";
 import {
     hasConfiguredCapabilityScopeForUser,
     type AuthorizationConfigurationError,
@@ -707,12 +709,32 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
 
     it("classifies and clears categories without version or event churn on no-op", async () => {
         const fixture = await createFixture("category-flow");
+        await grant(fixture.operator.userId, "it.ticket.read");
         const ticket = await createTicket(fixture.requester);
-        const activeCategory = await prisma.iTTicketCategory.create({
-            data: {
-                key: nextFixtureKey("category-active"),
-                name: "การเข้าถึงระบบ",
-            },
+        const reference = await getITOperatorReferenceData(fixture.operator.context);
+        const canonicalKeys = new Set<string>(IT_TICKET_CATEGORY_SEEDS.map(({ key }) => key));
+        const canonicalReferenceCategories = reference.categories
+            .filter(({ key }) => canonicalKeys.has(key))
+            .sort((left, right) => left.key.localeCompare(right.key));
+        const expectedCanonicalCategories = IT_TICKET_CATEGORY_SEEDS
+            .map(({ key, name }) => ({ key, name }))
+            .sort((left, right) => left.key.localeCompare(right.key));
+        expect(canonicalReferenceCategories.map(({ key, name }) => ({ key, name })))
+            .toEqual(expectedCanonicalCategories);
+        expect(new Set(canonicalReferenceCategories.map(({ key }) => key)).size)
+            .toBe(IT_TICKET_CATEGORY_SEEDS.length);
+        const firstReferenceCategory = canonicalReferenceCategories[0];
+        expect(firstReferenceCategory).toBeDefined();
+        if (firstReferenceCategory) {
+            expect(Object.keys(firstReferenceCategory).sort()).toEqual(["id", "key", "name"]);
+        }
+
+        const activeCategory = await prisma.iTTicketCategory.findUniqueOrThrow({
+            where: { key: "HARDWARE" },
+        });
+        expect(activeCategory).toMatchObject({
+            name: "อุปกรณ์คอมพิวเตอร์",
+            isActive: true,
         });
         const inactiveCategory = await prisma.iTTicketCategory.create({
             data: {
@@ -752,6 +774,9 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
             where: { id: activeCategory.id },
             data: { isActive: false },
         });
+        const referenceAfterDeactivation = await getITOperatorReferenceData(fixture.operator.context);
+        expect(referenceAfterDeactivation.categories.some(({ key }) => key === activeCategory.key))
+            .toBe(false);
         await expect(prisma.iTTicket.findUnique({
             where: { id: ticket.ticket.id },
             include: { category: true },

@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { IT_TICKET_CATEGORY_SEEDS } from "@/shared/it-ticket-category-seeds";
 import {
     ITTicketOperatorDetail,
     ITTicketOperatorQueue,
@@ -46,7 +47,11 @@ const ticket: ITOperatorTicket = {
 };
 
 const reference: ITOperatorReferenceData = {
-    categories: [{ id: 4, key: "NETWORK", name: "เครือข่าย" }],
+    categories: IT_TICKET_CATEGORY_SEEDS.map(({ key, name }, index) => ({
+        id: index + 1,
+        key,
+        name,
+    })),
     assignableOperators: [{ userId: 51, employeeId: 91, displayName: "สมชาย ใจดี" }],
 };
 
@@ -213,6 +218,86 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.getByRole("region", { name: "รูปภาพประกอบ" })).toBeInTheDocument();
         view.unmount();
         expect(revokeObjectUrl).toHaveBeenCalled();
+    });
+
+    it("selects and clears reference categories using the current internal version", async () => {
+        const selectedCategory = reference.categories.find(({ key }) => key === "HARDWARE");
+        if (!selectedCategory) throw new Error("missing canonical HARDWARE category fixture");
+
+        const categorizedTicket: ITOperatorTicket = {
+            ...ticket,
+            category: { ...selectedCategory, isActive: true },
+            version: 5,
+        };
+        const clearedTicket: ITOperatorTicket = {
+            ...categorizedTicket,
+            category: null,
+            version: 6,
+        };
+        const patchBodies: unknown[] = [];
+        const patchRoutes: string[] = [];
+        let patchCount = 0;
+        let detailReadCount = 0;
+
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("/timeline")) return timelineResponse();
+            if (init?.method === "PATCH") {
+                patchCount += 1;
+                patchRoutes.push(url);
+                patchBodies.push(JSON.parse(String(init.body)) as unknown);
+                return apiResponse({
+                    success: true,
+                    changed: true,
+                    ticket: {
+                        id: 19,
+                        version: patchCount === 1 ? 5 : 6,
+                        status: "OPEN",
+                        assignedToUserId: null,
+                        categoryId: patchCount === 1 ? selectedCategory.id : null,
+                        updatedAt: "2026-09-03T02:00:00.000Z",
+                    },
+                });
+            }
+
+            detailReadCount += 1;
+            const detail = detailReadCount === 1
+                ? ticket
+                : detailReadCount === 2 ? categorizedTicket : clearedTicket;
+            return detailResponse(detail);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        const categorySelector = await screen.findByRole("combobox", { name: "หมวดหมู่ Ticket" });
+        expect(within(categorySelector).getAllByRole("option").map((option) => option.textContent))
+            .toEqual([
+                "ไม่จัดหมวดหมู่",
+                ...reference.categories.map(({ name }) => name),
+            ]);
+        expect(screen.queryByText(/รุ่น|version|revision/i)).not.toBeInTheDocument();
+
+        fireEvent.change(categorySelector, { target: { value: String(selectedCategory.id) } });
+        expect(categorySelector).toHaveValue(String(selectedCategory.id));
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกหมวดหมู่" }));
+
+        expect(await screen.findByText("บันทึกหมวดหมู่แล้ว")).toBeInTheDocument();
+        await waitFor(() => expect(patchBodies).toHaveLength(1));
+        expect(patchRoutes).toEqual([expect.stringContaining("/category")]);
+        expect(patchBodies[0]).toEqual({ categoryId: selectedCategory.id, expectedVersion: 4 });
+        await waitFor(() => expect(detailReadCount).toBe(2));
+        expect(categorySelector).toHaveValue(String(selectedCategory.id));
+
+        fireEvent.change(categorySelector, { target: { value: "" } });
+        expect(categorySelector).toHaveValue("");
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกหมวดหมู่" }));
+
+        await waitFor(() => expect(patchBodies).toHaveLength(2));
+        expect(patchBodies[1]).toEqual({ categoryId: null, expectedVersion: 5 });
+        await waitFor(() => expect(detailReadCount).toBe(3));
+        expect(categorySelector).toHaveValue("");
+        expect(screen.queryByText(/รุ่น|version|revision/i)).not.toBeInTheDocument();
     });
 
     it("keeps a read-only ALL operator from receiving mutation controls", async () => {
