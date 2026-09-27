@@ -187,7 +187,7 @@ describe("dashboard menu", () => {
         });
         expect(menuItem("email-request")).toMatchObject({
             label: "ส่งคำร้องพนักงานใหม่",
-            sidebarLabel: "คำร้องบริการ IT",
+            sidebarLabel: "คำร้องพนักงานใหม่",
         });
         expect(menuItem("it-workspace")).toMatchObject({
             label: "บริการ IT",

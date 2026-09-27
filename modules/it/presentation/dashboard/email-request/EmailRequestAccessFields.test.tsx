@@ -21,6 +21,8 @@ describe("EmailRequestAccessFields", () => {
                 name: "ต้องการใช้ระบบสารบรรณ",
             }),
         ).not.toBeChecked();
+        expect(screen.getByText("ไม่ต้องการ", { exact: true })).toBeInTheDocument();
+        expect(screen.getByText("ต้องการ", { exact: true })).toBeInTheDocument();
         expect(screen.getByRole("checkbox", { name: "it" })).toBeChecked();
         expect(
             screen.getByText("เลือกได้หลายรายการ, เลือกแล้ว 1 จาก 17 รายการ"),

@@ -108,7 +108,7 @@ describe("DashboardSidebar", () => {
         ).toBeInTheDocument();
         expect(
             screen.getByRole("button", {
-                name: "คำร้องบริการ IT",
+                name: "คำร้องพนักงานใหม่",
             }),
         ).toBeInTheDocument();
         expect(

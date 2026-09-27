@@ -62,7 +62,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
         id: "email-request",
         label: "ส่งคำร้องพนักงานใหม่",
-        sidebarLabel: "คำร้องบริการ IT",
+        sidebarLabel: "คำร้องพนักงานใหม่",
         icon: Mail,
         description: "ส่งคำร้องอีเมล สารบรรณ และ Shared Drive ให้ทีมไอที",
     },

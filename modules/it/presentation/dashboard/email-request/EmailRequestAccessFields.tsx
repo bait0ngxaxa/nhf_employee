@@ -31,7 +31,7 @@ function DocumentSystemToggle({
 }: DocumentSystemToggleProps): ReactElement {
     return (
         <div className="border-b border-border-subtle pb-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                     <p
                         id="needsDocumentSystem-label"
@@ -46,29 +46,48 @@ function DocumentSystemToggle({
                         เปิดใช้เมื่อพนักงานใหม่ต้องได้รับสิทธิ์เข้าใช้งานระบบสารบรรณ
                     </p>
                 </div>
-                <label
-                    htmlFor="needsDocumentSystem"
-                    aria-disabled={disabled}
-                    className={cn(
-                        "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full bg-surface-muted transition-colors has-[:checked]:bg-brand-solid has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-brand-focus/50",
-                        disabled && "cursor-not-allowed opacity-60",
-                    )}
-                >
-                    <span className="sr-only">ต้องการใช้ระบบสารบรรณ</span>
-                    <input
-                        id="needsDocumentSystem"
-                        name="needsDocumentSystem"
-                        type="checkbox"
-                        role="switch"
-                        checked={checked}
-                        aria-labelledby="needsDocumentSystem-label"
-                        aria-describedby="needsDocumentSystem-description"
-                        disabled={disabled}
-                        onChange={onChange}
-                        className="peer sr-only"
-                    />
-                    <span className="ml-1 h-5 w-5 translate-x-0 rounded-full bg-surface-raised shadow-sm transition-transform duration-200 peer-checked:translate-x-5" />
-                </label>
+                <div role="group" aria-label="ความต้องการใช้ระบบสารบรรณ" className="flex min-h-11 items-center justify-end gap-2">
+                    <span className={cn(
+                        "rounded-md px-2 py-1.5 text-sm transition-colors",
+                        !checked ? "bg-brand-surface font-semibold text-brand-foreground" : "text-content-muted",
+                    )}>
+                        ไม่ต้องการ
+                    </span>
+                    <label
+                        aria-disabled={disabled}
+                        className={cn(
+                            "relative inline-flex h-11 w-12 shrink-0 cursor-pointer items-center",
+                            disabled && "cursor-not-allowed opacity-60",
+                        )}
+                    >
+                        <input
+                            id="needsDocumentSystem"
+                            name="needsDocumentSystem"
+                            type="checkbox"
+                            role="switch"
+                            checked={checked}
+                            aria-labelledby="needsDocumentSystem-label"
+                            aria-describedby="needsDocumentSystem-description"
+                            disabled={disabled}
+                            onChange={onChange}
+                            className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                        />
+                        <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute left-0 top-1/2 h-7 w-12 -translate-y-1/2 rounded-full bg-surface-muted transition-colors peer-checked:bg-brand-solid peer-focus-visible:ring-[3px] peer-focus-visible:ring-brand-focus/50"
+                        />
+                        <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute left-1 top-1/2 size-5 -translate-y-1/2 rounded-full bg-surface-raised shadow-sm transition-transform duration-200 peer-checked:translate-x-5 peer-focus-visible:ring-[3px] peer-focus-visible:ring-brand-focus/50"
+                        />
+                    </label>
+                    <span className={cn(
+                        "rounded-md px-2 py-1.5 text-sm transition-colors",
+                        checked ? "bg-brand-surface font-semibold text-brand-foreground" : "text-content-muted",
+                    )}>
+                        ต้องการ
+                    </span>
+                </div>
             </div>
         </div>
     );
