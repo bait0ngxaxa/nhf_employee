@@ -1,6 +1,6 @@
 # สเปกการแจ้งเตือนการลา
 
-เอกสารนี้สรุปขอบเขตการส่งอีเมลและ in-app notification สำหรับเหตุการณ์แจ้งเตือนการลาทุก flow ที่ตกลงไว้ก่อน implement รวมถึง personal LINE delivery ที่เพิ่มแบบ additive ในภายหลัง รายละเอียด channel matrix ฉบับรวมอยู่ที่ [Notification Channel Architecture](./notification-channels.md)
+เอกสารนี้สรุปขอบเขตการส่งอีเมลและ in-app notification สำหรับเหตุการณ์แจ้งเตือนการลาทุก flow ที่ตกลงไว้ก่อน implement รวมถึง personal LINE delivery ที่เพิ่มแบบ additive ในภายหลัง รายละเอียด channel matrix ฉบับรวมอยู่ที่ [Notification Channel Architecture](../integrations/notifications.md); ขั้นตอน production ใช้ [runbook หลัก](../operations/production-deployment.md)
 
 ## หลักการ
 

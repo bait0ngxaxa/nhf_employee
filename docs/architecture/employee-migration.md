@@ -28,7 +28,7 @@ Current-state note: Routine Import runtime behavior is retired, and H2A.2
 removed its persistence representation from the database and Prisma schema.
 Routine Import paths and semantics mentioned in the earlier discovery records
 below remain historical evidence. See
-[Routine Import retirement](../routine-import.md) for the current status.
+[Routine Import retirement](../archive/routine-import-retired.md) for the current status.
 
 ## F1 implementation record
 

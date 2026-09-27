@@ -45,7 +45,7 @@ select/write `RoutineTask.sourceFileName`, `sourceSheet`, `sourceRow` หรื�
 `recipient-scope-compatibility.ts` แล้ว ผู้ปฏิบัติงานยืนยันว่า production
 collision preflight และ migration deployment ผ่านแล้ว; Routine recipient
 persistence transition ปิดแล้ว. ขั้นตอนก่อน cutover เก็บไว้ใน
-[notification capability recipient migration](./architecture/notification-capability-recipient-migration.md).
+[notification capability recipient migration](../architecture/notification-capability-recipient-migration.md).
 
 ## Audit history
 

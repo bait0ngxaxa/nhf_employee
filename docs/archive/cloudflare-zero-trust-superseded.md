@@ -27,7 +27,7 @@ webhook signature และ business authorization ในแอปพลิเ�
 
 ## เอกสารที่ต้องใช้แทน
 
-ให้ใช้ [Cloudflare Tunnel — Public Application Deployment](./CLOUDFLARE_TUNNEL_SETUP.md)
+ให้ใช้ [Cloudflare Tunnel — Public Application Deployment](../operations/cloudflare-tunnel.md)
 เป็นคู่มือปัจจุบันเพียงฉบับเดียวสำหรับ:
 
 - การสร้าง public hostname

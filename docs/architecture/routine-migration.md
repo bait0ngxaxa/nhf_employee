@@ -14,7 +14,7 @@ domain, application, validation, HTTP, scheduler, reminder, contract-reminder,
 Dashboard, and LIFF implementations. H2A later retired the separate Excel/file
 import workflow as a permanent product decision. The current Prisma schema has
 no Import models, relations, enums, or task provenance fields. See
-[Routine Import retirement](../routine-import.md) for the rollout and rollback
+[Routine Import retirement](../archive/routine-import-retired.md) for the rollout and rollback
 boundary.
 
 ## Ownership and public entry points

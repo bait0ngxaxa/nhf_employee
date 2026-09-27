@@ -11,7 +11,7 @@
 
 Routine, Stock, and Email Request recipient selection now uses configured
 capabilities after Phase 13A/13A.1; see the
-[recipient migration record](./architecture/notification-capability-recipient-migration.md)
+[recipient migration record](../architecture/notification-capability-recipient-migration.md)
 for the current mappings and rollout boundary.
 
 ## Architecture
@@ -287,9 +287,7 @@ Legacy integrations ยังคงแยก configuration:
 - `LINE_IT_CHANNEL_SECRET`: inbound `/api/line/webhook`; Email Request และ IT Ticket ใช้ NHFapp personal LINE
 - `LINE_IT_CHANNEL_ACCESS_TOKEN`: retained low-level compatibility transport; ไม่มี current Email Request business producer
 
-Production ต้อง apply forward-only migration สำหรับ enum outbox ใหม่, ตั้งค่า NHFapp token/LIFF
-ให้มาจาก Provider เดียวกัน, ให้ผู้ใช้เพิ่ม NHFapp OA และทำ account linking, แล้วตรวจ outbox
-cron/worker และ provider logs ด้วยข้อมูลที่ไม่เปิดเผย token หรือ ID token
+ลำดับ migration, LIFF configuration, account linking และ outbox production verification อยู่ใน [production runbook](../operations/production-deployment.md); ตรวจ provider logs โดยไม่เปิดเผย token หรือ ID token
 
 ## Future retirement criteria for Stock legacy LINE
 

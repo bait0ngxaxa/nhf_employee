@@ -1258,7 +1258,7 @@ historical L0 wording is labelled where it no longer describes the source tree.
   - `sendLineWebhook`, `lineNotificationService.sendLineWebhook`,
     `LineWebhookData`, and `LINE_WEBHOOK_URL`: **FORMALLY RETAINED**. The
     variable remains in the local ignored environment, `.env.example`,
-    README, and `docs/line-routine.md`; no live deployment, LINE Console,
+    README, and `docs/operations/production-deployment.md`; no live deployment, LINE Console,
     Cloudflare, or operator environment was available to verify whether an
     external integration consumes it.
   - `lib/line/types.ts` `VerifiedLineIdentity`: **REMOVED** independently.
@@ -1773,7 +1773,7 @@ fallback from those headers.
 ### 19.2 Gate B — supported production topology
 
 Repository evidence was reconciled across `README.md`,
-`docs/leave-attachments-deployment.md`, both Cloudflare Tunnel guides,
+`docs/operations/storage-and-attachments.md`, both Cloudflare Tunnel guides,
 `docker-compose.yml`, `docker-compose.integration.yml`, the Nginx examples,
 `package.json`, `next.config.ts`, and the repository-wide deployment/config
 search.
@@ -2032,8 +2032,8 @@ Changed deployment/runtime files:
 - `package.json`: `npm run start` now binds Next.js to `127.0.0.1`.
 - `deployment/nginx/employee_nhf.cloudflare-origin.conf`: Nginx overwrites
   upstream `CF-Connecting-IP` from canonical `$remote_addr`.
-- `README.md`, `docs/leave-attachments-deployment.md`,
-  `CLOUDFLARE_TUNNEL_SETUP.md`, and `CLOUDFLARE_ZERO_TRUST_SETUP.md`: the
+- `README.md`, `docs/operations/storage-and-attachments.md`,
+  `docs/operations/cloudflare-tunnel.md`, and `docs/archive/cloudflare-zero-trust-superseded.md`: the
   supported one-process topology, restart behavior, origin reachability,
   client-IP responsibility, unsupported cluster/multi-host modes, and future
   scale prerequisites are explicit.
@@ -2857,7 +2857,7 @@ L5 changed:
   MySQL stale-recovery and concurrent-claim evidence;
 - focused provider, transport, processor, Leave, Routine, Stock, cron, and
   real-MySQL state-transition tests; and
-- `docs/notification-channels.md` and this architecture record.
+- `docs/integrations/notifications.md` and this architecture record.
 
 No provider configuration names, tokens, recipients, Thai notification
 content, Leave/Routine/Stock business flow, Email Request ownership, cron URL,
@@ -2911,7 +2911,7 @@ The evidence review inspected:
 - `modules/audit/**`, `modules/line/**`, the candidate `lib/line/**` files,
   `app/api/audit-logs/**`, and `app/api/line/webhook/route.ts`;
 - `README.md`, `.env.example`, `.env` variable names only,
-  `docs/line-routine.md`, `docs/notification-channels.md`, `package.json`,
+  `docs/operations/production-deployment.md`, `docs/integrations/notifications.md`, `package.json`,
   and `scripts/check-architecture.mjs`;
 - all repository-visible scripts, tests, Prisma support, Docker Compose,
   deployment/Nginx files, Cloudflare setup guides, and Git history for the
@@ -2934,7 +2934,7 @@ Consumer classification:
 | Candidate | Production runtime | Tests | Tool/operator | Deployment/configuration | Documentation |
 | --- | --- | --- | --- | --- | --- |
 | `lib/services/audit-log/**` | No consumer; Audit routes use `@/modules/audit` | No intentional legacy-path contract | No consumer | No consumer | Historical migration references only, plus current L6 disposition |
-| `sendLineWebhook` / `LineWebhookData` / `LINE_WEBHOOK_URL` | Helper definition/export only; no repository production caller | Retained outbound compatibility tests | No repository operator caller | `LINE_WEBHOOK_URL` is present in ignored local `.env` and `.env.example`; no deployment artifact consumer | README and `docs/line-routine.md` advertise the retained optional contract |
+| `sendLineWebhook` / `LineWebhookData` / `LINE_WEBHOOK_URL` | Helper definition/export only; no repository production caller | Retained outbound compatibility tests | No repository operator caller | `LINE_WEBHOOK_URL` is present in ignored local `.env` and `.env.example`; no deployment artifact consumer | README and `docs/operations/production-deployment.md` advertise the retained optional contract |
 | legacy `VerifiedLineIdentity` | No consumer | No consumer | No consumer | No runtime use | No current contract; authoritative type is under `modules/line` |
 
 ### 23.2 Package, build, and deployment evidence
@@ -2991,7 +2991,7 @@ Audit query, retention, export/display, and route tests remain in place.
 
 | Symbol/path | Disposition | Evidence and retained/removal condition |
 | --- | --- | --- |
-| `lib/line/index.ts :: sendLineWebhook` | **FORMALLY RETAINED** | README, `.env.example`, `docs/line-routine.md`, and the ignored local `.env` still expose `LINE_WEBHOOK_URL`; live deployment/external integration usage cannot be inspected. Remove only after deployment owner confirms the variable is unset/unused in every active environment and no external integration consumes the helper. |
+| `lib/line/index.ts :: sendLineWebhook` | **FORMALLY RETAINED** | README, `.env.example`, `docs/operations/production-deployment.md`, and the ignored local `.env` still expose `LINE_WEBHOOK_URL`; live deployment/external integration usage cannot be inspected. Remove only after deployment owner confirms the variable is unset/unused in every active environment and no external integration consumes the helper. |
 | `lineNotificationService.sendLineWebhook` | **FORMALLY RETAINED** | Retained as the object-form compatibility export of the same outbound contract; it is not the inbound route. The same external confirmation condition applies. |
 | `lib/line/types.ts :: LineWebhookData` | **FORMALLY RETAINED** | Its only current source consumer is the retained outbound helper, and it describes the advertised compatibility payload. Remove only with the helper and configuration after the same external confirmation. |
 | `LINE_WEBHOOK_URL` | **FORMALLY RETAINED** | Kept in runtime configuration and `.env.example`; current docs now identify it as optional legacy outbound compatibility, separate from `/api/line/webhook` and the current NHFapp personal Email Request LINE path. |
@@ -3014,7 +3014,7 @@ broadcast and the NHFapp identity integration are unchanged.
 - Added inbound webhook route tests for missing signature, missing channel
   configuration, invalid signature, and valid IT/Stock signatures. Added
   retained outbound helper tests for configured and absent URL behavior.
-- Updated current README, `.env.example`, `docs/line-routine.md`, the final
+- Updated current README, `.env.example`, `docs/operations/production-deployment.md`, the final
   repository audit, module-boundary/current identity records, and the Audit
   migration current-status note. Historical migration sections retain old
   paths where they describe the earlier I0/I1 state.

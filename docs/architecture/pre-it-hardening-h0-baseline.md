@@ -696,9 +696,9 @@ evidence-backed later cleanup.
 Invariant: source-backed readiness and operator-confirmed production
 behavior must remain separate.
 
-Evidence: docs/liff-production-acceptance.md keeps production, device,
+Evidence: docs/operations/production-acceptance.md keeps production, device,
 backup, origin, LINE, SMTP, cron, and restore rows at NOT RUN until evidence
-is attached. README.md and docs/line-routine.md document external cron,
+is attached. README.md and docs/operations/production-deployment.md document external cron,
 single-process, Cloudflare/Nginx, backup, and restore assumptions.
 
 Affected paths: production deployment, cron ownership, SMTP/LINE, database,
@@ -778,7 +778,7 @@ and the storage snapshot must remain recoverable with its database metadata.
 Evidence: lib/uploads/local.ts uses .uploads under the process working
 directory; the public upload route rejects private/traversal paths, and the
 Leave attachment route authorizes access before reading private storage.
-README.md and docs/leave-attachments-deployment.md require persistent disk
+README.md and docs/operations/storage-and-attachments.md require persistent disk
 and coordinated database/file backup.
 
 Affected paths: public stock image storage, private Leave attachments,

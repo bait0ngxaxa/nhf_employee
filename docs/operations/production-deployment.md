@@ -1,13 +1,15 @@
-# NHFapp Unified LINE / LIFF Production Runbook
+# Production Deployment & LIFF Runbook
 
-เอกสารนี้เป็น runbook ฉบับสุดท้ายสำหรับ Phase 5B — Production Acceptance / Launch Readiness Gate ของ Unified NHFapp LIFF ใช้สำหรับเตรียม ตรวจรับ และเปิดใช้งานใน production เท่านั้น
+**สถานะ: CURRENT / CANONICAL** — เอกสารหลักเพียงฉบับเดียวสำหรับการ deploy production และเปิดใช้ Unified LIFF/Rich Menu; [ผลตรวจรับ production ปัจจุบัน](./production-acceptance.md) บันทึกแยกตาม release
+
+เอกสารนี้ใช้สำหรับเตรียม ตรวจรับ deploy และเปิดใช้งาน NHFapp ใน production รวมทั้ง LINE/LIFF
 
 หลักการสำคัญ:
 
 - application deployment กับ Rich Menu activation เป็นคนละ launch control
 - Rich Menu ใหม่ต้องเป็นขั้นตอนสุดท้าย หลังตรวจระบบบน smartphone ครบแล้ว
 - `npm run line:richmenu:provision -- --apply` และ `npm run line:richmenu:set-default -- --apply` เป็นคำสั่งที่เปลี่ยน production state ผู้ปฏิบัติงานที่ได้รับอนุญาตเป็นผู้รันเองเท่านั้น
-- เอกสาร acceptance ที่ใช้บันทึกผลจริงอยู่ที่ [LIFF Production Acceptance](./liff-production-acceptance.md)
+- เอกสาร acceptance ที่ใช้บันทึกผลจริงอยู่ที่ [LIFF Production Acceptance](./production-acceptance.md)
 
 ## 1. Architecture
 
@@ -162,7 +164,7 @@ NEXT_PUBLIC_FEATURE_ROUTINE=false
 | `LEAVE_ATTACHMENT_CLEANUP_SECRET` | เปิด scheduled orphan cleanup ของ private leave attachments |
 | `AUTH_CLEANUP_SECRET`, `AUDIT_LOG_CLEANUP_SECRET` | เปิด maintenance endpoint ของ auth/audit ตาม deployment policy |
 
-รายละเอียด permission, backup, restore, reverse proxy และ cleanup ของ leave attachment อยู่ใน [Leave attachment deployment runbook](./leave-attachments-deployment.md)
+รายละเอียด permission, backup, restore, reverse proxy และ cleanup ของ leave attachment อยู่ใน [Storage and attachment operations](./storage-and-attachments.md)
 
 ### Existing notification integrations
 
@@ -204,7 +206,7 @@ unchanged. Email and LINE include a short event message, Ticket number, and CTA;
 they omit Ticket descriptions, comment bodies, attachment content/storage keys,
 and authorization grant details. Ticket recipient and stale-event policies remain
 unchanged.
-Leave notification ใช้ **in-app และ email** ผ่าน Leave notification/outbox workflow เดิม และเพิ่ม targeted personal LINE ผ่าน NHFapp OA สำหรับ workflow events ตาม [Notification Channel Architecture](./notification-channels.md) โดยไม่เปลี่ยน recipient semantics หรือ authorization ของ Leave
+Leave notification ใช้ **in-app และ email** ผ่าน Leave notification/outbox workflow เดิม และเพิ่ม targeted personal LINE ผ่าน NHFapp OA สำหรับ workflow events ตาม [Notification Channel Architecture](../integrations/notifications.md) โดยไม่เปลี่ยน recipient semantics หรือ authorization ของ Leave
 
 `BOOTSTRAP_ADMIN_EMAILS` ใช้ตอน seed/bootstrap เท่านั้น ส่วน `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` ใช้เมื่อ deployment เลือก Docker Compose MySQL
 
@@ -444,11 +446,11 @@ occurrence generated
 ```
 
 ผู้รับที่ไม่มี `LineAccountLink` ต้องยังได้ช่องทางที่เปิดใช้งานอยู่โดยไม่สร้าง Routine LINE child event ให้ผู้รับคนนั้น
-Leave notification acceptance ให้ตรวจ **in-app, email และ personal LINE** ตาม [Notification Channel Architecture](./notification-channels.md) โดยยืนยันว่า unlinked user ยังได้ช่องทางเดิม และ LINE action link เปิด LIFF ที่ให้ server ตรวจ authorization อีกครั้ง
+Leave notification acceptance ให้ตรวจ **in-app, email และ personal LINE** ตาม [Notification Channel Architecture](../integrations/notifications.md) โดยยืนยันว่า unlinked user ยังได้ช่องทางเดิม และ LINE action link เปิด LIFF ที่ให้ server ตรวจ authorization อีกครั้ง
 
 ## 8. Leave attachment production readiness
 
-ทำตาม [Leave attachment deployment runbook](./leave-attachments-deployment.md) และยืนยันอย่างน้อย:
+ทำตาม [Storage and attachment operations](./storage-and-attachments.md) และยืนยันอย่างน้อย:
 
 - `.uploads/private/leave` เป็น persistent storage และ process user อ่าน/เขียนได้
 - ไม่ expose directory นี้ด้วย Nginx static `alias` หรือ public URL
@@ -460,46 +462,29 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 - ไฟล์ใหญ่เกิน, aggregate ใหญ่เกิน และภาพไม่ถูกต้องถูก reject อย่างปลอดภัย
 - owner/approver ที่มีสิทธิ์เปิดได้ ส่วน employee อื่นและผู้ไม่มีสิทธิ์ถูกปฏิเสธโดยไม่เห็น storage path
 
-## 9. Exact production deployment order
+## 9. ลำดับการ deploy production และ LIFF gate ที่ต้องผ่าน
 
-ทำตามลำดับนี้ และอย่า activate Rich Menu ก่อนข้อ manual acceptance สำเร็จ:
+ทำตามลำดับนี้ทุก release; [production acceptance](./production-acceptance.md) ของ release ก่อนหน้าใช้แทนการตรวจครั้งนี้ไม่ได้ หยุดเมื่อ gate ใดไม่ผ่าน และห้าม activate Rich Menu ใหม่ก่อน LIFF gate และ acceptance ผ่าน
 
-1. Freeze production commit ที่ตั้งใจ deploy และหยุดการเปลี่ยนแปลงที่ไม่เกี่ยวข้อง
-2. บันทึก deployment commit SHA
-3. ตรวจ working tree/artifact ว่าเป็น release ที่ review แล้ว
-4. ตรวจ secret manager และ configure production environment โดยตั้ง `NEXT_PUBLIC_*` ก่อน build
-5. เตรียม persistent `.uploads/private/leave` และตรวจ permission/non-root process
-6. Backup database และ private attachment storage ตาม policy
-7. ติดตั้ง dependencies ด้วย `npm ci` และ generate Prisma client ด้วย `npx prisma generate`
-8. รัน `npm run architecture:check`, `npm run lint:strict`, `npm run typecheck` และ
-   targeted tests ที่เกี่ยวข้องกับ release; ถ้าเป็น high-risk release ที่ต้องการ
-   full-suite evidence ให้รัน `npm run test` หลัง checks เหล่านี้ผ่านและ
-   diff คงที่แล้ว
-9. รัน `npm run build` ด้วย non-secret/local configuration ที่สอดคล้องกับ production; หาก build local ใช้ production-only credential ไม่ได้ ให้ gate ไว้เป็น pre-deploy operator check
-10. Apply pending forward-only migrations ด้วย `npx prisma migrate deploy` หลัง backup; IT12 adds `IT_TICKET_EMAIL`, `EMAIL_REQUEST_EMAIL`, and `EMAIL_REQUEST_LINE` to `NotificationOutboxType`, preserving historical values and changing no Ticket or Inbox tables
-11. Deploy artifact/source ที่ตรงกับ commit SHA
-12. Start/restart Next.js ผ่าน supervisor ด้วย working directory, environment และ persistent storage ที่ถูกต้อง
-13. ตรวจ process/service health จาก origin เช่น `curl --fail http://127.0.0.1:3000/`
-14. ตรวจ public HTTPS และเปิด `/liff` โดยตรงก่อน Rich Menu
-15. ตรวจ `npm run line:richmenu:status` แบบ read-only ใน production operator environment
-16. ตรวจ `npm run line:richmenu:provision` แบบ dry-run และตรวจ URL/image/four areas
-17. Configure external owner ของ Routine scheduler และ Notification outbox แยกกัน
-18. ตรวจ scheduler/outbox smoke ตาม contract และตรวจ HTTP monitoring
-19. ทดสอบ unlinked LINE account และ account-link flow
-20. ทดสอบ returning linked-user flow และ session recovery
-21. ทดสอบ Stock end-to-end
-22. ทดสอบ Leave end-to-end รวม smartphone attachment
-23. ทดสอบ Routine end-to-end รวม stale-version และ reminder/outbox/deep link
-24. ทดสอบ cross-module navigation, feature flags และ deep links บน Android + iPhone ใน LINE in-app LIFF
-25. บันทึกผลใน [acceptance matrix](./liff-production-acceptance.md); ทุก critical row ต้อง `PASS` และไม่มี stop condition
-26. เรียก `npm run line:richmenu:provision` ซ้ำหลัง smartphone acceptance เพื่อบันทึก dry-run สุดท้าย
-27. เรียก `status` เพื่อบันทึก previous default `richMenuId` และตรวจว่า rollback target มีอยู่จริง
-28. บันทึก previous/new ID ที่คาดหมาย, timestamp, operator และ SHA ก่อน mutation
-29. รัน `npm run line:richmenu:provision -- --apply` เป็นขั้นตอนสุดท้ายเพื่อสร้าง/ตั้ง Unified Rich Menu ใหม่
-30. ตรวจ `richMenuId` ใหม่ด้วย `npm run line:richmenu:status`, เปิด chat ใหม่บน smartphone และเริ่ม monitoring window
-31. บันทึก final decision เป็น `GO` หรือ `NO-GO` โดย human operator
+1. Freeze release commit SHA และตรวจว่า source/artifact ตรงกับ revision ที่ review แล้ว
+2. ตรวจ production configuration, LINE Provider, LINE Login channel, LIFF ID, NHFapp Messaging API Channel, secrets, SMTP, feature flags และ `NEXT_PUBLIC_*` ก่อน build; ห้าม log หรือ commit ค่า secret
+3. Backup MySQL และ persistent `.uploads/` จากช่วงเวลาที่สอดคล้องกัน รวม Leave และ IT private attachments; ตรวจสิทธิ์ของ non-root process ตาม [storage operations](./storage-and-attachments.md)
+4. รัน `npm ci` และ `npx prisma generate`
+5. รัน repository verification: `npm run architecture:check`, `npm run lint:strict`, `npm run typecheck` และ `npm run test -- path/to/relevant-release.test.ts`; พิจารณา `npm run test` เฉพาะ release ที่เสี่ยงกระทบหลายส่วน
+6. รัน `npm run build` ด้วย configuration ที่สอดคล้องกับ production หลังตั้ง `NEXT_PUBLIC_*`
+7. รัน `npx prisma migrate deploy` หลัง backup เท่านั้น; migration production เดินหน้า ห้ามใช้ `prisma migrate dev` หรือ `prisma db push` เป็นขั้นตอน deploy ปกติ
+8. Deploy artifact/source ที่ตรงกับ release SHA แล้ว start/restart Next.js ผ่าน supervisor แบบ process เดียว โดย bind `127.0.0.1:3000` และใช้ persistent storage
+9. ตรวจ origin health เช่น `curl --fail http://127.0.0.1:3000/` และ public HTTPS health ผ่าน Cloudflare Tunnel → Nginx → Next.js; ตรวจ Nginx ด้วย `sudo nginx -t` เมื่อตั้งค่าหรือเปลี่ยน reverse proxy
+10. **Mandatory LIFF post-deploy gate:** เปิด `/liff` ใน LINE in-app browser บน Android และ iPhone ตรวจ LIFF ID กับ production LINE Login channel และยืนยัน LINE Login Channel กับ NHFapp Messaging API Channel อยู่ใต้ Provider เดียวกัน
+11. ทดสอบ LINE identity ที่ยังไม่ link เข้าสู่ account-link flow; linked user กลับมาแล้ว restore LIFF workforce session ได้; session หมดอายุแล้ว recovery ได้โดยไม่ replay mutation อัตโนมัติ
+12. ทดสอบ Stock, Leave, Routine ที่เปิดใช้ และ IT requester flow รวม attachment, cross-module navigation, direct deep links และ server-side authorization เมื่อเปิด deep link โดยตรง
+13. ตรวจ external owner ของ Routine scheduler และ notification outbox อย่างละหนึ่งราย ตรวจ invocation, outbox processing และ Email/LINE delivery ที่เปิดใช้ตาม contract ในหัวข้อ 7
+14. รัน `npm run line:richmenu:status` แบบ read-only และ `npm run line:richmenu:provision` แบบ dry-run; ตรวจ URL, รูป และสี่พื้นที่ของเมนู โดยยังไม่ใช้ `--apply`
+15. บันทึกผล release นี้ใน [production acceptance](./production-acceptance.md) ให้ครบ รวม device, storage, rollback readiness และ launch monitoring; human operator ตัดสิน GO/NO-GO
+16. หลัง GO เท่านั้น บันทึก previous default Rich Menu ID, target/new ID ที่คาดหมาย, operator, เวลา และ SHA; จากนั้นผู้ปฏิบัติงานที่ได้รับอนุญาตรัน `npm run line:richmenu:provision -- --apply` เป็น final launch control
+17. ตรวจ default menu ใหม่ด้วย `npm run line:richmenu:status`, เปิด chat ใหม่บน smartphone และติดตาม application, LIFF, scheduler, outbox, delivery และ attachments ระหว่าง post-launch monitoring
 
-Rich Menu activation คือ final launch switch เพราะทำให้ผู้ใช้เข้าถึงระบบที่ deploy แล้วโดยตรง ก่อนข้อ 28 ต้องยังไม่ตั้งเมนูใหม่เป็น default
+การ deploy application และ Rich Menu activation เป็นคนละ control. ถ้า status ไม่สามารถระบุ previous default menu/rollback target ได้ ให้หยุดก่อน `--apply`. Rollback application ต้องใช้ artifact ที่เข้ากันได้กับ forward-only schema; การคืน default Rich Menu ใช้ขั้นตอนในหัวข้อ 10
 
 ## 10. Rich Menu rollback
 
@@ -588,19 +573,13 @@ Inactive Employee
 Unlinked LINE User
 ```
 
-กรอกผลละเอียดใน [LIFF Production Acceptance](./liff-production-acceptance.md) ซึ่งครอบคลุม identity/session, Stock, Leave, Routine, requester IT, deep links, device/browser, scheduler/outbox, attachment, monitoring และ rollback
+บันทึกผล release นี้ใน [Production Acceptance](./production-acceptance.md) ซึ่งครอบคลุม identity/session, Stock, Leave, Routine, requester IT, deep links, device/browser, scheduler/outbox, attachment, monitoring และ rollback
 
 ## 13. Final decision
 
 ห้ามสรุป `GO` จาก automated tests เพียงอย่างเดียว `GO` ต้องเกิดหลัง production configuration, LINE console verification, real smartphone acceptance และ rollback evidence ครบแล้วโดย human operator
 
-Implementation agent ของ Phase 5B ต้องไม่:
-
-- รัน `npm run line:richmenu:provision -- --apply`
-- เปลี่ยน default Rich Menu จริง
-- เรียก production cron endpoints
-- ส่ง real production LINE push/email
-- แก้ LINE Developers Console, rotate credentials หรือ deploy production
+ผู้ปฏิบัติงาน production ที่ได้รับอนุญาตเท่านั้นเป็นผู้ใช้คำสั่ง mutation ของ Rich Menu และบันทึกหลักฐานก่อน/หลัง activation
 
 ## 14. Repository commands และ references
 
@@ -619,12 +598,275 @@ npm run line:richmenu:set-default -- --rich-menu-id=<id>
 
 References ภายใน:
 
-- [LIFF Production Acceptance](./liff-production-acceptance.md)
-- [Leave attachment deployment runbook](./leave-attachments-deployment.md)
-- [Routine reminder manual test](./line-routine-reminder-manual-test.md)
+- [LIFF Production Acceptance](./production-acceptance.md)
+- [Storage and attachment operations](./storage-and-attachments.md)
+- [Routine reminder manual test](./verification/routine-reminder.md)
 
 Official references เดิมที่ใช้ประกอบการตรวจ LINE configuration:
 
 - [LINE Developers — Use rich menus](https://developers.line.biz/en/docs/messaging-api/using-rich-menus/)
 - [LINE Developers — Messaging API reference](https://developers.line.biz/en/reference/messaging-api/nojs/)
 - [LINE Developers — LIFF API reference](https://developers.line.biz/en/reference/liff/)
+
+## Platform, Nginx และ external maintenance
+
+ลำดับที่ต้องทำจริงอยู่ในหัวข้อ 9; คำสั่งต่อไปนี้เป็นรายละเอียดของขั้นตอนนั้น โดยเฉพาะการติดตั้งครั้งแรก
+
+### Production environment และ initial install
+
+```bash
+cp .env.example .env
+```
+
+ตั้งค่าอย่างน้อย:
+
+- secret ทุกตัวเป็นค่าสุ่มที่ไม่ซ้ำกัน
+- `PUBLIC_APPROVE_URL` เป็น public HTTPS origin จริง
+- `DATABASE_URL` ให้ user/password/database ตรงกับค่า `MYSQL_*`
+- SMTP, LINE และ feature flags ตาม integration ที่ต้องเปิด
+
+ถ้าแอปรันบน host เดียวกับ Compose ให้ใช้:
+
+```dotenv
+DATABASE_URL="mysql://app_user:strong-password@127.0.0.1:3308/employee_nhf"
+```
+
+### MySQL service
+
+```bash
+docker compose config --quiet
+docker compose up -d --wait
+docker compose ps
+```
+
+Named volume `nhfemployee-data` เก็บข้อมูล MySQL แบบ persistent คำสั่ง `docker compose down` จะไม่ลบ volume แต่ **ห้าม** ใช้ `docker compose down --volumes` ใน production เว้นแต่ตั้งใจลบฐานข้อมูล
+
+### Release verification commands
+
+```bash
+npm ci
+npx prisma generate
+npm run architecture:check
+npm run lint:strict
+npm run typecheck
+npm run test -- path/to/relevant-release.test.ts
+```
+
+ให้ระบุ path ของ targeted tests ที่เกี่ยวข้องกับ release เสมอ อย่ารัน
+`npm run test` แบบไม่ระบุ path ในรอบแก้ไขปกติ หากเป็น release ที่มีความเสี่ยงกว้าง
+และจำเป็นต้องยืนยันทั้ง repository ให้รัน `npm run test` หลัง checks
+ข้างต้นผ่านและ diff คงที่แล้ว
+
+### Migration และ seed
+
+สำรองฐานข้อมูลก่อน migration ทุกครั้ง แล้วรัน:
+
+```bash
+npx prisma migrate deploy
+```
+
+รัน seed เฉพาะการติดตั้งครั้งแรก หรือเมื่อต้องการ reconcile ข้อมูลตั้งต้น:
+
+```bash
+npm run db:seed
+```
+
+ห้ามใช้ `prisma migrate dev` หรือ `prisma db push` กับ production
+
+### Build และ process supervisor
+
+ตั้ง production environment ให้ครบก่อน build โดยเฉพาะ `NEXT_PUBLIC_*`:
+
+```bash
+npm run build
+npm run start
+```
+
+`npm run start` ใช้ build จาก `.next/` และฟังพอร์ต `3000` ที่ `127.0.0.1` เท่านั้น ให้ใช้ process supervisor ของเครื่อง (เช่น systemd, Supervisor หรือ PM2 แบบ single process) เพื่อ:
+
+- ตั้ง working directory เป็น project root
+- โหลด `.env`/environment ของ production
+- restart เมื่อ process ล้มเหลวหรือเครื่อง reboot
+- รันด้วย non-root user ที่เขียน `.uploads/` ได้
+
+หลังเริ่ม process ให้ตรวจจากเครื่อง origin:
+
+```bash
+curl --fail http://127.0.0.1:3000/
+```
+
+
+### Process topology และ rate-limit contract
+
+Production topology ที่ repository รองรับในปัจจุบันคือ **หนึ่ง host และหนึ่ง
+Next.js production process** ที่รัน `npm run start` หลัง Nginx upstream เดียว
+เท่านั้น. systemd, Supervisor และ PM2 ใช้ได้ในโหมด single process; PM2 cluster,
+การรัน Next.js หลาย process หลัง Nginx และการกระจายไปหลาย host ยังไม่ใช่ topology
+ที่รองรับ. Node.js อาจทำได้ในทางเทคนิค แต่ห้ามเปิดใช้โดยถือว่า rate limit
+ปลอดภัยแล้ว.
+
+Auth และ mutation rate limit ใน `lib/auth/rate-limit.ts` และ
+`lib/security/mutation-rate-limit.ts` เป็น state ใน process เท่านั้น. Counter
+ไม่แชร์ข้าม process/host และหายเมื่อ process restart; นี่เป็น tradeoff ที่ยอมรับ
+สำหรับ topology ปัจจุบันและเป็น burst/brute-force control ไม่ใช่บัญชีโควตาถาวร.
+ก่อนเปิด cluster หรือ horizontal scale ต้องมี backend ที่แชร์และ consume แบบ
+atomic พร้อม deployment, failure policy, cleanup, integration test และ runbook
+ที่รองรับ รวมถึง shared/object storage สำหรับ `.uploads/`.
+
+เส้นทาง client IP ที่รองรับคือ `Cloudflare → Nginx → Next.js`. Nginx ตรวจ
+Cloudflare source ranges, ใช้ `real_ip_header CF-Connecting-IP` แล้วเขียนทับ
+`CF-Connecting-IP` ที่ส่งให้แอปจากค่า `$remote_addr` ที่ canonical แล้ว. แอปจึง
+ไม่ใช้ `X-Forwarded-For`, `X-Real-IP` หรือ forwarding header อื่นเป็น fallback.
+ห้ามเปิด `127.0.0.1:3000` ออก Internet. หากใช้ Cloudflare Tunnel ให้ public
+hostname route ผ่าน Nginx เพื่อเปิดใช้งาน **ทั้งแอปพลิเคชัน** โดย configuration
+ของ Tunnel ไม่กำหนด `path` allowlist; การ route ผ่าน Nginx ต้องมี trusted
+tunnel-to-Nginx client-IP contract ที่ operator ตรวจสอบเพิ่ม เพราะ config ใน
+repository นี้ trust เฉพาะ Cloudflare source ranges และไม่ถือว่า local
+`cloudflared` เป็น trusted proxy โดยอัตโนมัติ. การเปิด public ทุก path เป็นเพียง
+network reachability; Auth, authorization, role, LIFF และ webhook signature
+ยังต้องถูกบังคับโดยแอปพลิเคชัน.
+
+ถ้าไม่มีหรือมีค่า client identity ที่ไม่ถูกต้อง request จะอยู่ใน shared
+`unknown` bucket สำหรับ pre-auth controls. local development/test ใช้ bucket นี้
+ได้ แต่ไม่ควรใช้เป็นหลักฐานว่า production ระบุ client IP ได้. การแก้ traffic ที่
+ถูกจัดเป็น `unknown` ต้องแก้ reverse-proxy/origin configuration ไม่ใช่เพิ่ม
+fallback ที่เชื่อ header จาก client.
+
+
+### Nginx และ Cloudflare
+
+ไฟล์ตัวอย่างอยู่ที่:
+
+- `deployment/nginx/employee_nhf.cloudflare-origin.conf`
+- `deployment/nginx/cloudflare-real-ip.conf`
+
+ก่อนใช้ต้องแก้:
+
+- `server_name` ให้เป็น hostname จริง
+- path ของ Cloudflare Origin Certificate และ private key
+- upstream ต้องคงที่ `127.0.0.1:3000` ตาม single-process production contract
+
+ตัวอย่างติดตั้งบน Linux:
+
+```bash
+sudo cp deployment/nginx/cloudflare-real-ip.conf /etc/nginx/snippets/cloudflare-real-ip.conf
+sudo cp deployment/nginx/employee_nhf.cloudflare-origin.conf /etc/nginx/sites-available/employee_nhf.conf
+sudo ln -s /etc/nginx/sites-available/employee_nhf.conf /etc/nginx/sites-enabled/employee_nhf.conf
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+ขั้นตอน Cloudflare Tunnel แบบปัจจุบัน:
+
+- [Cloudflare Tunnel Setup](./cloudflare-tunnel.md)
+- [Cloudflare Zero Trust Setup — Superseded](../archive/cloudflare-zero-trust-superseded.md)
+
+เอกสาร Zero Trust เป็นบันทึกแนวทางเดิมเท่านั้น ไม่ใช่ขั้นตอนที่ต้องทำในการ
+deploy ปัจจุบัน ระบบใช้ public Cloudflare Tunnel และไม่ใช้ Cloudflare Access
+หรือ Zero Trust authentication gate.
+
+> รายการ Cloudflare IP ใน `cloudflare-real-ip.conf` ต้องตรวจเทียบกับรายการทางการเป็นระยะ และ origin firewall ควรอนุญาตเฉพาะ Cloudflare หรือ tunnel ที่ใช้งาน
+
+ตัวอย่าง Nginx ต้องคง `client_max_body_size 25m;` สำหรับคำขอลาที่มีหลักฐาน และต้องไม่มี `location` ที่ expose
+`.uploads/private` เป็น static file หรือ alias
+
+
+## Scheduled Maintenance
+
+แอปไม่มี in-process cron และไม่ควรพึ่ง request จากผู้ใช้เพื่อปลุก worker ใน production ให้ตั้ง external
+scheduler เรียก endpoints ต่อไปนี้ด้วย `POST`
+
+cron process ไม่ได้โหลด `.env` ของ Next.js อัตโนมัติ ต้องส่ง environment variables ให้ cron โดยตรง หรือสร้างไฟล์
+เฉพาะสำหรับ cron ที่อ่านได้เฉพาะผู้ดูแลระบบ เช่น `/etc/employee_nhf/cron.env`:
+
+```dotenv
+APP_BASE_URL="https://approve.example.com"
+ROUTINE_SCHEDULER_CRON_SECRET="replace-with-production-secret"
+NOTIFICATION_OUTBOX_CRON_SECRET="replace-with-production-secret"
+AUDIT_LOG_CLEANUP_SECRET="replace-with-production-secret"
+AUTH_CLEANUP_SECRET="replace-with-production-secret"
+LEAVE_ATTACHMENT_CLEANUP_SECRET="replace-with-production-secret"
+```
+
+ตั้ง permission เป็น `600` และใช้ secret คนละค่ากันทุกตัว `APP_BASE_URL` ต้องเป็น HTTPS origin เดียวกับ
+`PUBLIC_APPROVE_URL` โดยไม่มี `/` ท้าย URL หาก scheduler platform รองรับ environment variables อยู่แล้ว ไม่ต้องสร้างไฟล์นี้
+
+ตัวอย่าง crontab ด้านล่างใช้ `/bin/bash` และโหลดไฟล์ดังกล่าวก่อนเรียก endpoint:
+
+```cron
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+```
+
+### Routine scheduler — ตัวอย่างทุก 1 นาที
+
+สร้าง occurrence ตาม schedule และ enqueue reminder เข้า notification outbox แต่ไม่ได้ส่ง notification เอง ต้องตั้ง
+Notification outbox worker ด้านล่างด้วย สำหรับ production ต้องตั้ง `NEXT_PUBLIC_FEATURE_ROUTINE=true` ก่อน build มิฉะนั้น
+endpoint จะตอบสำเร็จแบบ no-op โดยไม่สร้าง occurrence หรือ reminder:
+
+```cron
+* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --max-time 50 --request POST --header "x-routine-secret: $ROUTINE_SCHEDULER_CRON_SECRET" "$APP_BASE_URL/api/cron/routine-scheduler"
+```
+
+### Notification outbox — ตัวอย่างทุก 1 นาที
+
+```cron
+* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "$APP_BASE_URL/api/cron/notification-outbox"
+```
+
+Worker claim สูงสุด 10 รายการต่อ invocation และ process ตามลำดับเวลาสร้าง การเรียกทุก 1 นาทีช่วยระบาย backlog ต่อเนื่อง
+Worker ส่งซ้ำสูงสุด 3 ครั้ง โดย backoff 1 และ 2 นาที รายการที่ล้มเหลวหลังครั้งที่ 3 เปลี่ยนเป็น `DEAD`
+
+Routine scheduler กับ outbox worker เริ่มในนาทีเดียวกันได้ หาก worker ทำงานก่อน scheduler enqueue รายการใหม่ รายการนั้นจะถูก
+process ในรอบถัดไป โดยอาจช้าสูงสุดประมาณ 1 นาที
+
+### Audit log cleanup — วันละครั้ง
+
+```cron
+15 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUDIT_LOG_CLEANUP_SECRET" "$APP_BASE_URL/api/audit-logs/cleanup"
+```
+
+ระบบลบ audit log ที่เก่ากว่า 90 วัน
+
+### Auth token cleanup — วันละครั้ง
+
+```cron
+30 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUTH_CLEANUP_SECRET" "$APP_BASE_URL/api/auth/cleanup"
+```
+
+ระบบลบ refresh token ที่หมดอายุหรือถูก revoke และเก่ากว่า retention window 7 วัน
+
+### Leave attachment orphan cleanup — วันละครั้ง
+
+ก่อนเปิด cron ให้รัน dry-run ด้วยตนเองหนึ่งครั้งและตรวจ counters ที่ตอบกลับ:
+
+```bash
+set -a
+. /etc/employee_nhf/cron.env
+set +a
+curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup?dryRun=true"
+```
+
+เมื่อผล dry-run ถูกต้องจึงเปิด cron ที่ลบจริง:
+
+```cron
+0 3 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup"
+```
+
+งานนี้ scan เฉพาะ private leave directory, เทียบ `storageKey` กับฐานข้อมูล และลบเฉพาะไฟล์ที่เก่ากว่า safety
+window 24 ชั่วโมง จึงไม่ควรลบไฟล์ที่อยู่ระหว่าง request; endpoint ต้องมี header secret เสมอและไม่คืนชื่อไฟล์หรือ path
+
+ทุก endpoint ตอบ `503` เมื่อไม่ได้ตั้ง secret และ `403` เมื่อ header secret ไม่ตรง Routine scheduler ตอบ `500` พร้อม
+counters เมื่อบางรายการทำงานไม่สำเร็จ `curl --fail` จึงทำให้ cron run นั้นล้มและสามารถแจ้งเตือนผ่านระบบ monitoring ภายนอกได้
+
+
+## Backup และ application rollback
+
+- ก่อน deploy ให้สำรอง MySQL และ `.uploads/` พร้อมกันเพื่อให้ข้อมูลอ้างอิงไฟล์ตรงกัน
+- สำรอง `.uploads/private/leave/` พร้อมตาราง `leave_attachments`; ขั้นตอน restore ให้ restore database และ directory จาก snapshot เวลาเดียวกัน แล้วตรวจจำนวน metadata/file ก่อนเปิด traffic
+- rollback application ได้ด้วยการนำ source/build รุ่นก่อนกลับมารัน
+- Prisma migrations ใน repository ออกแบบให้เดินหน้า การย้อน schema ต้องทำเป็น migration ใหม่และทดสอบกับสำเนาข้อมูลก่อน
+- migration เพิ่ม `leave_attachments` เป็น additive และไม่ลบ `attachmentUrl`; หากต้อง rollback application หลัง migration ให้คงตาราง/ไฟล์ไว้ เพราะรุ่นเก่าจะไม่อ่านข้อมูลใหม่ แล้ว deploy forward migration ที่ผ่านการทดสอบแทนการลบตาราง
+- การลบ Compose named volume เป็น destructive operation และไม่ใช่ขั้นตอน rollback
+
+รายละเอียด permission, restore, cleanup และแผนจัดการ `attachmentUrl` อยู่ใน [Storage and attachment operations](./storage-and-attachments.md)

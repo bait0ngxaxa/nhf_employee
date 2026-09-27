@@ -1,95 +1,30 @@
 # ดัชนีเอกสาร
 
-งาน H2A re-audit เริ่มจาก `main` ณ source revision
-`b5ddee48b42aa37f8fdb6d527e105a9ed94e2072` เป็น baseline เอกสาร phase และ
-audit ยังคงเก็บหลักฐาน ณ เวลาที่ตรวจ ไม่ได้อ้างว่าทุกข้อสรุปในบันทึกเก่าเป็น
-สถานะปัจจุบัน. การแก้ rollout-safety ของ H2A.1 re-baseline บน
-`3de85126f59de55f1d995224afbe7bdb727ba193`.
+## เริ่มต้น
 
-## เริ่มอ่าน
+- [README โครงการ](../README.md): ภาพรวมโมดูล เทคโนโลยี และการพัฒนาในเครื่อง
+- [Product](../PRODUCT.md), [Context](../CONTEXT.md), [Design](../DESIGN.md) และ [AGENTS.md](../AGENTS.md)
 
-- [README](../README.md): ติดตั้ง ตั้งค่า environment, deploy, scheduled maintenance,
-  backup และ troubleshooting
-- [Product](../PRODUCT.md): วัตถุประสงค์ ผู้ใช้ และความสามารถของระบบ
-- [Context](../CONTEXT.md): คำศัพท์ธุรกิจและความหมายที่ใช้ร่วมกัน
-- [Design](../DESIGN.md): แนวทางภาพลักษณ์และ UI
-- [AGENTS.md](../AGENTS.md): ข้อกำหนดการทำงานและการตรวจสอบของ repository
+## เอกสารปัจจุบันตามหน้าที่
 
-## สถาปัตยกรรมและสถานะปัจจุบัน
+- [Production Deployment & LIFF Runbook](./operations/production-deployment.md): **แหล่งอ้างอิงหลักเพียงฉบับเดียวสำหรับ deploy production, LINE/LIFF rollout, scheduler/outbox, Rich Menu, rollback และ monitoring**
+- [Production Acceptance](./operations/production-acceptance.md): ผลตรวจ production ปัจจุบันและข้อกำหนดให้ตรวจใหม่ทุก release
+- [Storage and Attachments](./operations/storage-and-attachments.md): persistent `.uploads/`, backup/restore, Leave และ IT private files
+- [Cloudflare Tunnel](./operations/cloudflare-tunnel.md): network path ที่รองรับผ่าน Nginx
+- [Routine reminder verification](./operations/verification/routine-reminder.md): ขั้นตอนทดสอบเฉพาะ reminder
+- [Notification architecture](./integrations/notifications.md): channel matrix, outbox และการเชื่อมต่อ LINE/Email
+- [Leave notification specification](./features/leave-notifications.md): กฎ workflow การแจ้งเตือนการลา
 
-- [Feature modules](../modules/README.md): ขอบเขตโมดูลที่มีอยู่ใน `modules/`
-- [Module boundaries](./architecture/module-boundaries.md): public entries,
-  ownership และเส้นแบ่งระหว่าง server กับ browser
-- [Dependency rules](./architecture/dependency-rules.md): ทิศทาง dependency
-  และการบังคับใช้
-- [Modular monolith](./architecture/modular-monolith.md): โครงสร้างระบบและ
-  แนวทางแบ่ง capability
-- [Repository audit](./architecture/final-repository-audit.md): K0 discovery,
-  K1 closure และ H0 audited-source record; อ่านสถานะตามหัวข้อ closure ล่าสุด
-- [Current authorization state](./architecture/authorization-current-state.md):
-  business authority, configured grants และ notification-recipient follow-up
-- [IT module design and phase status](./architecture/it-module-design.md):
-  ขอบเขต IT, authorization contract และสถานะการพัฒนา Ticket
-- [Notification channels](./notification-channels.md): ความหมายของแต่ละช่องทาง
-  และ event delivery
-- [Notification recipient migration](./architecture/notification-capability-recipient-migration.md):
-  Phase 13A/13A.1/13A.2 current state และ historical pre-cutover runbook
+**นโยบาย source of truth:** New production commands and operational deployment procedures must be added to `docs/operations/production-deployment.md`. Feature/integration documents should link to the canonical runbook instead of creating another deployment procedure. เอกสาร storage และ Cloudflare อธิบายรายละเอียดเฉพาะทางโดยมี runbook หลักกำหนดลำดับ release
 
-ปัจจุบัน `modules/` มี 11 ขอบเขต: Audit, Auth, Authorization, Department,
-Employee, IT, Leave, LINE/LIFF, Notification, Routine และ Stock. Phase K1 ปิด
-ขอบเขต Stock LIFF/provider ที่เคยพบใน K0. IT1, IT2 และ IT3 ปิดแล้ว: IT มี
-authorization domain, capability registry, server entry, Ticket persistence,
-การสร้างและ idempotency, workflow, assignment, category classification และ
-event history. IT3 เพิ่ม internal API และ Dashboard สำหรับสร้าง ดูรายการ และ
-ติดตามสถานะ Ticket ของตนเอง โดยบังคับ OWN ที่ query boundary. ยังไม่มี operator
-queue, comments/attachments หรือ notification producer. การย้าย Email Request
-ยังรอ IT8.
+## สถาปัตยกรรม ประวัติ และข้อมูลอ้างอิง
 
-Authorization ใช้ Default Domain Policy ของแต่ละ capability ร่วมกับ Team,
-TeamRole และ direct User grants ที่ตั้งค่าไว้; `ADMIN` ยังคงเป็นบทบาทของ
-Auth/control plane และไม่สร้าง business authority โดยอัตโนมัติ. Phase
-13A/13A.1/13A.2 ปรับ audience ของ notification ให้ใช้ configured capability
-และปิด Routine recipient enum contraction. H2A — CLOSED: H2A.1 นำ Routine
-Import runtime, API/UI/application services และ
-`routine.import.manage` ออก; H2A.2 ลบตาราง Import, `RoutineTask` provenance
-columns และ Prisma compatibility models, enums กับ relations แล้ว. Historical
-`ROUTINE_IMPORT_*` AuditAction ยังคงไว้เพื่อ AuditLog เก่า. การสร้างและดูแลงานทำ
-ผ่าน Routine task UI/API. H2B / Phase 13A.2: repository implementation
-COMPLETE; production collision preflight PASSED; production deployment PASSED;
-production transition CLOSED. Routine recipient persistence transition CLOSED.
-MySQL, Prisma และ application ใช้ recipient scopes แบบ canonical เท่านั้น.
+- [Architecture](./architecture/): contracts, migration records, phase closure และ security regression evidence; บันทึก phase เป็นหลักฐานตามเวลาที่เขียน **ไม่ใช่ production runbook หรือผลตรวจรับ production ปัจจุบัน**
+- [Current authorization state](./architecture/authorization-current-state.md), [module boundaries](./architecture/module-boundaries.md) และ [dependency rules](./architecture/dependency-rules.md)
+- [ADRs](./adr/): เหตุผลและการตัดสินใจด้านสถาปัตยกรรม
+- [Implementation plans](./implementation-plan/): แผนและลำดับงานย้อนหลัง
+- [Agent/domain notes](./agents/): บริบทสำหรับงานพัฒนา
+- [Reference files](./reference/): input artifacts รวม [Routine spreadsheet](./reference/NHF%20Routine%20list_cost_update270625.xls)
+- [Archive](./archive/): [Routine import ที่ยุติแล้ว](./archive/routine-import-retired.md) และ [Cloudflare Zero Trust ที่ superseded](./archive/cloudflare-zero-trust-superseded.md)
 
-## Runbooks และ workflow specs
-
-- [Cloudflare Tunnel setup](../CLOUDFLARE_TUNNEL_SETUP.md): public application
-  deployment ปัจจุบัน
-- [Cloudflare Zero Trust setup](../CLOUDFLARE_ZERO_TRUST_SETUP.md):
-  แนวทางเดิมที่ superseded แล้ว ไม่ใช่ขั้นตอน deploy ปัจจุบัน
-- [Unified LINE/LIFF runbook](./line-routine.md)
-- [LIFF production acceptance](./liff-production-acceptance.md): acceptance
-  matrix สำหรับผู้ปฏิบัติงาน
-- [LINE Routine reminder manual test](./line-routine-reminder-manual-test.md)
-- [Leave attachment deployment](./leave-attachments-deployment.md)
-- [Routine Import — retired](./routine-import.md): ประกาศการยุติการนำเข้าไฟล์
-- [Leave notification spec](./leave-notification-spec.md): ข้อกำหนด workflow
-  การแจ้งเตือนการลาและลิงก์ไปยัง channel matrix ปัจจุบัน
-
-การตรวจ production จริงที่ยังไม่มี operator confirmation เช่น Tunnel/Nginx,
-scheduler, secrets, LINE/SMTP, storage และ acceptance บนอุปกรณ์ ต้องยืนยันโดย
-ผู้ปฏิบัติงาน สถานะ H2B ด้านบนเป็น operator-confirmed; เอกสารใน repository
-เพียงอย่างเดียวไม่ใช่หลักฐานแทน operator สำหรับรายการอื่น
-
-## ADR และบันทึก migration
-
-- [ADR 0001 — Leave exception flows](./adr/0001-leave-exception-flows.md)
-- [ADR 0002 — Leave notification delivery](./adr/0002-leave-notification-delivery.md)
-- [ADR 0003 — Audit log retention cleanup](./adr/0003-audit-log-retention-cleanup.md)
-- [Architecture records](./architecture/): discovery, migration, closure,
-  security, runtime และ regression evidence ตาม phase
-- [Implementation plan](./implementation-plan/): แผนงาน Routine และการติดตาม
-  phase ที่เกี่ยวข้อง
-
-บันทึกที่ระบุ `Historical`, baseline, phase closure, `next phase` หรือ
-`not started` เป็นหลักฐานตามช่วงเวลาของบันทึกนั้น ให้อ่านคู่กับเอกสาร current
-state ที่ลิงก์ไว้และ source ปัจจุบันก่อนใช้ตัดสินสถานะงาน เอกสารที่เป็นแผนหรือ
-acceptance ซึ่งยังเปิดอยู่คงสถานะเดิมจนกว่าจะมีหลักฐานการปิดงาน
+หากบันทึกสถาปัตยกรรมระบุว่าหลักฐาน production ยังไม่มี ให้ตีความตามวันที่ของบันทึกนั้น ผลยืนยัน production ปัจจุบันอยู่ที่ [Production Acceptance](./operations/production-acceptance.md) เท่านั้น

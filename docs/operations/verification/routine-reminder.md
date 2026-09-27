@@ -4,8 +4,8 @@
 
 ## ก่อนเริ่ม
 
-- ตั้งค่า `LINE_APP_CHANNEL_ACCESS_TOKEN` และ `NEXT_PUBLIC_LINE_LIFF_ID`
-- รัน migration ล่าสุดด้วย `npx prisma migrate deploy`
+- ตั้งค่า `LINE_APP_CHANNEL_ACCESS_TOKEN` และ `NEXT_PUBLIC_LINE_LIFF_ID` ตาม environment ที่ทดสอบ
+- เตรียม deployment และ migration ตาม [production runbook](../production-deployment.md) หากทดสอบบน production
 - เปิด Routine feature flag
 - ผู้ทดสอบเพิ่ม NHF Official Account เป็นเพื่อนใน LINE แล้ว
 - ผู้ทดสอบเชื่อมบัญชี NHF กับ LINE ใน `/liff/routine` สำเร็จ
