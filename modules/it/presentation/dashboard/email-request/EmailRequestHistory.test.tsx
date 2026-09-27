@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "@/modules/auth/client";
@@ -57,8 +57,16 @@ describe("EmailRequestHistory", () => {
     it("displays reply email in request history", () => {
         render(<EmailRequestHistory />);
 
-        expect(screen.getByText("อีเมลตอบกลับ")).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: "reply@example.com" }))
+        const table = screen.getByRole("table");
+        expect(within(table).getByRole("columnheader", { name: "อีเมลตอบกลับ" })).toBeInTheDocument();
+        expect(within(table).getByRole("link", { name: "reply@example.com" }))
+            .toHaveAttribute("href", "mailto:reply@example.com");
+
+        const mobileList = screen.getByRole("list", {
+            name: "ประวัติคำร้องพนักงานใหม่สำหรับหน้าจอขนาดเล็ก",
+        });
+        expect(within(mobileList).getByText("อีเมลตอบกลับ")).toBeInTheDocument();
+        expect(within(mobileList).getByRole("link", { name: "reply@example.com" }))
             .toHaveAttribute("href", "mailto:reply@example.com");
     });
 });
