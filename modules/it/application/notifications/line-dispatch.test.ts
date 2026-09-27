@@ -1,5 +1,6 @@
 import type { NotificationOutbox } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LineIdentityVerificationError } from "@/lib/line/errors";
 
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
 import {
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     sendAppLineNotification: vi.fn(),
     buildITTicketLiffUrl: vi.fn(),
     transaction: vi.fn(),
+    operatorAudience: vi.fn(),
 }));
 
 vi.mock("@/modules/employee", () => ({
@@ -37,7 +39,7 @@ vi.mock("@/modules/it/application/liff-links", () => ({
     buildITTicketLiffUrl: mocks.buildITTicketLiffUrl,
 }));
 vi.mock("../operator-audience", () => ({
-    findITOperatorAudience: vi.fn(),
+    findITOperatorAudience: mocks.operatorAudience,
 }));
 vi.mock("../../infrastructure/persistence/ticket-notification-repository", () => ({
     findITTicketNotificationCommentSource: mocks.commentSource,
@@ -78,7 +80,7 @@ function buildLineOutbox(
     };
 }
 
-describe("IT requester Ticket LINE outbox dispatch", () => {
+describe("IT Ticket personal LINE outbox dispatch", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.transaction.mockImplementation(async (
@@ -107,6 +109,7 @@ describe("IT requester Ticket LINE outbox dispatch", () => {
         mocks.latestAssignmentGeneration.mockResolvedValue(null);
         mocks.latestStatusGeneration.mockResolvedValue({ id: 456 });
         mocks.currentWorkforce.mockResolvedValue({ userId: 42 });
+        mocks.operatorAudience.mockResolvedValue([{ userId: 42 }]);
         mocks.sendAppLineNotification.mockResolvedValue({ status: "SENT" });
         mocks.buildITTicketLiffUrl.mockImplementation((ticketId: number) =>
             `https://liff.line.me/nhfapp-liff-id/it/${ticketId}`,
@@ -149,22 +152,59 @@ describe("IT requester Ticket LINE outbox dispatch", () => {
             event: "CREATED",
             audience: "OPERATOR_QUEUE",
             source: { kind: "EVENT", id: 455 },
+            fact: {
+                id: 455,
+                ticketId: 123,
+                actorUserId: 7,
+                kind: "CREATED",
+                toStatus: null,
+                toAssigneeUserId: null,
+            },
         },
         {
             event: "ASSIGNED",
             audience: "ASSIGNEE",
             source: { kind: "EVENT", id: 456 },
+            fact: {
+                id: 456,
+                ticketId: 123,
+                actorUserId: 7,
+                kind: "ASSIGNED",
+                toStatus: null,
+                toAssigneeUserId: 42,
+            },
         },
         {
             event: "REQUESTER_COMMENTED",
             audience: "ASSIGNEE",
             source: { kind: "COMMENT", id: "cmr-comment-1" },
+            fact: null,
         },
-    ] as const)("supersedes operator-facing $event rows", async ({
+    ] as const)("sends approved operator-facing $event rows", async ({
         event,
         audience,
         source,
+        fact,
     }) => {
+        if (fact !== null) mocks.eventSource.mockResolvedValueOnce(fact);
+        else mocks.commentSource.mockResolvedValueOnce({
+            id: "cmr-comment-1",
+            ticketId: 123,
+            authorUserId: 7,
+            kind: "REQUESTER",
+        });
+        if (event === "ASSIGNED" || event === "REQUESTER_COMMENTED") {
+            mocks.ticketResource.mockResolvedValueOnce({
+                id: 123,
+                requesterUserId: 99,
+                assignedToUserId: 42,
+                status: "OPEN",
+            });
+        }
+        if (event === "ASSIGNED") {
+            mocks.latestAssignmentGeneration.mockResolvedValueOnce({ id: 456 });
+        }
+
         const payload: ITTicketNotificationPayloadV1 = {
             ...operatorComment,
             event,
@@ -172,11 +212,14 @@ describe("IT requester Ticket LINE outbox dispatch", () => {
             source,
         };
 
-        await expect(dispatchITTicketNotificationOutbox(
-            buildLineOutbox(payload),
-        )).resolves.toBe("SUPERSEDED");
+        await expect(dispatchITTicketNotificationOutbox(buildLineOutbox(payload)))
+            .resolves.toBe("SENT");
 
-        expect(mocks.sendAppLineNotification).not.toHaveBeenCalled();
+        expect(mocks.sendAppLineNotification).toHaveBeenCalledOnce();
+        expect(mocks.sendAppLineNotification).toHaveBeenCalledWith(expect.objectContaining({
+            userId: 42,
+            message: expect.objectContaining({ type: "flex" }),
+        }));
     });
 
     it("supersedes a source that no longer matches its Ticket or event", async () => {
@@ -260,6 +303,57 @@ describe("IT requester Ticket LINE outbox dispatch", () => {
         expect(mocks.sendAppLineNotification).not.toHaveBeenCalled();
     });
 
+    it("supersedes stale ASSIGNED and requester-comment assignee rows", async () => {
+        const assignedPayload: ITTicketNotificationPayloadV1 = {
+            ...operatorComment,
+            event: "ASSIGNED",
+            audience: "ASSIGNEE",
+            source: { kind: "EVENT", id: 456 },
+        };
+        mocks.eventSource.mockResolvedValueOnce({
+            id: 456,
+            ticketId: 123,
+            actorUserId: 7,
+            kind: "ASSIGNED",
+            toStatus: null,
+            toAssigneeUserId: 42,
+        });
+        mocks.ticketResource.mockResolvedValueOnce({
+            id: 123,
+            requesterUserId: 99,
+            assignedToUserId: 42,
+            status: "OPEN",
+        });
+        mocks.latestAssignmentGeneration.mockResolvedValueOnce({ id: 457 });
+
+        await expect(dispatchITTicketNotificationOutbox(
+            buildLineOutbox(assignedPayload),
+        )).resolves.toBe("SUPERSEDED");
+
+        const requesterCommentPayload: ITTicketNotificationPayloadV1 = {
+            ...assignedPayload,
+            event: "REQUESTER_COMMENTED",
+            source: { kind: "COMMENT", id: "cmr-comment-1" },
+        };
+        mocks.commentSource.mockResolvedValueOnce({
+            id: "cmr-comment-1",
+            ticketId: 123,
+            authorUserId: 7,
+            kind: "REQUESTER",
+        });
+        mocks.ticketResource.mockResolvedValueOnce({
+            id: 123,
+            requesterUserId: 99,
+            assignedToUserId: 43,
+            status: "OPEN",
+        });
+
+        await expect(dispatchITTicketNotificationOutbox(
+            buildLineOutbox(requesterCommentPayload),
+        )).resolves.toBe("SUPERSEDED");
+        expect(mocks.sendAppLineNotification).not.toHaveBeenCalled();
+    });
+
     it("does not status-suppress an informational operator comment", async () => {
         mocks.ticketResource.mockResolvedValueOnce({
             id: 123,
@@ -312,6 +406,19 @@ describe("IT requester Ticket LINE outbox dispatch", () => {
         await expect(dispatchITTicketNotificationOutbox(
             buildLineOutbox(),
         )).resolves.toBe("SUPERSEDED");
+    });
+
+    it("supersedes a requester LINE row when its LIFF destination is unavailable", async () => {
+        mocks.buildITTicketLiffUrl.mockImplementationOnce(() => {
+            throw new LineIdentityVerificationError(
+                "MISCONFIGURED",
+                "NHFapp LINE LIFF ID is not configured",
+            );
+        });
+
+        await expect(dispatchITTicketNotificationOutbox(buildLineOutbox()))
+            .resolves.toBe("SUPERSEDED");
+        expect(mocks.sendAppLineNotification).not.toHaveBeenCalled();
     });
 
     it("sends a privacy-safe Flex message to the canonical requester LIFF URL", async () => {

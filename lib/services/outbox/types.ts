@@ -26,6 +26,9 @@ export const OUTBOX_NOTIFICATION_TYPES = [
     "ROUTINE_CONTRACT_EXPIRY_LINE",
     "IT_TICKET_IN_APP",
     "IT_TICKET_LINE",
+    "IT_TICKET_EMAIL",
+    "EMAIL_REQUEST_EMAIL",
+    "EMAIL_REQUEST_LINE",
 ] as const;
 
 export type OutboxNotificationType = (typeof OUTBOX_NOTIFICATION_TYPES)[number];

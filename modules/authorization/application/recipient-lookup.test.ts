@@ -12,13 +12,14 @@ import type {
 function directGrantCandidate(
     userId: number,
     scopes: readonly string[],
+    capabilityKey = "routine.task.read",
 ): AuthorizationRecipientCandidate {
     return {
         userId,
         resolutionData: {
             userGrants: scopes.map((scope) => ({
                 userId,
-                capabilityKey: "routine.task.read",
+                capabilityKey,
                 scope,
             })),
             memberships: [],
@@ -28,6 +29,70 @@ function directGrantCandidate(
 }
 
 describe("authorization recipient lookup", () => {
+    it("includes direct, team, and TeamRole grants for the configured Email Request audience", async () => {
+        const capabilityKey = "email.request.read";
+        const loadActiveUsersWithConfiguredCapability = vi.fn<
+            AuthorizationRecipientRepository["loadActiveUsersWithConfiguredCapability"]
+        >().mockResolvedValue([
+            directGrantCandidate(7, ["ALL"], capabilityKey),
+            {
+                userId: 11,
+                resolutionData: {
+                    userGrants: [],
+                    memberships: [{
+                        userId: 11,
+                        teamId: 20,
+                        isTeamActive: true,
+                        teamRoleId: null,
+                        teamRole: null,
+                        teamGrants: [{
+                            teamId: 20,
+                            capabilityKey,
+                            scope: "ALL",
+                        }],
+                    }],
+                    teamRoleGrants: [],
+                },
+            },
+            {
+                userId: 13,
+                resolutionData: {
+                    userGrants: [],
+                    memberships: [{
+                        userId: 13,
+                        teamId: 30,
+                        isTeamActive: true,
+                        teamRoleId: 31,
+                        teamRole: { id: 31, isActive: true },
+                        teamGrants: [],
+                    }],
+                    teamRoleGrants: [{
+                        teamId: 30,
+                        teamRoleId: 31,
+                        capabilityKey,
+                        scope: "ALL",
+                    }],
+                },
+            },
+            {
+                userId: 99,
+                resolutionData: {
+                    userGrants: [],
+                    memberships: [],
+                    teamRoleGrants: [],
+                },
+            },
+        ]);
+        const lookup = createAuthorizationRecipientLookup({
+            repository: { loadActiveUsersWithConfiguredCapability },
+        });
+
+        await expect(lookup.findActiveUsersWithConfiguredCapabilityScope({
+            capability: capabilityKey,
+            scope: "ALL",
+        })).resolves.toEqual([7, 11, 13]);
+    });
+
     it("evaluates configured authority with the canonical evaluator", async () => {
         const loadActiveUsersWithConfiguredCapability = vi
             .fn<AuthorizationRecipientRepository["loadActiveUsersWithConfiguredCapability"]>()

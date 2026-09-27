@@ -144,14 +144,13 @@ openssl rand -base64 48
 | --- | --- |
 | `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID สำหรับ NHFapp personal notification deep links และ LIFF bootstrap |
 | `LINE_LOGIN_CHANNEL_ID` | LINE Login channel ID ที่ใช้ตรวจ identity ของ LIFF session |
-| `LINE_APP_CHANNEL_ACCESS_TOKEN` | canonical NHFapp Messaging API token สำหรับ personal LINE ของ Leave, Routine และ Stock result |
+| `LINE_APP_CHANNEL_ACCESS_TOKEN` | canonical NHFapp Messaging API token สำหรับ personal LINE ของ Leave, Routine, Stock result, IT Ticket และ Email Request |
 | `LINE_APP_CHANNEL_SECRET` | channel secret ของ NHFapp Messaging API / LIFF integration |
 | `LINE_LIFF_SESSION_SECRET` / `LINE_LIFF_SESSION_TTL_SECONDS` | secret และอายุของ NHFapp HttpOnly LIFF session |
-| `LINE_IT_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับคำร้องพนักงานใหม่ |
-| `LINE_IT_CHANNEL_SECRET` | ใช้ตรวจ signature ของ channel คำร้องพนักงานใหม่ |
+| `LINE_IT_CHANNEL_ACCESS_TOKEN` | retained low-level LINE compatibility transport; Email Request ไม่ใช้ส่ง notification แล้ว |
+| `LINE_IT_CHANNEL_SECRET` | ใช้ตรวจ signature ของ inbound `/api/line/webhook` |
 | `LINE_STOCK_CHANNEL_ACCESS_TOKEN` | channel access token สำหรับ Stock |
 | `LINE_STOCK_CHANNEL_SECRET` | ใช้ตรวจ signature ของ Stock webhook |
-| `LINE_IT_TEAM_USER_ID` | LINE user/group ID ผู้รับคำร้องพนักงานใหม่ |
 | `LINE_WEBHOOK_URL` | URL สำหรับ retained legacy outbound compatibility integration; แยกจาก inbound `/api/line/webhook` และไม่ใช่เส้นทางส่ง Email Request ปัจจุบัน |
 
 Webhook route ของแอปคือ `/api/line/webhook`

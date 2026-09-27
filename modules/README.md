@@ -5,8 +5,10 @@ Employee application.
 
 `modules/` currently contains the Audit, Auth, Authorization, Department,
 Employee, IT, Leave, LINE/LIFF, Notification, Routine, and Stock capability
-boundaries. IT1 through IT9D are closed under `modules/it/`. IT8 moved Email
-Request ownership into the module while preserving its compatibility seam.
+boundaries. Completed IT work through IT9D, IT11 Audit, and IT12 Notification
+Channel Completion is under `modules/it/`; IT10 remains OPEN / deferred.
+IT8 moved the structured Email Request subdomain into IT without changing its
+API or data compatibility contracts.
 IT9A is CLOSED and owns the requester-only LIFF authorization/API foundation.
 IT9B is CLOSED and provides requester presentation at `/liff/it` and
 `/liff/it/[ticketId]`. IT9C is **CLOSED** after independent review and owns the
@@ -15,15 +17,18 @@ requester deep links, and Unified Rich Menu destination. The review covered the
 fixed `LIFF_SELF_SERVICE` projection, requester Home visibility, shared
 Home/card/header/Bottom Nav integration, canonical requester LIFF root/detail
 destinations, the Unified Rich Menu four-area contract, the retained Dashboard
-Inbox destination, and no IT9D delivery leakage. IT9D is **CLOSED** after
-independent review and adds requester personal LINE for
-`OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED`; operator-facing
-events remain in-app only because operator LIFF does not exist. IT9E-A is
-COMPLETE for repository E2E/acceptance readiness; IT9E-UX-P0 unified IT
-workspace and creation evidence is IMPLEMENTED / review pending. IT9E-B
-Android/iPhone device acceptance is PAUSED / NOT RUN while the POC is under
-review. IT10 is OPEN / deferred. No Android/iPhone acceptance has been
-performed; no live LINE provider acceptance is claimed.
+Inbox destination, and no IT9D delivery leakage. IT9D is **CLOSED** after independent review and adds requester personal LINE
+for `OPERATOR_COMMENTED`, `WAITING_REQUESTER`, and `RESOLVED`. IT11 Audit
+Integration and Accountability is CLOSED. IT12 completes Inbox, Email, and
+personal NHFapp LINE for all six approved Ticket events; operator LINE links to
+the canonical Dashboard Ticket route, without introducing operator LIFF.
+Email Request now uses configured `email.request.read / ALL` recipients for
+Inbox, Email, and personal LINE, with independently retryable per-recipient
+channel rows. IT9E-A is COMPLETE for repository E2E/acceptance readiness;
+IT9E-UX-P0 unified IT workspace and creation evidence is IMPLEMENTED / review
+pending. IT9E-B Android/iPhone device acceptance is PAUSED / NOT RUN while the
+POC is under review. IT10 is OPEN / deferred. No Android/iPhone acceptance has
+been performed; no live LINE provider acceptance is claimed.
 The LIFF Home projection consumes IT's centralized presentation capabilities
 through `LIFF_SELF_SERVICE`; its requester read/create rule is presentation-only
 and does not change the existing API authorization boundary.
@@ -67,9 +72,10 @@ record their original phase boundaries; the current IT8 ownership state is
 closed and is summarized above. The retained
 `lib/line` outbound webhook (`sendLineWebhook`, its service-object export,
 `LineWebhookData`, and `LINE_WEBHOOK_URL`) remains a separate L6/H0 external
-compatibility seam. Active Email Request delivery continues through IT-owned
-Flex and generic LINE push/broadcast. Its type bridge references IT's
-authoritative payload type.
+compatibility seam. Active Email Request delivery now uses IT-owned Email and NHFapp personal LINE
+composers with one configured `email.request.read / ALL` audience. The parent
+outbox fans out idempotent per-recipient Email and LINE child rows; the legacy
+team-user/broadcast runtime path is retired.
 The runtime Auth capability is `modules/auth/`, with
 `@/modules/auth` as its server public entry and `@/modules/auth/client` as its
 browser public entry. It
@@ -248,17 +254,16 @@ for an in-app write. The business dispatch contract owns any transaction-bound
 persistence context; the global processor does not pass a transaction client
 directly to Notification. A direct processor-to-Notification dispatch is
 reserved for a future truly Notification-owned generic event with a fully
-resolved command payload; no current production event uses that shape. IT
-enqueues `IT_TICKET_IN_APP` and eligible `IT_TICKET_LINE` rows in the Ticket
-mutation transaction and exports its server-only dispatch contract through
-`@/modules/it`; app API adapters wake the global processor only after successful
-mutations. IT6 implements in-app Ticket notifications; IT9D reuses the same
-strict semantic payload and adds deterministic LINE event/retry identity,
-`LineAccountLink`, `LINE_APP_CHANNEL_ACCESS_TOKEN`, and the canonical requester
-LIFF Ticket destination. Dashboard Inbox URLs stay unchanged. Unlinked or
-ineligible recipients are superseded; provider failures use the shared
-at-least-once retry/dead-letter lifecycle. No live LINE provider or smartphone
-acceptance was performed. Ticket Email remains a product decision/deferred.
+resolved command payload; no current production event uses that shape. IT enqueues `IT_TICKET_IN_APP`, `IT_TICKET_EMAIL`, and approved
+`IT_TICKET_LINE` rows in the Ticket mutation transaction and exports its
+server-only dispatch contract through `@/modules/it`; app API adapters wake the
+global processor only after successful mutations. IT12 reuses one strict
+semantic payload and one source/applicability policy across channels. Email uses
+the current account email and shared SMTP transport; personal LINE resolves via
+`LineAccountLink` and the NHFapp channel. Requester LINE uses the existing LIFF
+Ticket destination; operator LINE uses the canonical Dashboard Ticket route.
+Provider failures use independent shared outbox retries. Delivery remains
+at-least-once and does not guarantee provider deduplication.
 The Ticket creation rate-limit scope is
 `it-ticket-create` (60 requests per IP per 15 minutes; 10 per authenticated
 principal per minute); like the shared mutation limiter, it is currently

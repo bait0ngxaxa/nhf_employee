@@ -2,7 +2,7 @@ import type { ITTicketEventKind, ITTicketStatus, Prisma } from "@prisma/client";
 
 type ITTicketNotificationReadContext = Pick<
     Prisma.TransactionClient,
-    "iTTicket" | "iTTicketEvent" | "iTTicketComment"
+    "iTTicket" | "iTTicketEvent" | "iTTicketComment" | "user"
 >;
 
 export interface ITTicketNotificationEventSource {
@@ -98,4 +98,18 @@ export function findITTicketNotificationResource(
             status: true,
         },
     });
+}
+
+export async function findITTicketNotificationRecipientEmail(
+    tx: ITTicketNotificationReadContext,
+    userId: number,
+): Promise<string | null> {
+    const recipient = await tx.user.findUnique({
+        where: { id: userId },
+        select: { email: true, isActive: true, deletedAt: true },
+    });
+    if (!recipient || !recipient.isActive || recipient.deletedAt !== null) {
+        return null;
+    }
+    return recipient.email;
 }

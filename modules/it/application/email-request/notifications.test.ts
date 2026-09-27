@@ -1,22 +1,31 @@
+import type { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EmailRequestData } from "../../domain/email-request/contracts";
 
-const findActiveUsersWithConfiguredCapabilityScopeMock = vi.hoisted(() => vi.fn());
-const createForUserOnceMock = vi.hoisted(() => vi.fn());
+const mocks = vi.hoisted(() => ({
+    findRecipients: vi.fn(),
+    createInbox: vi.fn(),
+    createMany: vi.fn(),
+    transaction: vi.fn(),
+}));
 
 vi.mock("@/modules/authorization", () => ({
-    findActiveUsersWithConfiguredCapabilityScope:
-        findActiveUsersWithConfiguredCapabilityScopeMock,
+    findActiveUsersWithConfiguredCapabilityScope: mocks.findRecipients,
+}));
+vi.mock("@/modules/notification", () => ({ createForUserOnce: mocks.createInbox }));
+vi.mock("@/lib/db/transaction", () => ({
+    runSerializableTransaction: mocks.transaction,
 }));
 
-vi.mock("@/modules/notification", () => ({
-    createForUserOnce: createForUserOnceMock,
-}));
-
-import { createEmailRequestInboxNotifications } from "./notifications";
+import {
+    buildEmailRequestEmailEventKey,
+    buildEmailRequestLineEventKey,
+    enqueueEmailRequestNotificationChannels,
+} from "./notifications";
 
 const payload: EmailRequestData = {
+    emailRequestId: 77,
     thaiName: "สมชาย ใจดี",
     englishName: "Somchai Jaidee",
     phone: "0812345678",
@@ -29,43 +38,107 @@ const payload: EmailRequestData = {
     requestedAt: "2026-09-20T03:00:00.000Z",
 };
 
-describe("Email Request notification recipients", () => {
+type EmailRequestCreateManyInput = {
+    readonly data: Prisma.NotificationOutboxCreateManyInput[];
+    readonly skipDuplicates?: boolean;
+};
+
+function getCreateManyCalls(): Array<[EmailRequestCreateManyInput]> {
+    return mocks.createMany.mock.calls as unknown as Array<[
+        EmailRequestCreateManyInput,
+    ]>;
+}
+
+describe("Email Request channel fan-out", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        const tx = {
+            notificationOutbox: { createMany: mocks.createMany },
+        } as unknown as Prisma.TransactionClient;
+        mocks.transaction.mockImplementation(async (
+            operation: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        ) => operation(tx));
+        mocks.findRecipients.mockResolvedValue([10, 11]);
+        mocks.createInbox.mockResolvedValue(undefined);
+        mocks.createMany.mockResolvedValue({ count: 4 });
     });
 
-    it("uses only configured email.request.read / ALL users", async () => {
-        findActiveUsersWithConfiguredCapabilityScopeMock.mockResolvedValue([10, 11]);
+    it("uses only configured email.request.read / ALL recipients for all three channels", async () => {
+        await enqueueEmailRequestNotificationChannels(77, 900, payload);
 
-        await createEmailRequestInboxNotifications(payload);
-
-        expect(findActiveUsersWithConfiguredCapabilityScopeMock).toHaveBeenCalledWith({
+        expect(mocks.findRecipients).toHaveBeenCalledWith({
             capability: "email.request.read",
             scope: "ALL",
-        });
-        expect(createForUserOnceMock).toHaveBeenCalledTimes(2);
-        expect(createForUserOnceMock.mock.calls.map(([input]) => input.userId))
+        }, expect.anything());
+        expect(mocks.createInbox).toHaveBeenCalledTimes(2);
+        expect(mocks.createInbox.mock.calls.map(([input]) => input.userId))
             .toEqual([10, 11]);
-        expect(createForUserOnceMock).toHaveBeenCalledWith(expect.objectContaining({
+        expect(mocks.createInbox).toHaveBeenCalledWith(expect.objectContaining({
             type: "SYSTEM_ALERT",
-            title: "มีคำขออีเมลพนักงานใหม่",
-            message: "สมชาย ใจดี (IT Officer, IT) ส่งคำขออีเมลพนักงานใหม่",
             actionUrl: "/dashboard/email-request",
             referenceId: "somchai@example.com",
             dedupeKey: "email-request:somchai@example.com:2026-09-20T03:00:00.000Z:10",
-        }));
+        }), expect.anything());
+
+        const createManyInput = getCreateManyCalls()[0]?.[0];
+        expect(createManyInput).toBeDefined();
+        if (!createManyInput) return;
+        expect(createManyInput.data).toHaveLength(4);
+        expect(createManyInput.skipDuplicates).toBe(true);
+        expect(createManyInput.data.map(({ type }) => type)).toEqual([
+            "EMAIL_REQUEST_EMAIL",
+            "EMAIL_REQUEST_LINE",
+            "EMAIL_REQUEST_EMAIL",
+            "EMAIL_REQUEST_LINE",
+        ]);
+        expect(createManyInput.data.map(({ eventKey }) => eventKey)).toEqual([
+            buildEmailRequestEmailEventKey(77, 900, 10),
+            buildEmailRequestLineEventKey(77, 900, 10),
+            buildEmailRequestEmailEventKey(77, 900, 11),
+            buildEmailRequestLineEventKey(77, 900, 11),
+        ]);
+        const parsedChildren = createManyInput.data.map(({ payload: rowPayload }) =>
+            JSON.parse(rowPayload) as Record<string, unknown>,
+        );
+        expect(parsedChildren.map(({ recipientUserId }) => recipientUserId))
+            .toEqual([10, 10, 11, 11]);
+        for (const row of createManyInput.data) {
+            expect(row.payload).not.toContain("replyEmail");
+            expect(row.payload).not.toContain("Somchai");
+        }
     });
 
-    it("does not resolve OWN-only authority as a broad request audience", async () => {
-        findActiveUsersWithConfiguredCapabilityScopeMock.mockResolvedValue([10]);
+    it("keeps fan-out idempotent when the parent is retried", async () => {
+        await enqueueEmailRequestNotificationChannels(77, 900, payload);
+        const firstRows = getCreateManyCalls()[0]?.[0].data;
+        await enqueueEmailRequestNotificationChannels(77, 900, payload);
+        const secondRows = getCreateManyCalls()[1]?.[0].data;
 
-        await createEmailRequestInboxNotifications(payload);
+        expect(mocks.createInbox).toHaveBeenCalledTimes(4);
+        expect(secondRows?.map(({ eventKey }) => eventKey))
+            .toEqual(firstRows?.map(({ eventKey }) => eventKey));
+    });
 
-        expect(findActiveUsersWithConfiguredCapabilityScopeMock).toHaveBeenCalledWith({
-            capability: "email.request.read",
-            scope: "ALL",
+    it("accepts an empty configured audience without creating any channel rows", async () => {
+        mocks.findRecipients.mockResolvedValueOnce([]);
+
+        await expect(enqueueEmailRequestNotificationChannels(77, 900, payload))
+            .resolves.toBeUndefined();
+
+        expect(mocks.createInbox).not.toHaveBeenCalled();
+        expect(mocks.createMany).not.toHaveBeenCalled();
+    });
+
+    it("uses parent outbox identity only for historical rows missing a request id", async () => {
+        await enqueueEmailRequestNotificationChannels(null, 901, {
+            ...payload,
+            emailRequestId: undefined,
         });
-        expect(createForUserOnceMock.mock.calls.map(([input]) => input.userId))
-            .toEqual([10]);
+
+        const rows = getCreateManyCalls()[0]?.[0].data;
+        expect(rows?.[0]?.eventKey).toBe(
+            "email-request:outbox:901:user:10:email",
+        );
+        expect(rows?.[0]?.payload).toContain('"emailRequestId":null');
     });
 });

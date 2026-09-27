@@ -10,7 +10,7 @@ type OutboxCreateManyInput = {
 };
 
 describe("IT Ticket outbox adapter", () => {
-    it("adds LINE only for requester comments, waiting, and resolved facts", async () => {
+    it("persists Inbox, Email, and approved personal LINE intents for every semantic fact", async () => {
         const createMany = vi.fn<
             (input: OutboxCreateManyInput) => Promise<{ count: number }>
         >(async () => ({ count: 0 }));
@@ -86,26 +86,43 @@ describe("IT Ticket outbox adapter", () => {
         expect(call?.skipDuplicates).toBe(true);
         expect(call?.data.map(({ type }) => type)).toEqual([
             "IT_TICKET_IN_APP",
+            "IT_TICKET_EMAIL",
             "IT_TICKET_LINE",
             "IT_TICKET_IN_APP",
+            "IT_TICKET_EMAIL",
             "IT_TICKET_LINE",
             "IT_TICKET_IN_APP",
+            "IT_TICKET_EMAIL",
             "IT_TICKET_LINE",
             "IT_TICKET_IN_APP",
+            "IT_TICKET_EMAIL",
+            "IT_TICKET_LINE",
             "IT_TICKET_IN_APP",
+            "IT_TICKET_EMAIL",
+            "IT_TICKET_LINE",
             "IT_TICKET_IN_APP",
+            "IT_TICKET_EMAIL",
+            "IT_TICKET_LINE",
             "IT_TICKET_IN_APP",
+            "IT_TICKET_EMAIL",
+            "IT_TICKET_LINE",
         ]);
 
         const lineRows = call?.data.filter(({ type }) => type === "IT_TICKET_LINE");
-        expect(lineRows).toHaveLength(3);
+        expect(lineRows).toHaveLength(payloads.length);
         for (const lineRow of lineRows ?? []) {
             const inAppRow = call?.data.find((row) =>
                 row.type === "IT_TICKET_IN_APP"
                 && row.payload === lineRow.payload,
             );
+            const emailRow = call?.data.find((row) =>
+                row.type === "IT_TICKET_EMAIL"
+                && row.payload === lineRow.payload,
+            );
             expect(inAppRow).toBeDefined();
+            expect(emailRow).toBeDefined();
             expect(lineRow.eventKey).not.toBe(inAppRow?.eventKey);
+            expect(lineRow.eventKey).not.toBe(emailRow?.eventKey);
         }
         expect(call?.data.every(({ payload }) =>
             !payload.includes("description")

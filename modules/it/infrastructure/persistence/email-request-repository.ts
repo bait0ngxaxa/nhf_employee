@@ -20,6 +20,11 @@ type EmailRequestPersistenceClient = Pick<
     "emailRequest" | "emailRequestIdempotency"
 >;
 
+type EmailRequestNotificationReadClient = Pick<
+    Prisma.TransactionClient,
+    "emailRequest"
+>;
+
 interface StoredEmailRequestReplay {
     requestHash: string;
     emailRequest: EmailRequest;
@@ -27,6 +32,16 @@ interface StoredEmailRequestReplay {
 
 export interface PersistedEmailRequestResult extends StoredEmailRequestReplay {
     replayed: boolean;
+}
+
+export function findEmailRequestNotificationSource(
+    tx: EmailRequestNotificationReadClient,
+    emailRequestId: number,
+): Promise<{ readonly id: number } | null> {
+    return tx.emailRequest.findUnique({
+        where: { id: emailRequestId },
+        select: { id: true },
+    });
 }
 
 class EmailRequestIdempotencyRaceError extends Error {}
@@ -55,6 +70,7 @@ function buildEmailRequestOutboxPayload(
     emailRequest: EmailRequest,
 ): EmailRequestData {
     return {
+        emailRequestId: emailRequest.id,
         thaiName: data.thaiName,
         englishName: data.englishName,
         phone: data.phone,

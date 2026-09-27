@@ -66,19 +66,33 @@ export type ITTicketNotificationPayloadV1 = z.infer<
     typeof itTicketNotificationPayloadSchema
 >;
 
-export type ITTicketRequesterLineNotificationPayload =
-    ITTicketNotificationPayloadV1 & {
-        readonly audience: "REQUESTER";
-        readonly event: "OPERATOR_COMMENTED" | "WAITING_REQUESTER" | "RESOLVED";
-    };
+export type ITTicketLineNotificationPayload = ITTicketNotificationPayloadV1 & {
+    readonly event:
+        | "CREATED"
+        | "ASSIGNED"
+        | "OPERATOR_COMMENTED"
+        | "REQUESTER_COMMENTED"
+        | "WAITING_REQUESTER"
+        | "RESOLVED";
+};
 
-export function isITTicketRequesterLineNotification(
+/** Explicit channel policy. Keep this aligned with the approved IT event matrix. */
+export function isITTicketLineNotification(
     payload: ITTicketNotificationPayloadV1,
-): payload is ITTicketRequesterLineNotificationPayload {
-    return payload.audience === "REQUESTER"
-        && (payload.event === "OPERATOR_COMMENTED"
-            || payload.event === "WAITING_REQUESTER"
-            || payload.event === "RESOLVED");
+): payload is ITTicketLineNotificationPayload {
+    switch (payload.event) {
+        case "CREATED":
+            return payload.audience === "OPERATOR_QUEUE";
+        case "ASSIGNED":
+            return payload.audience === "ASSIGNEE";
+        case "OPERATOR_COMMENTED":
+        case "WAITING_REQUESTER":
+        case "RESOLVED":
+            return payload.audience === "REQUESTER";
+        case "REQUESTER_COMMENTED":
+            return payload.audience === "ASSIGNEE"
+                || payload.audience === "OPERATOR_QUEUE";
+    }
 }
 
 export function parseITTicketNotificationPayload(
@@ -103,4 +117,11 @@ export function buildITTicketLineEventKey(
 ): string {
     const sourceKind = payload.source.kind === "EVENT" ? "event" : "comment";
     return `it:ticket:${payload.ticketId}:${sourceKind}:${payload.source.id}:user:${payload.recipientUserId}:line`;
+}
+
+export function buildITTicketEmailEventKey(
+    payload: ITTicketNotificationPayloadV1,
+): string {
+    const sourceKind = payload.source.kind === "EVENT" ? "event" : "comment";
+    return `it:ticket:${payload.ticketId}:${sourceKind}:${payload.source.id}:user:${payload.recipientUserId}:email`;
 }

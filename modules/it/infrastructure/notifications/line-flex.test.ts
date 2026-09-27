@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildITTicketLineFlexMessage } from "./line-flex";
+import { parseITTicketNotificationPayload } from "../../domain/ticket-notification";
 
 describe("IT Ticket personal LINE Flex message", () => {
     afterEach(() => {
@@ -9,57 +10,94 @@ describe("IT Ticket personal LINE Flex message", () => {
 
     it.each([
         {
+            event: "CREATED",
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 451 },
+            title: "มี Ticket IT ใหม่",
+            body: "มีคำขอ IT ใหม่รอรับเรื่อง",
+            action: "เปิดคิว IT",
+            destination: "https://app.example.com/dashboard/it/queue/123",
+        },
+        {
+            event: "ASSIGNED",
+            audience: "ASSIGNEE",
+            source: { kind: "EVENT", id: 452 },
+            title: "คุณได้รับมอบหมาย Ticket IT",
+            body: "มี Ticket IT มอบหมายให้คุณ",
+            action: "เปิด Ticket",
+            destination: "https://app.example.com/dashboard/it/queue/123",
+        },
+        {
             event: "OPERATOR_COMMENTED",
+            audience: "REQUESTER",
             source: { kind: "COMMENT", id: "cmr-comment-1" },
             title: "IT ตอบกลับคำขอของคุณ",
-            body: "Ticket IT #123 มีข้อความตอบกลับใหม่",
+            body: "มีข้อความตอบกลับใหม่",
             action: "เปิด Ticket",
+            destination: "https://liff.line.me/nhfapp-liff-id/it/123",
+        },
+        {
+            event: "REQUESTER_COMMENTED",
+            audience: "ASSIGNEE",
+            source: { kind: "COMMENT", id: "cmr-comment-2" },
+            title: "ผู้ขอส่งข้อความใหม่ใน Ticket IT",
+            body: "มีข้อความใหม่จากผู้ขอ",
+            action: "เปิด Ticket",
+            destination: "https://app.example.com/dashboard/it/queue/123",
         },
         {
             event: "WAITING_REQUESTER",
-            source: { kind: "EVENT", id: 456 },
+            audience: "REQUESTER",
+            source: { kind: "EVENT", id: 453 },
             title: "IT ต้องการข้อมูลเพิ่มเติม",
-            body: "Ticket IT #123 รอข้อมูลเพิ่มเติมจากคุณ",
+            body: "รอข้อมูลเพิ่มเติมจากคุณ",
             action: "ตอบกลับ",
+            destination: "https://liff.line.me/nhfapp-liff-id/it/123",
         },
         {
             event: "RESOLVED",
-            source: { kind: "EVENT", id: 457 },
+            audience: "REQUESTER",
+            source: { kind: "EVENT", id: 454 },
             title: "คำขอ IT ได้รับการแก้ไขแล้ว",
-            body: "Ticket IT #123 ได้รับการแก้ไขแล้ว",
+            body: "ได้รับการแก้ไขแล้ว",
             action: "ดูรายละเอียด",
+            destination: "https://liff.line.me/nhfapp-liff-id/it/123",
         },
-    ] as const)("composes the privacy-safe $event message", ({
-        event,
-        source,
-        title,
-        body,
-        action,
-    }) => {
+        {
+            event: "REQUESTER_COMMENTED",
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "COMMENT", id: "cmr-comment-3" },
+            title: "ผู้ขอส่งข้อความใหม่ใน Ticket IT",
+            body: "มีข้อความใหม่จากผู้ขอ",
+            action: "เปิด Ticket",
+            destination: "https://app.example.com/dashboard/it/queue/123",
+        },
+    ] as const)("composes a privacy-safe $event message for $audience", (input) => {
         vi.stubEnv("NEXT_PUBLIC_LINE_LIFF_ID", "nhfapp-liff-id");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://app.example.com");
 
-        const message = buildITTicketLineFlexMessage({
+        const payload = parseITTicketNotificationPayload({
             version: 1,
-            event,
+            event: input.event,
             ticketId: 123,
             recipientUserId: 42,
-            audience: "REQUESTER",
-            source,
+            audience: input.audience,
+            source: input.source,
         });
+        const message = buildITTicketLineFlexMessage(payload);
         const serialized = JSON.stringify(message);
 
         expect(message.type).toBe("flex");
         expect(message.altText).toContain("Ticket IT #123");
-        expect(serialized).toContain(title);
-        expect(serialized).toContain(body);
-        expect(serialized).toContain(action);
-        expect(serialized).toContain(
-            "https://liff.line.me/nhfapp-liff-id/it/123",
-        );
+        expect(serialized).toContain(input.title);
+        expect(serialized).toContain(input.body);
+        expect(serialized).toContain(input.action);
+        expect(serialized).toContain(input.destination);
         expect(serialized).not.toContain("description");
         expect(serialized).not.toContain("attachment");
         expect(serialized).not.toContain("department");
         expect(serialized).not.toContain("assignee");
         expect(serialized).not.toContain("private");
+        expect(serialized).not.toContain("cmr-comment");
     });
 });

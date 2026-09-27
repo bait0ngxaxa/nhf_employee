@@ -439,6 +439,9 @@ enum NotificationOutboxType {
   ROUTINE_CONTRACT_EXPIRY_LINE
   IT_TICKET_IN_APP
   IT_TICKET_LINE
+  IT_TICKET_EMAIL
+  EMAIL_REQUEST_EMAIL
+  EMAIL_REQUEST_LINE
 }
 
 enum NotificationOutboxStatus {

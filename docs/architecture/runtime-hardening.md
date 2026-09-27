@@ -2623,7 +2623,12 @@ revalidation can intentionally return `SUPERSEDED`, and Routine can return
 
 | Outbox type | Owning capability | Side effects performed | Provider/channel | Stable event identity | Provider idempotency/retry mechanism | Current ambiguity window | Stale/supersede validation | Failure result / terminal state |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `EMAIL_REQUEST` | Deferred Email Request / IT capability | Configured IT in-app rows, then one IT LINE notification | LINE IT push when `LINE_IT_TEAM_USER_ID` is configured, otherwise IT broadcast; `LINE_IT_CHANNEL_ACCESS_TOKEN` | Existing `eventKey` when present (`email-request:<id>:created`); historical row identity fallback | `createOutboxLineRetryKey(type, id, eventKey)`; the same key reaches push or broadcast | LINE key retention is 24 hours; after that a recovery retry may be accepted as a new request; end-user delivery is not guaranteed | Payload is boundary-validated; no Email Request migration or new module | LINE `false`/error -> `FAILED`, then `DEAD`; no business supersede introduced |
+| `EMAIL_REQUEST` | IT Email Request | Configured-audience Inbox rows and per-recipient Email/LINE children, atomically | IT transactional fan-out; no provider call on parent | `email-request:<id>:created`; historical parent outbox ID fallback | Inbox dedupe plus child unique event keys; parent retry recreates no children | No external ambiguity on parent; child provider rows are independent | Configured `email.request.read / ALL` is resolved for fan-out and rechecked by each child | Parent -> `SENT` after fan-out; persistence failure -> shared retry/dead-letter lifecycle |
+| `EMAIL_REQUEST_EMAIL` | IT Email Request | One recipient SMTP delivery | Shared SMTP transport | `email-request:<requestId>:user:<recipientUserId>:email` | Deterministic SMTP `Message-ID`; not provider idempotency | SMTP acceptance can be ambiguous; delivery is at-least-once | Current request, configured audience membership, active account, and valid current `User.email` are checked | Invalid recipient -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `EMAIL_REQUEST_LINE` | IT Email Request | One recipient NHFapp personal LINE delivery | `sendAppLineNotification({ userId })` via `LineAccountLink` | `email-request:<requestId>:user:<recipientUserId>:line` | `createLineRetryKey(eventKey)`; finite provider retention window | Retry key is not permanent deduplication or end-user delivery proof | Current request, configured audience, active account/link, and destination are checked | Unavailable recipient/destination -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `IT_TICKET_IN_APP` | IT Ticket | Existing `IT_TICKET` Inbox entry | In-app Inbox | `it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:in-app` | Unique outbox event key and Inbox dedupe key | No external provider ambiguity | Shared IT source-fact/applicability validation; current requester/operator eligibility and source actor exclusion | Stale/ineligible -> `SUPERSEDED`; persistence failure -> shared retry/dead-letter lifecycle |
+| `IT_TICKET_EMAIL` | IT Ticket | One recipient SMTP delivery | Shared SMTP transport | `it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:email` | Deterministic SMTP `Message-ID`; not provider idempotency | SMTP acceptance can be ambiguous; delivery is at-least-once | Same IT validation as Inbox/LINE; assignment and waiting generations are rechecked; current `User.email` is validated | Stale/invalid email -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
+| `IT_TICKET_LINE` | IT Ticket | One recipient NHFapp personal LINE delivery | `sendAppLineNotification({ userId })` via `LineAccountLink` | `it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:line` | `createLineRetryKey(eventKey)`; finite provider retention window | Retry key is not permanent deduplication or end-user delivery proof | Same IT validation as Inbox/Email; requester LIFF or operator Dashboard destination | Stale/unlinked/unavailable destination -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
 | `LEAVE_ACTION` | Leave | Current-action revalidation, Leave in-app entry, child personal LINE row, SMTP email | SMTP plus deferred NHFapp personal LINE child | Payload leave/action delivery identity; parent `eventKey` is historically optional | Deterministic Leave `Message-ID`; child key is `createLineRetryKey(LEAVE_LINE eventKey)` | SMTP acceptance can be ambiguous; child LINE key has the provider retention window | Current approver/action generation is rechecked; stale action -> `SUPERSEDED` | Provider error -> `FAILED`/`DEAD`; stale current action -> `SUPERSEDED` |
 | `LEAVE_RESULT` | Leave | In-app result, child personal LINE row, SMTP result email | SMTP plus NHFapp personal LINE push child | Payload `leaveId`/result identity; parent `eventKey` is historically optional | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Child enqueue is duplicate-safe and Leave state remains capability-owned | Provider error -> `FAILED`/`DEAD` |
 | `LEAVE_CANCELLED` | Leave | In-app cancellation, child personal LINE row, SMTP email | SMTP plus NHFapp personal LINE push child | Payload leave/cancellation identity; parent `eventKey` is historically optional | Deterministic Leave `Message-ID`; child LINE retry key | SMTP ambiguity; LINE key retention | Existing Leave recipient/state checks remain in child dispatch | Provider error -> `FAILED`/`DEAD` |
@@ -2690,12 +2695,9 @@ to the row/type, provider-format-safe after UUID derivation, independent of
 recipient and secrets, and does not alter the legacy token, audience, or
 direct helper behavior.
 
-Email Request remains deferred and in its current ownership location. Its
-dispatch now uses the non-blank existing `eventKey` when available and the
-same `outbox:<type>:<id>` fallback for historical rows without one. The key
-is threaded through the existing IT push-or-broadcast transport, so both
-variants use the same identity for one Outbox row. No Email Request business
-payload or recipient semantics changed.
+Historical pre-IT12 behavior used the parent `EMAIL_REQUEST` row for direct IT
+push/broadcast. IT12 retired that runtime path. The parent now resolves configured
+`email.request.read / ALL` recipients and creates idempotent Email and LINE children.
 
 ### 22.3 SMTP contract and internal retry characterization
 
@@ -2735,8 +2737,8 @@ PROCESSING
 
 Coverage includes:
 
-- Email Request IT LINE: the recovered request reuses the same event-derived
-  retry key;
+- Email Request LINE child: retries reuse the deterministic per-recipient child
+  event key and finite LINE retry key;
 - Stock legacy broadcast: the recovered request reuses the same Outbox-row
   retry key;
 - Stock request-result personal LINE: the persisted canonical retry key is
@@ -2990,15 +2992,15 @@ Audit query, retention, export/display, and route tests remain in place.
 | `lib/line/index.ts :: sendLineWebhook` | **FORMALLY RETAINED** | README, `.env.example`, `docs/line-routine.md`, and the ignored local `.env` still expose `LINE_WEBHOOK_URL`; live deployment/external integration usage cannot be inspected. Remove only after deployment owner confirms the variable is unset/unused in every active environment and no external integration consumes the helper. |
 | `lineNotificationService.sendLineWebhook` | **FORMALLY RETAINED** | Retained as the object-form compatibility export of the same outbound contract; it is not the inbound route. The same external confirmation condition applies. |
 | `lib/line/types.ts :: LineWebhookData` | **FORMALLY RETAINED** | Its only current source consumer is the retained outbound helper, and it describes the advertised compatibility payload. Remove only with the helper and configuration after the same external confirmation. |
-| `LINE_WEBHOOK_URL` | **FORMALLY RETAINED** | Kept in runtime configuration and `.env.example`; current docs now identify it as optional legacy outbound compatibility, separate from `/api/line/webhook` and the current IT Messaging API Email Request path. |
+| `LINE_WEBHOOK_URL` | **FORMALLY RETAINED** | Kept in runtime configuration and `.env.example`; current docs now identify it as optional legacy outbound compatibility, separate from `/api/line/webhook` and the current NHFapp personal Email Request LINE path. |
 | `lib/line/types.ts :: VerifiedLineIdentity` | **REMOVED** | No repository/package/runtime consumer; compile-time-only duplicate; `package.json` is private with no export map; authoritative `modules/line/application/types.ts` and `modules/line/index.ts` remain unchanged. |
 
 The inbound `POST /api/line/webhook` route and `lib/line/verify-signature.ts`
-were not changed. Active `LINE_IT_CHANNEL_SECRET`,
-`LINE_STOCK_CHANNEL_SECRET`, IT push/broadcast, Stock legacy broadcast,
-NHFapp personal LINE/LIFF identity, Email Request delivery, and L5 Outbox
-retry-key behavior remain unchanged. The retained outbound helper is now
-explicitly documented as distinct from inbound signature verification.
+were not changed. IT12 retires Email Request's direct IT push/broadcast runtime
+path; Email Request now uses configured per-recipient NHFapp personal LINE child
+rows. `LINE_IT_CHANNEL_SECRET` remains for inbound signature verification, and
+generic low-level IT transport exports remain compatibility code. Stock legacy
+broadcast and the NHFapp identity integration are unchanged.
 
 ### 23.5 Architecture, documentation, and schema changes
 

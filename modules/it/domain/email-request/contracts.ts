@@ -62,6 +62,8 @@ export interface Pagination {
 
 /** Durable payload contract for EMAIL_REQUEST outbox rows. */
 export interface EmailRequestData {
+    /** Added to new parent facts; absent on historical EMAIL_REQUEST rows. */
+    emailRequestId?: number;
     thaiName: string;
     englishName: string;
     phone: string;
@@ -72,4 +74,12 @@ export interface EmailRequestData {
     needsDocumentSystem: boolean;
     sharedDriveAccess: SharedDriveOption[];
     requestedAt: string;
+}
+
+/** Per-recipient transport child payload; the request details stay in the parent fact. */
+export interface EmailRequestChannelOutboxPayloadV1 {
+    readonly version: 1;
+    readonly emailRequestId: number | null;
+    readonly parentOutboxId: number;
+    readonly recipientUserId: number;
 }

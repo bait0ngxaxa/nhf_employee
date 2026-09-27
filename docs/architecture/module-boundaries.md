@@ -402,12 +402,11 @@ Stock, Routine, and Email Request retain ownership of their current triggering
 events, recipient policy, notification type, title/message, action URL,
 reference ID, channel choice, and event-specific dedupe or supersede semantics.
 IT owns Ticket event meaning, recipient policy, strict payload, destination,
-event identity, and stale-domain validation. IT6 implements in-app Ticket
-notifications. IT9A adds the requester LIFF API foundation. IT9D delivers
-personal NHFapp LINE only for requester `OPERATOR_COMMENTED`,
-`WAITING_REQUESTER`, and `RESOLVED`; operator-facing events remain in-app
-because operator LIFF does not exist. Ticket Email remains a product
-decision/deferred. Notification must not
+event identity, and stale-domain validation. IT12 completes Inbox, Email, and
+approved personal LINE for the six Ticket events, with all channel rows
+enqueued in the Ticket mutation transaction and one shared applicability
+policy. Requester LINE retains the LIFF Ticket destination; operator LINE links
+to the Dashboard Ticket route, and operator LIFF is not introduced. Notification must not
 grow audience APIs such as “notify all Stock
 admins” or become a workflow owner for another module. Leave, Stock, Routine,
 and IT use only `@/modules/notification` for Inbox persistence; physical
@@ -432,10 +431,12 @@ pass a transaction client directly to Notification. A direct
 processor-to-Notification dispatch is reserved for a future generic
 Notification-owned event with a fully resolved command payload, not current
 Leave, Stock, Routine, IT Ticket, or Email Request events. IT enqueues
-`IT_TICKET_IN_APP` and eligible `IT_TICKET_LINE` rows with the same Ticket
-mutation transaction and `EMAIL_REQUEST` with the Email Request creation
-transaction. The public IT server entry exports the Ticket dispatcher for both
-Ticket channel types and the separate Email Request dispatcher for the global
+`IT_TICKET_IN_APP`, `IT_TICKET_EMAIL`, and eligible `IT_TICKET_LINE` rows with
+the same Ticket mutation transaction. The `EMAIL_REQUEST` parent is persisted
+with Email Request creation; its IT dispatcher idempotently creates Inbox rows
+and independent per-recipient `EMAIL_REQUEST_EMAIL` / `EMAIL_REQUEST_LINE`
+children from configured `email.request.read / ALL` recipients. The public IT
+server entry exports the Ticket and Email Request dispatchers for the global
 processor.
 The outbox wakeup remains in the API adapter after the business transaction.
 

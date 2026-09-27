@@ -116,7 +116,7 @@ Provider evidence ต้องเป็น safe identifiers เท่านั�
 | OPS-15 | Routine reminder | ตรวจ email เมื่อ SMTP/recipient configured | email ถึงผู้รับและลิงก์ถูกต้อง | `NOT RUN` |  |
 | OPS-16 | Routine reminder | ตรวจ targeted LINE เมื่อ recipient linked และเป็นเพื่อน OA | `LINE_APP_CHANNEL_ACCESS_TOKEN` ส่ง Routine LINE push ถึง test user และเปิด deep link ถูกต้อง | `NOT RUN` |  |
 | OPS-17 | Stock integration | ตรวจ existing Stock request/low-stock LINE broadcast เมื่อ workflow เปิดใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` แยกจาก `LINE_APP`; broadcast ทำงานถูกต้อง | `NOT RUN` |  |
-| OPS-18 | IT integration | ตรวจ existing IT/email-request LINE notification เมื่อ workflow เปิดใช้ | ใช้ `LINE_IT_CHANNEL_ACCESS_TOKEN` แยกจาก `LINE_APP`; delivery ทำงานถูกต้อง | `NOT RUN` |  |
+| OPS-18 | IT integration | ตรวจ IT Ticket และ Email Request channel completion | Ticket Email/LINE และ Email Request per-recipient Email/LINE ใช้ SMTP + `LINE_APP_CHANNEL_ACCESS_TOKEN`, configured audience และ canonical destinations | `NOT RUN` |  |
 | OPS-19 | Leave notification | ตรวจ Leave notification ปัจจุบัน | in-app และ email ทำงาน; ไม่คาดหวัง Leave targeted LINE push | `NOT RUN` |  |
 | OPS-20 | Routine reminder | recipient ไม่มี `LineAccountLink` | ช่องทางอื่นที่เปิดยังทำงาน และไม่มี Routine LINE child event สำหรับผู้รับนั้น | `NOT RUN` |  |
 | OPS-21 | Outbox health | ตรวจ pending/failed/retry/DEAD เมื่อ observable | backlog ไม่โตผิดปกติ; error มี owner follow-up | `NOT RUN` |  |

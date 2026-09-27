@@ -1,10 +1,12 @@
 # Notification migration record
 
-Status: **Phase H3 CLOSED — Notification producer integration and final migration audit complete.**
+Status: **Phase H3 CLOSED — Notification producer integration and final migration audit complete; IT12 channel completion implemented.**
 Phase H1 server/application ownership and Phase H0 discovery remain closed.
-Notification H0-H3 migration is complete. Email Request remains on its
-transitional notification path pending IT8. IT1 adds authorization metadata
-only; it adds no Ticket notification producer or delivery behavior.
+Notification H0-H3 describes its original migration baseline. IT8 moved Email
+Request ownership under IT; IT12 now fans out its configured
+`email.request.read / ALL` audience to Inbox, Email, and NHFapp personal LINE.
+IT12 also completes IT Ticket Email and operator/requester personal LINE while
+preserving the semantic payload, authorization, and shared outbox lifecycle.
 
 Current-state note: this record preserves the H0-H3 boundary and recipient
 behavior at that migration's closure. Phase 13A/13A.1 later moved Routine,
@@ -564,11 +566,17 @@ ROUTINE_CONTRACT_EXPIRY_IN_APP
 ROUTINE_CONTRACT_EXPIRY_EMAIL
 ROUTINE_CONTRACT_EXPIRY_LINE
 IT_TICKET_IN_APP
+IT_TICKET_EMAIL
+IT_TICKET_LINE
+EMAIL_REQUEST_EMAIL
+EMAIL_REQUEST_LINE
 ```
 
-`IT_TICKET_IN_APP` is the only active IT outbox type. The historical `TICKET_*`
-outbox values above remain absent from the runtime whitelist and are never
-reinterpreted by the IT6 dispatcher.
+The active IT types are `IT_TICKET_IN_APP`, `IT_TICKET_EMAIL`, and
+`IT_TICKET_LINE`; Email Request uses its `EMAIL_REQUEST` parent plus independent
+`EMAIL_REQUEST_EMAIL` and `EMAIL_REQUEST_LINE` children. Historical `TICKET_*`
+outbox values remain absent from the runtime whitelist and are never
+reinterpreted by the IT dispatcher.
 
 All six outbox status values are active runtime lifecycle states. The enum
 comparison is intentional: storage compatibility is broader than the current
@@ -649,7 +657,7 @@ The target ownership map is:
 | Leave/Stock/Routine event and recipient policy | Respective business module |
 | `NotificationOutbox` row lifecycle, processor, retry, stale recovery, scheduling/wakeup | Shared/platform outbox infrastructure |
 | Email/LINE transport and provider retry mechanics | Shared/platform channel infrastructure |
-| Email/LINE event payload/message meaning | Respective business producer; Email Request remains deferred |
+| Email/LINE event payload/message meaning | Respective business producer; IT owns Email Request and IT Ticket channel semantics |
 | Dashboard navbar, menu, route mounting, generic labels | App/Dashboard composition |
 | Authentication/session and generic HTTP/security primitives | Existing auth/shared platform |
 
@@ -945,18 +953,19 @@ Processor.
 
 Notification H0-H3 migration complete. L4 separately closed the equal-
 timestamp history continuation defect with a deterministic composite cursor;
-legacy timestamp cursors retain their historical limitation. IT6 added in-app
-Ticket notifications through the IT public dispatcher and `IT_TICKET_IN_APP`.
-IT9D is **CLOSED** after independent review and adds the
-`IT_TICKET_LINE` outbox type for requester `OPERATOR_COMMENTED`,
-`WAITING_REQUESTER`, and `RESOLVED` events only. It reuses the IT6 strict payload
-and the global processor; Notification does not own Ticket recipient policy,
-Flex composition, LIFF destination, or stale validation. Operator-facing
-Ticket LINE and Ticket Email remain deferred. IT9E-A
-repository E2E/acceptance readiness is **COMPLETE**; IT9E-UX-P0 unified IT
-workspace and creation evidence is **IMPLEMENTED / review pending**. IT9E-B
-Android/iPhone device acceptance is **PAUSED / NOT RUN** while the POC is
-under review. IT10 remains **OPEN / deferred**. No Android/iPhone acceptance
-or live LINE provider acceptance has occurred. Email Request's retained legacy
-LINE configuration is unchanged. The global Outbox Processor plus Email/LINE
-delivery remain outside Notification.
+legacy timestamp cursors retain their historical limitation.
+
+IT12 is the current IT notification state. Every approved Ticket event has
+Inbox, Email, and NHFapp personal LINE for its unchanged recipient audience.
+Requester LINE retains `/liff/it/<ticketId>`; operator LINE links to the canonical
+Dashboard Ticket route. Operator LIFF is not introduced. Ticket Email/LINE omit
+descriptions, comment bodies, attachment data, and authorization grant details.
+
+Email Request `EMAIL_REQUEST` is a transactional parent fan-out to idempotent
+Inbox entries and per-recipient `EMAIL_REQUEST_EMAIL` / `EMAIL_REQUEST_LINE`
+children resolved from configured `email.request.read / ALL`. The legacy
+team-user/broadcast runtime delivery is retired. SMTP and LINE delivery remain
+at-least-once; provider keys do not guarantee exactly-once delivery.
+
+The global Outbox Processor remains a lifecycle/router; IT owns channel
+semantics, content, audience, applicability, and child fan-out.

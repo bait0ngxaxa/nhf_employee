@@ -9,19 +9,33 @@ import {
 } from "@/lib/db/transaction";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
+import type { LineFlexMessage } from "@/types/api";
 
 import { findITOperatorAudience } from "../operator-audience";
 import {
+    buildITTicketEmailEventKey,
     buildITTicketLineEventKey,
     buildITTicketNotificationEventKey,
-    isITTicketRequesterLineNotification,
+    isITTicketLineNotification,
     parseITTicketNotificationPayload,
     type ITTicketNotificationPayloadV1,
 } from "../../domain/ticket-notification";
-import { buildITTicketLineFlexMessage } from "../../infrastructure/notifications/line-flex";
+import {
+    buildITTicketLineFlexMessage,
+} from "../../infrastructure/notifications/line-flex";
+import {
+    normalizeITNotificationEmail,
+} from "../../infrastructure/notifications/email-recipient";
+import {
+    sendITTicketEmailNotification,
+} from "../../infrastructure/notifications/ticket-email";
+import {
+    isUnavailableITLineDestination,
+} from "../../infrastructure/notifications/line-destination";
 import {
     findITTicketNotificationCommentSource,
     findITTicketNotificationEventSource,
+    findITTicketNotificationRecipientEmail,
     findITTicketNotificationResource,
     findLatestITTicketAssignmentGeneration,
     findLatestITTicketStatusGeneration,
@@ -34,9 +48,18 @@ export type ITTicketNotificationDispatchOutcome =
     | "SUPERSEDED"
     | null;
 
+type ITTicketNotificationOutboxType =
+    | "IT_TICKET_IN_APP"
+    | "IT_TICKET_LINE"
+    | "IT_TICKET_EMAIL";
+
 type ITTicketNotificationSource =
     | { readonly kind: "EVENT"; readonly fact: ITTicketNotificationEventSource }
     | { readonly kind: "COMMENT"; readonly fact: ITTicketNotificationCommentSource };
+
+type ITTicketNotificationValidation =
+    | { readonly applicable: false }
+    | { readonly applicable: true; readonly recipientEmail?: string | null };
 
 class ITTicketNotificationSourceMismatchError extends Error {
     constructor(message: string) {
@@ -47,7 +70,7 @@ class ITTicketNotificationSourceMismatchError extends Error {
 
 function parseStoredPayload(
     payload: string,
-    type: "IT_TICKET_IN_APP" | "IT_TICKET_LINE",
+    type: ITTicketNotificationOutboxType,
 ): ITTicketNotificationPayloadV1 {
     let parsed: unknown;
     try {
@@ -61,12 +84,13 @@ function parseStoredPayload(
 async function loadSource(
     tx: Prisma.TransactionClient,
     payload: ITTicketNotificationPayloadV1,
+    type: ITTicketNotificationOutboxType,
 ): Promise<ITTicketNotificationSource> {
     if (payload.source.kind === "EVENT") {
         const fact = await findITTicketNotificationEventSource(tx, payload.source.id);
         if (fact === null) {
             throw new ITTicketNotificationSourceMismatchError(
-                "IT_TICKET_IN_APP event source not found",
+                `${type} event source not found`,
             );
         }
         return { kind: "EVENT", fact };
@@ -75,7 +99,7 @@ async function loadSource(
     const fact = await findITTicketNotificationCommentSource(tx, payload.source.id);
     if (fact === null) {
         throw new ITTicketNotificationSourceMismatchError(
-            "IT_TICKET_IN_APP comment source not found",
+            `${type} comment source not found`,
         );
     }
     return { kind: "COMMENT", fact };
@@ -84,10 +108,11 @@ async function loadSource(
 function assertSourceMatchesPayload(
     source: ITTicketNotificationSource,
     payload: ITTicketNotificationPayloadV1,
+    type: ITTicketNotificationOutboxType,
 ): number {
     if (source.fact.ticketId !== payload.ticketId) {
         throw new ITTicketNotificationSourceMismatchError(
-            "IT_TICKET_IN_APP source Ticket mismatch",
+            `${type} source Ticket mismatch`,
         );
     }
 
@@ -107,7 +132,7 @@ function assertSourceMatchesPayload(
                         : false;
         if (!matches) {
             throw new ITTicketNotificationSourceMismatchError(
-                "IT_TICKET_IN_APP event source does not match event",
+                `${type} event source does not match event`,
             );
         }
         return fact.actorUserId;
@@ -120,7 +145,7 @@ function assertSourceMatchesPayload(
             : null;
     if (expectedKind === null || source.fact.kind !== expectedKind) {
         throw new ITTicketNotificationSourceMismatchError(
-            "IT_TICKET_IN_APP comment source does not match event",
+            `${type} comment source does not match event`,
         );
     }
     return source.fact.authorUserId;
@@ -169,10 +194,41 @@ async function isCurrentlyApplicable(
             ? ticket.assignedToUserId === payload.recipientUserId
             : ticket.assignedToUserId === null;
     }
-    if (payload.event === "WAITING_REQUESTER") {
-        return ticket.status === "WAITING_REQUESTER";
-    }
     return true;
+}
+
+async function validateNotification(
+    notification: NotificationOutbox,
+    payload: ITTicketNotificationPayloadV1,
+): Promise<ITTicketNotificationValidation> {
+    const type = notification.type as ITTicketNotificationOutboxType;
+    try {
+        return await runSerializableTransaction(async (tx) => {
+            const source = await loadSource(tx, payload, type);
+            const sourceActorUserId = assertSourceMatchesPayload(source, payload, type);
+            if (!(await isCurrentlyApplicable(tx, payload, sourceActorUserId))) {
+                return { applicable: false };
+            }
+
+            if (type === "IT_TICKET_EMAIL") {
+                const storedEmail = await findITTicketNotificationRecipientEmail(
+                    tx,
+                    payload.recipientUserId,
+                );
+                return {
+                    applicable: true,
+                    recipientEmail: normalizeITNotificationEmail(storedEmail),
+                };
+            }
+
+            return { applicable: true };
+        });
+    } catch (error) {
+        if (error instanceof ITTicketNotificationSourceMismatchError) {
+            return { applicable: false };
+        }
+        throw error;
+    }
 }
 
 function composeInboxContent(
@@ -225,73 +281,90 @@ function composeInboxContent(
     }
 }
 
-/** Dispatches one IT-owned outbox row and leaves retry lifecycle to the shared processor. */
+/** Dispatches one IT-owned channel row; shared processor owns retry lifecycle. */
 export async function dispatchITTicketNotificationOutbox(
     notification: NotificationOutbox,
 ): Promise<ITTicketNotificationDispatchOutcome> {
     if (
         notification.type !== "IT_TICKET_IN_APP"
         && notification.type !== "IT_TICKET_LINE"
+        && notification.type !== "IT_TICKET_EMAIL"
     ) return null;
 
-    const payload = parseStoredPayload(notification.payload, notification.type);
-    const isLine = notification.type === "IT_TICKET_LINE";
-    const eventKey = isLine
+    const type = notification.type;
+    const payload = parseStoredPayload(notification.payload, type);
+    const expectedEventKey = type === "IT_TICKET_LINE"
         ? buildITTicketLineEventKey(payload)
-        : buildITTicketNotificationEventKey(payload);
-    if (notification.eventKey !== eventKey) {
-        throw new Error(`${notification.type} event identity mismatch`);
+        : type === "IT_TICKET_EMAIL"
+            ? buildITTicketEmailEventKey(payload)
+            : buildITTicketNotificationEventKey(payload);
+    if (notification.eventKey !== expectedEventKey) {
+        throw new Error(`${type} event identity mismatch`);
     }
 
-    if (isLine) {
-        if (!isITTicketRequesterLineNotification(payload)) return "SUPERSEDED";
-
-        const currentlyApplicable = await runSerializableTransaction(async (tx) => {
-            try {
-                const source = await loadSource(tx, payload);
-                const sourceActorUserId = assertSourceMatchesPayload(source, payload);
-                return isCurrentlyApplicable(tx, payload, sourceActorUserId);
-            } catch (error) {
-                if (error instanceof ITTicketNotificationSourceMismatchError) {
-                    return false;
+    if (type === "IT_TICKET_IN_APP") {
+        try {
+            return await runSerializableTransaction(async (tx) => {
+                const source = await loadSource(tx, payload, type);
+                const sourceActorUserId = assertSourceMatchesPayload(source, payload, type);
+                if (!(await isCurrentlyApplicable(tx, payload, sourceActorUserId))) {
+                    return "SUPERSEDED";
                 }
-                throw error;
+
+                const inbox = composeInboxContent(payload);
+                await createForUserOnce({
+                    userId: payload.recipientUserId,
+                    type: "IT_TICKET",
+                    title: inbox.title,
+                    message: inbox.message,
+                    actionUrl: inbox.actionUrl,
+                    referenceId: String(payload.ticketId),
+                    dedupeKey: expectedEventKey,
+                }, tx);
+                return "SENT";
+            });
+        } catch (error) {
+            if (hasPrismaErrorCode(error, "P2003")) {
+                return "SUPERSEDED";
             }
-        });
-        if (!currentlyApplicable) return "SUPERSEDED";
+            if (error instanceof ITTicketNotificationSourceMismatchError) {
+                return "SUPERSEDED";
+            }
+            throw error;
+        }
+    }
+
+    if (type === "IT_TICKET_LINE") {
+        if (!isITTicketLineNotification(payload)) return "SUPERSEDED";
+        const validation = await validateNotification(notification, payload);
+        if (!validation.applicable) return "SUPERSEDED";
+
+        let message: LineFlexMessage;
+        try {
+            message = buildITTicketLineFlexMessage(payload);
+        } catch (error) {
+            if (isUnavailableITLineDestination(error)) return "SUPERSEDED";
+            throw error;
+        }
 
         const result = await sendAppLineNotification({
             userId: payload.recipientUserId,
-            message: buildITTicketLineFlexMessage(payload),
-            retryKey: createLineRetryKey(eventKey),
+            message,
+            retryKey: createLineRetryKey(expectedEventKey),
         });
         return result.status === "SENT" ? "SENT" : "SUPERSEDED";
     }
 
-    try {
-        return await runSerializableTransaction(async (tx) => {
-            const source = await loadSource(tx, payload);
-            const sourceActorUserId = assertSourceMatchesPayload(source, payload);
-            if (!(await isCurrentlyApplicable(tx, payload, sourceActorUserId))) {
-                return "SUPERSEDED";
-            }
-
-            const inbox = composeInboxContent(payload);
-            await createForUserOnce({
-                userId: payload.recipientUserId,
-                type: "IT_TICKET",
-                title: inbox.title,
-                message: inbox.message,
-                actionUrl: inbox.actionUrl,
-                referenceId: String(payload.ticketId),
-                dedupeKey: eventKey,
-            }, tx);
-            return "SENT";
-        });
-    } catch (error) {
-        if (hasPrismaErrorCode(error, "P2003")) {
-            return "SUPERSEDED";
-        }
-        throw error;
+    const validation = await validateNotification(notification, payload);
+    if (!validation.applicable || !validation.recipientEmail) {
+        return "SUPERSEDED";
     }
+
+    const isSent = await sendITTicketEmailNotification(
+        payload,
+        validation.recipientEmail,
+        expectedEventKey,
+    );
+    if (!isSent) throw new Error("IT Ticket Email notification failed");
+    return "SENT";
 }

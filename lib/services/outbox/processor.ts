@@ -1,6 +1,5 @@
 import type { NotificationOutbox } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { createOutboxLineRetryKey } from "./provider-key";
 import { dispatchStockOutbox } from "@/modules/stock";
 import {
     dispatchITEmailRequestOutbox,
@@ -193,11 +192,6 @@ export async function dispatchNotification(
 
     const emailRequestOutcome = await dispatchITEmailRequestOutbox(
         notification,
-        createOutboxLineRetryKey(
-            notification.type,
-            notification.id,
-            notification.eventKey,
-        ),
     );
     if (emailRequestOutcome !== null) return emailRequestOutcome;
 

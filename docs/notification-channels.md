@@ -74,58 +74,98 @@ LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel �
 | Stock request self-cancellation | มีเดิม | ไม่เพิ่ม/ไม่เปลี่ยน behavior เดิม | requester ที่ active และมี link → Stock LIFF | ไม่ใช้ |
 | Stock new request for operations | มีเดิม | ตาม behavior เดิมของระบบ | ยังไม่ใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` |
 | Low-stock alert | มีเดิม | ตาม behavior เดิมของระบบ | ยังไม่ใช้ | ใช้ `LINE_STOCK_CHANNEL_ACCESS_TOKEN` |
-| IT Ticket events | มีผ่าน `IT_TICKET_IN_APP` | ยังไม่ใช้ | เฉพาะ requester events ตาม matrix IT9D ด้านล่าง | ไม่ใช้สำหรับ Ticket |
+| IT Ticket events | `IT_TICKET_IN_APP` | `IT_TICKET_EMAIL` | `IT_TICKET_LINE` ตาม IT12 matrix ด้านล่าง | ไม่ใช้สำหรับ Ticket |
 
 คำว่า “มี parent เดิม” หมายถึงไม่เปลี่ยน notification record, dedupe, read/unread,
 หรือ email workflow เดิมของ event นั้น LINE เป็น child delivery เพิ่มเติม
 
-IT6 retains in-app Ticket notifications. IT9D is **CLOSED** after independent
-review and delivers requester-only personal NHFapp LINE for the approved events
-below. IT owns event meaning, recipient, payload, message, destination and
-Ticket stale checks; `modules/notification`
-owns Inbox persistence; the shared outbox owns claim/retry/backoff/dead-letter/
-supersede and processor composition. Ticket Email remains deferred. Retained
-`LINE_IT_*` configuration remains for legacy Email Request behavior and is not
-used by Ticket delivery. Historical `TICKET_*` outbox values remain readable
-compatibility values and are not runtime-dispatchable.
+## IT Ticket channel completion — IT12
 
-### IT Ticket event matrix — IT9D
+IT12 completes delivery for the six approved Ticket facts. Recipient rules,
+authorization, Inbox semantics, Ticket timeline, Audit, requester LIFF, and
+workflow behavior remain owned by IT and unchanged. The same validated
+semantic payload and source/applicability policy serve Inbox, Email, and LINE.
 
-| IT event | Current in-app recipient | Personal NHFapp LINE | Destination |
+### IT Ticket event matrix
+
+| IT event | Audience | Inbox | Email | NHFapp personal LINE |
+| --- | --- | --- | --- | --- |
+| `CREATED` | Configured operator queue | Yes | Yes | Yes |
+| `ASSIGNED` | Newly assigned eligible operator | Yes | Yes | Yes |
+| `OPERATOR_COMMENTED` | Requester | Yes | Yes | Yes |
+| `REQUESTER_COMMENTED` | Current assignee, or configured operator queue while unassigned | Yes | Yes | Yes |
+| `WAITING_REQUESTER` | Requester | Yes | Yes | Yes |
+| `RESOLVED` | Requester | Yes | Yes | Yes |
+
+No channel is added for category changes, ordinary `IN_PROGRESS`, unassignment,
+attachments alone, reads, analytics, replayed/no-op commands, or failed commands.
+
+### IT Ticket destinations
+
+| Audience | Inbox | Email | Personal LINE |
 | --- | --- | --- | --- |
-| `CREATED` | `OPERATOR_QUEUE` | No | — |
-| `ASSIGNED` | `ASSIGNEE` | No | — |
-| `OPERATOR_COMMENTED` | `REQUESTER` | Yes | Requester Ticket LIFF: `/liff/it/<ticketId>` |
-| `REQUESTER_COMMENTED` | `ASSIGNEE` or `OPERATOR_QUEUE` | No | — |
-| `WAITING_REQUESTER` | `REQUESTER` | Yes | Requester Ticket LIFF: `/liff/it/<ticketId>` |
-| `RESOLVED` | `REQUESTER` | Yes | Requester Ticket LIFF: `/liff/it/<ticketId>` |
+| Requester | Dashboard Ticket `/dashboard/it/<ticketId>` | Dashboard Ticket `/dashboard/it/<ticketId>` | Requester LIFF `/liff/it/<ticketId>` |
+| Operator queue or assignee | Canonical operator Dashboard Ticket `/dashboard/it/queue/<ticketId>` | Same operator Dashboard Ticket | Same operator Dashboard Ticket |
 
-The `IT_TICKET_LINE` row reuses the strict IT6 semantic payload and is persisted
-in the same Ticket transaction as its in-app row. Its deterministic identity is
-`it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:line`;
-the existing in-app identity keeps its `:in-app` suffix. The LINE retry key is
-`createLineRetryKey(eventKey)`. The CTA is built only through
-`buildITTicketLiffUrl(ticketId)`. No Ticket text, comment body, attachment data,
-Department, assignee detail or other private content is sent in the Flex message.
+Operator LIFF is **not** introduced. LIFF remains requester-only; operator
+actions remain behind Dashboard authorization. The canonical route values come
+from the application route SSOT, and public absolute URLs use the configured
+public-origin helper. Existing login and return behavior is unchanged. The
+proxy preserves the Ticket destination while refreshing an expired session;
+when a user has no valid access or refresh session, it sends them to `/login`
+without a `returnTo` value, so a fresh login may return to the Dashboard home
+instead of the linked Ticket. IT12 does not change that authentication flow.
 
-IT operator-facing personal LINE is not implemented: the current LIFF IT surface
-is requester-only and no operator LIFF destination exists. Operator events
-remain on their current in-app Dashboard routes; IT9D does not substitute a
-Dashboard URL into LINE. Existing requester Inbox actions also remain on
-`/dashboard/it/<ticketId>`.
+`IT_TICKET_IN_APP`, `IT_TICKET_EMAIL`, and eligible `IT_TICKET_LINE` intents are
+persisted in the Ticket business transaction. Their deterministic event keys
+share the source fact, Ticket, and recipient, with distinct `:in-app`, `:email`,
+and `:line` suffixes. Replays reuse the same identities and do not duplicate
+intents. The shared processor owns retry/backoff/dead-letter/supersede lifecycle;
+IT owns event meaning, recipient resolution, applicability, content, and
+destination.
 
-The shared `sendAppLineNotification()` path resolves application users through
-`LineAccountLink` and uses `LINE_APP_CHANNEL_ACCESS_TOKEN`. Unlinked or
-ineligible users are returned as `SUPERSEDED`, without retrying a valid business
-state forever. A provider error propagates into the shared retry lifecycle
-(maximum three attempts, then `DEAD`). This lifecycle is at-least-once; LINE's
-retry key is a finite duplicate-suppression window rather than a guarantee of
-permanent provider or end-user delivery. No live LINE provider acceptance is
-claimed and no Android/iPhone acceptance has been performed. IT9E-A repository
-E2E/acceptance readiness is COMPLETE; IT9E-UX-P0 unified IT workspace and
-creation evidence is IMPLEMENTED / review pending. IT9E-B Android/iPhone
-device acceptance is PAUSED / NOT RUN while the POC is under review. IT10 is
-OPEN / deferred.
+All three channels use the same source-fact and applicability checks. `ASSIGNED`
+is suppressed when its assignment generation is no longer current. An assignee
+comment is suppressed after reassignment; a queue comment is suppressed once
+the Ticket is assigned. `WAITING_REQUESTER` is sent only for its current status
+generation. Requester/operator eligibility and source-actor exclusion are also
+rechecked at dispatch. `RESOLVED` remains an occurred business fact and is not
+discarded solely because a later Ticket status changed.
+
+Ticket Email resolves the current active account email from `User`; missing or
+invalid email supersedes only that Email row. Ticket Email and LINE contain the
+Ticket number, event wording, and destination only. They do not copy Ticket
+descriptions, comment bodies, attachment content or storage keys, or grant data.
+Requester LINE continues to use the canonical requester LIFF builder. Operator
+LINE uses the canonical Dashboard Ticket route and the shared personal NHFapp
+delivery path via `LineAccountLink`.
+
+### Email Request channel completion
+
+Email Request now resolves one audience from configured
+`email.request.read / ALL` authority through
+`findActiveUsersWithConfiguredCapabilityScope(...)`. The same configured
+recipient set receives the existing Inbox entry and one Email and personal LINE
+child intent per user. An ADMIN role, Department, hardcoded list,
+`EMAIL_REQUEST_INAPP_RECIPIENT_EMAILS`, or `LINE_IT_TEAM_USER_ID` does not add
+recipients.
+
+The `EMAIL_REQUEST` parent validates its stored event and transactionally fans
+out idempotent Inbox rows plus `EMAIL_REQUEST_EMAIL` and `EMAIL_REQUEST_LINE`
+children. Each child has one recipient and an independent retry lifecycle.
+Email goes to the recipient's current account `User.email`, never the requester's
+`replyEmail`. Personal LINE resolves by application `userId` and
+`LineAccountLink`; no requester acknowledgement is added. Child payloads contain
+stable identifiers only.
+
+The Email Request team-user/direct-push and broadcast fallback is retired from
+current runtime delivery. `LINE_IT_TEAM_USER_ID` has no current consumer.
+`LINE_IT_CHANNEL_SECRET` remains for the inbound webhook, while IT Ticket and
+Email Request personal LINE use the NHFapp application channel.
+
+SMTP and LINE delivery remain at-least-once. Deterministic SMTP `Message-ID` and
+LINE retry keys aid correlation and bounded duplicate suppression; neither
+guarantees permanent exactly-once delivery.
 
 ## Leave LINE flows
 
@@ -212,9 +252,9 @@ Stock แบ่งเป็นสองกลุ่ม:
   `eventKey` ทำให้ enqueue ซ้ำจาก parent retry ไม่สร้าง child ซ้ำ
 - `sendLineAppMessage()` ส่ง `X-Line-Retry-Key`; provider duplicate acknowledgement (`409`)
   ที่มี retry key ถือว่าสำเร็จตาม implementation ปัจจุบัน
-- Email Request ยังรอการย้ายเจ้าของไปยัง IT ใน IT8; IT1 ไม่เปลี่ยนพฤติกรรมปัจจุบัน. Outbox dispatch ใช้
-  `eventKey` เดิมสร้าง retry key เมื่อมีค่า และใช้ `outbox:<type>:<id>` เป็น fallback
-  สำหรับ historical row ที่ไม่มี `eventKey` ทั้ง push และ broadcast ใช้ identity เดียวกัน
+- Email Request parent สร้าง per-recipient `EMAIL_REQUEST_EMAIL` และ
+  `EMAIL_REQUEST_LINE` child rows แบบ idempotent; Email กับ LINE retry แยกกัน
+  และ historical parent ที่ไม่มี request ID ใช้ parent outbox ID เป็น fallback identity
 - Stock operational broadcast ใช้ `outbox:<type>:<id>` เป็น retry identity โดยตรง
   เพราะสอง historical event types นี้ไม่มี eventKey contract ที่เชื่อถือได้
 - LINE retry key ของ Messaging API มี retention window 24 ชั่วโมงเท่านั้น การใช้ key
@@ -244,7 +284,8 @@ Legacy integrations ยังคงแยก configuration:
 
 - `LINE_STOCK_CHANNEL_ACCESS_TOKEN`: Stock operational broadcast เดิม
 - `LINE_STOCK_CHANNEL_SECRET`: Stock legacy webhook/integration เดิม
-- `LINE_IT_CHANNEL_ACCESS_TOKEN` และค่าที่เกี่ยวข้อง: IT/email-request integration เดิม
+- `LINE_IT_CHANNEL_SECRET`: inbound `/api/line/webhook`; Email Request และ IT Ticket ใช้ NHFapp personal LINE
+- `LINE_IT_CHANNEL_ACCESS_TOKEN`: retained low-level compatibility transport; ไม่มี current Email Request business producer
 
 Production ต้อง apply forward-only migration สำหรับ enum outbox ใหม่, ตั้งค่า NHFapp token/LIFF
 ให้มาจาก Provider เดียวกัน, ให้ผู้ใช้เพิ่ม NHFapp OA และทำ account linking, แล้วตรวจ outbox

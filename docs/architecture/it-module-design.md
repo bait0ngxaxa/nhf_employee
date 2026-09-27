@@ -1,6 +1,6 @@
 # IT Module Architecture and Domain Contract
 
-Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to Requester LIFF CLOSED; IT9E-A repository E2E/acceptance readiness COMPLETE; IT9E-UX-P0 UAT candidate / awaiting UAT feedback; IT9E-UX-P1 presentation polish complete; IT Ticket category bootstrap correction COMPLETE after verification; IT9E-B Android/iPhone device acceptance PAUSED / NOT RUN; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred; IT11 Audit Integration & Accountability COMPLETE.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Successful state-changing Ticket commands append separate accountability records through Audit's public contract. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
+Status: **IT0 CLOSED; IT1 authorization foundation CLOSED; IT2 Ticket persistence and workflow CLOSED; IT3 user self-service CLOSED; IT4 operator processing CLOSED; IT5A Conversation + Timeline CLOSED; IT5B Private Attachments CLOSED; IT6 CLOSED; IT7 Analytics Dashboard CLOSED; IT8 Email Request ownership migration CLOSED; IT9A LIFF Authorization + API Foundation CLOSED; IT9B LIFF Self-Service UI + Conversation + Attachments CLOSED; IT9C LIFF Home / Navigation / Deep Link / Rich Menu Integration CLOSED; IT9D IT Ticket LINE Notifications to Requester LIFF CLOSED; IT9E-A repository E2E/acceptance readiness COMPLETE; IT9E-UX-P0 UAT candidate / awaiting UAT feedback; IT9E-UX-P1 presentation polish complete; IT Ticket category bootstrap correction COMPLETE after verification; IT9E-B Android/iPhone device acceptance PAUSED / NOT RUN; IT10 Final Hardening + Compatibility + Retention Audit OPEN / deferred; IT11 Audit Integration & Accountability COMPLETE; IT12 Notification Channel Completion COMPLETE.** The `modules/it` server boundary owns the five Ticket capabilities, with requester read/create/comment available to Dashboard and LIFF self-service, while manage and analytics remain Dashboard-only. IT owns Ticket persistence/workflow, immutable shared conversation with nested private image evidence, bounded merged timeline, separate requester-only and read-ALL operator queries, aggregate-only analytics, internal APIs, capability-projected Dashboard surfaces, IT Ticket notification semantics, and the existing structured Email Request subdomain. Successful state-changing Ticket commands append separate accountability records through Audit's public contract. Email Request remains separate from `ITTicket`. Earlier documents that describe prior phase boundaries are historical; this document records the current state. Product questions marked OPEN must be answered before the slice that depends on them. Current implementation wins over older phase documents.
 
 ## 1. Product scope and terminology
 
@@ -153,9 +153,9 @@ IT business event → IT-owned reason, audience, content, channel, destination,
                        → Notification public command and/or generic SMTP/LINE
 ```
 
-**LOCKED; IT6 in-app and IT9D requester LINE.** IT6 retains the existing in-app Ticket notification semantics and Dashboard destinations. IT9D adds requester-only personal NHFapp LINE for the approved events below, using the requester LIFF Ticket destination completed in IT9C. Ticket Email remains a product decision/deferred. IT owns event meaning, recipient policy, strict payload, event identity, Flex composition, destination, and stale-recipient/domain validation. Notification owns Inbox persistence/read state. Shared outbox infrastructure owns claim, retry/backoff, dead-letter, supersede lifecycle, and processor composition.
+**Historical snapshot — IT6/IT9D closure; superseded for channel coverage by Section 32.** At the IT9D closure boundary, IT6 in-app semantics and requester-only personal NHFapp LINE were implemented for the approved events below, using the requester LIFF Ticket destination completed in IT9C. Ticket Email was still deferred at that phase boundary. This table records that historical channel state; Section 32 defines the current IT12 matrix. IT owns event meaning, recipient policy, strict payload, event identity, Flex composition, destination, and stale-recipient/domain validation. Notification owns Inbox persistence/read state. Shared outbox infrastructure owns claim, retry/backoff, dead-letter, supersede lifecycle, and processor composition.
 
-| Event | Current in-app recipient | Personal LINE in IT9D | Suppression / applicability |
+| Event | Inbox at IT9D closure | Personal LINE at IT9D closure | Suppression / applicability |
 | --- | --- | --- | --- |
 | `CREATED` | Configured IT operator audience | No | Active workforce with configured `it.ticket.read`, `it.ticket.comment`, and `it.ticket.manage` ALL; exclude requester/actor. No eligible operators is valid. |
 | `ASSIGNED` | New non-null assignee | No | Exclude self-assignment and unassignment; dispatch only while still current assignee and eligible operator. |
@@ -164,7 +164,7 @@ IT business event → IT-owned reason, audience, content, channel, destination,
 | `WAITING_REQUESTER` | Requester | Yes → requester Ticket LIFF | Dispatch only while Ticket remains in the source `WAITING_REQUESTER` generation and state. |
 | `RESOLVED` | Requester | Yes → requester Ticket LIFF | Enqueue only on a successful transition into `RESOLVED`; later legitimate Ticket state does not invalidate the occurred fact. |
 
-No notification is produced for ordinary `IN_PROGRESS` start/resume, unassignment, no-op/replay, self, or old assignee after reassignment. No behavior is defined here for other workflow states. Persist each eligible `IT_TICKET_IN_APP` and `IT_TICKET_LINE` intent in the same transaction as the Ticket/event/comment and applicable idempotency/attachment facts. Both channels reuse the unchanged strict versioned IT payload: event identity, Ticket/recipient IDs, audience, and immutable event/comment source ID only. It excludes descriptions, comment bodies, attachment data, sensitive Employee data, grants, and client display text. The existing in-app event key remains `it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:in-app`; LINE uses the distinct `...:line` suffix. The global processor delegates both types to the public IT dispatcher. The dispatcher validates source and current applicability, keeps requester Inbox actions on `/dashboard/it/<ticketId>` and operator actions on the canonical Dashboard queue route, and sends only requester LINE actions to `buildITTicketLiffUrl(ticketId)`. Historical `TICKET_*` values remain storage compatibility only and are not runtime-dispatchable.
+At the IT9D closure boundary, no notification was produced for ordinary `IN_PROGRESS` start/resume, unassignment, no-op/replay, self, or old assignee after reassignment. No behavior was defined there for other workflow states. Eligible `IT_TICKET_IN_APP` and `IT_TICKET_LINE` intents were persisted in the same transaction as the Ticket/event/comment and applicable idempotency/attachment facts. Both channels reuse the unchanged strict versioned IT payload: event identity, Ticket/recipient IDs, audience, and immutable event/comment source ID only. It excludes descriptions, comment bodies, attachment data, sensitive Employee data, grants, and client display text. The existing in-app event key remains `it:ticket:<ticketId>:<source-kind>:<source-id>:user:<recipientUserId>:in-app`; LINE uses the distinct `...:line` suffix. The global processor delegates both types to the public IT dispatcher. The dispatcher validates source and current applicability, keeps requester Inbox actions on `/dashboard/it/<ticketId>` and operator actions on the canonical Dashboard queue route, and sends only requester LINE actions to `buildITTicketLiffUrl(ticketId)`. Historical `TICKET_*` values remain storage compatibility only and are not runtime-dispatchable.
 
 ## 10. Analytics and Department history
 
@@ -236,7 +236,7 @@ CURRENT IT8: app/API compatibility adapters + modules/it application/domain/
 | [`modules/it/presentation/dashboard/email-request`](../../modules/it/presentation/dashboard/email-request), [`components/dashboard/sections/EmailRequestSection.tsx`](../../components/dashboard/sections/EmailRequestSection.tsx), [`app/dashboard/email-request`](../../app/dashboard/email-request) | Form/history/provider moved to IT. SWR remains disabled without read authority; form attempt keys persist after uncertain failure, clear on visible edit and confirmed success. The small shared Dashboard wrapper remains to supply cancel/success navigation. Create-only users see the form without a list GET; read-only users see history without a form. |
 | [`constants/dashboard.ts`](../../constants/dashboard.ts), [`app/_lib/auth/current-user.ts`](../../app/_lib/auth/current-user.ts), [`app/dashboard/_lib/route-access.ts`](../../app/dashboard/_lib/route-access.ts) | Generic menu/route mapping and the current-user capability projection remain Dashboard/Auth composition. The route is available for read OR create; form/history gates remain independent. Current-user Employee projection eligibility is unchanged. |
 | [`modules/it/application/email-request/notifications.ts`](../../modules/it/application/email-request/notifications.ts), [`modules/notification/index.ts`](../../modules/notification/index.ts) | Inbox recipients remain active users with configured `email.request.read / ALL`; default-only users are excluded. IT owns the unchanged `SYSTEM_ALERT`, Thai text, Dashboard destination, replyEmail reference, and per-recipient dedupe, and calls Notification's public `createForUserOnce`. The obsolete Email Request compatibility adapter was removed. |
-| [`modules/it/application/email-request/dispatch.ts`](../../modules/it/application/email-request/dispatch.ts), [`modules/it/infrastructure/notifications/email-request-line.ts`](../../modules/it/infrastructure/notifications/email-request-line.ts), [`modules/it/infrastructure/notifications/email-request-flex.ts`](../../modules/it/infrastructure/notifications/email-request-flex.ts), [`lib/services/outbox/processor.ts`](../../lib/services/outbox/processor.ts) | IT validates historical stored payloads, creates Inbox before LINE, selects the configured IT user ID or broadcast fallback, and composes the unchanged sensitive provisioning/contact Flex with the Dashboard action. The shared processor delegates through `@/modules/it` and retains claim/retry/state lifecycle. |
+| [`modules/it/application/email-request/dispatch.ts`](../../modules/it/application/email-request/dispatch.ts), [`modules/it/infrastructure/notifications/email-request-line.ts`](../../modules/it/infrastructure/notifications/email-request-line.ts), [`modules/it/infrastructure/notifications/email-request-flex.ts`](../../modules/it/infrastructure/notifications/email-request-flex.ts), [`lib/services/outbox/processor.ts`](../../lib/services/outbox/processor.ts) | IT owns Email Request event meaning and resolves configured `email.request.read / ALL` recipients for Inbox and per-recipient `EMAIL_REQUEST_EMAIL` / `EMAIL_REQUEST_LINE` children. The legacy team-user/broadcast runtime path is retired. Email uses the recipient account email, and personal LINE resolves application users through `LineAccountLink`. The shared processor delegates through `@/modules/it` and retains claim/retry/state lifecycle. |
 | [`modules/it/application/email-request/audit.ts`](../../modules/it/application/email-request/audit.ts), [`lib/server/audit.ts`](../../lib/server/audit.ts), [`modules/audit`](../../modules/audit) | IT constructs the unchanged selected `EMAIL_REQUEST` Audit fields only for new creation. The thin shared request-metadata seam supplies trusted IP/user-agent and calls the Audit public command best-effort; replay emits no Audit. |
 
 **LOCKED.** Email Request is a structured IT service-request subdomain, not automatically one `ITTicket`. It records the *target employee's* names/contact, position, free-text Department, document-system need and selected shared drives; the authenticated requester is a different identity. The current `EmailRequest` model has no Ticket status, assignee, comments or timeline. Flattening those fields into title/description or automatically creating Ticket rows would change validation, idempotency, recipients, reporting and historic IDs. A future optional link from Email Request to Ticket needs a verified workflow and explicit cardinality. IT8 was an ownership migration first, with no automatic record conversion.
@@ -257,10 +257,11 @@ suite (22 files; 153 tests), and the full suite (365 files; 3,515 passed,
 
 ### Retained LINE webhook compatibility correction
 
-The active Email Request outbox path remains IT-owned:
-`dispatchITEmailRequestOutbox` → IT-owned Flex → generic LINE Messaging
-push/broadcast. Separately, IT8 preserves the formally retained legacy
-outbound webhook seam outside IT: `sendLineWebhook`,
+The current Email Request parent fans out Inbox rows plus independent
+per-recipient `EMAIL_REQUEST_EMAIL` and `EMAIL_REQUEST_LINE` children for the
+configured `email.request.read / ALL` audience. Its former team-user/direct
+push and broadcast fallback is retired. Separately, IT8 preserves the formally
+retained legacy outbound webhook seam outside IT: `sendLineWebhook`,
 `lineNotificationService.sendLineWebhook`, `LineWebhookData`, and
 `LINE_WEBHOOK_URL`. `lib/line/types.ts` is a thin type-only bridge to IT's
 authoritative `EmailRequestData`; the historical `email_request` shape and
@@ -311,12 +312,10 @@ Do not delete, rename, reinterpret, or reuse historical stored values in IT0. At
 6. Is exactly one current assignee sufficient? If not, assignment cardinality and workload definitions change.
 7. Is priority part of MVP? Should requester provide a separate urgency signal? Who may set `URGENT`?
 8. Are categories centrally configured by deployment/operator data, or must IT administer them in the app? What initial categories are approved?
-9. Which notification channels and recipients are required for creation, assignment, replies and resolution? Is an unassigned queue broadcast desired?
-10. IT9A establishes requester-only LIFF authorization and APIs; IT9B and IT9C provide the requester presentation and shell integration. IT9D's approved Ticket LINE matrix is requester-only (`OPERATOR_COMMENTED`, `WAITING_REQUESTER`, `RESOLVED`); operator-facing LINE requires a separately approved destination. IT9E-A repository readiness is complete; IT9E-UX-P0 is implemented and awaiting review; IT9E-B device acceptance is paused and not run.
-11. Are response/resolution targets required now? If so, specify measures before considering any SLA implementation.
-12. Should reporting periods use calendar or fiscal year, which timezone/business-hours convention, and how should reopened/resolved/cancelled cycles count? Should `RESOLVED` be included in backlog?
-13. Are active application accounts without an Employee profile eligible? Current active workforce helper requires an Employee; product wording alone does not settle this exception.
-14. What retention/deletion policy applies to Ticket text, files, personal identity snapshots and operational history?
+9. Are response/resolution targets required now? If so, specify measures before considering any SLA implementation.
+10. Should reporting periods use calendar or fiscal year, which timezone/business-hours convention, and how should reopened/resolved/cancelled cycles count? Should `RESOLVED` be included in backlog?
+11. Are active application accounts without an Employee profile eligible? Current active workforce helper requires an Employee; product wording alone does not settle this exception.
+12. What retention/deletion policy applies to Ticket text, files, personal identity snapshots and operational history?
 
 These questions are intentionally unresolved; later slices must close their dependencies before schema/API behavior is frozen.
 
@@ -690,3 +689,60 @@ failure trigger that proved Ticket/event/idempotency rollback; the full unit
 suite passed 380/380 files with 3,688 tests passed and 1 skipped.
 `npm run lint:strict`, `npm run typecheck`, and `npm run architecture:check`
 also passed; the architecture check examined 1,283 repository source files.
+
+## 32. IT12 — Notification Channel Completion (COMPLETE)
+
+IT12 adds independent Email and NHFapp personal LINE delivery to the approved
+IT Ticket facts. It preserves the existing event semantics, recipient policy,
+Inbox `IT_TICKET` type and action routes, Audit transaction, Ticket history,
+requester LIFF behavior, authorization, replay handling, and workflow.
+
+| Event | Audience | Inbox | Email | Personal LINE |
+| --- | --- | --- | --- | --- |
+| `CREATED` | Configured operator audience | Yes | Yes | Yes |
+| `ASSIGNED` | Newly assigned eligible operator | Yes | Yes | Yes |
+| `OPERATOR_COMMENTED` | Requester | Yes | Yes | Yes |
+| `REQUESTER_COMMENTED` | Current assignee, or operator queue while unassigned | Yes | Yes | Yes |
+| `WAITING_REQUESTER` | Requester | Yes | Yes | Yes |
+| `RESOLVED` | Requester | Yes | Yes | Yes |
+
+The Ticket mutation transaction persists `IT_TICKET_IN_APP`,
+`IT_TICKET_EMAIL`, and approved `IT_TICKET_LINE` intents with the source fact.
+Event keys remain deterministic per source fact, Ticket, recipient, and channel,
+using `:in-app`, `:email`, and `:line`. Existing semantic payload V1 remains
+the source of truth and contains identifiers/context only.
+
+One IT-owned applicability path validates the immutable event/comment source,
+Ticket ownership, active workforce/operator authority, actor exclusion, current
+assignment generation, and current `WAITING_REQUESTER` generation for all
+channels. A stale assignee assignment or comment, stale waiting generation, or
+ineligible recipient is `SUPERSEDED`. `RESOLVED` retains occurred-fact
+applicability and is not invalidated solely by a later status transition.
+
+Email resolves the current active recipient account email from `User`; missing
+or invalid address supersedes that Email row only. Email and LINE have independent
+outbox rows, retries, and dead-letter transitions. Ticket content, comment bodies,
+attachment data/storage keys, and authorization grant details are excluded from
+Email and LINE content. SMTP Message-ID and LINE retry keys do not guarantee
+exactly-once external delivery.
+
+Requester Inbox and Email link to the canonical Dashboard Ticket route; requester
+LINE uses the existing `/liff/it/<ticketId>` LIFF builder. Operator Inbox, Email,
+and LINE link to the canonical operator Dashboard Ticket route. Operator LIFF is
+not introduced, and LIFF remains requester-only.
+The current proxy preserves a Ticket destination while refreshing an expired
+session, but a user without valid access or refresh cookies is sent to `/login`
+without `returnTo`; a fresh login may therefore land on Dashboard home instead
+of the Ticket. IT12 leaves this existing authentication behavior unchanged.
+
+Email Request parent `EMAIL_REQUEST` now resolves configured
+`email.request.read / ALL` recipients once for Inbox plus per-user
+`EMAIL_REQUEST_EMAIL` and `EMAIL_REQUEST_LINE` child intents. Email uses the
+recipient's account email rather than `replyEmail`; LINE uses application
+`userId` and `LineAccountLink`. The legacy Email Request IT team-user/broadcast
+runtime path is retired. The requester acknowledgement is not added.
+
+The forward-only migration adds `IT_TICKET_EMAIL`, `EMAIL_REQUEST_EMAIL`, and
+`EMAIL_REQUEST_LINE` while preserving all historical outbox enum values.
+Email Request and Ticket delivery failures happen after business commit; they do
+not roll back Ticket state or duplicate Audit, Inbox, or another channel.

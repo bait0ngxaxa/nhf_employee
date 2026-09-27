@@ -1,9 +1,10 @@
 import type { Prisma } from "@prisma/client";
 
 import {
+    buildITTicketEmailEventKey,
     buildITTicketLineEventKey,
     buildITTicketNotificationEventKey,
-    isITTicketRequesterLineNotification,
+    isITTicketLineNotification,
     type ITTicketNotificationPayloadV1,
 } from "../../domain/ticket-notification";
 
@@ -26,7 +27,13 @@ export async function enqueueITTicketNotificationIntents(
             payload: serializedPayload,
         }];
 
-        if (isITTicketRequesterLineNotification(payload)) {
+        intents.push({
+            type: "IT_TICKET_EMAIL",
+            eventKey: buildITTicketEmailEventKey(payload),
+            payload: serializedPayload,
+        });
+
+        if (isITTicketLineNotification(payload)) {
             intents.push({
                 type: "IT_TICKET_LINE",
                 eventKey: buildITTicketLineEventKey(payload),
