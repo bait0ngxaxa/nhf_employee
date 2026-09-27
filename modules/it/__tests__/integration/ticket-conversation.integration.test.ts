@@ -56,6 +56,9 @@ function nextFixtureKey(label: string): string {
 }
 
 async function cleanFixtures(): Promise<void> {
+    await prisma.auditLog.deleteMany({
+        where: { user: { email: { startsWith: `${TEST_PREFIX}-` } } },
+    });
     await prisma.iTTicketCommentIdempotency.deleteMany({
         where: { author: { email: { startsWith: `${TEST_PREFIX}-` } } },
     });
@@ -201,7 +204,7 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         })).firstRespondedAt;
         expect(firstRespondedAt).toEqual(new Date(firstOperatorComment.comment.createdAt));
 
-        await postITOperatorTicketComment(
+        const secondOperatorComment = await postITOperatorTicketComment(
             fixture.operator.context,
             { ticketId: created.ticket.id, body: "พบสาเหตุแล้วค่ะ" },
             { idempotencyKey: nextFixtureKey("second-operator-comment") },
@@ -232,13 +235,50 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         expect(await prisma.notification.count({
             where: { type: "NEW_COMMENT", referenceId: String(created.ticket.id) },
         })).toBe(noNotificationBefore);
-        expect(await prisma.auditLog.count({
+        const commentAudits = await prisma.auditLog.findMany({
             where: {
                 entityType: "ITTicket",
                 entityId: created.ticket.id,
                 action: "TICKET_COMMENT",
             },
-        })).toBe(0);
+            orderBy: { id: "asc" },
+            select: { userId: true, details: true },
+        });
+        expect(commentAudits).toHaveLength(3);
+        expect(commentAudits.map((audit) => audit.userId)).toEqual([
+            fixture.requester.userId,
+            fixture.operator.userId,
+            fixture.operator.userId,
+        ]);
+        expect(commentAudits.map((audit) => JSON.parse(audit.details ?? "null"))).toEqual([
+            {
+                after: {
+                    commentId: requesterComment.comment.id,
+                    authorSide: "REQUESTER",
+                    attachmentCount: 0,
+                },
+                metadata: { channel: "DASHBOARD" },
+            },
+            {
+                after: {
+                    commentId: firstOperatorComment.comment.id,
+                    authorSide: "OPERATOR",
+                    attachmentCount: 0,
+                },
+                metadata: { channel: "DASHBOARD" },
+            },
+            {
+                after: {
+                    commentId: secondOperatorComment.comment.id,
+                    authorSide: "OPERATOR",
+                    attachmentCount: 0,
+                },
+                metadata: { channel: "DASHBOARD" },
+            },
+        ]);
+        for (const body of [firstBody, "กำลังตรวจสอบให้ค่ะ", "พบสาเหตุแล้วค่ะ"]) {
+            expect(commentAudits.some((audit) => audit.details?.includes(body))).toBe(false);
+        }
     });
 
     it("replays a same-key canonical request and conflicts on body, Ticket, or requester/operator semantics", async () => {
@@ -284,6 +324,13 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
 
         expect(await prisma.iTTicketComment.count({ where: { ticketId: first.ticket.id } })).toBe(1);
         expect(await prisma.iTTicketComment.count({ where: { ticketId: second.ticket.id } })).toBe(0);
+        expect(await prisma.auditLog.count({
+            where: {
+                entityType: "ITTicket",
+                entityId: first.ticket.id,
+                action: "TICKET_COMMENT",
+            },
+        })).toBe(1);
         expect((await getITRequesterTicketTimeline(fixture.requester.context, first.ticket.id))
             .items.filter((item) => item.type === "COMMENT")).toHaveLength(1);
     });

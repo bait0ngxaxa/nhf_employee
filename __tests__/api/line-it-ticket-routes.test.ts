@@ -250,7 +250,14 @@ describe("LIFF IT Ticket API routes", () => {
             type: "INCIDENT",
             title: "หัวข้อ",
             description: "รายละเอียด",
-        }, { idempotencyKey: "create-key" });
+        }, {
+            idempotencyKey: "create-key",
+            requestMetadata: expect.objectContaining({
+                userEmail: user.email,
+                requestId: expect.any(String),
+                correlationId: expect.any(String),
+            }),
+        });
         expect(mocks.wakeOutbox).toHaveBeenCalledTimes(1);
     });
 
@@ -261,7 +268,14 @@ describe("LIFF IT Ticket API routes", () => {
             type: "INCIDENT",
             title: "หัวข้อสำหรับส่งพร้อมภาพ",
             description: "รายละเอียดพร้อมภาพประกอบ",
-        }, { idempotencyKey: "multipart-create-key" });
+        }, {
+            idempotencyKey: "multipart-create-key",
+            requestMetadata: expect.objectContaining({
+                userEmail: user.email,
+                requestId: expect.any(String),
+                correlationId: expect.any(String),
+            }),
+        });
 
         const withFile = await createTicket(multipartCreateRequest(true));
         const options = mocks.createTicket.mock.calls.at(-1)?.[2];
@@ -407,7 +421,15 @@ describe("LIFF IT Ticket API routes", () => {
         expect(mocks.postComment).toHaveBeenCalledWith(actorContext, {
             ticketId: 19,
             body: "รายละเอียดเพิ่มเติม",
-        }, { idempotencyKey: "same-comment-key", attachments: [] });
+        }, {
+            idempotencyKey: "same-comment-key",
+            attachments: [],
+            requestMetadata: expect.objectContaining({
+                userEmail: user.email,
+                requestId: expect.any(String),
+                correlationId: expect.any(String),
+            }),
+        });
         expect(mocks.wakeOutbox).toHaveBeenCalledTimes(1);
     });
 

@@ -28,9 +28,16 @@ import {
 } from "./ticket-schemas";
 import type {
     CreateITTicketResult,
+    ITCommandRequestMetadata,
     ITTicketMutationResult,
     ITTicketRecord,
 } from "./types";
+import {
+    createITTicketAssignmentAudit,
+    createITTicketCategoryAudit,
+    createITTicketCreationAudit,
+    createITTicketStatusAudit,
+} from "./ticket-audit";
 import { createITTicketRequestHash } from "../domain/ticket-idempotency";
 import { isAllowedITTicketTransition } from "../domain/ticket-workflow";
 import {
@@ -150,6 +157,7 @@ export async function createITTicket(
     options: {
         readonly idempotencyKey: string;
         readonly attachments?: readonly ITTicketAttachmentSource[];
+        readonly requestMetadata?: ITCommandRequestMetadata;
     },
 ): Promise<CreateITTicketResult> {
     const canonicalInput = parseCreateInput(input);
@@ -270,6 +278,14 @@ export async function createITTicket(
                 source: { kind: "EVENT", id: eventId },
             }));
         await enqueueITTicketNotificationIntents(tx, notifications);
+
+        await createITTicketCreationAudit(
+            tx,
+            context,
+            options.requestMetadata,
+            toITTicketRecord(ticket),
+            preparedAttachments.length,
+        );
 
         return { ticket: toITTicketRecord(ticket), replayed: false };
     };
@@ -422,6 +438,7 @@ async function saveMutationAndEvent(
 export async function transitionITTicketStatus(
     context: ITAuthorizationContext,
     input: unknown,
+    requestMetadata?: ITCommandRequestMetadata,
 ): Promise<ITTicketMutationResult> {
     const command = parseInput(transitionITTicketStatusInputSchema, input);
     return runOperatorMutation(async (tx) => {
@@ -441,7 +458,7 @@ export async function transitionITTicketStatus(
                 || command.targetStatus === "RESOLVED")
             && ticket.requesterUserId !== context.authorizationActor.userId;
 
-        return saveMutationAndEvent(
+        const result = await saveMutationAndEvent(
             tx,
             ticket,
             command.expectedVersion,
@@ -471,6 +488,14 @@ export async function transitionITTicketStatus(
                 }])
                 : undefined,
         );
+        await createITTicketStatusAudit(
+            tx,
+            context,
+            requestMetadata,
+            ticket,
+            result.ticket,
+        );
+        return result;
     });
 }
 
@@ -488,6 +513,7 @@ async function assertEligibleAssignee(
 export async function assignITTicket(
     context: ITAuthorizationContext,
     input: unknown,
+    requestMetadata?: ITCommandRequestMetadata,
 ): Promise<ITTicketMutationResult> {
     const command = parseInput(assignITTicketInputSchema, input);
     return runOperatorMutation(async (tx) => {
@@ -510,7 +536,7 @@ export async function assignITTicket(
         const notifyNewAssignee = newAssigneeUserId !== null
             && newAssigneeUserId !== actorUserId;
 
-        return saveMutationAndEvent(
+        const result = await saveMutationAndEvent(
             tx,
             ticket,
             command.expectedVersion,
@@ -533,6 +559,15 @@ export async function assignITTicket(
                 }])
                 : undefined,
         );
+        await createITTicketAssignmentAudit(
+            tx,
+            context,
+            requestMetadata,
+            ticket.id,
+            ticket.assignedToUserId,
+            result.ticket.assignedToUserId,
+        );
+        return result;
     });
 }
 
@@ -540,6 +575,7 @@ export async function assignITTicket(
 export async function setITTicketCategory(
     context: ITAuthorizationContext,
     input: unknown,
+    requestMetadata?: ITCommandRequestMetadata,
 ): Promise<ITTicketMutationResult> {
     const command = parseInput(setITTicketCategoryInputSchema, input);
     return runOperatorMutation(async (tx) => {
@@ -560,7 +596,7 @@ export async function setITTicketCategory(
         }
 
         const occurredAt = new Date();
-        return saveMutationAndEvent(
+        const result = await saveMutationAndEvent(
             tx,
             ticket,
             command.expectedVersion,
@@ -573,5 +609,14 @@ export async function setITTicketCategory(
                 toCategoryId: command.categoryId,
             },
         );
+        await createITTicketCategoryAudit(
+            tx,
+            context,
+            requestMetadata,
+            ticket.id,
+            ticket.categoryId,
+            result.ticket.categoryId,
+        );
+        return result;
     });
 }

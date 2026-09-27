@@ -196,12 +196,28 @@ describe("IT Ticket conversation HTTP routes", () => {
         expect(mocks.requesterPost).toHaveBeenCalledWith(
             context,
             { ticketId: 19, body: "ขอความช่วยเหลือค่ะ" },
-            { idempotencyKey: "same-key", attachments: [] },
+            {
+                idempotencyKey: "same-key",
+                attachments: [],
+                requestMetadata: expect.objectContaining({
+                    userEmail: session.user.email,
+                    requestId: expect.any(String),
+                    correlationId: expect.any(String),
+                }),
+            },
         );
         expect(mocks.operatorPost).toHaveBeenCalledWith(
             context,
             { ticketId: 19, body: "กำลังตรวจสอบค่ะ" },
-            { idempotencyKey: "operator-key", attachments: [] },
+            {
+                idempotencyKey: "operator-key",
+                attachments: [],
+                requestMetadata: expect.objectContaining({
+                    userEmail: session.user.email,
+                    requestId: expect.any(String),
+                    correlationId: expect.any(String),
+                }),
+            },
         );
         expect(await requesterResponse.json()).toMatchObject({ success: true, replayed: false });
         expect(mocks.wakeOutbox).toHaveBeenCalledTimes(2);

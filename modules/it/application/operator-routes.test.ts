@@ -280,17 +280,29 @@ describe("IT operator API adapters", () => {
             ticketId: 19,
             assigneeUserId: 51,
             expectedVersion: 4,
-        });
+        }, expect.objectContaining({
+            userEmail: user.email,
+            requestId: expect.any(String),
+            correlationId: expect.any(String),
+        }));
         expect(mocks.assign).toHaveBeenNthCalledWith(2, actorContext, {
             ticketId: 19,
             assigneeUserId: 52,
             expectedVersion: 5,
-        });
+        }, expect.objectContaining({
+            userEmail: user.email,
+            requestId: expect.any(String),
+            correlationId: expect.any(String),
+        }));
         expect(mocks.assign).toHaveBeenNthCalledWith(3, actorContext, {
             ticketId: 19,
             assigneeUserId: null,
             expectedVersion: 6,
-        });
+        }, expect.objectContaining({
+            userEmail: user.email,
+            requestId: expect.any(String),
+            correlationId: expect.any(String),
+        }));
         expect((await assign.json()).ticket).toMatchObject({ id: 19, version: 5 });
         expect(mocks.wakeOutbox).toHaveBeenCalledTimes(2);
     });
@@ -316,12 +328,20 @@ describe("IT operator API adapters", () => {
             ticketId: 19,
             categoryId: 4,
             expectedVersion: 4,
-        });
+        }, expect.objectContaining({
+            userEmail: user.email,
+            requestId: expect.any(String),
+            correlationId: expect.any(String),
+        }));
         expect(mocks.setCategory).toHaveBeenNthCalledWith(2, actorContext, {
             ticketId: 19,
             categoryId: null,
             expectedVersion: 5,
-        });
+        }, expect.objectContaining({
+            userEmail: user.email,
+            requestId: expect.any(String),
+            correlationId: expect.any(String),
+        }));
     });
 
     it("maps approved transition failures and stale or competing writes to conflict", async () => {
@@ -371,7 +391,11 @@ describe("IT operator API adapters", () => {
             ticketId: 19,
             targetStatus: "IN_PROGRESS",
             expectedVersion: 4,
-        });
+        }, expect.objectContaining({
+            userEmail: user.email,
+            requestId: expect.any(String),
+            correlationId: expect.any(String),
+        }));
     });
 
     it("maps missing, inactive, and ineligible reference outcomes consistently", async () => {

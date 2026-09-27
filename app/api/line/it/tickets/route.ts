@@ -11,6 +11,7 @@ import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     buildITAuthorizationContext,
     createITTicket,
+    createITCommandRequestMetadata,
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_LIST_DEFAULT_PAGE,
     listITRequesterTickets,
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             parsed.input,
             {
                 idempotencyKey: idempotencyKey.data,
+                requestMetadata: createITCommandRequestMetadata(auth.user, request.headers),
                 ...(parsed.attachments.length > 0 ? { attachments: parsed.attachments } : {}),
             },
         );

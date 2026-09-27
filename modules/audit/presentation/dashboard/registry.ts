@@ -150,6 +150,26 @@ export const AUDIT_ACTION_META = {
         label: "ส่งคำร้องพนักงานใหม่",
         badgeClassName: AUDIT_BADGE_TONES.dataImport,
     },
+    TICKET_CREATE: {
+        label: "สร้าง IT Ticket",
+        badgeClassName: AUDIT_BADGE_TONES.create,
+    },
+    TICKET_UPDATE: {
+        label: "แก้ไข IT Ticket",
+        badgeClassName: AUDIT_BADGE_TONES.update,
+    },
+    TICKET_STATUS_CHANGE: {
+        label: "เปลี่ยนสถานะ IT Ticket",
+        badgeClassName: AUDIT_BADGE_TONES.stateChange,
+    },
+    TICKET_ASSIGN: {
+        label: "มอบหมาย IT Ticket",
+        badgeClassName: AUDIT_BADGE_TONES.reassigned,
+    },
+    TICKET_COMMENT: {
+        label: "แสดงความคิดเห็นใน IT Ticket",
+        badgeClassName: AUDIT_BADGE_TONES.neutral,
+    },
     LEAVE_REQUEST_CREATE: {
         label: "ยื่นคำขอลา",
         badgeClassName: AUDIT_BADGE_TONES.signOut,
@@ -277,6 +297,7 @@ export const AUDIT_ACTION_FILTER_OPTIONS = [
 
 export const AUDIT_ENTITY_LABELS = {
     User: "ผู้ใช้ระบบ",
+    ITTicket: "ทิกเก็ต IT",
     Team: "Team",
     TeamRole: "TeamRole",
     Employee: "พนักงาน",

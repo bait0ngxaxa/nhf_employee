@@ -10,6 +10,7 @@ import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/
 import { IT_TICKET_COMMENT_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 import {
     buildCurrentITAuthorizationContext,
+    createITCommandRequestMetadata,
     IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES,
     getITTicketCommentMediaType,
     isITTicketCommentParseFailure,
@@ -90,7 +91,11 @@ export async function POST(
         const result = await postITOperatorTicketComment(
             await buildCurrentITAuthorizationContext(auth.user),
             { ticketId, body: parsed.body },
-            { idempotencyKey, attachments: parsed.attachments },
+            {
+                idempotencyKey,
+                attachments: parsed.attachments,
+                requestMetadata: createITCommandRequestMetadata(auth.user, request.headers),
+            },
         );
         if (!result.replayed) scheduleITTicketOutboxWakeup();
         return NextResponse.json(

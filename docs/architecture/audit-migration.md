@@ -1,14 +1,16 @@
 # Audit capability migration
 
 Status: **Phase I3 CLOSED — Audit producer integration and physical
-persistence exclusivity complete.**
+persistence exclusivity complete; IT11 Ticket producer integration COMPLETE.**
 
 Audit capability migration I0-I3 is closed. At the I3 audited baseline,
-Auth/Session/Identity migration had not started. Phase J0 discovery has since
-closed, and the current Auth / Session / Identity migration (J0-J3) is complete.
-Its current boundary is authoritative in
+Auth/Session/Identity and Email Request/future IT producer migrations had not
+started. Phase J0 discovery has since closed, and the current Auth / Session /
+Identity migration (J0-J3) is complete. IT11 now integrates the current IT
+Ticket commands; Email Request retains its existing compatibility producer.
+The current Auth / Session / Identity boundary is authoritative in
 [auth-session-identity-migration.md](./auth-session-identity-migration.md),
-while Email Request/future IT migration remains deferred.
+while Email Request behavior remains unchanged.
 
 Baseline audited: `05c2327be2f46e83a843040b978093b30a1c0289`
 (`refactor(notification): migrate Leave Stock and Routine Inbox writes`).
@@ -28,7 +30,9 @@ evidence was reviewed. The duplicate Audit `UserContext` was not moved to
 another shared location. References to those files in the I0/I1 sections
 below are historical migration evidence; the final current ownership result
 is recorded in Sections 25 and 26 and in the L6 closure of
-`docs/architecture/runtime-hardening.md`.
+`docs/architecture/runtime-hardening.md`. IT11 adds Ticket-owned event
+semantics through `@/modules/audit`; it does not move Audit persistence or
+change Email Request's best-effort compatibility path.
 
 H2A.1 retired the Routine Import runtime path, API routes, UI, application
 services, `routine.import.manage` capability, and audit producers. H2A.2
@@ -1273,3 +1277,46 @@ script, operator artifact, package export, or deployment build path imports
 `lib/services/audit-log/**`; those files are therefore **REMOVED**. The
 authoritative public contract and all current query/retention behavior remain
 under `@/modules/audit`.
+
+## 28. IT11 — Audit Integration & Accountability (COMPLETE)
+
+The action inventory in the I3 baseline above recorded the Ticket actions as
+deferred/legacy because the new Ticket domain did not yet have an Audit
+producer. IT11 explicitly reactivates the retained values for current
+`ITTicket` mutations without changing the Prisma enum or adding Ticket Audit
+storage abstractions.
+
+| IT Ticket command | Audit action | Entity | Detail contract |
+| --- | --- | --- | --- |
+| `createITTicket` | `TICKET_CREATE` | `ITTicket` | Persisted type, status, requester, assignee, category, Department, and attachment count. |
+| `assignITTicket` | `TICKET_ASSIGN` | `ITTicket` | Persisted `assignedToUserId` before and after. |
+| `transitionITTicketStatus` | `TICKET_STATUS_CHANGE` | `ITTicket` | Persisted status and `resolvedAt` before and after. |
+| `setITTicketCategory` | `TICKET_UPDATE` | `ITTicket` | Persisted `categoryId` before and after; `metadata.change = CATEGORY`. |
+| Requester/operator comment commands | `TICKET_COMMENT` | `ITTicket` | Comment ID, `REQUESTER`/`OPERATOR` author side, and attachment count. |
+
+The IT application owns this mapping and calls the public
+`appendAuditInTransaction(...)` contract in each command's existing
+transaction. Persistence failure aborts the transaction. Creation/comment
+idempotency replays and no-op assignment/category results do not add records.
+Comment bodies, attachment bytes, and private storage keys are excluded.
+Actor user ID and channel come from the trusted authorization context;
+authenticated email and request metadata enter through a separate IT command
+adapter. Client IP is recorded only through `getTrustedClientIp(...)`.
+
+Audit is accountability history. `ITTicketEvent` and `ITTicketComment` remain
+the operational timeline source; no Audit read is added to Ticket history.
+The Audit Dashboard now has explicit Thai presentation metadata for the five
+active Ticket actions and `ITTicket`. `TICKET_DELETE` remains retained for
+historical compatibility and has no new producer.
+
+Email Request still emits its existing `EMAIL_REQUEST` record through the
+legacy best-effort public Audit append for a newly created request only.
+Replay behavior and Email Request business behavior are unchanged.
+
+Verification (2026-09-27): focused actor/Audit/Email Request tests passed
+24/24; focused Ticket route contract tests passed 63/63; real-MySQL IT
+integration passed 22/22 files and 160/160 tests, including an Audit insert
+failure trigger that proved Ticket/event/idempotency rollback; the full unit
+suite passed 380/380 files with 3,688 tests passed and 1 skipped.
+`npm run lint:strict`, `npm run typecheck`, and `npm run architecture:check`
+also passed; the architecture check examined 1,283 repository source files.

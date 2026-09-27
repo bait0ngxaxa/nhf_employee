@@ -1,7 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
-import { buildCurrentITAuthorizationContext, type ITTicketMutationResult } from "@/modules/it";
+import {
+    buildCurrentITAuthorizationContext,
+    createITCommandRequestMetadata,
+    type ITCommandRequestMetadata,
+    type ITTicketMutationResult,
+} from "@/modules/it";
 import type { ITAuthorizationContext } from "@/modules/it";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";
@@ -17,6 +22,7 @@ interface SafeParseSchema<TBody extends object> {
 type ITTicketMutation<TBody extends object> = (
     context: ITAuthorizationContext,
     input: TBody & { readonly ticketId: number },
+    requestMetadata?: ITCommandRequestMetadata,
 ) => Promise<ITTicketMutationResult>;
 
 interface ITTicketMutationOptions<TBody extends object> {
@@ -55,7 +61,11 @@ export async function patchITOperatorTicket<TBody extends object>(
         }
 
         const context = await buildCurrentITAuthorizationContext(auth.user);
-        const result = await mutate(context, { ...parsed.data, ticketId });
+        const result = await mutate(
+            context,
+            { ...parsed.data, ticketId },
+            createITCommandRequestMetadata(auth.user, request.headers),
+        );
         if (
             result.changed
             && options.shouldWakeOutbox?.(

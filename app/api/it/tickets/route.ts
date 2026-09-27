@@ -6,6 +6,7 @@ import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/
 import {
     buildCurrentITAuthorizationContext,
     createITTicket,
+    createITCommandRequestMetadata,
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_LIST_DEFAULT_PAGE,
     listITRequesterTickets,
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const context = await buildCurrentITAuthorizationContext(auth.user);
         const result = await createITTicket(context, parsed.input, {
             idempotencyKey: idempotencyKey.data,
+            requestMetadata: createITCommandRequestMetadata(auth.user, request.headers),
             ...(parsed.attachments.length > 0 ? { attachments: parsed.attachments } : {}),
         });
         if (!result.replayed) scheduleITTicketOutboxWakeup();

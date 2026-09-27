@@ -10,6 +10,7 @@ export {
     resolveITCapabilityInTransaction,
 } from "./application/authorization";
 export { buildCurrentITAuthorizationContext } from "./application/workforce";
+export { createITCommandRequestMetadata } from "./server/command-actor";
 export { buildITLiffUrl, buildITTicketLiffUrl } from "./application/liff-links";
 export { dispatchITTicketNotificationOutbox } from "./application/notifications/dispatch";
 export type {
@@ -174,6 +175,7 @@ export type { ITTicketCommentSubmission, ITTicketTimelinePage, ITTicketTimelineI
 export type { ITTicketAttachmentSummary } from "./contracts";
 export type {
     CreateITTicketResult,
+    ITCommandRequestMetadata,
     ITTicketMutationResult,
     ITTicketRecord,
 } from "./application/types";

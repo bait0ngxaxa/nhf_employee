@@ -115,7 +115,15 @@ describe.each([
         expect(target).toHaveBeenCalledWith(
             actorContext,
             { ticketId: 19, body: "ตรวจสอบให้หน่อย" },
-            { idempotencyKey: "comment-key", attachments: [] },
+            {
+                idempotencyKey: "comment-key",
+                attachments: [],
+                requestMetadata: expect.objectContaining({
+                    userEmail: user.email,
+                    requestId: expect.any(String),
+                    correlationId: expect.any(String),
+                }),
+            },
         );
         expect(mocks.preAuthLimit).not.toHaveBeenCalled();
         expect(mocks.authenticatedLimit).not.toHaveBeenCalled();

@@ -35,6 +35,7 @@ import { getCurrentWorkforceDepartmentSnapshotInTransaction } from "@/modules/em
 import { ITWorkforceDeniedError } from "@/modules/it";
 
 const TEST_PREFIX = "it2-ticket-workflow";
+const AUDIT_FAILURE_TRIGGER = "it11_force_audit_failure";
 let fixtureSequence = 0;
 
 interface WorkforceUser {
@@ -82,6 +83,26 @@ async function dropEventFailureTrigger(): Promise<void> {
     }
 }
 
+async function dropAuditFailureTrigger(): Promise<void> {
+    const connection = await mysql.createConnection(getTestDatabaseUrl());
+    try {
+        await connection.query(`DROP TRIGGER IF EXISTS \`${AUDIT_FAILURE_TRIGGER}\``);
+    } finally {
+        await connection.end();
+    }
+}
+
+async function createAuditFailureTrigger(): Promise<void> {
+    const connection = await mysql.createConnection(getTestDatabaseUrl());
+    try {
+        await connection.query(
+            `CREATE TRIGGER \`${AUDIT_FAILURE_TRIGGER}\` BEFORE INSERT ON audit_logs FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'IT11 integration audit failure'`,
+        );
+    } finally {
+        await connection.end();
+    }
+}
+
 async function createEventFailureTrigger(): Promise<void> {
     const connection = await mysql.createConnection(getTestDatabaseUrl());
     try {
@@ -95,6 +116,10 @@ async function createEventFailureTrigger(): Promise<void> {
 
 async function cleanFixtures(): Promise<void> {
     await dropEventFailureTrigger();
+    await dropAuditFailureTrigger();
+    await prisma.auditLog.deleteMany({
+        where: { user: { email: { startsWith: `${TEST_PREFIX}-` } } },
+    });
     await prisma.iTTicketCreateIdempotency.deleteMany({
         where: { requester: { email: { startsWith: `${TEST_PREFIX}-` } } },
     });
@@ -106,6 +131,10 @@ async function cleanFixtures(): Promise<void> {
     });
     await prisma.iTTicketCategory.deleteMany({
         where: { key: { startsWith: `${TEST_PREFIX}-` } },
+    });
+    await prisma.iTTicketCategory.updateMany({
+        where: { key: { in: IT_TICKET_CATEGORY_SEEDS.map(({ key }) => key) } },
+        data: { isActive: true },
     });
     await prisma.userCapabilityGrant.deleteMany({
         where: { user: { email: { startsWith: `${TEST_PREFIX}-` } } },
@@ -282,17 +311,39 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
     it("creates from the authenticated requester, snapshots Department, and replays the canonical request", async () => {
         const fixture = await createFixture("create-replay");
         const key = nextFixtureKey("create-key");
+        const requesterEmail = (await prisma.user.findUniqueOrThrow({
+            where: { id: fixture.requester.userId },
+            select: { email: true },
+        })).email;
+        const liffContext = buildITAuthorizationContext(
+            { id: fixture.requester.userId, role: fixture.requester.role },
+            fixture.requester.employeeId,
+            "LIFF_SELF_SERVICE",
+        );
+        const requestMetadata = {
+            userEmail: requesterEmail,
+            ipAddress: "203.0.113.17",
+            userAgent: "IT11 test client",
+            requestId: "it11-create-request",
+            correlationId: "it11-create-correlation",
+        };
         const input = {
             type: "SERVICE_REQUEST",
             title: "  ขอความช่วยเหลือระบบงาน  ",
             description: "  ระบบแสดงข้อความผิดพลาดเมื่อเปิดหน้าแบบฟอร์ม  ",
         };
 
-        const created = await createTicket(fixture.requester, key, input);
-        const replay = await createTicket(fixture.requester, key, {
+        const created = await createITTicket(liffContext, input, {
+            idempotencyKey: key,
+            requestMetadata,
+        });
+        const replay = await createITTicket(liffContext, {
             type: "SERVICE_REQUEST",
             title: "ขอความช่วยเหลือระบบงาน",
             description: "ระบบแสดงข้อความผิดพลาดเมื่อเปิดหน้าแบบฟอร์ม",
+        }, {
+            idempotencyKey: key,
+            requestMetadata: { ...requestMetadata, requestId: "it11-replayed-request" },
         });
 
         expect(created.replayed).toBe(false);
@@ -342,6 +393,76 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         });
         expect(idempotency.requestHash).toMatch(/^[a-f0-9]{64}$/);
         expect(idempotency.ticketId).toBe(created.ticket.id);
+
+        const createAudits = await prisma.auditLog.findMany({
+            where: {
+                entityType: "ITTicket",
+                entityId: created.ticket.id,
+                action: "TICKET_CREATE",
+            },
+            select: {
+                userId: true,
+                userEmail: true,
+                ipAddress: true,
+                userAgent: true,
+                details: true,
+            },
+        });
+        expect(createAudits).toHaveLength(1);
+        expect(createAudits[0]).toMatchObject({
+            userId: fixture.requester.userId,
+            userEmail: requesterEmail,
+            ipAddress: "203.0.113.17",
+            userAgent: "IT11 test client",
+        });
+        expect(JSON.parse(createAudits[0]?.details ?? "null")).toEqual({
+            after: {
+                type: "SERVICE_REQUEST",
+                status: "OPEN",
+                requesterUserId: fixture.requester.userId,
+                assignedToUserId: null,
+                categoryId: null,
+                requesterDepartmentId: fixture.departmentId,
+                attachmentCount: 0,
+            },
+            metadata: {
+                channel: "LIFF_SELF_SERVICE",
+                requestId: "it11-create-request",
+                correlationId: "it11-create-correlation",
+            },
+        });
+    });
+
+    it("rolls back Ticket, event, and idempotency state when Audit persistence fails", async () => {
+        const fixture = await createFixture("audit-failure");
+        const idempotencyKey = nextFixtureKey("audit-failure-key");
+        await createAuditFailureTrigger();
+        try {
+            await expect(createITTicket(
+                fixture.requester.context,
+                {
+                    type: "INCIDENT",
+                    title: "Audit ต้อง commit พร้อม Ticket",
+                    description: "ทดสอบ rollback เมื่อบันทึก Audit ล้มเหลว",
+                },
+                { idempotencyKey },
+            )).rejects.toThrow();
+        } finally {
+            await dropAuditFailureTrigger();
+        }
+
+        expect(await prisma.iTTicket.count({
+            where: { requesterUserId: fixture.requester.userId },
+        })).toBe(0);
+        expect(await prisma.iTTicketEvent.count({
+            where: { ticket: { requesterUserId: fixture.requester.userId } },
+        })).toBe(0);
+        expect(await prisma.iTTicketCreateIdempotency.count({
+            where: { requesterUserId: fixture.requester.userId, idempotencyKey },
+        })).toBe(0);
+        expect(await prisma.auditLog.count({
+            where: { userId: fixture.requester.userId, action: "TICKET_CREATE" },
+        })).toBe(0);
     });
 
     it("rejects reuse of a creation key with different normalized input", async () => {
@@ -359,6 +480,9 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         })).toBe(1);
         expect(await prisma.iTTicketEvent.count({
             where: { ticket: { requesterUserId: fixture.requester.userId } },
+        })).toBe(1);
+        expect(await prisma.auditLog.count({
+            where: { userId: fixture.requester.userId, action: "TICKET_CREATE" },
         })).toBe(1);
     });
 
@@ -386,6 +510,9 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         })).toBe(1);
         expect(await prisma.iTTicketCreateIdempotency.count({
             where: { requesterUserId: fixture.requester.userId, idempotencyKey: key },
+        })).toBe(1);
+        expect(await prisma.auditLog.count({
+            where: { userId: fixture.requester.userId, action: "TICKET_CREATE" },
         })).toBe(1);
     });
 
@@ -521,6 +648,45 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         const resolvedEvent = events.at(-1);
         expect(resolvedEvent?.occurredAt).toEqual(ticket.resolvedAt);
 
+        const statusAudits = await prisma.auditLog.findMany({
+            where: {
+                entityType: "ITTicket",
+                entityId: ticket.id,
+                action: "TICKET_STATUS_CHANGE",
+            },
+            orderBy: { id: "asc" },
+            select: { userId: true, details: true },
+        });
+        expect(statusAudits).toHaveLength(transitions.length);
+        expect(statusAudits.every((audit) => audit.userId === fixture.operator.userId)).toBe(true);
+        expect(statusAudits.slice(0, 3).map((audit) =>
+            JSON.parse(audit.details ?? "null"),
+        )).toEqual([
+            {
+                before: { status: "OPEN", resolvedAt: null },
+                after: { status: "IN_PROGRESS", resolvedAt: null },
+                metadata: { channel: "DASHBOARD" },
+            },
+            {
+                before: { status: "IN_PROGRESS", resolvedAt: null },
+                after: { status: "WAITING_REQUESTER", resolvedAt: null },
+                metadata: { channel: "DASHBOARD" },
+            },
+            {
+                before: { status: "WAITING_REQUESTER", resolvedAt: null },
+                after: { status: "IN_PROGRESS", resolvedAt: null },
+                metadata: { channel: "DASHBOARD" },
+            },
+        ]);
+        expect(JSON.parse(statusAudits[3]?.details ?? "null")).toEqual({
+            before: { status: "IN_PROGRESS", resolvedAt: null },
+            after: {
+                status: "RESOLVED",
+                resolvedAt: ticket.resolvedAt?.toISOString(),
+            },
+            metadata: { channel: "DASHBOARD" },
+        });
+
         await expect(transitionITTicketStatus(fixture.operator.context, {
             ticketId: ticket.id,
             targetStatus: ITTicketStatus.CLOSED,
@@ -533,6 +699,9 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
         expect(await prisma.iTTicketEvent.count({ where: { ticketId: ticket.id } }))
             .toBe(transitions.length + 1);
+        expect(await prisma.auditLog.count({
+            where: { entityType: "ITTicket", entityId: ticket.id, action: "TICKET_STATUS_CHANGE" },
+        })).toBe(transitions.length);
     });
 
     it("assigns only eligible configured operators and records assign, reassign, and unassign facts", async () => {
@@ -598,6 +767,32 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
             { kind: "ASSIGNED", from: null, to: firstAssignee.userId },
             { kind: "ASSIGNED", from: firstAssignee.userId, to: secondAssignee.userId },
             { kind: "UNASSIGNED", from: secondAssignee.userId, to: null },
+        ]);
+        const assignmentAudits = await prisma.auditLog.findMany({
+            where: {
+                entityType: "ITTicket",
+                entityId: ticket.ticket.id,
+                action: "TICKET_ASSIGN",
+            },
+            orderBy: { id: "asc" },
+            select: { details: true },
+        });
+        expect(assignmentAudits.map((audit) => JSON.parse(audit.details ?? "null"))).toEqual([
+            {
+                before: { assignedToUserId: null },
+                after: { assignedToUserId: firstAssignee.userId },
+                metadata: { channel: "DASHBOARD" },
+            },
+            {
+                before: { assignedToUserId: firstAssignee.userId },
+                after: { assignedToUserId: secondAssignee.userId },
+                metadata: { channel: "DASHBOARD" },
+            },
+            {
+                before: { assignedToUserId: secondAssignee.userId },
+                after: { assignedToUserId: null },
+                metadata: { channel: "DASHBOARD" },
+            },
         ]);
         await expect(assignITTicket(fixture.operator.context, {
             ticketId: ticket.ticket.id,
@@ -814,6 +1009,27 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         }))).toEqual([
             { kind: "CATEGORY_CHANGED", from: null, to: activeCategory.id },
             { kind: "CATEGORY_CHANGED", from: activeCategory.id, to: null },
+        ]);
+        const categoryAudits = await prisma.auditLog.findMany({
+            where: {
+                entityType: "ITTicket",
+                entityId: ticket.ticket.id,
+                action: "TICKET_UPDATE",
+            },
+            orderBy: { id: "asc" },
+            select: { details: true },
+        });
+        expect(categoryAudits.map((audit) => JSON.parse(audit.details ?? "null"))).toEqual([
+            {
+                before: { categoryId: null },
+                after: { categoryId: activeCategory.id },
+                metadata: { change: "CATEGORY", channel: "DASHBOARD" },
+            },
+            {
+                before: { categoryId: activeCategory.id },
+                after: { categoryId: null },
+                metadata: { change: "CATEGORY", channel: "DASHBOARD" },
+            },
         ]);
     });
 

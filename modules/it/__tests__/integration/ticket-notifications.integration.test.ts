@@ -106,6 +106,9 @@ async function cleanFixtures(): Promise<void> {
             },
         });
     }
+    await prisma.auditLog.deleteMany({
+        where: { user: { email: { startsWith: `${TEST_PREFIX}-` } } },
+    });
     await prisma.iTTicketCommentIdempotency.deleteMany({
         where: { author: { email: { startsWith: `${TEST_PREFIX}-` } } },
     });

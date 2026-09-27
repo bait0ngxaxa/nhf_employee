@@ -187,7 +187,14 @@ describe("IT requester Ticket API adapters", () => {
                 title: "เข้าใช้งานระบบไม่ได้",
                 description: "หน้าเข้าสู่ระบบแสดงข้อผิดพลาด",
             },
-            { idempotencyKey: "same-logical-attempt" },
+            {
+                idempotencyKey: "same-logical-attempt",
+                requestMetadata: expect.objectContaining({
+                    userEmail: user.email,
+                    requestId: expect.any(String),
+                    correlationId: expect.any(String),
+                }),
+            },
         );
         expect(body.ticket).toMatchObject({ id: 19, status: "OPEN" });
         expect(body.ticket).not.toHaveProperty("requesterUserId");
@@ -209,7 +216,14 @@ describe("IT requester Ticket API adapters", () => {
             type: "INCIDENT",
             title: "หัวข้อ multipart",
             description: "รายละเอียด multipart",
-        }, { idempotencyKey: "multipart-empty" });
+        }, {
+            idempotencyKey: "multipart-empty",
+            requestMetadata: expect.objectContaining({
+                userEmail: user.email,
+                requestId: expect.any(String),
+                correlationId: expect.any(String),
+            }),
+        });
     });
 
     it("passes multipart image sources to the creation command", async () => {

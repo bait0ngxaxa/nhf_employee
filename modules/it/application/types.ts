@@ -25,6 +25,15 @@ export interface ITTicketMutationResult {
     readonly changed: boolean;
 }
 
+/** Trusted request metadata supplied separately from the authorization contract. */
+export interface ITCommandRequestMetadata {
+    readonly userEmail?: string;
+    readonly ipAddress?: string;
+    readonly userAgent?: string;
+    readonly requestId?: string;
+    readonly correlationId?: string;
+}
+
 export interface CreateITTicketResult {
     readonly ticket: ITTicketRecord;
     readonly replayed: boolean;

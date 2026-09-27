@@ -87,6 +87,9 @@ async function cleanFixtures(): Promise<void> {
     }
 
     await prisma.iTTicketAttachment.deleteMany({ where: { ticketId: { in: ticketIds } } });
+    await prisma.auditLog.deleteMany({
+        where: { user: { email: { startsWith: `${TEST_PREFIX}-` } } },
+    });
     await prisma.iTTicketCommentIdempotency.deleteMany({
         where: { author: { email: { startsWith: `${TEST_PREFIX}-` } } },
     });
@@ -261,6 +264,23 @@ describe.sequential("IT5B private Ticket attachments with real MySQL", () => {
         ]);
         expect(await prisma.iTTicketComment.count({ where: { ticketId: first.ticket.id } })).toBe(0);
         expect(await prisma.iTTicketEvent.count({ where: { ticketId: first.ticket.id } })).toBe(1);
+        const createAudit = await prisma.auditLog.findMany({
+            where: {
+                entityType: "ITTicket",
+                entityId: first.ticket.id,
+                action: "TICKET_CREATE",
+            },
+            select: { details: true },
+        });
+        expect(createAudit).toHaveLength(1);
+        expect(JSON.parse(createAudit[0]?.details ?? "null")).toMatchObject({
+            after: {
+                type: "INCIDENT",
+                status: "OPEN",
+                attachmentCount: 3,
+            },
+            metadata: { channel: "DASHBOARD" },
+        });
         expect(await filesForTicket(first.ticket.id)).toEqual(firstFiles);
         expect(firstFiles).toHaveLength(3);
         expect(requesterDetail.initialAttachments).toHaveLength(3);
@@ -447,6 +467,26 @@ describe.sequential("IT5B private Ticket attachments with real MySQL", () => {
             expect((await sharp(stored).metadata()).format).toBe("webp");
             expect(stored.byteLength).toBe(row.sizeBytes);
         }
+
+        const commentAudit = await prisma.auditLog.findMany({
+            where: {
+                entityType: "ITTicket",
+                entityId: ticket.ticket.id,
+                action: "TICKET_COMMENT",
+            },
+            select: { details: true },
+        });
+        expect(commentAudit).toHaveLength(1);
+        expect(JSON.parse(commentAudit[0]?.details ?? "null")).toEqual({
+            after: {
+                commentId: result.comment.id,
+                authorSide: "REQUESTER",
+                attachmentCount: 2,
+            },
+            metadata: { channel: "DASHBOARD" },
+        });
+        expect(commentAudit[0]?.details).not.toContain("แนบภาพประกอบค่ะ");
+        expect(commentAudit[0]?.details).not.toContain(rows[0]?.storageKey);
 
         const timeline = await getITRequesterTicketTimeline(fixture.requester.context, ticket.ticket.id);
         expect(timeline.items.find((item) => item.type === "COMMENT")).toMatchObject({

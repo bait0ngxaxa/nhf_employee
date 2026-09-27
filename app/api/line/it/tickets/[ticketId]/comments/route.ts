@@ -12,6 +12,7 @@ import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     buildITAuthorizationContext,
+    createITCommandRequestMetadata,
     getITTicketCommentMediaType,
     isITTicketCommentParseFailure,
     IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES,
@@ -76,7 +77,11 @@ export async function POST(
         const result = await postITRequesterTicketComment(
             buildITAuthorizationContext(auth.user, auth.employeeId, "LIFF_SELF_SERVICE"),
             { ticketId, body: parsed.body },
-            { idempotencyKey: idempotencyKey.data, attachments: parsed.attachments },
+            {
+                idempotencyKey: idempotencyKey.data,
+                attachments: parsed.attachments,
+                requestMetadata: createITCommandRequestMetadata(auth.user, request.headers),
+            },
         );
         if (!result.replayed) scheduleITTicketOutboxWakeup();
         return NextResponse.json(

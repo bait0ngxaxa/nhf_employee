@@ -46,10 +46,13 @@ import {
 } from "../infrastructure/persistence/ticket-conversation-repository";
 import { createITTicketAttachmentRows } from "../infrastructure/persistence/ticket-attachment-repository";
 import type { ITTicketCommentSubmission } from "../contracts";
+import type { ITCommandRequestMetadata } from "./types";
+import { createITTicketCommentAudit } from "./ticket-audit";
 
 interface PostCommentOptions {
     readonly idempotencyKey: string;
     readonly attachments?: readonly ITTicketAttachmentSource[];
+    readonly requestMetadata?: ITCommandRequestMetadata;
 }
 
 type ITTicketCommentSide = typeof ITTicketCommentKind[keyof typeof ITTicketCommentKind];
@@ -341,6 +344,15 @@ async function postITTicketComment(
                 comment.id,
                 authorUserId,
                 side,
+            );
+            await createITTicketCommentAudit(
+                tx,
+                context,
+                options.requestMetadata,
+                ticketId,
+                comment.id,
+                side,
+                storedAttachments.length,
             );
 
             return toSubmission(persistedComment, false);
