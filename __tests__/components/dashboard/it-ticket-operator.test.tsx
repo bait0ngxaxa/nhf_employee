@@ -729,7 +729,12 @@ describe("IT operator Ticket detail presentation", () => {
         )).toBeInTheDocument();
         expect(timelineReadCount).toBe(2);
         expect(screen.getByRole("button", { name: "รอข้อมูลจากผู้แจ้ง" })).toBeDisabled();
+        expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeDisabled();
+        expect(screen.getByRole("button", { name: "บันทึกหมวดหมู่" })).toBeDisabled();
         expect(patchBodies[0]).toEqual({ targetStatus: "IN_PROGRESS", expectedVersion: 4 });
+
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+        expect(patchBodies).toHaveLength(1);
 
         fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบข้อมูลล่าสุดแล้ว" }));
         fireEvent.change(screen.getByLabelText("ผู้รับผิดชอบ Ticket"), {
@@ -746,10 +751,11 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
     });
 
-    it.each(["network", "server"] as const)(
-        "reports an ambiguous %s result and retains conflict review with a Ticket refresh",
+    it.each(["network", "server", "incomplete-success"] as const)(
+        "reports an ambiguous %s result and retains review with a Ticket refresh",
         async (failureKind) => {
             let detailReadCount = 0;
+            let patchCount = 0;
             const latestTicket: ITOperatorTicket = {
                 ...ticket,
                 status: "IN_PROGRESS",
@@ -760,8 +766,12 @@ describe("IT operator Ticket detail presentation", () => {
                 if (url.includes("/reference")) return referenceResponse();
                 if (url.includes("/timeline")) return timelineResponse();
                 if (init?.method === "PATCH") {
+                    patchCount += 1;
                     if (failureKind === "network") throw new Error("socket reset");
-                    return apiResponse({ error: "internal server exception" }, 500);
+                    if (failureKind === "server") {
+                        return apiResponse({ error: "internal server exception" }, 500);
+                    }
+                    return apiResponse({ success: true, ticket: { id: 19 } });
                 }
                 detailReadCount += 1;
                 return detailResponse(detailReadCount === 1 ? ticket : latestTicket);
@@ -771,13 +781,14 @@ describe("IT operator Ticket detail presentation", () => {
 
             fireEvent.click(await screen.findByRole("button", { name: "เริ่มดำเนินการ" }));
 
-            const conflictText = await screen.findByText(
-                "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
+            const ambiguousText = await screen.findByText(
+                "ไม่สามารถยืนยันผลการบันทึกล่าสุดได้ ระบบโหลดข้อมูล Ticket ล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
             );
-            const conflictAlert = conflictText.closest('[role="alert"]');
-            expect(conflictAlert).toHaveTextContent(
-                "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
+            const ambiguousAlert = ambiguousText.closest('[role="alert"]');
+            expect(ambiguousAlert).toHaveTextContent(
+                "ไม่สามารถยืนยันผลการบันทึกล่าสุดได้ ระบบโหลดข้อมูล Ticket ล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
             );
+            expect(ambiguousAlert).not.toHaveTextContent(/เปลี่ยนแปลงจากผู้ใช้อื่น|รุ่น|version|revision/i);
             await waitFor(() => expect(detailReadCount).toBe(2));
             expect(toast.error).toHaveBeenCalledWith(
                 "ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด",
@@ -786,7 +797,15 @@ describe("IT operator Ticket detail presentation", () => {
             expect(sonnerToast.error.mock.calls.flat().join(" ")).not.toContain("internal server exception");
             expect(screen.queryByText("internal server exception")).not.toBeInTheDocument();
             expect(screen.getByRole("button", { name: "รอข้อมูลจากผู้แจ้ง" })).toBeDisabled();
+            expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeDisabled();
+            expect(screen.getByRole("button", { name: "บันทึกหมวดหมู่" })).toBeDisabled();
             expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
+            expect(toast.success).not.toHaveBeenCalled();
+            expect(patchCount).toBe(1);
+
+            fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบข้อมูลล่าสุดแล้ว" }));
+            expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeEnabled();
+            expect(patchCount).toBe(1);
         },
     );
 });

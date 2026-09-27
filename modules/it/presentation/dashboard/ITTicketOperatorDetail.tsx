@@ -44,6 +44,8 @@ type ReferenceState =
     | { readonly key: number; readonly kind: "loaded"; readonly value: ITOperatorReferenceData }
     | { readonly key: number; readonly kind: "error"; readonly message: string };
 
+type MutationReviewReason = "CONCURRENT_CHANGE" | "AMBIGUOUS_RESULT";
+
 const STATUS_ACTION_LABELS: Readonly<Partial<Record<ITTicketStatus, string>>> = {
     IN_PROGRESS: "เริ่มดำเนินการ",
     WAITING_REQUESTER: "รอข้อมูลจากผู้แจ้ง",
@@ -70,7 +72,7 @@ export function ITTicketOperatorDetail({
     const [refreshKey, setRefreshKey] = useState(0);
     const [referenceRefreshKey, setReferenceRefreshKey] = useState(0);
     const [busy, setBusy] = useState(false);
-    const [conflictReviewRequired, setConflictReviewRequired] = useState(false);
+    const [mutationReviewReason, setMutationReviewReason] = useState<MutationReviewReason | null>(null);
     const [mutationAccessDenied, setMutationAccessDenied] = useState(false);
     const inFlightRef = useRef(false);
     const requiredVersionRef = useRef(0);
@@ -154,7 +156,7 @@ export function ITTicketOperatorDetail({
         body: Record<string, number | string | null>,
         successMessage: string,
     ): Promise<void> => {
-        if (!ticket || loading || inFlightRef.current || conflictReviewRequired || mutationAccessDenied) return;
+        if (!ticket || loading || inFlightRef.current || mutationReviewReason !== null || mutationAccessDenied) return;
         inFlightRef.current = true;
         setBusy(true);
 
@@ -169,7 +171,7 @@ export function ITTicketOperatorDetail({
                 const message = readITOperatorError(payload, response.status, true);
                 if (response.status === 409) {
                     if (isITOperatorMutationVersionConflict(payload)) {
-                        setConflictReviewRequired(true);
+                        setMutationReviewReason("CONCURRENT_CHANGE");
                         toast.error("Ticket มีการเปลี่ยนแปลง กรุณาตรวจสอบข้อมูลล่าสุด");
                     } else {
                         toast.error(message);
@@ -188,7 +190,7 @@ export function ITTicketOperatorDetail({
                     toast.error(message);
                     setMutationAccessDenied(true);
                 } else if (response.status >= 500) {
-                    setConflictReviewRequired(true);
+                    setMutationReviewReason("AMBIGUOUS_RESULT");
                     toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
                     refreshTicket();
                 } else {
@@ -200,7 +202,7 @@ export function ITTicketOperatorDetail({
             const result = parseITOperatorTicketMutationSnapshot(payload);
             if (result === null || result.ticket.id !== ticket.id
                 || result.ticket.version < ticket.version) {
-                setConflictReviewRequired(true);
+                setMutationReviewReason("AMBIGUOUS_RESULT");
                 toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
                 refreshTicket();
                 return;
@@ -210,7 +212,7 @@ export function ITTicketOperatorDetail({
             toast.success(successMessage);
             refreshTicket();
         } catch {
-            setConflictReviewRequired(true);
+            setMutationReviewReason("AMBIGUOUS_RESULT");
             toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
             refreshTicket();
         } finally {
@@ -235,7 +237,7 @@ export function ITTicketOperatorDetail({
         ? categoryDraft.value
         : ticket?.category ? String(ticket.category.id) : "";
     const canManage = capabilities.canManageTickets && !mutationAccessDenied;
-    const actionsDisabled = busy || loading || conflictReviewRequired || !ticket;
+    const actionsDisabled = busy || loading || mutationReviewReason !== null || !ticket;
 
     const handleAssignment = (): void => {
         if (!ticket) return;
@@ -326,17 +328,19 @@ export function ITTicketOperatorDetail({
                             </div>
                         </header>
 
-                        {conflictReviewRequired ? (
+                        {mutationReviewReason !== null ? (
                             <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
                                 <p>
-                                    Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ
+                                    {mutationReviewReason === "CONCURRENT_CHANGE"
+                                        ? "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ"
+                                        : "ไม่สามารถยืนยันผลการบันทึกล่าสุดได้ ระบบโหลดข้อมูล Ticket ล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ"}
                                 </p>
                                 <Button
                                     type="button"
                                     size="sm"
                                     variant="outline"
                                     disabled={busy || loading || !ticket}
-                                    onClick={() => setConflictReviewRequired(false)}
+                                    onClick={() => setMutationReviewReason(null)}
                                 >
                                     ตรวจสอบข้อมูลล่าสุดแล้ว
                                 </Button>
