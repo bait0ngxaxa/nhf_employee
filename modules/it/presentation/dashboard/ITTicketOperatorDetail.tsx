@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { ArrowLeft, CircleAlert, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -69,8 +70,6 @@ export function ITTicketOperatorDetail({
     const [refreshKey, setRefreshKey] = useState(0);
     const [referenceRefreshKey, setReferenceRefreshKey] = useState(0);
     const [busy, setBusy] = useState(false);
-    const [actionError, setActionError] = useState<string | null>(null);
-    const [actionMessage, setActionMessage] = useState<string | null>(null);
     const [conflictReviewRequired, setConflictReviewRequired] = useState(false);
     const [mutationAccessDenied, setMutationAccessDenied] = useState(false);
     const inFlightRef = useRef(false);
@@ -158,8 +157,6 @@ export function ITTicketOperatorDetail({
         if (!ticket || loading || inFlightRef.current || conflictReviewRequired || mutationAccessDenied) return;
         inFlightRef.current = true;
         setBusy(true);
-        setActionError(null);
-        setActionMessage(null);
 
         try {
             const response = await fetch(route, {
@@ -173,9 +170,9 @@ export function ITTicketOperatorDetail({
                 if (response.status === 409) {
                     if (isITOperatorMutationVersionConflict(payload)) {
                         setConflictReviewRequired(true);
-                        setActionError(null);
+                        toast.error("Ticket มีการเปลี่ยนแปลง กรุณาตรวจสอบข้อมูลล่าสุด");
                     } else {
-                        setActionError(message);
+                        toast.error(message);
                         if (isITTicketResponseRecord(payload)) {
                             if (payload.code === "ASSIGNEE_NOT_ELIGIBLE") {
                                 setAssignmentDraft(null);
@@ -187,14 +184,15 @@ export function ITTicketOperatorDetail({
                         }
                     }
                     refreshTicket();
+                } else if (response.status === 401 || response.status === 403) {
+                    toast.error(message);
+                    setMutationAccessDenied(true);
+                } else if (response.status >= 500) {
+                    setConflictReviewRequired(true);
+                    toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
+                    refreshTicket();
                 } else {
-                    setActionError(message);
-                    if (response.status === 401 || response.status === 403) {
-                        setMutationAccessDenied(true);
-                    } else if (response.status >= 500) {
-                        setConflictReviewRequired(true);
-                        refreshTicket();
-                    }
+                    toast.error(message);
                 }
                 return;
             }
@@ -202,18 +200,18 @@ export function ITTicketOperatorDetail({
             const result = parseITOperatorTicketMutationSnapshot(payload);
             if (result === null || result.ticket.id !== ticket.id
                 || result.ticket.version < ticket.version) {
-                setActionError("ระบบบันทึกผลตอบกลับไม่ครบถ้วน กำลังโหลด Ticket ล่าสุดเพื่อยืนยันผล");
                 setConflictReviewRequired(true);
+                toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
                 refreshTicket();
                 return;
             }
 
             requiredVersionRef.current = result.ticket.version;
-            setActionMessage(successMessage);
+            toast.success(successMessage);
             refreshTicket();
         } catch {
-            setActionError("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลด Ticket ล่าสุดเพื่อให้ตรวจสอบก่อนดำเนินการต่อ");
             setConflictReviewRequired(true);
+            toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
             refreshTicket();
         } finally {
             inFlightRef.current = false;
@@ -243,7 +241,7 @@ export function ITTicketOperatorDetail({
         if (!ticket) return;
         const assigneeUserId = assignmentValue === "" ? null : Number(assignmentValue);
         if (assigneeUserId !== null && !Number.isSafeInteger(assigneeUserId)) {
-            setActionError("ผู้รับผิดชอบที่เลือกไม่ถูกต้อง");
+            toast.error("ผู้รับผิดชอบที่เลือกไม่ถูกต้อง");
             return;
         }
         void runMutation(
@@ -257,7 +255,7 @@ export function ITTicketOperatorDetail({
         if (!ticket) return;
         const categoryId = categoryValue === "" ? null : Number(categoryValue);
         if (categoryId !== null && !Number.isSafeInteger(categoryId)) {
-            setActionError("หมวดหมู่ที่เลือกไม่ถูกต้อง");
+            toast.error("หมวดหมู่ที่เลือกไม่ถูกต้อง");
             return;
         }
         void runMutation(
@@ -336,10 +334,7 @@ export function ITTicketOperatorDetail({
                                     size="sm"
                                     variant="outline"
                                     disabled={busy || loading || !ticket}
-                                    onClick={() => {
-                                        setConflictReviewRequired(false);
-                                        setActionError(null);
-                                    }}
+                                    onClick={() => setConflictReviewRequired(false)}
                                 >
                                     ตรวจสอบข้อมูลล่าสุดแล้ว
                                 </Button>
@@ -349,16 +344,6 @@ export function ITTicketOperatorDetail({
                             <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
                                 สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงปิดการดำเนินการไว้ กรุณาโหลดหน้าใหม่เพื่อตรวจสอบสิทธิ์ปัจจุบัน
                             </div>
-                        ) : null}
-                        {actionError ? (
-                            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
-                                {actionError}
-                            </div>
-                        ) : null}
-                        {actionMessage ? (
-                            <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
-                                {actionMessage}
-                            </p>
                         ) : null}
                         {referenceError ? (
                             <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">

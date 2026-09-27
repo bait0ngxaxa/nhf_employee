@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 import { IT_TICKET_CATEGORY_SEEDS } from "@/shared/it-ticket-category-seeds";
 import {
@@ -10,6 +11,13 @@ import {
     type ITPresentationCapabilities,
     type ITTicketAttachmentSummary,
 } from "@/modules/it/client";
+
+const sonnerToast = vi.hoisted(() => ({
+    success: vi.fn(),
+    error: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({ toast: sonnerToast }));
 
 const requesterCapabilities: ITPresentationCapabilities = {
     canReadOwnTickets: true,
@@ -111,6 +119,8 @@ function timelineResponse(withStatusChange = false): Response {
 
 beforeEach(() => {
     fetchMock.mockReset();
+    sonnerToast.success.mockReset();
+    sonnerToast.error.mockReset();
     objectUrlSequence = 0;
     createObjectUrl.mockClear();
     revokeObjectUrl.mockClear();
@@ -282,8 +292,9 @@ describe("IT operator Ticket detail presentation", () => {
         expect(categorySelector).toHaveValue(String(selectedCategory.id));
         fireEvent.click(screen.getByRole("button", { name: "บันทึกหมวดหมู่" }));
 
-        expect(await screen.findByText("บันทึกหมวดหมู่แล้ว")).toBeInTheDocument();
         await waitFor(() => expect(patchBodies).toHaveLength(1));
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("บันทึกหมวดหมู่แล้ว"));
+        expect(screen.queryByText("บันทึกหมวดหมู่แล้ว")).not.toBeInTheDocument();
         expect(patchRoutes).toEqual([expect.stringContaining("/category")]);
         expect(patchBodies[0]).toEqual({ categoryId: selectedCategory.id, expectedVersion: 4 });
         await waitFor(() => expect(detailReadCount).toBe(2));
@@ -295,9 +306,158 @@ describe("IT operator Ticket detail presentation", () => {
 
         await waitFor(() => expect(patchBodies).toHaveLength(2));
         expect(patchBodies[1]).toEqual({ categoryId: null, expectedVersion: 5 });
+        await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2));
+        expect(toast.success).toHaveBeenNthCalledWith(2, "บันทึกหมวดหมู่แล้ว");
         await waitFor(() => expect(detailReadCount).toBe(3));
         expect(categorySelector).toHaveValue("");
+        expect(screen.queryByText("บันทึกหมวดหมู่แล้ว")).not.toBeInTheDocument();
         expect(screen.queryByText(/รุ่น|version|revision/i)).not.toBeInTheDocument();
+    });
+
+    it("shows ordinary mutation failures through one safe toast", async () => {
+        fetchMock.mockImplementation(async (input, init) => {
+            if (String(input).includes("/reference")) return referenceResponse();
+            if (String(input).includes("/timeline")) return timelineResponse();
+            if (init?.method === "PATCH") {
+                return apiResponse({ error: "ไม่สามารถบันทึกข้อมูลได้ในขณะนี้" }, 422);
+            }
+            return detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        fireEvent.click(await screen.findByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("ไม่สามารถบันทึกข้อมูลได้ในขณะนี้"));
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(screen.queryByText("ไม่สามารถบันทึกข้อมูลได้ในขณะนี้")).not.toBeInTheDocument();
+    });
+
+    it("clears an inactive category draft, refreshes references, and shows its safe error as a toast", async () => {
+        let referenceReadCount = 0;
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url.includes("/reference")) {
+                referenceReadCount += 1;
+                return referenceResponse();
+            }
+            if (url.includes("/timeline")) return timelineResponse();
+            if (init?.method === "PATCH") {
+                return apiResponse({
+                    error: "หมวดหมู่ที่เลือกไม่สามารถใช้งานได้",
+                    code: "CATEGORY_INACTIVE",
+                }, 409);
+            }
+            return detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        const categorySelector = await screen.findByRole("combobox", { name: "หมวดหมู่ Ticket" });
+        fireEvent.change(categorySelector, { target: { value: "1" } });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกหมวดหมู่" }));
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("หมวดหมู่ที่เลือกไม่สามารถใช้งานได้"));
+        await waitFor(() => expect(referenceReadCount).toBe(2));
+        expect(categorySelector).toHaveValue("");
+        expect(toast.error).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears an ineligible assignee draft, refreshes references, and shows its safe error as a toast", async () => {
+        let referenceReadCount = 0;
+        fetchMock.mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url.includes("/reference")) {
+                referenceReadCount += 1;
+                return referenceResponse();
+            }
+            if (url.includes("/timeline")) return timelineResponse();
+            if (init?.method === "PATCH") {
+                return apiResponse({
+                    error: "ผู้รับผิดชอบที่เลือกไม่พร้อมใช้งาน",
+                    code: "ASSIGNEE_NOT_ELIGIBLE",
+                }, 409);
+            }
+            return detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        const assigneeSelector = await screen.findByRole("combobox", { name: "ผู้รับผิดชอบ Ticket" });
+        fireEvent.change(assigneeSelector, { target: { value: "51" } });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith("ผู้รับผิดชอบที่เลือกไม่พร้อมใช้งาน"));
+        await waitFor(() => expect(referenceReadCount).toBe(2));
+        expect(assigneeSelector).toHaveValue("");
+        expect(toast.error).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps mutation access denial persistent while also reporting it through toast", async () => {
+        fetchMock.mockImplementation(async (input, init) => {
+            if (String(input).includes("/reference")) return referenceResponse();
+            if (String(input).includes("/timeline")) return timelineResponse();
+            if (init?.method === "PATCH") {
+                return apiResponse({ error: "internal authorization detail" }, 403);
+            }
+            return detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        fireEvent.click(await screen.findByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+
+        const accessWarning = await screen.findByText(
+            "สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงปิดการดำเนินการไว้ กรุณาโหลดหน้าใหม่เพื่อตรวจสอบสิทธิ์ปัจจุบัน",
+        );
+        expect(accessWarning.closest('[role="alert"]')).toHaveTextContent(
+            "สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงปิดการดำเนินการไว้",
+        );
+        expect(toast.error).toHaveBeenCalledWith("บัญชีนี้ไม่มีสิทธิ์ดำเนินการกับคิว IT Ticket");
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
+        expect(screen.queryByText("internal authorization detail")).not.toBeInTheDocument();
+    });
+
+    it("keeps detail load errors inline with a retry action", async () => {
+        let detailReadCount = 0;
+        fetchMock.mockImplementation(async (input) => {
+            if (String(input).includes("/reference")) return referenceResponse();
+            if (String(input).includes("/timeline")) return timelineResponse();
+            detailReadCount += 1;
+            return detailReadCount === 1
+                ? apiResponse({}, 500)
+                : detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        expect(await screen.findByText("ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง")).toBeInTheDocument();
+        expect(screen.getByRole("alert")).toContainElement(screen.getByRole("button", { name: "โหลดอีกครั้ง" }));
+        expect(toast.error).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "โหลดอีกครั้ง" }));
+        expect(await screen.findByRole("heading", { name: "Ticket #19" })).toBeInTheDocument();
+    });
+
+    it("keeps reference load errors inline with a retry action", async () => {
+        let referenceReadCount = 0;
+        fetchMock.mockImplementation(async (input) => {
+            if (String(input).includes("/reference")) {
+                referenceReadCount += 1;
+                return referenceReadCount === 1 ? apiResponse({}, 500) : referenceResponse();
+            }
+            if (String(input).includes("/timeline")) return timelineResponse();
+            return detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        expect(await screen.findByText("ไม่สามารถเชื่อมต่อคิว IT Ticket ได้ กรุณาลองอีกครั้ง")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "โหลดตัวเลือกอีกครั้ง" })).toBeInTheDocument();
+        expect(toast.error).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "โหลดตัวเลือกอีกครั้ง" }));
+        expect(await screen.findByRole("combobox", { name: "หมวดหมู่ Ticket" })).toBeInTheDocument();
     });
 
     it("keeps a read-only ALL operator from receiving mutation controls", async () => {
@@ -431,7 +591,9 @@ describe("IT operator Ticket detail presentation", () => {
         expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "เริ่มดำเนินการ" }));
 
-        expect(await screen.findByText("เปลี่ยนสถานะเป็นกำลังดำเนินการแล้ว")).toBeInTheDocument();
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("เปลี่ยนสถานะเป็นกำลังดำเนินการแล้ว"));
+        expect(toast.success).toHaveBeenCalledTimes(1);
+        expect(screen.queryByText("เปลี่ยนสถานะเป็นกำลังดำเนินการแล้ว")).not.toBeInTheDocument();
         expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
         expect(await screen.findByText(
             "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
@@ -547,6 +709,9 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.queryByRole("button", { name: "ยกเลิกแล้ว" })).not.toBeInTheDocument();
 
         fireEvent.click(await screen.findByRole("button", { name: "เริ่มดำเนินการ" }));
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+            "Ticket มีการเปลี่ยนแปลง กรุณาตรวจสอบข้อมูลล่าสุด",
+        ));
         expect(await screen.findByRole("alert")).toHaveTextContent(
             "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
         );
@@ -557,6 +722,8 @@ describe("IT operator Ticket detail presentation", () => {
         );
         expect(conflictAlert).not.toHaveTextContent(/รุ่น|version|revision/i);
         expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(sonnerToast.error.mock.calls.flat().join(" ")).not.toMatch(/รุ่น|version|revision/i);
         expect(await screen.findByText(
             "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
         )).toBeInTheDocument();
@@ -572,7 +739,54 @@ describe("IT operator Ticket detail presentation", () => {
 
         await waitFor(() => expect(patchBodies).toHaveLength(2));
         expect(patchBodies[1]).toEqual({ assigneeUserId: 51, expectedVersion: 5 });
-        expect(await screen.findByText("บันทึกผู้รับผิดชอบแล้ว")).toBeInTheDocument();
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("บันทึกผู้รับผิดชอบแล้ว"));
+        await waitFor(() => expect(detailReadCount).toBe(3));
+        expect(toast.success).toHaveBeenCalledTimes(1);
+        expect(screen.queryByText("บันทึกผู้รับผิดชอบแล้ว")).not.toBeInTheDocument();
         expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
     });
+
+    it.each(["network", "server"] as const)(
+        "reports an ambiguous %s result and retains conflict review with a Ticket refresh",
+        async (failureKind) => {
+            let detailReadCount = 0;
+            const latestTicket: ITOperatorTicket = {
+                ...ticket,
+                status: "IN_PROGRESS",
+                version: 5,
+            };
+            fetchMock.mockImplementation(async (input, init) => {
+                const url = String(input);
+                if (url.includes("/reference")) return referenceResponse();
+                if (url.includes("/timeline")) return timelineResponse();
+                if (init?.method === "PATCH") {
+                    if (failureKind === "network") throw new Error("socket reset");
+                    return apiResponse({ error: "internal server exception" }, 500);
+                }
+                detailReadCount += 1;
+                return detailResponse(detailReadCount === 1 ? ticket : latestTicket);
+            });
+
+            render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+            fireEvent.click(await screen.findByRole("button", { name: "เริ่มดำเนินการ" }));
+
+            const conflictText = await screen.findByText(
+                "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
+            );
+            const conflictAlert = conflictText.closest('[role="alert"]');
+            expect(conflictAlert).toHaveTextContent(
+                "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น ระบบโหลดข้อมูลล่าสุดแล้ว กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ",
+            );
+            await waitFor(() => expect(detailReadCount).toBe(2));
+            expect(toast.error).toHaveBeenCalledWith(
+                "ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด",
+            );
+            expect(toast.error).toHaveBeenCalledTimes(1);
+            expect(sonnerToast.error.mock.calls.flat().join(" ")).not.toContain("internal server exception");
+            expect(screen.queryByText("internal server exception")).not.toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "รอข้อมูลจากผู้แจ้ง" })).toBeDisabled();
+            expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
+        },
+    );
 });
