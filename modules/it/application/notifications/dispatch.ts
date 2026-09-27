@@ -9,7 +9,6 @@ import {
 } from "@/lib/db/transaction";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
-import type { LineFlexMessage } from "@/types/api";
 
 import { findITOperatorAudience } from "../operator-audience";
 import {
@@ -29,9 +28,6 @@ import {
 import {
     sendITTicketEmailNotification,
 } from "../../infrastructure/notifications/ticket-email";
-import {
-    isUnavailableITLineDestination,
-} from "../../infrastructure/notifications/line-destination";
 import {
     findITTicketNotificationCommentSource,
     findITTicketNotificationEventSource,
@@ -339,13 +335,7 @@ export async function dispatchITTicketNotificationOutbox(
         const validation = await validateNotification(notification, payload);
         if (!validation.applicable) return "SUPERSEDED";
 
-        let message: LineFlexMessage;
-        try {
-            message = buildITTicketLineFlexMessage(payload);
-        } catch (error) {
-            if (isUnavailableITLineDestination(error)) return "SUPERSEDED";
-            throw error;
-        }
+        const message = buildITTicketLineFlexMessage(payload);
 
         const result = await sendAppLineNotification({
             userId: payload.recipientUserId,

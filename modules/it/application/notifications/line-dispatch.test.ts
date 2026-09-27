@@ -1,5 +1,5 @@
 import type { NotificationOutbox } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LineIdentityVerificationError } from "@/lib/line/errors";
 
 import { createLineRetryKey } from "@/lib/services/outbox/provider-key";
@@ -81,6 +81,10 @@ function buildLineOutbox(
 }
 
 describe("IT Ticket personal LINE outbox dispatch", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.transaction.mockImplementation(async (
@@ -408,7 +412,7 @@ describe("IT Ticket personal LINE outbox dispatch", () => {
         )).resolves.toBe("SUPERSEDED");
     });
 
-    it("supersedes a requester LINE row when its LIFF destination is unavailable", async () => {
+    it("propagates requester LIFF configuration failures to the outbox retry lifecycle", async () => {
         mocks.buildITTicketLiffUrl.mockImplementationOnce(() => {
             throw new LineIdentityVerificationError(
                 "MISCONFIGURED",
@@ -417,7 +421,30 @@ describe("IT Ticket personal LINE outbox dispatch", () => {
         });
 
         await expect(dispatchITTicketNotificationOutbox(buildLineOutbox()))
-            .resolves.toBe("SUPERSEDED");
+            .rejects.toBeInstanceOf(LineIdentityVerificationError);
+        expect(mocks.sendAppLineNotification).not.toHaveBeenCalled();
+    });
+
+    it("propagates operator public-origin configuration failures to the outbox retry lifecycle", async () => {
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "");
+        const payload: ITTicketNotificationPayloadV1 = {
+            ...operatorComment,
+            event: "CREATED",
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 455 },
+        };
+        mocks.eventSource.mockResolvedValueOnce({
+            id: 455,
+            ticketId: 123,
+            actorUserId: 7,
+            kind: "CREATED",
+            toStatus: null,
+            toAssigneeUserId: null,
+        });
+
+        await expect(dispatchITTicketNotificationOutbox(buildLineOutbox(payload)))
+            .rejects.toThrow("PUBLIC_APPROVE_URL is required in production.");
         expect(mocks.sendAppLineNotification).not.toHaveBeenCalled();
     });
 

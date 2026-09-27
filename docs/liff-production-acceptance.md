@@ -10,10 +10,10 @@ is IMPLEMENTED / review pending; IT9E-B Android/iPhone device acceptance is
 PAUSED / NOT RUN while the POC is under review. IT10 is OPEN / deferred.
 No Android/iPhone acceptance has been performed and no live LINE provider
 acceptance is claimed; no Ticket push was sent with production configuration
-during IT9E-A. OPS-18 and the
-`IT Messaging API Channel ID` field below refer only to the retained legacy
-Email Request/IT LINE integration; requester Ticket LINE uses the shared
-NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` path.
+during IT9E-A. The
+`IT Messaging API Channel ID` field below is for retained legacy IT LINE
+compatibility only. Current IT Ticket and Email Request personal LINE
+use the shared NHFapp `LINE_APP_CHANNEL_ACCESS_TOKEN` path.
 
 ## 1. วิธีบันทึกผล
 
@@ -321,7 +321,7 @@ LINE in-app LIFF พร้อม evidence ของอุปกรณ์นั�
 | Routine | mutation errors, `409` conflicts, unauthorized deep links | `NOT RUN` |  |
 | Scheduler | HTTP failures, `errors` counter, unexpected no-op | `NOT RUN` |  |
 | Outbox | HTTP failures, `failed`, pending/retry backlog และ `DEAD` rows เมื่อ observable | `NOT RUN` |  |
-| Delivery | `LINE_APP` Routine delivery, `LINE_STOCK` Stock broadcast, `LINE_IT` IT notification และ SMTP/email delivery failures | `NOT RUN` |  |
+| Delivery | `LINE_APP` personal LINE (Leave/Routine/IT Ticket/Email Request), `LINE_STOCK` Stock broadcast และ SMTP/email delivery failures | `NOT RUN` |  |
 
 หยุด rolloutและพิจารณา rollback/containment ทันทีเมื่อพบ login/session ล้มเหลวสม่ำเสมอ, account link ผิดคนหรือ overwrite, authorization bypass, duplicate/data-integrity failure, scheduler สร้าง reminder ผิด, outbox backlog โตควบคุมไม่ได้ หรือ Rich Menu ใหม่พาไป broken route/critical mobile action ใช้ไม่ได้ ความผิดพลาดด้าน security/data integrity เป็น immediate stop; cosmetic defect เล็กน้อยต้องประเมินผลกระทบก่อน
 

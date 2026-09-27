@@ -2654,12 +2654,13 @@ revalidation can intentionally return `SUPERSEDED`, and Routine can return
 | `ROUTINE_CONTRACT_EXPIRY_EMAIL` | Routine | None beyond contract-expiry email request | SMTP | `routine-contract:<task>:end:<date>:user:<user>` | Deterministic Routine contract `Message-ID` | SMTP ambiguity; Message-ID is not provider deduplication | Event key, current contract, assignee and valid-email state are checked | Stale/unavailable -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
 | `ROUTINE_CONTRACT_EXPIRY_LINE` | Routine | None beyond personal LINE provider request | NHFapp personal LINE push | `routine-contract:<task>:end:<date>:user:<user>:line` | Persisted `retryKey` must equal `createLineRetryKey(eventKey)`; keyed 409 accepted | Same LINE retention/delivery limitation | Event/retry key, current contract, recipient/link, due state, and destination are checked | Not due -> `DEFERRED`; stale/unavailable/mismatched -> `SUPERSEDED`; provider failure -> `FAILED`/`DEAD` |
 
-The matrix separates the three LINE channels deliberately: NHFapp personal
-push uses `LINE_APP_CHANNEL_ACCESS_TOKEN`, Stock operational broadcast keeps
-`LINE_STOCK_CHANNEL_ACCESS_TOKEN`, and Email Request uses the existing IT
-configuration and target selection. It also separates SMTP email from LINE;
-the shared processor does not turn their different provider guarantees into a
-common exactly-once abstraction.
+The matrix distinguishes NHFapp personal LINE from Stock broadcast: IT Ticket
+and Email Request personal pushes both use `LINE_APP_CHANNEL_ACCESS_TOKEN`,
+while Stock broadcast keeps `LINE_STOCK_CHANNEL_ACCESS_TOKEN`. Email Request
+resolves recipients from `email.request.read / ALL` and current
+`LineAccountLink`; the legacy team-user/broadcast selection is retired. SMTP
+email remains separate from LINE; the shared processor does not turn their
+different provider guarantees into a common exactly-once abstraction.
 
 ### 22.2 LINE retry-key contract and coverage
 
@@ -2702,7 +2703,8 @@ push/broadcast. IT12 retired that runtime path. The parent now resolves configur
 ### 22.3 SMTP contract and internal retry characterization
 
 The active SMTP Outbox paths are Leave action/result/event email, Routine
-reminder email, Routine contract-expiry email, and Stock request-result email.
+reminder and contract-expiry email, Stock request-result email, plus IT
+`IT_TICKET_EMAIL` and `EMAIL_REQUEST_EMAIL`.
 Each has a deterministic `Message-ID` derived from its stable capability
 identity. The ID is preserved across the internal Nodemailer retry loop and
 across a later Outbox retry for the same logical delivery.

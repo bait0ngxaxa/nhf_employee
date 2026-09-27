@@ -40,7 +40,7 @@ describe("Email Request personal NHFapp LINE notification", () => {
         expect(serialized).not.toContain("phone");
     });
 
-    it("supersedes a missing public destination without invoking LINE", async () => {
+    it("propagates a missing public origin to the outbox retry lifecycle", async () => {
         vi.stubEnv("NODE_ENV", "production");
         vi.stubEnv("PUBLIC_APPROVE_URL", "");
 
@@ -48,10 +48,7 @@ describe("Email Request personal NHFapp LINE notification", () => {
             userId: 10,
             emailRequestId: null,
             retryKey: "stable-line-retry-key",
-        })).resolves.toEqual({
-            status: "SKIPPED",
-            reason: "INVALID_DESTINATION",
-        });
+        })).rejects.toThrow("PUBLIC_APPROVE_URL is required in production.");
         expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
     });
 });
