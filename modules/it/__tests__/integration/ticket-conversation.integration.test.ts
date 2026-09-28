@@ -514,13 +514,45 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         await expect(prisma.iTTicket.findUniqueOrThrow({ where: { id: waiting.ticket.id } }))
             .resolves.toMatchObject({ status: "WAITING_REQUESTER", version: before.version });
 
-        for (const status of ["RESOLVED", "CLOSED", "CANCELLED"] as const) {
-            const ticket = await createTicket(fixture.requester, `closed-${status}`);
-            await prisma.iTTicket.update({ where: { id: ticket.ticket.id }, data: { status } });
+        const nonCommentablePaths = [
+            {
+                label: "resolved",
+                targets: [ITTicketStatus.IN_PROGRESS, ITTicketStatus.RESOLVED],
+                status: ITTicketStatus.RESOLVED,
+            },
+            {
+                label: "closed",
+                targets: [
+                    ITTicketStatus.IN_PROGRESS,
+                    ITTicketStatus.RESOLVED,
+                    ITTicketStatus.CLOSED,
+                ],
+                status: ITTicketStatus.CLOSED,
+            },
+            {
+                label: "cancelled",
+                targets: [ITTicketStatus.CANCELLED],
+                status: ITTicketStatus.CANCELLED,
+            },
+        ] as const;
+        for (const path of nonCommentablePaths) {
+            const ticket = await createTicket(fixture.requester, `closed-${path.label}`);
+            let expectedVersion = ticket.ticket.version;
+            for (const targetStatus of path.targets) {
+                const transitioned = await transitionITTicketStatus(fixture.operator.context, {
+                    ticketId: ticket.ticket.id,
+                    targetStatus,
+                    expectedVersion,
+                });
+                expectedVersion = transitioned.ticket.version;
+            }
+            await expect(prisma.iTTicket.findUniqueOrThrow({
+                where: { id: ticket.ticket.id },
+            })).resolves.toMatchObject({ status: path.status });
             await expect(postITRequesterTicketComment(
                 fixture.requester.context,
-                { ticketId: ticket.ticket.id, body: "ข้อความหลังปิดงาน" },
-                { idempotencyKey: nextFixtureKey(`${status}-comment`) },
+                { ticketId: ticket.ticket.id, body: "ข้อความหลังจบหรือยกเลิกงาน" },
+                { idempotencyKey: nextFixtureKey(`${path.label}-comment`) },
             )).rejects.toBeInstanceOf(ITTicketNotCommentableError);
             expect(await prisma.iTTicketComment.count({ where: { ticketId: ticket.ticket.id } })).toBe(0);
         }
@@ -716,6 +748,86 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         ]));
         expect(JSON.stringify(timeline)).not.toContain("@integration.test");
         expect(JSON.stringify(timeline)).not.toContain("password");
+    });
+
+    it("projects every newly approved lifecycle transition into the requester timeline", async () => {
+        const fixture = await createFixture("lifecycle-timeline", true);
+        const cases = [
+            {
+                key: "open-cancel",
+                targets: [ITTicketStatus.CANCELLED],
+                transitions: [[ITTicketStatus.OPEN, ITTicketStatus.CANCELLED]],
+            },
+            {
+                key: "in-progress-cancel",
+                targets: [ITTicketStatus.IN_PROGRESS, ITTicketStatus.CANCELLED],
+                transitions: [
+                    [ITTicketStatus.OPEN, ITTicketStatus.IN_PROGRESS],
+                    [ITTicketStatus.IN_PROGRESS, ITTicketStatus.CANCELLED],
+                ],
+            },
+            {
+                key: "waiting-cancel",
+                targets: [
+                    ITTicketStatus.IN_PROGRESS,
+                    ITTicketStatus.WAITING_REQUESTER,
+                    ITTicketStatus.CANCELLED,
+                ],
+                transitions: [
+                    [ITTicketStatus.OPEN, ITTicketStatus.IN_PROGRESS],
+                    [ITTicketStatus.IN_PROGRESS, ITTicketStatus.WAITING_REQUESTER],
+                    [ITTicketStatus.WAITING_REQUESTER, ITTicketStatus.CANCELLED],
+                ],
+            },
+            {
+                key: "resolved-reopen",
+                targets: [
+                    ITTicketStatus.IN_PROGRESS,
+                    ITTicketStatus.RESOLVED,
+                    ITTicketStatus.IN_PROGRESS,
+                ],
+                transitions: [
+                    [ITTicketStatus.OPEN, ITTicketStatus.IN_PROGRESS],
+                    [ITTicketStatus.IN_PROGRESS, ITTicketStatus.RESOLVED],
+                    [ITTicketStatus.RESOLVED, ITTicketStatus.IN_PROGRESS],
+                ],
+            },
+            {
+                key: "resolved-close",
+                targets: [
+                    ITTicketStatus.IN_PROGRESS,
+                    ITTicketStatus.RESOLVED,
+                    ITTicketStatus.CLOSED,
+                ],
+                transitions: [
+                    [ITTicketStatus.OPEN, ITTicketStatus.IN_PROGRESS],
+                    [ITTicketStatus.IN_PROGRESS, ITTicketStatus.RESOLVED],
+                    [ITTicketStatus.RESOLVED, ITTicketStatus.CLOSED],
+                ],
+            },
+        ] as const;
+
+        for (const testCase of cases) {
+            const created = await createTicket(fixture.requester, testCase.key);
+            let expectedVersion = created.ticket.version;
+            for (const targetStatus of testCase.targets) {
+                const changed = await transitionITTicketStatus(fixture.operator.context, {
+                    ticketId: created.ticket.id,
+                    targetStatus,
+                    expectedVersion,
+                });
+                expectedVersion = changed.ticket.version;
+            }
+
+            const timeline = await getITRequesterTicketTimeline(
+                fixture.requester.context,
+                created.ticket.id,
+            );
+            expect(timeline.items
+                .filter((item) => item.type === "STATUS_CHANGED")
+                .map((item) => [item.fromStatus, item.toStatus]))
+                .toEqual(testCase.transitions);
+        }
     });
 
     it("rejects deletion of retained comments and their referenced users", async () => {

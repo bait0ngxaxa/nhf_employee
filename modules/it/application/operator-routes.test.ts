@@ -344,7 +344,7 @@ describe("IT operator API adapters", () => {
         }));
     });
 
-    it("maps approved transition failures and stale or competing writes to conflict", async () => {
+    it("maps domain-rejected transitions and stale or competing writes to conflict", async () => {
         const changed = await patchStatus(
             patchRequest("http://localhost/api/it/operator/tickets/19/status", {
                 targetStatus: "IN_PROGRESS",
@@ -396,6 +396,21 @@ describe("IT operator API adapters", () => {
             requestId: expect.any(String),
             correlationId: expect.any(String),
         }));
+    });
+
+    it("does not wake requester notification delivery for cancel, reopen, or close actions", async () => {
+        for (const targetStatus of ["CANCELLED", "IN_PROGRESS", "CLOSED"] as const) {
+            const response = await patchStatus(
+                patchRequest("http://localhost/api/it/operator/tickets/19/status", {
+                    targetStatus,
+                    expectedVersion: 5,
+                }),
+                ticketParams("19"),
+            );
+            expect(response.status).toBe(200);
+        }
+
+        expect(mocks.wakeOutbox).not.toHaveBeenCalled();
     });
 
     it("maps missing, inactive, and ineligible reference outcomes consistently", async () => {

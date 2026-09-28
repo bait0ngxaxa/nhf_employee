@@ -602,7 +602,7 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         })).rejects.toBeInstanceOf(ITWorkforceDeniedError);
     });
 
-    it("implements only approved status transitions and appends atomic resolved history", async () => {
+    it("reopens and closes resolved Tickets while preserving atomic status history", async () => {
         const fixture = await createFixture("status-flow");
         const created = await createTicket(fixture.requester);
         const transitions = [
@@ -610,9 +610,24 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
             { from: ITTicketStatus.IN_PROGRESS, to: ITTicketStatus.WAITING_REQUESTER },
             { from: ITTicketStatus.WAITING_REQUESTER, to: ITTicketStatus.IN_PROGRESS },
             { from: ITTicketStatus.IN_PROGRESS, to: ITTicketStatus.RESOLVED },
+            { from: ITTicketStatus.RESOLVED, to: ITTicketStatus.IN_PROGRESS },
+            { from: ITTicketStatus.IN_PROGRESS, to: ITTicketStatus.RESOLVED },
+            { from: ITTicketStatus.RESOLVED, to: ITTicketStatus.CLOSED },
         ] as const;
 
+        await expect(transitionITTicketStatus(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            targetStatus: ITTicketStatus.RESOLVED,
+            expectedVersion: 1,
+        })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
+        await expect(transitionITTicketStatus(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            targetStatus: ITTicketStatus.CLOSED,
+            expectedVersion: 1,
+        })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
+
         let expectedVersion = 1;
+        let resolvedAt: Date | null = null;
         for (const transition of transitions) {
             const changed = await transitionITTicketStatus(fixture.operator.context, {
                 ticketId: created.ticket.id,
@@ -624,12 +639,37 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
                 changed: true,
                 ticket: { status: transition.to, version: expectedVersion },
             });
+            if (transition.to === ITTicketStatus.RESOLVED) {
+                expect(changed.ticket.resolvedAt).toBeInstanceOf(Date);
+                resolvedAt = changed.ticket.resolvedAt;
+            } else if (transition.from === ITTicketStatus.RESOLVED
+                && transition.to === ITTicketStatus.IN_PROGRESS) {
+                expect(changed.ticket.resolvedAt).toBeNull();
+                resolvedAt = null;
+            } else if (transition.to === ITTicketStatus.CLOSED) {
+                expect(changed.ticket.resolvedAt).toEqual(resolvedAt);
+            }
+            if (transition.to === ITTicketStatus.WAITING_REQUESTER) {
+                await expect(transitionITTicketStatus(fixture.operator.context, {
+                    ticketId: created.ticket.id,
+                    targetStatus: ITTicketStatus.RESOLVED,
+                    expectedVersion,
+                })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
+            } else if (transition.from === ITTicketStatus.IN_PROGRESS
+                && transition.to === ITTicketStatus.RESOLVED) {
+                await expect(transitionITTicketStatus(fixture.operator.context, {
+                    ticketId: created.ticket.id,
+                    targetStatus: ITTicketStatus.CANCELLED,
+                    expectedVersion,
+                })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
+            }
         }
 
         const ticket = await prisma.iTTicket.findUniqueOrThrow({
             where: { id: created.ticket.id },
         });
-        expect(ticket.resolvedAt).not.toBeNull();
+        expect(ticket.status).toBe(ITTicketStatus.CLOSED);
+        expect(ticket.resolvedAt).toEqual(resolvedAt);
         const events = await eventsFor(ticket.id);
         expect(events.map((event) => [event.kind, event.fromStatus, event.toStatus]))
             .toEqual([
@@ -645,8 +685,10 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
                 || (previousEvent.occurredAt.getTime() === event.occurredAt.getTime()
                     && previousEvent.id < event.id);
         })).toBe(true);
-        const resolvedEvent = events.at(-1);
-        expect(resolvedEvent?.occurredAt).toEqual(ticket.resolvedAt);
+        const finalResolvedEvent = events
+            .filter((event) => event.toStatus === ITTicketStatus.RESOLVED)
+            .at(-1);
+        expect(finalResolvedEvent?.occurredAt).toEqual(ticket.resolvedAt);
 
         const statusAudits = await prisma.auditLog.findMany({
             where: {
@@ -682,19 +724,30 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
             before: { status: "IN_PROGRESS", resolvedAt: null },
             after: {
                 status: "RESOLVED",
-                resolvedAt: ticket.resolvedAt?.toISOString(),
+                resolvedAt: expect.any(String),
             },
+            metadata: { channel: "DASHBOARD" },
+        });
+
+        expect(JSON.parse(statusAudits[4]?.details ?? "null")).toMatchObject({
+            before: { status: "RESOLVED", resolvedAt: expect.any(String) },
+            after: { status: "IN_PROGRESS", resolvedAt: null },
+            metadata: { channel: "DASHBOARD" },
+        });
+        expect(JSON.parse(statusAudits[6]?.details ?? "null")).toEqual({
+            before: { status: "RESOLVED", resolvedAt: ticket.resolvedAt?.toISOString() },
+            after: { status: "CLOSED", resolvedAt: ticket.resolvedAt?.toISOString() },
             metadata: { channel: "DASHBOARD" },
         });
 
         await expect(transitionITTicketStatus(fixture.operator.context, {
             ticketId: ticket.id,
-            targetStatus: ITTicketStatus.CLOSED,
+            targetStatus: ITTicketStatus.IN_PROGRESS,
             expectedVersion: expectedVersion,
         })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
         await expect(transitionITTicketStatus(fixture.operator.context, {
             ticketId: ticket.id,
-            targetStatus: ITTicketStatus.IN_PROGRESS,
+            targetStatus: ITTicketStatus.CANCELLED,
             expectedVersion: expectedVersion,
         })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
         expect(await prisma.iTTicketEvent.count({ where: { ticketId: ticket.id } }))
@@ -702,6 +755,64 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         expect(await prisma.auditLog.count({
             where: { entityType: "ITTicket", entityId: ticket.id, action: "TICKET_STATUS_CHANGE" },
         })).toBe(transitions.length);
+    });
+
+    it("cancels OPEN, IN_PROGRESS, or WAITING_REQUESTER Tickets without resolving them", async () => {
+        const fixture = await createFixture("status-cancel");
+        const cancellationPaths = [
+            { beforeCancel: ITTicketStatus.OPEN, targets: [] },
+            { beforeCancel: ITTicketStatus.IN_PROGRESS, targets: [ITTicketStatus.IN_PROGRESS] },
+            {
+                beforeCancel: ITTicketStatus.WAITING_REQUESTER,
+                targets: [ITTicketStatus.IN_PROGRESS, ITTicketStatus.WAITING_REQUESTER],
+            },
+        ] as const;
+
+        for (const path of cancellationPaths) {
+            const created = await createTicket(fixture.requester);
+            let expectedVersion = 1;
+            let currentStatus: ITTicketStatus = ITTicketStatus.OPEN;
+            for (const targetStatus of path.targets) {
+                const result = await transitionITTicketStatus(fixture.operator.context, {
+                    ticketId: created.ticket.id,
+                    targetStatus,
+                    expectedVersion,
+                });
+                currentStatus = targetStatus;
+                expectedVersion += 1;
+                expect(result.ticket.status).toBe(currentStatus);
+            }
+            expect(currentStatus).toBe(path.beforeCancel);
+
+            const cancelled = await transitionITTicketStatus(fixture.operator.context, {
+                ticketId: created.ticket.id,
+                targetStatus: ITTicketStatus.CANCELLED,
+                expectedVersion,
+            });
+            expect(cancelled).toMatchObject({
+                changed: true,
+                ticket: {
+                    status: ITTicketStatus.CANCELLED,
+                    resolvedAt: null,
+                    version: expectedVersion + 1,
+                },
+            });
+            const events = await eventsFor(created.ticket.id);
+            expect(events.at(-1)).toMatchObject({
+                kind: "STATUS_CHANGED",
+                fromStatus: path.beforeCancel,
+                toStatus: ITTicketStatus.CANCELLED,
+                actorUserId: fixture.operator.userId,
+            });
+
+            await expect(transitionITTicketStatus(fixture.operator.context, {
+                ticketId: created.ticket.id,
+                targetStatus: ITTicketStatus.IN_PROGRESS,
+                expectedVersion: expectedVersion + 1,
+            })).rejects.toBeInstanceOf(ITTicketInvalidTransitionError);
+            expect(await prisma.iTTicketEvent.count({ where: { ticketId: created.ticket.id } }))
+                .toBe(path.targets.length + 2);
+        }
     });
 
     it("assigns only eligible configured operators and records assign, reassign, and unassign facts", async () => {

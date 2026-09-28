@@ -344,6 +344,17 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             analyticsOnly.userId,
             new Date("2026-09-25T17:02:00.000Z"),
         );
+        await prisma.iTTicketEvent.create({
+            data: {
+                ticketId: cancelledTicket,
+                actorUserId: analyticsOnly.userId,
+                kind: "STATUS_CHANGED",
+                fromStatus: "IN_PROGRESS",
+                toStatus: "CANCELLED",
+                occurredAt: new Date("2026-09-25T17:04:00.000Z"),
+            },
+            select: { id: true },
+        });
 
         await prisma.iTTicketCategory.update({
             where: { id: category.id },

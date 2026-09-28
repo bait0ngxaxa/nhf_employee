@@ -72,38 +72,37 @@ Do not hard delete Tickets in normal operation. `CLOSED` and `CANCELLED` represe
 
 ## 5. Workflow, assignment, conversation, classification
 
-**LOCKED core transitions** (assuming an active eligible actor and domain resource authorization):
+**LOCKED canonical lifecycle.** All status transitions are IT/operator actions and require the existing `it.ticket.manage / ALL` authority plus the domain transition check. Requesters cannot change Ticket status or cancel Tickets.
 
-```text
-OPEN --operator starts--> IN_PROGRESS
-IN_PROGRESS --operator requests information--> WAITING_REQUESTER
-WAITING_REQUESTER --requester replies / comment--> WAITING_REQUESTER
-WAITING_REQUESTER --operator resumes--> IN_PROGRESS
-IN_PROGRESS --operator resolves--> RESOLVED --authorized closure?--> CLOSED
+~~~text
+OPEN → IN_PROGRESS | CANCELLED
+IN_PROGRESS → WAITING_REQUESTER | RESOLVED | CANCELLED
+WAITING_REQUESTER → IN_PROGRESS | CANCELLED
+RESOLVED → IN_PROGRESS | CLOSED
+CLOSED → terminal
+CANCELLED → terminal
+~~~
 
-OPEN / IN_PROGRESS / WAITING_REQUESTER / RESOLVED --cancellation?--> CANCELLED
-RESOLVED / CLOSED --reopening?--> IN_PROGRESS
-```
+| Status | Meaning |
+| --- | --- |
+| `OPEN` | รับเรื่องแล้ว; IT has received the Ticket but has not started work. |
+| `IN_PROGRESS` | กำลังดำเนินการ; IT is actively working on it. |
+| `WAITING_REQUESTER` | รอข้อมูลจากผู้แจ้ง; work is waiting for more information from the requester. |
+| `RESOLVED` | แก้ไขแล้ว; IT considers the issue resolved, but it is not permanently closed. IT may reopen it to `IN_PROGRESS` or close it. |
+| `CLOSED` | ปิดงานแล้ว; IT explicitly confirmed the Ticket is finished. This state is final. |
+| `CANCELLED` | ยกเลิกแล้ว; IT intentionally stopped the Ticket without resolving it. This state is final and distinct from `RESOLVED`. |
 
-| Transition / action | Actor and rule | Contract status |
-| --- | --- | --- |
-| Create → `OPEN` | Active eligible workforce with `it.ticket.create / OWN`; server sets requester. | LOCKED |
-| `OPEN → IN_PROGRESS`, `IN_PROGRESS → WAITING_REQUESTER`, `IN_PROGRESS → RESOLVED` | Operator with `it.ticket.manage / ALL`; require current-state predicate. | LOCKED |
-| Requester reply while `WAITING_REQUESTER` | Append the shared comment and keep `WAITING_REQUESTER`; no implicit status transition. Whether replies should automatically resume work remains unresolved. An operator with manage ALL may explicitly resume. | IT5A locks no auto-resume; product policy OPEN |
-| `RESOLVED → CLOSED` | `RESOLVED` means IT states a solution was supplied; `CLOSED` means final handling is complete. Closure actor/timing are OPEN. | OPEN |
-| Cancellation | Whether requester may cancel; eligible states; operator cancellation authority/reason are OPEN. No unrestricted status write. | OPEN |
-| Reopening | Whether resolved or closed tickets can reopen, who may do so, and time window are OPEN. | OPEN |
-| Terminal handling | `CLOSED`/`CANCELLED` reject ordinary status mutation and comments unless reopening/exception policy is explicitly approved. | LOCKED default |
+`WAITING_REQUESTER` is active work, entered only when a requester response is needed; it is not a notification delivery state. A requester comment in this state appends conversation and leaves the status unchanged until an operator explicitly resumes it. Ticket creation to `OPEN` remains available to eligible workforce with `it.ticket.create / OWN`; the server binds the requester. IT may cancel only from `OPEN`, `IN_PROGRESS`, or `WAITING_REQUESTER`. A resolved issue needing more work uses `RESOLVED → IN_PROGRESS`; IT closes a resolved Ticket manually, with no timeout or requester confirmation. `CLOSED` and `CANCELLED` are final. A status filter cannot manufacture authority.
 
-`WAITING_REQUESTER` is an active unresolved state, entered only when a requester response is needed; it is not a notification delivery state. IT2 persists the operator transition to this state and explicit operator resume. IT5A requester replies append conversation while leaving the state unchanged; auto-resume remains unresolved. A status filter cannot manufacture authority. Assignment starts null (`UNASSIGNED`); `ASSIGNED` means a non-null User reference, whose current eligibility may later change. Only manage ALL may issue assignment mutations, and each selected assignee must satisfy the IT assignee eligibility contract. **IT1 locks that contract as active workforce plus configured `it.ticket.read / ALL`, `it.ticket.comment / ALL`, and `it.ticket.manage / ALL`.** Each capability is independent; defaults, including read/comment OWN, do not count as configured operator authority, and analytics is not required. IT2 rechecks that evidence within the assignment transaction through the central configured-authority evaluator and the current Employee lifecycle projection. Do not create `it.ticket.assignable` without a new requirement. Team name, TeamRole name, Department and job title never determine eligibility. The initial schema uses one nullable assignee; later product review may revisit the OPEN cardinality question. When an assignee later becomes inactive, retain the historical User reference and require a visible reassignment/unassignment path; do not silently transfer work.
+Assignment starts null (`UNASSIGNED`); `ASSIGNED` means a non-null User reference, whose current eligibility may later change. Only manage ALL may issue assignment mutations, and each selected assignee must satisfy the IT assignee eligibility contract. **IT1 locks that contract as active workforce plus configured `it.ticket.read / ALL`, `it.ticket.comment / ALL`, and `it.ticket.manage / ALL`.** Each capability is independent; defaults, including read/comment OWN, do not count as configured operator authority, and analytics is not required. IT2 rechecks that evidence within the assignment transaction through the central configured-authority evaluator and the current Employee lifecycle projection. Do not create `it.ticket.assignable` without a new requirement. Team name, TeamRole name, Department and job title never determine eligibility. The initial schema uses one nullable assignee; later product review may revisit the OPEN cardinality question. When an assignee later becomes inactive, retain the historical User reference and require a visible reassignment/unassignment path; do not silently transfer work.
 
-IT5A permits ordinary comments only in `OPEN`, `IN_PROGRESS`, and `WAITING_REQUESTER`; `RESOLVED`, `CLOSED`, and `CANCELLED` are non-commentable. IT5B attachments follow this exact lifecycle. A requester endpoint always scopes by both Ticket ID and authenticated requester ID, even for an actor with comment ALL. Operator reads require read ALL; operator replies with optional images independently require read ALL and comment ALL, not manage ALL. Requester messages never set `firstRespondedAt`; the first accepted operator comment atomically sets it once, and images do not set it independently. Assignment, status, category, retries, and later replies do not change it. No comment behavior is defined for `RESOLVED` beyond this non-commentable boundary. Internal IT-only notes require a distinct visibility/authorization model and remain deferred.
+Ordinary comments are permitted only in `OPEN`, `IN_PROGRESS`, and `WAITING_REQUESTER`; `RESOLVED`, `CLOSED`, and `CANCELLED` are non-commentable. IT5B attachments follow this same conversation lifecycle. A requester endpoint always scopes by both Ticket ID and authenticated requester ID, even for an actor with comment ALL. Operator reads require read ALL; operator replies with optional images independently require read ALL and comment ALL, not manage ALL. Requester messages never set `firstRespondedAt`; the first accepted operator comment atomically sets it once, and images do not set it independently. Assignment, status, category, retries, and later replies do not change it. Internal IT-only notes require a distinct visibility/authorization model and remain deferred.
 
 Priority candidates are `LOW`, `NORMAL`, `HIGH`, `URGENT`. If included in MVP, default authoritative priority to `NORMAL`, and allow only manage ALL to change it. Requester urgency may be collected as separate input only after a product decision; never treat it as operational priority. Record priority changes in the timeline. A formal impact×urgency matrix and SLA engine are outside scope. Category may be null until classified; operator manages classification, while category reference maintenance can initially be deployment/configuration managed without a new capability.
 
 ## 6. Business timeline and Audit
 
-**LOCKED; operational history implemented in IT5A, accountability integration in IT11.** Ticket history is an operational record, separate from `AuditLog`. IT2 persists `CREATED`, `ASSIGNED`/`UNASSIGNED`, `STATUS_CHANGED`, and `CATEGORY_CHANGED` events with structured old/new values, actor, timestamp, and stable event ordering. Each event is appended in the same transaction as its mutation. IT5A appends immutable comments as separate business facts and merges them with events for presentation; it does not add a duplicate comment event. The bounded timeline orders by `(timestamp ASC, source rank EVENT before COMMENT, source id ASC)` and uses a keyset cursor over that total order. `resolvedAt` is set on the single approved transition into `RESOLVED`; IT2 has no reopen operation that clears it. `firstRespondedAt` is set only by the first accepted operator comment. Do not infer first response or waiting duration from `updatedAt`.
+**LOCKED; operational history implemented in IT5A, accountability integration in IT11.** Ticket history is an operational record, separate from `AuditLog`. IT2 persists `CREATED`, `ASSIGNED`/`UNASSIGNED`, `STATUS_CHANGED`, and `CATEGORY_CHANGED` events with structured old/new values, actor, timestamp, and stable event ordering. Each event is appended in the same transaction as its mutation. IT5A appends immutable comments as separate business facts and merges them with events for presentation; it does not add a duplicate comment event. The bounded timeline orders by `(timestamp ASC, source rank EVENT before COMMENT, source id ASC)` and uses a keyset cursor over that total order. `resolvedAt` is set when entering `RESOLVED`, cleared on `RESOLVED → IN_PROGRESS`, and preserved on `RESOLVED → CLOSED`; cancellation does not set it. `STATUS_CHANGED` events and corresponding Audit facts remain atomic with each status mutation and record reopen, close, and cancellation occurrences. `firstRespondedAt` is set only by the first accepted operator comment. Do not infer first response or waiting duration from `updatedAt`.
 
 `ITTicketEvent` and `ITTicketComment` answer operational questions and feed analytics. `AuditLog` records security/accountability evidence and follows [`modules/audit`](../../modules/audit) public commands. At the IT5A phase boundary, comment Audit was deferred pending a policy decision. IT11 resolves that decision: successful create, assignment, status, category, and requester/operator comment mutations are auditable in their existing transaction. A comment Audit record identifies the comment, author side, and attachment count; it never copies the body, file bytes, or private storage key. Replays, no-op assignment/category changes, and failed commands add no second state-change record. Never use Audit as the Ticket event store or expose Audit rows as the requester timeline.
 
@@ -176,10 +175,10 @@ Reporting uses the explicit `Asia/Bangkok` timezone and supports exactly `7D`, `
 | --- | --- |
 | Current backlog | Current status is `OPEN`, `IN_PROGRESS`, or `WAITING_REQUESTER`; `RESOLVED`, `CLOSED`, and `CANCELLED` are excluded. Summary includes waiting requester, unassigned backlog, and whole-minute age of the oldest current-backlog Ticket, without identifying that Ticket. |
 | New Tickets | Tickets with `createdAt` in `[startAt, endAt)`. |
-| Resolved Tickets | Distinct Ticket IDs with `ITTicketEvent.kind = STATUS_CHANGED` and `toStatus = RESOLVED` in the period. The current workflow has no reopen path; grouping by Ticket ID remains defensive. |
+| Resolved Tickets | Distinct Ticket IDs with `ITTicketEvent.kind = STATUS_CHANGED` and `toStatus = RESOLVED` in the period. Reopening and resolving again does not count a Ticket more than once in the same reporting window; cancellation alone is never resolution. |
 | Average first response | Period-created Ticket cohort with non-null canonical `firstRespondedAt`; duration is `firstRespondedAt - createdAt`, elapsed wall-clock minutes. The DTO also reports sample count. |
-| Average resolution | Tickets with a period `STATUS_CHANGED → RESOLVED` event; duration is the earliest qualifying event's `occurredAt - Ticket.createdAt`. `updatedAt` is not used. |
-| Created vs resolved trend | One local-day bucket per period date, from `Ticket.createdAt` and `STATUS_CHANGED → RESOLVED` event `occurredAt`. Empty days have zero values. |
+| Average resolution | Tickets with a period `STATUS_CHANGED → RESOLVED` event; duration is the earliest qualifying event for each Ticket in the period's `occurredAt - Ticket.createdAt`. `updatedAt` and cancellation events are not used. |
+| Created vs resolved trend | One local-day bucket per period date, from `Ticket.createdAt` and `STATUS_CHANGED → RESOLVED` event `occurredAt`. Cancellation events do not contribute to resolved totals. Empty days have zero values. |
 | Current status distribution | All current Tickets grouped by current status, in canonical enum/label order with zero counts included. |
 | Ticket type distribution | Period-created Ticket cohort grouped as `INCIDENT`, `SERVICE_REQUEST`, and `SUGGESTION`, with stable zero-count values. |
 | Current backlog by category | Current backlog grouped by current category. Null uses `ยังไม่จัดหมวดหมู่`; inactive referenced categories remain reportable. |
@@ -190,7 +189,7 @@ The browser-safe DTO contains only period metadata, aggregate counts/durations, 
 
 All persistence aggregates are read in one MySQL `REPEATABLE READ` transaction. InnoDB's consistent non-locking reads in this isolation share one transaction snapshot, so summary cards and distributions represent the same database moment. This is a read-only snapshot, not the Serializable mutation helper. Queries use database counts/grouping/minimums and only bounded timestamp projections for daily bucketing and average calculations. The requester Department name is stored at Ticket creation by the existing Employee public snapshot contract; IT never reads Employee persistence internals.
 
-Deferred beyond IT7: reopen counts/cycles, accumulated `WAITING_REQUESTER` duration, business-hours duration, SLA/compliance, priority, historical assignment/category intervals, status-as-of reporting, custom date ranges, exports, materialized analytics, scheduled aggregation, external BI, forecasting, AI insights, and Email Request analytics. These need a reachable workflow, approved reporting policy, or IT8 ownership first.
+Deferred beyond IT7: reopen counts and accumulated resolution cycles, accumulated `WAITING_REQUESTER` duration, business-hours duration, SLA/compliance, priority, historical assignment/category intervals, status-as-of reporting, custom date ranges, exports, materialized analytics, scheduled aggregation, external BI, forecasting, AI insights, and Email Request analytics. These need an approved reporting policy or IT8 ownership first.
 
 At creation, IT2 resolves Department from the authenticated User's current Employee through `getCurrentWorkforceDepartmentSnapshotInTransaction()` in the public Employee module contract. It stores nullable `requesterDepartmentId` and `requesterDepartmentNameSnapshot`; the reference uses `ON DELETE SET NULL`, while the name remains unchanged across Department rename, deletion, or later Employee transfer. IT never imports Employee persistence internals and never uses Department for authorization. Existing Email Request's free-text `department` is a different, user-entered provisioning snapshot and remains intact through IT8.
 
@@ -302,22 +301,16 @@ Do not delete, rename, reinterpret, or reuse historical stored values in IT0. At
 
 **Non-goals:** ITIL Problem/Change Management, CMDB/assets, SLA engine or breach automation, approvals, multi-tenant/external customers, email ingestion, chatbot/AI classification, knowledge base, automatic routing/escalation/on-call, nested IT teams, custom workflow/policy DSL, arbitrary custom fields, and automatic EmailRequest→Ticket conversion. LIFF operator, analytics, and administrative surfaces are out of scope. IT9A adds no LIFF UI, Home card, navigation item, Rich Menu change, or Ticket LINE notification.
 
-**OPEN product questions that materially affect a later implementation:**
+The cancellation, closure, reopening, commentability, and requester-reply decisions formerly tracked here are now locked in Section 5; the active backlog and resolution metric definitions are locked in Section 10. They are no longer open product questions.
 
-1. May a requester cancel, and from which states? May an operator cancel, and is a reason mandatory?
-2. Can `RESOLVED` or `CLOSED` reopen, by whom, and within what window? Who closes, and is closure manual or time-based? May a requester reply while resolved, and if so what transition applies? IT5A currently rejects comments in `RESOLVED` until that policy is approved.
-3. Should a requester reply in `WAITING_REQUESTER` ever resume `IN_PROGRESS` automatically? IT5A keeps the status unchanged; operators may explicitly resume. IT5A also fixes first response to the first accepted operator comment, not a status-only action.
-4. Are internal IT-only notes required? This changes comment visibility, storage and API authorization.
-5. Are attachments required in the first production slice, and which file types/count/size are allowed?
-6. Is exactly one current assignee sufficient? If not, assignment cardinality and workload definitions change.
-7. Is priority part of MVP? Should requester provide a separate urgency signal? Who may set `URGENT`?
-8. Are categories centrally configured by deployment/operator data, or must IT administer them in the app? What initial categories are approved?
-9. Are response/resolution targets required now? If so, specify measures before considering any SLA implementation.
-10. Should reporting periods use calendar or fiscal year, which timezone/business-hours convention, and how should reopened/resolved/cancelled cycles count? Should `RESOLVED` be included in backlog?
-11. Are active application accounts without an Employee profile eligible? Current active workforce helper requires an Employee; product wording alone does not settle this exception.
-12. What retention/deletion policy applies to Ticket text, files, personal identity snapshots and operational history?
+**Remaining open product questions that may affect later work:**
 
-These questions are intentionally unresolved; later slices must close their dependencies before schema/API behavior is frozen.
+1. Are internal IT-only notes required? This changes comment visibility, storage and API authorization.
+2. Is exactly one current assignee sufficient? If not, assignment cardinality and workload definitions change.
+3. Is priority part of MVP? Should requester provide a separate urgency signal? Who may set `URGENT`?
+4. Are categories centrally configured by deployment/operator data, or must IT administer them in the app?
+5. Are active application accounts without an Employee profile eligible? Current active workforce helper requires an Employee; product wording alone does not settle this exception.
+6. What retention/deletion policy applies to Ticket text, files, personal identity snapshots and operational history?
 
 ## 16. Incremental implementation roadmap
 
@@ -360,6 +353,8 @@ IT1 is **CLOSED**. The authorization registry includes the `it` domain and exact
 
 ## 18. IT2 closure
 
+Historical IT2 phase boundary: the limited transition set below describes what IT2 implemented at that time. It has since been extended; Section 5 is the current canonical lifecycle.
+
 IT2 is **CLOSED**. The additive migration creates only `it_tickets`, `it_ticket_categories`, `it_ticket_events`, and `it_ticket_create_idempotency`, with Ticket type/status/event vocabularies, history-preserving relations, requester/assignee/category/Department indexes, a Department name snapshot, and a version token. No legacy Ticket tables or data are restored.
 
 `modules/it/index.ts` exposes the validated creation command, status-transition command, assignment command, category classification command, stable result/error/enumeration contracts, and the pure transition rule. Creation binds requester to the trusted actor, defaults to `OPEN`/unassigned/uncategorized/version 1, and commits Ticket + `CREATED` event + SHA-256 idempotency row in one Serializable transaction. Same-key/same-canonical-input requests replay; a changed payload conflicts. Operator writes recheck current workforce and manage ALL in their transaction, condition on expected version, increment the version, and append a structured event atomically. Assignment additionally requires active target workforce plus configured read/comment/manage ALL; no default scopes, role, Department, Team name, or analytics grant counts.
@@ -370,15 +365,19 @@ IT2 adds no API/UI, priority, comments, attachments, notifications/outbox events
 
 ## 19. IT3 closure
 
+Historical IT3 phase boundary: the exclusions below describe the requester API slice at that time. Ticket lifecycle decisions now locked in Section 5 supersede the former open status questions.
+
 IT3 is **CLOSED**. The IT application query boundary provides bounded, newest-first requester list pagination and requester detail. Both queries revalidate current workforce and `it.ticket.read`; the list/count predicates include `requesterUserId`, and detail uses both Ticket ID and requester ID in the database lookup. Foreign and absent Tickets share the same not-found result. The explicit requester DTO excludes ownership, Department, assignee, version, authorization, and event-history data.
 
 The internal Dashboard API is `POST /api/it/tickets`, `GET /api/it/tickets`, and `GET /api/it/tickets/[ticketId]`. Creation reuses the IT2 schema and command, requires `Idempotency-Key`, derives requester identity from the authenticated session, and preserves replay/conflict results. There is no external versioned API contract. The Dashboard route `/dashboard/it` and requester detail route use the server-derived IT capability projection for navigation/route presentation; API and application boundaries remain authoritative and independently validate access. `@/modules/it/client` exposes only browser-safe contracts and self-service presentation.
 
 Focused query, API, Dashboard, route-access, navigation, route-SSOT, and current-user projection tests passed: 88 tests across 7 files. `npm run architecture:check` passed for 1,176 source files, and `npm run lint:strict` and `npm run typecheck` passed. One `npm run test` full-suite attempt reported 3,336 passed and 5 failures across two files: four current-user projection tests lacked the new IT mock, then passed in isolation (9/9) after the fixture update; the Routine browser graph architecture test timed out under full-suite load, then passed in isolation (1/1). No second agent-run full-suite was made for that IT3 work. After the completed IT3 implementation was committed, the user manually ran the final full suite and confirmed it passed; no count was provided for that confirmation, and the agent did not execute that final verification.
 
-IT3 adds no operator queue or ALL-ticket query, assignment/category/status mutation surface, comments, timeline/events, attachments, notifications/outbox behavior, Ticket Audit producer, priority, cancellation/closure/reopen flow, analytics, LIFF support, or Email Request migration. These remain deferred to later phases or open product decisions.
+At the IT3 closure boundary, its requester/API slice had no operator queue or ALL-ticket query, assignment/category/status mutation surface, comments, timeline/events, attachments, notifications/outbox behavior, Ticket Audit producer, priority, cancellation/closure/reopen flow, analytics, LIFF support, or Email Request migration. The lifecycle decisions formerly open at that boundary are now locked in Section 5; the other listed capabilities were deferred to later phases or open product decisions.
 
 ## 20. IT4 closure
+
+Historical IT4 phase boundary: the transition controls listed below describe IT4's implementation. The approved lifecycle is now defined in Section 5.
 
 IT4 is **CLOSED**. It adds separate organization-wide operator reads under `modules/it/application/ticket-queries.ts`; each queue, detail, and reference query validates current workforce and effective `it.ticket.read / ALL` in the transaction before querying Ticket/category rows. IT3 requester queries remain owner-scoped and unchanged. The explicit operator DTO contains only Ticket processing fields and requester/assignee/category presentation; it does not expose raw relations, events, comments, or notification state.
 
@@ -394,9 +393,11 @@ The additive migration `20260925100000_it4_operator_ticket_queue_indexes` adds `
 
 Verification executed: focused operator query/API/presentation/navigation tests passed (including 37/37 and 20/20 final follow-up subsets); `npm run test:integration:mysql` passed (18 files, 117 tests), applying all migrations to the dedicated integration database; `npm run architecture:check` passed for 1,191 source files; `npm run lint:strict`, `npm run typecheck`, and `npx prisma validate` passed; the final `npm run test` passed (345 files, 3,376 tests). Impeccable UI detection returned no findings. The IT3 final full-suite confirmation remains user-run after the committed IT3 implementation as recorded above.
 
-IT4 introduced no conversation/comments, internal notes, timeline UI, attachments, notifications, Audit producer, SLA/priority, analytics, cancel/close/reopen transitions, automatic resume/assignment, category administration, production Team/grant seeding, LIFF behavior, or Email Request migration. IT5A subsequently added only shared conversation and timeline; the remaining items continue to be deferred to later phases or open product decisions.
+At the IT4 closure boundary, the operator slice had no conversation/comments, internal notes, timeline UI, attachments, notifications, Audit producer, SLA/priority, analytics, cancel/close/reopen transitions, automatic resume/assignment, category administration, production Team/grant seeding, LIFF behavior, or Email Request migration. The transition exclusions describe that historical boundary; Section 5 now defines the approved lifecycle. The other listed items continued to be deferred to later phases or open product decisions.
 
 ## 21. IT5A implementation status — Conversation + Timeline
+
+Historical IT5A phase boundary: its comment rules already blocked resolved replies, but the product policy was not yet recorded there. Section 5 now locks the current commentable states and explicitly keeps `RESOLVED` non-commentable.
 
 IT5A is **CLOSED**. Its implementation remained unchanged during IT5B. Closure was initially pending after the recorded IT5A full-suite timeouts below; the later integrated full-suite run in section 22 passed and validates the unchanged IT5A implementation. The single additive migration `20260925110000_it5a_ticket_conversation` adds `ITTicketCommentKind`, nullable `ITTicket.firstRespondedAt`, `it_ticket_comments`, and `it_ticket_comment_idempotency`. Comments store the authenticated author, server-derived `REQUESTER`/`OPERATOR` kind, trimmed body, and timestamp. Ticket, author, idempotency author, and linked comment relations use restrictive delete behavior. The comment query index is `(ticketId, createdAt, id)`; idempotency uses unique `(authorUserId, idempotencyKey)` and unique `commentId`. No old Ticket table/comment data is restored or migrated.
 
@@ -424,7 +425,7 @@ The earlier IT5B full-suite attempt reported 350/354 files and 3,419/3,443 tests
 
 The compatibility correction restores missing/empty `Content-Type` as the bounded JSON path while explicit unsupported media types still fail with 415. Composer retries retain an attempt until the current canonical signature is calculated at submission; tests cover direct retry, canonical whitespace edits, body/file changes, post-success clearing, and no duplicate local timeline item. The focused correction plus IT attachment/comment regression selection passed (13 files, 96 tests, 1 skipped). `npm run lint:strict`, `npm run typecheck`, and `npm run architecture:check` passed; the architecture check covered 1,220 repository source files. The final integrated `npm run test` run passed **354/354 files**, with **3,449 tests passed and 1 skipped** (3,450 total; 228.60 seconds). This later clean run validates unchanged IT5A and closes its earlier verification debt as well as IT5B. The old failed run remains recorded above as historical evidence.
 
-No attachment Audit producer, comment edit/delete, business file deletion, object storage, or multi-host local-disk support was added. Committed attachment retention duration remains deferred to IT9; internal notes, resolved-ticket reply/reopen policy, formal retention, and future private object storage remain deferred.
+No attachment Audit producer, comment edit/delete, business file deletion, object storage, or multi-host local-disk support was added. Committed attachment retention duration remains deferred to IT9; resolved-ticket reply/reopen policy is now locked in Section 5. Internal notes, formal retention, and future private object storage remain deferred.
 
 ## 23. IT6 implementation — Ticket Notifications
 
@@ -622,7 +623,7 @@ Ticket creation accepts existing JSON requests without images and multipart requ
 
 For image-bearing create requests, the idempotency hash includes the canonical Ticket fields and ordered prepared image identity (original filename plus content SHA-256). Identical request/key replays the same Ticket without duplicate rows or files; changed text, type, or image identity conflicts. Validation and storage failures do not report success. MySQL integration verified transaction rollback and cleanup after attachment-row failure, no Ticket/file on invalid image, and no Ticket when storage fails. The existing bounded orphan cleanup remains unchanged. CREATED notification semantics and payload content are unchanged and contain no attachment data.
 
-Assignee remains nullable. The stored Ticket statuses and executable transition graph remain unchanged; this POC adds no transition into `CLOSED` or `CANCELLED` and does not change assignment, category, notification, metrics, LINE, Rich Menu, or authorization policy.
+Historical POC checkpoint: at that time, the stored Ticket statuses and executable transition graph were unchanged, and the POC added no transition into `CLOSED` or `CANCELLED`. That prototype boundary is superseded by the now-locked lifecycle in Section 5. Assignee remains nullable; this lifecycle approval does not change assignment, category, LINE, Rich Menu, or authorization policy.
 
 Focused repository verification passed **24 files / 232 tests**; after a test-fixture typing correction, the affected initial-image component test passed **1 file / 3 tests**. Focused real-MySQL verification passed **3 files / 38 tests** for attachment creation/replay/authorization/compensation, notifications, and the existing workflow; the migration was applied to the dedicated `employee_nhf_integration` database. `npx prisma generate`, `npx prisma validate`, `architecture:check` (1,278 source files), `lint:strict`, `typecheck`, `git diff --check`, and one `npm run build` passed; the build generated 99 static pages and included the Dashboard compatibility routes and LIFF Ticket pages. The repository-wide test suite was not run because the focused runtime and MySQL selections cover this POC's changed surfaces.
 
@@ -705,6 +706,8 @@ requester LIFF behavior, authorization, replay handling, and workflow.
 | `REQUESTER_COMMENTED` | Current assignee, or operator queue while unassigned | Yes | Yes | Yes |
 | `WAITING_REQUESTER` | Requester | Yes | Yes | Yes |
 | `RESOLVED` | Requester | Yes | Yes | Yes |
+
+Operator start/resume, cancellation, reopening, and closure do not create new notification intents. Requester-facing status notifications remain limited to the existing `WAITING_REQUESTER` and `RESOLVED` events; a pending waiting notification is revalidated against its source status generation before delivery.
 
 The Ticket mutation transaction persists `IT_TICKET_IN_APP`,
 `IT_TICKET_EMAIL`, and approved `IT_TICKET_LINE` intents with the source fact.

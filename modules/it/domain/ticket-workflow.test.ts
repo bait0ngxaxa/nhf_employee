@@ -1,7 +1,10 @@
 import type { ITTicketStatus } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
-import { isAllowedITTicketTransition } from "./ticket-workflow";
+import {
+    getAllowedITTicketTransitions,
+    isAllowedITTicketTransition,
+} from "./ticket-workflow";
 
 const STATUSES = [
     "OPEN",
@@ -12,20 +15,26 @@ const STATUSES = [
     "CANCELLED",
 ] as const satisfies readonly ITTicketStatus[];
 
-const APPROVED_TRANSITIONS = new Set([
-    "OPEN:IN_PROGRESS",
-    "IN_PROGRESS:WAITING_REQUESTER",
-    "WAITING_REQUESTER:IN_PROGRESS",
-    "IN_PROGRESS:RESOLVED",
-]);
+const APPROVED_TRANSITIONS: Readonly<Record<ITTicketStatus, readonly ITTicketStatus[]>> = {
+    OPEN: ["IN_PROGRESS", "CANCELLED"],
+    IN_PROGRESS: ["WAITING_REQUESTER", "RESOLVED", "CANCELLED"],
+    WAITING_REQUESTER: ["IN_PROGRESS", "CANCELLED"],
+    RESOLVED: ["IN_PROGRESS", "CLOSED"],
+    CLOSED: [],
+    CANCELLED: [],
+};
 
 describe("IT Ticket workflow", () => {
     it.each(STATUSES.flatMap((from) => STATUSES.map((to) => [from, to] as const)))(
         "%s → %s follows the approved transition table",
         (from, to) => {
-            expect(isAllowedITTicketTransition(from, to)).toBe(
-                APPROVED_TRANSITIONS.has(`${from}:${to}`),
-            );
+            const allowed = APPROVED_TRANSITIONS[from].includes(to);
+            expect(isAllowedITTicketTransition(from, to)).toBe(allowed);
+            expect(getAllowedITTicketTransitions(from).includes(to)).toBe(allowed);
         },
     );
+
+    it.each(STATUSES)("returns the exact operator actions for %s", (from) => {
+        expect(getAllowedITTicketTransitions(from)).toEqual(APPROVED_TRANSITIONS[from]);
+    });
 });

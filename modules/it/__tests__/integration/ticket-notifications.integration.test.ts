@@ -666,6 +666,47 @@ describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
         expect(inbox[0]?.message).not.toContain("รายละเอียดส่วนตัว");
     });
 
+    it("does not notify cancellation and supersedes a pending waiting delivery", async () => {
+        const fixture = await createTicketFixture("cancel-status");
+        const operator = await createOperator(fixture, "cancel-status-operator");
+        const created = await createTicket(fixture.requester, "cancel-status");
+        const started = await transitionITTicketStatus(operator.context, {
+            ticketId: created.ticket.id,
+            expectedVersion: created.ticket.version,
+            targetStatus: "IN_PROGRESS",
+        });
+        const waiting = await transitionITTicketStatus(operator.context, {
+            ticketId: started.ticket.id,
+            expectedVersion: started.ticket.version,
+            targetStatus: "WAITING_REQUESTER",
+        });
+        const waitingRow = (await getOutboxRows(created.ticket.id))
+            .find(({ payload }) => payload.event === "WAITING_REQUESTER");
+        const waitingLineRow = (await getLineOutboxRows(created.ticket.id))
+            .find(({ payload }) => payload.event === "WAITING_REQUESTER");
+
+        const cancelled = await transitionITTicketStatus(operator.context, {
+            ticketId: waiting.ticket.id,
+            expectedVersion: waiting.ticket.version,
+            targetStatus: "CANCELLED",
+        });
+        expect(cancelled.ticket.status).toBe("CANCELLED");
+        expect((await getOutboxRows(created.ticket.id))
+            .filter(({ payload }) => payload.event !== "CREATED")
+            .map(({ payload }) => payload.event)).toEqual(["WAITING_REQUESTER"]);
+        expect((await getLineOutboxRows(created.ticket.id))
+            .filter(({ payload }) => payload.event !== "CREATED")
+            .map(({ payload }) => payload.event)).toEqual(["WAITING_REQUESTER"]);
+
+        await expect(dispatchITTicketNotificationOutbox(
+            waitingRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SUPERSEDED");
+        await expect(dispatchITTicketNotificationOutbox(
+            waitingLineRow?.row ?? failMissingOutboxRow(),
+        )).resolves.toBe("SUPERSEDED");
+        expect(lineTransport.send).not.toHaveBeenCalled();
+    });
+
     it("deduplicates Inbox retries, routes queue actions, and suppresses stale or ineligible operators", async () => {
         const fixture = await createTicketFixture("dispatch-revalidation");
         const operatorA = await createOperator(fixture, "dispatch-a");

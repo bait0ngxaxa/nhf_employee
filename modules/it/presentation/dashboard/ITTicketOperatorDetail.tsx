@@ -47,10 +47,23 @@ type ReferenceState =
 type MutationReviewReason = "CONCURRENT_CHANGE" | "AMBIGUOUS_RESULT";
 
 const STATUS_ACTION_LABELS: Readonly<Partial<Record<ITTicketStatus, string>>> = {
-    IN_PROGRESS: "เริ่มดำเนินการ",
     WAITING_REQUESTER: "รอข้อมูลจากผู้แจ้ง",
     RESOLVED: "ทำเครื่องหมายว่าแก้ไขแล้ว",
+    CLOSED: "ปิดงาน",
+    CANCELLED: "ยกเลิก",
 };
+
+function getStatusActionLabel(
+    currentStatus: ITTicketStatus,
+    targetStatus: ITTicketStatus,
+): string {
+    if (targetStatus === "IN_PROGRESS") {
+        if (currentStatus === "RESOLVED") return "เปิดงานอีกครั้ง";
+        if (currentStatus === "WAITING_REQUESTER") return "กลับมาดำเนินการ";
+        return "เริ่มดำเนินการ";
+    }
+    return STATUS_ACTION_LABELS[targetStatus] ?? IT_TICKET_STATUS_LABELS[targetStatus];
+}
 
 function TicketStatus({ status }: { readonly status: ITTicketStatus }): ReactElement {
     return (
@@ -238,6 +251,9 @@ export function ITTicketOperatorDetail({
         : ticket?.category ? String(ticket.category.id) : "";
     const canManage = capabilities.canManageTickets && !mutationAccessDenied;
     const actionsDisabled = busy || loading || mutationReviewReason !== null || !ticket;
+    const allowedTransitions = ticket
+        ? getAllowedITTicketTransitions(ticket.status)
+        : [];
 
     const handleAssignment = (): void => {
         if (!ticket) return;
@@ -508,17 +524,17 @@ export function ITTicketOperatorDetail({
                                         </p>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        {getAllowedITTicketTransitions(ticket.status).map((targetStatus) => (
+                                        {allowedTransitions.map((targetStatus) => (
                                             <Button
                                                 key={targetStatus}
                                                 type="button"
                                                 disabled={actionsDisabled}
                                                 onClick={() => handleTransition(targetStatus)}
                                             >
-                                                {STATUS_ACTION_LABELS[targetStatus] ?? IT_TICKET_STATUS_LABELS[targetStatus]}
+                                                {getStatusActionLabel(ticket.status, targetStatus)}
                                             </Button>
                                         ))}
-                                        {getAllowedITTicketTransitions(ticket.status).length === 0 ? (
+                                        {allowedTransitions.length === 0 ? (
                                             <p className="text-sm text-content-muted">ไม่มีการเปลี่ยนสถานะที่อนุมัติสำหรับสถานะนี้</p>
                                         ) : null}
                                     </div>

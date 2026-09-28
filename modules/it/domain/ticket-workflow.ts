@@ -1,34 +1,30 @@
 import type { ITTicketStatus } from "@prisma/client";
 
-/** The only status transitions approved for the IT2 workflow. */
+const ALLOWED_TRANSITIONS: Readonly<Record<ITTicketStatus, readonly ITTicketStatus[]>> =
+    Object.freeze({
+        OPEN: Object.freeze(["IN_PROGRESS", "CANCELLED"] as const),
+        IN_PROGRESS: Object.freeze([
+            "WAITING_REQUESTER",
+            "RESOLVED",
+            "CANCELLED",
+        ] as const),
+        WAITING_REQUESTER: Object.freeze(["IN_PROGRESS", "CANCELLED"] as const),
+        RESOLVED: Object.freeze(["IN_PROGRESS", "CLOSED"] as const),
+        CLOSED: Object.freeze([]),
+        CANCELLED: Object.freeze([]),
+    });
+
+/** The sole state-transition definition for the approved IT Ticket lifecycle. */
 export function isAllowedITTicketTransition(
     from: ITTicketStatus,
     to: ITTicketStatus,
 ): boolean {
-    switch (from) {
-        case "OPEN":
-            return to === "IN_PROGRESS";
-        case "IN_PROGRESS":
-            return to === "WAITING_REQUESTER" || to === "RESOLVED";
-        case "WAITING_REQUESTER":
-            return to === "IN_PROGRESS";
-        case "RESOLVED":
-        case "CLOSED":
-        case "CANCELLED":
-            return false;
-    }
+    return ALLOWED_TRANSITIONS[from].includes(to);
 }
 
 /** Returns only approved operator destinations for the current status. */
 export function getAllowedITTicketTransitions(
     from: ITTicketStatus,
 ): readonly ITTicketStatus[] {
-    const operatorTargets: readonly ITTicketStatus[] = [
-        "IN_PROGRESS",
-        "WAITING_REQUESTER",
-        "RESOLVED",
-    ];
-    return operatorTargets.filter((target) =>
-        isAllowedITTicketTransition(from, target),
-    );
+    return ALLOWED_TRANSITIONS[from];
 }

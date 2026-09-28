@@ -198,6 +198,46 @@ describe("IT operator queue presentation", () => {
 });
 
 describe("IT operator Ticket detail presentation", () => {
+    it.each([
+        ["OPEN", ["เริ่มดำเนินการ", "ยกเลิก"]],
+        ["IN_PROGRESS", ["รอข้อมูลจากผู้แจ้ง", "ทำเครื่องหมายว่าแก้ไขแล้ว", "ยกเลิก"]],
+        ["WAITING_REQUESTER", ["กลับมาดำเนินการ", "ยกเลิก"]],
+        ["RESOLVED", ["เปิดงานอีกครั้ง", "ปิดงาน"]],
+        ["CLOSED", []],
+        ["CANCELLED", []],
+    ] as const)(
+        "shows only canonical lifecycle actions for %s",
+        async (status, expectedActions) => {
+            fetchMock.mockImplementation(async (input) => {
+                if (String(input).includes("/reference")) return referenceResponse();
+                if (String(input).includes("/timeline")) return timelineResponse();
+                return detailResponse({ ...ticket, status });
+            });
+
+            render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+            expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
+            const actionLabels = [
+                "เริ่มดำเนินการ",
+                "รอข้อมูลจากผู้แจ้ง",
+                "ทำเครื่องหมายว่าแก้ไขแล้ว",
+                "ยกเลิก",
+                "กลับมาดำเนินการ",
+                "เปิดงานอีกครั้ง",
+                "ปิดงาน",
+            ];
+            const expectedActionSet = new Set<string>(expectedActions);
+            for (const label of actionLabels) {
+                if (expectedActionSet.has(label)) {
+                    expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+                } else {
+                    expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
+                }
+            }
+            expect(screen.queryByRole("combobox", { name: "สถานะ" })).not.toBeInTheDocument();
+        },
+    );
+
     it("shows initial requester evidence in the operator Ticket detail", async () => {
         const attachment: ITTicketAttachmentSummary = {
             id: "b".repeat(32),

@@ -468,7 +468,9 @@ export async function transitionITTicketStatus(
                 status: command.targetStatus,
                 ...(command.targetStatus === "RESOLVED"
                     ? { resolvedAt: occurredAt }
-                    : {}),
+                    : ticket.status === "RESOLVED" && command.targetStatus === "IN_PROGRESS"
+                        ? { resolvedAt: null }
+                        : {}),
             },
             {
                 kind: "STATUS_CHANGED",
