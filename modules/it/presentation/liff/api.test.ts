@@ -15,6 +15,8 @@ vi.mock("@/lib/client/api-client", () => ({
 import {
     fetchLiffITAttachment,
     fetchLiffITTicket,
+    fetchLiffITTicketActivity,
+    fetchLiffITTicketConversation,
     fetchLiffITTickets,
     createLiffITTicket,
     postLiffITTicketComment,
@@ -120,6 +122,28 @@ describe("IT requester LIFF API adapter", () => {
             position: 0,
         }]);
         expect(JSON.stringify(detail)).not.toMatch(/storageKey|uploaderUserId/);
+    });
+
+    it("uses independent LIFF Conversation and Activity routes with source-specific cursors", async () => {
+        apiGetMock
+            .mockResolvedValueOnce(success({ success: true, items: [], olderCursor: null, hasMore: false }))
+            .mockResolvedValueOnce(success({ success: true, items: [], olderCursor: null, hasMore: false }));
+
+        await expect(fetchLiffITTicketConversation(42, { cursor: "comment-cursor" }))
+            .resolves.toMatchObject({ items: [], hasMore: false });
+        await expect(fetchLiffITTicketActivity(42, { cursor: "event-cursor" }))
+            .resolves.toMatchObject({ items: [], hasMore: false });
+
+        expect(apiGetMock).toHaveBeenNthCalledWith(
+            1,
+            `${API_ROUTES.line.itTicketConversationById(42)}?limit=25&cursor=comment-cursor`,
+            expect.objectContaining({ retryCount: 0, skipAuthRefresh: true }),
+        );
+        expect(apiGetMock).toHaveBeenNthCalledWith(
+            2,
+            `${API_ROUTES.line.itTicketActivityById(42)}?limit=25&cursor=event-cursor`,
+            expect.objectContaining({ retryCount: 0, skipAuthRefresh: true }),
+        );
     });
 
     it("keeps a recovered Ticket creation mutation from automatic replay", async () => {

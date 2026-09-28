@@ -1,11 +1,12 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
     fetchTickets: vi.fn(),
     fetchTicket: vi.fn(),
     createTicket: vi.fn(),
-    fetchTimeline: vi.fn(),
+    fetchConversation: vi.fn(),
+    fetchActivity: vi.fn(),
     postComment: vi.fn(),
     fetchAttachment: vi.fn(),
 }));
@@ -14,7 +15,8 @@ vi.mock("./api", () => ({
     fetchLiffITTickets: mocks.fetchTickets,
     fetchLiffITTicket: mocks.fetchTicket,
     createLiffITTicket: mocks.createTicket,
-    fetchLiffITTicketTimeline: mocks.fetchTimeline,
+    fetchLiffITTicketConversation: mocks.fetchConversation,
+    fetchLiffITTicketActivity: mocks.fetchActivity,
     postLiffITTicketComment: mocks.postComment,
     fetchLiffITAttachment: mocks.fetchAttachment,
 }));
@@ -100,7 +102,8 @@ describe("LiffITApp requester experience", () => {
         mocks.fetchTickets.mockResolvedValue(LIST);
         mocks.fetchTicket.mockResolvedValue(TICKET_DETAIL);
         mocks.createTicket.mockResolvedValue(TICKET);
-        mocks.fetchTimeline.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+        mocks.fetchConversation.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+        mocks.fetchActivity.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
         mocks.postComment.mockResolvedValue(undefined);
         mocks.fetchAttachment.mockResolvedValue(new Blob(["image"], { type: "image/webp" }));
         objectUrlSequence = 0;
@@ -318,9 +321,20 @@ describe("LiffITApp requester experience", () => {
 
     it("loads requester detail and conversation, keeps WAITING_REQUESTER unchanged after a reply", async () => {
         mocks.fetchTicket.mockResolvedValue(TICKET_DETAIL);
-        mocks.fetchTimeline.mockResolvedValue({
+        mocks.fetchActivity.mockResolvedValue({
             items: [{
-                type: "COMMENT",
+                type: "STATUS_CHANGED",
+                id: 8,
+                occurredAt: "2026-09-25T03:00:00.000Z",
+                actorDisplayName: "เจ้าหน้าที่ภายใน",
+                fromStatus: "OPEN",
+                toStatus: "IN_PROGRESS",
+            }],
+            olderCursor: null,
+            hasMore: false,
+        });
+        mocks.fetchConversation.mockResolvedValue({
+            items: [{
                 id: "operator-note",
                 createdAt: "2026-09-25T04:00:00.000Z",
                 authorDisplayName: "เจ้าหน้าที่",
@@ -333,7 +347,6 @@ describe("LiffITApp requester experience", () => {
         });
         mocks.postComment.mockResolvedValue({
             comment: {
-                type: "COMMENT",
                 id: "requester-note",
                 createdAt: "2026-09-26T04:00:00.000Z",
                 authorDisplayName: "พนักงาน",
@@ -355,6 +368,15 @@ describe("LiffITApp requester experience", () => {
         expect(await screen.findByText("ขอรายละเอียดเพิ่มเติม")).toBeInTheDocument();
         expect(screen.getByText("เจ้าหน้าที่ IT")).toBeInTheDocument();
         expect(screen.getByText("ขอรายละเอียดเพิ่มเติม")).toBeInTheDocument();
+        const conversation = screen.getByRole("list", { name: "ข้อความในการสนทนา" });
+        expect(within(conversation).queryByText("เริ่มดำเนินการ")).not.toBeInTheDocument();
+        const activityDisclosure = screen.getByText("ประวัติการดำเนินการ");
+        expect(activityDisclosure.closest("details")).not.toHaveAttribute("open");
+        fireEvent.click(activityDisclosure);
+        const activity = await screen.findByRole("list", {
+            name: "ประวัติการดำเนินการ Ticket #42",
+        });
+        expect(within(activity).getByText("เริ่มดำเนินการ")).toBeInTheDocument();
         expect(screen.getByText("การตอบกลับของคุณจะไม่เปลี่ยนสถานะ Ticket โดยอัตโนมัติ")).toBeInTheDocument();
 
         fireEvent.change(screen.getByRole("textbox", { name: "ตอบกลับ" }), {

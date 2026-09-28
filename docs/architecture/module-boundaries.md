@@ -16,7 +16,8 @@ K1 closed the three Stock findings. IT1 established the `modules/it` server
 authorization foundation, IT2 added IT-owned Ticket persistence and domain
 commands, IT3 added requester-only Ticket API and Dashboard presentation, IT4
 added the separate read-ALL operator queue/API and processing surface, IT5A
-added shared conversation and a bounded merged timeline, IT5B added
+added shared Conversation and its original bounded merged timeline
+(superseded by the current Conversation/Activity separation), IT5B added
 comment-owned private image attachments, IT6 implements in-app Ticket
 notifications, and IT7 adds an aggregate-only analytics query and Dashboard.
 IT8 moved the existing structured Email Request subdomain into IT and is
@@ -172,8 +173,10 @@ pipeline and a nullable attachment `commentId`; comment attachments and their
 read authorization retain the existing contract.
 
 IT5A adds immutable comments, actor-side classification, comment idempotency,
-`firstRespondedAt`, and a bounded merged timeline in the IT application and
-persistence layers. IT5B adds comment-owned immutable image metadata, bounded
+and `firstRespondedAt`. Its original merged query was later replaced by
+independent comment-only Conversation (`ITTicketComment`, `(createdAt, id)`)
+and event-only Activity (`ITTicketEvent`, `(occurredAt, id)`) reads. AuditLog
+remains a separate security/accountability history. IT5B adds comment-owned immutable image metadata, bounded
 multipart handling, private local storage, current-read-authorized download,
 orphan cleanup, attachment-aware idempotency and Dashboard previews. Requester
 conversation paths always include the authenticated requester predicate;
@@ -210,7 +213,7 @@ live authorization model.
 
 IT9A adds requester-only `/api/line/it/**` adapters that authenticate through
 `requireLiffWorkforceSession()` and reuse the same IT commands, requester
-queries, timeline, comment/attachment, and download operations. Its IT-owned
+Conversation/Activity queries, comment/attachment, and download operations. Its IT-owned
 channel policy clamps effective LIFF read/create/comment authority to OWN for
 USER and ADMIN even when configured authority is ALL; configured decision
 evidence remains distinct, Dashboard configured ALL remains unchanged, and

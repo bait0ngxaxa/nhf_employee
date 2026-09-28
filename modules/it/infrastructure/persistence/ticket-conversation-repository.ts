@@ -41,7 +41,7 @@ export type ITTicketCommentRecord = Prisma.ITTicketCommentGetPayload<{
     select: typeof IT_TICKET_COMMENT_SELECT;
 }>;
 
-export const IT_TICKET_EVENT_TIMELINE_SELECT = {
+export const IT_TICKET_ACTIVITY_EVENT_SELECT = {
     id: true,
     kind: true,
     fromStatus: true,
@@ -75,11 +75,11 @@ export const IT_TICKET_EVENT_TIMELINE_SELECT = {
     toCategory: { select: { name: true } },
 } satisfies Prisma.ITTicketEventSelect;
 
-export type ITTicketEventTimelineRecord = Prisma.ITTicketEventGetPayload<{
-    select: typeof IT_TICKET_EVENT_TIMELINE_SELECT;
+export type ITTicketActivityEventRecord = Prisma.ITTicketEventGetPayload<{
+    select: typeof IT_TICKET_ACTIVITY_EVENT_SELECT;
 }>;
 
-export interface ITTicketConversationState {
+export interface ITTicketReadState {
     readonly id: number;
     readonly requesterUserId: number;
     readonly assignedToUserId: number | null;
@@ -87,11 +87,11 @@ export interface ITTicketConversationState {
     readonly firstRespondedAt: Date | null;
 }
 
-export async function findRequesterITTicketConversationState(
+export async function findRequesterITTicketReadState(
     tx: ITTicketConversationPersistenceContext,
     ticketId: number,
     requesterUserId: number,
-): Promise<ITTicketConversationState | null> {
+): Promise<ITTicketReadState | null> {
     return tx.iTTicket.findFirst({
         where: { id: ticketId, requesterUserId },
         select: {
@@ -104,10 +104,10 @@ export async function findRequesterITTicketConversationState(
     });
 }
 
-export async function findOperatorITTicketConversationState(
+export async function findOperatorITTicketReadState(
     tx: ITTicketConversationPersistenceContext,
     ticketId: number,
-): Promise<ITTicketConversationState | null> {
+): Promise<ITTicketReadState | null> {
     return tx.iTTicket.findUnique({
         where: { id: ticketId },
         select: {
@@ -175,7 +175,7 @@ export async function claimITTicketFirstResponse(
     });
 }
 
-export async function findITTicketTimelineComments(
+export async function findITTicketConversationComments(
     tx: ITTicketConversationPersistenceContext,
     where: Prisma.ITTicketCommentWhereInput,
     take: number,
@@ -188,14 +188,14 @@ export async function findITTicketTimelineComments(
     });
 }
 
-export async function findITTicketTimelineEvents(
+export async function findITTicketActivityEvents(
     tx: ITTicketConversationPersistenceContext,
     where: Prisma.ITTicketEventWhereInput,
     take: number,
-): Promise<ITTicketEventTimelineRecord[]> {
+): Promise<ITTicketActivityEventRecord[]> {
     return tx.iTTicketEvent.findMany({
         where,
-        select: IT_TICKET_EVENT_TIMELINE_SELECT,
+        select: IT_TICKET_ACTIVITY_EVENT_SELECT,
         orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
         take,
     });

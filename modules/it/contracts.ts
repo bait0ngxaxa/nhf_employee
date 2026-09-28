@@ -8,8 +8,10 @@ export const IT_TICKET_TITLE_MAX_LENGTH = 200;
 export const IT_TICKET_DESCRIPTION_MAX_LENGTH = 10_000;
 /** Technical safety bound pending an IT-specific product maximum. */
 export const IT_TICKET_COMMENT_MAX_LENGTH = IT_TICKET_DESCRIPTION_MAX_LENGTH;
-export const IT_TICKET_TIMELINE_DEFAULT_LIMIT = 25;
-export const IT_TICKET_TIMELINE_MAX_LIMIT = 100;
+export const IT_TICKET_CONVERSATION_DEFAULT_LIMIT = 25;
+export const IT_TICKET_CONVERSATION_MAX_LIMIT = 100;
+export const IT_TICKET_ACTIVITY_DEFAULT_LIMIT = 25;
+export const IT_TICKET_ACTIVITY_MAX_LIMIT = 100;
 export const IT_TICKET_COMMENTABLE_STATUSES = Object.freeze([
     "OPEN",
     "IN_PROGRESS",
@@ -179,8 +181,7 @@ export interface ITOperatorTicketMutationSnapshot {
     readonly updatedAt: string;
 }
 
-export interface ITTicketTimelineComment {
-    readonly type: "COMMENT";
+export interface ITTicketConversationItem {
     readonly id: string;
     readonly createdAt: string;
     readonly authorDisplayName: string;
@@ -199,17 +200,17 @@ export interface ITTicketAttachmentSummary {
     readonly position: number;
 }
 
-export type ITTicketTimelineEvent =
+export type ITTicketActivityItem =
     | {
         readonly type: "CREATED";
         readonly id: number;
-        readonly createdAt: string;
+        readonly occurredAt: string;
         readonly actorDisplayName: string;
     }
     | {
         readonly type: "ASSIGNED" | "UNASSIGNED";
         readonly id: number;
-        readonly createdAt: string;
+        readonly occurredAt: string;
         readonly actorDisplayName: string;
         readonly fromAssigneeDisplayName: string | null;
         readonly toAssigneeDisplayName: string | null;
@@ -217,7 +218,7 @@ export type ITTicketTimelineEvent =
     | {
         readonly type: "STATUS_CHANGED";
         readonly id: number;
-        readonly createdAt: string;
+        readonly occurredAt: string;
         readonly actorDisplayName: string;
         readonly fromStatus: ITTicketStatus | null;
         readonly toStatus: ITTicketStatus | null;
@@ -225,23 +226,28 @@ export type ITTicketTimelineEvent =
     | {
         readonly type: "CATEGORY_CHANGED";
         readonly id: number;
-        readonly createdAt: string;
+        readonly occurredAt: string;
         readonly actorDisplayName: string;
         readonly fromCategoryName: string | null;
         readonly toCategoryName: string | null;
     };
 
-export type ITTicketTimelineItem = ITTicketTimelineComment | ITTicketTimelineEvent;
+export interface ITTicketConversationPage {
+    /** Chronological order; the first page contains the latest bounded comment slice. */
+    readonly items: readonly ITTicketConversationItem[];
+    readonly olderCursor: string | null;
+    readonly hasMore: boolean;
+}
 
-export interface ITTicketTimelinePage {
-    /** Chronological order; the first page contains the latest bounded slice. */
-    readonly items: readonly ITTicketTimelineItem[];
+export interface ITTicketActivityPage {
+    /** Chronological order; the first page contains the latest bounded event slice. */
+    readonly items: readonly ITTicketActivityItem[];
     readonly olderCursor: string | null;
     readonly hasMore: boolean;
 }
 
 export interface ITTicketCommentSubmission {
-    readonly comment: ITTicketTimelineComment;
+    readonly comment: ITTicketConversationItem;
     readonly replayed: boolean;
 }
 

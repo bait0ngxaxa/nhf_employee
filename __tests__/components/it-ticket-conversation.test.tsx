@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ITTicketConversation } from "@/modules/it/client";
 
 const ticketId = 19;
-const emptyTimeline = {
+const emptyConversation = {
     success: true,
     items: [],
     olderCursor: null,
@@ -82,7 +82,7 @@ afterEach(() => {
 function setupFetch(post: (init: RequestInit) => Promise<Response>) {
     const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
         if (init?.method === "POST") return post(init);
-        return jsonResponse(emptyTimeline);
+        return jsonResponse(emptyConversation);
     });
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("crypto", webcrypto);
@@ -210,7 +210,7 @@ describe("IT Ticket conversation attachment UI", () => {
         expect(await screen.findByRole("alert")).toHaveTextContent("สูงสุด 3");
     });
 
-    it("reuses the same key for a direct retry and renders only one local timeline comment", async () => {
+    it("reuses the same key for a direct retry and renders only one local Conversation comment", async () => {
         const keys: string[] = [];
         let postCount = 0;
         setupFetch(async (init) => {

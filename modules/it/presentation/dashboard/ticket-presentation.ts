@@ -4,8 +4,10 @@ import {
     IT_TICKET_TYPE_LABELS,
     type ITTicketCommentSubmission,
     type ITTicketAttachmentSummary,
-    type ITTicketTimelineItem,
-    type ITTicketTimelinePage,
+    type ITTicketActivityItem,
+    type ITTicketActivityPage,
+    type ITTicketConversationItem,
+    type ITTicketConversationPage,
     type ITAssignableOperator,
     type ITOperatorReferenceData,
     type ITOperatorTicket,
@@ -26,6 +28,11 @@ export const IT_TICKET_STATUS_STYLES: Readonly<Record<ITTicketStatus, string>> =
     CLOSED: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
     CANCELLED: "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200",
 };
+
+const IT_TICKET_ACTIVITY_DATE_FORMATTER = new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "medium",
+    timeZone: "Asia/Bangkok",
+});
 
 export function isITTicketResponseRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -371,6 +378,30 @@ export function formatITTicketDate(value: string): string {
     }).format(date);
 }
 
+export function formatITTicketActivityTime(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
+    return new Intl.DateTimeFormat("th-TH", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+        timeZone: "Asia/Bangkok",
+    }).format(date);
+}
+
+export function formatITTicketActivityTimestamp(value: string, ticketCreatedAt: string): string {
+    const activityDate = new Date(value);
+    if (Number.isNaN(activityDate.getTime())) return "ไม่ระบุ";
+    const time = formatITTicketActivityTime(value);
+    const activityDay = IT_TICKET_ACTIVITY_DATE_FORMATTER.format(activityDate);
+    const receivedDate = new Date(ticketCreatedAt);
+    if (!Number.isNaN(receivedDate.getTime())
+        && activityDay === IT_TICKET_ACTIVITY_DATE_FORMATTER.format(receivedDate)) {
+        return time;
+    }
+    return `${activityDay} · ${time}`;
+}
+
 function isISODateTime(value: unknown): value is string {
     return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
@@ -383,44 +414,45 @@ function isNullableDisplayName(value: unknown): value is string | null {
     return value === null || typeof value === "string";
 }
 
-export function parseITTicketTimelineItem(value: unknown): ITTicketTimelineItem | null {
+export function parseITTicketConversationItem(value: unknown): ITTicketConversationItem | null {
     if (!isITTicketResponseRecord(value)
-        || !isISODateTime(value.createdAt)) {
+        || typeof value.id !== "string"
+        || value.id.length < 1
+        || value.id.length > 30
+        || !isISODateTime(value.createdAt)
+        || typeof value.authorDisplayName !== "string"
+        || (value.authorSide !== "REQUESTER" && value.authorSide !== "OPERATOR")
+        || typeof value.body !== "string"
+        || !Array.isArray(value.attachments)
+        || value.attachments.length > 3) {
         return null;
     }
+    const attachments = value.attachments.map(parseITTicketAttachmentSummary);
+    if (attachments.some((attachment, index) =>
+        attachment === null || attachment.position !== index,
+    )) return null;
+    return {
+        id: value.id,
+        createdAt: value.createdAt,
+        authorDisplayName: value.authorDisplayName,
+        authorSide: value.authorSide,
+        body: value.body,
+        attachments: attachments.filter(
+            (attachment): attachment is ITTicketAttachmentSummary => attachment !== null,
+        ),
+    };
+}
 
-    if (value.type === "COMMENT") {
-        if (typeof value.id !== "string"
-            || typeof value.authorDisplayName !== "string"
-            || (value.authorSide !== "REQUESTER" && value.authorSide !== "OPERATOR")
-            || typeof value.body !== "string"
-            || !Array.isArray(value.attachments)
-            || value.attachments.length > 3) {
-            return null;
-        }
-        const attachments = value.attachments.map(parseITTicketAttachmentSummary);
-        if (attachments.some((attachment, index) =>
-            attachment === null || attachment.position !== index,
-        )) return null;
-        return {
-            type: "COMMENT",
-            id: value.id,
-            createdAt: value.createdAt,
-            authorDisplayName: value.authorDisplayName,
-            authorSide: value.authorSide,
-            body: value.body,
-            attachments: attachments.filter(
-                (attachment): attachment is ITTicketAttachmentSummary => attachment !== null,
-            ),
-        };
-    }
-
-    if (!isPositiveSafeInteger(value.id) || typeof value.actorDisplayName !== "string") {
+export function parseITTicketActivityItem(value: unknown): ITTicketActivityItem | null {
+    if (!isITTicketResponseRecord(value)
+        || !isISODateTime(value.occurredAt)
+        || !isPositiveSafeInteger(value.id)
+        || typeof value.actorDisplayName !== "string") {
         return null;
     }
     const base = {
         id: value.id,
-        createdAt: value.createdAt,
+        occurredAt: value.occurredAt,
         actorDisplayName: value.actorDisplayName,
     };
 
@@ -464,6 +496,69 @@ export function parseITTicketTimelineItem(value: unknown): ITTicketTimelineItem 
     return null;
 }
 
+export function describeITTicketActivityItem(
+    item: ITTicketActivityItem,
+    audience: "DASHBOARD" | "LIFF",
+): string {
+    let description: string;
+    switch (item.type) {
+        case "CREATED":
+            description = "รับเรื่องแล้ว";
+            break;
+        case "ASSIGNED":
+            description = audience === "LIFF"
+                ? "อัปเดตการรับเรื่อง"
+                : item.toAssigneeDisplayName === null
+                    ? item.fromAssigneeDisplayName === null
+                        ? "นำผู้รับผิดชอบออก"
+                        : `นำ ${item.fromAssigneeDisplayName} ออกจากผู้รับผิดชอบ`
+                    : `มอบหมายให้ ${item.toAssigneeDisplayName}`;
+            break;
+        case "UNASSIGNED":
+            description = audience === "LIFF"
+                ? "อัปเดตการรับเรื่อง"
+                : item.fromAssigneeDisplayName === null
+                    ? "นำผู้รับผิดชอบออก"
+                    : `นำ ${item.fromAssigneeDisplayName} ออกจากผู้รับผิดชอบ`;
+            break;
+        case "STATUS_CHANGED":
+            if (item.fromStatus === "RESOLVED" && item.toStatus === "IN_PROGRESS") {
+                description = "เปิดงานอีกครั้ง";
+            } else if (item.toStatus === "IN_PROGRESS" && item.fromStatus === "WAITING_REQUESTER") {
+                description = "กลับมาดำเนินการ";
+            } else if (item.toStatus === "IN_PROGRESS" && item.fromStatus === "OPEN") {
+                description = "เริ่มดำเนินการ";
+            } else if (item.toStatus === "WAITING_REQUESTER") {
+                description = `เปลี่ยนเป็น ${IT_TICKET_STATUS_LABELS.WAITING_REQUESTER}`;
+            } else if (item.toStatus === "RESOLVED") {
+                description = "ทำเครื่องหมายว่าแก้ไขแล้ว";
+            } else if (item.toStatus === "CLOSED") {
+                description = "ปิดงาน";
+            } else if (item.toStatus === "CANCELLED") {
+                description = "ยกเลิก";
+            } else if (item.toStatus !== null) {
+                description = `เปลี่ยนเป็น ${IT_TICKET_STATUS_LABELS[item.toStatus]}`;
+            } else {
+                description = "อัปเดตสถานะ Ticket";
+            }
+            break;
+        case "CATEGORY_CHANGED":
+            description = audience === "LIFF"
+                ? "ปรับข้อมูลการจัดหมวดหมู่"
+                : `เปลี่ยนหมวดหมู่จาก ${item.fromCategoryName ?? "ไม่จัดหมวดหมู่"} เป็น ${item.toCategoryName ?? "ไม่จัดหมวดหมู่"}`;
+            break;
+    }
+    return description;
+}
+
+export function describeITTicketActivityActor(
+    item: ITTicketActivityItem,
+    audience: "DASHBOARD" | "LIFF",
+): string {
+    if (audience === "DASHBOARD") return item.actorDisplayName;
+    return item.type === "CREATED" ? "คุณ" : "เจ้าหน้าที่ IT";
+}
+
 function parseITTicketAttachmentSummary(value: unknown): ITTicketAttachmentSummary | null {
     if (!isITTicketResponseRecord(value)
         || typeof value.id !== "string"
@@ -501,7 +596,7 @@ function parseITTicketAttachmentSummary(value: unknown): ITTicketAttachmentSumma
     };
 }
 
-export function parseITTicketTimelinePage(value: unknown): ITTicketTimelinePage | null {
+export function parseITTicketConversationPage(value: unknown): ITTicketConversationPage | null {
     if (!isITTicketResponseRecord(value)
         || value.success !== true
         || !Array.isArray(value.items)
@@ -510,10 +605,28 @@ export function parseITTicketTimelinePage(value: unknown): ITTicketTimelinePage 
         || (value.hasMore && typeof value.olderCursor !== "string")) {
         return null;
     }
-    const items = value.items.map(parseITTicketTimelineItem);
+    const items = value.items.map(parseITTicketConversationItem);
     if (items.some((item) => item === null)) return null;
     return {
-        items: items.filter((item): item is ITTicketTimelineItem => item !== null),
+        items: items.filter((item): item is ITTicketConversationItem => item !== null),
+        olderCursor: value.olderCursor,
+        hasMore: value.hasMore,
+    };
+}
+
+export function parseITTicketActivityPage(value: unknown): ITTicketActivityPage | null {
+    if (!isITTicketResponseRecord(value)
+        || value.success !== true
+        || !Array.isArray(value.items)
+        || (value.olderCursor !== null && typeof value.olderCursor !== "string")
+        || typeof value.hasMore !== "boolean"
+        || (value.hasMore && typeof value.olderCursor !== "string")) {
+        return null;
+    }
+    const items = value.items.map(parseITTicketActivityItem);
+    if (items.some((item) => item === null)) return null;
+    return {
+        items: items.filter((item): item is ITTicketActivityItem => item !== null),
         olderCursor: value.olderCursor,
         hasMore: value.hasMore,
     };
@@ -525,34 +638,37 @@ export function parseITTicketCommentSubmission(value: unknown): ITTicketCommentS
         || typeof value.replayed !== "boolean") {
         return null;
     }
-    const comment = parseITTicketTimelineItem(value.comment);
-    if (comment === null || comment.type !== "COMMENT") return null;
+    const comment = parseITTicketConversationItem(value.comment);
+    if (comment === null) return null;
     return { comment, replayed: value.replayed };
 }
 
-export function mergeITTicketTimelineItems(
-    ...groups: readonly (readonly ITTicketTimelineItem[])[]
-): ITTicketTimelineItem[] {
-    const unique = new Map<string, ITTicketTimelineItem>();
+export function mergeITTicketConversationItems(
+    ...groups: readonly (readonly ITTicketConversationItem[])[]
+): ITTicketConversationItem[] {
+    const unique = new Map<string, ITTicketConversationItem>();
     for (const item of groups.flat()) {
-        unique.set(`${item.type}:${item.id}`, item);
+        unique.set(item.id, item);
     }
     return [...unique.values()].sort((left, right) => {
         const timeDifference = Date.parse(left.createdAt) - Date.parse(right.createdAt);
         if (timeDifference !== 0) return timeDifference;
-        const leftIsEvent = left.type !== "COMMENT";
-        const rightIsEvent = right.type !== "COMMENT";
-        if (leftIsEvent !== rightIsEvent) return leftIsEvent ? -1 : 1;
-        if (typeof left.id === "number" && typeof right.id === "number") {
-            return left.id - right.id;
-        }
-        const leftId = String(left.id);
-        const rightId = String(right.id);
-        return leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+        return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
     });
 }
 
-export function readITTicketConversationError(
+export function mergeITTicketActivityItems(
+    ...groups: readonly (readonly ITTicketActivityItem[])[]
+): ITTicketActivityItem[] {
+    const unique = new Map<number, ITTicketActivityItem>();
+    for (const item of groups.flat()) unique.set(item.id, item);
+    return [...unique.values()].sort((left, right) => {
+        const timeDifference = Date.parse(left.occurredAt) - Date.parse(right.occurredAt);
+        return timeDifference !== 0 ? timeDifference : left.id - right.id;
+    });
+}
+
+export function readITTicketReadError(
     payload: unknown,
     status: number,
     operator: boolean,

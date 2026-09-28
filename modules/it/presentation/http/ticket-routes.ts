@@ -45,7 +45,7 @@ export function parseITRequesterTicketId(value: string): number | null {
     return isValidITTicketId(ticketId) ? ticketId : null;
 }
 
-export function readITTicketTimelineQuery(
+export function readITTicketHistoryQuery(
     searchParams: URLSearchParams,
 ): Record<string, string> | null {
     const result: Record<string, string> = {};

@@ -8,8 +8,10 @@ import {
     createITTicket,
     getITOperatorTicket,
     getITRequesterTicket,
-    getITOperatorTicketTimeline,
-    getITRequesterTicketTimeline,
+    getITOperatorTicketActivity,
+    getITRequesterTicketActivity,
+    getITOperatorTicketConversation,
+    getITRequesterTicketConversation,
     ITCapabilityDeniedError,
     ITTicketCommentKind,
     ITTicketIdempotencyConflictError,
@@ -224,11 +226,11 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         })).toBe(3);
         expect((await eventsFor(created.ticket.id)).map((event) => event.kind)).toEqual(["CREATED"]);
 
-        const timeline = await getITRequesterTicketTimeline(fixture.requester.context, created.ticket.id);
-        expect(timeline.items.map((item) => item.type)).toEqual([
-            "CREATED", "COMMENT", "COMMENT", "COMMENT",
-        ]);
-        expect(timeline.items.filter((item) => item.type === "COMMENT")).toHaveLength(3);
+        const conversation = await getITRequesterTicketConversation(fixture.requester.context, created.ticket.id);
+        const activity = await getITRequesterTicketActivity(fixture.requester.context, created.ticket.id);
+        expect(conversation.items.map((item) => item.body)).toHaveLength(3);
+        expect(conversation.items.every((item) => "body" in item)).toBe(true);
+        expect(activity.items.map((item) => item.type)).toEqual(["CREATED"]);
         expect(await prisma.notificationOutbox.count({
             where: { type: "TICKET_COMMENT_IN_APP" },
         })).toBe(noOutboxBefore);
@@ -331,11 +333,11 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
                 action: "TICKET_COMMENT",
             },
         })).toBe(1);
-        expect((await getITRequesterTicketTimeline(fixture.requester.context, first.ticket.id))
-            .items.filter((item) => item.type === "COMMENT")).toHaveLength(1);
+        expect((await getITRequesterTicketConversation(fixture.requester.context, first.ticket.id))
+            .items).toHaveLength(1);
     });
 
-    it("serializes concurrent same-key requester submissions to one durable timeline item", async () => {
+    it("serializes concurrent same-key requester submissions to one durable Conversation comment", async () => {
         const fixture = await createFixture("same-key-race");
         const ticket = await createTicket(fixture.requester, "same-key-race");
         const key = nextFixtureKey("same-comment-key");
@@ -352,8 +354,8 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         expect(await prisma.iTTicketCommentIdempotency.count({
             where: { comment: { ticketId: ticket.ticket.id } },
         })).toBe(1);
-        const timeline = await getITRequesterTicketTimeline(fixture.requester.context, ticket.ticket.id);
-        expect(timeline.items.filter((item) => item.type === "COMMENT")).toHaveLength(1);
+        const conversation = await getITRequesterTicketConversation(fixture.requester.context, ticket.ticket.id);
+        expect(conversation.items).toHaveLength(1);
     });
 
     it("enforces requester ownership even with ALL authority and hides foreign/absent resource existence", async () => {
@@ -364,11 +366,15 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         await grant(fixture.requester.userId, "it.ticket.read");
         await grant(fixture.requester.userId, "it.ticket.comment");
 
-        await expect(getITRequesterTicketTimeline(fixture.requester.context, ownTicket.ticket.id))
+        await expect(getITRequesterTicketConversation(fixture.requester.context, ownTicket.ticket.id))
+            .resolves.toMatchObject({ items: [] });
+        await expect(getITRequesterTicketActivity(fixture.requester.context, ownTicket.ticket.id))
             .resolves.toMatchObject({ items: [expect.objectContaining({ type: "CREATED" })] });
-        await expect(getITRequesterTicketTimeline(fixture.requester.context, foreignTicket.ticket.id))
+        await expect(getITRequesterTicketConversation(fixture.requester.context, foreignTicket.ticket.id))
             .rejects.toBeInstanceOf(ITTicketNotFoundError);
-        await expect(getITRequesterTicketTimeline(fixture.requester.context, 2_000_000_000))
+        await expect(getITRequesterTicketActivity(fixture.requester.context, foreignTicket.ticket.id))
+            .rejects.toBeInstanceOf(ITTicketNotFoundError);
+        await expect(getITRequesterTicketConversation(fixture.requester.context, 2_000_000_000))
             .rejects.toBeInstanceOf(ITTicketNotFoundError);
         await expect(postITRequesterTicketComment(
             fixture.requester.context,
@@ -408,7 +414,15 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
 
         await expect(getITRequesterTicket(liffContext, ownTicket.ticket.id))
             .resolves.toMatchObject({ id: ownTicket.ticket.id });
+        await expect(getITRequesterTicketConversation(liffContext, ownTicket.ticket.id))
+            .resolves.toMatchObject({ items: [] });
+        await expect(getITRequesterTicketActivity(liffContext, ownTicket.ticket.id))
+            .resolves.toMatchObject({ items: [expect.objectContaining({ type: "CREATED" })] });
         await expect(getITRequesterTicket(liffContext, foreignTicket.ticket.id))
+            .rejects.toBeInstanceOf(ITTicketNotFoundError);
+        await expect(getITRequesterTicketConversation(liffContext, foreignTicket.ticket.id))
+            .rejects.toBeInstanceOf(ITTicketNotFoundError);
+        await expect(getITRequesterTicketActivity(liffContext, foreignTicket.ticket.id))
             .rejects.toBeInstanceOf(ITTicketNotFoundError);
         await expect(postITRequesterTicketComment(
             liffContext,
@@ -429,12 +443,16 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
         const fixture = await createFixture("operator-boundary");
         const ticket = await createTicket(fixture.requester, "operator-boundary");
         const defaultOnly = await createWorkforceUser("default-only", fixture.departmentId, Role.ADMIN);
-        await expect(getITOperatorTicketTimeline(defaultOnly.context, ticket.ticket.id))
+        await expect(getITOperatorTicketConversation(defaultOnly.context, ticket.ticket.id))
+            .rejects.toBeInstanceOf(ITCapabilityDeniedError);
+        await expect(getITOperatorTicketActivity(defaultOnly.context, ticket.ticket.id))
             .rejects.toBeInstanceOf(ITCapabilityDeniedError);
 
         const readOnly = await createWorkforceUser("read-only", fixture.departmentId);
         await grant(readOnly.userId, "it.ticket.read");
-        await expect(getITOperatorTicketTimeline(readOnly.context, ticket.ticket.id))
+        await expect(getITOperatorTicketConversation(readOnly.context, ticket.ticket.id))
+            .resolves.toMatchObject({ items: [] });
+        await expect(getITOperatorTicketActivity(readOnly.context, ticket.ticket.id))
             .resolves.toMatchObject({ items: [expect.objectContaining({ type: "CREATED" })] });
         await expect(postITOperatorTicketComment(
             readOnly.context,
@@ -444,7 +462,9 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
 
         const commentOnly = await createWorkforceUser("comment-only", fixture.departmentId);
         await grant(commentOnly.userId, "it.ticket.comment");
-        await expect(getITOperatorTicketTimeline(commentOnly.context, ticket.ticket.id))
+        await expect(getITOperatorTicketConversation(commentOnly.context, ticket.ticket.id))
+            .rejects.toMatchObject({ capability: "it.ticket.read" });
+        await expect(getITOperatorTicketActivity(commentOnly.context, ticket.ticket.id))
             .rejects.toMatchObject({ capability: "it.ticket.read" });
         await expect(postITOperatorTicketComment(
             commentOnly.context,
@@ -636,55 +656,147 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
             .resolves.toMatchObject({ firstRespondedAt: savedFirstResponse });
     });
 
-    it("paginates the merged timeline without skipping or duplicating equal-timestamp rows", async () => {
-        const fixture = await createFixture("timeline-pagination");
-        const ticket = await createTicket(fixture.requester, "timeline-pagination");
-        for (let index = 0; index < 4; index += 1) {
-            await postITRequesterTicketComment(
-                fixture.requester.context,
-                { ticketId: ticket.ticket.id, body: `ข้อความ ${index}` },
-                { idempotencyKey: nextFixtureKey(`timeline-comment-${index}`) },
-            );
-        }
+    it("paginates Conversation and Activity independently across tied timestamps and unequal source volumes", async () => {
+        const fixture = await createFixture("separate-history-pagination");
+        const eventHeavyTicket = await createTicket(fixture.requester, "event-heavy");
+        const commentHeavyTicket = await createTicket(fixture.requester, "comment-heavy");
         const tiedAt = new Date("2026-09-01T12:00:00.000Z");
+
+        await prisma.iTTicketEvent.createMany({
+            data: Array.from({ length: 24 }, () => ({
+                ticketId: eventHeavyTicket.ticket.id,
+                actorUserId: fixture.operator.userId,
+                kind: "STATUS_CHANGED" as const,
+                fromStatus: ITTicketStatus.OPEN,
+                toStatus: ITTicketStatus.IN_PROGRESS,
+                occurredAt: tiedAt,
+            })),
+        });
+        await prisma.iTTicketComment.createMany({
+            data: Array.from({ length: 3 }, (_, index) => ({
+                ticketId: eventHeavyTicket.ticket.id,
+                authorUserId: fixture.requester.userId,
+                kind: ITTicketCommentKind.REQUESTER,
+                body: `ข้อความ event-heavy ${index}`,
+                createdAt: tiedAt,
+            })),
+        });
+        await prisma.iTTicketEvent.createMany({
+            data: Array.from({ length: 2 }, () => ({
+                ticketId: commentHeavyTicket.ticket.id,
+                actorUserId: fixture.operator.userId,
+                kind: "STATUS_CHANGED" as const,
+                fromStatus: ITTicketStatus.OPEN,
+                toStatus: ITTicketStatus.IN_PROGRESS,
+                occurredAt: tiedAt,
+            })),
+        });
+        await prisma.iTTicketComment.createMany({
+            data: Array.from({ length: 25 }, (_, index) => ({
+                ticketId: commentHeavyTicket.ticket.id,
+                authorUserId: fixture.requester.userId,
+                kind: ITTicketCommentKind.REQUESTER,
+                body: `ข้อความ comment-heavy ${index}`,
+                createdAt: tiedAt,
+            })),
+        });
         await prisma.iTTicketEvent.updateMany({
-            where: { ticketId: ticket.ticket.id },
+            where: { ticketId: eventHeavyTicket.ticket.id },
             data: { occurredAt: tiedAt },
         });
-        await prisma.iTTicketComment.updateMany({
-            where: { ticketId: ticket.ticket.id },
-            data: { createdAt: tiedAt },
-        });
 
-        const allItems: string[] = [];
-        let cursor: string | undefined;
-        let hasMore = true;
-        while (hasMore) {
-            const page = await getITRequesterTicketTimeline(fixture.requester.context, ticket.ticket.id, {
-                limit: 2,
-                ...(cursor === undefined ? {} : { cursor }),
-            });
-            allItems.unshift(...page.items.map((item) => `${item.type}:${item.id}`));
-            cursor = page.olderCursor ?? undefined;
-            hasMore = page.hasMore;
+        const eventHeavyConversation = await getITRequesterTicketConversation(
+            fixture.requester.context,
+            eventHeavyTicket.ticket.id,
+            { limit: 25 },
+        );
+        expect(eventHeavyConversation.items).toHaveLength(3);
+        expect(eventHeavyConversation.items.every((item) => "body" in item)).toBe(true);
+        const commentHeavyActivity = await getITRequesterTicketActivity(
+            fixture.requester.context,
+            commentHeavyTicket.ticket.id,
+            { limit: 25 },
+        );
+        expect(commentHeavyActivity.items).toHaveLength(3);
+        expect(commentHeavyActivity.items.every((item) => !("body" in item))).toBe(true);
+
+        async function collectConversation(ticketId: number): Promise<string[]> {
+            const collected: string[] = [];
+            let cursor: string | undefined;
+            let hasMore = true;
+            while (hasMore) {
+                const page = await getITRequesterTicketConversation(
+                    fixture.requester.context,
+                    ticketId,
+                    { limit: 7, ...(cursor === undefined ? {} : { cursor }) },
+                );
+                collected.unshift(...page.items.map((item) => item.id));
+                cursor = page.olderCursor ?? undefined;
+                hasMore = page.hasMore;
+            }
+            return collected;
         }
 
-        const eventIds = await prisma.iTTicketEvent.findMany({
-            where: { ticketId: ticket.ticket.id },
-            select: { id: true },
-            orderBy: { id: "asc" },
-        });
-        const commentIds = await prisma.iTTicketComment.findMany({
-            where: { ticketId: ticket.ticket.id },
-            select: { id: true },
-            orderBy: { id: "asc" },
-        });
-        const expected = [
-            ...eventIds.map((event) => `CREATED:${event.id}`),
-            ...commentIds.map((comment) => `COMMENT:${comment.id}`),
-        ];
-        expect(allItems).toEqual(expected);
-        expect(new Set(allItems).size).toBe(expected.length);
+        async function collectActivity(ticketId: number): Promise<number[]> {
+            const collected: number[] = [];
+            let cursor: string | undefined;
+            let hasMore = true;
+            while (hasMore) {
+                const page = await getITRequesterTicketActivity(
+                    fixture.requester.context,
+                    ticketId,
+                    { limit: 7, ...(cursor === undefined ? {} : { cursor }) },
+                );
+                collected.unshift(...page.items.map((item) => item.id));
+                cursor = page.olderCursor ?? undefined;
+                hasMore = page.hasMore;
+            }
+            return collected;
+        }
+
+        for (const testTicket of [eventHeavyTicket, commentHeavyTicket]) {
+            const conversationIds = await collectConversation(testTicket.ticket.id);
+            const expectedCommentIds = await prisma.iTTicketComment.findMany({
+                where: { ticketId: testTicket.ticket.id },
+                select: { id: true },
+                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            });
+            expect(conversationIds).toEqual(expectedCommentIds.map((comment) => comment.id));
+            expect(new Set(conversationIds).size).toBe(expectedCommentIds.length);
+
+            const activityIds = await collectActivity(testTicket.ticket.id);
+            const expectedEventIds = await prisma.iTTicketEvent.findMany({
+                where: { ticketId: testTicket.ticket.id },
+                select: { id: true },
+                orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
+            });
+            expect(activityIds).toEqual(expectedEventIds.map((event) => event.id));
+            expect(new Set(activityIds).size).toBe(expectedEventIds.length);
+        }
+
+        const conversationWithOlder = await getITRequesterTicketConversation(
+            fixture.requester.context,
+            commentHeavyTicket.ticket.id,
+            { limit: 2 },
+        );
+        const wrongTicketCursor = conversationWithOlder.olderCursor;
+        expect(wrongTicketCursor).not.toBeNull();
+        if (wrongTicketCursor === null) throw new Error("Expected older Conversation cursor");
+        await expect(getITRequesterTicketConversation(
+            fixture.requester.context,
+            eventHeavyTicket.ticket.id,
+            { cursor: wrongTicketCursor },
+        )).rejects.toBeInstanceOf(ITTicketInputValidationError);
+        await expect(getITRequesterTicketActivity(
+            fixture.requester.context,
+            commentHeavyTicket.ticket.id,
+            { cursor: wrongTicketCursor },
+        )).rejects.toBeInstanceOf(ITTicketInputValidationError);
+        await expect(getITRequesterTicketConversation(
+            fixture.requester.context,
+            commentHeavyTicket.ticket.id,
+            { cursor: "malformed" },
+        )).rejects.toBeInstanceOf(ITTicketInputValidationError);
     });
 
     it("renders every existing business event with names from retained current identities", async () => {
@@ -719,11 +831,11 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
             data: { status: "INACTIVE" },
         });
 
-        const timeline = await getITRequesterTicketTimeline(fixture.requester.context, ticket.ticket.id);
-        expect(timeline.items.map((item) => item.type)).toEqual([
+        const activity = await getITRequesterTicketActivity(fixture.requester.context, ticket.ticket.id);
+        expect(activity.items.map((item) => item.type)).toEqual([
             "CREATED", "STATUS_CHANGED", "ASSIGNED", "CATEGORY_CHANGED", "UNASSIGNED",
         ]);
-        expect(timeline.items).toEqual(expect.arrayContaining([
+        expect(activity.items).toEqual(expect.arrayContaining([
             expect.objectContaining({ type: "CREATED", actorDisplayName: "พนักงาน event-projection-requester" }),
             expect.objectContaining({
                 type: "STATUS_CHANGED",
@@ -746,12 +858,12 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
                 toAssigneeDisplayName: null,
             }),
         ]));
-        expect(JSON.stringify(timeline)).not.toContain("@integration.test");
-        expect(JSON.stringify(timeline)).not.toContain("password");
+        expect(JSON.stringify(activity)).not.toContain("@integration.test");
+        expect(JSON.stringify(activity)).not.toContain("password");
     });
 
-    it("projects every newly approved lifecycle transition into the requester timeline", async () => {
-        const fixture = await createFixture("lifecycle-timeline", true);
+    it("projects every newly approved lifecycle transition into requester Activity", async () => {
+        const fixture = await createFixture("lifecycle-activity", true);
         const cases = [
             {
                 key: "open-cancel",
@@ -819,11 +931,11 @@ describe.sequential("IT5A Ticket conversation with real MySQL", () => {
                 expectedVersion = changed.ticket.version;
             }
 
-            const timeline = await getITRequesterTicketTimeline(
+            const activity = await getITRequesterTicketActivity(
                 fixture.requester.context,
                 created.ticket.id,
             );
-            expect(timeline.items
+            expect(activity.items
                 .filter((item) => item.type === "STATUS_CHANGED")
                 .map((item) => [item.fromStatus, item.toStatus]))
                 .toEqual(testCase.transitions);

@@ -92,18 +92,18 @@ function referenceResponse(): Response {
     return apiResponse({ success: true, ...reference });
 }
 
-function timelineResponse(withStatusChange = false): Response {
+function activityResponse(withStatusChange = false): Response {
     const items: unknown[] = [{
         type: "CREATED",
         id: 1,
-        createdAt: ticket.createdAt,
+        occurredAt: ticket.createdAt,
         actorDisplayName: ticket.requester.displayName,
     }];
     if (withStatusChange) {
         items.push({
             type: "STATUS_CHANGED",
             id: 2,
-            createdAt: "2026-09-03T01:30:00.000Z",
+            occurredAt: "2026-09-03T01:30:00.000Z",
             actorDisplayName: "เจ้าหน้าที่อีกคน",
             fromStatus: "OPEN",
             toStatus: "IN_PROGRESS",
@@ -114,6 +114,21 @@ function timelineResponse(withStatusChange = false): Response {
         items,
         olderCursor: null,
         hasMore: false,
+    });
+}
+
+function conversationResponse(): Response {
+    return apiResponse({ success: true, items: [], olderCursor: null, hasMore: false });
+}
+
+const configureFetch = fetchMock.mockImplementation.bind(fetchMock);
+
+function mockApiImplementation(
+    implementation: Parameters<typeof fetchMock.mockImplementation>[0],
+): void {
+    configureFetch(async (input, init) => {
+        if (String(input).includes("/conversation")) return conversationResponse();
+        return implementation(input, init);
     });
 }
 
@@ -168,7 +183,7 @@ describe("IT operator queue presentation", () => {
     });
 
     it("renders operational identity and submits filters to the server", async () => {
-        fetchMock.mockImplementation(async (input) => {
+        mockApiImplementation(async (input) => {
             const url = String(input);
             if (url.includes("/reference")) return referenceResponse();
             if (url.includes("status=IN_PROGRESS")) return queueResponse([]);
@@ -208,9 +223,9 @@ describe("IT operator Ticket detail presentation", () => {
     ] as const)(
         "shows only canonical lifecycle actions for %s",
         async (status, expectedActions) => {
-            fetchMock.mockImplementation(async (input) => {
+            mockApiImplementation(async (input) => {
                 if (String(input).includes("/reference")) return referenceResponse();
-                if (String(input).includes("/timeline")) return timelineResponse();
+                if (String(input).includes("/activity")) return activityResponse();
                 return detailResponse({ ...ticket, status });
             });
 
@@ -238,6 +253,54 @@ describe("IT operator Ticket detail presentation", () => {
         },
     );
 
+    it.each([
+        ["OPEN", true],
+        ["IN_PROGRESS", true],
+        ["WAITING_REQUESTER", true],
+        ["RESOLVED", false],
+        ["CLOSED", false],
+        ["CANCELLED", false],
+    ] as const)("keeps operator Conversation %s commentability unchanged", async (status, commentable) => {
+        mockApiImplementation(async (input) => {
+            if (String(input).includes("/reference")) return referenceResponse();
+            if (String(input).includes("/activity")) return activityResponse();
+            return detailResponse({ ...ticket, status });
+        });
+        const capabilities: ITPresentationCapabilities = {
+            ...requesterCapabilities,
+            canCommentAllTickets: true,
+            canManageTickets: false,
+        };
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={capabilities} />);
+
+        expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
+        if (commentable) {
+            expect(await screen.findByLabelText("ตอบกลับ")).toBeInTheDocument();
+        } else {
+            expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
+            expect(screen.getByText(/จึงอ่านบทสนทนาได้อย่างเดียว/)).toBeInTheDocument();
+        }
+    });
+
+    it("keeps Ticket controls available when Conversation loading fails", async () => {
+        configureFetch(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("/conversation")) return apiResponse({ error: "temporary" }, 503);
+            if (url.includes("/activity")) return activityResponse();
+            return detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("temporary");
+        const activity = await screen.findByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" });
+        expect(within(activity).getByText("ผู้ดำเนินการ: อารี ใจเย็น")).toBeInTheDocument();
+        expect(within(activity).getByText("รับเรื่องแล้ว")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "เริ่มดำเนินการ" })).toBeEnabled();
+    });
+
     it("shows initial requester evidence in the operator Ticket detail", async () => {
         const attachment: ITTicketAttachmentSummary = {
             id: "b".repeat(32),
@@ -248,7 +311,7 @@ describe("IT operator Ticket detail presentation", () => {
             height: 30,
             position: 0,
         };
-        fetchMock.mockImplementation(async (input) => {
+        mockApiImplementation(async (input) => {
             if (String(input).includes("/attachments/")) {
                 return new Response(new Blob(["private image"], { type: "image/webp" }), {
                     status: 200,
@@ -256,7 +319,7 @@ describe("IT operator Ticket detail presentation", () => {
                 });
             }
             if (String(input).includes("/reference")) return referenceResponse();
-            if (String(input).includes("/timeline")) return timelineResponse();
+            if (String(input).includes("/activity")) return activityResponse();
             return detailResponse(ticket, [attachment]);
         });
 
@@ -289,10 +352,10 @@ describe("IT operator Ticket detail presentation", () => {
         let patchCount = 0;
         let detailReadCount = 0;
 
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) return referenceResponse();
-            if (url.includes("/timeline")) return timelineResponse();
+            if (url.includes("/activity")) return activityResponse();
             if (init?.method === "PATCH") {
                 patchCount += 1;
                 patchRoutes.push(url);
@@ -355,9 +418,9 @@ describe("IT operator Ticket detail presentation", () => {
     });
 
     it("shows ordinary mutation failures through one safe toast", async () => {
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             if (String(input).includes("/reference")) return referenceResponse();
-            if (String(input).includes("/timeline")) return timelineResponse();
+            if (String(input).includes("/activity")) return activityResponse();
             if (init?.method === "PATCH") {
                 return apiResponse({ error: "ไม่สามารถบันทึกข้อมูลได้ในขณะนี้" }, 422);
             }
@@ -376,13 +439,13 @@ describe("IT operator Ticket detail presentation", () => {
 
     it("clears an inactive category draft, refreshes references, and shows its safe error as a toast", async () => {
         let referenceReadCount = 0;
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) {
                 referenceReadCount += 1;
                 return referenceResponse();
             }
-            if (url.includes("/timeline")) return timelineResponse();
+            if (url.includes("/activity")) return activityResponse();
             if (init?.method === "PATCH") {
                 return apiResponse({
                     error: "หมวดหมู่ที่เลือกไม่สามารถใช้งานได้",
@@ -406,13 +469,13 @@ describe("IT operator Ticket detail presentation", () => {
 
     it("clears an ineligible assignee draft, refreshes references, and shows its safe error as a toast", async () => {
         let referenceReadCount = 0;
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) {
                 referenceReadCount += 1;
                 return referenceResponse();
             }
-            if (url.includes("/timeline")) return timelineResponse();
+            if (url.includes("/activity")) return activityResponse();
             if (init?.method === "PATCH") {
                 return apiResponse({
                     error: "ผู้รับผิดชอบที่เลือกไม่พร้อมใช้งาน",
@@ -435,9 +498,9 @@ describe("IT operator Ticket detail presentation", () => {
     });
 
     it("keeps mutation access denial persistent while also reporting it through toast", async () => {
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             if (String(input).includes("/reference")) return referenceResponse();
-            if (String(input).includes("/timeline")) return timelineResponse();
+            if (String(input).includes("/activity")) return activityResponse();
             if (init?.method === "PATCH") {
                 return apiResponse({ error: "internal authorization detail" }, 403);
             }
@@ -462,9 +525,9 @@ describe("IT operator Ticket detail presentation", () => {
 
     it("keeps detail load errors inline with a retry action", async () => {
         let detailReadCount = 0;
-        fetchMock.mockImplementation(async (input) => {
+        mockApiImplementation(async (input) => {
             if (String(input).includes("/reference")) return referenceResponse();
-            if (String(input).includes("/timeline")) return timelineResponse();
+            if (String(input).includes("/activity")) return activityResponse();
             detailReadCount += 1;
             return detailReadCount === 1
                 ? apiResponse({}, 500)
@@ -482,12 +545,12 @@ describe("IT operator Ticket detail presentation", () => {
 
     it("keeps reference load errors inline with a retry action", async () => {
         let referenceReadCount = 0;
-        fetchMock.mockImplementation(async (input) => {
+        mockApiImplementation(async (input) => {
             if (String(input).includes("/reference")) {
                 referenceReadCount += 1;
                 return referenceReadCount === 1 ? apiResponse({}, 500) : referenceResponse();
             }
-            if (String(input).includes("/timeline")) return timelineResponse();
+            if (String(input).includes("/activity")) return activityResponse();
             return detailResponse(ticket);
         });
 
@@ -501,9 +564,9 @@ describe("IT operator Ticket detail presentation", () => {
     });
 
     it("keeps a read-only ALL operator from receiving mutation controls", async () => {
-        fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
+        mockApiImplementation(async (input) => String(input).includes("/reference")
             ? referenceResponse()
-            : String(input).includes("/timeline") ? timelineResponse() : detailResponse(ticket));
+            : String(input).includes("/activity") ? activityResponse() : detailResponse(ticket));
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={requesterCapabilities} />);
 
@@ -525,21 +588,21 @@ describe("IT operator Ticket detail presentation", () => {
             canCommentAllTickets: true,
             canManageTickets: false,
         };
-        fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
+        mockApiImplementation(async (input) => String(input).includes("/reference")
             ? referenceResponse()
-            : String(input).includes("/timeline") ? timelineResponse() : detailResponse(ticket));
+            : String(input).includes("/activity") ? activityResponse() : detailResponse(ticket));
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={commentOnlyCapabilities} />);
 
         expect(await screen.findByLabelText("ตอบกลับ")).toBeInTheDocument();
-        expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ผู้ดำเนินการ: อารี ใจเย็น")).toBeInTheDocument();
         expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
     });
 
     it("does not show a reply composer for manage ALL without comment ALL", async () => {
-        fetchMock.mockImplementation(async (input) => String(input).includes("/reference")
+        mockApiImplementation(async (input) => String(input).includes("/reference")
             ? referenceResponse()
-            : String(input).includes("/timeline") ? timelineResponse() : detailResponse(ticket));
+            : String(input).includes("/activity") ? activityResponse() : detailResponse(ticket));
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
@@ -550,9 +613,9 @@ describe("IT operator Ticket detail presentation", () => {
     });
 
     it("posts the shared operator reply and leaves the workflow status alone", async () => {
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             if (String(input).includes("/reference")) return referenceResponse();
-            if (String(input).includes("/timeline")) return timelineResponse();
+            if (String(input).includes("/activity")) return activityResponse();
             if (init?.method === "POST") {
                 return apiResponse({
                     success: true,
@@ -577,7 +640,7 @@ describe("IT operator Ticket detail presentation", () => {
         };
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={commentOnlyCapabilities} />);
-        await screen.findByText("อารี ใจเย็น สร้าง Ticket");
+        await screen.findByText("ผู้ดำเนินการ: อารี ใจเย็น");
         fireEvent.change(screen.getByLabelText("ตอบกลับ"), {
             target: { value: "  กำลังตรวจสอบให้ค่ะ  " },
         });
@@ -585,28 +648,29 @@ describe("IT operator Ticket detail presentation", () => {
 
         expect(await screen.findByText("ส่งข้อความเรียบร้อยแล้ว")).toBeInTheDocument();
         expect(screen.getAllByText("กำลังตรวจสอบให้ค่ะ")).toHaveLength(1);
-        expect(screen.getByText("รับเรื่องแล้ว")).toBeInTheDocument();
+        expect(within(screen.getByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" }))
+            .getByText("รับเรื่องแล้ว")).toBeInTheDocument();
         const postCall = fetchMock.mock.calls.find(([, options]) => options?.method === "POST");
         expect(postCall?.[0]).toBe("/api/it/operator/tickets/19/comments");
         expect(JSON.parse(String(postCall?.[1]?.body))).toEqual({ body: "กำลังตรวจสอบให้ค่ะ" });
-        expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/timeline"))).toHaveLength(1);
+        expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/activity"))).toHaveLength(1);
         expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "PATCH")).toHaveLength(0);
     });
 
-    it("reloads the latest timeline after a successful workflow change", async () => {
+    it("reloads Activity after a successful workflow change", async () => {
         let detailReadCount = 0;
-        let timelineReadCount = 0;
+        let activityReadCount = 0;
         const progressedTicket: ITOperatorTicket = {
             ...ticket,
             status: "IN_PROGRESS",
             version: 5,
         };
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) return referenceResponse();
-            if (url.includes("/timeline")) {
-                timelineReadCount += 1;
-                return timelineResponse(timelineReadCount > 1);
+            if (url.includes("/activity")) {
+                activityReadCount += 1;
+                return activityResponse(activityReadCount > 1);
             }
             if (init?.method === "PATCH") {
                 return apiResponse({
@@ -628,33 +692,34 @@ describe("IT operator Ticket detail presentation", () => {
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
-        expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ผู้ดำเนินการ: อารี ใจเย็น")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "เริ่มดำเนินการ" }));
 
         await waitFor(() => expect(toast.success).toHaveBeenCalledWith("เปลี่ยนสถานะเป็นกำลังดำเนินการแล้ว"));
         expect(toast.success).toHaveBeenCalledTimes(1);
         expect(screen.queryByText("เปลี่ยนสถานะเป็นกำลังดำเนินการแล้ว")).not.toBeInTheDocument();
         expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
-        expect(await screen.findByText(
-            "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
-        )).toBeInTheDocument();
-        expect(timelineReadCount).toBe(2);
+        await screen.findByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน");
+        const activity = screen.getByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" });
+        expect(await within(activity).findByText("เริ่มดำเนินการ")).toBeInTheDocument();
+        expect(within(activity).getByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน")).toBeInTheDocument();
+        expect(activityReadCount).toBe(2);
     });
 
-    it("does not refetch the timeline for a no-op workflow mutation with the same version", async () => {
+    it("does not refetch Activity for a no-op workflow mutation with the same version", async () => {
         let detailReadCount = 0;
-        let timelineReadCount = 0;
+        let activityReadCount = 0;
         let patchCount = 0;
         const assignedTicket: ITOperatorTicket = {
             ...ticket,
             assignee: { userId: 51, displayName: "สมชาย ใจดี" },
         };
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) return referenceResponse();
-            if (url.includes("/timeline")) {
-                timelineReadCount += 1;
-                return timelineResponse();
+            if (url.includes("/activity")) {
+                activityReadCount += 1;
+                return activityResponse();
             }
             if (init?.method === "PATCH") {
                 patchCount += 1;
@@ -677,18 +742,18 @@ describe("IT operator Ticket detail presentation", () => {
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
-        expect(await screen.findByText("อารี ใจเย็น สร้าง Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ผู้ดำเนินการ: อารี ใจเย็น")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
         await waitFor(() => expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeEnabled());
 
         expect(patchCount).toBe(1);
         expect(detailReadCount).toBe(2);
-        expect(timelineReadCount).toBe(1);
+        expect(activityReadCount).toBe(1);
     });
 
     it("sends the displayed version and requires review after loading a stale conflict", async () => {
         let detailReadCount = 0;
-        let timelineReadCount = 0;
+        let activityReadCount = 0;
         const latestTicket: ITOperatorTicket = {
             ...ticket,
             status: "IN_PROGRESS",
@@ -702,12 +767,12 @@ describe("IT operator Ticket detail presentation", () => {
         };
         const patchBodies: unknown[] = [];
         let patchCount = 0;
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             const url = String(input);
             if (url.includes("/reference")) return referenceResponse();
-            if (url.includes("/timeline")) {
-                timelineReadCount += 1;
-                return timelineResponse(timelineReadCount > 1);
+            if (url.includes("/activity")) {
+                activityReadCount += 1;
+                return activityResponse(activityReadCount > 1);
             }
             if (init?.method === "PATCH") {
                 patchBodies.push(JSON.parse(String(init.body)) as unknown);
@@ -764,10 +829,11 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
         expect(toast.error).toHaveBeenCalledTimes(1);
         expect(sonnerToast.error.mock.calls.flat().join(" ")).not.toMatch(/รุ่น|version|revision/i);
-        expect(await screen.findByText(
-            "เจ้าหน้าที่อีกคน เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ",
-        )).toBeInTheDocument();
-        expect(timelineReadCount).toBe(2);
+        await screen.findByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน");
+        const activity = screen.getByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" });
+        expect(await within(activity).findByText("เริ่มดำเนินการ")).toBeInTheDocument();
+        expect(within(activity).getByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน")).toBeInTheDocument();
+        expect(activityReadCount).toBe(2);
         expect(screen.getByRole("button", { name: "รอข้อมูลจากผู้แจ้ง" })).toBeDisabled();
         expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeDisabled();
         expect(screen.getByRole("button", { name: "บันทึกหมวดหมู่" })).toBeDisabled();
@@ -801,10 +867,10 @@ describe("IT operator Ticket detail presentation", () => {
                 status: "IN_PROGRESS",
                 version: 5,
             };
-            fetchMock.mockImplementation(async (input, init) => {
+            mockApiImplementation(async (input, init) => {
                 const url = String(input);
                 if (url.includes("/reference")) return referenceResponse();
-                if (url.includes("/timeline")) return timelineResponse();
+                if (url.includes("/activity")) return activityResponse();
                 if (init?.method === "PATCH") {
                     patchCount += 1;
                     if (failureKind === "network") throw new Error("socket reset");

@@ -5,8 +5,10 @@ import type * as ITModule from "@/modules/it";
 const mocks = vi.hoisted(() => ({
     session: vi.fn(),
     buildContext: vi.fn(),
-    requesterTimeline: vi.fn(),
-    operatorTimeline: vi.fn(),
+    requesterConversation: vi.fn(),
+    requesterActivity: vi.fn(),
+    operatorConversation: vi.fn(),
+    operatorActivity: vi.fn(),
     requesterPost: vi.fn(),
     operatorPost: vi.fn(),
     wakeOutbox: vi.fn(),
@@ -21,16 +23,20 @@ vi.mock("@/modules/it", async () => {
     return {
         ...actual,
         buildCurrentITAuthorizationContext: mocks.buildContext,
-        getITRequesterTicketTimeline: mocks.requesterTimeline,
-        getITOperatorTicketTimeline: mocks.operatorTimeline,
+        getITRequesterTicketConversation: mocks.requesterConversation,
+        getITRequesterTicketActivity: mocks.requesterActivity,
+        getITOperatorTicketConversation: mocks.operatorConversation,
+        getITOperatorTicketActivity: mocks.operatorActivity,
         postITRequesterTicketComment: mocks.requesterPost,
         postITOperatorTicketComment: mocks.operatorPost,
     };
 });
 
-import { GET as getRequesterTimeline } from "@/app/api/it/tickets/[ticketId]/timeline/route";
+import { GET as getRequesterConversation } from "@/app/api/it/tickets/[ticketId]/conversation/route";
+import { GET as getRequesterActivity } from "@/app/api/it/tickets/[ticketId]/activity/route";
 import { POST as postRequesterComment } from "@/app/api/it/tickets/[ticketId]/comments/route";
-import { GET as getOperatorTimeline } from "@/app/api/it/operator/tickets/[ticketId]/timeline/route";
+import { GET as getOperatorConversation } from "@/app/api/it/operator/tickets/[ticketId]/conversation/route";
+import { GET as getOperatorActivity } from "@/app/api/it/operator/tickets/[ticketId]/activity/route";
 import { POST as postOperatorComment } from "@/app/api/it/operator/tickets/[ticketId]/comments/route";
 
 const session = { user: { id: "41", email: "staff@example.test", role: "USER" } };
@@ -69,8 +75,10 @@ beforeEach(() => {
     vi.clearAllMocks();
     mocks.session.mockResolvedValue({ ok: true, ...session });
     mocks.buildContext.mockResolvedValue(context);
-    mocks.requesterTimeline.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
-    mocks.operatorTimeline.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+    mocks.requesterConversation.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+    mocks.requesterActivity.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+    mocks.operatorConversation.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+    mocks.operatorActivity.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
     mocks.requesterPost.mockResolvedValue(commentSubmission);
     mocks.operatorPost.mockResolvedValue({
         ...commentSubmission,
@@ -78,59 +86,76 @@ beforeEach(() => {
     });
 });
 
-describe("IT Ticket conversation HTTP routes", () => {
+describe("IT Ticket conversation and activity HTTP routes", () => {
     it("requires authentication and rejects malformed IDs and unauthorized query widening", async () => {
         mocks.session.mockImplementation(async (options: {
             readonly unauthorizedResponse: () => Response;
         }) => ({ ok: false, response: options.unauthorizedResponse() }));
-        const unauthorized = await getRequesterTimeline(
-            request("http://localhost/api/it/tickets/19/timeline", "GET"),
+        const unauthorized = await getRequesterConversation(
+            request("http://localhost/api/it/tickets/19/conversation", "GET"),
             routeContext("19"),
         );
         expect(unauthorized.status).toBe(401);
 
         mocks.session.mockResolvedValue({ ok: true, ...session });
-        const malformedId = await getRequesterTimeline(
-            request("http://localhost/api/it/tickets/0/timeline", "GET"),
+        const malformedId = await getRequesterConversation(
+            request("http://localhost/api/it/tickets/0/conversation", "GET"),
             routeContext("0"),
         );
-        const widened = await getRequesterTimeline(
-            request("http://localhost/api/it/tickets/19/timeline?scope=all", "GET"),
+        const widened = await getRequesterActivity(
+            request("http://localhost/api/it/tickets/19/activity?scope=all", "GET"),
             routeContext("19"),
         );
         expect(malformedId.status).toBe(400);
         expect(widened.status).toBe(400);
-        expect(mocks.requesterTimeline).not.toHaveBeenCalled();
+        expect(mocks.requesterConversation).not.toHaveBeenCalled();
+        expect(mocks.requesterActivity).not.toHaveBeenCalled();
     });
 
-    it("keeps requester timeline input bounded to pagination and passes its route-owned query", async () => {
-        const response = await getRequesterTimeline(
-            request("http://localhost/api/it/tickets/19/timeline?limit=12&cursor=abc", "GET"),
+    it("keeps requester Conversation and Activity pagination independent and bounded", async () => {
+        const conversation = await getRequesterConversation(
+            request("http://localhost/api/it/tickets/19/conversation?limit=12&cursor=comment-cursor", "GET"),
+            routeContext("19"),
+        );
+        const activity = await getRequesterActivity(
+            request("http://localhost/api/it/tickets/19/activity?limit=7&cursor=event-cursor", "GET"),
             routeContext("19"),
         );
 
-        expect(response.status).toBe(200);
-        expect(mocks.requesterTimeline).toHaveBeenCalledWith(context, 19, {
+        expect([conversation.status, activity.status]).toEqual([200, 200]);
+        expect(mocks.requesterConversation).toHaveBeenCalledWith(context, 19, {
             limit: "12",
-            cursor: "abc",
+            cursor: "comment-cursor",
+        });
+        expect(mocks.requesterActivity).toHaveBeenCalledWith(context, 19, {
+            limit: "7",
+            cursor: "event-cursor",
         });
     });
 
-    it("keeps operator timeline pagination bounded and rejects client scope authority", async () => {
-        const widened = await getOperatorTimeline(
-            request("http://localhost/api/it/operator/tickets/19/timeline?scope=all", "GET"),
+    it("keeps operator Conversation and Activity reads bounded and rejects client scope authority", async () => {
+        const widened = await getOperatorActivity(
+            request("http://localhost/api/it/operator/tickets/19/activity?scope=all", "GET"),
             routeContext("19"),
         );
-        const response = await getOperatorTimeline(
-            request("http://localhost/api/it/operator/tickets/19/timeline?limit=12&cursor=abc", "GET"),
+        const conversation = await getOperatorConversation(
+            request("http://localhost/api/it/operator/tickets/19/conversation?limit=12&cursor=comment-cursor", "GET"),
+            routeContext("19"),
+        );
+        const activity = await getOperatorActivity(
+            request("http://localhost/api/it/operator/tickets/19/activity?limit=7&cursor=event-cursor", "GET"),
             routeContext("19"),
         );
 
         expect(widened.status).toBe(400);
-        expect(response.status).toBe(200);
-        expect(mocks.operatorTimeline).toHaveBeenCalledWith(context, 19, {
+        expect([conversation.status, activity.status]).toEqual([200, 200]);
+        expect(mocks.operatorConversation).toHaveBeenCalledWith(context, 19, {
             limit: "12",
-            cursor: "abc",
+            cursor: "comment-cursor",
+        });
+        expect(mocks.operatorActivity).toHaveBeenCalledWith(context, 19, {
+            limit: "7",
+            cursor: "event-cursor",
         });
     });
 

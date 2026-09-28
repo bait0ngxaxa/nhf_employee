@@ -1303,8 +1303,9 @@ Actor user ID and channel come from the trusted authorization context;
 authenticated email and request metadata enter through a separate IT command
 adapter. Client IP is recorded only through `getTrustedClientIp(...)`.
 
-Audit is accountability history. `ITTicketEvent` and `ITTicketComment` remain
-the operational timeline source; no Audit read is added to Ticket history.
+Audit is accountability history. `ITTicketComment` remains the Conversation
+source and `ITTicketEvent` remains the Activity source; no Audit read is added
+to either Ticket presentation.
 The Audit Dashboard now has explicit Thai presentation metadata for the five
 active Ticket actions and `ITTicket`. `TICKET_DELETE` remains retained for
 historical compatibility and has no new producer.

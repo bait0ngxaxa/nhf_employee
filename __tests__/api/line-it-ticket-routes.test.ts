@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
     listTickets: vi.fn(),
     createTicket: vi.fn(),
     getTicket: vi.fn(),
-    timeline: vi.fn(),
+    conversation: vi.fn(),
+    activity: vi.fn(),
     postComment: vi.fn(),
     getAttachment: vi.fn(),
     readAttachment: vi.fn(),
@@ -29,7 +30,8 @@ vi.mock("@/modules/it", async () => {
         listITRequesterTickets: mocks.listTickets,
         createITTicket: mocks.createTicket,
         getITRequesterTicket: mocks.getTicket,
-        getITRequesterTicketTimeline: mocks.timeline,
+        getITRequesterTicketConversation: mocks.conversation,
+        getITRequesterTicketActivity: mocks.activity,
         postITRequesterTicketComment: mocks.postComment,
         getITTicketAttachmentForDownload: mocks.getAttachment,
         readITTicketAttachment: mocks.readAttachment,
@@ -45,7 +47,8 @@ vi.mock("@/lib/server/it-ticket-outbox-wakeup", () => ({
 
 import { GET as getTickets, POST as createTicket } from "@/app/api/line/it/tickets/route";
 import { GET as getTicketDetail } from "@/app/api/line/it/tickets/[ticketId]/route";
-import { GET as getTimeline } from "@/app/api/line/it/tickets/[ticketId]/timeline/route";
+import { GET as getConversation } from "@/app/api/line/it/tickets/[ticketId]/conversation/route";
+import { GET as getActivity } from "@/app/api/line/it/tickets/[ticketId]/activity/route";
 import { POST as postComment } from "@/app/api/line/it/tickets/[ticketId]/comments/route";
 import { GET as getAttachment } from "@/app/api/line/it/attachments/[attachmentId]/route";
 import {
@@ -168,7 +171,8 @@ beforeEach(() => {
     });
     mocks.createTicket.mockResolvedValue({ ticket: ticketRecord, replayed: false });
     mocks.getTicket.mockResolvedValue(requesterTicket);
-    mocks.timeline.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+    mocks.conversation.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+    mocks.activity.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
     mocks.postComment.mockResolvedValue(commentSubmission);
     mocks.getAttachment.mockResolvedValue({
         id: "a".repeat(32),
@@ -353,30 +357,36 @@ describe("LIFF IT Ticket API routes", () => {
         expect(JSON.stringify(await first.json())).not.toMatch(/requesterUserId|assignedToUserId|storageKey/);
     });
 
-    it("serves own timeline and rejects foreign resources, malformed cursor, and duplicate cursor", async () => {
-        const own = await getTimeline(
-            jsonRequest("http://localhost/api/line/it/tickets/19/timeline?limit=25", "GET"),
+    it("serves independent own Conversation and Activity pages and rejects invalid pagination", async () => {
+        const ownConversation = await getConversation(
+            jsonRequest("http://localhost/api/line/it/tickets/19/conversation?limit=25", "GET"),
             ticketParams("19"),
         );
-        mocks.timeline.mockRejectedValueOnce(new ITTicketNotFoundError());
-        const foreign = await getTimeline(
-            jsonRequest("http://localhost/api/line/it/tickets/20/timeline", "GET"),
+        const ownActivity = await getActivity(
+            jsonRequest("http://localhost/api/line/it/tickets/19/activity?limit=10", "GET"),
+            ticketParams("19"),
+        );
+        mocks.conversation.mockRejectedValueOnce(new ITTicketNotFoundError());
+        const foreign = await getConversation(
+            jsonRequest("http://localhost/api/line/it/tickets/20/conversation", "GET"),
             ticketParams("20"),
         );
-        mocks.timeline.mockRejectedValueOnce(new ITTicketInputValidationError());
-        const malformed = await getTimeline(
-            jsonRequest("http://localhost/api/line/it/tickets/19/timeline?cursor=bad", "GET"),
+        mocks.activity.mockRejectedValueOnce(new ITTicketInputValidationError());
+        const malformed = await getActivity(
+            jsonRequest("http://localhost/api/line/it/tickets/19/activity?cursor=bad", "GET"),
             ticketParams("19"),
         );
-        const duplicate = await getTimeline(
-            jsonRequest("http://localhost/api/line/it/tickets/19/timeline?cursor=a&cursor=b", "GET"),
+        const duplicate = await getConversation(
+            jsonRequest("http://localhost/api/line/it/tickets/19/conversation?cursor=a&cursor=b", "GET"),
             ticketParams("19"),
         );
 
-        expect([own.status, foreign.status, malformed.status, duplicate.status])
-            .toEqual([200, 404, 400, 400]);
-        expect(mocks.timeline).toHaveBeenCalledTimes(3);
-        expect(mocks.timeline).toHaveBeenCalledWith(actorContext, 19, { limit: "25" });
+        expect([ownConversation.status, ownActivity.status, foreign.status, malformed.status, duplicate.status])
+            .toEqual([200, 200, 404, 400, 400]);
+        expect(mocks.conversation).toHaveBeenCalledTimes(2);
+        expect(mocks.activity).toHaveBeenCalledTimes(2);
+        expect(mocks.conversation).toHaveBeenCalledWith(actorContext, 19, { limit: "25" });
+        expect(mocks.activity).toHaveBeenCalledWith(actorContext, 19, { limit: "10" });
     });
 
     it("posts only requester comments, replays without wakeup, and maps changed content or terminal state safely", async () => {

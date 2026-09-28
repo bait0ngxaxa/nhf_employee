@@ -16,12 +16,14 @@ import type {
     ITRequesterTicket,
     ITRequesterTicketDetail,
     ITRequesterTicketList,
+    ITTicketActivityPage,
     ITTicketCommentSubmission,
-    ITTicketTimelinePage,
+    ITTicketConversationPage,
 } from "../../contracts";
 import {
+    IT_TICKET_ACTIVITY_DEFAULT_LIMIT,
+    IT_TICKET_CONVERSATION_DEFAULT_LIMIT,
     IT_TICKET_LIST_DEFAULT_LIMIT,
-    IT_TICKET_TIMELINE_DEFAULT_LIMIT,
 } from "../../contracts";
 import {
     isITTicketResponseRecord,
@@ -29,10 +31,11 @@ import {
     parseITRequesterTicketDetail,
     parseITRequesterTicketList,
     parseITTicketCommentSubmission,
-    parseITTicketTimelinePage,
+    parseITTicketActivityPage,
+    parseITTicketConversationPage,
 } from "../dashboard/ticket-presentation";
 
-type ITErrorContext = "list" | "detail" | "comment" | "create" | "attachment";
+type ITErrorContext = "list" | "detail" | "conversation" | "activity" | "comment" | "create" | "attachment";
 
 function getITApiErrorMessage(
     response: Extract<ApiResponse<unknown>, { success: false }>,
@@ -133,25 +136,48 @@ export async function fetchLiffITTicket(
     return parsed;
 }
 
-export async function fetchLiffITTicketTimeline(
+export async function fetchLiffITTicketConversation(
     ticketId: number,
     input: { readonly cursor?: string; readonly signal?: AbortSignal } = {},
-): Promise<ITTicketTimelinePage> {
-    const params = new URLSearchParams({ limit: String(IT_TICKET_TIMELINE_DEFAULT_LIMIT) });
+): Promise<ITTicketConversationPage> {
+    const params = new URLSearchParams({ limit: String(IT_TICKET_CONVERSATION_DEFAULT_LIMIT) });
     if (input.cursor) params.set("cursor", input.cursor);
     const payload = await unwrapITResponse(
         await apiGet<unknown>(
-            `${API_ROUTES.line.itTicketTimelineById(ticketId)}?${params.toString()}`,
+            `${API_ROUTES.line.itTicketConversationById(ticketId)}?${params.toString()}`,
             {
                 ...LIFF_API_REQUEST_OPTIONS,
                 ...(input.signal ? { signal: input.signal } : {}),
             },
         ),
-        "detail",
+        "conversation",
     );
-    const parsed = parseITTicketTimelinePage(payload);
+    const parsed = parseITTicketConversationPage(payload);
     if (parsed === null) {
-        throw invalidResponse("ข้อมูลประวัติ Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
+        throw invalidResponse("ข้อมูลบทสนทนาไม่ถูกต้อง กรุณาลองอีกครั้ง");
+    }
+    return parsed;
+}
+
+export async function fetchLiffITTicketActivity(
+    ticketId: number,
+    input: { readonly cursor?: string; readonly signal?: AbortSignal } = {},
+): Promise<ITTicketActivityPage> {
+    const params = new URLSearchParams({ limit: String(IT_TICKET_ACTIVITY_DEFAULT_LIMIT) });
+    if (input.cursor) params.set("cursor", input.cursor);
+    const payload = await unwrapITResponse(
+        await apiGet<unknown>(
+            `${API_ROUTES.line.itTicketActivityById(ticketId)}?${params.toString()}`,
+            {
+                ...LIFF_API_REQUEST_OPTIONS,
+                ...(input.signal ? { signal: input.signal } : {}),
+            },
+        ),
+        "activity",
+    );
+    const parsed = parseITTicketActivityPage(payload);
+    if (parsed === null) {
+        throw invalidResponse("ข้อมูลประวัติการดำเนินการไม่ถูกต้อง กรุณาลองอีกครั้ง");
     }
     return parsed;
 }

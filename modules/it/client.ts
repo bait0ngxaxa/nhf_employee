@@ -3,6 +3,7 @@
 export { LiffITApp } from "./presentation/liff/LiffITApp";
 export { ITTicketDetail } from "./presentation/dashboard/ITTicketDetail";
 export { ITTicketConversation } from "./presentation/dashboard/ITTicketConversation";
+export { ITTicketActivity } from "./presentation/ITTicketActivity";
 export { ITTicketOperatorDetail } from "./presentation/dashboard/ITTicketOperatorDetail";
 export { ITTicketOperatorQueue } from "./presentation/dashboard/ITTicketOperatorQueue";
 export { ITTicketSelfService } from "./presentation/dashboard/ITTicketSelfService";
@@ -21,8 +22,10 @@ export {
     IT_TICKET_COMMENT_MAX_LENGTH,
     IT_TICKET_LIST_DEFAULT_LIMIT,
     IT_TICKET_STATUS_LABELS,
-    IT_TICKET_TIMELINE_DEFAULT_LIMIT,
-    IT_TICKET_TIMELINE_MAX_LIMIT,
+    IT_TICKET_ACTIVITY_DEFAULT_LIMIT,
+    IT_TICKET_ACTIVITY_MAX_LIMIT,
+    IT_TICKET_CONVERSATION_DEFAULT_LIMIT,
+    IT_TICKET_CONVERSATION_MAX_LIMIT,
     IT_TICKET_ATTACHMENT_ACCEPTED_TYPES,
     IT_TICKET_ATTACHMENT_MAX_BYTES,
     IT_TICKET_ATTACHMENT_MAX_FILES,
@@ -49,10 +52,10 @@ export type {
     ITRequesterTicketPagination,
     ITTicketCommentSubmission,
     ITTicketAttachmentSummary,
-    ITTicketTimelineComment,
-    ITTicketTimelineEvent,
-    ITTicketTimelineItem,
-    ITTicketTimelinePage,
+    ITTicketActivityItem,
+    ITTicketActivityPage,
+    ITTicketConversationItem,
+    ITTicketConversationPage,
     ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
     ITAnalyticsPeriod,
 } from "./contracts";

@@ -82,7 +82,7 @@ LINE Login Channel ที่มี LIFF และ NHFapp Messaging API Channel �
 ## IT Ticket channel completion — IT12
 
 IT12 completes delivery for the six approved Ticket facts. Recipient rules,
-authorization, Inbox semantics, Ticket timeline, Audit, requester LIFF, and
+authorization, Inbox semantics, Ticket Activity, Audit, requester LIFF, and
 workflow behavior remain owned by IT and unchanged. The same validated
 semantic payload and source/applicability policy serve Inbox, Email, and LINE.
 

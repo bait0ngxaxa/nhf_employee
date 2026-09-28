@@ -38,10 +38,10 @@ import {
     createITTicketCommentIdempotency,
     findITTicketCommentById,
     findITTicketCommentReplay,
-    findOperatorITTicketConversationState,
-    findRequesterITTicketConversationState,
+    findOperatorITTicketReadState,
+    findRequesterITTicketReadState,
     type ITTicketCommentRecord,
-    type ITTicketConversationState,
+    type ITTicketReadState,
     type ITTicketConversationPersistenceContext,
 } from "../infrastructure/persistence/ticket-conversation-repository";
 import { createITTicketAttachmentRows } from "../infrastructure/persistence/ticket-attachment-repository";
@@ -65,7 +65,6 @@ function toSubmission(
 ): ITTicketCommentSubmission {
     return {
         comment: {
-            type: "COMMENT",
             id: comment.id,
             createdAt: comment.createdAt.toISOString(),
             authorDisplayName: getUserDisplayName(comment.author, "ไม่ระบุชื่อ"),
@@ -132,8 +131,8 @@ async function findConversationTicket(
     side: ITTicketCommentSide,
 ) {
     const ticket = side === ITTicketCommentKind.REQUESTER
-        ? await findRequesterITTicketConversationState(tx, ticketId, requesterUserId)
-        : await findOperatorITTicketConversationState(tx, ticketId);
+        ? await findRequesterITTicketReadState(tx, ticketId, requesterUserId)
+        : await findOperatorITTicketReadState(tx, ticketId);
     if (ticket === null) throw new ITTicketNotFoundError();
     return ticket;
 }
@@ -169,7 +168,7 @@ async function readReplay(
 
 async function enqueueCommentNotificationIntents(
     tx: Prisma.TransactionClient,
-    ticket: ITTicketConversationState,
+    ticket: ITTicketReadState,
     commentId: string,
     authorUserId: number,
     side: ITTicketCommentSide,

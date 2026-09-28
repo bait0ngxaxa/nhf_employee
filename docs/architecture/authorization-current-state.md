@@ -40,14 +40,18 @@
 > to `ALL`; Dashboard configured `ALL` behavior is unchanged.
 >
 > Ticket persistence, shared application commands and queries, requester
-> OWN-constrained reads/conversation, a separate read-ALL operator
-> API/Dashboard surface, operator read-ALL/comment-ALL conversation, and a
-> merged timeline exist. IT5B attachments use current comment authority for
+> OWN-constrained reads/Conversation, a separate read-ALL operator
+> API/Dashboard surface, operator read-ALL/comment-ALL Conversation, and
+> event-only Activity reads exist. The original IT9A merged `/timeline` route
+> was removed when its only in-repository Dashboard and LIFF consumers moved
+> to independent Conversation and Activity routes. IT5B attachments use current comment authority for
 > upload and current `it.ticket.read` authority for private download; requester
 > access remains constrained to the requester's Ticket. No attachment
-> capability was added. IT9A adds `/api/line/it/tickets` (list/create),
-> `/api/line/it/tickets/:id`, `/api/line/it/tickets/:id/timeline`,
-> `/api/line/it/tickets/:id/comments`, and
+> capability was added. At its original phase boundary, IT9A listed
+> `/api/line/it/tickets/:id/timeline`; that merged endpoint is retired. The
+> current LIFF Conversation and Activity routes are listed below. Other IT9A
+> routes are `/api/line/it/tickets` (list/create),
+> `/api/line/it/tickets/:id`, `/api/line/it/tickets/:id/comments`, and
 > `/api/line/it/attachments/:id`. These routes use
 > `requireLiffWorkforceSession()` and the shared IT requester commands/queries.
 > IT9A does not add a `/liff/it` UI, LIFF Home or Bottom Nav entry, Rich Menu
@@ -92,10 +96,7 @@ authorization configuration: `AUTHORIZATION_SEED_CONFIGURATION` remains
 empty. The IT assignee contract requires active workforce plus configured
 read, comment, and manage `ALL`; Default Domain Policy and analytics authority
 do not satisfy those requirements. IT8 adds no capability key, grant
-configuration, or Email Request default. Ticket persistence, requester
-queries, operator queue, requester/operator timelines and replies, private
-comment attachments, read-authorized attachment access, API, and Dashboard
-surfaces exist. Email Request remains a structured domain with independent
+configuration, or Email Request default. Ticket persistence, requester queries, operator queue, requester/operator Conversation and Activity reads, replies, private comment attachments, read-authorized attachment access, API, and Dashboard surfaces exist. Email Request remains a structured domain with independent
 configured authority and is not mapped to an IT Ticket.
 
 The detailed matrices and phase notes below include historical evidence from
@@ -1890,14 +1891,23 @@ The IT9A requester API surface is:
 
 - `GET` and `POST /api/line/it/tickets`
 - `GET /api/line/it/tickets/:id`
-- `GET /api/line/it/tickets/:id/timeline`
+- `GET /api/line/it/tickets/:id/conversation`
+- `GET /api/line/it/tickets/:id/activity`
 - `POST /api/line/it/tickets/:id/comments`
 - `GET /api/line/it/attachments/:id`
 
 Every route uses `requireLiffWorkforceSession()` and invokes the shared IT
-requester commands/queries for tickets, timelines, comments, and attachments.
+requester commands/queries for tickets, Conversation, Activity, comments, and attachments. Conversation reads only `ITTicketComment`; Activity reads only `ITTicketEvent`. Both retain the effective LIFF requester OWN boundary and the authenticated requester's Ticket resource predicate. They accept independent source-specific keyset cursors; neither endpoint accepts client-selected scope authority.
 IT9A does not include a `/liff/it` UI, LIFF Home entry, Bottom Nav entry, Rich
 Menu integration, Ticket LINE notifications, operator LIFF, or analytics LIFF.
+
+Current Dashboard requester reads are `GET /api/it/tickets/:id/conversation`
+and `GET /api/it/tickets/:id/activity`; both retain authenticated requester
+resource scoping. Operator reads are `GET
+/api/it/operator/tickets/:id/conversation` and `GET
+/api/it/operator/tickets/:id/activity`; both require current
+`it.ticket.read / ALL`. Each Conversation route reads comments only and each
+Activity route reads events only, with independent source-specific cursors.
 
 ## Current IT requester LIFF phase status
 

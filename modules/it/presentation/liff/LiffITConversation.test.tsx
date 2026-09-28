@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ITTicketStatus } from "@prisma/client";
 
 const mocks = vi.hoisted(() => ({
-    fetchTimeline: vi.fn(),
+    fetchConversation: vi.fn(),
     postComment: vi.fn(),
     fetchAttachment: vi.fn(),
 }));
 
 vi.mock("./api", () => ({
-    fetchLiffITTicketTimeline: mocks.fetchTimeline,
+    fetchLiffITTicketConversation: mocks.fetchConversation,
     postLiffITTicketComment: mocks.postComment,
     fetchLiffITAttachment: mocks.fetchAttachment,
 }));
@@ -69,7 +69,7 @@ describe("LiffITConversation", () => {
             configurable: true,
             value: vi.fn(),
         });
-        mocks.fetchTimeline.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
+        mocks.fetchConversation.mockResolvedValue({ items: [], olderCursor: null, hasMore: false });
         mocks.postComment.mockResolvedValue({ comment: COMMENT, replayed: false });
         mocks.fetchAttachment.mockResolvedValue(new Blob(["private image"], { type: "image/webp" }));
     });
@@ -80,17 +80,10 @@ describe("LiffITConversation", () => {
         Reflect.deleteProperty(URL, "revokeObjectURL");
     });
 
-    it("renders requester comments, IT comments, and lifecycle events without operator reference details", async () => {
-        mocks.fetchTimeline.mockResolvedValueOnce({
+    it("renders human comments only", async () => {
+        mocks.fetchConversation.mockResolvedValueOnce({
             items: [
                 {
-                    type: "CREATED",
-                    id: 1,
-                    createdAt: "2026-09-25T01:00:00.000Z",
-                    actorDisplayName: "ผู้แจ้ง",
-                },
-                {
-                    type: "COMMENT",
                     id: "requester-comment",
                     createdAt: "2026-09-25T02:00:00.000Z",
                     authorDisplayName: "ผู้แจ้งทดสอบ",
@@ -103,53 +96,23 @@ describe("LiffITConversation", () => {
                     id: "it-comment",
                     createdAt: "2026-09-25T03:00:00.000Z",
                 },
-                {
-                    type: "STATUS_CHANGED",
-                    id: 2,
-                    createdAt: "2026-09-25T04:00:00.000Z",
-                    actorDisplayName: "IT ภายใน",
-                    fromStatus: "OPEN",
-                    toStatus: "IN_PROGRESS",
-                },
-                {
-                    type: "ASSIGNED",
-                    id: 3,
-                    createdAt: "2026-09-25T05:00:00.000Z",
-                    actorDisplayName: "IT ภายใน",
-                    fromAssigneeDisplayName: "ผู้รับผิดชอบเดิม",
-                    toAssigneeDisplayName: "ผู้รับผิดชอบใหม่",
-                },
-                {
-                    type: "CATEGORY_CHANGED",
-                    id: 4,
-                    createdAt: "2026-09-25T06:00:00.000Z",
-                    actorDisplayName: "IT ภายใน",
-                    fromCategoryName: "หมวดหมู่ลับเดิม",
-                    toCategoryName: "หมวดหมู่ลับใหม่",
-                },
             ],
             olderCursor: null,
             hasMore: false,
         });
         renderConversation();
 
-        const timeline = await screen.findByRole("list", { name: "ลำดับการสนทนาและเหตุการณ์ Ticket" });
-        expect(within(timeline).getByText("สร้าง Ticket แล้ว")).toBeInTheDocument();
-        expect(within(timeline).getByText("ข้อความจากผู้แจ้ง")).toBeInTheDocument();
-        expect(within(timeline).getByText("ข้อความล่าสุดจากเจ้าหน้าที่")).toBeInTheDocument();
-        expect(within(timeline).getByText("เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ")).toBeInTheDocument();
-        expect(within(timeline).getByText("เจ้าหน้าที่ IT อัปเดตการรับเรื่อง")).toBeInTheDocument();
-        expect(within(timeline).getByText("เจ้าหน้าที่ IT ปรับข้อมูลการจัดหมวดหมู่")).toBeInTheDocument();
-        expect(within(timeline).queryByText("ผู้รับผิดชอบใหม่")).not.toBeInTheDocument();
-        expect(within(timeline).queryByText("หมวดหมู่ลับใหม่")).not.toBeInTheDocument();
+        const conversation = await screen.findByRole("list", { name: "ข้อความในการสนทนา" });
+        expect(within(conversation).getByText("ข้อความจากผู้แจ้ง")).toBeInTheDocument();
+        expect(within(conversation).getByText("ข้อความล่าสุดจากเจ้าหน้าที่")).toBeInTheDocument();
+        expect(within(conversation).queryByText(/สถานะ|ผู้รับผิดชอบ|หมวดหมู่|สร้าง Ticket/)).not.toBeInTheDocument();
     });
 
     it("loads older history with the server cursor and keeps chronological ordering", async () => {
-        mocks.fetchTimeline
+        mocks.fetchConversation
             .mockResolvedValueOnce({ items: [COMMENT], olderCursor: "opaque-cursor", hasMore: true })
             .mockResolvedValueOnce({
                 items: [{
-                    type: "COMMENT",
                     id: "comment-older",
                     createdAt: "2026-09-25T01:00:00.000Z",
                     authorDisplayName: "ผู้แจ้ง",
@@ -170,28 +133,28 @@ describe("LiffITConversation", () => {
             });
         renderConversation();
         await screen.findByText("ข้อความล่าสุดจากเจ้าหน้าที่");
-        fireEvent.click(screen.getByRole("button", { name: "ดูประวัติก่อนหน้า" }));
+        fireEvent.click(screen.getByRole("button", { name: "ดูข้อความก่อนหน้า" }));
 
         const older = await screen.findByText("ข้อความเก่ากว่า");
         const latest = screen.getByText("ข้อความล่าสุดจากเจ้าหน้าที่");
         expect(older.compareDocumentPosition(latest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(screen.getByRole("button", { name: "ดูรูปภาพ" })).toBeInTheDocument();
         expect(mocks.fetchAttachment).not.toHaveBeenCalled();
-        expect(mocks.fetchTimeline).toHaveBeenNthCalledWith(2, 42, {
+        expect(mocks.fetchConversation).toHaveBeenNthCalledWith(2, 42, {
             cursor: "opaque-cursor",
             signal: expect.any(AbortSignal),
         });
     });
 
-    it("retries timeline failures and shows a useful empty history state", async () => {
-        mocks.fetchTimeline
+    it("retries conversation failures and shows a useful empty state", async () => {
+        mocks.fetchConversation
             .mockRejectedValueOnce(new LiffApiError("ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้", 404))
             .mockResolvedValueOnce({ items: [], olderCursor: null, hasMore: false });
         renderConversation();
 
         expect(await screen.findByRole("alert")).toHaveTextContent("ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้");
-        fireEvent.click(screen.getByRole("button", { name: "โหลดประวัติอีกครั้ง" }));
-        expect(await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "โหลดบทสนทนาอีกครั้ง" }));
+        expect(await screen.findByText("ยังไม่มีข้อความในบทสนทนา")).toBeInTheDocument();
     });
 
     it.each(["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] as const)(
@@ -205,10 +168,10 @@ describe("LiffITConversation", () => {
     it.each(["RESOLVED", "CLOSED", "CANCELLED"] as const)(
         "keeps %s history readable without showing a reply form",
         async (status) => {
-            mocks.fetchTimeline.mockResolvedValueOnce({ items: [COMMENT], olderCursor: null, hasMore: false });
+            mocks.fetchConversation.mockResolvedValueOnce({ items: [COMMENT], olderCursor: null, hasMore: false });
             renderConversation(status);
             expect(await screen.findByText("ข้อความล่าสุดจากเจ้าหน้าที่")).toBeInTheDocument();
-            expect(screen.getByText(`Ticket นี้อยู่ในสถานะ ${status === "RESOLVED" ? "แก้ไขแล้ว" : status === "CLOSED" ? "ปิดงานแล้ว" : "ยกเลิกแล้ว"} จึงอ่านประวัติได้ แต่ไม่สามารถส่งข้อความตอบกลับได้`)).toBeInTheDocument();
+            expect(screen.getByText(`Ticket นี้อยู่ในสถานะ ${status === "RESOLVED" ? "แก้ไขแล้ว" : status === "CLOSED" ? "ปิดงานแล้ว" : "ยกเลิกแล้ว"} จึงอ่านบทสนทนาได้ แต่ไม่สามารถส่งข้อความตอบกลับได้`)).toBeInTheDocument();
             expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
         },
     );
@@ -319,9 +282,8 @@ describe("LiffITConversation", () => {
         Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:private-image") });
         const revokeObjectURL = vi.fn();
         Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL });
-        mocks.fetchTimeline.mockResolvedValueOnce({
+        mocks.fetchConversation.mockResolvedValueOnce({
             items: [{
-                type: "COMMENT",
                 id: "comment-image",
                 createdAt: "2026-09-25T03:00:00.000Z",
                 authorDisplayName: "เจ้าหน้าที่ IT",
@@ -363,7 +325,7 @@ describe("LiffITConversation", () => {
         mocks.fetchAttachment
             .mockRejectedValueOnce(new LiffApiError("ไม่สามารถเปิดรูปภาพได้ในขณะนี้ กรุณาลองใหม่", 503))
             .mockResolvedValueOnce(new Blob(["private image"], { type: "image/webp" }));
-        mocks.fetchTimeline.mockResolvedValueOnce({
+        mocks.fetchConversation.mockResolvedValueOnce({
             items: [{
                 type: "COMMENT",
                 id: "comment-image-retry",
@@ -399,10 +361,10 @@ describe("LiffITConversation", () => {
         expect(revokeObjectURL).toHaveBeenCalledWith("blob:retry-image");
     });
 
-    it("does not let an older timeline response replace a newer Ticket timeline", async () => {
+    it("does not let an older Conversation response replace a newer Ticket Conversation", async () => {
         const older = deferred<{ items: Array<typeof COMMENT>; olderCursor: null; hasMore: false }>();
         const latest = deferred<{ items: Array<typeof COMMENT>; olderCursor: null; hasMore: false }>();
-        mocks.fetchTimeline.mockImplementation((id: number) => id === 1 ? older.promise : latest.promise);
+        mocks.fetchConversation.mockImplementation((id: number) => id === 1 ? older.promise : latest.promise);
         const view = render(
             <LiffITConversation ticketId={1} status="OPEN" refreshVersion={0} ticketRefreshing={false} onTicketRefresh={vi.fn()} />,
         );

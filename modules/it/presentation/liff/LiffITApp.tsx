@@ -46,10 +46,12 @@ import {
 import {
     fetchLiffITTicket,
     fetchLiffITAttachment,
+    fetchLiffITTicketActivity,
     fetchLiffITTickets,
     createLiffITTicket,
 } from "./api";
 import { LiffITConversation } from "./LiffITConversation";
+import { ITTicketActivity } from "../ITTicketActivity";
 import { ITTicketInitialAttachments } from "../dashboard/ITTicketInitialAttachments";
 import {
     createITTicketCreationAttemptSignature,
@@ -605,9 +607,9 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                         <header className="space-y-1">
                             <h2 id="liff-it-conversation-heading" className="flex items-center gap-2 text-lg font-semibold text-content-heading">
                                 <MessageSquareText aria-hidden="true" className="size-5 text-brand-foreground" />
-                                การสนทนาและประวัติ
+                                การสนทนา
                             </h2>
-                            <p className="text-sm leading-6 text-content-secondary">ข้อความและความคืบหน้าของ Ticket นี้</p>
+                            <p className="text-sm leading-6 text-content-secondary">ข้อความระหว่างคุณกับเจ้าหน้าที่ IT</p>
                         </header>
                         <LiffITConversation
                             key={ticket.id}
@@ -621,6 +623,16 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                             }}
                         />
                     </section>
+                    <ITTicketActivity
+                        key={`activity:${ticket.id}`}
+                        ticketId={ticket.id}
+                        ticketCreatedAt={ticket.createdAt}
+                        audience="REQUESTER"
+                        surface="LIFF"
+                        revision={refreshVersion}
+                        collapsible
+                        pageLoader={fetchLiffITTicketActivity}
+                    />
                 </>
             ) : null}
         </main>

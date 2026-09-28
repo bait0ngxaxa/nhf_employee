@@ -429,14 +429,17 @@ export const API_ROUTES = {
     itTickets: {
         list: "/api/it/tickets",
         byId: (id: number | string): string => `/api/it/tickets/${id}`,
-        timelineById: (id: number | string): string => `/api/it/tickets/${id}/timeline`,
+        conversationById: (id: number | string): string => `/api/it/tickets/${id}/conversation`,
+        activityById: (id: number | string): string => `/api/it/tickets/${id}/activity`,
         commentsById: (id: number | string): string => `/api/it/tickets/${id}/comments`,
     },
     itOperatorTickets: {
         list: "/api/it/operator/tickets",
         byId: (id: number | string): string => `/api/it/operator/tickets/${id}`,
-        timelineById: (id: number | string): string =>
-            `/api/it/operator/tickets/${id}/timeline`,
+        conversationById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/conversation`,
+        activityById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/activity`,
         commentsById: (id: number | string): string =>
             `/api/it/operator/tickets/${id}/comments`,
         reference: "/api/it/operator/reference",
@@ -486,8 +489,10 @@ export const API_ROUTES = {
         itTickets: "/api/line/it/tickets",
         itTicketById: (id: number | string): string =>
             `/api/line/it/tickets/${id}`,
-        itTicketTimelineById: (id: number | string): string =>
-            `/api/line/it/tickets/${id}/timeline`,
+        itTicketConversationById: (id: number | string): string =>
+            `/api/line/it/tickets/${id}/conversation`,
+        itTicketActivityById: (id: number | string): string =>
+            `/api/line/it/tickets/${id}/activity`,
         itTicketCommentsById: (id: number | string): string =>
             `/api/line/it/tickets/${id}/comments`,
         itAttachmentById: (id: string): string =>

@@ -4,12 +4,14 @@ import { requireApiSession } from "@/lib/auth/api";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import {
     buildCurrentITAuthorizationContext,
-    getITRequesterTicketTimeline,
-    logITTicketRouteFailure,
-    mapITTicketRouteError,
-    parseITRequesterTicketId,
-    readITTicketTimelineQuery,
+    getITOperatorTicketConversation,
+    readITTicketHistoryQuery,
 } from "@/modules/it";
+
+import {
+    mapITOperatorRouteError,
+    parseITOperatorTicketId,
+} from "../../../_lib/response";
 
 export async function GET(
     request: NextRequest,
@@ -22,26 +24,24 @@ export async function GET(
         });
         if (!auth.ok) return auth.response;
 
-        const { ticketId: rawTicketId } = await context.params;
-        const ticketId = parseITRequesterTicketId(rawTicketId);
+        const ticketId = parseITOperatorTicketId((await context.params).ticketId);
         if (ticketId === null) {
-            return jsonError("หมายเลข Ticket ไม่ถูกต้อง", 400, { success: false });
+            return jsonError("รหัส Ticket ไม่ถูกต้อง", 400, { success: false });
         }
-        const query = readITTicketTimelineQuery(request.nextUrl.searchParams);
+        const query = readITTicketHistoryQuery(request.nextUrl.searchParams);
         if (query === null) {
-            return jsonError("เงื่อนไขประวัติ Ticket ไม่ถูกต้อง", 400, { success: false });
+            return jsonError("เงื่อนไขการสนทนาไม่ถูกต้อง", 400, { success: false });
         }
-
-        const timeline = await getITRequesterTicketTimeline(
+        const page = await getITOperatorTicketConversation(
             await buildCurrentITAuthorizationContext(auth.user),
             ticketId,
             query,
         );
-        return NextResponse.json({ success: true, ...timeline });
+        return NextResponse.json({ success: true, ...page });
     } catch (error) {
-        const expected = mapITTicketRouteError(error);
+        const expected = mapITOperatorRouteError(error);
         if (expected) return expected;
-        logITTicketRouteFailure("Error reading requester IT Ticket timeline", error);
+        console.error("Error reading operator IT Ticket conversation:", error);
         return operationFailed(500, { success: false });
     }
 }

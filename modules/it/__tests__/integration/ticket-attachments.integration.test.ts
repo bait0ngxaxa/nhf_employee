@@ -10,7 +10,7 @@ import {
     createITTicket,
     getITOperatorTicket,
     getITRequesterTicket,
-    getITRequesterTicketTimeline,
+    getITRequesterTicketConversation,
     getITTicketAttachmentForDownload,
     ITTicketAttachmentValidationError,
     ITTicketCommentKind,
@@ -488,8 +488,8 @@ describe.sequential("IT5B private Ticket attachments with real MySQL", () => {
         expect(commentAudit[0]?.details).not.toContain("แนบภาพประกอบค่ะ");
         expect(commentAudit[0]?.details).not.toContain(rows[0]?.storageKey);
 
-        const timeline = await getITRequesterTicketTimeline(fixture.requester.context, ticket.ticket.id);
-        expect(timeline.items.find((item) => item.type === "COMMENT")).toMatchObject({
+        const conversation = await getITRequesterTicketConversation(fixture.requester.context, ticket.ticket.id);
+        expect(conversation.items.find((item) => item.id === result.comment.id)).toMatchObject({
             id: result.comment.id,
             attachments: result.comment.attachments,
         });

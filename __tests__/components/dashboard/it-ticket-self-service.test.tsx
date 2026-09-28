@@ -65,7 +65,7 @@ function createdTicketResponse(): Response {
     return apiResponse({ success: true, ticket, replayed: false }, 201);
 }
 
-function timelineResponse(items: readonly unknown[] = [], options: {
+function activityResponse(items: readonly unknown[] = [], options: {
     readonly olderCursor?: string | null;
     readonly hasMore?: boolean;
 } = {}): Response {
@@ -74,6 +74,21 @@ function timelineResponse(items: readonly unknown[] = [], options: {
         items,
         olderCursor: options.olderCursor ?? null,
         hasMore: options.hasMore ?? false,
+    });
+}
+
+function conversationResponse(): Response {
+    return apiResponse({ success: true, items: [], olderCursor: null, hasMore: false });
+}
+
+const configureFetch = fetchMock.mockImplementation.bind(fetchMock);
+
+function mockApiImplementation(
+    implementation: Parameters<typeof fetchMock.mockImplementation>[0],
+): void {
+    configureFetch(async (input, init) => {
+        if (String(input).includes("/conversation")) return conversationResponse();
+        return implementation(input, init);
     });
 }
 
@@ -133,7 +148,7 @@ afterEach(() => {
 
 describe("IT Ticket self-service presentation", () => {
     it("shows a skeleton while the bounded requester list is loading", async () => {
-        fetchMock.mockImplementation(() => new Promise<Response>(() => undefined));
+        mockApiImplementation(() => new Promise<Response>(() => undefined));
 
         render(<ITTicketSelfService capabilities={capabilities} />);
 
@@ -179,7 +194,7 @@ describe("IT Ticket self-service presentation", () => {
 
     it("disables duplicate submissions while the create request is pending", async () => {
         const pendingPost: { resolve: ((response: Response) => void) | null } = { resolve: null };
-        fetchMock.mockImplementation((_input, init) => init?.method === "POST"
+        mockApiImplementation((_input, init) => init?.method === "POST"
             ? new Promise<Response>((resolve) => { pendingPost.resolve = resolve; })
             : Promise.resolve(emptyListResponse()));
 
@@ -227,7 +242,7 @@ describe("IT Ticket self-service presentation", () => {
     });
 
     it("previews and removes selected images, then sends retained evidence as multipart", async () => {
-        fetchMock.mockImplementation((_input, init) => init?.method === "POST"
+        mockApiImplementation((_input, init) => init?.method === "POST"
             ? Promise.resolve(createdTicketResponse())
             : Promise.resolve(emptyListResponse()));
 
@@ -276,15 +291,17 @@ describe("IT Ticket requester detail", () => {
             height: 16,
             position: 0,
         };
-        fetchMock.mockImplementation(async (input) => {
+        mockApiImplementation(async (input) => {
             if (String(input).includes("/attachments/")) {
                 return new Response(new Blob(["private image"], { type: "image/webp" }), {
                     status: 200,
                     headers: { "Content-Type": "image/webp" },
                 });
             }
-            return String(input).includes("/timeline")
-                ? timelineResponse()
+            const url = String(input);
+            if (url.includes("/conversation")) return conversationResponse();
+            return url.includes("/activity")
+                ? activityResponse()
                 : apiResponse({ success: true, ticket: { ...ticketDetail, initialAttachments: [attachment] } });
         });
 
@@ -305,15 +322,28 @@ describe("IT Ticket requester detail", () => {
         ["CLOSED", "ปิดงานแล้ว"],
         ["CANCELLED", "ยกเลิกแล้ว"],
     ] as const)("renders %s status as %s", async (status, label) => {
-        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
-            ? timelineResponse()
-            : apiResponse({ success: true, ticket: { ...ticketDetail, status } }));
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/conversation")) return conversationResponse();
+            return url.includes("/activity")
+                ? activityResponse()
+                : apiResponse({ success: true, ticket: { ...ticketDetail, status } });
+        });
 
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
 
         expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
         expect(screen.getByText(label)).toBeInTheDocument();
         expect(screen.getByText("หน้าเข้าสู่ระบบแสดงข้อผิดพลาด")).toBeInTheDocument();
+        const commentable = status === "OPEN"
+            || status === "IN_PROGRESS"
+            || status === "WAITING_REQUESTER";
+        if (commentable) {
+            expect(await screen.findByLabelText("ตอบกลับ")).toBeInTheDocument();
+        } else {
+            expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
+            expect(screen.getByText(/จึงอ่านบทสนทนาได้อย่างเดียว/)).toBeInTheDocument();
+        }
     });
 
     it("shows a non-leaking not-found error for a direct foreign Ticket URL", async () => {
@@ -326,76 +356,96 @@ describe("IT Ticket requester detail", () => {
         expect(fetchMock).toHaveBeenCalledWith("/api/it/tickets/900", expect.anything());
     });
 
-    it("shows timeline loading, empty, retry, and event history states", async () => {
-        fetchMock.mockImplementation(async (input) => {
-            if (String(input).includes("/timeline")) {
+    it("shows Activity loading and renders compact lifecycle history", async () => {
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/conversation")) return conversationResponse();
+            if (url.includes("/activity")) {
                 return new Promise<Response>(() => undefined);
             }
             return apiResponse({ success: true, ticket: ticketDetail });
         });
         const { unmount } = render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
-        expect(await screen.findByRole("status", { name: "กำลังโหลดประวัติ Ticket" }))
+        expect(await screen.findByRole("status", { name: "กำลังโหลดประวัติการดำเนินการ" }))
             .toBeInTheDocument();
         unmount();
 
-        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
-            ? timelineResponse([
-                { type: "CREATED", id: 1, createdAt: ticket.createdAt, actorDisplayName: "สมชาย" },
-                { type: "ASSIGNED", id: 2, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromAssigneeDisplayName: null, toAssigneeDisplayName: "วิชัย" },
-                { type: "UNASSIGNED", id: 3, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromAssigneeDisplayName: "วิชัย", toAssigneeDisplayName: null },
-                { type: "STATUS_CHANGED", id: 4, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromStatus: "OPEN", toStatus: "IN_PROGRESS" },
-                { type: "CATEGORY_CHANGED", id: 5, createdAt: ticket.updatedAt, actorDisplayName: "อารี", fromCategoryName: null, toCategoryName: "ระบบเครือข่าย" },
-            ])
-            : apiResponse({ success: true, ticket: ticketDetail }));
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/conversation")) return conversationResponse();
+            return url.includes("/activity")
+                ? activityResponse([
+                    { type: "CREATED", id: 1, occurredAt: ticket.createdAt, actorDisplayName: "สมชาย" },
+                    { type: "ASSIGNED", id: 2, occurredAt: ticket.updatedAt, actorDisplayName: "อารี", fromAssigneeDisplayName: null, toAssigneeDisplayName: "วิชัย" },
+                    { type: "UNASSIGNED", id: 3, occurredAt: ticket.updatedAt, actorDisplayName: "อารี", fromAssigneeDisplayName: "วิชัย", toAssigneeDisplayName: null },
+                    { type: "STATUS_CHANGED", id: 4, occurredAt: ticket.updatedAt, actorDisplayName: "อารี", fromStatus: "OPEN", toStatus: "IN_PROGRESS" },
+                    { type: "CATEGORY_CHANGED", id: 5, occurredAt: ticket.updatedAt, actorDisplayName: "อารี", fromCategoryName: null, toCategoryName: "ระบบเครือข่าย" },
+                ])
+                : apiResponse({ success: true, ticket: ticketDetail });
+        });
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
-        expect(await screen.findByText("สมชาย สร้าง Ticket")).toBeInTheDocument();
-        expect(screen.getByText("อารี เปลี่ยนผู้รับผิดชอบจาก ไม่มีผู้รับผิดชอบ เป็น วิชัย"))
+        const activityDisclosure = await screen.findByText("ประวัติการดำเนินการ");
+        expect(activityDisclosure.closest("details")).not.toHaveAttribute("open");
+        fireEvent.click(activityDisclosure);
+        expect(await screen.findByText("รับเรื่องแล้ว")).toBeInTheDocument();
+        expect(screen.getByText("ผู้ดำเนินการ: สมชาย")).toBeInTheDocument();
+        expect(screen.getByText("มอบหมายให้ วิชัย"))
             .toBeInTheDocument();
-        expect(screen.getByText("อารี นำความรับผิดชอบของ วิชัย ออก")).toBeInTheDocument();
-        expect(screen.getByText("อารี เปลี่ยนสถานะจาก รับเรื่องแล้ว เป็น กำลังดำเนินการ"))
+        expect(screen.getByText("นำ วิชัย ออกจากผู้รับผิดชอบ")).toBeInTheDocument();
+        expect(screen.getByText("เริ่มดำเนินการ"))
             .toBeInTheDocument();
-        expect(screen.getByText("อารี เปลี่ยนหมวดหมู่จาก ไม่จัดหมวดหมู่ เป็น ระบบเครือข่าย"))
+        expect(screen.getByText("เปลี่ยนหมวดหมู่จาก ไม่จัดหมวดหมู่ เป็น ระบบเครือข่าย"))
             .toBeInTheDocument();
+        expect(screen.getAllByText("ผู้ดำเนินการ: อารี")).toHaveLength(4);
     });
 
     it("shows requester reply only for projected comment authority and commentable status", async () => {
-        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
-            ? timelineResponse()
-            : apiResponse({ success: true, ticket: ticketDetail }));
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/conversation")) return conversationResponse();
+            return url.includes("/activity")
+                ? activityResponse()
+                : apiResponse({ success: true, ticket: ticketDetail });
+        });
         const { rerender, unmount } = render(
             <ITTicketDetail ticketId={19} canCommentOwnTickets={false} />,
         );
-        expect(await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ"))
+        expect(await screen.findByText("ยังไม่มีข้อความในบทสนทนา"))
             .toBeInTheDocument();
         expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
 
         rerender(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
         expect(await screen.findByLabelText("ตอบกลับ")).toBeInTheDocument();
 
-        fetchMock.mockImplementation(async (input) => String(input).includes("/timeline")
-            ? timelineResponse()
-            : apiResponse({ success: true, ticket: { ...ticketDetail, status: "RESOLVED" } }));
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/conversation")) return conversationResponse();
+            return url.includes("/activity")
+                ? activityResponse()
+                : apiResponse({ success: true, ticket: { ...ticketDetail, status: "RESOLVED" } });
+        });
         unmount();
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
-        expect(await screen.findByText(/สถานะ “แก้ไขแล้ว” จึงอ่านประวัติได้อย่างเดียว/))
+        expect(await screen.findByText(/สถานะ “แก้ไขแล้ว” จึงอ่านบทสนทนาได้อย่างเดียว/))
             .toBeInTheDocument();
         expect(screen.queryByLabelText("ตอบกลับ")).not.toBeInTheDocument();
     });
 
     it("reuses the idempotency key after an uncertain retry of the same canonical body", async () => {
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             if (init?.method === "POST") {
                 return fetchMock.mock.calls.filter(([, options]) => options?.method === "POST").length === 1
                     ? Promise.reject(new Error("network result uncertain"))
                     : postedCommentResponse(true);
             }
-            return String(input).includes("/timeline")
-                ? timelineResponse()
+            if (String(input).includes("/conversation")) return conversationResponse();
+            return String(input).includes("/activity")
+                ? activityResponse()
                 : apiResponse({ success: true, ticket: { ...ticketDetail, status: "WAITING_REQUESTER" } });
         });
 
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
-        await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ");
+        await screen.findByText("ยังไม่มีข้อความในบทสนทนา");
         const composer = screen.getByLabelText("ตอบกลับ");
         fireEvent.change(composer, { target: { value: "  ขออัปเดตผลตรวจสอบค่ะ  " } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
@@ -416,19 +466,20 @@ describe("IT Ticket requester detail", () => {
 
     it("uses a new idempotency key when the canonical body changes after uncertainty", async () => {
         randomUUID.mockReturnValueOnce("it-comment-key-a").mockReturnValueOnce("it-comment-key-b");
-        fetchMock.mockImplementation(async (input, init) => {
+        mockApiImplementation(async (input, init) => {
             if (init?.method === "POST") {
                 const count = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST").length;
                 return count === 1
                     ? Promise.reject(new Error("network result uncertain"))
                     : postedCommentResponse();
             }
-            return String(input).includes("/timeline")
-                ? timelineResponse()
+            if (String(input).includes("/conversation")) return conversationResponse();
+            return String(input).includes("/activity")
+                ? activityResponse()
                 : apiResponse({ success: true, ticket: ticketDetail });
         });
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
-        await screen.findByText("ยังไม่มีข้อความหรือประวัติการดำเนินการ");
+        await screen.findByText("ยังไม่มีข้อความในบทสนทนา");
         fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความแรก" } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByRole("alert");

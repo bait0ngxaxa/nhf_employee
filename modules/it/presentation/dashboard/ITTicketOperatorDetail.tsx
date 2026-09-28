@@ -14,6 +14,7 @@ import {
     toDashboardITTabPath,
 } from "@/lib/ssot/routes";
 import { ITTicketConversation } from "./ITTicketConversation";
+import { ITTicketActivity } from "../ITTicketActivity";
 
 import {
     IT_TICKET_STATUS_LABELS,
@@ -432,7 +433,12 @@ export function ITTicketOperatorDetail({
                             status={ticket.status}
                             canComment={capabilities.canCommentAllTickets}
                             operator
-                            timelineRevision={ticket.version}
+                        />
+                        <ITTicketActivity
+                            ticketId={ticket.id}
+                            ticketCreatedAt={ticket.createdAt}
+                            audience="OPERATOR"
+                            revision={ticket.version}
                         />
 
                         {canManage ? (

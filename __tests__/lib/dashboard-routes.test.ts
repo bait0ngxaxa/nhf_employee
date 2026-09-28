@@ -150,10 +150,18 @@ describe("dashboard route SSOT", () => {
     it("centralizes internal IT Ticket API routes without changing the Stock alias", () => {
         expect(API_ROUTES.itTickets.list).toBe("/api/it/tickets");
         expect(API_ROUTES.itTickets.byId(27)).toBe("/api/it/tickets/27");
+        expect(API_ROUTES.itTickets.conversationById(27)).toBe("/api/it/tickets/27/conversation");
+        expect(API_ROUTES.itTickets.activityById(27)).toBe("/api/it/tickets/27/activity");
+        expect(API_ROUTES.itOperatorTickets.conversationById(27))
+            .toBe("/api/it/operator/tickets/27/conversation");
+        expect(API_ROUTES.itOperatorTickets.activityById(27))
+            .toBe("/api/it/operator/tickets/27/activity");
         expect(API_ROUTES.line.itTickets).toBe("/api/line/it/tickets");
         expect(API_ROUTES.line.itTicketById(27)).toBe("/api/line/it/tickets/27");
-        expect(API_ROUTES.line.itTicketTimelineById(27))
-            .toBe("/api/line/it/tickets/27/timeline");
+        expect(API_ROUTES.line.itTicketConversationById(27))
+            .toBe("/api/line/it/tickets/27/conversation");
+        expect(API_ROUTES.line.itTicketActivityById(27))
+            .toBe("/api/line/it/tickets/27/activity");
         expect(API_ROUTES.line.itTicketCommentsById(27))
             .toBe("/api/line/it/tickets/27/comments");
         expect(API_ROUTES.line.itAttachmentById("attachment-id"))

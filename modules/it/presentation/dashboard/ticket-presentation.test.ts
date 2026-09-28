@@ -8,9 +8,16 @@ import {
     parseITOperatorTicketMutationSnapshot,
     isITOperatorMutationVersionConflict,
     readITOperatorError,
-    mergeITTicketTimelineItems,
-    parseITTicketTimelineItem,
-    parseITTicketTimelinePage,
+    formatITTicketActivityTime,
+    formatITTicketActivityTimestamp,
+    describeITTicketActivityActor,
+    describeITTicketActivityItem,
+    mergeITTicketActivityItems,
+    mergeITTicketConversationItems,
+    parseITTicketActivityItem,
+    parseITTicketActivityPage,
+    parseITTicketConversationItem,
+    parseITTicketConversationPage,
     parseITRequesterTicketDetail,
 } from "./ticket-presentation";
 
@@ -35,6 +42,18 @@ const operatorTicket = {
 };
 
 describe("IT operator presentation contracts", () => {
+    it("formats compact Activity times in Bangkok time", () => {
+        expect(formatITTicketActivityTime("2026-09-01T07:03:00.000Z")).toBe("14:03");
+        expect(formatITTicketActivityTimestamp(
+            "2026-09-01T07:03:00.000Z",
+            "2026-09-01T01:00:00.000Z",
+        )).toBe("14:03");
+        expect(formatITTicketActivityTimestamp(
+            "2026-09-01T17:03:00.000Z",
+            "2026-09-01T01:00:00.000Z",
+        )).toBe("2 ก.ย. 2569 · 00:03");
+    });
+
     it("parses the operator DTO including a historical inactive category", () => {
         expect(parseITOperatorTicket(operatorTicket)).toEqual(operatorTicket);
         expect(parseITOperatorTicket(operatorTicket)).not.toHaveProperty("events");
@@ -148,58 +167,35 @@ describe("IT operator presentation contracts", () => {
     });
 });
 
-describe("IT Ticket timeline presentation contracts", () => {
-    it("parses only browser-safe comment and event fields", () => {
-        const payload = {
-            success: true,
-            items: [
-                {
-                    type: "CREATED",
-                    id: 4,
-                    createdAt: "2026-09-01T01:00:00.000Z",
-                    actorDisplayName: "สมชาย ใจดี",
-                    actor: { email: "private@example.test" },
-                },
-                {
-                    type: "COMMENT",
-                    id: "cmtest123",
-                    createdAt: "2026-09-01T02:00:00.000Z",
-                    authorDisplayName: "อารี ใจเย็น",
-                    authorSide: "OPERATOR",
-                    body: "ตรวจสอบให้แล้วค่ะ",
-                    attachments: [],
-                    author: { password: "private" },
-                },
-            ],
-            olderCursor: "eyJzb3VyY2UiOiJFVkVOVCJ9",
-            hasMore: true,
-        };
-        const page = parseITTicketTimelinePage(payload);
+describe("IT Ticket conversation and activity presentation contracts", () => {
+    const comment = {
+        id: "cmtest123",
+        createdAt: "2026-09-01T02:00:00.000Z",
+        authorDisplayName: "อารี ใจเย็น",
+        authorSide: "OPERATOR",
+        body: "ตรวจสอบให้แล้วค่ะ",
+        attachments: [],
+    } as const;
+    const created = {
+        type: "CREATED",
+        id: 4,
+        occurredAt: "2026-09-01T01:00:00.000Z",
+        actorDisplayName: "สมชาย ใจดี",
+    } as const;
 
-        expect(page).toEqual({
-            items: [
-                {
-                    type: "CREATED",
-                    id: 4,
-                    createdAt: "2026-09-01T01:00:00.000Z",
-                    actorDisplayName: "สมชาย ใจดี",
-                },
-                {
-                    type: "COMMENT",
-                    id: "cmtest123",
-                    createdAt: "2026-09-01T02:00:00.000Z",
-                    authorDisplayName: "อารี ใจเย็น",
-                    authorSide: "OPERATOR",
-                    body: "ตรวจสอบให้แล้วค่ะ",
-                    attachments: [],
-                },
-            ],
-            olderCursor: "eyJzb3VyY2UiOiJFVkVOVCJ9",
+    it("parses comment-only conversation pages and rejects event rows", () => {
+        expect(parseITTicketConversationPage({
+            success: true,
+            items: [{ ...comment, author: { password: "private" } }],
+            olderCursor: "conversation-cursor",
+            hasMore: true,
+        })).toEqual({
+            items: [comment],
+            olderCursor: "conversation-cursor",
             hasMore: true,
         });
-        expect(page?.items[0]).not.toHaveProperty("actor");
-        expect(page?.items[1]).not.toHaveProperty("author");
-        expect(parseITTicketTimelinePage({
+        expect(parseITTicketConversationItem(created)).toBeNull();
+        expect(parseITTicketConversationPage({
             success: true,
             items: [],
             olderCursor: null,
@@ -207,49 +203,78 @@ describe("IT Ticket timeline presentation contracts", () => {
         })).toBeNull();
     });
 
-    it("uses timestamp, event-before-comment, and stable source-id ordering for ties", () => {
+    it("parses event-only activity pages and rejects comment rows", () => {
+        expect(parseITTicketActivityPage({
+            success: true,
+            items: [{ ...created, actor: { email: "private@example.test" } }],
+            olderCursor: "activity-cursor",
+            hasMore: true,
+        })).toEqual({
+            items: [created],
+            olderCursor: "activity-cursor",
+            hasMore: true,
+        });
+        expect(parseITTicketActivityItem(comment)).toBeNull();
+    });
+
+    it("merges pages independently with stable ID ordering for equal timestamps", () => {
         const at = "2026-09-01T01:00:00.000Z";
-        const items = mergeITTicketTimelineItems([
-            {
-                type: "COMMENT",
-                id: "cm02",
-                createdAt: at,
-                authorDisplayName: "ผู้แจ้ง",
-                authorSide: "REQUESTER",
-                body: "ข้อความ",
-                attachments: [],
-            },
-            { type: "CREATED", id: 8, createdAt: at, actorDisplayName: "ก" },
-            { type: "STATUS_CHANGED", id: 4, createdAt: at, actorDisplayName: "ข", fromStatus: "OPEN", toStatus: "IN_PROGRESS" },
-            {
-                type: "COMMENT",
-                id: "cm01",
-                createdAt: at,
-                authorDisplayName: "เจ้าหน้าที่",
-                authorSide: "OPERATOR",
-                body: "ข้อความ",
-                attachments: [],
-            },
-            { type: "CREATED", id: 7, createdAt: at, actorDisplayName: "ค" },
+        const conversation = mergeITTicketConversationItems([
+            { ...comment, id: "cm02", createdAt: at },
+            { ...comment, id: "cm01", createdAt: at },
+        ]);
+        const activity = mergeITTicketActivityItems([
+            { type: "CREATED", id: 8, occurredAt: at, actorDisplayName: "ข" },
+            { type: "CREATED", id: 7, occurredAt: at, actorDisplayName: "ก" },
         ]);
 
-        expect(items.map((item) => `${item.type}:${item.id}`)).toEqual([
-            "STATUS_CHANGED:4",
-            "CREATED:7",
-            "CREATED:8",
-            "COMMENT:cm01",
-            "COMMENT:cm02",
-        ]);
+        expect(conversation.map((item) => item.id)).toEqual(["cm01", "cm02"]);
+        expect(activity.map((item) => item.id)).toEqual([7, 8]);
+        expect(conversation.every((item) => "body" in item)).toBe(true);
+        expect(activity.every((item) => "occurredAt" in item)).toBe(true);
+    });
+
+    it("uses canonical Thai lifecycle wording and keeps LIFF assignment/category details private", () => {
+        const reopen = {
+            type: "STATUS_CHANGED",
+            id: 9,
+            occurredAt: "2026-09-01T02:00:00.000Z",
+            actorDisplayName: "สมชาย",
+            fromStatus: "RESOLVED",
+            toStatus: "IN_PROGRESS",
+        } as const;
+        const assigned = {
+            type: "ASSIGNED",
+            id: 10,
+            occurredAt: "2026-09-01T02:01:00.000Z",
+            actorDisplayName: "สมชาย",
+            fromAssigneeDisplayName: null,
+            toAssigneeDisplayName: "อารี ใจเย็น",
+        } as const;
+        const category = {
+            type: "CATEGORY_CHANGED",
+            id: 11,
+            occurredAt: "2026-09-01T02:02:00.000Z",
+            actorDisplayName: "สมชาย",
+            fromCategoryName: null,
+            toCategoryName: "ข้อมูลภายใน",
+        } as const;
+
+        expect(describeITTicketActivityItem(reopen, "DASHBOARD")).toBe("เปิดงานอีกครั้ง");
+        expect(describeITTicketActivityActor(reopen, "DASHBOARD")).toBe("สมชาย");
+        expect(describeITTicketActivityActor(reopen, "LIFF")).toBe("เจ้าหน้าที่ IT");
+        expect(describeITTicketActivityActor({ ...reopen, type: "CREATED" }, "LIFF")).toBe("คุณ");
+        expect(describeITTicketActivityItem(assigned, "DASHBOARD")).toContain("อารี ใจเย็น");
+        expect(describeITTicketActivityActor(assigned, "DASHBOARD")).toBe("สมชาย");
+        expect(describeITTicketActivityItem(assigned, "LIFF")).not.toContain("อารี ใจเย็น");
+        expect(describeITTicketActivityItem(category, "LIFF")).not.toContain("ข้อมูลภายใน");
+        expect(describeITTicketActivityItem(category, "DASHBOARD")).toContain("ข้อมูลภายใน");
     });
 
     it("validates attachment summaries before exposing private image URLs to presentation", () => {
-        const comment = {
-            type: "COMMENT",
-            id: "cmtest123",
-            createdAt: "2026-09-01T02:00:00.000Z",
-            authorDisplayName: "ผู้แจ้ง",
+        const commentWithAttachment = {
+            ...comment,
             authorSide: "REQUESTER",
-            body: "มีภาพประกอบ",
             attachments: [{
                 id: "a".repeat(32),
                 originalName: "หลักฐาน.png",
@@ -261,29 +286,31 @@ describe("IT Ticket timeline presentation contracts", () => {
                 storageKey: "it/19/private.webp",
             }],
         };
-        const parsed = parseITTicketTimelineItem(comment);
+        const parsed = parseITTicketConversationItem(commentWithAttachment);
         expect(parsed).toMatchObject({
-            type: "COMMENT",
             attachments: [{ id: "a".repeat(32), originalName: "หลักฐาน.png" }],
         });
         expect(parsed).not.toHaveProperty("attachments.0.storageKey");
 
         for (const invalidAttachment of [
-            { ...comment.attachments[0], id: "../private" },
-            { ...comment.attachments[0], contentType: "image/png" },
-            { ...comment.attachments[0], position: 3 },
-            { ...comment.attachments[0], sizeBytes: 0 },
-            { ...comment.attachments[0], width: 2401 },
-            { ...comment.attachments[0], originalName: "../proof.png" },
-            { ...comment.attachments[0], originalName: "   " },
-            { ...comment.attachments[0], originalName: " proof.png " },
-            { ...comment.attachments[0], originalName: "proof\u0085.png" },
+            { ...commentWithAttachment.attachments[0], id: "../private" },
+            { ...commentWithAttachment.attachments[0], contentType: "image/png" },
+            { ...commentWithAttachment.attachments[0], position: 3 },
+            { ...commentWithAttachment.attachments[0], sizeBytes: 0 },
+            { ...commentWithAttachment.attachments[0], width: 2401 },
+            { ...commentWithAttachment.attachments[0], originalName: "../proof.png" },
+            { ...commentWithAttachment.attachments[0], originalName: "   " },
+            { ...commentWithAttachment.attachments[0], originalName: " proof.png " },
+            { ...commentWithAttachment.attachments[0], originalName: "proof\u0085.png" },
         ]) {
-            expect(parseITTicketTimelineItem({
-                ...comment,
+            expect(parseITTicketConversationItem({
+                ...commentWithAttachment,
                 attachments: [invalidAttachment],
             })).toBeNull();
         }
-        expect(parseITTicketTimelineItem({ ...comment, attachments: undefined })).toBeNull();
+        expect(parseITTicketConversationItem({
+            ...commentWithAttachment,
+            attachments: undefined,
+        })).toBeNull();
     });
 });

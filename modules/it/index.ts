@@ -47,9 +47,11 @@ export {
     listITOperatorTickets,
 } from "./application/ticket-queries";
 export {
-    getITOperatorTicketTimeline,
-    getITRequesterTicketTimeline,
-} from "./application/ticket-timeline-queries";
+    getITOperatorTicketActivity,
+    getITOperatorTicketConversation,
+    getITRequesterTicketActivity,
+    getITRequesterTicketConversation,
+} from "./application/ticket-conversation-activity-queries";
 export {
     postITOperatorTicketComment,
     postITRequesterTicketComment,
@@ -78,7 +80,7 @@ export {
     logITTicketRouteFailure,
     mapITTicketRouteError,
     parseITRequesterTicketId,
-    readITTicketTimelineQuery,
+    readITTicketHistoryQuery,
 } from "./presentation/http/ticket-routes";
 export {
     getITAnalyticsDashboard,
@@ -109,8 +111,10 @@ export {
     IT_TICKET_ATTACHMENT_WEBP_QUALITY,
     IT_TICKET_DATABASE_INT_MAX,
     IT_TICKET_DESCRIPTION_MAX_LENGTH,
-    IT_TICKET_TIMELINE_DEFAULT_LIMIT,
-    IT_TICKET_TIMELINE_MAX_LIMIT,
+    IT_TICKET_ACTIVITY_DEFAULT_LIMIT,
+    IT_TICKET_ACTIVITY_MAX_LIMIT,
+    IT_TICKET_CONVERSATION_DEFAULT_LIMIT,
+    IT_TICKET_CONVERSATION_MAX_LIMIT,
     IT_TICKET_TITLE_MAX_LENGTH,
 } from "./contracts";
 export {
@@ -171,7 +175,13 @@ export type {
     SetITTicketCategoryInput,
     TransitionITTicketStatusInput,
 } from "./application/ticket-schemas";
-export type { ITTicketCommentSubmission, ITTicketTimelinePage, ITTicketTimelineItem } from "./contracts";
+export type {
+    ITTicketActivityItem,
+    ITTicketActivityPage,
+    ITTicketCommentSubmission,
+    ITTicketConversationItem,
+    ITTicketConversationPage,
+} from "./contracts";
 export type { ITTicketAttachmentSummary } from "./contracts";
 export type {
     CreateITTicketResult,

@@ -4,11 +4,11 @@ import { jsonError, operationFailed } from "@/lib/ssot/http";
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     buildITAuthorizationContext,
-    getITRequesterTicketTimeline,
+    getITRequesterTicketConversation,
     logITTicketRouteFailure,
     mapITTicketRouteError,
     parseITRequesterTicketId,
-    readITTicketTimelineQuery,
+    readITTicketHistoryQuery,
 } from "@/modules/it";
 
 interface RouteContext {
@@ -27,20 +27,20 @@ export async function GET(
         if (ticketId === null) {
             return jsonError("หมายเลข Ticket ไม่ถูกต้อง", 400, { success: false });
         }
-        const query = readITTicketTimelineQuery(request.nextUrl.searchParams);
+        const query = readITTicketHistoryQuery(request.nextUrl.searchParams);
         if (query === null) {
-            return jsonError("เงื่อนไขประวัติ Ticket ไม่ถูกต้อง", 400, { success: false });
+            return jsonError("เงื่อนไขการสนทนาไม่ถูกต้อง", 400, { success: false });
         }
-        const timeline = await getITRequesterTicketTimeline(
+        const page = await getITRequesterTicketConversation(
             buildITAuthorizationContext(auth.user, auth.employeeId, "LIFF_SELF_SERVICE"),
             ticketId,
             query,
         );
-        return NextResponse.json({ success: true, ...timeline });
+        return NextResponse.json({ success: true, ...page });
     } catch (error) {
         const expected = mapITTicketRouteError(error);
         if (expected) return expected;
-        logITTicketRouteFailure("Error reading LIFF IT Ticket timeline", error);
+        logITTicketRouteFailure("Error reading LIFF IT Ticket conversation", error);
         return operationFailed(500, { success: false });
     }
 }

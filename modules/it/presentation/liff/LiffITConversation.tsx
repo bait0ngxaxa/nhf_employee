@@ -31,9 +31,8 @@ import {
     IT_TICKET_COMMENT_MAX_LENGTH,
     IT_TICKET_STATUS_LABELS,
     type ITTicketAttachmentSummary,
-    type ITTicketTimelineEvent,
-    type ITTicketTimelineItem,
-    type ITTicketTimelinePage,
+    type ITTicketConversationItem,
+    type ITTicketConversationPage,
 } from "../../contracts";
 import {
     createITTicketCommentAttemptSignature,
@@ -42,16 +41,16 @@ import {
 } from "../dashboard/ticket-attachment-client";
 import {
     formatITTicketDate,
-    mergeITTicketTimelineItems,
+    mergeITTicketConversationItems,
 } from "../dashboard/ticket-presentation";
 import {
     fetchLiffITAttachment,
-    fetchLiffITTicketTimeline,
+    fetchLiffITTicketConversation,
     postLiffITTicketComment,
 } from "./api";
 
-type TimelineState =
-    | { readonly key: string; readonly kind: "loaded"; readonly page: ITTicketTimelinePage }
+type ConversationState =
+    | { readonly key: string; readonly kind: "loaded"; readonly page: ITTicketConversationPage }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -60,20 +59,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function formatAttachmentSize(sizeBytes: number): string {
     return `${(sizeBytes / (1024 * 1024)).toLocaleString("th-TH", { maximumFractionDigits: 1 })} MiB`;
-}
-
-function eventDescription(event: ITTicketTimelineEvent): string {
-    switch (event.type) {
-        case "CREATED":
-            return "สร้าง Ticket แล้ว";
-        case "ASSIGNED":
-        case "UNASSIGNED":
-            return "เจ้าหน้าที่ IT อัปเดตการรับเรื่อง";
-        case "STATUS_CHANGED":
-            return `เปลี่ยนสถานะจาก ${event.fromStatus === null ? "ไม่ระบุสถานะ" : IT_TICKET_STATUS_LABELS[event.fromStatus]} เป็น ${event.toStatus === null ? "ไม่ระบุสถานะ" : IT_TICKET_STATUS_LABELS[event.toStatus]}`;
-        case "CATEGORY_CHANGED":
-            return "เจ้าหน้าที่ IT ปรับข้อมูลการจัดหมวดหมู่";
-    }
 }
 
 function PrivateAttachment({
@@ -170,18 +155,7 @@ function PrivateAttachment({
     );
 }
 
-function TimelineItem({ item }: { readonly item: ITTicketTimelineItem }): ReactElement {
-    if (item.type !== "COMMENT") {
-        return (
-            <li className="py-2">
-                <article className="mx-auto max-w-[92%] rounded-lg bg-surface-subtle px-3 py-2 text-center">
-                    <p className="text-xs font-semibold leading-5 text-content-secondary">{eventDescription(item)}</p>
-                    <time dateTime={item.createdAt} className="mt-1 block text-xs tabular-nums text-content-muted">{formatITTicketDate(item.createdAt)}</time>
-                </article>
-            </li>
-        );
-    }
-
+function ConversationItem({ item }: { readonly item: ITTicketConversationItem }): ReactElement {
     const requesterMessage = item.authorSide === "REQUESTER";
     return (
         <li className={`flex py-2 ${requesterMessage ? "justify-end" : "justify-start"}`}>
@@ -221,7 +195,7 @@ export function LiffITConversation({
     readonly ticketRefreshing: boolean;
     readonly onTicketRefresh: () => void;
 }): ReactElement {
-    const [timelineState, setTimelineState] = useState<TimelineState | null>(null);
+    const [conversationState, setConversationState] = useState<ConversationState | null>(null);
     const [retry, setRetry] = useState(0);
     const [olderBusy, setOlderBusy] = useState(false);
     const [olderErrorState, setOlderErrorState] = useState<{ readonly key: string; readonly message: string } | null>(null);
@@ -243,17 +217,17 @@ export function LiffITConversation({
     const commentAttemptRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
 
     const requestKey = `${ticketId}:${refreshVersion}:${retry}`;
-    const timeline = timelineState?.key === requestKey && timelineState.kind === "loaded"
-        ? timelineState.page
+    const conversation = conversationState?.key === requestKey && conversationState.kind === "loaded"
+        ? conversationState.page
         : null;
-    const timelineError = timelineState?.key === requestKey && timelineState.kind === "error"
-        ? timelineState.message
+    const conversationError = conversationState?.key === requestKey && conversationState.kind === "error"
+        ? conversationState.message
         : null;
     const olderError = olderErrorState?.key === requestKey ? olderErrorState.message : null;
     const postError = postErrorState?.refreshVersion === refreshVersion
         ? postErrorState.message
         : null;
-    const loading = timeline === null && timelineError === null;
+    const loading = conversation === null && conversationError === null;
     const commentable = IT_TICKET_COMMENTABLE_STATUSES.some((candidate) => candidate === status);
     const canReply = commentable
         && postingDeniedAt !== refreshVersion
@@ -266,18 +240,18 @@ export function LiffITConversation({
 
     useEffect(() => {
         const controller = new AbortController();
-        void fetchLiffITTicketTimeline(ticketId, { signal: controller.signal })
+        void fetchLiffITTicketConversation(ticketId, { signal: controller.signal })
             .then((page) => {
                 if (!controller.signal.aborted) {
-                    setTimelineState({ key: requestKey, kind: "loaded", page });
+                    setConversationState({ key: requestKey, kind: "loaded", page });
                 }
             })
             .catch((error: unknown) => {
                 if (controller.signal.aborted) return;
-                setTimelineState({
+                setConversationState({
                     key: requestKey,
                     kind: "error",
-                    message: getErrorMessage(error, "ไม่สามารถโหลดประวัติ Ticket ได้ กรุณาลองอีกครั้ง"),
+                    message: getErrorMessage(error, "ไม่สามารถโหลดบทสนทนาได้ กรุณาลองอีกครั้ง"),
                 });
             });
         return () => {
@@ -294,7 +268,7 @@ export function LiffITConversation({
     }, []);
 
     const loadOlder = async (): Promise<void> => {
-        const cursor = timeline?.olderCursor;
+        const cursor = conversation?.olderCursor;
         if (!cursor || olderInFlightRef.current) return;
         const controller = new AbortController();
         olderControllerRef.current = controller;
@@ -302,18 +276,18 @@ export function LiffITConversation({
         setOlderBusy(true);
         setOlderErrorState(null);
         try {
-            const olderPage = await fetchLiffITTicketTimeline(ticketId, {
+            const olderPage = await fetchLiffITTicketConversation(ticketId, {
                 cursor,
                 signal: controller.signal,
             });
             if (controller.signal.aborted) return;
-            setTimelineState((current) => {
+            setConversationState((current) => {
                 if (current?.key !== requestKey || current.kind !== "loaded") return current;
                 return {
                     key: requestKey,
                     kind: "loaded",
                     page: {
-                        items: mergeITTicketTimelineItems(olderPage.items, current.page.items),
+                        items: mergeITTicketConversationItems(olderPage.items, current.page.items),
                         olderCursor: olderPage.olderCursor,
                         hasMore: olderPage.hasMore,
                     },
@@ -402,15 +376,15 @@ export function LiffITConversation({
             commentAttemptRef.current = attempt;
 
             const result = await postLiffITTicketComment(ticketId, body, files, attempt.key);
-            if (timeline !== null) {
-                setTimelineState((current) => {
+            if (conversation !== null) {
+                setConversationState((current) => {
                     if (current?.key !== requestKey || current.kind !== "loaded") return current;
                     return {
                         key: requestKey,
                         kind: "loaded",
                         page: {
                             ...current.page,
-                            items: mergeITTicketTimelineItems(current.page.items, [result.comment]),
+                            items: mergeITTicketConversationItems(current.page.items, [result.comment]),
                         },
                     };
                 });
@@ -449,34 +423,34 @@ export function LiffITConversation({
                     <div className="ml-auto h-16 w-4/5 animate-pulse motion-reduce:animate-none rounded-xl bg-surface-subtle" />
                 </div>
             ) : null}
-            {timelineError ? (
+            {conversationError ? (
                 <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
-                    <p className="flex items-start gap-2"><CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />{timelineError}</p>
+                    <p className="flex items-start gap-2"><CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />{conversationError}</p>
                     <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => setRetry((value) => value + 1)}>
                         <RefreshCw aria-hidden="true" className="size-4" />
-                        โหลดประวัติอีกครั้ง
+                        โหลดบทสนทนาอีกครั้ง
                     </Button>
                 </div>
             ) : null}
-            {timeline ? (
+            {conversation ? (
                 <>
-                    {timeline.hasMore ? (
+                    {conversation.hasMore ? (
                         <div className="space-y-2">
                             {olderError ? <p role="alert" className="text-sm leading-6 text-rose-800 dark:text-rose-200">{olderError}</p> : null}
                             <Button type="button" variant="outline" className="min-h-11 w-full" disabled={olderBusy} onClick={() => void loadOlder()}>
                                 <RefreshCw aria-hidden="true" className={`size-4 motion-reduce:animate-none ${olderBusy ? "animate-spin" : ""}`} />
-                                {olderBusy ? "กำลังโหลดประวัติเก่า…" : olderError ? "ลองโหลดประวัติเก่าอีกครั้ง" : "ดูประวัติก่อนหน้า"}
+                                {olderBusy ? "กำลังโหลดข้อความเก่า…" : olderError ? "ลองโหลดข้อความเก่าอีกครั้ง" : "ดูข้อความก่อนหน้า"}
                             </Button>
                         </div>
                     ) : null}
-                    {timeline.items.length === 0 ? (
+                    {conversation.items.length === 0 ? (
                         <p className="rounded-xl border border-dashed border-border-neutral bg-surface-raised px-4 py-6 text-center text-sm leading-6 text-content-secondary">
-                            ยังไม่มีข้อความหรือประวัติการดำเนินการ
+                            ยังไม่มีข้อความในบทสนทนา
                         </p>
                     ) : (
-                        <ol aria-label="ลำดับการสนทนาและเหตุการณ์ Ticket" className="space-y-1">
-                            {timeline.items.map((item) => (
-                                <TimelineItem key={`${item.type}:${item.id}`} item={item} />
+                        <ol aria-label="ข้อความในการสนทนา" className="space-y-1">
+                            {conversation.items.map((item) => (
+                                <ConversationItem key={item.id} item={item} />
                             ))}
                         </ol>
                     )}
@@ -485,7 +459,7 @@ export function LiffITConversation({
 
             {!commentable ? (
                 <p className="rounded-xl border border-border-neutral bg-surface-subtle p-4 text-sm leading-6 text-content-secondary">
-                    Ticket นี้อยู่ในสถานะ {IT_TICKET_STATUS_LABELS[status]} จึงอ่านประวัติได้ แต่ไม่สามารถส่งข้อความตอบกลับได้
+                    Ticket นี้อยู่ในสถานะ {IT_TICKET_STATUS_LABELS[status]} จึงอ่านบทสนทนาได้ แต่ไม่สามารถส่งข้อความตอบกลับได้
                 </p>
             ) : null}
             {commentable && status === "WAITING_REQUESTER" ? (

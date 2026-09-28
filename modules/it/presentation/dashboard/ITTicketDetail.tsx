@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { ITTicketConversation } from "./ITTicketConversation";
+import { ITTicketActivity } from "../ITTicketActivity";
 
 import {
     IT_TICKET_STATUS_LABELS,
@@ -144,6 +145,12 @@ export function ITTicketDetail({
                             status={ticket.status}
                             canComment={canCommentOwnTickets}
                             operator={false}
+                        />
+                        <ITTicketActivity
+                            ticketId={ticket.id}
+                            ticketCreatedAt={ticket.createdAt}
+                            audience="REQUESTER"
+                            collapsible
                         />
                     </>
                 ) : null}

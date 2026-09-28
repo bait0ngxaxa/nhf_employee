@@ -283,7 +283,7 @@ Phase H3 CLOSED — Notification producer integration and final migration audit 
 
 Notification H0-H3 migration complete. IT1 authorization foundation, IT2
 Ticket persistence/workflow, IT3 requester self-service, IT4 operator
-processing, IT5A conversation/timeline, and IT5B private attachments are closed.
+processing, IT5A's original merged conversation/timeline implementation, and IT5B private attachments are closed. The merged presentation was superseded by separate `ITTicketComment` Conversation and `ITTicketEvent` Activity reads; `AuditLog` remains a distinct accountability/security history.
 IT6 in-app notifications are implemented with final closure verification
 pending because the repository-wide test run had resource-sensitive timeouts in
 unrelated existing UI/architecture tests. Email Request migration remains
