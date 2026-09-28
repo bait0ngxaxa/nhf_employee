@@ -18,10 +18,12 @@ vi.mock("nodemailer", () => ({
 describe("Email transport", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        process.env.SMTP_USER = "user";
-        process.env.SMTP_PASS = "pass";
+        process.env.EMAIL_PROVIDER = "smtp";
+        process.env.SMTP_USER = "user@example.test";
+        process.env.SMTP_PASS = "smtp-test-password";
         process.env.SMTP_HOST = "smtp.test";
         process.env.SMTP_PORT = "587";
+        process.env.MICROSOFT_CLIENT_SECRET = "graph-test-secret";
         verifyMock.mockResolvedValue(true);
         sendMailMock.mockResolvedValue({ messageId: "123" });
     });
@@ -55,8 +57,25 @@ describe("Email transport", () => {
 
         expect(result).toBe(true);
         expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
-            from: '"NHFapp" <user>',
+            from: '"NHFapp" <user@example.test>',
             messageId: undefined,
+        }));
+    });
+
+    it("preserves the supplied Message-ID on a successful SMTP send", async () => {
+        const messageId = "<nhf-stable@example.test>";
+
+        const result = await sendEmail({
+            to: "t",
+            subject: "s",
+            html: "h",
+            text: "t",
+            messageId,
+        });
+
+        expect(result).toBe(true);
+        expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+            messageId,
         }));
     });
 
@@ -168,7 +187,7 @@ describe("Email transport", () => {
             .spyOn(console, "error")
             .mockImplementation(() => undefined);
         sendMailMock.mockRejectedValue(
-            new Error("SMTP authentication failed for pass"),
+            new Error("SMTP auth smtp-test-password graph-test-secret"),
         );
 
         try {
@@ -185,7 +204,8 @@ describe("Email transport", () => {
                 .flat()
                 .map(String)
                 .join(" ");
-            expect(loggedValues).not.toContain("pass");
+            expect(loggedValues).not.toContain("smtp-test-password");
+            expect(loggedValues).not.toContain("graph-test-secret");
         } finally {
             consoleErrorSpy.mockRestore();
             vi.useRealTimers();

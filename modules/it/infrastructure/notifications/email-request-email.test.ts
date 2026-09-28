@@ -21,6 +21,9 @@ describe("Email Request Email content", () => {
             "<nhf-email-request-77-user-10@notifications.thainhf.org>",
         );
         expect(email.html).toContain("https://app.example.com/dashboard/email-request");
+        expect(email.html).toContain("<table role=\"presentation\"");
+        expect(email.html).toContain("มีคำขออีเมลพนักงานใหม่รอตรวจสอบ");
+        expect(email.text).toContain("รายการ: คำร้องอีเมลพนักงานใหม่ #77");
         expect(email.html).not.toContain("somchai@example.com");
         expect(email.html).not.toContain("replyEmail");
         expect(email.html).not.toContain("phone");

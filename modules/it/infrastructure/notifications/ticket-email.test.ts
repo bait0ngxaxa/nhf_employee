@@ -40,7 +40,12 @@ describe("IT Ticket Email composition", () => {
         expect(email.to).toBe("operator@example.com");
         expect(email.subject).toBe(subject);
         expect(email.html).toContain(`https://app.example.com${route}`);
+        expect(email.html).toContain("<table role=\"presentation\"");
+        expect(email.html).toContain("NHFapp&nbsp; | &nbsp;ระบบ NHF IT");
+        expect(email.html).toContain("<h1");
         expect(email.text).toContain(`https://app.example.com${route}`);
+        expect(email.text).toContain("เลขที่ Ticket: Ticket IT #123");
+        expect(email.text).toContain("กรุณาอย่าตอบกลับ");
         expect(email.messageId).toBe(
             "<nhf-it-it-ticket-123-source-user-42-email@notifications.thainhf.org>",
         );

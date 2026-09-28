@@ -43,6 +43,7 @@ vi.mock("nodemailer", () => ({
 describe("Stock email notifications", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubEnv("EMAIL_PROVIDER", "smtp");
         process.env.SMTP_USER = "user";
         process.env.SMTP_PASS = "pass";
         process.env.SMTP_HOST = "smtp.test";
@@ -53,6 +54,7 @@ describe("Stock email notifications", () => {
     });
 
     afterEach(() => {
+        vi.unstubAllEnvs();
         vi.resetModules();
     });
 

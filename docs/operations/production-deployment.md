@@ -159,11 +159,51 @@ NEXT_PUBLIC_FEATURE_ROUTINE=false
 
 | Variable/asset | ใช้เมื่อ |
 | --- | --- |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Routine reminder/contract expiry, Leave notification email และ notification email เดิม; Routine/Leave email acceptance ต้องตั้งครบ |
+| `EMAIL_PROVIDER`, `EMAIL_FROM`, `EMAIL_FROM_NAME` | เลือก provider และกำหนด sender ของอีเมล production ผ่าน Microsoft Graph |
+| `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Microsoft Entra application authentication สำหรับ Microsoft Graph |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Manual rollback provider; ตั้งค่าครบเมื่อเลือก `EMAIL_PROVIDER="smtp"` |
 | `.uploads/` | รูป Stock และ private attachments ของ Leave/IT; ต้องอยู่บน persistent disk (`.uploads/private/leave/` และ `.uploads/private/it/` ต้องไม่เปิดเป็น public files) |
 | `LEAVE_ATTACHMENT_CLEANUP_SECRET` | เปิด scheduled orphan cleanup ของ private leave attachments |
 | `IT_ATTACHMENT_CLEANUP_SECRET` | ป้องกัน scheduled orphan cleanup ของ private IT attachments |
 | `AUTH_CLEANUP_SECRET`, `AUDIT_LOG_CLEANUP_SECRET` | เปิด maintenance endpoint ของ auth/audit ตาม deployment policy |
+
+Outbound email production ใช้ Microsoft Graph แบบ application authentication
+(OAuth 2.0 client credentials) โดยไม่ต้องมี interactive/delegated user login:
+
+```dotenv
+EMAIL_PROVIDER="microsoft-graph"
+EMAIL_FROM="nhfapp@thainhf.org"
+EMAIL_FROM_NAME="NHFapp"
+
+MICROSOFT_TENANT_ID="..."
+MICROSOFT_CLIENT_ID="..."
+MICROSOFT_CLIENT_SECRET="..."
+```
+
+หากไม่ได้กำหนด `EMAIL_PROVIDER` ระบบใช้ `microsoft-graph` เป็นค่าเริ่มต้น;
+provider value ที่ไม่รองรับจะไม่ส่งอีเมล
+
+ใน Microsoft Entra ให้เพิ่ม Microsoft Graph **Application permission** `Mail.Send`
+และ grant **admin consent** ก่อนเปิดส่งจริง แอปส่งในนาม mailbox
+`nhfapp@thainhf.org`; ต้องตั้ง `EMAIL_FROM` ให้ตรงกับ mailbox นี้ ห้ามใส่ค่า
+credential จริงใน repository หรือเอกสาร
+
+Graph `202 Accepted` หมายถึงคำขอได้รับการยอมรับให้ process เท่านั้น ไม่ได้ยืนยันว่า
+อีเมลส่งถึง mailbox ปลายทางแล้ว
+
+Manual rollback ใช้ `EMAIL_PROVIDER="smtp"` พร้อม SMTP Gmail configuration ด้านล่าง
+แล้ว reload/restart application เพื่อให้ process โหลดค่าใหม่ ไม่มี automatic
+Graph → SMTP fallback โดยตั้งใจ เพื่อไม่ให้การส่งซ้ำจากผลลัพธ์ Graph ที่คลุมเครือ
+สร้างอีเมลซ้ำจากคนละ provider
+
+```dotenv
+EMAIL_PROVIDER="smtp"
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER="it.nhfservice@gmail.com"
+SMTP_PASS="..."
+```
 
 รายละเอียด permission, backup, restore, reverse proxy และ cleanup ของ Leave/IT attachments อยู่ใน [Storage and attachment operations](./storage-and-attachments.md)
 
@@ -188,13 +228,13 @@ current Email Request producer.
 EMAIL_REQUEST parent outbox
     → configured `email.request.read / ALL` audience
     → per-recipient EMAIL_REQUEST_EMAIL / EMAIL_REQUEST_LINE child rows
-    → SMTP or sendAppLineNotification({ userId, ... }) independently
+    → selected email provider or sendAppLineNotification({ userId, ... }) independently
     → account email or LineAccountLink
     → canonical Email Request Dashboard route
 
 IT_TICKET_IN_APP + IT_TICKET_EMAIL + eligible IT_TICKET_LINE
     → transactionally persisted with Ticket business fact
-    → shared Inbox / SMTP / sendAppLineNotification({ userId, ... })
+    → shared Inbox / selected email provider / sendAppLineNotification({ userId, ... })
     → requester Dashboard / requester LIFF, or operator Dashboard Ticket
 ```
 
@@ -441,7 +481,7 @@ occurrence generated
 → parent outbox event created
 → notification outbox runs
 → in-app notification visible
-→ email delivery เมื่อ SMTP/recipient พร้อม
+→ email delivery เมื่อ provider/recipient พร้อม
 → Routine targeted LINE push delivery เมื่อ LINE account linked และ OA เป็นเพื่อน
 → LIFF deep link เปิด task/occurrence ที่ถูกต้อง
 ```
@@ -468,7 +508,7 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 ทำตามลำดับนี้ทุก release; [production acceptance](./production-acceptance.md) ของ release ก่อนหน้าใช้แทนการตรวจครั้งนี้ไม่ได้ หยุดเมื่อ gate ใดไม่ผ่าน และห้าม activate Rich Menu ใหม่ก่อน LIFF gate และ acceptance ผ่าน
 
 1. Freeze release commit SHA และตรวจว่า source/artifact ตรงกับ revision ที่ review แล้ว
-2. ตรวจ production configuration, LINE Provider, LINE Login channel, LIFF ID, NHFapp Messaging API Channel, secrets, SMTP, feature flags และ `NEXT_PUBLIC_*` ก่อน build; ห้าม log หรือ commit ค่า secret
+2. ตรวจ production configuration, LINE Provider, LINE Login channel, LIFF ID, NHFapp Messaging API Channel, Microsoft Entra email settings, SMTP rollback settings, feature flags และ `NEXT_PUBLIC_*` ก่อน build; ห้าม log หรือ commit ค่า secret
 3. Backup MySQL และ persistent `.uploads/` จากช่วงเวลาที่สอดคล้องกัน รวม Leave และ IT private attachments; ตรวจสิทธิ์ของ non-root process ตาม [storage operations](./storage-and-attachments.md)
 4. รัน `npm ci` และ `npx prisma generate`
 5. รัน repository verification: `npm run architecture:check`, `npm run lint:strict`, `npm run typecheck` และ `npm run test -- path/to/relevant-release.test.ts`; พิจารณา `npm run test` เฉพาะ release ที่เสี่ยงกระทบหลายส่วน
@@ -544,7 +584,7 @@ npm run line:richmenu:status
 - scheduler HTTP failures, `errors` counter และ unexpected zero/no-op behavior
 - outbox HTTP failures, `failed` counter, `DEAD` rows และ pending/retry backlog เมื่อ observable
 - LINE provider/delivery failures และ OA friend/block status ของ test identities
-- SMTP connection/send failures และ email delivery failures
+- Email provider connection/send failures และ email delivery failures
 
 ### Stop conditions
 
@@ -624,7 +664,7 @@ cp .env.example .env
 - secret ทุกตัวเป็นค่าสุ่มที่ไม่ซ้ำกัน
 - `PUBLIC_APPROVE_URL` เป็น public HTTPS origin จริง
 - `DATABASE_URL` ให้ user/password/database ตรงกับค่า `MYSQL_*`
-- SMTP, LINE และ feature flags ตาม integration ที่ต้องเปิด
+- Email provider, SMTP rollback, LINE และ feature flags ตาม integration ที่ต้องเปิด
 
 ถ้าแอปรันบน host เดียวกับ Compose ให้ใช้:
 

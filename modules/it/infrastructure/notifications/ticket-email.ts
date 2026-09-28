@@ -2,7 +2,7 @@ import type { EmailData } from "@/lib/email/types";
 import { sendEmail } from "@/lib/email";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import { APP_ROUTES } from "@/lib/ssot/routes";
-import { escapeHtml } from "@/lib/email/templates/html";
+import { generateITNotificationEmailHTML } from "./email-template";
 
 import type { ITTicketNotificationPayloadV1 } from "../../domain/ticket-notification";
 
@@ -65,20 +65,30 @@ export function buildITTicketEmailData(
     const copy = IT_TICKET_EMAIL_COPY[payload.event];
     const ticketLabel = `Ticket IT #${payload.ticketId}`;
     const actionUrl = getTicketActionUrl(payload);
-    const escapedTicket = escapeHtml(ticketLabel);
-    const escapedBody = escapeHtml(copy.body);
-    const escapedActionUrl = escapeHtml(actionUrl);
-    const escapedActionLabel = escapeHtml(copy.actionLabel);
+    const subject = copy.subject(payload.ticketId);
 
     return {
         to,
-        subject: copy.subject(payload.ticketId),
-        html: [
-            `<p>${escapedBody}</p>`,
-            `<p>${escapedTicket}</p>`,
-            `<p><a href="${escapedActionUrl}">${escapedActionLabel}</a></p>`,
+        subject,
+        html: generateITNotificationEmailHTML({
+            title: subject,
+            intro: copy.body,
+            referenceLabel: "เลขที่ Ticket",
+            referenceValue: ticketLabel,
+            actionLabel: copy.actionLabel,
+            actionUrl,
+        }),
+        text: [
+            "ระบบ NHFapp | ระบบ NHF IT",
+            "",
+            copy.body,
+            "",
+            `เลขที่ Ticket: ${ticketLabel}`,
+            "",
+            `${copy.actionLabel}: ${actionUrl}`,
+            "",
+            "ระบบ NHFapp ส่งอีเมลฉบับนี้โดยอัตโนมัติ กรุณาอย่าตอบกลับ",
         ].join("\n"),
-        text: `${copy.body}\n${ticketLabel}\n${copy.actionLabel}: ${actionUrl}`,
         messageId: buildITTicketMessageId(eventKey),
         fromName: "ระบบ NHF IT",
     };

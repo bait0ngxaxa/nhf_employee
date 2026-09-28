@@ -1,8 +1,8 @@
 import { sendEmail } from "@/lib/email";
 import type { EmailData } from "@/lib/email/types";
-import { escapeHtml } from "@/lib/email/templates/html";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import { generateITNotificationEmailHTML } from "./email-template";
 
 export function buildEmailRequestEmailData(
     emailRequestId: number | null,
@@ -17,18 +17,32 @@ export function buildEmailRequestEmailData(
     const label = emailRequestId === null
         ? "คำร้องอีเมลพนักงานใหม่"
         : `คำร้องอีเมลพนักงานใหม่ #${emailRequestId}`;
+    const subject = emailRequestId === null
+        ? "มีคำขออีเมลพนักงานใหม่"
+        : `มีคำขออีเมลพนักงานใหม่ #${emailRequestId}`;
 
     return {
         to: recipientEmail,
-        subject: emailRequestId === null
-            ? "มีคำขออีเมลพนักงานใหม่"
-            : `มีคำขออีเมลพนักงานใหม่ #${emailRequestId}`,
-        html: [
-            `<p>${escapeHtml("มีคำขออีเมลพนักงานใหม่รอตรวจสอบ")}</p>`,
-            `<p>${escapeHtml(label)}</p>`,
-            `<p><a href="${escapeHtml(actionUrl)}">${escapeHtml("เปิดคำร้องในระบบ")}</a></p>`,
+        subject,
+        html: generateITNotificationEmailHTML({
+            title: subject,
+            intro: "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ",
+            referenceLabel: "รายการ",
+            referenceValue: label,
+            actionLabel: "เปิดคำร้องในระบบ",
+            actionUrl,
+        }),
+        text: [
+            "ระบบ NHFapp | ระบบ NHF IT",
+            "",
+            "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ",
+            "",
+            `รายการ: ${label}`,
+            "",
+            `เปิดคำร้องในระบบ: ${actionUrl}`,
+            "",
+            "ระบบ NHFapp ส่งอีเมลฉบับนี้โดยอัตโนมัติ กรุณาอย่าตอบกลับ",
         ].join("\n"),
-        text: `มีคำขออีเมลพนักงานใหม่รอตรวจสอบ\n${label}\nเปิดคำร้องในระบบ: ${actionUrl}`,
         messageId: emailRequestId === null
             ? `<nhf-email-request-outbox-${parentOutboxId}-user-${recipientUserId}@notifications.thainhf.org>`
             : `<nhf-email-request-${emailRequestId}-user-${recipientUserId}@notifications.thainhf.org>`,

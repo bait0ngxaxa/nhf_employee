@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendMailMock = vi.hoisted(() => vi.fn());
 const verifyMock = vi.hoisted(() => vi.fn());
@@ -30,12 +30,17 @@ function expectEscapedHtml(html: string): void {
 describe("Routine email notifications", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubEnv("EMAIL_PROVIDER", "smtp");
         process.env.SMTP_USER = "user";
         process.env.SMTP_PASS = "pass";
         process.env.SMTP_HOST = "smtp.test";
         process.env.SMTP_PORT = "587";
         verifyMock.mockResolvedValue(true);
         sendMailMock.mockResolvedValue({ messageId: "123" });
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
     });
 
     it("sends an escaped HTML/text reminder with a deterministic Message-ID", async () => {
