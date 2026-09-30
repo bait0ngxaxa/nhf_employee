@@ -116,12 +116,9 @@ describe("IT analytics Dashboard presentation", () => {
         expect(within(overview).getByText("6", { selector: "dd" })).toBeInTheDocument();
         expect(within(overview).getByText("แก้ไขแล้ว")).toBeInTheDocument();
         expect(within(overview).getByText("2", { selector: "dd" })).toBeInTheDocument();
-        expect(within(overview).getByText("เวลาตอบกลับครั้งแรกเฉลี่ย")).toBeInTheDocument();
-        expect(within(overview).getByText("2 ชม. 18 นาที")).toBeInTheDocument();
-        expect(within(overview).getByText("จาก 3 Ticket ที่มีการตอบกลับ")).toBeInTheDocument();
-        expect(within(overview).getByText("เวลาแก้ไขเฉลี่ย")).toBeInTheDocument();
-        expect(within(overview).getByText("ยังไม่มีข้อมูล")).toBeInTheDocument();
-        expect(within(overview).getByText("จาก 2 Ticket ที่มีการแก้ไข")).toBeInTheDocument();
+        expect(within(overview).queryByText("เวลาตอบกลับครั้งแรกเฉลี่ย")).not.toBeInTheDocument();
+        expect(within(overview).queryByText("เวลาแก้ไขเฉลี่ย")).not.toBeInTheDocument();
+        expect(within(overview).queryByText("ยังไม่มีข้อมูล")).not.toBeInTheDocument();
         expect(within(overview).getByText("งานที่ค้างนานที่สุด 2 ชม. 18 นาที")).toBeInTheDocument();
         expect(screen.queryByRole("region", { name: "งานค้างปัจจุบัน" })).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "รายงาน IT" })).toBeInTheDocument();
@@ -175,7 +172,7 @@ describe("IT analytics Dashboard presentation", () => {
             .getByText("ไม่ระบุหน่วยงาน")).toBeInTheDocument();
     });
 
-    it("shows zero data as a valid empty dashboard without displaying zero-minute averages", async () => {
+    it("shows zero data as a valid empty dashboard without rendering average metrics", async () => {
         const empty = dashboardPayload("30D", 0) as {
             dashboard: Record<string, unknown>;
         };
@@ -218,7 +215,7 @@ describe("IT analytics Dashboard presentation", () => {
         render(<ITAnalyticsDashboard />);
 
         expect(await screen.findByText("ยังไม่มีข้อมูลในช่วงเวลานี้")).toBeInTheDocument();
-        expect(screen.getAllByText("ยังไม่มีข้อมูล").length).toBeGreaterThanOrEqual(2);
+        expect(screen.queryByText("ยังไม่มีข้อมูล")).not.toBeInTheDocument();
         expect(screen.getAllByText("0").length).toBeGreaterThan(0);
         expect(screen.queryByText("0 นาที")).not.toBeInTheDocument();
 

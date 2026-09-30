@@ -407,7 +407,7 @@ export function ITTicketSelfService({
             <Dialog open={dialogOpen} onOpenChange={(open) => {
                 if (!creating) setDialogOpen(open);
             }}>
-                <DialogContent showCloseButton={!creating}>
+                <DialogContent className="sm:max-w-2xl" showCloseButton={!creating}>
                     <DialogHeader>
                         <DialogTitle>แจ้งปัญหา / ขอความช่วยเหลือ</DialogTitle>
                         <DialogDescription>

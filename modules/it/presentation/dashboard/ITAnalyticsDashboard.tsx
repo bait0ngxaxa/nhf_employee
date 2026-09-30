@@ -62,8 +62,8 @@ function ReportSkeleton(): ReactElement {
                         />
                     ))}
                 </div>
-                <div className="grid grid-cols-2 gap-5 border-t border-border-neutral pt-5 sm:grid-cols-4">
-                    {Array.from({ length: 4 }, (_, index) => (
+                <div className="grid grid-cols-2 gap-5 border-t border-border-neutral pt-5 sm:grid-cols-2">
+                    {Array.from({ length: 2 }, (_, index) => (
                         <Skeleton key={index} className="h-20 w-full" />
                     ))}
                 </div>
@@ -129,21 +129,9 @@ function SummaryOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
                 <OverviewMetric label="รอข้อมูลจากผู้แจ้ง" value={countText(summary.waitingRequester)} />
                 <OverviewMetric label="ยังไม่มีผู้รับผิดชอบ" value={countText(summary.unassignedBacklog)} />
             </dl>
-            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-5 border-t border-border-neutral pt-5 sm:grid-cols-4">
+            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-5 border-t border-border-neutral pt-5 sm:grid-cols-2">
                 <OverviewMetric label="Ticket ใหม่" value={countText(summary.newTickets)} />
                 <OverviewMetric label="แก้ไขแล้ว" value={countText(summary.resolvedTickets)} />
-                <OverviewMetric
-                    label="เวลาตอบกลับครั้งแรกเฉลี่ย"
-                    value={formatITAnalyticsDuration(summary.averageFirstResponseMinutes)}
-                    detail={"จาก " + countText(summary.firstRespondedTickets) + " Ticket ที่มีการตอบกลับ"}
-                    emphasis="secondary"
-                />
-                <OverviewMetric
-                    label="เวลาแก้ไขเฉลี่ย"
-                    value={formatITAnalyticsDuration(summary.averageResolutionMinutes)}
-                    detail={"จาก " + countText(summary.resolvedTickets) + " Ticket ที่มีการแก้ไข"}
-                    emphasis="secondary"
-                />
             </dl>
         </section>
     );
