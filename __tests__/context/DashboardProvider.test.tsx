@@ -571,6 +571,7 @@ describe("DashboardProvider navigation state", () => {
             emailRequestCapabilities: {
                 canReadRequests: true,
                 canCreateRequests: false,
+                canUpdateOwnRequests: false, canUpdateAllRequests: false,
             },
         };
         rerender(

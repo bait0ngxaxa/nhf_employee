@@ -287,6 +287,13 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
         channels: ["DASHBOARD"] as const,
     }),
     defineCapability({
+        key: "email.request.update",
+        domain: "email",
+        description: "Update employee access requirements within an authorized resource scope.",
+        scopes: ["OWN", "ALL"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
+    defineCapability({
         key: "email.request.create",
         domain: "email",
         description: "Create Email requests within an authorized resource scope.",

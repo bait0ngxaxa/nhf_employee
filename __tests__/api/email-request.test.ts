@@ -16,6 +16,7 @@ const authorizationMocks = vi.hoisted(() => ({
     toEmailRequestReadAuthorization: vi.fn(),
     createEmailRequest: vi.fn(),
     getEmailRequests: vi.fn(),
+    getEmailRequestPresentationCapabilities: vi.fn(),
     EmailRequestIdempotencyConflictError: class extends Error {
         constructor() {
             super("Idempotency-Key นี้ถูกใช้กับข้อมูลคำขออื่นแล้ว");
@@ -56,6 +57,7 @@ vi.mock("@/modules/it", async (importOriginal) => {
         ...actual,
         createEmailRequest: authorizationMocks.createEmailRequest,
         getEmailRequests: authorizationMocks.getEmailRequests,
+        getEmailRequestPresentationCapabilities: authorizationMocks.getEmailRequestPresentationCapabilities,
         EmailRequestIdempotencyConflictError:
             authorizationMocks.EmailRequestIdempotencyConflictError,
         EmailRequestCapabilityDeniedError:
@@ -82,11 +84,14 @@ const VALID_BODY = {
     position: "เจ้าหน้าที่",
     department: "มสช.",
     replyEmail: "somchai@example.com",
-    needsDocumentSystem: false,
+    documentSystemDecision: "NOT_REQUIRED",
+    sharedDriveDecision: "REQUIRED",
     sharedDriveAccess: ["it"],
 };
 const EXISTING_EMAIL_REQUEST = {
     id: 10,
+    needsDocumentSystem: false,
+    accessVersion: 1,
     ...VALID_BODY,
     phone: "081-2345678",
     requestedBy: USER.id,
@@ -106,6 +111,7 @@ describe("/api/email-request", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         authenticated();
+        authorizationMocks.getEmailRequestPresentationCapabilities.mockResolvedValue({ canReadRequests: true, canCreateRequests: true, canUpdateOwnRequests: true, canUpdateAllRequests: false });
         authorizationMocks.assertEmailRequestCapability.mockImplementation(
             async (_context: unknown, capability: string) => ({
                 actor: {
@@ -214,7 +220,8 @@ describe("/api/email-request", () => {
                     englishName: VALID_BODY.englishName,
                     position: VALID_BODY.position,
                     department: VALID_BODY.department,
-                    needsDocumentSystem: VALID_BODY.needsDocumentSystem,
+                    documentSystemDecision: VALID_BODY.documentSystemDecision,
+                    sharedDriveDecision: VALID_BODY.sharedDriveDecision,
                     sharedDriveAccess: VALID_BODY.sharedDriveAccess,
                 },
             },
@@ -280,6 +287,9 @@ describe("/api/email-request", () => {
                 position: EXISTING_EMAIL_REQUEST.position,
                 department: EXISTING_EMAIL_REQUEST.department,
                 needsDocumentSystem: EXISTING_EMAIL_REQUEST.needsDocumentSystem,
+                documentSystemDecision: EXISTING_EMAIL_REQUEST.documentSystemDecision,
+                sharedDriveDecision: EXISTING_EMAIL_REQUEST.sharedDriveDecision,
+                accessVersion: EXISTING_EMAIL_REQUEST.accessVersion,
                 sharedDriveAccess: EXISTING_EMAIL_REQUEST.sharedDriveAccess,
                 requestedAt: EXISTING_EMAIL_REQUEST.createdAt.toISOString(),
             },
@@ -415,7 +425,9 @@ describe("/api/email-request", () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({
             success: true,
+            capabilities: { canReadRequests: true, canCreateRequests: true, canUpdateOwnRequests: true, canUpdateAllRequests: false },
             emailRequests: [{
+                canUpdateAccessRequirements: true,
                 ...EXISTING_EMAIL_REQUEST,
                 createdAt: EXISTING_EMAIL_REQUEST.createdAt.toISOString(),
                 updatedAt: EXISTING_EMAIL_REQUEST.updatedAt.toISOString(),
@@ -443,5 +455,17 @@ describe("/api/email-request", () => {
 
         expect(response.status).toBe(403);
         expect(emailRequestService.getEmailRequests).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { own: true, all: false, expected: false },
+        { own: false, all: true, expected: true },
+        { own: false, all: false, expected: false },
+    ])("projects row editing for another request: $own/$all", async ({ own, all, expected }) => {
+        authorizationMocks.getEmailRequestPresentationCapabilities.mockResolvedValue({ canReadRequests: true, canCreateRequests: false, canUpdateOwnRequests: own, canUpdateAllRequests: all });
+        emailRequestService.getEmailRequests.mockResolvedValue({ emailRequests: [{ ...EXISTING_EMAIL_REQUEST, requestedBy: 99 }], pagination: { page: 1, limit: 10, total: 1, totalPages: 1 } });
+        const response = await GET(new NextRequest("http://localhost/api/email-request"));
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ emailRequests: [{ canUpdateAccessRequirements: expected }] });
     });
 });

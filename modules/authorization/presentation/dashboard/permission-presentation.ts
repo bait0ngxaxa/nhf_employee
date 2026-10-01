@@ -368,6 +368,7 @@ export const authorizationCapabilityPresentation: Readonly<
         OWN: "คำขออีเมลที่ผู้ใช้นี้ส่ง",
         ALL: "คำขออีเมลทั้งหมดที่ความสามารถนี้อนุญาต",
     }),
+    "email.request.update": capability("แก้ไขสิทธิ์คำร้องพนักงานใหม่", "ระบุหรือแก้ไขสิทธิ์ระบบสารบรรณและ Shared Drive", ["อีเมล", "สิทธิ์", "แก้ไข"]),
     "email.request.create": capability("สร้างคำขออีเมล", "สร้างคำขอที่เกี่ยวข้องกับอีเมล", ["อีเมล", "email", "คำขอ", "สร้าง"]),
 
     "notification.inbox.read": capability("ดูการแจ้งเตือน", "ดูการแจ้งเตือนของผู้ใช้นี้", ["การแจ้งเตือน", "แจ้งเตือน", "ดู"]),

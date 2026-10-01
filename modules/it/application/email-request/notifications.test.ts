@@ -141,4 +141,21 @@ describe("Email Request channel fan-out", () => {
         );
         expect(rows?.[0]?.payload).toContain('"emailRequestId":null');
     });
+
+    it("uses access-version identities for update retries and permits later notifications without PII", async () => {
+        const update = { version: 1 as const, emailRequestId: 77, accessVersion: 2 };
+        await enqueueEmailRequestNotificationChannels(77, 901, update);
+        await enqueueEmailRequestNotificationChannels(77, 901, update);
+        await enqueueEmailRequestNotificationChannels(77, 902, { ...update, accessVersion: 3 });
+        const calls = getCreateManyCalls();
+        expect(calls[0]?.[0].data.map((row) => row.eventKey)).toEqual(calls[1]?.[0].data.map((row) => row.eventKey));
+        expect(calls[2]?.[0].data[0]?.eventKey).toBe("email-request:77:access:3:user:10:email");
+        expect(mocks.createInbox).toHaveBeenCalledWith(expect.objectContaining({
+            title: "มีการอัปเดตสิทธิ์พนักงานใหม่", message: "คำร้อง #77 มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม",
+            dedupeKey: "email-request:77:access:2:user:10",
+        }), expect.anything());
+        expect(mocks.findRecipients).toHaveBeenCalledWith({ capability: "email.request.read", scope: "ALL" }, expect.anything());
+        expect(JSON.stringify(calls)).not.toContain(payload.phone);
+        expect(JSON.stringify(mocks.createInbox.mock.calls)).not.toContain(payload.phone);
+    });
 });

@@ -98,11 +98,13 @@ function buildChildOutbox(
             payload.emailRequestId,
             payload.parentOutboxId,
             payload.recipientUserId,
+            payload.accessVersion,
         )
         : buildEmailRequestLineEventKey(
             payload.emailRequestId,
             payload.parentOutboxId,
             payload.recipientUserId,
+            payload.accessVersion,
         );
     return buildOutbox(type, JSON.stringify(payload), eventKey, 100);
 }
@@ -184,6 +186,7 @@ describe("IT Email Request outbox dispatcher", () => {
             "it@example.com",
             10,
             900,
+            undefined,
         );
         expect(mocks.sendLine).not.toHaveBeenCalled();
     });
@@ -267,5 +270,17 @@ describe("IT Email Request outbox dispatcher", () => {
         await expect(dispatchITEmailRequestOutbox(
             buildOutbox("LEAVE_ACTION", "{}"),
         )).resolves.toBeNull();
+    });
+
+    it("dispatches an explicit update parent and versioned transport children with update semantics", async () => {
+        const update = { version: 1, emailRequestId: 42, accessVersion: 2 };
+        expect(await dispatchITEmailRequestOutbox(buildOutbox("EMAIL_REQUEST_ACCESS_UPDATED", JSON.stringify(update), "email-request:42:access:2"))).toBe("SENT");
+        expect(mocks.enqueueChannels).toHaveBeenCalledWith(42, 42, update);
+        await dispatchITEmailRequestOutbox(buildChildOutbox("EMAIL_REQUEST_EMAIL", buildChildPayload({ accessVersion: 2 })));
+        expect(mocks.sendEmail).toHaveBeenCalledWith(42, "it@example.com", 10, 900, 2);
+        await dispatchITEmailRequestOutbox(buildChildOutbox("EMAIL_REQUEST_LINE", buildChildPayload({ accessVersion: 2 })));
+        expect(mocks.sendLine).toHaveBeenCalledWith(expect.objectContaining({ emailRequestId: 42, accessVersion: 2 }));
+        await expect(dispatchITEmailRequestOutbox(buildOutbox("EMAIL_REQUEST_ACCESS_UPDATED", JSON.stringify(update), "email-request:42:access:3")))
+            .rejects.toThrow("event identity mismatch");
     });
 });

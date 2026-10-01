@@ -442,6 +442,7 @@ enum NotificationOutboxType {
   IT_TICKET_EMAIL
   EMAIL_REQUEST_EMAIL
   EMAIL_REQUEST_LINE
+  EMAIL_REQUEST_ACCESS_UPDATED
 }
 
 enum NotificationOutboxStatus {
@@ -567,17 +568,43 @@ model EmailRequest {
   position            String
   department          String
   replyEmail          String
+  // Compatibility mirror only; nullable decisions identify writes from the old app.
   needsDocumentSystem Boolean  @default(false)
+  documentSystemDecision AccessDecision?
+  sharedDriveDecision AccessDecision?
+  accessVersion Int @default(1)
   sharedDriveAccess   Json?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   requestedBy         Int
   user                User     @relation(fields: [requestedBy], references: [id])
   idempotency         EmailRequestIdempotency?
+  accessChanges       EmailRequestAccessChange[]
 
   @@index([requestedBy])
   @@index([createdAt])
   @@map("email_requests")
+}
+
+enum AccessDecision {
+  UNDECIDED
+  NOT_REQUIRED
+  REQUIRED
+}
+
+// Immutable domain history; independent of the 90-day generic audit retention.
+model EmailRequestAccessChange {
+  id Int @id @default(autoincrement())
+  emailRequestId Int
+  actorId Int
+  accessVersion Int
+  before Json
+  after Json
+  createdAt DateTime @default(now())
+  emailRequest EmailRequest @relation(fields: [emailRequestId], references: [id], onDelete: Restrict)
+
+  @@unique([emailRequestId, accessVersion])
+  @@map("email_request_access_changes")
 }
 
 model EmailRequestIdempotency {

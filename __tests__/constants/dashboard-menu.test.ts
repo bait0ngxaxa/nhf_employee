@@ -109,11 +109,13 @@ const auditCapabilities = {
 } satisfies AuditPresentationCapabilities;
 
 const emailReadCapabilities: EmailRequestPresentationCapabilities = {
+    canUpdateOwnRequests: false, canUpdateAllRequests: false,
     canReadRequests: true,
     canCreateRequests: false,
 };
 
 const emailCreateCapabilities: EmailRequestPresentationCapabilities = {
+    canUpdateOwnRequests: false, canUpdateAllRequests: false,
     canReadRequests: false,
     canCreateRequests: true,
 };

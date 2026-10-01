@@ -214,6 +214,7 @@ export type {
 } from "./application/email-request/authorization";
 export {
     createEmailRequest,
+    updateEmailRequestAccessRequirements,
 } from "./application/email-request/commands";
 export {
     getEmailRequests,
@@ -246,3 +247,5 @@ export type {
 } from "./application/email-request/types";
 export type { EmailRequestData } from "./domain/email-request/contracts";
 export type { EmailRequestInput } from "./domain/email-request/validation";
+export { updateAccessRequirementsSchema } from "./domain/email-request/access-requirements";
+export { EmailRequestAccessConflictError, EmailRequestNotFoundError } from "./application/email-request/access-errors";

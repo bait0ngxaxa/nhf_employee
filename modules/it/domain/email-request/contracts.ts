@@ -1,8 +1,12 @@
+import type { AccessDecision } from "./access-requirements";
 import type { SharedDriveOption } from "./constants";
+import type { EmailRequestInput } from "./validation";
 
 export interface EmailRequestPresentationCapabilities {
     readonly canReadRequests: boolean;
     readonly canCreateRequests: boolean;
+    readonly canUpdateOwnRequests: boolean;
+    readonly canUpdateAllRequests: boolean;
 }
 
 /**
@@ -17,8 +21,13 @@ export interface EmailRequest {
     position: string;
     department: string;
     replyEmail: string;
+    /** Temporary compatibility mirror. */
     needsDocumentSystem: boolean;
-    sharedDriveAccess: SharedDriveOption[] | null;
+    documentSystemDecision: AccessDecision;
+    sharedDriveDecision: AccessDecision;
+    accessVersion: number;
+    canUpdateAccessRequirements: boolean;
+    sharedDriveAccess: SharedDriveOption[];
     createdAt: string;
     updatedAt: string;
     requestedBy: number;
@@ -32,23 +41,14 @@ export interface EmailRequest {
 /**
  * Email Request form data for creating new requests
  */
-export interface EmailRequestFormData {
-    thaiName: string;
-    englishName: string;
-    phone: string;
-    nickname: string;
-    position: string;
-    department: string;
-    replyEmail: string;
-    needsDocumentSystem: boolean;
-    sharedDriveAccess: SharedDriveOption[];
-}
+export type EmailRequestFormData = EmailRequestInput;
 
 /**
  * API response for email request list
  */
 export interface EmailRequestListResponse {
     success: boolean;
+    capabilities: EmailRequestPresentationCapabilities;
     emailRequests: EmailRequest[];
     pagination: Pagination;
 }
@@ -76,10 +76,17 @@ export interface EmailRequestData {
     requestedAt: string;
 }
 
+export interface EmailRequestAccessUpdatedData {
+    readonly version: 1;
+    readonly emailRequestId: number;
+    readonly accessVersion: number;
+}
+
 /** Per-recipient transport child payload; the request details stay in the parent fact. */
 export interface EmailRequestChannelOutboxPayloadV1 {
     readonly version: 1;
     readonly emailRequestId: number | null;
+    readonly accessVersion?: number;
     readonly parentOutboxId: number;
     readonly recipientUserId: number;
 }

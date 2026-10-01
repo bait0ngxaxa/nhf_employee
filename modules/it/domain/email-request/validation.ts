@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SHARED_DRIVE_OPTIONS } from "./constants";
+import { accessRequirementFields, validateAccessRequirements } from "./access-requirements";
 
 const PHONE_ERROR_MESSAGE =
     "กรุณาระบุเบอร์โทรศัพท์ให้ถูกต้อง (10 หลัก เช่น 0889999999 หรือ 088-9999999)";
@@ -31,16 +31,11 @@ export const emailRequestSchema = z.object({
     position: z.string().min(1, "กรุณากรอกตำแหน่ง"),
     department: z.string().min(1, "กรุณากรอกสังกัด"),
     replyEmail: z.string().email("รูปแบบอีเมลไม่ถูกต้อง"),
-    needsDocumentSystem: z.boolean().default(false),
-    sharedDriveAccess: z
-        .array(z.enum(SHARED_DRIVE_OPTIONS))
-        .max(SHARED_DRIVE_OPTIONS.length)
-        .refine(
-            (value) => new Set(value).size === value.length,
-            "ไม่ควรเลือก Shared Drive ซ้ำ",
-        )
-        .default([]),
-});
+    ...accessRequirementFields,
+    documentSystemDecision: accessRequirementFields.documentSystemDecision.default("UNDECIDED"),
+    sharedDriveDecision: accessRequirementFields.sharedDriveDecision.default("UNDECIDED"),
+    sharedDriveAccess: accessRequirementFields.sharedDriveAccess.default([]),
+}).strict().superRefine(validateAccessRequirements);
 
 export const emailRequestFiltersSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),

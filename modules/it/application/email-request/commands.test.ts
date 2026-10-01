@@ -28,7 +28,8 @@ const DATA: CreateEmailRequestData = {
     position: "เจ้าหน้าที่",
     replyEmail: "somchai@example.com",
     nickname: "ชาย",
-    needsDocumentSystem: true,
+    documentSystemDecision: "REQUIRED",
+    sharedDriveDecision: "REQUIRED",
     sharedDriveAccess: ["account", "it"],
 };
 const USER = { id: 1, role: "ADMIN", email: "admin@thainhf.org" };
@@ -83,6 +84,16 @@ describe("Email Request Mutations", () => {
                 eventKey: `email-request:${EXISTING_REQUEST.id}:created`,
             }),
         });
+    });
+
+    it("persists valid undecided creation and its temporary compatibility mirror", async () => {
+        prismaMock.emailRequestIdempotency.findUnique.mockResolvedValue(null);
+        prismaMock.emailRequest.create.mockResolvedValue({ ...EXISTING_REQUEST, documentSystemDecision: "UNDECIDED", sharedDriveDecision: "UNDECIDED", sharedDriveAccess: [], accessVersion: 1 } as never);
+        await createEmailRequest({ ...DATA, documentSystemDecision: "UNDECIDED", sharedDriveDecision: "UNDECIDED", sharedDriveAccess: [] }, USER, { idempotencyKey: "undecided-key" });
+        expect(prismaMock.emailRequest.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+            documentSystemDecision: "UNDECIDED", sharedDriveDecision: "UNDECIDED", sharedDriveAccess: [], needsDocumentSystem: false,
+        }) });
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: "EMAIL_REQUEST" }) });
     });
 
     it("replays the existing request for the same key and canonical payload", async () => {

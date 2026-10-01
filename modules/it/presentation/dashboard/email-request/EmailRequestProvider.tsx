@@ -8,6 +8,7 @@ import {
     type ChangeEvent,
     type FormEvent,
     type ReactNode,
+    type ReactElement,
 } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -32,7 +33,8 @@ const initialFormData: EmailRequestFormData = {
     position: "",
     department: "",
     replyEmail: "",
-    needsDocumentSystem: false,
+    documentSystemDecision: "UNDECIDED",
+    sharedDriveDecision: "UNDECIDED",
     sharedDriveAccess: [],
 };
 
@@ -112,7 +114,7 @@ function focusInvalidField(field: keyof EmailRequestFormData): void {
 export function EmailRequestProvider({
     children,
     capabilities,
-}: EmailRequestProviderProps) {
+}: EmailRequestProviderProps): ReactElement {
     // List state
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -162,8 +164,10 @@ export function EmailRequestProvider({
             const { name, type, checked, value } = e.target;
             const field = name as keyof EmailRequestFormData;
             setFormData((prev) => {
-                if (field === "needsDocumentSystem") {
-                    return { ...prev, needsDocumentSystem: checked };
+                if (field === "documentSystemDecision" || field === "sharedDriveDecision") {
+                    if (value !== "UNDECIDED" && value !== "NOT_REQUIRED" && value !== "REQUIRED") return prev;
+                    return { ...prev, [field]: value,
+                        sharedDriveAccess: field === "sharedDriveDecision" && value !== "REQUIRED" ? [] : prev.sharedDriveAccess };
                 }
 
                 if (field === "sharedDriveAccess") {

@@ -226,6 +226,7 @@ describe("Email Request authorization adapter", () => {
         expected,
     }) => {
         mocks.resolveMany.mockResolvedValue(new Map([
+            ["email.request.update", decision("email.request.update", [])],
             ["email.request.read", decision("email.request.read", readScopes)],
             ["email.request.create", decision("email.request.create", createScopes)],
         ]));
@@ -234,15 +235,16 @@ describe("Email Request authorization adapter", () => {
             getEmailRequestPresentationCapabilities(
                 buildEmailRequestAuthorizationContext({ id: 7, role: "USER" }),
             ),
-        ).resolves.toEqual(expected);
+        ).resolves.toEqual({ ...expected, canUpdateOwnRequests: false, canUpdateAllRequests: false });
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 7, channel: "DASHBOARD" }),
-            ["email.request.read", "email.request.create"],
+            ["email.request.read", "email.request.create", "email.request.update"],
         );
     });
 
     it("projects configured ADMIN authority through resolved capability grants", async () => {
         mocks.resolveMany.mockResolvedValue(new Map([
+            ["email.request.update", decision("email.request.update", [])],
             ["email.request.read", decision("email.request.read", ["ALL"], [
                 grant("email.request.read", "ALL", { type: "USER", userId: 7 }),
             ])],
@@ -255,6 +257,17 @@ describe("Email Request authorization adapter", () => {
             getEmailRequestPresentationCapabilities(
                 buildEmailRequestAuthorizationContext({ id: 7, role: "ADMIN" }),
             ),
-        ).resolves.toEqual({ canReadRequests: true, canCreateRequests: true });
+        ).resolves.toEqual({ canReadRequests: true, canCreateRequests: true, canUpdateOwnRequests: false, canUpdateAllRequests: false });
+    });
+
+    it.each(["OWN", "ALL"] as const)("projects update %s without collapsing row ownership", async (scope) => {
+        mocks.resolveMany.mockResolvedValue(new Map([
+            ["email.request.read", decision("email.request.read", ["ALL"])],
+            ["email.request.create", decision("email.request.create", [])],
+            ["email.request.update", decision("email.request.update", [scope])],
+        ]));
+        expect(await getEmailRequestPresentationCapabilities(buildEmailRequestAuthorizationContext({ id: 7, role: "USER" }))).toMatchObject({
+            canUpdateOwnRequests: scope === "OWN", canUpdateAllRequests: scope === "ALL",
+        });
     });
 });

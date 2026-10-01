@@ -6,12 +6,12 @@ import {
     hasPrismaErrorCode,
     runSerializableTransaction,
 } from "@/lib/db/transaction";
+import { readStoredAccessRequirements } from "../../domain/email-request/access-requirements";
 import type { EmailRequestData } from "../../domain/email-request/contracts";
 import type {
     CreateEmailRequestData,
     EmailRequestFilters,
     EmailRequestReadAuthorization,
-    EmailRequestWithUser,
     PaginatedEmailRequestsResult,
 } from "../../application/email-request/types";
 
@@ -78,7 +78,7 @@ function buildEmailRequestOutboxPayload(
         position: data.position,
         department: data.department,
         replyEmail: data.replyEmail,
-        needsDocumentSystem: data.needsDocumentSystem,
+        needsDocumentSystem: data.documentSystemDecision === "REQUIRED",
         sharedDriveAccess: data.sharedDriveAccess,
         requestedAt: emailRequest.createdAt.toISOString(),
     };
@@ -111,7 +111,9 @@ export async function persistEmailRequest(
                     position: data.position,
                     department: data.department,
                     replyEmail: data.replyEmail,
-                    needsDocumentSystem: data.needsDocumentSystem,
+                    needsDocumentSystem: data.documentSystemDecision === "REQUIRED",
+                    documentSystemDecision: data.documentSystemDecision,
+                    sharedDriveDecision: data.sharedDriveDecision,
                     sharedDriveAccess: data.sharedDriveAccess,
                     requestedBy: input.userId,
                 },
@@ -200,7 +202,7 @@ export const getEmailRequests = cache(
         ]);
 
         return {
-            emailRequests: emailRequests as EmailRequestWithUser[],
+            emailRequests: emailRequests.map((row) => ({ ...row, ...readStoredAccessRequirements(row) })),
             pagination: {
                 page,
                 limit,

@@ -13,6 +13,7 @@ import {
     emailRequestFiltersSchema,
     emailRequestSchema,
     getEmailRequests,
+    getEmailRequestPresentationCapabilities,
     toEmailRequestReadAuthorization,
     type EmailRequestFilters,
 } from "@/modules/it";
@@ -100,6 +101,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                     position: result.emailRequest.position,
                     department: result.emailRequest.department,
                     needsDocumentSystem: result.emailRequest.needsDocumentSystem,
+                    documentSystemDecision: result.emailRequest.documentSystemDecision,
+                    sharedDriveDecision: result.emailRequest.sharedDriveDecision,
+                    accessVersion: result.emailRequest.accessVersion,
                     sharedDriveAccess: result.emailRequest.sharedDriveAccess,
                     requestedAt: result.emailRequest.createdAt.toISOString(),
                 },
@@ -150,9 +154,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             readAuthorization,
         );
 
+        const capabilities = await getEmailRequestPresentationCapabilities(buildEmailRequestAuthorizationContext(auth.user));
         return NextResponse.json({
             success: true,
             ...result,
+            capabilities,
+            emailRequests: result.emailRequests.map((row) => ({
+                ...row,
+                canUpdateAccessRequirements: capabilities.canUpdateAllRequests
+                    || (capabilities.canUpdateOwnRequests && row.requestedBy === auth.user.id),
+            })),
         });
     } catch (error) {
         if (error instanceof EmailRequestCapabilityDeniedError) {

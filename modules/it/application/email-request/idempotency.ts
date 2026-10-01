@@ -21,7 +21,8 @@ export function createEmailRequestHash(data: CreateEmailRequestData): string {
         position: data.position,
         department: data.department,
         replyEmail: data.replyEmail,
-        needsDocumentSystem: data.needsDocumentSystem,
+        documentSystemDecision: data.documentSystemDecision,
+        sharedDriveDecision: data.sharedDriveDecision,
         sharedDriveAccess: [...data.sharedDriveAccess].sort(),
     });
 

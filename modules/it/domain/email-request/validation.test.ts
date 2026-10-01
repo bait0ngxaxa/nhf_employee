@@ -16,7 +16,8 @@ describe("Email Request Validation", () => {
         expect(result.success).toBe(true);
         if (result.success) {
             expect(result.data.phone).toBe("081-2345678");
-            expect(result.data.needsDocumentSystem).toBe(false);
+            expect(result.data.documentSystemDecision).toBe("UNDECIDED");
+            expect(result.data.sharedDriveDecision).toBe("UNDECIDED");
             expect(result.data.sharedDriveAccess).toEqual([]);
         }
     });
@@ -89,7 +90,8 @@ describe("Email Request Validation", () => {
             position: "Dev",
             department: "IT",
             replyEmail: "test@email.com",
-            needsDocumentSystem: true,
+            documentSystemDecision: "REQUIRED",
+            sharedDriveDecision: "REQUIRED",
             sharedDriveAccess: ["account", "it", "project_research"],
         };
 
@@ -97,7 +99,7 @@ describe("Email Request Validation", () => {
 
         expect(result.success).toBe(true);
         if (result.success) {
-            expect(result.data.needsDocumentSystem).toBe(true);
+            expect(result.data.documentSystemDecision).toBe("REQUIRED");
             expect(result.data.sharedDriveAccess).toEqual([
                 "account",
                 "it",
@@ -115,7 +117,8 @@ describe("Email Request Validation", () => {
             position: "Dev",
             department: "IT",
             replyEmail: "test@email.com",
-            needsDocumentSystem: false,
+            documentSystemDecision: "NOT_REQUIRED",
+            sharedDriveDecision: "REQUIRED",
             sharedDriveAccess: ["unknown_drive"],
         };
 
@@ -138,7 +141,8 @@ describe("Email Request Validation", () => {
             position: "Dev",
             department: "IT",
             replyEmail: "test@email.com",
-            needsDocumentSystem: false,
+            documentSystemDecision: "NOT_REQUIRED",
+            sharedDriveDecision: "REQUIRED",
             sharedDriveAccess: ["it", "it"],
         };
 

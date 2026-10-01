@@ -1,6 +1,9 @@
 "use client";
 
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
+import type { EmailRequest } from "../../../domain/email-request/contracts";
+import { ACCESS_DECISION_LABELS, type AccessDecision } from "../../../domain/email-request/access-requirements";
+import { EmailRequestDetail } from "./EmailRequestDetail";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +19,6 @@ import {
 import {
     ChevronLeft,
     ChevronRight,
-    CheckCircle,
     AlertCircle,
     RefreshCw,
 } from "lucide-react";
@@ -24,18 +26,36 @@ import { useEmailRequestHistory } from "./useEmailRequestHistory";
 import { formatThaiDateTime } from "@/lib/helpers/date-helpers";
 import { useAuth } from "@/modules/auth/client";
 
-function formatSharedDriveAccess(
-    sharedDriveAccess: readonly string[] | null | undefined,
-): string {
-    if (!sharedDriveAccess || sharedDriveAccess.length === 0) {
-        return "ไม่ได้ระบุ";
-    }
+function AccessSummary({ request }: { request: EmailRequest }): ReactElement {
+    const decision = (label: string, value: AccessDecision): ReactElement => (
+        <Badge variant="secondary" className={value === "UNDECIDED" ? "bg-surface-muted text-content-secondary" : ""}>
+            {label}: {ACCESS_DECISION_LABELS[value]}
+        </Badge>
+    );
+    return <div className="space-y-2">
+        <div>{decision("สารบรรณ", request.documentSystemDecision)}</div>
+        <div>{decision("Shared Drive", request.sharedDriveDecision)}</div>
+        {request.sharedDriveDecision === "REQUIRED" && <p className="text-sm text-content-secondary [overflow-wrap:anywhere]">{request.sharedDriveAccess.join(", ")}</p>}
+    </div>;
+}
 
-    return sharedDriveAccess.join(", ");
+function EmployeeName({ request }: { request: EmailRequest }): ReactElement {
+    return <div className="min-w-0 [overflow-wrap:anywhere]">
+        <p className="font-semibold text-content-heading">{request.thaiName}{request.nickname ? ` (${request.nickname})` : ""}</p>
+        <p className="text-sm text-content-secondary">{request.englishName}</p>
+    </div>;
+}
+
+function Contact({ request }: { request: EmailRequest }): ReactElement {
+    return <div className="min-w-0 space-y-1 [overflow-wrap:anywhere]">
+        <p><a href={`tel:${request.phone}`} className="text-content-body underline-offset-4 hover:underline">{request.phone}</a></p>
+        <a href={`mailto:${request.replyEmail}`} className="text-primary underline-offset-4 hover:underline">{request.replyEmail}</a>
+    </div>;
 }
 
 export function EmailRequestHistory(): ReactElement | null {
     const { user } = useAuth();
+    const [selected, setSelected] = useState<EmailRequest | null>(null);
     const {
         emailRequests,
         pagination,
@@ -130,155 +150,34 @@ export function EmailRequestHistory(): ReactElement | null {
                 ) : (
                     <>
                         <div className="hidden overflow-x-auto overscroll-x-contain rounded-lg border border-border-subtle xl:block">
-                            <Table className="min-w-[860px] tabular-nums">
-                                <TableHeader>
-                                    <TableRow className="bg-surface-subtle">
-                                        <TableHead className="font-semibold">
-                                            ชื่อ-นามสกุล
-                                        </TableHead>
-                                        <TableHead className="font-semibold">
-                                            ตำแหน่ง
-                                        </TableHead>
-                                        <TableHead className="font-semibold">
-                                            สังกัด
-                                        </TableHead>
-                                        <TableHead className="font-semibold">
-                                            อีเมลตอบกลับ
-                                        </TableHead>
-                                        <TableHead className="font-semibold">
-                                            สิทธิ์ระบบ
-                                        </TableHead>
-                                        <TableHead className="font-semibold">
-                                            วันที่ขอ
-                                        </TableHead>
-                                        <TableHead className="font-semibold">
-                                            สถานะ
-                                        </TableHead>
+                            <Table className="tabular-nums">
+                                <TableHeader><TableRow className="bg-surface-subtle">
+                                    {["พนักงาน", "ตำแหน่ง / สังกัด", "ติดต่อ", "สิทธิ์ที่ขอ", "วันที่ส่ง"].map((label) => <TableHead key={label} className="font-semibold">{label}</TableHead>)}
+                                    <TableHead><span className="sr-only">การดำเนินการ</span></TableHead>
+                                </TableRow></TableHeader>
+                                <TableBody>{emailRequests.map((request) => (
+                                    <TableRow key={request.id} className="hover:bg-surface-subtle">
+                                        <TableCell className="max-w-56 align-top"><EmployeeName request={request} /></TableCell>
+                                        <TableCell className="max-w-48 align-top [overflow-wrap:anywhere]"><p>{request.position}</p><p className="text-sm text-content-secondary">{request.department}</p></TableCell>
+                                        <TableCell className="max-w-56 align-top"><Contact request={request} /></TableCell>
+                                        <TableCell className="max-w-56 align-top"><AccessSummary request={request} /></TableCell>
+                                        <TableCell className="align-top text-sm">{formatThaiDateTime(request.createdAt)}</TableCell>
+                                        <TableCell className="align-top"><Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setSelected(request)}>ดูรายละเอียด</Button></TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {emailRequests.map((request) => (
-                                        <TableRow
-                                            key={request.id}
-                                            className="hover:bg-surface-subtle"
-                                        >
-                                            <TableCell className="max-w-56 align-top">
-                                                <div className="min-w-0">
-                                                    <p className="font-medium text-content-heading [overflow-wrap:anywhere]">
-                                                        {request.thaiName}
-                                                    </p>
-                                                    <p className="text-sm text-content-secondary [overflow-wrap:anywhere]">
-                                                        {request.englishName}
-                                                    </p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="max-w-56 align-top [overflow-wrap:anywhere]">
-                                                {request.position}
-                                            </TableCell>
-                                            <TableCell className="max-w-56 align-top [overflow-wrap:anywhere]">
-                                                {request.department}
-                                            </TableCell>
-                                            <TableCell className="max-w-64 align-top [overflow-wrap:anywhere]">
-                                                <a
-                                                    href={`mailto:${request.replyEmail}`}
-                                                    className="font-medium text-primary underline-offset-4 hover:underline"
-                                                >
-                                                    {request.replyEmail}
-                                                </a>
-                                            </TableCell>
-                                            <TableCell className="max-w-72 align-top">
-                                                <div className="space-y-2">
-                                                    <Badge
-                                                        className={
-                                                            request.needsDocumentSystem
-                                                                ? "w-fit border-transparent bg-primary/10 text-primary hover:bg-primary/10"
-                                                                : "w-fit bg-secondary text-secondary-foreground hover:bg-secondary"
-                                                        }
-                                                    >
-                                                        สารบรรณ:{" "}
-                                                        {request.needsDocumentSystem
-                                                            ? "ต้องการ"
-                                                            : "ไม่ต้องการ"}
-                                                    </Badge>
-                                                    <p
-                                                        className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]"
-                                                        title={formatSharedDriveAccess(
-                                                            request.sharedDriveAccess,
-                                                        )}
-                                                    >
-                                                        พื้นที่ไฟล์:{" "}
-                                                        {formatSharedDriveAccess(
-                                                            request.sharedDriveAccess,
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-sm align-top whitespace-nowrap">
-                                                {formatThaiDateTime(request.createdAt)}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                <Badge className="flex w-fit items-center gap-1 bg-status-positive-surface-strong text-status-positive-strong hover:bg-status-positive-surface-strong">
-                                                    <CheckCircle className="h-3 w-3" />
-                                                    เสร็จสิ้น
-                                                </Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
+                                ))}</TableBody>
                             </Table>
                         </div>
-
                         <ul aria-label="ประวัติคำร้องพนักงานใหม่สำหรับหน้าจอขนาดเล็ก" className="space-y-3 xl:hidden">
                             {emailRequests.map((request) => (
                                 <li key={request.id} className="min-w-0 rounded-lg border border-border-subtle bg-surface-raised p-4">
-                                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className="font-semibold text-content-heading [overflow-wrap:anywhere]">
-                                                {request.thaiName}
-                                            </p>
-                                            <p className="text-sm text-content-secondary [overflow-wrap:anywhere]">
-                                                {request.englishName}
-                                            </p>
-                                        </div>
-                                        <Badge className="flex w-fit shrink-0 items-center gap-1 bg-status-positive-surface-strong text-status-positive-strong hover:bg-status-positive-surface-strong">
-                                            <CheckCircle aria-hidden="true" className="h-3 w-3" />
-                                            เสร็จสิ้น
-                                        </Badge>
-                                    </div>
-
-                                    <dl className="mt-4 grid min-w-0 gap-x-4 gap-y-3 border-t border-border-subtle pt-3 text-sm sm:grid-cols-2">
-                                        <div className="min-w-0">
-                                            <dt className="text-xs text-content-muted">ตำแหน่ง</dt>
-                                            <dd className="mt-1 break-words text-content-body">{request.position}</dd>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <dt className="text-xs text-content-muted">สังกัด</dt>
-                                            <dd className="mt-1 break-words text-content-body">{request.department}</dd>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <dt className="text-xs text-content-muted">อีเมลตอบกลับ</dt>
-                                            <dd className="mt-1 [overflow-wrap:anywhere]">
-                                                <a href={`mailto:${request.replyEmail}`} className="font-medium text-primary underline-offset-4 hover:underline">
-                                                    {request.replyEmail}
-                                                </a>
-                                            </dd>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <dt className="text-xs text-content-muted">สิทธิ์ระบบ</dt>
-                                            <dd className="mt-1 space-y-1 [overflow-wrap:anywhere]">
-                                                <p className="text-content-body">
-                                                    สารบรรณ: {request.needsDocumentSystem ? "ต้องการ" : "ไม่ต้องการ"}
-                                                </p>
-                                                <p className="text-content-secondary">
-                                                    พื้นที่ไฟล์: {formatSharedDriveAccess(request.sharedDriveAccess)}
-                                                </p>
-                                            </dd>
-                                        </div>
-                                        <div className="min-w-0 sm:col-span-2">
-                                            <dt className="text-xs text-content-muted">วันที่ขอ</dt>
-                                            <dd className="mt-1 text-content-body">{formatThaiDateTime(request.createdAt)}</dd>
-                                        </div>
+                                    <EmployeeName request={request} />
+                                    <dl className="mt-4 grid min-w-0 gap-4 border-t border-border-subtle pt-3 text-sm sm:grid-cols-2">
+                                        <div className="min-w-0"><dt className="text-content-secondary">ตำแหน่ง / สังกัด</dt><dd className="mt-1 [overflow-wrap:anywhere]"><p>{request.position}</p><p>{request.department}</p></dd></div>
+                                        <div className="min-w-0"><dt className="text-content-secondary">ติดต่อ</dt><dd className="mt-1"><Contact request={request} /></dd></div>
+                                        <div className="min-w-0"><dt className="text-content-secondary">สิทธิ์ที่ขอ</dt><dd className="mt-1"><AccessSummary request={request} /></dd></div>
+                                        <div className="min-w-0"><dt className="text-content-secondary">วันที่ส่ง</dt><dd className="mt-1">{formatThaiDateTime(request.createdAt)}</dd></div>
                                     </dl>
+                                    <Button type="button" variant="outline" className="mt-4 min-h-11 w-full" onClick={() => setSelected(request)}>ดูรายละเอียด</Button>
                                 </li>
                             ))}
                         </ul>
@@ -325,6 +224,7 @@ export function EmailRequestHistory(): ReactElement | null {
                         )}
                     </>
                 )}
+                {selected && <EmailRequestDetail key={selected.id} request={selected} onClose={() => setSelected(null)} onSaved={refresh} />}
             </CardContent>
         </Card>
     );

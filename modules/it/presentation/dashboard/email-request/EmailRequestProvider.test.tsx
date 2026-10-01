@@ -85,11 +85,12 @@ const TestComponent = () => {
             />
             <input
                 data-testid="input-needsDocumentSystem"
-                name="needsDocumentSystem"
-                type="checkbox"
-                checked={formData.needsDocumentSystem}
+                name="documentSystemDecision"
+                type="radio" value="REQUIRED"
+                checked={formData.documentSystemDecision === "REQUIRED"}
                 onChange={handleInputChange}
             />
+            <input data-testid="input-sharedDriveDecision" name="sharedDriveDecision" type="radio" value="REQUIRED" checked={formData.sharedDriveDecision === "REQUIRED"} onChange={handleInputChange} />
             <input
                 data-testid="input-sharedDrive-it"
                 name="sharedDriveAccess"
@@ -116,6 +117,7 @@ describe("EmailRequestProvider", () => {
     const fullCapabilities = {
         canReadRequests: true,
         canCreateRequests: true,
+        canUpdateOwnRequests: false, canUpdateAllRequests: false,
     } as const;
 
     function createSuccessResponse<T>(data: T): ApiResponse<T> {
@@ -214,6 +216,7 @@ describe("EmailRequestProvider", () => {
 
         fillValidForm();
         fireEvent.click(screen.getByTestId("input-needsDocumentSystem"));
+        fireEvent.click(screen.getByTestId("input-sharedDriveDecision"));
         fireEvent.click(screen.getByTestId("input-sharedDrive-it"));
         const submitBtn = screen.getByTestId("submit-btn");
         fireEvent.click(submitBtn);
@@ -224,7 +227,8 @@ describe("EmailRequestProvider", () => {
                 expect.objectContaining({
                     thaiName: "สมชาย ใจดี",
                     phone: "081-2345678",
-                    needsDocumentSystem: true,
+                    documentSystemDecision: "REQUIRED",
+                    sharedDriveDecision: "REQUIRED",
                     sharedDriveAccess: ["it"],
                 }),
                 {
@@ -347,7 +351,7 @@ describe("EmailRequestProvider", () => {
     it("does not start the list GET request for create-only authority", () => {
         render(
             <EmailRequestProvider
-                capabilities={{ canReadRequests: false, canCreateRequests: true }}
+                capabilities={{ canReadRequests: false, canCreateRequests: true, canUpdateOwnRequests: false, canUpdateAllRequests: false }}
             >
                 <TestComponent />
             </EmailRequestProvider>,

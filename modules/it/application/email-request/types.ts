@@ -1,21 +1,12 @@
 import type { EmailRequest } from "@prisma/client";
-import type { SharedDriveOption } from "../../domain/email-request/constants";
+import type { EmailRequestInput } from "../../domain/email-request/validation";
+import type { AccessRequirements } from "../../domain/email-request/access-requirements";
 import type { AuthorizationScope } from "@/modules/authorization";
 
 // ==================== Input Types ====================
 
 /** Data for creating a new email request */
-export interface CreateEmailRequestData {
-    thaiName: string;
-    englishName: string;
-    phone: string;
-    nickname?: string;
-    position: string;
-    department: string;
-    replyEmail: string;
-    needsDocumentSystem: boolean;
-    sharedDriveAccess: SharedDriveOption[];
-}
+export type CreateEmailRequestData = EmailRequestInput;
 
 export interface CreateEmailRequestOptions {
     idempotencyKey: string;
@@ -49,7 +40,7 @@ export interface EmailRequestUserInfo {
 }
 
 /** Email request with user relation */
-export interface EmailRequestWithUser extends EmailRequest {
+export interface EmailRequestWithUser extends Omit<EmailRequest, "documentSystemDecision" | "sharedDriveDecision" | "sharedDriveAccess">, AccessRequirements {
     user: EmailRequestUserInfo;
 }
 
@@ -73,4 +64,9 @@ export interface CreateEmailRequestResult {
     replayed: boolean;
     error?: string;
     status?: number;
+}
+
+export interface UpdateEmailRequestAccessResult {
+    readonly emailRequest: EmailRequest;
+    readonly changed: boolean;
 }

@@ -23,7 +23,7 @@ interface EmailRequestFormProps {
 
 type EmailRequestTextFieldId = Exclude<
     keyof EmailRequestFormData,
-    "needsDocumentSystem" | "sharedDriveAccess"
+    "documentSystemDecision" | "sharedDriveDecision" | "sharedDriveAccess"
 >;
 
 type EmailRequestFieldProps = {
@@ -88,7 +88,7 @@ function EmailRequestField({
     );
 }
 
-export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps) {
+export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps): ReactElement {
     const {
         formData,
         isFormLoading: isLoading,
@@ -224,7 +224,10 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                         </fieldset>
 
                         <EmailRequestAccessFields
-                            needsDocumentSystem={formData.needsDocumentSystem}
+                            sharedDriveFieldId="sharedDriveAccess"
+                            documentSystemDecision={formData.documentSystemDecision}
+                            sharedDriveDecision={formData.sharedDriveDecision}
+                            error={fieldErrors.sharedDriveAccess}
                             selectedDrives={selectedDrives}
                             disabled={isLoading}
                             onChange={handleInputChange}

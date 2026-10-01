@@ -19,19 +19,19 @@ describe("EmailRequestSection capability projection", () => {
     it.each([
         {
             label: "create-only",
-            capabilities: { canReadRequests: false, canCreateRequests: true },
+            capabilities: { canReadRequests: false, canCreateRequests: true, canUpdateOwnRequests: false, canUpdateAllRequests: false },
             form: true,
             history: false,
         },
         {
             label: "read-only",
-            capabilities: { canReadRequests: true, canCreateRequests: false },
+            capabilities: { canReadRequests: true, canCreateRequests: false, canUpdateOwnRequests: false, canUpdateAllRequests: false },
             form: false,
             history: true,
         },
         {
             label: "read and create",
-            capabilities: { canReadRequests: true, canCreateRequests: true },
+            capabilities: { canReadRequests: true, canCreateRequests: true, canUpdateOwnRequests: false, canUpdateAllRequests: false },
             form: true,
             history: true,
         },

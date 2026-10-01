@@ -91,6 +91,7 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
 
     "email.request.read": CENTRAL_ONLY,
     "email.request.create": CENTRAL_ONLY,
+    "email.request.update": CENTRAL_ONLY,
 
     "notification.inbox.read": CENTRAL_WITH_DEFAULT_POLICY,
     "notification.inbox.update": CENTRAL_WITH_DEFAULT_POLICY,

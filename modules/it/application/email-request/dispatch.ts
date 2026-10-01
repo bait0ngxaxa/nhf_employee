@@ -98,6 +98,7 @@ export function parseEmailRequestOutboxPayload(payload: unknown): EmailRequestDa
 const positiveIdSchema = z.number().int().positive().max(2_147_483_647);
 const emailRequestChannelPayloadSchema = z.object({
     version: z.literal(1),
+    accessVersion: z.number().int().min(2).max(2_147_483_647).optional(),
     emailRequestId: positiveIdSchema.nullable(),
     parentOutboxId: positiveIdSchema,
     recipientUserId: positiveIdSchema,
@@ -174,6 +175,16 @@ export type ITEmailRequestOutboxDispatchOutcome = "SENT" | "SUPERSEDED" | null;
 export async function dispatchITEmailRequestOutbox(
     notification: NotificationOutbox,
 ): Promise<ITEmailRequestOutboxDispatchOutcome> {
+    if (notification.type === "EMAIL_REQUEST_ACCESS_UPDATED") {
+        const payload = z.object({ version: z.literal(1), emailRequestId: positiveIdSchema,
+            accessVersion: z.number().int().min(2).max(2_147_483_647) }).strict()
+            .parse(parseStoredPayload(notification.payload, notification.type));
+        if (notification.eventKey !== `email-request:${payload.emailRequestId}:access:${payload.accessVersion}`) {
+            throw new Error("EMAIL_REQUEST_ACCESS_UPDATED event identity mismatch");
+        }
+        await enqueueEmailRequestNotificationChannels(payload.emailRequestId, notification.id, payload);
+        return "SENT";
+    }
     if (notification.type === "EMAIL_REQUEST") {
         const payload = parseEmailRequestOutboxPayload(
             parseStoredPayload(notification.payload, notification.type),
@@ -202,11 +213,13 @@ export async function dispatchITEmailRequestOutbox(
             payload.emailRequestId,
             payload.parentOutboxId,
             payload.recipientUserId,
+            payload.accessVersion,
         )
         : buildEmailRequestLineEventKey(
             payload.emailRequestId,
             payload.parentOutboxId,
             payload.recipientUserId,
+            payload.accessVersion,
         );
     if (notification.eventKey !== expectedEventKey) {
         throw new Error(`${type} event identity mismatch`);
@@ -225,6 +238,7 @@ export async function dispatchITEmailRequestOutbox(
             validation.recipientEmail,
             payload.recipientUserId,
             payload.parentOutboxId,
+            payload.accessVersion,
         );
         if (!sent) throw new Error("Email Request Email notification failed");
         return "SENT";
@@ -234,6 +248,7 @@ export async function dispatchITEmailRequestOutbox(
         userId: payload.recipientUserId,
         emailRequestId: payload.emailRequestId,
         retryKey: createLineRetryKey(expectedEventKey),
+        ...(payload.accessVersion === undefined ? {} : { accessVersion: payload.accessVersion }),
     });
     return result.status === "SENT" ? "SENT" : "SUPERSEDED";
 }

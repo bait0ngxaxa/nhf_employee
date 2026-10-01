@@ -46,7 +46,8 @@ const DATA: CreateEmailRequestData = {
     position: "เจ้าหน้าที่",
     department: "มสช.",
     replyEmail: "somchai@example.com",
-    needsDocumentSystem: true,
+    documentSystemDecision: "REQUIRED",
+    sharedDriveDecision: "REQUIRED",
     sharedDriveAccess: ["it", "account"],
 };
 

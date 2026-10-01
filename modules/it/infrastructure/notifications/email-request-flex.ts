@@ -3,6 +3,7 @@ import type { LineFlexMessage } from "@/types/api";
 export function generateEmailRequestFlexMessage(
     emailRequestId: number | null,
     actionUrl: string,
+    accessVersion?: number,
 ): LineFlexMessage {
     const label = emailRequestId === null
         ? "คำร้องอีเมลพนักงานใหม่"
@@ -10,7 +11,7 @@ export function generateEmailRequestFlexMessage(
 
     return {
         type: "flex",
-        altText: `${label} รอตรวจสอบ`,
+        altText: accessVersion === undefined ? `${label} รอตรวจสอบ` : `มีการอัปเดตสิทธิ์พนักงานใหม่ #${emailRequestId}`,
         contents: {
             type: "bubble",
             header: {
@@ -20,7 +21,7 @@ export function generateEmailRequestFlexMessage(
                 backgroundColor: "#7C3AED",
                 contents: [{
                     type: "text",
-                    text: "มีคำร้องพนักงานใหม่",
+                    text: accessVersion === undefined ? "มีคำร้องพนักงานใหม่" : "มีการอัปเดตสิทธิ์พนักงานใหม่",
                     color: "#FFFFFF",
                     size: "lg",
                     weight: "bold",
@@ -41,7 +42,7 @@ export function generateEmailRequestFlexMessage(
                     },
                     {
                         type: "text",
-                        text: "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ",
+                        text: accessVersion === undefined ? "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ" : "มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม",
                         color: "#4B5563",
                         size: "sm",
                         wrap: true,

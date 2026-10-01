@@ -9,6 +9,7 @@ export function buildEmailRequestEmailData(
     recipientEmail: string,
     recipientUserId: number,
     parentOutboxId: number,
+    accessVersion?: number,
 ): EmailData {
     const actionUrl = new URL(
         APP_ROUTES.dashboardEmailRequest,
@@ -17,7 +18,10 @@ export function buildEmailRequestEmailData(
     const label = emailRequestId === null
         ? "คำร้องอีเมลพนักงานใหม่"
         : `คำร้องอีเมลพนักงานใหม่ #${emailRequestId}`;
-    const subject = emailRequestId === null
+    const intro = accessVersion === undefined ? "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ" : "มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม";
+    const subject = accessVersion !== undefined
+        ? `มีการอัปเดตสิทธิ์พนักงานใหม่ #${emailRequestId}`
+        : emailRequestId === null
         ? "มีคำขออีเมลพนักงานใหม่"
         : `มีคำขออีเมลพนักงานใหม่ #${emailRequestId}`;
 
@@ -26,7 +30,7 @@ export function buildEmailRequestEmailData(
         subject,
         html: generateITNotificationEmailHTML({
             title: subject,
-            intro: "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ",
+            intro,
             referenceLabel: "รายการ",
             referenceValue: label,
             actionLabel: "เปิดคำร้องในระบบ",
@@ -35,7 +39,7 @@ export function buildEmailRequestEmailData(
         text: [
             "ระบบ NHFapp | ระบบ NHF IT",
             "",
-            "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ",
+            intro,
             "",
             `รายการ: ${label}`,
             "",
@@ -43,7 +47,9 @@ export function buildEmailRequestEmailData(
             "",
             "ระบบ NHFapp ส่งอีเมลฉบับนี้โดยอัตโนมัติ กรุณาอย่าตอบกลับ",
         ].join("\n"),
-        messageId: emailRequestId === null
+        messageId: accessVersion !== undefined
+            ? `<nhf-email-request-${emailRequestId}-access-${accessVersion}-user-${recipientUserId}@notifications.thainhf.org>`
+            : emailRequestId === null
             ? `<nhf-email-request-outbox-${parentOutboxId}-user-${recipientUserId}@notifications.thainhf.org>`
             : `<nhf-email-request-${emailRequestId}-user-${recipientUserId}@notifications.thainhf.org>`,
         fromName: "ระบบ NHF IT",
@@ -55,11 +61,13 @@ export function sendEmailRequestEmailNotification(
     recipientEmail: string,
     recipientUserId: number,
     parentOutboxId: number,
+    accessVersion?: number,
 ): Promise<boolean> {
     return sendEmail(buildEmailRequestEmailData(
         emailRequestId,
         recipientEmail,
         recipientUserId,
         parentOutboxId,
+        accessVersion,
     ));
 }

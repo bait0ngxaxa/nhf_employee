@@ -39,4 +39,17 @@ describe("Email Request Email content", () => {
             "<nhf-email-request-outbox-901-user-10@notifications.thainhf.org>",
         );
     });
+
+    it("uses update copy and a new stable message identity per access version without phone", () => {
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://app.example.com");
+        const first = buildEmailRequestEmailData(77, "it@example.com", 10, 901, 2);
+        const retry = buildEmailRequestEmailData(77, "it@example.com", 10, 901, 2);
+        const later = buildEmailRequestEmailData(77, "it@example.com", 10, 902, 3);
+        expect(first.subject).toBe("มีการอัปเดตสิทธิ์พนักงานใหม่ #77");
+        expect(first.html).toContain("มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม");
+        expect(first.text).not.toContain("มีคำขออีเมลพนักงานใหม่รอตรวจสอบ");
+        expect(first.messageId).toBe(retry.messageId);
+        expect(first.messageId).not.toBe(later.messageId);
+        expect(JSON.stringify(first)).not.toMatch(/phone|081/);
+    });
 });

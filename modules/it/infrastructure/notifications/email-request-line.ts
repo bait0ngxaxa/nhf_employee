@@ -13,6 +13,7 @@ export async function sendEmailRequestLineNotification(input: {
     readonly userId: number;
     readonly emailRequestId: number | null;
     readonly retryKey: string;
+    readonly accessVersion?: number;
 }): Promise<EmailRequestLineNotificationResult> {
     const actionUrl = new URL(
         APP_ROUTES.dashboardEmailRequest,
@@ -24,6 +25,7 @@ export async function sendEmailRequestLineNotification(input: {
         message: generateEmailRequestFlexMessage(
             input.emailRequestId,
             actionUrl,
+            input.accessVersion,
         ),
         retryKey: input.retryKey,
     });

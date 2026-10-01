@@ -9,6 +9,7 @@ import {
     type AuthorizationAdministrationEffectiveAccessInspection,
     type AuthorizationAdministrationInspectionContext,
     type AuthorizationScope,
+    type AuthorizationPersistenceContext,
 } from "@/modules/authorization";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import type { UserRole } from "@/lib/ssot/permissions";
@@ -20,6 +21,7 @@ import type { EmailRequestReadAuthorization } from "./types";
 export const EMAIL_REQUEST_CAPABILITIES = [
     "email.request.read",
     "email.request.create",
+    "email.request.update",
 ] as const;
 
 export type EmailRequestCapability = (typeof EMAIL_REQUEST_CAPABILITIES)[number];
@@ -173,6 +175,16 @@ export async function assertEmailRequestCapability(
     return resolveEmailRequestCapability(context, capability);
 }
 
+export async function resolveEmailRequestCapabilityInTransaction(
+    context: EmailRequestAuthorizationContext,
+    capability: EmailRequestCapability,
+    persistenceContext: AuthorizationPersistenceContext,
+): Promise<EmailRequestCapabilityAuthorization> {
+    const actor = context.authorizationActor;
+    const decision = await authorization.resolveInTransaction(actor, capability, persistenceContext);
+    return composeEmailRequestCapabilityAuthorization(actor, capability, decision);
+}
+
 function projectEmailRequestCapabilityDecision(
     actor: EmailRequestAuthorizationActor,
     capability: EmailRequestCapability,
@@ -217,7 +229,10 @@ export async function getEmailRequestPresentationCapabilities(
     const readScopes = project("email.request.read");
     const createScopes = project("email.request.create");
 
+    const updateScopes = project("email.request.update");
     return Object.freeze({
+        canUpdateOwnRequests: updateScopes?.includes("OWN") === true,
+        canUpdateAllRequests: updateScopes?.includes("ALL") === true,
         canReadRequests: readScopes?.includes("OWN") === true
             || readScopes?.includes("ALL") === true,
         canCreateRequests: createScopes?.includes("ALL") === true,

@@ -51,4 +51,13 @@ describe("Email Request personal NHFapp LINE notification", () => {
         })).rejects.toThrow("PUBLIC_APPROVE_URL is required in production.");
         expect(sendAppLineNotificationMock).not.toHaveBeenCalled();
     });
+
+    it("says access update in LINE without employee contact information", async () => {
+        await sendEmailRequestLineNotification({ userId: 10, emailRequestId: 77, accessVersion: 2, retryKey: "access-update-key" });
+        const serialized = JSON.stringify(sendAppLineNotificationMock.mock.calls[0]?.[0]);
+        expect(serialized).toContain("มีการอัปเดตสิทธิ์พนักงานใหม่");
+        expect(serialized).toContain("มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม");
+        expect(serialized).not.toContain("มีคำขออีเมลพนักงานใหม่รอตรวจสอบ");
+        expect(serialized).not.toMatch(/phone|081/);
+    });
 });

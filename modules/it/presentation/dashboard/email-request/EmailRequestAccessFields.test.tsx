@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { EmailRequestAccessFields } from "./EmailRequestAccessFields";
 import type { SharedDriveOption } from "../../../domain/email-request/constants";
@@ -10,28 +10,24 @@ describe("EmailRequestAccessFields", () => {
 
         render(
             <EmailRequestAccessFields
-                needsDocumentSystem={false}
+                documentSystemDecision="UNDECIDED"
+                sharedDriveDecision="REQUIRED"
                 selectedDrives={selectedDrives}
                 onChange={onChange}
             />,
         );
 
-        expect(
-            screen.getByRole("switch", {
-                name: "ต้องการใช้ระบบสารบรรณ",
-            }),
-        ).not.toBeChecked();
-        expect(screen.getByText("ไม่ต้องการ", { exact: true })).toBeInTheDocument();
-        expect(screen.getByText("ต้องการ", { exact: true })).toBeInTheDocument();
+        const document = within(screen.getByRole("group", { name: "ระบบสารบรรณ" }));
+        expect(document.getByRole("radio", { name: /ยังไม่ทราบ/ })).toBeChecked();
+        expect(document.getByRole("radio", { name: "ไม่ต้องใช้" })).not.toBeChecked();
+        expect(document.getByRole("radio", { name: "ต้องใช้" })).not.toBeChecked();
         expect(screen.getByRole("checkbox", { name: "it" })).toBeChecked();
         expect(
-            screen.getByText("เลือกได้หลายรายการ, เลือกแล้ว 1 จาก 17 รายการ"),
+            screen.getByText("เลือกอย่างน้อยหนึ่งรายการ (เลือกได้หลายรายการ)"),
         ).toBeInTheDocument();
 
         fireEvent.click(
-            screen.getByRole("switch", {
-                name: "ต้องการใช้ระบบสารบรรณ",
-            }),
+            document.getByRole("radio", { name: "ต้องใช้" }),
         );
         fireEvent.click(screen.getByRole("checkbox", { name: "account" }));
 
@@ -43,7 +39,8 @@ describe("EmailRequestAccessFields", () => {
 
         render(
             <EmailRequestAccessFields
-                needsDocumentSystem
+                documentSystemDecision="REQUIRED"
+                sharedDriveDecision="REQUIRED"
                 selectedDrives={selectedDrives}
                 disabled
                 onChange={vi.fn()}
@@ -51,10 +48,23 @@ describe("EmailRequestAccessFields", () => {
         );
 
         expect(
-            screen.getByRole("switch", {
-                name: "ต้องการใช้ระบบสารบรรณ",
-            }),
+            within(screen.getByRole("group", { name: "ระบบสารบรรณ" })).getByRole("radio", { name: "ต้องใช้" }),
         ).toBeDisabled();
         expect(screen.getByRole("checkbox", { name: "it" })).toBeDisabled();
+    });
+
+    it.each(["UNDECIDED", "NOT_REQUIRED"] as const)("hides drive selection for %s", (sharedDriveDecision) => {
+        render(<EmailRequestAccessFields documentSystemDecision="UNDECIDED" sharedDriveDecision={sharedDriveDecision} selectedDrives={new Set()} onChange={vi.fn()} />);
+        expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+        expect(within(screen.getByRole("group", { name: "Shared Drive" })).getByRole("radio", { name: sharedDriveDecision === "UNDECIDED" ? /ยังไม่ทราบ/ : "ไม่ต้องใช้" })).toBeChecked();
+    });
+
+    it("keeps independent accessible field identities when creation and the detail editor coexist", () => {
+        const { container } = render(<>
+            <form><EmailRequestAccessFields sharedDriveFieldId="sharedDriveAccess" documentSystemDecision="REQUIRED" sharedDriveDecision="REQUIRED" selectedDrives={new Set()} onChange={vi.fn()} /></form>
+            <form><EmailRequestAccessFields documentSystemDecision="REQUIRED" sharedDriveDecision="REQUIRED" selectedDrives={new Set()} onChange={vi.fn()} /></form>
+        </>);
+        const ids = Array.from(container.querySelectorAll("[id]"), (element) => element.id);
+        expect(new Set(ids).size).toBe(ids.length);
     });
 });

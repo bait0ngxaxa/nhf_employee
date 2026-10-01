@@ -464,6 +464,7 @@ describe("Authorization Administration capability catalog", () => {
         for (const key of [
             "leave.recovery.manage",
             "email.request.read",
+            "email.request.update",
             "email.request.create",
         ]) {
             expect(first.find(({ key: capabilityKey }) => capabilityKey === key)).toMatchObject({
@@ -490,6 +491,7 @@ describe("Authorization Administration capability catalog", () => {
             "leave.recovery.manage",
             "audit.read",
             "email.request.read",
+            "email.request.update",
             "email.request.create",
             "it.ticket.manage",
             "it.analytics.read",
@@ -529,10 +531,10 @@ describe("Authorization Administration capability catalog", () => {
             "it.ticket.create",
             "it.ticket.comment",
         ]);
-        expect(first).toHaveLength(45);
+        expect(first).toHaveLength(46);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_ONLY",
-        )).toHaveLength(18);
+        )).toHaveLength(19);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
         )).toHaveLength(27);
@@ -544,7 +546,7 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(0);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(45);
+        )).toHaveLength(46);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
         )).toHaveLength(0);
