@@ -74,6 +74,25 @@ this presentation state adds no capability or authorization grant, and direct IT
 API checks remain authoritative. `it.ticket.manage` and `it.analytics.read`
 remain unsupported through LIFF.
 
+## Email Request Access Requirements — current extension after IT8
+
+The later [Access Requirements extension](email-request-access-requirements.md)
+adds `email.request.update / OWN|ALL` on `DASHBOARD`, with no implicit/default
+grant or automatic authorization configuration. Team, TeamRole, or exceptional
+User grants must be configured explicitly. Presentation exposes all four fields:
+`canReadRequests`, `canCreateRequests`, `canUpdateOwnRequests`, and
+`canUpdateAllRequests`; ownership remains a per-request predicate, not a global
+edit flag. Server authorization is independently rechecked for
+`PATCH /api/email-request/:id/access-requirements`.
+
+IT owns `AccessDecision`, `accessVersion`, immutable `EmailRequestAccessChange`,
+and `EMAIL_REQUEST_ACCESS_UPDATED` meaning. Access mutation, durable history,
+strict Audit append, and parent outbox fact commit together. The audience remains
+configured `email.request.read / ALL`. Email Request remains separate from
+`ITTicket`. Historical read/create-only phase records below describe their
+original boundaries and are superseded by this note for current access editing;
+their verification counts are historical, not current registry counts.
+
 ## Current final authorization model
 
 The current production source of truth, including IT9A, is:
@@ -84,12 +103,12 @@ The current production source of truth, including IT9A, is:
 | Business authority | Domain-owned Default Domain Policy plus configured `TEAM`, `TEAM_ROLE`, and exceptional direct `USER` grants. |
 | Resolver | `createAuthorizationResolver()` is the canonical constructor; USER and ADMIN load configured persistence equally. `systemRole` never creates a business grant. |
 | IT authorization | **Dashboard:** `it.ticket.read/create/comment` default to `OWN`, and configured Team, TeamRole, and direct User authority is additive; `it.ticket.manage` and `it.analytics.read` have no defaults and require configured `ALL`. **LIFF_SELF_SERVICE:** read/create/comment are supported with effective `OWN` only for USER and ADMIN, even when configured authority resolves to `ALL`; manage and analytics are unsupported. **SYSTEM:** all five IT capabilities are unsupported. `systemRole`, Department, and Team/TeamRole names do not grant IT business authority; configured grants remain resolver evidence. Requester reads, comments, and attachment downloads retain the requester Ticket predicate in LIFF. IT5B upload uses current comment authority (requester OWN through requester-only resource scope; operator read ALL plus comment ALL), while each private download re-resolves current read OWN/ALL and checks the Ticket requester relation. Assignment, comment authorship, manage, and comment ALL alone do not grant download. Dashboard queue/detail reads require read ALL before broad Ticket rows are queried, workflow mutations recheck manage ALL transactionally, and assignee checks use configured exact-user scopes only. Ticket ownership remains requester-based. |
-| Email Request authorization | Existing `email.request.read` (`OWN|ALL`) and `email.request.create` (`ALL`) remain unchanged. Default scopes are empty; POST requires effective create ALL, and GET applies OWN as `requestedBy = authenticated userId` in the database. Actor is `DASHBOARD` with `employeeId: null`. No `it.ticket.*`, `it.analytics.read`, ADMIN role, Department, Team, or TeamRole mapping grants Email Request access. |
+| Email Request authorization | Existing `email.request.read` (`OWN|ALL`) and `email.request.create` (`ALL`) remain unchanged; the later Access Requirements extension adds `email.request.update` (`OWN|ALL`). All three have empty defaults and require explicit configured grants. POST requires effective create ALL; GET applies OWN as `requestedBy = authenticated userId` in the database. PATCH access requirements rechecks update authority transactionally: OWN is limited to the original requester, ALL can update any request. Dashboard entry remains read OR create; update alone grants neither route entry nor read access. Actor is `DASHBOARD` with `employeeId: null`. No `it.ticket.*`, `it.analytics.read`, ADMIN role, Department, Team, or TeamRole mapping grants Email Request access. |
 | Administration presentation | Account/system role is shown separately from business grant sources. Business explanations contain only Team, TeamRole, and direct User origins. |
 | Routine provenance | Future mutation classification uses effective business authority; historical `ownershipMode: "ADMIN"` audit JSON remains readable and is not rewritten. |
 | Fail-closed behavior | Unknown, inactive, revoked, malformed, unsupported, or structurally invalid configured sources remain denied or surface the existing configuration error. |
 
-The current registry contains 45 capabilities across the nine authorization
+The current registry contains 46 capabilities across the nine authorization
 domains: `employee`, `department`, `routine`, `stock`, `leave`, `audit`,
 `email`, `notification`, and `it`. IT1/IT2/IT3/IT4/IT5A/IT5B add no production
 authorization configuration: `AUTHORIZATION_SEED_CONFIGURATION` remains

@@ -12,6 +12,7 @@ import type {
 import type { DepartmentPresentationCapabilities } from "@/modules/department";
 import type { AuditPresentationCapabilities } from "@/modules/audit";
 import type { NotificationPresentationCapabilities } from "@/modules/notification";
+import type { EmailRequestPresentationCapabilities } from "@/modules/it/client";
 import type { ITPresentationCapabilities } from "@/modules/it";
 
 const {
@@ -56,7 +57,7 @@ const {
     notificationContextMock: vi.fn(),
     notificationProjectionMock: vi.fn(),
     emailRequestContextMock: vi.fn(),
-    emailRequestCapabilitiesMock: vi.fn(),
+    emailRequestCapabilitiesMock: vi.fn<() => Promise<EmailRequestPresentationCapabilities>>(),
     itContextMock: vi.fn(),
     itCapabilitiesMock: vi.fn(),
     userTeamsMock: vi.fn(),
@@ -164,7 +165,9 @@ const ROUTINE = {
 const EMAIL_REQUEST_CAPABILITIES = {
     canReadRequests: true,
     canCreateRequests: true,
-};
+    canUpdateOwnRequests: true,
+    canUpdateAllRequests: false,
+} satisfies EmailRequestPresentationCapabilities;
 
 const STOCK = {
     canReadCatalog: true,

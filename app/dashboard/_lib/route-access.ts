@@ -21,6 +21,13 @@ export type DashboardEmployeeCapability = keyof Pick<
     "canCreateEmployees" | "canImportEmployees"
 >;
 
+const NO_EMAIL_REQUEST_CAPABILITIES = {
+    canReadRequests: false,
+    canCreateRequests: false,
+    canUpdateOwnRequests: false,
+    canUpdateAllRequests: false,
+} satisfies EmailRequestPresentationCapabilities;
+
 export async function requireDashboardEmailRequestAccess(): Promise<EmailRequestPresentationCapabilities> {
     const user = await getCurrentUserProjection();
 
@@ -28,10 +35,7 @@ export async function requireDashboardEmailRequestAccess(): Promise<EmailRequest
         redirect(APP_ROUTES.login);
     }
 
-    const capabilities = user.emailRequestCapabilities ?? {
-        canReadRequests: false,
-        canCreateRequests: false,
-    };
+    const capabilities = user.emailRequestCapabilities ?? NO_EMAIL_REQUEST_CAPABILITIES;
     if (!capabilities.canReadRequests && !capabilities.canCreateRequests) {
         redirect(APP_ROUTES.accessDenied);
     }

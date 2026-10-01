@@ -125,7 +125,7 @@ Configured Team / TeamRole / direct User grants
 | `it.ticket.manage` | `ALL` | Assignment, state, category, priority. No per-button capabilities. |
 | `it.analytics.read` | `ALL` | Operational aggregates, protected independently from broad Ticket read. |
 
-This vocabulary is sufficient for the approved Ticket operations; it does not replace existing `email.request.read / OWN|ALL` and `email.request.create / ALL`, which remain active contracts. IT8 moved Email Request ownership with compatibility tests and did not reinterpret these capabilities or inherit grants from Ticket capabilities. No capability or grant is added in IT0.
+This vocabulary is sufficient for the approved Ticket operations; it does not replace existing `email.request.read / OWN|ALL` and `email.request.create / ALL`, which remain active contracts. The later Access Requirements extension adds `email.request.update / OWN|ALL` with no defaults and explicit grants (see section 12). IT8 moved Email Request ownership with compatibility tests and did not reinterpret these capabilities or inherit grants from Ticket capabilities. No capability or grant is added in IT0.
 
 Default Domain Policy supplies `read/create/comment / OWN` to every eligible Dashboard and LIFF workforce actor, for both USER and ADMIN system roles. `manage` and `analytics.read` have no default. Dashboard policy composes configured authority additively through the current public `composeAuthorizationAuthority`. The LIFF-owned policy then constrains its three supported requester capabilities to `OWN` without changing configured-decision evidence; a resolver denial for unknown capability, unsupported channel, or invalid configuration cannot be rescued by defaults. The recipient helper `findActiveUsersWithConfiguredCapabilityScope` enumerates **configured** authority only; it does not enumerate Default Domain Policy recipients. Use it for explicitly configured operator audience only where the business event requires that audience, then apply IT lifecycle/recipient rules. Team, TeamRole and direct User grants remain supported by the central model, but the repository intentionally seeds no authorization policy until an explicit mapping is approved. IT1 must not seed or infer an IT Team, IT TeamRole, membership, grant, or Department→Team mapping. Any example IT operator grants are vocabulary illustrations only; activating them requires later explicit configuration through Authorization Administration against an approved real-user mapping. Administration's names are labels, not policy.
 
@@ -214,12 +214,50 @@ IT9A owns the **CLOSED** requester-only authorization/API foundation, including:
 
 IT9B owns the **CLOSED** requester LIFF UI at `/liff/it` and `/liff/it/:ticketId`, including conversation and private attachments. IT9C is **CLOSED** after independent review and integrates the Home module projection and card, shared Bottom Navigation and header, canonical external requester LIFF destinations, and Unified Rich Menu destination. Home and navigation visibility remain presentation only; server APIs enforce authorization. IT9D adds requester Ticket LINE delivery; it does not change authorization or operator destinations.
 
-## 12. Existing Email Request: IT8 ownership and compatibility
+## 12. Existing Email Request: current access requirements and IT8 history
+
+### Current Access Requirements extension (after IT8)
+
+The [Access Requirements contract](email-request-access-requirements.md) supersedes
+IT8's read/create-only and binary-access descriptions below. Email Request remains
+separate from `ITTicket`; no processing status or Ticket workflow is introduced.
+
+- `AccessDecision` independently tracks Document System and Shared Drive as
+  `UNDECIDED`, `NOT_REQUIRED`, or `REQUIRED`; new requests default to UNDECIDED.
+  Shared Drive requires valid nonempty selections only for REQUIRED.
+- Nullable expand-compatible decision columns preserve old-application writes.
+  Historical document true/false maps to REQUIRED/NOT_REQUIRED; nonempty drives
+  map to REQUIRED and empty/null to NOT_REQUIRED. `needsDocumentSystem` remains
+  a compatibility mirror; new decisions are the business source of truth.
+- `PATCH /api/email-request/:id/access-requirements` accepts only access fields
+  and `expectedAccessVersion`. The centralized `email.request.update / OWN|ALL`
+  decision is rechecked transactionally; OWN means the original requester.
+  There is no implicit/default grant: explicit authorization configuration is
+  required. Read/create contracts and Dashboard entry through read OR create
+  remain unchanged; update alone grants no read or route access.
+- `accessVersion` starts at 1; stale versions return 409. A normalized semantic
+  no-op creates no version, history, Audit, or notification side effect. A real
+  change atomically writes the mutation, immutable `EmailRequestAccessChange`
+  old/new states, strict Audit append, and `EMAIL_REQUEST_ACCESS_UPDATED` parent.
+  Durable domain history is independent of generic Audit retention.
+- Update identity is `email-request:<id>:access:<version>`; configured
+  `email.request.read / ALL` recipients and existing per-recipient transports
+  are retained. Update copy is distinct and excludes phone/unnecessary PII.
+- History shows nickname and phone without a fake completion status. The Detail
+  Sheet shows complete request information and the authorized coherent access
+  editor. UI capabilities expose update OWN and ALL separately.
+
+### Historical IT8 ownership and compatibility record
+
+The table and closure evidence below record the IT8 boundary and retained LINE
+correction. Their old DTO, authorization, schema, and creation-only Audit statements
+are historical evidence, not the current Access Requirements contract.
+
 
 ```text
 HISTORICAL THROUGH IT7: app/api + lib/services/email-request
                        + legacy validation/types/constants and UI
-CURRENT IT8: app/API compatibility adapters + modules/it application/domain/
+AT IT8 CLOSURE: app/API compatibility adapters + modules/it application/domain/
              infrastructure/persistence/presentation
              Notification, Audit, shared outbox lifecycle and generic LINE
              provider transport stay under their existing owners

@@ -284,6 +284,33 @@ unchanged. Unlinked or ineligible users are superseded without retry; provider
 errors use the shared at-least-once retry/dead-letter lifecycle. No live LINE
 provider or smartphone/device acceptance was performed; IT9E is OPEN / next phase.
 
+## Email Request Access Requirements — current extension after IT8
+
+The [Access Requirements extension](email-request-access-requirements.md) retains
+Email Request as a separate structured domain from `ITTicket`. IT owns
+`AccessDecision` validation, access-update application orchestration, optimistic
+`accessVersion`, immutable `EmailRequestAccessChange` persistence, Dashboard
+Detail Sheet/editor, Audit event meaning, and `EMAIL_REQUEST_ACCESS_UPDATED`
+notification semantics. IT persistence writes the access mutation and domain
+history in the same transaction as the strict Audit append and parent outbox
+fact; the shared processor continues to own delivery claim/retry lifecycle.
+Notification owns Inbox persistence and Audit owns generic Audit persistence.
+
+The narrow HTTP adapter is `PATCH /api/email-request/:id/access-requirements`;
+it delegates access-only validation and mutation to IT. Authorization centrally
+registers `email.request.update / OWN|ALL` with empty defaults and no implicit
+grant; explicit Team, TeamRole, or User authorization configuration is required.
+IT rechecks the resolver decision and original requester predicate server-side.
+Browser-safe capabilities distinguish update OWN from ALL; Dashboard entry still
+requires read OR create, and update alone grants no read access.
+
+The expand-compatible nullable decisions and legacy `needsDocumentSystem` mirror
+are documented in the linked contract. Versioned update events retain the
+configured `email.request.read / ALL` audience and per-recipient delivery
+infrastructure. The following IT8 section preserves historical ownership and
+verification evidence; its no-schema-change/read-create-only statements describe
+IT8, not this later extension.
+
 ## IT8 Email Request ownership — CLOSED
 
 Email Request is a structured IT service-request subdomain and remains a

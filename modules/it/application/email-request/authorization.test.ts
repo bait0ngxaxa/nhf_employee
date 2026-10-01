@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { EmailRequestPresentationCapabilities } from "@/modules/it/client";
 import type * as AuthorizationModule from "@/modules/authorization";
 import type {
     AuthorizationDecision,
@@ -200,25 +201,25 @@ describe("Email Request authorization adapter", () => {
             label: "read-only",
             readScopes: ["OWN"] as const,
             createScopes: [] as const,
-            expected: { canReadRequests: true, canCreateRequests: false },
+            expected: { canReadRequests: true, canCreateRequests: false, canUpdateOwnRequests: false, canUpdateAllRequests: false } satisfies EmailRequestPresentationCapabilities,
         },
         {
             label: "create-only",
             readScopes: [] as const,
             createScopes: ["ALL"] as const,
-            expected: { canReadRequests: false, canCreateRequests: true },
+            expected: { canReadRequests: false, canCreateRequests: true, canUpdateOwnRequests: false, canUpdateAllRequests: false } satisfies EmailRequestPresentationCapabilities,
         },
         {
             label: "read and create",
             readScopes: ["ALL"] as const,
             createScopes: ["ALL"] as const,
-            expected: { canReadRequests: true, canCreateRequests: true },
+            expected: { canReadRequests: true, canCreateRequests: true, canUpdateOwnRequests: false, canUpdateAllRequests: false } satisfies EmailRequestPresentationCapabilities,
         },
         {
             label: "no capability",
             readScopes: [] as const,
             createScopes: [] as const,
-            expected: { canReadRequests: false, canCreateRequests: false },
+            expected: { canReadRequests: false, canCreateRequests: false, canUpdateOwnRequests: false, canUpdateAllRequests: false } satisfies EmailRequestPresentationCapabilities,
         },
     ])("projects configured USER Email Request $label authority", async ({
         readScopes,
@@ -235,7 +236,7 @@ describe("Email Request authorization adapter", () => {
             getEmailRequestPresentationCapabilities(
                 buildEmailRequestAuthorizationContext({ id: 7, role: "USER" }),
             ),
-        ).resolves.toEqual({ ...expected, canUpdateOwnRequests: false, canUpdateAllRequests: false });
+        ).resolves.toEqual(expected);
         expect(mocks.resolveMany).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 7, channel: "DASHBOARD" }),
             ["email.request.read", "email.request.create", "email.request.update"],
