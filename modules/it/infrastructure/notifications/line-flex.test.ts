@@ -11,6 +11,7 @@ describe("IT Ticket personal LINE Flex message", () => {
     it.each([
         {
             event: "CREATED",
+            color: "#2563EB",
             audience: "OPERATOR_QUEUE",
             source: { kind: "EVENT", id: 451 },
             title: "มี Ticket IT ใหม่",
@@ -20,6 +21,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         },
         {
             event: "ASSIGNED",
+            color: "#2563EB",
             audience: "ASSIGNEE",
             source: { kind: "EVENT", id: 452 },
             title: "คุณได้รับมอบหมาย Ticket IT",
@@ -29,6 +31,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         },
         {
             event: "OPERATOR_COMMENTED",
+            color: "#2563EB",
             audience: "REQUESTER",
             source: { kind: "COMMENT", id: "cmr-comment-1" },
             title: "IT ตอบกลับ Ticket ของคุณ",
@@ -38,6 +41,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         },
         {
             event: "REQUESTER_COMMENTED",
+            color: "#7C3AED",
             audience: "ASSIGNEE",
             source: { kind: "COMMENT", id: "cmr-comment-2" },
             title: "ผู้ขอส่งข้อความใหม่ใน Ticket IT",
@@ -47,6 +51,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         },
         {
             event: "WAITING_REQUESTER",
+            color: "#B45309",
             audience: "REQUESTER",
             source: { kind: "EVENT", id: 453 },
             title: "Ticket IT รอข้อมูลเพิ่มเติมจากคุณ",
@@ -56,6 +61,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         },
         {
             event: "RESOLVED",
+            color: "#047857",
             audience: "REQUESTER",
             source: { kind: "EVENT", id: 454 },
             title: "Ticket IT ได้รับการแก้ไขแล้ว",
@@ -65,6 +71,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         },
         {
             event: "REQUESTER_COMMENTED",
+            color: "#7C3AED",
             audience: "OPERATOR_QUEUE",
             source: { kind: "COMMENT", id: "cmr-comment-3" },
             title: "ผู้ขอส่งข้อความใหม่ใน Ticket IT",
@@ -88,6 +95,10 @@ describe("IT Ticket personal LINE Flex message", () => {
         const serialized = JSON.stringify(message);
 
         expect(message.type).toBe("flex");
+        expect(message.contents.header?.backgroundColor).toBe(input.color);
+        expect(message.contents.footer?.contents[0]).toMatchObject({
+            type: "button", color: input.color, action: { label: input.action },
+        });
         expect(message.altText).toBe(`IT: ${input.title} · Ticket IT #123`);
         expect(message.contents.header?.contents[0]).toMatchObject({ type: "text", text: "NHFapp | IT · Ticket IT" });
         expect(message.contents.body?.contents[0]).toMatchObject({ type: "text", text: input.title });

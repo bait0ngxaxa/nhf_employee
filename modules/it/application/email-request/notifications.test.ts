@@ -163,7 +163,7 @@ describe("Email Request channel fan-out", () => {
         expect(calls[0]?.[0].data.map((row) => row.eventKey)).toEqual(calls[1]?.[0].data.map((row) => row.eventKey));
         expect(calls[2]?.[0].data[0]?.eventKey).toBe("email-request:77:access:3:user:10:email");
         expect(mocks.createInbox).toHaveBeenCalledWith(expect.objectContaining({
-            title: "มีการอัปเดตสิทธิ์พนักงานใหม่", message: "คำขออีเมลพนักงานใหม่ #77",
+            title: "มีการอัปเดตสิทธิ์พนักงานใหม่", message: "คำขอ #77 · มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม",
             dedupeKey: "email-request:77:access:2:user:10",
         }), expect.anything());
         expect(mocks.findRecipients).toHaveBeenCalledWith({ capability: "email.request.read", scope: "ALL" }, expect.anything());

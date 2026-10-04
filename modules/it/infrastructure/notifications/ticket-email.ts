@@ -1,4 +1,4 @@
-import { NOTIFICATION_FOOTER, NOTIFICATION_MODULES, notificationSubject } from "@/shared/notifications/presentation";
+import { NOTIFICATION_ACTIONS, NOTIFICATION_FOOTER, NOTIFICATION_MODULES, notificationSubject } from "@/shared/notifications/presentation";
 import { getITTicketNotificationContent } from "../../domain/ticket-notification-content";
 import type { EmailData } from "@/lib/email/types";
 import { sendEmail } from "@/lib/email";
@@ -39,7 +39,7 @@ export function buildITTicketEmailData(
             intro: copy.summary,
             referenceLabel: "เลขที่ Ticket",
             referenceValue: ticketLabel,
-            actionLabel: copy.actionLabel,
+            actionLabel: NOTIFICATION_ACTIONS.ticket,
             actionUrl,
         }),
         text: [
@@ -50,7 +50,7 @@ export function buildITTicketEmailData(
             "",
             `เลขที่ Ticket: ${ticketLabel}`,
             "",
-            `${copy.actionLabel}: ${actionUrl}`,
+            `${NOTIFICATION_ACTIONS.ticket}: ${actionUrl}`,
             "",
             NOTIFICATION_FOOTER,
         ].join("\n"),

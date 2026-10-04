@@ -86,6 +86,7 @@ export async function enqueueEmailRequestNotificationChannels(
     payload: EmailRequestData | EmailRequestAccessUpdatedData,
 ): Promise<void> {
     const accessVersion = "accessVersion" in payload ? payload.accessVersion : undefined;
+    const content = getEmailRequestNotificationContent(accessVersion);
     await runSerializableTransaction(async (tx) => {
         const recipientUserIds = await findActiveUsersWithConfiguredCapabilityScope({
             capability: "email.request.read",
@@ -96,9 +97,9 @@ export async function enqueueEmailRequestNotificationChannels(
             await createForUserOnce({
                 userId,
                 type: "SYSTEM_ALERT",
-                title: getEmailRequestNotificationContent(accessVersion).title,
+                title: content.title,
                 message: "accessVersion" in payload
-                    ? `คำขออีเมลพนักงานใหม่ #${emailRequestId}`
+                    ? `คำขอ #${emailRequestId} · ${content.summary}`
                     : `สำหรับ ${payload.thaiName} (${payload.position}, ${payload.department})`,
                 actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.emailRequest),
                 referenceId: "accessVersion" in payload ? String(emailRequestId) : payload.replyEmail,
