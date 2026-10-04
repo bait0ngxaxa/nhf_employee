@@ -1,3 +1,5 @@
+import { buildNotificationFlex } from "@/lib/line/notification-flex";
+import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 
 export interface RoutineReminderFlexMessageData {
@@ -12,95 +14,59 @@ export interface RoutineReminderFlexMessageData {
 export function generateRoutineReminderFlexMessage(
     data: RoutineReminderFlexMessageData,
 ): LineFlexMessage {
-    return {
-        type: "flex",
-        altText: `แจ้งเตือนงาน Routine: ${data.taskTitle}`,
-        contents: {
-            type: "bubble",
-            header: {
-                type: "box",
-                layout: "vertical",
-                contents: [
-                    {
-                        type: "text",
-                        text: "แจ้งเตือนงาน Routine",
-                        weight: "bold",
-                        color: "#FFFFFF",
-                        size: "lg",
-                    },
-                ],
-                backgroundColor: "#2563EB",
-                paddingAll: "20px",
+    return buildNotificationFlex({
+        module: "Routine",
+        categoryLabel: "งานตามกำหนด",
+        title: "งานใกล้ถึงกำหนด",
+        altText: `งานใกล้ถึงกำหนด: ${data.taskTitle}`,
+        contents: [
+            {
+                type: "text",
+                text: data.taskTitle,
+                weight: "bold",
+                size: "md",
+                wrap: true,
             },
-            body: {
+            {
                 type: "box",
                 layout: "vertical",
+                margin: "md",
                 spacing: "sm",
                 contents: [
                     {
                         type: "text",
-                        text: data.taskTitle,
-                        weight: "bold",
-                        size: "lg",
+                        text: `หน่วยงาน: ${data.unitName}`,
+                        color: "#4B5563",
+                        size: "sm",
                         wrap: true,
                     },
                     {
-                        type: "box",
-                        layout: "vertical",
-                        margin: "md",
-                        spacing: "sm",
-                        contents: [
-                            {
-                                type: "text",
-                                text: `หน่วยงาน: ${data.unitName}`,
-                                color: "#4B5563",
-                                size: "sm",
-                                wrap: true,
-                            },
-                            {
-                                type: "text",
-                                text: `หมวดหมู่: ${data.categoryName}`,
-                                color: "#4B5563",
-                                size: "sm",
-                                wrap: true,
-                            },
-                            {
-                                type: "text",
-                                text: `ครบกำหนด: ${data.dueDateLabel}`,
-                                color: "#111827",
-                                size: "sm",
-                                wrap: true,
-                            },
-                            {
-                                type: "text",
-                                text: data.timingLabel,
-                                color: "#1D4ED8",
-                                size: "sm",
-                                weight: "bold",
-                                wrap: true,
-                            },
-                        ],
+                        type: "text",
+                        text: `หมวดหมู่: ${data.categoryName}`,
+                        color: "#4B5563",
+                        size: "sm",
+                        wrap: true,
                     },
-                ],
-            },
-            footer: {
-                type: "box",
-                layout: "vertical",
-                spacing: "sm",
-                contents: [
                     {
-                        type: "button",
-                        style: "primary",
-                        height: "sm",
-                        action: {
-                            type: "uri",
-                            label: "เปิดดูงาน",
-                            uri: data.actionUrl,
-                        },
-                        color: "#2563EB",
+                        type: "text",
+                        text: `ครบกำหนด: ${data.dueDateLabel}`,
+                        color: "#111827",
+                        size: "sm",
+                        wrap: true,
+                    },
+                    {
+                        type: "text",
+                        text: data.timingLabel,
+                        color: "#1D4ED8",
+                        size: "sm",
+                        weight: "bold",
+                        wrap: true,
                     },
                 ],
             },
-        },
-    };
+        ],
+        actionLabel: NOTIFICATION_ACTIONS.task,
+        actionUrl: data.actionUrl,
+        accentColor: "#2563EB",
+    });
 }

@@ -20,8 +20,8 @@ describe("Stock low LINE Flex message", () => {
         }, "https://example.com");
         const serializedMessage = JSON.stringify(message);
 
-        expect(message.altText).toBe("สต็อกต่ำถึงจุดสั่งซื้อ: หมึกพิมพ์");
+        expect(message.altText).toBe("Stock: วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ 1 รายการ");
         expect(serializedMessage).toContain("หมึกพิมพ์ (สี: ดำ) (INK-BLACK)");
-        expect(serializedMessage).toContain("คงเหลือ 1 ตลับ | จุดสั่งซื้อ 5");
+        expect(serializedMessage).toContain("คงเหลือ 1 ตลับ | จุดแจ้งเตือน 5");
     });
 });

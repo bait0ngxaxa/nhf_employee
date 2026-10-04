@@ -1,3 +1,6 @@
+import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
+import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
+import { LEAVE_NOTIFICATION_TITLES } from "../../domain/notification-content";
 import type { LineFlexComponent, LineFlexMessage } from "@/types/api";
 
 import {
@@ -27,7 +30,6 @@ type LeaveSummaryPayload = {
 
 type LeaveFlexMessageData = {
     title: string;
-    altText: string;
     employeeName: string;
     leaveSummary: string;
     details?: string;
@@ -69,76 +71,11 @@ function buildLeaveFlexMessage(data: LeaveFlexMessageData): LineFlexMessage {
         });
     }
 
-    return {
-        type: "flex",
-        altText: data.altText,
-        contents: {
-            type: "bubble",
-            header: {
-                type: "box",
-                layout: "vertical",
-                contents: [
-                    {
-                        type: "text",
-                        text: data.title,
-                        weight: "bold",
-                        color: "#FFFFFF",
-                        size: "lg",
-                        wrap: true,
-                    },
-                ],
-                backgroundColor: data.accentColor,
-                paddingAll: "20px",
-            },
-            body: {
-                type: "box",
-                layout: "vertical",
-                spacing: "sm",
-                contents: [
-                    {
-                        type: "text",
-                        text: data.employeeName,
-                        weight: "bold",
-                        size: "lg",
-                        wrap: true,
-                    },
-                    {
-                        type: "text",
-                        text: data.leaveSummary,
-                        color: "#111827",
-                        size: "sm",
-                        wrap: true,
-                        margin: "sm",
-                    },
-                    {
-                        type: "box",
-                        layout: "vertical",
-                        margin: "md",
-                        spacing: "sm",
-                        contents: detailContents,
-                    },
-                ],
-            },
-            footer: {
-                type: "box",
-                layout: "vertical",
-                spacing: "sm",
-                contents: [
-                    {
-                        type: "button",
-                        style: "primary",
-                        height: "sm",
-                        action: {
-                            type: "uri",
-                            label: data.actionLabel,
-                            uri: data.actionUrl,
-                        },
-                        color: data.accentColor,
-                    },
-                ],
-            },
-        },
-    };
+    return buildNotificationFlex({
+        module: "Leave", categoryLabel: "คำขอลา", title: data.title,
+        contents: [notificationFlexText(data.employeeName), notificationFlexText(data.leaveSummary), ...detailContents],
+        actionLabel: data.actionLabel, actionUrl: data.actionUrl, accentColor: data.accentColor,
+    });
 }
 
 function formatSummary(payload: LeaveSummaryPayload): string {
@@ -151,12 +88,11 @@ export function generateLeaveActionFlexMessage(
 ): LineFlexMessage {
     const summary = formatSummary(payload);
     return buildLeaveFlexMessage({
-        title: "มีคำขอลาใหม่รออนุมัติ",
-        altText: `${payload.employee.name} ส่งคำขอลาใหม่`,
+        title: LEAVE_NOTIFICATION_TITLES.action,
         employeeName: payload.employee.name,
         leaveSummary: summary,
         details: `รายละเอียดเพิ่มเติม${formatLeaveFlagSummary(payload)}`,
-        actionLabel: "ตรวจสอบคำขอ",
+        actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl,
         accentColor: "#2563EB",
     });
@@ -173,17 +109,16 @@ export function generateLeaveResultFlexMessage(
         : undefined;
     return buildLeaveFlexMessage({
         title: isApproved
-            ? "คำขอลาได้รับการอนุมัติ"
-            : "คำขอลาไม่ได้รับการอนุมัติ",
-        altText: `${getLeaveTypeLabel(payload.leaveType)}${statusLabel}`,
+            ? LEAVE_NOTIFICATION_TITLES.approved
+            : LEAVE_NOTIFICATION_TITLES.rejected,
         employeeName: payload.employee.name,
         leaveSummary: formatSummary(payload),
         details,
         statusLabel,
         statusColor: isApproved ? "#047857" : "#B91C1C",
-        actionLabel: "เปิดรายละเอียด",
+        actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
-        accentColor: isApproved ? "#059669" : "#DC2626",
+        accentColor: isApproved ? "#047857" : "#DC2626",
     });
 }
 
@@ -192,11 +127,10 @@ export function generateLeaveCancelledFlexMessage(
     actionUrl: string,
 ): LineFlexMessage {
     return buildLeaveFlexMessage({
-        title: "คำขอลาถูกยกเลิก",
-        altText: `${payload.employee.name} ยกเลิกคำขอลา`,
+        title: LEAVE_NOTIFICATION_TITLES.cancelled,
         employeeName: payload.employee.name,
         leaveSummary: formatSummary(payload),
-        actionLabel: "เปิดรายละเอียด",
+        actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
         accentColor: "#6B7280",
     });
@@ -207,14 +141,13 @@ export function generateLeaveCancellationRequestedFlexMessage(
     actionUrl: string,
 ): LineFlexMessage {
     return buildLeaveFlexMessage({
-        title: "มีคำขอยกเลิกวันลารอยืนยัน",
-        altText: `${payload.employee.name} ขอยกเลิกวันลา`,
+        title: LEAVE_NOTIFICATION_TITLES.cancellationRequested,
         employeeName: payload.employee.name,
         leaveSummary: formatSummary(payload),
         details: `หมายเหตุ: ${payload.note}`,
-        actionLabel: "ตรวจสอบคำขอ",
+        actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl,
-        accentColor: "#D97706",
+        accentColor: "#B45309",
     });
 }
 
@@ -223,14 +156,13 @@ export function generateLeaveCancelledAfterApprovalFlexMessage(
     actionUrl: string,
 ): LineFlexMessage {
     return buildLeaveFlexMessage({
-        title: "ยกเลิกวันลาที่อนุมัติแล้วเรียบร้อย",
-        altText: `${formatLeaveDecisionActor(payload)} ยืนยันการยกเลิกวันลา`,
+        title: LEAVE_NOTIFICATION_TITLES.cancelledAfterApproval,
         employeeName: payload.employee.name,
         leaveSummary: formatSummary(payload),
         details: `ผู้ยืนยัน: ${formatLeaveDecisionActor(payload)}`,
         statusLabel: "ยกเลิกแล้ว",
         statusColor: "#6B7280",
-        actionLabel: "เปิดรายละเอียด",
+        actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
         accentColor: "#6B7280",
     });
@@ -241,14 +173,13 @@ export function generateLeaveNotTakenRequestedFlexMessage(
     actionUrl: string,
 ): LineFlexMessage {
     return buildLeaveFlexMessage({
-        title: "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน",
-        altText: `${payload.employee.name} แจ้งไม่ได้ใช้วันลา`,
+        title: LEAVE_NOTIFICATION_TITLES.notTakenRequested,
         employeeName: payload.employee.name,
         leaveSummary: formatSummary(payload),
         details: `หมายเหตุ: ${payload.note}`,
-        actionLabel: "ตรวจสอบคำขอ",
+        actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl,
-        accentColor: "#D97706",
+        accentColor: "#B45309",
     });
 }
 
@@ -257,14 +188,13 @@ export function generateLeaveNotTakenConfirmedFlexMessage(
     actionUrl: string,
 ): LineFlexMessage {
     return buildLeaveFlexMessage({
-        title: "ยืนยันไม่ได้ใช้วันลาแล้ว",
-        altText: `${formatLeaveDecisionActor(payload)} ยืนยันไม่ได้ใช้วันลา`,
+        title: LEAVE_NOTIFICATION_TITLES.notTakenConfirmed,
         employeeName: payload.employee.name,
         leaveSummary: formatSummary(payload),
         details: `ผู้ยืนยัน: ${formatLeaveDecisionActor(payload)}`,
         statusLabel: "ไม่ได้ใช้วันลา",
         statusColor: "#6B7280",
-        actionLabel: "เปิดรายละเอียด",
+        actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
         accentColor: "#6B7280",
     });

@@ -662,7 +662,7 @@ describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
         expect(inbox).toHaveLength(1);
         expect(inbox[0]?.actionUrl).toBe(`/dashboard/it/${created.ticket.id}`);
         expect(inbox[0]?.type).toBe("IT_TICKET");
-        expect(inbox[0]?.title).toBe("คำขอ IT ได้รับการแก้ไขแล้ว");
+        expect(inbox[0]?.title).toBe("Ticket IT ได้รับการแก้ไขแล้ว");
         expect(inbox[0]?.message).not.toContain("รายละเอียดส่วนตัว");
     });
 

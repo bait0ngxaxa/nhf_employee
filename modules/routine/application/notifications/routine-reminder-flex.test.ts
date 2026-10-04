@@ -13,7 +13,7 @@ describe("Routine LINE reminder Flex message", () => {
             actionUrl: "https://liff.line.me/routine-id?taskId=71&occurrenceId=91",
         });
 
-        expect(message.altText).toBe("แจ้งเตือนงาน Routine: ตรวจสอบระบบประจำเดือน");
+        expect(message.altText).toBe("Routine: งานใกล้ถึงกำหนด: ตรวจสอบระบบประจำเดือน");
         expect(JSON.stringify(message)).toContain("ฝ่าย IT");
         expect(JSON.stringify(message)).toContain("ครบกำหนดวันนี้");
         expect(JSON.stringify(message)).toContain(

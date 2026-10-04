@@ -108,6 +108,18 @@ describe("Email Request channel fan-out", () => {
         }
     });
 
+    it("describes thaiName as the requested employee, never as the actor", async () => {
+        // The producer supplies the requested employee snapshot; requestedBy is separate.
+        await enqueueEmailRequestNotificationChannels(77, 900, payload);
+        expect(mocks.createInbox).toHaveBeenCalledWith(expect.objectContaining({
+            title: "มีคำขออีเมลพนักงานใหม่",
+            message: "สำหรับ สมชาย ใจดี (IT Officer, IT)",
+        }), expect.anything());
+        const content = JSON.stringify(mocks.createInbox.mock.calls);
+        expect(content).not.toContain("ส่งคำขออีเมลพนักงานใหม่");
+        expect(content).not.toContain("มีคำขออีเมลพนักงานใหม่สำหรับ");
+    });
+
     it("keeps fan-out idempotent when the parent is retried", async () => {
         await enqueueEmailRequestNotificationChannels(77, 900, payload);
         const firstRows = getCreateManyCalls()[0]?.[0].data;
@@ -151,7 +163,7 @@ describe("Email Request channel fan-out", () => {
         expect(calls[0]?.[0].data.map((row) => row.eventKey)).toEqual(calls[1]?.[0].data.map((row) => row.eventKey));
         expect(calls[2]?.[0].data[0]?.eventKey).toBe("email-request:77:access:3:user:10:email");
         expect(mocks.createInbox).toHaveBeenCalledWith(expect.objectContaining({
-            title: "มีการอัปเดตสิทธิ์พนักงานใหม่", message: "คำร้อง #77 มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม",
+            title: "มีการอัปเดตสิทธิ์พนักงานใหม่", message: "คำขออีเมลพนักงานใหม่ #77",
             dedupeKey: "email-request:77:access:2:user:10",
         }), expect.anything());
         expect(mocks.findRecipients).toHaveBeenCalledWith({ capability: "email.request.read", scope: "ALL" }, expect.anything());

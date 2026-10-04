@@ -1,4 +1,5 @@
-﻿import type { Prisma } from "@prisma/client";
+﻿import { NOTIFICATION_FOOTER, notificationSubject } from "@/shared/notifications/presentation";
+import type { Prisma } from "@prisma/client";
 import type { JWTPayload } from "jose";
 
 interface SessionUserLike {
@@ -100,8 +101,8 @@ export const AUTH_SIGNUP_MESSAGES = {
 
 export const AUTH_FORGOT_PASSWORD_MESSAGES = {
     requestAcceptedThai: "หากอีเมลนี้มีอยู่ในระบบ คุณจะได้รับลิงก์รีเซ็ตรหัสผ่านทางอีเมล",
-    resetSubjectThai: "[NHF IT] รีเซ็ตรหัสผ่าน",
+    resetSubjectThai: notificationSubject("Account", "คำขอรีเซ็ตรหัสผ่าน"),
     resetMailTextThai: (name: string, resetUrl: string): string =>
-        `สวัสดีคุณ ${name},\n\nกรุณาคลิกลิงก์ด้านล่างเพื่อรีเซ็ตรหัสผ่าน:\n${resetUrl}\n\nลิงก์จะหมดอายุภายใน 1 ชั่วโมง\n\nหากคุณไม่ได้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยอีเมลนี้`,
+        `เรียน ${name}\n\nคำขอรีเซ็ตรหัสผ่าน\nตั้งรหัสผ่านใหม่: ${resetUrl}\n\nลิงก์จะหมดอายุภายใน 1 ชั่วโมง\nหากคุณไม่ได้ขอรีเซ็ตรหัสผ่าน กรุณาเพิกเฉยอีเมลนี้ รหัสผ่านของคุณจะไม่ถูกเปลี่ยนแปลง\n\n${NOTIFICATION_FOOTER}`,
     requestFailedThai: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
 } as const;

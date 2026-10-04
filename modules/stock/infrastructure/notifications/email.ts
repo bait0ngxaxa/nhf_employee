@@ -1,3 +1,4 @@
+import { NOTIFICATION_MODULES, notificationSubject } from "@/shared/notifications/presentation";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import {
     STOCK_DASHBOARD_TABS,
@@ -11,7 +12,7 @@ import {
 } from "./email-template/stock-request-result";
 import type { StockRequestResultEmailPayload } from "./notification-payloads";
 
-const STOCK_EMAIL_FROM_NAME = "ระบบเบิกวัสดุ NHFapp";
+const STOCK_EMAIL_FROM_NAME = NOTIFICATION_MODULES.Stock.sender;
 
 function buildStockRequestResultMessageId(
     data: StockRequestResultEmailPayload,
@@ -28,8 +29,8 @@ export async function sendStockRequestResultNotification(
     const emailData: EmailData = {
         to: data.recipient.email,
         subject: data.status === "ISSUED"
-            ? `[NHF Stock] คำขอเบิก #${data.requestId} ถูกจ่ายเรียบร้อยแล้ว`
-            : `[NHF Stock] คำขอเบิก #${data.requestId} ถูกยกเลิก`,
+            ? notificationSubject("Stock", `คำขอเบิกวัสดุ #${data.requestId} ถูกจ่ายแล้ว`)
+            : notificationSubject("Stock", `คำขอเบิกวัสดุ #${data.requestId} ถูกยกเลิก`),
         html: generateStockRequestResultEmailHTML(data, dashboardUrl),
         text: generateStockRequestResultEmailText(data, dashboardUrl),
         messageId: buildStockRequestResultMessageId(data),

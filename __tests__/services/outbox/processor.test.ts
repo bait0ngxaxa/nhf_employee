@@ -874,7 +874,7 @@ describe("processOutbox", () => {
         expect(sendStockLineBroadcast).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: "flex",
-                altText: "มีคำขอเบิกวัสดุใหม่ #77",
+                altText: "Stock: มีคำขอเบิกวัสดุใหม่ #77",
             }),
             createOutboxLineRetryKey("STOCK_REQUEST_LINE", 105),
         );
@@ -920,7 +920,7 @@ describe("processOutbox", () => {
             data: expect.objectContaining({
                 userId: 1,
                 type: "STOCK_REQUEST_NEW",
-                title: "คำขอเบิกวัสดุใหม่",
+                title: "มีคำขอเบิกวัสดุใหม่",
                 referenceId: "77",
             }),
         });
@@ -973,7 +973,7 @@ describe("processOutbox", () => {
         expect(sendStockLineBroadcast).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: "flex",
-                altText: "สต็อกต่ำถึงจุดสั่งซื้อ: ปากกา",
+                altText: "Stock: วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ 1 รายการ",
             }),
             createOutboxLineRetryKey("STOCK_LOW_LINE", 106),
         );
@@ -1010,7 +1010,7 @@ describe("processOutbox", () => {
         expect(sendStockLineBroadcast).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: "flex",
-                altText: "สต็อกต่ำถึงจุดสั่งซื้อ: หมึกพิมพ์",
+                altText: "Stock: วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ 1 รายการ",
             }),
             createOutboxLineRetryKey("STOCK_LOW_LINE", 116),
         );
@@ -1055,7 +1055,7 @@ describe("processOutbox", () => {
             data: expect.objectContaining({
                 userId: 1,
                 type: "SYSTEM_ALERT",
-                title: "วัสดุใกล้หมดสต็อก",
+                title: "วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ",
                 referenceId: "PEN-001",
             }),
         });

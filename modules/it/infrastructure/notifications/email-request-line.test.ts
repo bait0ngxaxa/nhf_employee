@@ -32,8 +32,10 @@ describe("Email Request personal NHFapp LINE notification", () => {
             userId: 10,
             retryKey: "stable-line-retry-key",
         });
+        expect(input.message.altText).toBe("IT: มีคำขออีเมลพนักงานใหม่ #77");
+        expect(input.message.contents.body?.contents[0]).toMatchObject({ text: "มีคำขออีเมลพนักงานใหม่" });
         const serialized = JSON.stringify(input.message);
-        expect(serialized).toContain("คำร้องอีเมลพนักงานใหม่ #77");
+        expect(serialized).toContain("คำขออีเมลพนักงานใหม่ #77");
         expect(serialized).toContain("https://app.example.com/dashboard/email-request");
         expect(serialized).not.toContain("somchai@example.com");
         expect(serialized).not.toContain("replyEmail");

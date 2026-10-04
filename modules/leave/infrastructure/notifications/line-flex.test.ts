@@ -135,6 +135,23 @@ describe("Leave LINE Flex messages", () => {
     });
 
     it.each([
+        [generateLeaveActionFlexMessage(buildActionPayload(), "url"), "มีคำขอลาใหม่รออนุมัติ", "ตรวจสอบคำขอ"],
+        [generateLeaveResultFlexMessage(buildResultPayload(), "url"), "คำขอลาได้รับการอนุมัติ", "เปิดรายละเอียด"],
+        [generateLeaveResultFlexMessage({ ...buildResultPayload(), status: "REJECTED" }, "url"), "คำขอลาไม่ได้รับการอนุมัติ", "เปิดรายละเอียด"],
+        [generateLeaveCancelledFlexMessage(buildCancelledPayload(), "url"), "คำขอลาถูกยกเลิก", "เปิดรายละเอียด"],
+        [generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), "url"), "มีคำขอยกเลิกวันลารอยืนยัน", "ตรวจสอบคำขอ"],
+        [generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), "url"), "ยืนยันการยกเลิกวันลาแล้ว", "เปิดรายละเอียด"],
+        [generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), "url"), "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน", "ตรวจสอบคำขอ"],
+        [generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), "url"), "ยืนยันไม่ได้ใช้วันลาแล้ว", "เปิดรายละเอียด"],
+    ] as const)("uses the canonical event title, privacy-safe preview and CTA", (message, title, action) => {
+        expect(message.altText).toBe(`วันลา: ${title}`);
+        expect(message.contents.header?.contents[0]).toMatchObject({ text: "NHFapp | วันลา · คำขอลา" });
+        expect(message.contents.body?.contents[0]).toMatchObject({ text: title });
+        expect(message.contents.footer?.contents[0]).toMatchObject({ action: { label: action, uri: "url" } });
+        expect(message.altText).not.toContain(employee.name);
+    });
+
+    it.each([
         ["result", generateLeaveResultFlexMessage(buildResultPayload(), "result-url"), "result-url"],
         ["cancelled", generateLeaveCancelledFlexMessage(buildCancelledPayload(), "cancel-url"), "cancel-url"],
         ["cancellation request", generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), "review-url"), "review-url"],

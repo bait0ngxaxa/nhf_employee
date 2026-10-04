@@ -1,3 +1,5 @@
+import { NOTIFICATION_FOOTER, NOTIFICATION_MODULES, notificationSubject } from "@/shared/notifications/presentation";
+import { getITTicketNotificationContent } from "../../domain/ticket-notification-content";
 import type { EmailData } from "@/lib/email/types";
 import { sendEmail } from "@/lib/email";
 import { getPublicOrigin } from "@/lib/network/public-url";
@@ -5,45 +7,6 @@ import { APP_ROUTES } from "@/lib/ssot/routes";
 import { generateITNotificationEmailHTML } from "./email-template";
 
 import type { ITTicketNotificationPayloadV1 } from "../../domain/ticket-notification";
-
-interface ITTicketEmailCopy {
-    readonly subject: (ticketId: number) => string;
-    readonly body: string;
-    readonly actionLabel: string;
-}
-
-const IT_TICKET_EMAIL_COPY: Record<ITTicketNotificationPayloadV1["event"], ITTicketEmailCopy> = {
-    CREATED: {
-        subject: (ticketId) => `มี Ticket IT ใหม่ #${ticketId}`,
-        body: "มีคำขอ IT ใหม่รอรับเรื่อง",
-        actionLabel: "เปิด Ticket ในระบบ",
-    },
-    ASSIGNED: {
-        subject: (ticketId) => `คุณได้รับมอบหมาย Ticket IT #${ticketId}`,
-        body: "มี Ticket IT มอบหมายให้คุณ",
-        actionLabel: "เปิด Ticket ในระบบ",
-    },
-    OPERATOR_COMMENTED: {
-        subject: (ticketId) => `IT ตอบกลับ Ticket IT #${ticketId} แล้ว`,
-        body: "IT ตอบกลับคำขอของคุณแล้ว",
-        actionLabel: "เปิด Ticket ในระบบ",
-    },
-    REQUESTER_COMMENTED: {
-        subject: (ticketId) => `มีข้อความใหม่ใน Ticket IT #${ticketId}`,
-        body: "ผู้ขอส่งข้อความใหม่ใน Ticket IT",
-        actionLabel: "เปิด Ticket ในระบบ",
-    },
-    WAITING_REQUESTER: {
-        subject: (ticketId) => `IT ต้องการข้อมูลเพิ่มเติมสำหรับ Ticket IT #${ticketId}`,
-        body: "IT ต้องการข้อมูลเพิ่มเติมเพื่อดำเนินการต่อ",
-        actionLabel: "เปิด Ticket ในระบบ",
-    },
-    RESOLVED: {
-        subject: (ticketId) => `Ticket IT #${ticketId} ได้รับการแก้ไขแล้ว`,
-        body: "คำขอ IT ของคุณได้รับการแก้ไขแล้ว",
-        actionLabel: "ดู Ticket ในระบบ",
-    },
-};
 
 function getTicketActionUrl(payload: ITTicketNotificationPayloadV1): string {
     const route = payload.audience === "REQUESTER"
@@ -62,35 +25,37 @@ export function buildITTicketEmailData(
     to: string,
     eventKey: string,
 ): EmailData {
-    const copy = IT_TICKET_EMAIL_COPY[payload.event];
+    const copy = getITTicketNotificationContent(payload);
     const ticketLabel = `Ticket IT #${payload.ticketId}`;
     const actionUrl = getTicketActionUrl(payload);
-    const subject = copy.subject(payload.ticketId);
+    const subject = `${copy.title} #${payload.ticketId}`;
 
     return {
         to,
-        subject,
+        subject: notificationSubject("IT", subject),
         html: generateITNotificationEmailHTML({
+            categoryLabel: "Ticket IT",
             title: subject,
-            intro: copy.body,
+            intro: copy.summary,
             referenceLabel: "เลขที่ Ticket",
             referenceValue: ticketLabel,
             actionLabel: copy.actionLabel,
             actionUrl,
         }),
         text: [
-            "ระบบ NHFapp | ระบบ NHF IT",
+            "NHFapp | IT",
             "",
-            copy.body,
+            subject,
+            copy.summary,
             "",
             `เลขที่ Ticket: ${ticketLabel}`,
             "",
             `${copy.actionLabel}: ${actionUrl}`,
             "",
-            "ระบบ NHFapp ส่งอีเมลฉบับนี้โดยอัตโนมัติ กรุณาอย่าตอบกลับ",
+            NOTIFICATION_FOOTER,
         ].join("\n"),
         messageId: buildITTicketMessageId(eventKey),
-        fromName: "ระบบ NHF IT",
+        fromName: NOTIFICATION_MODULES.IT.sender,
     };
 }
 

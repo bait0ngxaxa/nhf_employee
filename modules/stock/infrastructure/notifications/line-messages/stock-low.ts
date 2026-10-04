@@ -1,3 +1,5 @@
+import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
+import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 import type { StockLowLineData } from "../../../contracts/notifications";
 import { formatDate } from "@/lib/line/helpers";
@@ -12,7 +14,7 @@ function buildItemsPreview(items: StockLowLineData["items"]): string {
             ? `${item.itemName} (${item.variantLabel})`
             : item.name;
         const sku = "variantId" in item ? item.variantSku : item.sku;
-        return `${name} (${sku})\nคงเหลือ ${item.quantity} ${item.unit} | จุดสั่งซื้อ ${item.minStock}`;
+        return `${name} (${sku})\nคงเหลือ ${item.quantity} ${item.unit} | จุดแจ้งเตือน ${item.minStock}`;
     });
 
     if (items.length > 3) {
@@ -22,103 +24,39 @@ function buildItemsPreview(items: StockLowLineData["items"]): string {
     return previewItems.join("\n\n");
 }
 
-function getAltText(data: StockLowLineData): string {
-    if (data.itemCount === 1) {
-        const item = data.items[0];
-        const name = item
-            ? ("variantId" in item ? item.itemName : item.name)
-            : "";
-        return `สต็อกต่ำถึงจุดสั่งซื้อ: ${name}`;
-    }
-
-    return `มี ${data.itemCount} รายการสต็อกต่ำถึงจุดสั่งซื้อ`;
-}
-
-function getHeaderText(data: StockLowLineData): string {
-    return data.itemCount === 1
-        ? "สต็อกถึงจุดสั่งซื้อ"
-        : "มีหลายรายการถึงจุดสั่งซื้อ";
-}
-
 export function generateStockLowFlexMessage(
     data: StockLowLineData,
     baseUrl: string,
 ): LineFlexMessage {
-    return {
-        type: "flex",
-        altText: getAltText(data),
-        contents: {
-            type: "bubble",
-            header: {
-                type: "box",
-                layout: "vertical",
-                contents: [
-                    {
-                        type: "text",
-                        text: getHeaderText(data),
-                        weight: "bold",
-                        color: "#ffffff",
-                        size: "xl",
-                    },
-                    {
-                        type: "text",
-                        text: `แจ้งเตือนเมื่อ ${formatDate(data.alertedAt)}`,
-                        color: "#ffedd5",
-                        size: "sm",
-                        wrap: true,
-                        margin: "sm"
-                    },
-                ],
-                backgroundColor: "#ea580c",
-                paddingAll: "20px",
+    return buildNotificationFlex({
+        module: "Stock",
+        categoryLabel: "คลังวัสดุ",
+        title: "วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ",
+        altText: `วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ ${data.itemCount} รายการ`,
+        contents: [
+            notificationFlexText(`แจ้งเตือนเมื่อ ${formatDate(data.alertedAt)}`),
+            {
+                type: "text",
+                text: `จำนวนรายการที่ต้องติดตาม ${data.itemCount} รายการ`,
+                weight: "bold",
+                size: "md",
+                wrap: true,
             },
-            body: {
-                type: "box",
-                layout: "vertical",
-                contents: [
-                    {
-                        type: "text",
-                        text: `จำนวนรายการที่ต้องติดตาม ${data.itemCount} รายการ`,
-                        weight: "bold",
-                        size: "md",
-                        wrap: true,
-                    },
-                    {
-                        type: "separator",
-                        margin: "md",
-                    },
-                    {
-                        type: "text",
-                        text: buildItemsPreview(data.items),
-                        size: "sm",
-                        color: "#374151",
-                        wrap: true,
-                        margin: "md",
-                    },
-                ],
+            {
+                type: "separator",
+                margin: "md",
             },
-            footer: {
-                type: "box",
-                layout: "vertical",
-                spacing: "sm",
-                contents: [
-                    {
-                        type: "button",
-                        style: "primary",
-                        height: "sm",
-                        action: {
-                            type: "uri",
-                            label: "เปิดหน้าคลังวัสดุ",
-                            uri: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.inventory)}`,
-                        },
-                        color: "#ea580c",
-                    },
-                    {
-                        type: "spacer",
-                        size: "sm",
-                    },
-                ],
+            {
+                type: "text",
+                text: buildItemsPreview(data.items),
+                size: "sm",
+                color: "#374151",
+                wrap: true,
+                margin: "md",
             },
-        },
-    };
+        ],
+        actionLabel: NOTIFICATION_ACTIONS.inventory,
+        actionUrl: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.inventory)}`,
+        accentColor: "#C2410C",
+    });
 }

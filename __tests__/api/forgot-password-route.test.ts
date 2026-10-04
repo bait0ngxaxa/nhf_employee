@@ -78,6 +78,11 @@ describe("forgot-password route", () => {
         await expect(readResponse(unknownResponse)).resolves.toEqual(acceptedBody);
         await expect(readResponse(knownResponse)).resolves.toEqual(acceptedBody);
         expect(sendEmailMock).toHaveBeenCalledTimes(1);
+        expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+            subject: "[NHFapp][Account] คำขอรีเซ็ตรหัสผ่าน",
+            fromName: "NHFapp | บัญชีผู้ใช้",
+            html: expect.stringContaining("ตั้งรหัสผ่านใหม่"),
+        }));
     });
 
     it("keeps database-limited requests in the accepted response path", async () => {

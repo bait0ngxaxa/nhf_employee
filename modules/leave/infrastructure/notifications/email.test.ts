@@ -6,6 +6,10 @@ import type {
 } from "../../application/notifications/notification-payloads";
 import {
     sendLeaveActionNotification,
+    sendLeaveResultNotification,
+    sendLeaveCancelledNotification,
+    sendLeaveCancellationRequestedNotification,
+    sendLeaveNotTakenRequestedNotification,
     sendLeaveCancelledAfterApprovalNotification,
     sendLeaveNotTakenConfirmedNotification,
 } from "./email";
@@ -93,7 +97,7 @@ describe("Leave email notifications", () => {
 
             expect(sendMailMock).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    from: '"ระบบลา NHFapp" <user>',
+                    from: '"NHFapp | ระบบวันลา" <user>',
                 }),
             );
             const firstMessageId = sendMailMock.mock.calls[0][0].messageId;
@@ -120,6 +124,37 @@ describe("Leave email notifications", () => {
             expect(nextMessageId).not.toBe(previousMessageId);
             expect(nextMessageId).toContain("-300@");
         });
+    });
+
+    it.each([
+        ["action", "มีคำขอลาใหม่รออนุมัติ", "ตรวจสอบคำขอ"],
+        ["approved", "คำขอลาได้รับการอนุมัติ", "เปิดรายละเอียด"],
+        ["rejected", "คำขอลาไม่ได้รับการอนุมัติ", "เปิดรายละเอียด"],
+        ["cancelled", "คำขอลาถูกยกเลิก", "เปิดรายละเอียด"],
+        ["cancellationRequested", "มีคำขอยกเลิกวันลารอยืนยัน", "ตรวจสอบคำขอ"],
+        ["cancelledAfterApproval", "ยืนยันการยกเลิกวันลาแล้ว", "เปิดรายละเอียด"],
+        ["notTakenRequested", "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน", "ตรวจสอบคำขอ"],
+        ["notTakenConfirmed", "ยืนยันไม่ได้ใช้วันลาแล้ว", "เปิดรายละเอียด"],
+    ] as const)("uses matching subject and heading for %s", async (event, title, action) => {
+        const base = buildAdminLeaveDecisionPayload();
+        const request = { ...base, approver: { employeeId: 20, userId: 2, email: "manager@thainhf.org", name: "ผู้อนุมัติ" }, note: "เหตุผล" };
+        switch (event) {
+            case "action": await sendLeaveActionNotification({ ...request, reason: "พักผ่อน", emergencyReason: null, specialReason: null, overQuotaDays: 0 }, "https://app.example.com/review"); break;
+            case "approved": case "rejected": await sendLeaveResultNotification({ ...base, status: event === "approved" ? "APPROVED" : "REJECTED", approverName: "ผู้อนุมัติ", reason: null }); break;
+            case "cancelled": await sendLeaveCancelledNotification(request); break;
+            case "cancellationRequested": await sendLeaveCancellationRequestedNotification(request); break;
+            case "cancelledAfterApproval": await sendLeaveCancelledAfterApprovalNotification(base); break;
+            case "notTakenRequested": await sendLeaveNotTakenRequestedNotification(request); break;
+            case "notTakenConfirmed": await sendLeaveNotTakenConfirmedNotification(base); break;
+        }
+        const mail = sendMailMock.mock.calls[0]?.[0];
+        expect(mail).toMatchObject({ from: '"NHFapp | ระบบวันลา" <user>', subject: `[NHFapp][Leave] ${title}` });
+        expect(mail.html).toContain(title);
+        expect(mail.html).toContain(action);
+        expect(mail.html).toContain("NHFapp&nbsp; | &nbsp;วันลา");
+        expect(mail.html).toContain("หากปุ่มเปิดไม่ได้");
+        expect(mail.text).not.toMatch(/APPROVED|REJECTED/);
+        expect(mail.text).toContain("กรุณาอย่าตอบกลับ");
     });
 
     describe("leave recovery decision notifications", () => {

@@ -212,7 +212,7 @@ export async function requestLeaveNotTaken(
             userId,
             type: "LEAVE_NOT_TAKEN_REQUESTED",
             title: "แจ้งไม่ได้ใช้วันลาแล้ว",
-            message: `แจ้งไม่ได้ใช้วันลาแล้ว: ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(leaveSummary)}`,
+            message: `${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary(leaveSummary)}`,
             actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
             referenceId: leaveRequest.id,
         }, tx);

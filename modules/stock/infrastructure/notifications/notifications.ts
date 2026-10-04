@@ -86,8 +86,8 @@ export async function notifyStockRequestResult(
             ? "คำขอเบิกวัสดุถูกจ่ายแล้ว"
             : "คำขอเบิกวัสดุถูกยกเลิก",
         message: isIssued
-            ? `คำขอเบิก #${requestId} ถูกจ่ายเรียบร้อยแล้ว`
-            : `คำขอเบิก #${requestId} ถูกยกเลิก${cancelReason ? `: ${cancelReason}` : ""}`,
+            ? `เลขที่คำขอ #${requestId}`
+            : `เลขที่คำขอ #${requestId}${cancelReason ? ` · เหตุผล: ${cancelReason}` : ""}`,
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.myRequests),
         referenceId: String(requestId),
     }, client);
@@ -173,8 +173,8 @@ export async function notifyStockRequestProcessorsNewRequest(
 ): Promise<void> {
     await createForCapabilityRecipients({
         type: "STOCK_REQUEST_NEW",
-        title: "คำขอเบิกวัสดุใหม่",
-        message: `${requesterName} ส่งคำขอเบิกวัสดุ #${requestId} (${projectCode})`,
+        title: "มีคำขอเบิกวัสดุใหม่",
+        message: `${requesterName} · คำขอ #${requestId} (${projectCode})`,
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(requestId),
     }, "stock.request.process", `stock:${requestId}:STOCK_REQUEST_NEW`, client);
@@ -285,8 +285,8 @@ export async function notifyStockRequestProcessorsLineInApp(
 ): Promise<void> {
     await createForCapabilityRecipients({
         type: "STOCK_REQUEST_NEW",
-        title: "คำขอเบิกวัสดุใหม่",
-        message: `${payload.requesterName} ส่งคำขอเบิกวัสดุ #${payload.requestId} (${payload.projectCode})`,
+        title: "มีคำขอเบิกวัสดุใหม่",
+        message: `${payload.requesterName} · คำขอ #${payload.requestId} (${payload.projectCode})`,
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
         referenceId: String(payload.requestId),
     }, "stock.request.process", `stock:${payload.requestId}:STOCK_REQUEST_NEW`, client);
@@ -312,7 +312,7 @@ export async function notifyInventoryManagersLowStockInApp(
 ): Promise<void> {
     await createForCapabilityRecipients({
         type: "SYSTEM_ALERT",
-        title: "วัสดุใกล้หมดสต็อก",
+        title: "วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ",
         message: buildLowStockMessage(payload),
         actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.inventory),
         referenceId: payload.items[0]
@@ -355,8 +355,8 @@ export async function notifyStockRequestProcessorsRequestCancelledByRequester(
     const inputs: NotificationCreateInput[] = recipientUserIds.map((userId) => ({
             userId,
             type: "STOCK_CANCELLED",
-            title: "คำขอเบิกถูกผู้ใช้ยกเลิก",
-            message: `${requesterName} ยกเลิกคำขอเบิก #${requestId} แล้ว`,
+            title: "ผู้ขอยกเลิกคำขอเบิกวัสดุ",
+            message: `${requesterName} · คำขอ #${requestId}`,
             actionUrl: toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests),
             referenceId: String(requestId),
         }));

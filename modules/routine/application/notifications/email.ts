@@ -1,3 +1,4 @@
+import { NOTIFICATION_MODULES, notificationSubject } from "@/shared/notifications/presentation";
 import { sendEmail } from "@/lib/email";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import type { EmailData } from "@/lib/email/types";
@@ -15,7 +16,7 @@ import type {
     RoutineReminderEmailData,
 } from "./notification-types";
 
-const ROUTINE_EMAIL_FROM_NAME = "ระบบ NHF Routine";
+const ROUTINE_EMAIL_FROM_NAME = NOTIFICATION_MODULES.Routine.sender;
 
 function buildRoutineReminderMessageId(data: RoutineReminderEmailData): string {
     const safePart = (value: number | string): string =>
@@ -36,7 +37,7 @@ export async function sendRoutineReminderNotification(
     const subjectTitle = data.taskTitle.replace(/[\r\n]+/g, " ").trim();
     const emailData: EmailData = {
         to: data.to,
-        subject: `[NHF Routine] งานใกล้ถึงกำหนด: ${subjectTitle}`,
+        subject: notificationSubject("Routine", `งานใกล้ถึงกำหนด: ${subjectTitle}`),
         html: generateRoutineReminderEmailHTML({ ...data, actionUrl }),
         text: generateRoutineReminderEmailText({ ...data, actionUrl }),
         messageId: buildRoutineReminderMessageId(data),
@@ -60,7 +61,7 @@ export async function sendRoutineContractExpiryNotification(
     const subjectTitle = data.taskTitle.replace(/[\r\n]+/g, " ").trim();
     const emailData: EmailData = {
         to: data.to,
-        subject: `[NHF Routine] สัญญาใกล้สิ้นสุด: ${subjectTitle}`,
+        subject: notificationSubject("Routine", `สัญญาใกล้สิ้นสุด: ${subjectTitle}`),
         html: generateRoutineContractExpiryEmailHTML({ ...data, actionUrl }),
         text: generateRoutineContractExpiryEmailText({ ...data, actionUrl }),
         messageId: buildRoutineContractExpiryMessageId(data),

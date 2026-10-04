@@ -10,6 +10,9 @@ const notificationMocks = vi.hoisted(() => ({
 vi.mock("@/modules/notification", () => notificationMocks);
 import {
     sendLeaveActionNotifications,
+    sendLeaveCancelledNotifications,
+    sendLeaveCancellationRequestedNotifications,
+    sendLeaveNotTakenRequestedNotifications,
     sendLeaveCancelledAfterApprovalNotifications,
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveResultNotifications,
@@ -128,6 +131,34 @@ describe("leave notification delivery", () => {
         leaveEmailMocks.sendLeaveNotTakenConfirmedNotification.mockResolvedValue(true);
     });
 
+    it.each([
+        ["action", "มีคำขอลาใหม่รออนุมัติ", 2],
+        ["approved", "คำขอลาได้รับการอนุมัติ", 1],
+        ["rejected", "คำขอลาไม่ได้รับการอนุมัติ", 1],
+        ["cancelled", "คำขอลาถูกยกเลิก", 2],
+        ["cancellationRequested", "มีคำขอยกเลิกวันลารอยืนยัน", 2],
+        ["cancelledAfterApproval", "ยืนยันการยกเลิกวันลาแล้ว", 1],
+        ["notTakenRequested", "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน", 2],
+        ["notTakenConfirmed", "ยืนยันไม่ได้ใช้วันลาแล้ว", 1],
+    ] as const)("keeps %s Inbox title consistent with Email/LINE and separates context", async (event, title, userId) => {
+        for (const mock of Object.values(leaveEmailMocks)) mock.mockResolvedValue(true);
+        const action = buildActionPayload();
+        const request = { ...action, note: "เหตุผล" };
+        switch (event) {
+            case "action": await sendLeaveActionNotifications(action); break;
+            case "approved": case "rejected": await sendLeaveResultNotifications({ ...buildResultPayload(), status: event === "approved" ? "APPROVED" : "REJECTED" }); break;
+            case "cancelled": await sendLeaveCancelledNotifications(request); break;
+            case "cancellationRequested": await sendLeaveCancellationRequestedNotifications(request); break;
+            case "cancelledAfterApproval": await sendLeaveCancelledAfterApprovalNotifications(buildDecisionPayload()); break;
+            case "notTakenRequested": await sendLeaveNotTakenRequestedNotifications(request); break;
+            case "notTakenConfirmed": await sendLeaveNotTakenConfirmedNotifications(buildNotTakenDecisionPayload()); break;
+        }
+        expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(expect.objectContaining({ title, userId }), prismaMock);
+        const message = notificationMocks.createForUserOnce.mock.calls[0]?.[0].message;
+        expect(message).toContain("ลาป่วย");
+        expect(message).not.toContain(title);
+    });
+
     it("builds canonical employee and approver name snapshots", () => {
         const employee = buildLeaveRecipientSnapshot({
             id: 10,
@@ -199,7 +230,7 @@ describe("leave notification delivery", () => {
             expect.objectContaining({
                 type: "LEAVE_CANCELLED_AFTER_APPROVAL",
                 message: expect.stringContaining(
-                    "ผู้ดูแลระบบ Admin User ยืนยันการยกเลิก",
+                    "ผู้ยืนยัน: ผู้ดูแลระบบ Admin User",
                 ),
             }),
             prismaMock,
@@ -213,7 +244,7 @@ describe("leave notification delivery", () => {
             expect.objectContaining({
                 type: "LEAVE_NOT_TAKEN_CONFIRMED",
                 message: expect.stringContaining(
-                    "ผู้ดูแลระบบ Admin User ยืนยันไม่ได้ใช้วันลา",
+                    "ผู้ยืนยัน: ผู้ดูแลระบบ Admin User",
                 ),
             }),
             prismaMock,
@@ -229,7 +260,7 @@ describe("leave notification delivery", () => {
         expect(notificationMocks.createForUserOnce).toHaveBeenCalledWith(
             expect.objectContaining({
                 type: "LEAVE_NOT_TAKEN_CONFIRMED",
-                message: expect.stringContaining("Admin User ยืนยันไม่ได้ใช้วันลา"),
+                message: expect.stringContaining("ผู้ยืนยัน: Admin User"),
             }),
             prismaMock,
         );

@@ -1,3 +1,5 @@
+import { generateRoutineContractExpiryEmailHTML } from "./routine-contract-expiry-email";
+import { generateRoutineContractExpiryFlexMessage } from "./routine-contract-expiry-flex";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendMailMock = vi.hoisted(() => vi.fn());
@@ -13,7 +15,7 @@ vi.mock("nodemailer", () => ({
     },
 }));
 
-import { sendRoutineReminderNotification } from "./email";
+import { sendRoutineReminderNotification, sendRoutineContractExpiryNotification } from "./email";
 import { generateRoutineReminderEmailHTML } from "./routine-reminder-email";
 
 const XSS_PAYLOAD = `<script>alert("xss")</script><img src=x onerror="alert('x')">`;
@@ -64,13 +66,13 @@ describe("Routine email notifications", () => {
         await sendRoutineReminderNotification(data);
 
         expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
-            from: '"ระบบ NHF Routine" <user>',
+            from: '"NHFapp | ระบบ Routine" <user>',
             to: "user@example.com",
-            subject: "[NHF Routine] งานใกล้ถึงกำหนด: งาน <ทดสอบ>",
+            subject: "[NHFapp][Routine] งานใกล้ถึงกำหนด: งาน <ทดสอบ>",
             messageId: "<nhf-routine-91-rule-31-user-17-v2@notifications.thainhf.org>",
             html: expect.stringContaining("งาน &lt;ทดสอบ&gt;"),
             text: expect.stringContaining(
-                "ดูรายการ Routine: http://localhost:3000/dashboard/routine?taskId=71&occurrenceId=91",
+                "เปิดดูงาน: http://localhost:3000/dashboard/routine?taskId=71&occurrenceId=91",
             ),
         }));
         expect(sendMailMock.mock.calls[0]?.[0].messageId).toBe(
@@ -96,6 +98,23 @@ describe("Routine email notifications", () => {
         });
 
         expectEscapedHtml(html);
-        expect(html).toContain("ดูรายการ Routine");
+        expect(html).toContain("เปิดดูงาน");
     });
+    it("keeps contract expiry Email and LINE semantics consistent with escaped content", async () => {
+        const data = { to: "user@example.com", recipientName: "ผู้รับ", taskTitle: "สัญญา <ทดสอบ>\r\n",
+            unitName: "หน่วยงาน", categoryName: "หมวดหมู่", contractEndDate: "2026-08-05", actionUrl: "/dashboard/routine?taskId=71", taskId: 71, userId: 17 };
+        await sendRoutineContractExpiryNotification(data);
+        expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
+            from: '"NHFapp | ระบบ Routine" <user>', subject: "[NHFapp][Routine] สัญญาใกล้สิ้นสุด: สัญญา <ทดสอบ>",
+            messageId: "<nhf-routine-contract-71-end-2026-08-05-user-17@notifications.thainhf.org>",
+            html: expect.stringContaining("สัญญาใกล้สิ้นสุด"), text: expect.stringContaining("เปิดดูงาน:"),
+        }));
+        expectEscapedHtml(generateRoutineContractExpiryEmailHTML({ ...data, recipientName: XSS_PAYLOAD, taskTitle: XSS_PAYLOAD,
+            unitName: XSS_PAYLOAD, categoryName: XSS_PAYLOAD, actionUrl: `https://app.example.com/?q=${XSS_PAYLOAD}` }));
+        const line = generateRoutineContractExpiryFlexMessage({ taskTitle: "สัญญา", unitName: "หน่วยงาน", categoryName: "หมวดหมู่", contractEndDateLabel: "5 สิงหาคม 2569", actionUrl: "https://liff.line.me/app/routine?taskId=71" });
+        expect(line.altText).toBe("Routine: สัญญาใกล้สิ้นสุด: สัญญา");
+        expect(line.contents.body?.contents[0]).toMatchObject({ text: "สัญญาใกล้สิ้นสุด" });
+        expect(line.contents.footer?.contents[0]).toMatchObject({ action: { label: "เปิดดูงาน", uri: "https://liff.line.me/app/routine?taskId=71" } });
+    });
+
 });

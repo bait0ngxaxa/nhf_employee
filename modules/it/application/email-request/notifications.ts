@@ -1,3 +1,4 @@
+import { getEmailRequestNotificationContent } from "../../domain/email-request/notification-content";
 import type { Prisma } from "@prisma/client";
 
 import { findActiveUsersWithConfiguredCapabilityScope } from "@/modules/authorization";
@@ -95,10 +96,10 @@ export async function enqueueEmailRequestNotificationChannels(
             await createForUserOnce({
                 userId,
                 type: "SYSTEM_ALERT",
-                title: accessVersion === undefined ? "มีคำขออีเมลพนักงานใหม่" : "มีการอัปเดตสิทธิ์พนักงานใหม่",
+                title: getEmailRequestNotificationContent(accessVersion).title,
                 message: "accessVersion" in payload
-                    ? `คำร้อง #${emailRequestId} มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม`
-                    : `${payload.thaiName} (${payload.position}, ${payload.department}) ส่งคำขออีเมลพนักงานใหม่`,
+                    ? `คำขออีเมลพนักงานใหม่ #${emailRequestId}`
+                    : `สำหรับ ${payload.thaiName} (${payload.position}, ${payload.department})`,
                 actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.emailRequest),
                 referenceId: "accessVersion" in payload ? String(emailRequestId) : payload.replyEmail,
                 dedupeKey: "accessVersion" in payload

@@ -1,3 +1,4 @@
+import { getITTicketNotificationContent } from "../../domain/ticket-notification-content";
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 
 import { getCurrentWorkforceDepartmentSnapshotInTransaction } from "@/modules/employee";
@@ -237,44 +238,8 @@ function composeInboxContent(
         : operatorPath;
     const ticketLabel = `Ticket IT #${payload.ticketId}`;
 
-    switch (payload.event) {
-        case "CREATED":
-            return {
-                title: "มีคำขอ IT ใหม่",
-                message: `${ticketLabel} รอรับเรื่องในคิว IT`,
-                actionUrl,
-            };
-        case "ASSIGNED":
-            return {
-                title: "คุณได้รับมอบหมาย Ticket IT",
-                message: `${ticketLabel} อยู่ในความรับผิดชอบของคุณ`,
-                actionUrl,
-            };
-        case "OPERATOR_COMMENTED":
-            return {
-                title: "IT ตอบกลับคำขอของคุณ",
-                message: `${ticketLabel} มีข้อความตอบกลับใหม่`,
-                actionUrl,
-            };
-        case "REQUESTER_COMMENTED":
-            return {
-                title: "ผู้ขอส่งข้อความใหม่ใน Ticket IT",
-                message: `${ticketLabel} มีข้อความจากผู้ขอ`,
-                actionUrl,
-            };
-        case "WAITING_REQUESTER":
-            return {
-                title: "IT ต้องการข้อมูลเพิ่มเติม",
-                message: `${ticketLabel} รอข้อมูลเพิ่มเติมจากคุณ`,
-                actionUrl,
-            };
-        case "RESOLVED":
-            return {
-                title: "คำขอ IT ได้รับการแก้ไขแล้ว",
-                message: `${ticketLabel} ได้รับการแก้ไขแล้ว`,
-                actionUrl,
-            };
-    }
+    const copy = getITTicketNotificationContent(payload);
+    return { title: copy.title, message: `${ticketLabel} · ${copy.summary}`, actionUrl };
 }
 
 /** Dispatches one IT-owned channel row; shared processor owns retry lifecycle. */

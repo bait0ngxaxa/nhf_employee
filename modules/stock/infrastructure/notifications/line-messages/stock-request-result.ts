@@ -1,3 +1,5 @@
+import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
+import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 
 import type { StockRequestResultLinePayload } from "../notification-payloads";
@@ -32,93 +34,48 @@ export function generateStockRequestResultFlexMessage(
         detailLines.push(`เหตุผล: ${payload.cancelReason}`);
     }
 
-    return {
-        type: "flex",
-        altText: `คำขอเบิก #${payload.requestId}${statusLabel}`,
-        contents: {
-            type: "bubble",
-            header: {
-                type: "box",
-                layout: "vertical",
-                contents: [
-                    {
-                        type: "text",
-                        text: isIssued
-                            ? "คำขอเบิกวัสดุถูกจ่ายแล้ว"
-                            : "คำขอเบิกวัสดุถูกยกเลิก",
-                        weight: "bold",
-                        color: "#FFFFFF",
-                        size: "lg",
-                        wrap: true,
-                    },
-                    {
-                        type: "text",
-                        text: `เลขที่คำขอ #${payload.requestId}`,
-                        color: "#FFFFFF",
-                        size: "sm",
-                        margin: "sm",
-                    },
-                ],
-                backgroundColor: statusColor,
-                paddingAll: "20px",
+    return buildNotificationFlex({
+        module: "Stock",
+        categoryLabel: "คำขอเบิกวัสดุ",
+        title: isIssued ? "คำขอเบิกวัสดุถูกจ่ายแล้ว" : "คำขอเบิกวัสดุถูกยกเลิก",
+        altText: `คำขอเบิกวัสดุ #${payload.requestId} ${isIssued ? "ถูกจ่ายแล้ว" : "ถูกยกเลิก"}`,
+        contents: [
+            notificationFlexText(`เลขที่คำขอ #${payload.requestId}`),
+            {
+                type: "text",
+                text: payload.recipient.name,
+                weight: "bold",
+                size: "md",
+                wrap: true,
             },
-            body: {
-                type: "box",
-                layout: "vertical",
-                spacing: "sm",
-                contents: [
-                    {
-                        type: "text",
-                        text: payload.recipient.name,
-                        weight: "bold",
-                        size: "lg",
-                        wrap: true,
-                    },
-                    ...detailLines.map((text) => ({
-                        type: "text" as const,
-                        text,
-                        color: text.startsWith("สถานะ") ? statusColor : "#374151",
-                        size: "sm" as const,
-                        wrap: true,
-                    })),
-                    {
-                        type: "separator",
-                        margin: "md",
-                    },
-                    {
-                        type: "text",
-                        text: "รายการ",
-                        weight: "bold",
-                        size: "sm",
-                        margin: "md",
-                    },
-                    {
-                        type: "text",
-                        text: buildItemsPreview(payload.items),
-                        color: "#374151",
-                        size: "sm",
-                        wrap: true,
-                    },
-                ],
+            ...detailLines.map((text) => ({
+                type: "text" as const,
+                text,
+                color: text.startsWith("สถานะ") ? statusColor : "#374151",
+                size: "sm" as const,
+                wrap: true,
+            })),
+            {
+                type: "separator",
+                margin: "md",
             },
-            footer: {
-                type: "box",
-                layout: "vertical",
-                spacing: "sm",
-                contents: [
-                    {
-                        type: "button",
-                        style: "primary",
-                        height: "sm",
-                        action: {
-                            type: "uri",
-                            label: "เปิดรายละเอียด",
-                            uri: actionUrl,
-                        },
-                        color: statusColor,
-                    },
-                ],
+            {
+                type: "text",
+                text: "รายการ",
+                weight: "bold",
+                size: "sm",
+                margin: "md",
             },
-        },
-    };
+            {
+                type: "text",
+                text: buildItemsPreview(payload.items),
+                color: "#374151",
+                size: "sm",
+                wrap: true,
+            },
+        ],
+        actionLabel: NOTIFICATION_ACTIONS.details,
+        actionUrl,
+        accentColor: statusColor,
+    });
 }

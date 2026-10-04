@@ -1,3 +1,5 @@
+import { getEmailRequestNotificationContent } from "../../domain/email-request/notification-content";
+import { NOTIFICATION_ACTIONS, NOTIFICATION_FOOTER, NOTIFICATION_MODULES, notificationSubject } from "@/shared/notifications/presentation";
 import { sendEmail } from "@/lib/email";
 import type { EmailData } from "@/lib/email/types";
 import { getPublicOrigin } from "@/lib/network/public-url";
@@ -16,43 +18,42 @@ export function buildEmailRequestEmailData(
         getPublicOrigin(),
     ).toString();
     const label = emailRequestId === null
-        ? "คำร้องอีเมลพนักงานใหม่"
-        : `คำร้องอีเมลพนักงานใหม่ #${emailRequestId}`;
-    const intro = accessVersion === undefined ? "มีคำขออีเมลพนักงานใหม่รอตรวจสอบ" : "มีการระบุหรือแก้ไขสิทธิ์การใช้งานเพิ่มเติม";
-    const subject = accessVersion !== undefined
-        ? `มีการอัปเดตสิทธิ์พนักงานใหม่ #${emailRequestId}`
-        : emailRequestId === null
-        ? "มีคำขออีเมลพนักงานใหม่"
-        : `มีคำขออีเมลพนักงานใหม่ #${emailRequestId}`;
+        ? "คำขออีเมลพนักงานใหม่"
+        : `คำขออีเมลพนักงานใหม่ #${emailRequestId}`;
+    const copy = getEmailRequestNotificationContent(accessVersion);
+    const intro = copy.summary;
+    const title = `${copy.title}${emailRequestId === null ? "" : ` #${emailRequestId}`}`;
 
     return {
         to: recipientEmail,
-        subject,
+        subject: notificationSubject("IT", title),
         html: generateITNotificationEmailHTML({
-            title: subject,
+            categoryLabel: "คำขออีเมลพนักงานใหม่",
+            title,
             intro,
             referenceLabel: "รายการ",
             referenceValue: label,
-            actionLabel: "เปิดคำร้องในระบบ",
+            actionLabel: NOTIFICATION_ACTIONS.review,
             actionUrl,
         }),
         text: [
-            "ระบบ NHFapp | ระบบ NHF IT",
+            "NHFapp | IT",
             "",
+            title,
             intro,
             "",
             `รายการ: ${label}`,
             "",
-            `เปิดคำร้องในระบบ: ${actionUrl}`,
+            `ตรวจสอบคำขอ: ${actionUrl}`,
             "",
-            "ระบบ NHFapp ส่งอีเมลฉบับนี้โดยอัตโนมัติ กรุณาอย่าตอบกลับ",
+            NOTIFICATION_FOOTER,
         ].join("\n"),
         messageId: accessVersion !== undefined
             ? `<nhf-email-request-${emailRequestId}-access-${accessVersion}-user-${recipientUserId}@notifications.thainhf.org>`
             : emailRequestId === null
             ? `<nhf-email-request-outbox-${parentOutboxId}-user-${recipientUserId}@notifications.thainhf.org>`
             : `<nhf-email-request-${emailRequestId}-user-${recipientUserId}@notifications.thainhf.org>`,
-        fromName: "ระบบ NHF IT",
+        fromName: NOTIFICATION_MODULES.IT.sender,
     };
 }
 

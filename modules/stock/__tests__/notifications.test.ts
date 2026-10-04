@@ -277,7 +277,7 @@ describe("Stock Notifications", () => {
                 userId: 7,
                 type: "STOCK_CANCELLED",
                 title: "คำขอเบิกวัสดุถูกยกเลิก",
-                message: "คำขอเบิก #42 ถูกยกเลิก: ผู้เบิกไม่มารับ",
+                message: "เลขที่คำขอ #42 · เหตุผล: ผู้เบิกไม่มารับ",
                 actionUrl: "/dashboard/stock?stockTab=my-requests",
                 referenceId: "42",
             },

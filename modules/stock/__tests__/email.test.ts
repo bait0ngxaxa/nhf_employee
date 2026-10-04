@@ -65,12 +65,12 @@ describe("Stock email notifications", () => {
             );
 
             expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
-                from: '"ระบบเบิกวัสดุ NHFapp" <user>',
+                from: '"NHFapp | ระบบ Stock" <user>',
                 to: "somchai@example.com",
-                subject: "[NHF Stock] คำขอเบิก #123 ถูกจ่ายเรียบร้อยแล้ว",
+                subject: "[NHFapp][Stock] คำขอเบิกวัสดุ #123 ถูกจ่ายแล้ว",
                 messageId: "<nhf-stock-request-123-issued@notifications.thainhf.org>",
                 text: expect.stringContaining(
-                    "ดูรายการเบิกของฉัน: http://localhost:3000/dashboard/stock?stockTab=my-requests",
+                    "เปิดรายละเอียด: http://localhost:3000/dashboard/stock?stockTab=my-requests",
                 ),
                 html: expect.stringContaining(
                     "ขนาด: A4",
@@ -84,7 +84,7 @@ describe("Stock email notifications", () => {
             );
 
             expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({
-                subject: "[NHF Stock] คำขอเบิก #123 ถูกยกเลิก",
+                subject: "[NHFapp][Stock] คำขอเบิกวัสดุ #123 ถูกยกเลิก",
                 messageId: "<nhf-stock-request-123-cancelled@notifications.thainhf.org>",
                 text: expect.stringContaining("เหตุผลยกเลิก: มีวัสดุทดแทนแล้ว"),
                 html: expect.stringContaining("มีวัสดุทดแทนแล้ว"),

@@ -7,13 +7,13 @@ describe("IT Ticket Email composition", () => {
     afterEach(() => vi.unstubAllEnvs());
 
     it.each([
-        ["CREATED", "OPERATOR_QUEUE", { kind: "EVENT", id: 1 }, "มี Ticket IT ใหม่ #123", "/dashboard/it/queue/123"],
-        ["ASSIGNED", "ASSIGNEE", { kind: "EVENT", id: 2 }, "คุณได้รับมอบหมาย Ticket IT #123", "/dashboard/it/queue/123"],
-        ["OPERATOR_COMMENTED", "REQUESTER", { kind: "COMMENT", id: "comment-3" }, "IT ตอบกลับ Ticket IT #123 แล้ว", "/dashboard/it/123"],
-        ["REQUESTER_COMMENTED", "ASSIGNEE", { kind: "COMMENT", id: "comment-4" }, "มีข้อความใหม่ใน Ticket IT #123", "/dashboard/it/queue/123"],
-        ["WAITING_REQUESTER", "REQUESTER", { kind: "EVENT", id: 5 }, "IT ต้องการข้อมูลเพิ่มเติมสำหรับ Ticket IT #123", "/dashboard/it/123"],
-        ["RESOLVED", "REQUESTER", { kind: "EVENT", id: 6 }, "Ticket IT #123 ได้รับการแก้ไขแล้ว", "/dashboard/it/123"],
-        ["REQUESTER_COMMENTED", "OPERATOR_QUEUE", { kind: "COMMENT", id: "comment-7" }, "มีข้อความใหม่ใน Ticket IT #123", "/dashboard/it/queue/123"],
+        ["CREATED", "OPERATOR_QUEUE", { kind: "EVENT", id: 1 }, "[NHFapp][IT] มี Ticket IT ใหม่ #123", "/dashboard/it/queue/123"],
+        ["ASSIGNED", "ASSIGNEE", { kind: "EVENT", id: 2 }, "[NHFapp][IT] คุณได้รับมอบหมาย Ticket IT #123", "/dashboard/it/queue/123"],
+        ["OPERATOR_COMMENTED", "REQUESTER", { kind: "COMMENT", id: "comment-3" }, "[NHFapp][IT] IT ตอบกลับ Ticket ของคุณ #123", "/dashboard/it/123"],
+        ["REQUESTER_COMMENTED", "ASSIGNEE", { kind: "COMMENT", id: "comment-4" }, "[NHFapp][IT] ผู้ขอส่งข้อความใหม่ใน Ticket IT #123", "/dashboard/it/queue/123"],
+        ["WAITING_REQUESTER", "REQUESTER", { kind: "EVENT", id: 5 }, "[NHFapp][IT] Ticket IT รอข้อมูลเพิ่มเติมจากคุณ #123", "/dashboard/it/123"],
+        ["RESOLVED", "REQUESTER", { kind: "EVENT", id: 6 }, "[NHFapp][IT] Ticket IT ได้รับการแก้ไขแล้ว #123", "/dashboard/it/123"],
+        ["REQUESTER_COMMENTED", "OPERATOR_QUEUE", { kind: "COMMENT", id: "comment-7" }, "[NHFapp][IT] ผู้ขอส่งข้อความใหม่ใน Ticket IT #123", "/dashboard/it/queue/123"],
     ] as const)("composes concise content for %s / %s", (
         event,
         audience,
@@ -39,9 +39,12 @@ describe("IT Ticket Email composition", () => {
 
         expect(email.to).toBe("operator@example.com");
         expect(email.subject).toBe(subject);
+        expect(email.fromName).toBe("NHFapp | ระบบ IT");
+        expect(email.html).toContain("เปิด Ticket");
+        expect(email.html).toContain("Ticket IT");
         expect(email.html).toContain(`https://app.example.com${route}`);
         expect(email.html).toContain("<table role=\"presentation\"");
-        expect(email.html).toContain("NHFapp&nbsp; | &nbsp;ระบบ NHF IT");
+        expect(email.html).toContain("NHFapp&nbsp; | &nbsp;IT");
         expect(email.html).toContain("<h1");
         expect(email.text).toContain(`https://app.example.com${route}`);
         expect(email.text).toContain("เลขที่ Ticket: Ticket IT #123");

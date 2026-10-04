@@ -314,3 +314,49 @@ Phase นี้ intentionally ไม่ migrate operational broadcast และ�
 - `STOCK_REQUEST_LINE` และ `STOCK_LOW_LINE` ใช้ operational Stock Messaging
   channel ผ่าน `LINE_STOCK_CHANNEL_ACCESS_TOKEN` และ
   `sendStockLineBroadcast(...)`
+
+## Notification content contract
+
+Domain modules own the canonical event title, concise summary, category,
+reference, semantic status and CTA intent. Inbox, Email and LINE render the same
+event meaning; channel shortening must not change the actor, result or required
+action. Shared code owns presentation only, never business audiences or workflow.
+
+- **Email subject:** `[NHFapp][Module] <event>`; Module is `IT`, `Leave`,
+  `Routine`, `Stock` or `Account`. Append a short reference when useful. Use
+  `notificationSubject()` to remove CR/LF from dynamic subject content.
+- **Email sender:** `NHFapp | ระบบ IT`, `NHFapp | ระบบวันลา`,
+  `NHFapp | ระบบ Routine`, `NHFapp | ระบบ Stock`, `NHFapp | บัญชีผู้ใช้`.
+  Identities live in `shared/notifications/presentation.ts`.
+- **Canonical labels:** `IT` (category `Ticket IT` or
+  `คำขออีเมลพนักงานใหม่`), `วันลา` (category `คำขอลา`), `Routine`
+  (category `งานตามกำหนด` or `สัญญา`), `Stock` (category `คำขอเบิกวัสดุ`
+  or `คลังวัสดุ`), and `บัญชีผู้ใช้`.
+- **Email structure:** full-page pale background, centered table-based card,
+  NHFapp/module header, hidden preheader, category, event heading, concise intro,
+  structured details, primary CTA, fallback URL and automated-message footer.
+  All templates, including password reset, use
+  `lib/email/templates/notification.ts`. Its inputs are plain text and are escaped
+  centrally; it accepts no raw HTML. Domains keep their existing field selection
+  and URL validation. Password reset tokens appear only in the existing action URL.
+- **LINE Flex:** NHFapp/module/category header, event title first in the body,
+  short context and structured details/status, then one small primary CTA in the
+  footer. Use `lib/line/notification-flex.ts`; domains supply their existing
+  details, destination and meaningful module/status colors.
+- **LINE altText:** `<canonical module label>: <event title>`, optionally followed
+  by a short reference/task name. Keep within 400 characters; do not add employee
+  contacts, private content or unnecessary actor names to the preview.
+- **In-app:** title states the event; message contains short context/reference,
+  without repeating the title. Name an actor only when the payload identifies the
+  actor. Email Request `thaiName` is the requested employee, so creation reads
+  `มีคำขออีเมลพนักงานใหม่` / `สำหรับ <thaiName> (<position>, <department>)`.
+- **CTA vocabulary:** `เปิด Ticket`, `ตรวจสอบคำขอ`, `เปิดรายละเอียด`,
+  `เปิดดูงาน`, `เปิดคลังวัสดุ`, `ตั้งรหัสผ่านใหม่`. Review and informational
+  intents remain distinct even when their existing destinations share a page.
+
+No recipient, capability, event/key, outbox, retry, read/unread or routing behavior
+changes with this contract. IT Email/LINE still exclude description, comment,
+attachment, grant and contact details. Stock operational LINE remains a legacy
+broadcast channel; personal result LINE remains NHFapp. Existing notification
+rows are not rewritten. Channel coverage and implementation references are listed
+in [notification inventory](./notification-inventory.md).

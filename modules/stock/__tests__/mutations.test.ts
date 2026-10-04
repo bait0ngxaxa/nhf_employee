@@ -1618,7 +1618,7 @@ describe("Stock Service Mutations", () => {
                 expect.objectContaining({
                     userId: 1,
                     type: "STOCK_REQUEST_NEW",
-                    message: "สมชาย ใจดี (ชาย) ส่งคำขอเบิกวัสดุ #1 (PRJ-MATCH)",
+                    message: "สมชาย ใจดี (ชาย) · คำขอ #1 (PRJ-MATCH)",
                     dedupeKey: "stock:1:STOCK_REQUEST_NEW:1",
                 }),
                 prismaMock,

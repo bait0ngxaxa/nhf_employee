@@ -1,3 +1,4 @@
+import { NOTIFICATION_MODULES } from "@/shared/notifications/presentation";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { sendEmail } from "@/lib/email";
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await sendEmail({
             to: resetRequest.user.email,
             subject: AUTH_FORGOT_PASSWORD_MESSAGES.resetSubjectThai,
+            fromName: NOTIFICATION_MODULES.Account.sender,
             html: generatePasswordResetEmailHTML(resetUrl.toString(), resetRequest.user.name),
             text: AUTH_FORGOT_PASSWORD_MESSAGES.resetMailTextThai(
                 resetRequest.user.name,

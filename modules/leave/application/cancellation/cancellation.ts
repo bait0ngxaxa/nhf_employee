@@ -1,3 +1,4 @@
+import { LEAVE_NOTIFICATION_TITLES } from "../../domain/notification-content";
 import type { Prisma } from "@prisma/client";
 
 import { runSerializableTransaction } from "@/lib/db/transaction";
@@ -760,13 +761,13 @@ async function createSelfCancelledNotification(
     await createForUser({
         userId,
         type: "LEAVE_CANCELLED",
-        title: "คำขอลาถูกยกเลิกแล้ว",
-        message: `ยกเลิกคำขอ${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
+        title: LEAVE_NOTIFICATION_TITLES.cancelled,
+        message: `${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
             startDate: leaveRequest.startDate.toISOString(),
             endDate: leaveRequest.endDate.toISOString(),
             period: leaveRequest.period,
             durationDays: halfDaysToDays(leaveRequest.durationHalfDays),
-        })} แล้ว`,
+        })}`,
         actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: leaveRequest.id,
         dedupeKey: `leave:${userId}:LEAVE_CANCELLED:${leaveRequest.id}`,
@@ -782,7 +783,7 @@ async function createCancellationRequestedNotification(
         userId,
         type: "LEAVE_CANCELLATION_REQUESTED",
         title: "ส่งคำขอยกเลิกวันลาแล้ว",
-        message: `ส่งคำขอยกเลิก${getLeaveTypeLabel(leaveRequest.leaveType)}แล้ว รอผู้อนุมัติยืนยัน`,
+        message: `${getLeaveTypeLabel(leaveRequest.leaveType)} · รอผู้อนุมัติยืนยัน`,
         actionUrl: toDashboardMenuPath(APP_DASHBOARD_TABS.leaveHistory),
         referenceId: leaveRequest.id,
         dedupeKey: `leave:${userId}:LEAVE_CANCELLATION_REQUESTED:${leaveRequest.id}`,
@@ -800,7 +801,7 @@ async function createCancellationRejectedNotification(
         userId: employeeUserId,
         type: "SYSTEM_ALERT",
         title: "คำขอยกเลิกวันลาไม่ได้รับการอนุมัติ",
-        message: `คำขอลา${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
+        message: `${getLeaveTypeLabel(leaveRequest.leaveType)} ${formatLeaveSummary({
             startDate: leaveRequest.startDate.toISOString(),
             endDate: leaveRequest.endDate.toISOString(),
             period: leaveRequest.period,

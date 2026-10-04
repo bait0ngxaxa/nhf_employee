@@ -19,7 +19,7 @@ async function sendThroughSharedTransport(): Promise<boolean> {
         html: "<p>HTML body รายการภาษาไทย</p>",
         text: "Plain text ข้อความภาษาไทย",
         messageId: "<nhf-stable@example.test>",
-        fromName: "ระบบ NHF Routine",
+        fromName: "NHFapp | ระบบ Routine",
     });
 }
 
@@ -164,7 +164,7 @@ describe("Microsoft Graph email transport", () => {
         expect(getMimePart(rawMime, "text/html")).toBe(
             "<p>HTML body รายการภาษาไทย</p>",
         );
-        expect(decodeFromHeader(rawMime)).toContain("ระบบ NHF Routine");
+        expect(decodeFromHeader(rawMime)).toContain("NHFapp | ระบบ Routine");
         expect(rawMime).toContain("Message-ID: <nhf-stable@example.test>");
 
         const secondRawMime = Buffer.from(

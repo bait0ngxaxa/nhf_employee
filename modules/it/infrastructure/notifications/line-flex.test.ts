@@ -14,8 +14,8 @@ describe("IT Ticket personal LINE Flex message", () => {
             audience: "OPERATOR_QUEUE",
             source: { kind: "EVENT", id: 451 },
             title: "มี Ticket IT ใหม่",
-            body: "มีคำขอ IT ใหม่รอรับเรื่อง",
-            action: "เปิดคิว IT",
+            body: "รอรับเรื่องในคิว IT",
+            action: "เปิด Ticket",
             destination: "https://app.example.com/dashboard/it/queue/123",
         },
         {
@@ -23,7 +23,7 @@ describe("IT Ticket personal LINE Flex message", () => {
             audience: "ASSIGNEE",
             source: { kind: "EVENT", id: 452 },
             title: "คุณได้รับมอบหมาย Ticket IT",
-            body: "มี Ticket IT มอบหมายให้คุณ",
+            body: "อยู่ในความรับผิดชอบของคุณ",
             action: "เปิด Ticket",
             destination: "https://app.example.com/dashboard/it/queue/123",
         },
@@ -31,8 +31,8 @@ describe("IT Ticket personal LINE Flex message", () => {
             event: "OPERATOR_COMMENTED",
             audience: "REQUESTER",
             source: { kind: "COMMENT", id: "cmr-comment-1" },
-            title: "IT ตอบกลับคำขอของคุณ",
-            body: "มีข้อความตอบกลับใหม่",
+            title: "IT ตอบกลับ Ticket ของคุณ",
+            body: "มีข้อความตอบกลับใหม่จาก IT",
             action: "เปิด Ticket",
             destination: "https://liff.line.me/nhfapp-liff-id/it/123",
         },
@@ -49,18 +49,18 @@ describe("IT Ticket personal LINE Flex message", () => {
             event: "WAITING_REQUESTER",
             audience: "REQUESTER",
             source: { kind: "EVENT", id: 453 },
-            title: "IT ต้องการข้อมูลเพิ่มเติม",
-            body: "รอข้อมูลเพิ่มเติมจากคุณ",
-            action: "ตอบกลับ",
+            title: "Ticket IT รอข้อมูลเพิ่มเติมจากคุณ",
+            body: "กรุณาให้ข้อมูลเพิ่มเติมเพื่อให้ IT ดำเนินการต่อ",
+            action: "เปิด Ticket",
             destination: "https://liff.line.me/nhfapp-liff-id/it/123",
         },
         {
             event: "RESOLVED",
             audience: "REQUESTER",
             source: { kind: "EVENT", id: 454 },
-            title: "คำขอ IT ได้รับการแก้ไขแล้ว",
-            body: "ได้รับการแก้ไขแล้ว",
-            action: "ดูรายละเอียด",
+            title: "Ticket IT ได้รับการแก้ไขแล้ว",
+            body: "ตรวจสอบผลการแก้ไขได้ในรายละเอียด Ticket",
+            action: "เปิด Ticket",
             destination: "https://liff.line.me/nhfapp-liff-id/it/123",
         },
         {
@@ -88,6 +88,9 @@ describe("IT Ticket personal LINE Flex message", () => {
         const serialized = JSON.stringify(message);
 
         expect(message.type).toBe("flex");
+        expect(message.altText).toBe(`IT: ${input.title} · Ticket IT #123`);
+        expect(message.contents.header?.contents[0]).toMatchObject({ type: "text", text: "NHFapp | IT · Ticket IT" });
+        expect(message.contents.body?.contents[0]).toMatchObject({ type: "text", text: input.title });
         expect(message.altText).toContain("Ticket IT #123");
         expect(serialized).toContain(input.title);
         expect(serialized).toContain(input.body);
