@@ -5,9 +5,12 @@ this document's long-term `ADMIN` business-authority target and the selected
 legacy USER-default permanence explicitly narrowed by the Phase 12H target,
 especially Routine broad authority; see
 [authorization-phase-12ha-role-neutral-contract.md](./authorization-phase-12ha-role-neutral-contract.md).
-The current runtime still has the Phase 12A role-sensitive behavior until the
-later Phase 12H cutover. This document is retained as historical evidence and
-is not rewritten as though the earlier contract did not exist.
+**SUPERSEDED runtime model:** the Phase 12H cutover and Phase 12H-I closure
+have replaced the Phase 12A role-sensitive business authority. Use
+[Current Authorization State](./authorization-current-state.md) and
+[Phase 12H-I closure](./authorization-phase-12hi-compatibility-debt-removal.md)
+for the current role-neutral production contract. The phase record below is
+retained as historical evidence.
 
 Status: CLOSED — architecture contract and inventory only
 

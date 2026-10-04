@@ -1,5 +1,12 @@
 # Leave Authorization Migration — Phase 7A / Phase 7B / Phase 7C
 
+> **SUPERSEDED business-authorization model / historical phase record.**
+> Any ADMIN-derived business authority or role-sensitive defaults below describe
+> this phase only. Current authority is domain Default Domain Policy plus Team,
+> TeamRole, and exceptional direct User grants; `systemRole` is not a business
+> grant source. Use [Current Authorization State](./authorization-current-state.md)
+> and [Phase 12H-I closure](./authorization-phase-12hi-compatibility-debt-removal.md).
+
 สถานะ: Phase 7A — CLOSED; Phase 7B — CLOSED; Phase 7C — CLOSED; Leave authorization migration — CLOSED
 วันที่: 2026-09-13
 

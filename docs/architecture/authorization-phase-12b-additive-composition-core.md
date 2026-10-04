@@ -1,5 +1,12 @@
 # NHF Employee — Authorization Phase 12B: Additive Authorization Composition Core
 
+> **SUPERSEDED business-authorization model / historical phase record.**
+> Any ADMIN-derived business authority or role-sensitive defaults below describe
+> this phase only. Current authority is domain Default Domain Policy plus Team,
+> TeamRole, and exceptional direct User grants; `systemRole` is not a business
+> grant source. Use [Current Authorization State](./authorization-current-state.md)
+> and [Phase 12H-I closure](./authorization-phase-12hi-compatibility-debt-removal.md).
+
 Status: CLOSED — reusable composition primitive and contract tests
 
 Starting commit: `8e975a5c10d4df57566e18ceab639369afad523a`

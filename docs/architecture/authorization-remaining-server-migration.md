@@ -1,5 +1,12 @@
 # Remaining Server Authorization Migration — Phase 9A
 
+> **SUPERSEDED business-authorization model / historical phase record.**
+> Any ADMIN-derived business authority or role-sensitive defaults below describe
+> this phase only. Current authority is domain Default Domain Policy plus Team,
+> TeamRole, and exceptional direct User grants; `systemRole` is not a business
+> grant source. Use [Current Authorization State](./authorization-current-state.md)
+> and [Phase 12H-I closure](./authorization-phase-12hi-compatibility-debt-removal.md).
+
 สถานะ: **Phase 9A — CLOSED**  
 Baseline: `139022923f8bfd9db059bad2026ebd059e345287`  
 วันที่: 2026-09-13  

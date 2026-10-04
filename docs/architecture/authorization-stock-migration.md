@@ -1,5 +1,12 @@
 # Stock Authorization Migration — Phase 6A / Phase 6B / Phase 6C
 
+> **SUPERSEDED business-authorization model / historical phase record.**
+> Any ADMIN-derived business authority or role-sensitive defaults below describe
+> this phase only. Current authority is domain Default Domain Policy plus Team,
+> TeamRole, and exceptional direct User grants; `systemRole` is not a business
+> grant source. Use [Current Authorization State](./authorization-current-state.md)
+> and [Phase 12H-I closure](./authorization-phase-12hi-compatibility-debt-removal.md).
+
 สถานะ: Phase 6A **server enforcement**, Phase 6B **presentation projection** และ Phase 6C **migration closure / regression hardening** เสร็จสิ้น<br>
 ขอบเขต: Stock เท่านั้น; ไม่รวม Leave, Employee, Audit หรือ Settings
 

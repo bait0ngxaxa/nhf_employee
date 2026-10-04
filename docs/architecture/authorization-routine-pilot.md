@@ -1,5 +1,12 @@
 # Phase 4 — Routine authorization pilot
 
+> **SUPERSEDED business-authorization model / historical phase record.**
+> Any ADMIN-derived business authority or role-sensitive defaults below describe
+> this phase only. Current authority is domain Default Domain Policy plus Team,
+> TeamRole, and exceptional direct User grants; `systemRole` is not a business
+> grant source. Use [Current Authorization State](./authorization-current-state.md)
+> and [Phase 12H-I closure](./authorization-phase-12hi-compatibility-debt-removal.md).
+
 Status: historical Phase 4 server-side migration slice. Phase 12D now closes
 the remaining Routine capability surfaces; this document records the
 Routine-specific composition that existed around the Phase 3 authorization boundary;
