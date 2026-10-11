@@ -1,6 +1,6 @@
 # NHF Employee — Phase 0: Auth & Database Deduplication Baseline
 
-**สถานะ:** Phase 0 เสร็จ; ไม่มีการเปลี่ยนโค้ดแอป
+**สถานะ:** Phase 0 static audit เสร็จ; runtime HTTP/SQL measurement ยัง pending. รายงาน implementation และ verification ของ Phase 1 อยู่ท้ายเอกสาร
 **วันที่ตรวจ:** 2026-10-11
 **Commit ที่ตรวจ:** 3497b0b6c8e20254af825edfa8480aa58e65672a
 **ขอบเขต:** static source audit และ read-only environment check; ไม่มี runtime instrumentation
@@ -162,10 +162,47 @@ Static budget ต่อ current-user projection ของผู้ใช้ Dash
 - read-only integration check ผ่าน Node/mysql2: host 127.0.0.1, port 3309, database employee_nhf_integration, tableCount=0. แอป port 3000 ไม่รับ connection. ไม่ได้เปิด server, apply migration, seed หรือแก้ฐานข้อมูล
 - อ่าน tests: current-user projection, HybridAuthProvider, browser transport, Auth sessions, refresh-token repository, authorization resolver และ authorization-resolution repository. Tests เหล่านี้ครอบ lifecycle, refresh/retry/single-flight และ batch ต่อ repository delegate; provider tests ครอบ public/LIFF skip และ protected bootstrap แต่ไม่ครอบ focus/reconnect/visibility/periodic runtime counts
 - คำสั่งตรวจที่รันจริง: `git status --short` (สะอาดก่อนเริ่ม; ตอนจบมีรายงานใหม่ไฟล์เดียว), `git rev-parse HEAD` (ยืนยัน commit ข้างต้น), `rg -n` สำหรับตรวจคำอ้างอิงในรายงาน และ `Get-Content -Raw -Encoding UTF8` สำหรับอ่านรายงาน; `git diff --no-index --check -- /dev/null docs/architecture/auth-dedup-phase0-baseline.md` ไม่มี whitespace diagnostics (exit code 1 เป็นผลปกติเมื่อ no-index พบว่าไฟล์ใหม่ต่างจาก /dev/null)
-- ไม่รัน tests, lint, typecheck, integration suite หรือ production build; เป็น audit/report-only และไม่มี source/test changes ที่ทำให้การรันเหล่านั้นเพิ่มหลักฐาน
+- ใน Phase 0 ไม่รัน tests, lint, typecheck, integration suite หรือ production build เพราะเป็น audit/report-only; ผลตรวจ Phase 1 บันทึกแยกไว้ท้ายเอกสาร
 - ไม่มี HTTP request counts, projection counters, per-request Prisma SQL/query-event counts หรือ scenario runtime observations: **NOT MEASURED**
 
 ### ไฟล์และผลส่งมอบ
 
-ไฟล์ที่เปลี่ยน: docs/architecture/auth-dedup-phase0-baseline.md เท่านั้น
-ยังไม่เปลี่ยน authentication/authorization behavior, Prisma schema, migrations, cookie หรือ refresh semantics.
+Phase 0 เปลี่ยนเฉพาะรายงานนี้ และไม่ได้เปลี่ยน authentication/authorization behavior, Prisma schema, migrations, cookie หรือ refresh semantics.
+
+## Phase 1 Verification Report — Request-Scoped Auth Projection Deduplication
+
+### Implementation
+
+- ครอบ `projectCurrentUser()` ด้วย `React.cache()` และคง export `getCurrentUserProjection()` แบบไม่มี argument และคืน `CurrentUserProjection | null` ตามเดิม. Body, ลำดับการตรวจ, และ capability composition เดิมไม่เปลี่ยน.
+- React cache ใช้ซ้ำทั้ง Promise ที่กำลังทำงานและค่าที่ resolve แล้วภายใน RSC render request เดียว; request render ถัดไปเริ่ม cache ใหม่. การเรียกนอก RSC ไม่มีการเก็บผลข้ามการเรียก และ Route Handler ยังเรียก export เดิมโดยตรง.
+- ไฟล์ Phase 1 ที่เปลี่ยน: `app/_lib/auth/current-user.ts`, `__tests__/auth/current-user-projection.test.ts`, `modules/auth/application/sessions.test.ts`, `vitest.config.ts` และรายงานนี้.
+
+### Before / after evidence
+
+| Controlled case | ก่อนครอบ cache | หลังครอบ cache | แหล่งหลักฐานและขอบเขต |
+|---|---|---|---|
+| เรียก projection พร้อมกัน 2 ครั้งใน RSC render เดียว | Account resolution 2, Employee projection 2, Team projection 2, Routine capabilities 2 | แต่ละ mock ถูกเรียก 1 ครั้ง | React Flight renderer จริง; domain/persistence functions เป็น mocks |
+| เรียก projection ครั้งที่สองหลังครั้งแรก resolve แล้วใน RSC render เดียว | Account resolution 2 | Account, Employee, Team และ Routine capability mocks ถูกเรียกครั้งเดียว | React Flight renderer จริง; ยืนยันการ reuse ค่าที่ resolve แล้ว |
+| RSC render แยกกันโดยใช้ token/identity คนละชุด | — | 2 render ทำ account resolution รวม 2 ครั้ง; ได้ identity/capability `41/true` และ `42/false` | ยืนยัน cache isolation และผลตาม identity ใน test harness; account/capability data เป็น mocks |
+| เรียก function 2 ครั้งนอก RSC context | — | Account resolution 2 ครั้ง | ยืนยันว่าไม่มี module/global result cache ใน test context; ไม่ใช่การวัด SQL หรือ full Next Route Handler runtime |
+
+การวัดก่อนแก้ใช้ RSC tests เดียวกันโดยถอด wrapper ชั่วคราว: concurrent case ได้ 2 calls ต่อ mock ที่นับ และ resolved case เรียก account resolver 2 ครั้ง. หลังแก้ tests เดียวกันยืนยัน 1 call ต่อ mock ที่นับในแต่ละกรณี. ตัวเลขนี้เป็น execution counts ของ mocks ไม่ใช่ Prisma delegate หรือ SQL statement counts.
+
+### Verification ที่รัน
+
+- `npm run test -- __tests__/auth/current-user-projection.test.ts modules/auth/application/sessions.test.ts __tests__/api/auth-me.test.ts __tests__/dashboard-route-access.test.ts` — ผ่าน 4 files, 42 tests.
+- ก่อนแก้ cache: `npm run test -- __tests__/auth/current-user-projection.test.ts -t "deduplicates concurrent projection calls within one RSC render request"` — ล้มเหลวตามที่คาดใน baseline; ทั้ง 4 mock execution counts เป็น 2.
+- `npm run architecture:check` — ผ่าน; ตรวจ module boundaries 1,318 source files.
+- `npm run lint:strict` — ผ่าน.
+- `npm run typecheck` — ผ่าน.
+- ไม่รัน full test suite, integration database suite หรือ production build.
+
+### Security invariants และข้อจำกัด
+
+- การตรวจ JWT, active session family, account state, Employee lifecycle, Team projection, Leave rules และ capability resolution ยังทำใน body เดิมทุกครั้งที่เริ่ม RSC request ใหม่. มี test ยืนยัน unauthorized/revoked resolver และ inactive Employee ยังได้ `null`; test เดิมยืนยัน projection value และ capabilities ครบตาม contract.
+- เพิ่ม test ให้ `resolveAuthenticatedAccount()` ปฏิเสธ access token เมื่อ session family ถูก revoke และไม่อ่าน account ต่อ. `/api/auth/me`, `HybridAuthProvider`, SWR, refresh-token rotation และ domain services ไม่ได้แก้.
+- RSC boundary test ใช้ React Flight renderer ที่ติดตั้งมากับ Next; service/persistence dependencies ถูก mock. ไม่ได้ยิง full Next HTTP server หรือฐานข้อมูลจริง; Prisma query events, SQL counts และ production DB savings ยัง **NOT MEASURED**. ข้อจำกัด Phase 0 เรื่อง app port และ integration DB เปล่ายังคงอยู่.
+
+### Phase 2 readiness
+
+Phase 2 ยัง **ไม่พร้อมเริ่ม** จากหลักฐานปัจจุบัน. Phase 1 พิสูจน์การลด projection execution ซ้ำภายใน RSC request ได้ แต่ยังไม่พิสูจน์ต้นทุน SQL ของ TeamMembership/TeamRole/User grant reads. ก่อนรวม authorization reads ให้เก็บ query-event หรือ SQL statement counts ที่ผูกกับ request บน integration environment ที่มี schema และข้อมูลทดสอบจริง พร้อมแยกตาม query family.

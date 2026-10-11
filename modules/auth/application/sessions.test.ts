@@ -171,6 +171,21 @@ describe("refresh session state-machine outcomes", () => {
         })).resolves.toEqual({ status: "unauthorized" });
     });
 
+    it("rejects an access token when its session family has been revoked", async () => {
+        verifyAccessTokenMock.mockResolvedValue({
+            sub: "7",
+            sessionId: "family-7",
+            tokenVersion: 4,
+            role: "ADMIN",
+        });
+        hasActiveSessionFamilyMock.mockResolvedValue(false);
+
+        await expect(resolveAuthenticatedAccount("access-token")).resolves.toBeNull();
+
+        expect(hasActiveSessionFamilyMock).toHaveBeenCalledWith(7, "family-7");
+        expect(findAccountForResolutionMock).not.toHaveBeenCalled();
+    });
+
     it("returns a plain unauthorized result for an invalid transition", async () => {
         rotateRefreshTokenAtomicallyMock.mockResolvedValue({ status: "invalid" });
 

@@ -69,7 +69,20 @@ export default defineConfig({
                     name: "node",
                     environment: "node",
                     include: [...NODE_TESTS],
-                    exclude: [...DOM_TESTS, ARCHITECTURE_TEST],
+                    exclude: [
+                        ...DOM_TESTS,
+                        ARCHITECTURE_TEST,
+                        "__tests__/auth/current-user-projection.test.ts",
+                    ],
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: "rsc",
+                    environment: "node",
+                    include: ["__tests__/auth/current-user-projection.test.ts"],
+                    execArgv: ["--conditions=react-server"],
                 },
             },
             {

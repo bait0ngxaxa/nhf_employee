@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 
 import { resolveAuthenticatedAccount } from "@/modules/auth";
@@ -43,7 +44,7 @@ import { getUserDisplayName } from "@/shared/identity/display";
 
 export type CurrentUserProjection = AuthenticatedUser;
 
-export async function getCurrentUserProjection(): Promise<CurrentUserProjection | null> {
+async function projectCurrentUser(): Promise<CurrentUserProjection | null> {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(HYBRID_ACCESS_COOKIE_NAME)?.value;
     const account = await resolveAuthenticatedAccount(accessToken);
@@ -180,3 +181,6 @@ export async function getCurrentUserProjection(): Promise<CurrentUserProjection 
         itCapabilities,
     };
 }
+
+export const getCurrentUserProjection: () => Promise<CurrentUserProjection | null> =
+    cache(projectCurrentUser);

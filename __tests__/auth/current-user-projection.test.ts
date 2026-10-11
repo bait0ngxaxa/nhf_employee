@@ -1,4 +1,6 @@
 // @vitest-environment node
+import { createRequire } from "node:module";
+import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthenticatedAccount } from "@/modules/auth";
 import type {
@@ -64,6 +66,11 @@ const {
 }));
 
 vi.mock("next/headers", () => ({ cookies: cookiesMock }));
+// Load the real server-conditioned React module used by the installed Flight renderer.
+vi.mock("react", async () => {
+    const { createRequire } = await import("node:module");
+    return createRequire(`${process.cwd()}/package.json`)("react");
+});
 vi.mock("@/modules/auth", () => ({ resolveAuthenticatedAccount: resolveAccountMock }));
 vi.mock("@/modules/employee", () => ({
     buildEmployeeAuthorizationContext: employeeAuthorizationContextMock,
@@ -105,6 +112,37 @@ vi.mock("@/modules/authorization", () => ({
 }));
 
 import { getCurrentUserProjection } from "@/app/_lib/auth/current-user";
+
+interface ReactFlightServer {
+    renderToReadableStream(
+        model: ReactNode,
+        moduleMap: Record<string, unknown>,
+    ): ReadableStream<Uint8Array>;
+}
+
+const reactFlightServer = createRequire(import.meta.url)(
+    "next/dist/compiled/react-server-dom-webpack/server.node",
+) as ReactFlightServer;
+
+async function renderServerComponent(
+    component: () => Promise<ReactNode>,
+): Promise<string> {
+    const stream = reactFlightServer.renderToReadableStream(
+        createElement(component),
+        {},
+    );
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let output = "";
+
+    while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        output += decoder.decode(result.value, { stream: true });
+    }
+
+    return output + decoder.decode();
+}
 
 const ACCOUNT: AuthenticatedAccount = {
     userId: 41,
@@ -430,5 +468,139 @@ describe("current-user application projection", () => {
         expect(notificationProjectionMock).not.toHaveBeenCalled();
         expect(itContextMock).not.toHaveBeenCalled();
         expect(itCapabilitiesMock).not.toHaveBeenCalled();
+    });
+
+    it("deduplicates concurrent projection calls within one RSC render request", async () => {
+        async function ProjectionProbe(): Promise<ReactNode> {
+            const [first, second] = await Promise.all([
+                getCurrentUserProjection(),
+                getCurrentUserProjection(),
+            ]);
+
+            return createElement(
+                "span",
+                null,
+                `${first?.id}|${second?.id}|${first?.routineCapabilities?.canReadTasks}`,
+            );
+        }
+
+        const output = await renderServerComponent(ProjectionProbe);
+
+        expect(output).toContain("41|41|true");
+        expect({
+            accountResolution: resolveAccountMock.mock.calls.length,
+            employeeProjection: employeeProjectionMock.mock.calls.length,
+            teamProjection: userTeamsMock.mock.calls.length,
+            routineCapabilities: routineProjectionMock.mock.calls.length,
+        }).toEqual({
+            accountResolution: 1,
+            employeeProjection: 1,
+            teamProjection: 1,
+            routineCapabilities: 1,
+        });
+    });
+
+    it("reuses a resolved projection later in the same RSC render request", async () => {
+        async function ProjectionProbe(): Promise<ReactNode> {
+            const first = await getCurrentUserProjection();
+            const second = await getCurrentUserProjection();
+
+            return createElement(
+                "span",
+                null,
+                `${first?.id}|${second?.id}|${second?.routineCapabilities?.canReadTasks}`,
+            );
+        }
+
+        const output = await renderServerComponent(ProjectionProbe);
+
+        expect(output).toContain("41|41|true");
+        expect(resolveAccountMock).toHaveBeenCalledTimes(1);
+        expect(employeeProjectionMock).toHaveBeenCalledTimes(1);
+        expect(userTeamsMock).toHaveBeenCalledTimes(1);
+        expect(routineProjectionMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("resolves fresh identity and capabilities in independent RSC render requests", async () => {
+        let accessToken = "first-access-token";
+        cookiesMock.mockImplementation(async () => ({
+            get: () => ({ value: accessToken }),
+        }));
+        resolveAccountMock.mockImplementation(async (token: string | undefined) => ({
+            ...ACCOUNT,
+            userId: token === "second-access-token" ? 42 : 41,
+        }));
+        routineProjectionMock.mockImplementation(async (actor: { id: number }) => ({
+            ...ROUTINE,
+            canReadTasks: actor.id === 41,
+        }));
+
+        async function ProjectionProbe(): Promise<ReactNode> {
+            const user = await getCurrentUserProjection();
+            return createElement(
+                "span",
+                null,
+                `${user?.id}|${user?.routineCapabilities?.canReadTasks}`,
+            );
+        }
+
+        const firstRequest = await renderServerComponent(ProjectionProbe);
+        accessToken = "second-access-token";
+        const secondRequest = await renderServerComponent(ProjectionProbe);
+
+        expect(firstRequest).toContain("41|true");
+        expect(secondRequest).toContain("42|false");
+        expect(resolveAccountMock).toHaveBeenNthCalledWith(1, "first-access-token");
+        expect(resolveAccountMock).toHaveBeenNthCalledWith(2, "second-access-token");
+        expect(resolveAccountMock).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(["unauthenticated account", "revoked session family"])(
+        "keeps %s unauthorized when the session resolver returns no account",
+        async () => {
+            resolveAccountMock.mockResolvedValue(null);
+
+            async function ProjectionProbe(): Promise<ReactNode> {
+                const [first, second] = await Promise.all([
+                    getCurrentUserProjection(),
+                    getCurrentUserProjection(),
+                ]);
+                return createElement("span", null, `${first === null}|${second === null}`);
+            }
+
+            const output = await renderServerComponent(ProjectionProbe);
+
+            expect(output).toContain("true|true");
+            expect(resolveAccountMock).toHaveBeenCalledTimes(1);
+            expect(employeeProjectionMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it("does not resolve capabilities for an inactive Employee in one RSC request", async () => {
+        employeeProjectionMock.mockResolvedValue(null);
+
+        async function ProjectionProbe(): Promise<ReactNode> {
+            const [first, second] = await Promise.all([
+                getCurrentUserProjection(),
+                getCurrentUserProjection(),
+            ]);
+            return createElement("span", null, `${first === null}|${second === null}`);
+        }
+
+        const output = await renderServerComponent(ProjectionProbe);
+
+        expect(output).toContain("true|true");
+        expect(resolveAccountMock).toHaveBeenCalledTimes(1);
+        expect(employeeProjectionMock).toHaveBeenCalledTimes(1);
+        expect(userTeamsMock).not.toHaveBeenCalled();
+        expect(leaveCapabilitiesMock).not.toHaveBeenCalled();
+        expect(employeeCapabilitiesMock).not.toHaveBeenCalled();
+    });
+
+    it("does not share projection results outside an RSC render request", async () => {
+        await getCurrentUserProjection();
+        await getCurrentUserProjection();
+
+        expect(resolveAccountMock).toHaveBeenCalledTimes(2);
     });
 });
