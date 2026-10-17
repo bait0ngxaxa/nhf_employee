@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { StockRequestStatus } from "@prisma/client";
 import { toast } from "sonner";
-import { apiPost } from "@/lib/client/api-client";
+import { apiGet, apiPost, type ApiResponse } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { ensureStockApiSuccess } from "./stockAdminInventory.shared";
 
@@ -22,13 +23,41 @@ export type StockIssueRequestResult =
         readonly success: false;
         readonly message: string;
         readonly status: number | undefined;
+        readonly requiresStatusVerification: boolean;
     };
+
+export type StockIssueRequestStatusVerification =
+    | { readonly kind: "eligible" }
+    | { readonly kind: "ineligible"; readonly status: StockRequestStatus }
+    | { readonly kind: "unknown" };
 
 type UseStockRequestActionsResult = {
     processingRequestId: number | null;
     runCancelRequest: (requestId: number, cancelReason?: string) => Promise<void>;
     runIssueRequest: (requestId: number) => Promise<StockIssueRequestResult>;
+    verifyIssueRequestStatus: (
+        requestId: number,
+    ) => Promise<StockIssueRequestStatusVerification>;
 };
+
+type StockRequestStatusResponse = {
+    requests?: Array<{ id: number; status: StockRequestStatus }>;
+};
+
+const STALE_ISSUE_RESPONSE_MESSAGES = [
+    "ไม่พบคำขอเบิก",
+    "คำขอนี้ถูกดำเนินการแล้ว",
+] as const;
+
+function requiresIssueStatusVerification(
+    response: ApiResponse<unknown>,
+): boolean {
+    return !response.success
+        && response.status === 400
+        && STALE_ISSUE_RESPONSE_MESSAGES.some(
+            (message) => response.errorThai === message || response.error === message,
+        );
+}
 
 export function useStockRequestActions({
     canCancelRequests,
@@ -75,6 +104,7 @@ export function useStockRequestActions({
                 success: false,
                 message: "คุณไม่มีสิทธิ์ดำเนินการนี้",
                 status: undefined,
+                requiresStatusVerification: false,
             };
         }
         if (issueInFlightRef.current) {
@@ -82,16 +112,19 @@ export function useStockRequestActions({
                 success: false,
                 message: "กำลังดำเนินการจ่ายคำขออื่นอยู่",
                 status: undefined,
+                requiresStatusVerification: false,
             };
         }
         issueInFlightRef.current = true;
         setProcessingRequestId(requestId);
 
         let responseStatus: number | undefined;
+        let needsStatusVerification = false;
         let result: StockIssueRequestResult;
         try {
             const response = await apiPost(API_ROUTES.stock.issueById(requestId), {});
             responseStatus = response.status;
+            needsStatusVerification = requiresIssueStatusVerification(response);
             ensureStockApiSuccess(
                 response,
                 "เกิดข้อผิดพลาด",
@@ -101,7 +134,12 @@ export function useStockRequestActions({
             const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
             toast.error(message);
             onIssueFailure?.();
-            result = { success: false, message, status: responseStatus };
+            result = {
+                success: false,
+                message,
+                status: responseStatus,
+                requiresStatusVerification: needsStatusVerification,
+            };
         } finally {
             issueInFlightRef.current = false;
             setProcessingRequestId(null);
@@ -116,9 +154,43 @@ export function useStockRequestActions({
         return result;
     }
 
+    async function verifyIssueRequestStatus(
+        requestId: number,
+    ): Promise<StockIssueRequestStatusVerification> {
+        const params = new URLSearchParams({
+            scope: "all",
+            search: String(requestId),
+            page: "1",
+            limit: "100",
+        });
+
+        try {
+            const response = await apiGet<StockRequestStatusResponse>(
+                `${API_ROUTES.stock.requests}?${params.toString()}`,
+            );
+            if (!response.success) {
+                return { kind: "unknown" };
+            }
+
+            const request = response.data.requests?.find(
+                (candidate) => candidate.id === requestId,
+            );
+            if (!request) {
+                return { kind: "unknown" };
+            }
+
+            return request.status === "PENDING_ISSUE"
+                ? { kind: "eligible" }
+                : { kind: "ineligible", status: request.status };
+        } catch {
+            return { kind: "unknown" };
+        }
+    }
+
     return {
         processingRequestId,
         runCancelRequest,
         runIssueRequest,
+        verifyIssueRequestStatus,
     };
 }

@@ -39,11 +39,53 @@ import {
 } from "./stockRequest.shared";
 import { getRequestItemDisplayName } from "./stockVariant.shared";
 import { getUserDisplayName } from "@/shared/identity/display";
-import { useStockRequestActions } from "./useStockRequestActions";
+import {
+    useStockRequestActions,
+    type StockIssueRequestStatusVerification,
+} from "./useStockRequestActions";
 import { StockRequestNote } from "./StockRequestNote";
 import { StockEmptyState } from "./StockLoadingState";
 import { StockRequestListSkeleton } from "./StockSkeletons";
 import { StockRequestMobileCards } from "./StockRequestMobileCards";
+
+type IssueStatusVerificationState =
+    | { requestId: number; kind: "checking" }
+    | {
+        requestId: number;
+        kind: "verified";
+        result: StockIssueRequestStatusVerification;
+    };
+
+type IssueConfirmationStatus =
+    | { kind: "checking" }
+    | { kind: "eligible"; isFresh: boolean }
+    | { kind: "ineligible"; status: StockRequest["status"] }
+    | { kind: "unknown" };
+
+function resolveIssueConfirmationStatus(
+    latestStatus: StockRequest["status"] | undefined,
+    verification: IssueStatusVerificationState | null,
+): IssueConfirmationStatus {
+    if (latestStatus !== undefined && latestStatus !== "PENDING_ISSUE") {
+        return { kind: "ineligible", status: latestStatus };
+    }
+    if (verification?.kind === "checking") {
+        return { kind: "checking" };
+    }
+    if (verification?.kind === "verified") {
+        if (verification.result.kind === "ineligible") {
+            return verification.result;
+        }
+        if (verification.result.kind === "unknown") {
+            return { kind: "unknown" };
+        }
+        return { kind: "eligible", isFresh: true };
+    }
+    if (latestStatus === "PENDING_ISSUE") {
+        return { kind: "eligible", isFresh: false };
+    }
+    return { kind: "unknown" };
+}
 
 export function StockAdminRequests() {
     const {
@@ -64,7 +106,12 @@ export function StockAdminRequests() {
         requestSearchQuery,
         setRequestSearchQuery,
     } = useStockUIContext();
-    const { processingRequestId, runCancelRequest, runIssueRequest } =
+    const {
+        processingRequestId,
+        runCancelRequest,
+        runIssueRequest,
+        verifyIssueRequestStatus,
+    } =
         useStockRequestActions({
             canCancelRequests: canCancelAnyRequests,
             canProcessRequests,
@@ -80,6 +127,8 @@ export function StockAdminRequests() {
         });
     const [issueRequest, setIssueRequest] = useState<StockRequest | null>(null);
     const [issueError, setIssueError] = useState<string | null>(null);
+    const [issueStatusVerification, setIssueStatusVerification] =
+        useState<IssueStatusVerificationState | null>(null);
     const issueCancelButtonRef = useRef<HTMLButtonElement>(null);
     const issueTriggerRef = useRef<HTMLButtonElement | null>(null);
     const issueFallbackFocusRef = useRef<HTMLInputElement>(null);
@@ -87,6 +136,17 @@ export function StockAdminRequests() {
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
     const isInitialLoading = isLoading && requests.length === 0;
+    const latestIssueRequest = issueRequest
+        ? requests.find((request) => request.id === issueRequest.id)
+        : undefined;
+    const activeIssueStatusVerification = issueRequest
+        && issueStatusVerification?.requestId === issueRequest.id
+        ? issueStatusVerification
+        : null;
+    const issueConfirmationStatus = resolveIssueConfirmationStatus(
+        latestIssueRequest?.status,
+        activeIssueStatusVerification,
+    );
 
     function openIssueConfirmation(
         request: StockRequest,
@@ -95,18 +155,17 @@ export function StockAdminRequests() {
         if (!canProcessRequests || request.status !== "PENDING_ISSUE") return;
         issueTriggerRef.current = trigger;
         setIssueError(null);
+        setIssueStatusVerification(null);
         setIssueRequest(request);
     }
 
     async function handleIssue(): Promise<void> {
         const selectedRequest = issueRequest;
-        if (!selectedRequest || processingRequestId !== null) return;
-
-        const latestRequest = requests.find((request) => request.id === selectedRequest.id);
-        if (latestRequest && latestRequest.status !== "PENDING_ISSUE") {
-            setIssueError("สถานะคำขอเปลี่ยนแปลงแล้ว กรุณาตรวจสอบข้อมูลล่าสุดก่อนดำเนินการ");
-            return;
-        }
+        if (
+            !selectedRequest
+            || processingRequestId !== null
+            || issueConfirmationStatus.kind !== "eligible"
+        ) return;
 
         setIssueError(null);
         const result = await runIssueRequest(selectedRequest.id);
@@ -114,9 +173,39 @@ export function StockAdminRequests() {
             setIssueRequest((current) =>
                 current?.id === selectedRequest.id ? null : current,
             );
+            setIssueStatusVerification(null);
+        } else if (result.requiresStatusVerification) {
+            setIssueError(null);
+            setIssueStatusVerification({
+                requestId: selectedRequest.id,
+                kind: "checking",
+            });
+            const verification = await verifyIssueRequestStatus(selectedRequest.id);
+            setIssueStatusVerification({
+                requestId: selectedRequest.id,
+                kind: "verified",
+                result: verification,
+            });
         } else {
             setIssueError(result.message);
         }
+    }
+
+    async function handleVerifyIssueStatus(): Promise<void> {
+        const selectedRequest = issueRequest;
+        if (!selectedRequest || processingRequestId !== null) return;
+
+        setIssueError(null);
+        setIssueStatusVerification({
+            requestId: selectedRequest.id,
+            kind: "checking",
+        });
+        const verification = await verifyIssueRequestStatus(selectedRequest.id);
+        setIssueStatusVerification({
+            requestId: selectedRequest.id,
+            kind: "verified",
+            result: verification,
+        });
     }
 
     async function handleCancel(requestId: number, reason: string): Promise<void> {
@@ -374,17 +463,22 @@ export function StockAdminRequests() {
 
             <StockIssueConfirmationDialog
                 request={issueRequest}
-                latestStatus={requests.find((request) => request.id === issueRequest?.id)?.status}
+                status={issueConfirmationStatus}
                 error={issueError}
                 loading={processingRequestId === issueRequest?.id}
                 cancelButtonRef={issueCancelButtonRef}
                 triggerRef={issueTriggerRef}
                 fallbackFocusRef={issueFallbackFocusRef}
                 onClose={() => {
+                    if (issueConfirmationStatus.kind !== "eligible") {
+                        refreshRequests();
+                    }
                     setIssueError(null);
+                    setIssueStatusVerification(null);
                     setIssueRequest(null);
                 }}
                 onConfirm={() => void handleIssue()}
+                onVerifyStatus={() => void handleVerifyIssueStatus()}
             />
 
         </div>
@@ -393,7 +487,7 @@ export function StockAdminRequests() {
 
 function StockIssueConfirmationDialog({
     request,
-    latestStatus,
+    status,
     error,
     loading,
     cancelButtonRef,
@@ -401,9 +495,10 @@ function StockIssueConfirmationDialog({
     fallbackFocusRef,
     onClose,
     onConfirm,
+    onVerifyStatus,
 }: {
     request: StockRequest | null;
-    latestStatus: StockRequest["status"] | undefined;
+    status: IssueConfirmationStatus;
     error: string | null;
     loading: boolean;
     cancelButtonRef: RefObject<HTMLButtonElement | null>;
@@ -411,10 +506,9 @@ function StockIssueConfirmationDialog({
     fallbackFocusRef: RefObject<HTMLInputElement | null>;
     onClose: () => void;
     onConfirm: () => void;
+    onVerifyStatus: () => void;
 }) {
     if (!request) return null;
-
-    const isStale = latestStatus !== undefined && latestStatus !== "PENDING_ISSUE";
 
     return (
         <Dialog
@@ -491,9 +585,32 @@ function StockIssueConfirmationDialog({
                     )}
                 </div>
 
-                {isStale ? (
+                {status.kind === "ineligible" ? (
                     <p role="alert" className="rounded-lg border border-status-warning-border bg-status-warning-surface px-3 py-2 text-sm text-status-warning-foreground">
-                        สถานะคำขอเปลี่ยนเป็น “{getStockRequestStatusMeta(latestStatus).label}” แล้ว จึงไม่สามารถจ่ายคำขอนี้ซ้ำได้ กรุณาตรวจสอบรายการล่าสุด
+                        สถานะคำขอเปลี่ยนเป็น “{getStockRequestStatusMeta(status.status).label}” แล้ว จึงไม่สามารถจ่ายคำขอนี้ซ้ำได้ กรุณาตรวจสอบรายการล่าสุด
+                    </p>
+                ) : status.kind === "unknown" ? (
+                    <div className="space-y-2">
+                        <p role="alert" className="rounded-lg border border-status-warning-border bg-status-warning-surface px-3 py-2 text-sm text-status-warning-foreground">
+                            ไม่สามารถยืนยันสถานะล่าสุดของคำขอนี้ได้ จึงยังจ่ายไม่ได้ กรุณาปิดหน้าต่างเพื่อรีเฟรชรายการและเปิดคำขอใหม่
+                        </p>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={loading}
+                            onClick={onVerifyStatus}
+                            className="min-h-11 px-4"
+                        >
+                            ตรวจสอบสถานะอีกครั้ง
+                        </Button>
+                    </div>
+                ) : status.kind === "checking" ? (
+                    <p role="status" aria-live="polite" className="text-sm text-content-secondary">
+                        กำลังตรวจสอบสถานะคำขอล่าสุด…
+                    </p>
+                ) : status.isFresh ? (
+                    <p role="status" className="rounded-lg border border-status-info-border bg-status-info-surface px-3 py-2 text-sm text-status-info-foreground">
+                        ตรวจสอบแล้ว คำขอยังอยู่ในสถานะรอจ่าย กรุณาตรวจสอบข้อมูลก่อนยืนยันอีกครั้ง
                     </p>
                 ) : error ? (
                     <p role="alert" className="rounded-lg border border-status-danger-border-subtle bg-status-danger-surface px-3 py-2 text-sm text-status-danger-foreground">
@@ -521,7 +638,7 @@ function StockIssueConfirmationDialog({
                     </Button>
                     <Button
                         type="button"
-                        disabled={loading || isStale}
+                        disabled={loading || status.kind !== "eligible"}
                         aria-busy={loading}
                         onClick={onConfirm}
                         className="min-h-11 px-5"
