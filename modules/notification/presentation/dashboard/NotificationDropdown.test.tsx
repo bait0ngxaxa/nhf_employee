@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 import { apiGet, apiPatch, apiPost } from "@/lib/client/api-client";
 import type { ApiResponse } from "@/lib/client/api-client";
@@ -123,5 +124,174 @@ describe("NotificationDropdown read/update presentation", () => {
         });
         expect(apiPatch).not.toHaveBeenCalled();
         expect(apiPost).not.toHaveBeenCalled();
+    });
+
+    it("updates confirmed read state after navigating to an actionable notification", async () => {
+        let serverItem = buildItem({
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        });
+        vi.mocked(apiGet).mockImplementation(async () => success<NotificationsData>({
+            notifications: [serverItem],
+            unreadCount: serverItem.isRead ? 0 : 1,
+        }));
+        vi.mocked(apiPatch).mockImplementation(async () => {
+            serverItem = { ...serverItem, isRead: true };
+            return success({});
+        });
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationDropdown canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        const trigger = await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ });
+        fireEvent.pointerDown(trigger, { button: 0 });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ }));
+
+        await waitFor(() => {
+            expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+            expect(apiPatch).toHaveBeenCalledWith(
+                API_ROUTES.notifications.read("notification-1"),
+            );
+        });
+
+        fireEvent.pointerDown(trigger, { button: 0 });
+        await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ });
+        expect(screen.queryByLabelText("ยังไม่อ่าน")).not.toBeInTheDocument();
+    });
+
+    it("navigates before a slow read-state request completes", async () => {
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        vi.mocked(apiPatch).mockReturnValue(new Promise((resolve) => {
+            resolveRead = resolve;
+        }));
+        renderDropdown(true, buildItem({
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        }));
+
+        const trigger = await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ });
+        fireEvent.pointerDown(trigger, { button: 0 });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ }));
+
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+        expect(apiPatch).toHaveBeenCalledWith(
+            API_ROUTES.notifications.read("notification-1"),
+        );
+        resolveRead?.(success({}));
+    });
+
+    it("allows reopening the same actionable notification while its PATCH is pending without duplicating the PATCH", async () => {
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        vi.mocked(apiPatch).mockReturnValue(new Promise((resolve) => {
+            resolveRead = resolve;
+        }));
+        renderDropdown(true, buildItem({
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        }));
+
+        const trigger = await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ });
+        fireEvent.pointerDown(trigger, { button: 0 });
+        const notification = await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ });
+        fireEvent.click(notification);
+        expect(routerPush).toHaveBeenCalledTimes(1);
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+
+        fireEvent.pointerDown(trigger, { button: 0 });
+        const reopenedNotification = await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ });
+        expect(reopenedNotification).toBeEnabled();
+        fireEvent.click(reopenedNotification);
+
+        expect(routerPush).toHaveBeenCalledTimes(2);
+        expect(routerPush).toHaveBeenLastCalledWith("/dashboard/stock");
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+        resolveRead?.(success({}));
+    });
+
+    it("keeps actionable notifications available during another read update", async () => {
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        const first = {
+            ...buildItem({ isRead: false, actionUrl: null }),
+            id: "notification-1",
+            title: "อ่านสถานะช้า",
+        };
+        const second = {
+            ...buildItem({ isRead: false, actionUrl: "/dashboard/stock" }),
+            id: "notification-2",
+            title: "เปิดสต็อก",
+        };
+        vi.mocked(apiGet).mockResolvedValue(success<NotificationsData>({
+            notifications: [first, second],
+            unreadCount: 2,
+        }));
+        vi.mocked(apiPatch)
+            .mockReturnValueOnce(new Promise((resolve) => {
+                resolveRead = resolve;
+            }))
+            .mockResolvedValueOnce(success({}));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationDropdown canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        fireEvent.pointerDown(
+            await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ }),
+            { button: 0 },
+        );
+        fireEvent.click(await screen.findByRole("menuitem", { name: /อ่านสถานะช้า/ }));
+        await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByRole("menuitem", { name: /เปิดสต็อก/ }));
+
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+        await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+        resolveRead?.(success({}));
+    });
+
+    it("keeps the notification unread when best-effort persistence is rejected", async () => {
+        vi.mocked(apiPatch).mockResolvedValue({
+            success: false,
+            error: "Forbidden",
+            errorThai: "คุณไม่มีสิทธิ์ดำเนินการนี้",
+            code: "FORBIDDEN",
+            status: 403,
+        });
+        renderDropdown(true, buildItem({
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        }));
+
+        const trigger = await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ });
+        fireEvent.pointerDown(trigger, { button: 0 });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ }));
+
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+        await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+        fireEvent.pointerDown(trigger, { button: 0 });
+        await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ });
+        expect(screen.getByText("1 รายการที่ยังไม่อ่าน")).toBeInTheDocument();
+        expect(screen.getByLabelText("ยังไม่อ่าน")).toBeInTheDocument();
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("handles rejected best-effort requests without an unhandled rejection", async () => {
+        vi.mocked(apiPatch).mockRejectedValue(new Error("Network failure"));
+        renderDropdown(true, buildItem({
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        }));
+
+        const trigger = await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ });
+        fireEvent.pointerDown(trigger, { button: 0 });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ }));
+
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+        await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+        expect(toast.error).not.toHaveBeenCalled();
     });
 });

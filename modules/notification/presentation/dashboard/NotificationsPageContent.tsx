@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -48,7 +48,10 @@ export function NotificationsSection({
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [pendingId, setPendingId] = useState<string | null>(null);
+    const pendingIdsRef = useRef<Set<string>>(new Set<string>());
+    const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(
+        () => new Set<string>(),
+    );
     const [isMarkingAll, setIsMarkingAll] = useState(false);
 
     const apiUrl = getApiUrl(filter);
@@ -68,6 +71,51 @@ export function NotificationsSection({
 
     const hasUnread = items.some((item) => !item.isRead);
     const totalCount = data?.totalCount ?? 0;
+
+    const persistReadState = async (notification: NotificationItem): Promise<void> => {
+        const result = await apiPatch(
+            API_ROUTES.notifications.read(notification.id),
+        );
+        if (!result.success) {
+            throw new Error(result.errorThai);
+        }
+
+        setItems((current) =>
+            current.map((item) =>
+                item.id === notification.id ? { ...item, isRead: true } : item,
+            ),
+        );
+        await mutate((current) => {
+            if (!current) return current;
+            const wasUnread = current.notifications.some(
+                (item) => item.id === notification.id && !item.isRead,
+            ) || items.some(
+                (item) => item.id === notification.id && !item.isRead,
+            );
+            return {
+                ...current,
+                notifications: current.notifications.map((item) =>
+                    item.id === notification.id ? { ...item, isRead: true } : item,
+                ),
+                totalCount: filter === "unread" && wasUnread
+                    ? Math.max(0, current.totalCount - 1)
+                    : current.totalCount,
+            };
+        }, { revalidate: false });
+        void mutate().catch(() => undefined);
+    };
+
+    const addPendingId = (notificationId: string): boolean => {
+        if (pendingIdsRef.current.has(notificationId)) return false;
+        pendingIdsRef.current.add(notificationId);
+        setPendingIds(new Set(pendingIdsRef.current));
+        return true;
+    };
+
+    const removePendingId = (notificationId: string): void => {
+        if (!pendingIdsRef.current.delete(notificationId)) return;
+        setPendingIds(new Set(pendingIdsRef.current));
+    };
 
     const loadMore = useCallback(async (): Promise<void> => {
         if (!cursor || isLoadingMore) {
@@ -106,36 +154,30 @@ export function NotificationsSection({
             notification.actionUrl,
         );
 
-        if (!canUpdateInbox) {
-            if (targetUrl) {
-                router.push(targetUrl);
+        if (targetUrl) {
+            router.push(targetUrl);
+
+            if (canUpdateInbox && addPendingId(notification.id)) {
+                void persistReadState(notification)
+                    .catch(() => undefined)
+                    .finally(() => removePendingId(notification.id));
             }
             return;
         }
 
-        if (pendingId || isMarkingAll) {
+        if (!canUpdateInbox || pendingIdsRef.current.size > 0 || isMarkingAll) {
             return;
         }
 
-        setPendingId(notification.id);
+        if (!addPendingId(notification.id)) return;
         try {
-            await apiPatch(API_ROUTES.notifications.read(notification.id));
-            setItems((current) =>
-                current.map((item) =>
-                    item.id === notification.id ? { ...item, isRead: true } : item,
-                ),
-            );
-            await mutate();
-
-            if (targetUrl) {
-                router.push(targetUrl);
-            }
+            await persistReadState(notification);
         } catch {
             toast.error("อัปเดตการแจ้งเตือนไม่สำเร็จ", {
                 description: "ลองเปิดรายการนี้อีกครั้ง หรือโหลดข้อมูลใหม่",
             });
         } finally {
-            setPendingId(null);
+            removePendingId(notification.id);
         }
     };
 
@@ -165,7 +207,6 @@ export function NotificationsSection({
         setItems([]);
         setCursor(null);
         setHasMore(false);
-        setPendingId(null);
     };
 
     return (
@@ -193,8 +234,8 @@ export function NotificationsSection({
                     ) : (
                         <NotificationPageList
                             items={items}
-                            pendingId={pendingId}
-                            isDisabled={canUpdateInbox && (Boolean(pendingId) || isMarkingAll)}
+                            pendingIds={pendingIds}
+                            isDisabled={canUpdateInbox && (pendingIds.size > 0 || isMarkingAll)}
                             onOpen={handleMarkAsRead}
                         />
                     )}

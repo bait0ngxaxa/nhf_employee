@@ -78,10 +78,29 @@ describe("normalizeNotificationActionUrl", () => {
         expect(normalizeNotificationActionUrl(null)).toBeNull();
     });
 
-    it("preserves a valid action URL", () => {
-        const actionUrl = "/dashboard/stock?stockTab=browse";
+    it.each([
+        ["/dashboard", "/dashboard"],
+        ["/dashboard?tab=stock", "/dashboard?tab=stock"],
+        [
+            "/dashboard/stock?stockTab=browse&term=a%20b#items%20list",
+            "/dashboard/stock?stockTab=browse&term=a%20b#items%20list",
+        ],
+    ])("preserves the intended internal destination %s", (actionUrl, expected) => {
+        const normalizedUrl = normalizeNotificationActionUrl(actionUrl);
+        expect(normalizedUrl).toBe(expected);
+        if (normalizedUrl !== null) {
+            expect(
+                new URL(normalizedUrl, "https://nhf-notification.invalid").origin,
+            ).toBe("https://nhf-notification.invalid");
+        }
+    });
 
-        expect(normalizeNotificationActionUrl(actionUrl)).toBe(actionUrl);
+    it("returns a canonical pathname while preserving query and hash encoding", () => {
+        expect(
+            normalizeNotificationActionUrl(
+                "/dashboard/stock/../inventory?term=a%20b&tag=%E0%B8%81#items%20list",
+            ),
+        ).toBe("/dashboard/inventory?term=a%20b&tag=%E0%B8%81#items%20list");
     });
 
     it("normalizes the legacy IT equipment tab alias", () => {
@@ -98,10 +117,22 @@ describe("normalizeNotificationActionUrl", () => {
         ).toBe("/dashboard");
     });
 
-    it("returns the normalized URL when it cannot be parsed", () => {
-        const malformedUrl = "http://[invalid";
-
-        expect(normalizeNotificationActionUrl(malformedUrl)).toBe(malformedUrl);
+    it.each([
+        "/..//evil.example/path",
+        "/%2e%2e//evil.example/path",
+        "/a/..//evil.example/path",
+        "/.///evil.example/path",
+        "https://evil.example/path",
+        "//evil.example/path",
+        "/\\\\evil.example/path",
+        "/dashboard\\\\evil.example/path",
+        "/dashboard\n?tab=stock",
+        "/dashboard\r?tab=stock",
+        "/dashboard\t?tab=stock",
+        "javascript:alert(1)",
+        "http://[invalid",
+    ])("rejects malformed or non-internal action URL %s", (actionUrl) => {
+        expect(normalizeNotificationActionUrl(actionUrl)).toBeNull();
     });
 });
 

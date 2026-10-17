@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 
 import { apiGet, apiPatch, apiPost } from "@/lib/client/api-client";
 import type { ApiResponse } from "@/lib/client/api-client";
@@ -228,5 +229,168 @@ describe("NotificationsSection history pagination", () => {
         });
         expect(apiPatch).not.toHaveBeenCalled();
         expect(apiPost).not.toHaveBeenCalled();
+    });
+
+    it("navigates before a slow read-state request completes", async () => {
+        const notification = buildItem("notification-1", "ไปยังรายการ", {
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        });
+        vi.mocked(apiGet).mockResolvedValue(success({
+            notifications: [notification],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 1,
+        }));
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        vi.mocked(apiPatch).mockReturnValue(new Promise((resolve) => {
+            resolveRead = resolve;
+        }));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        fireEvent.click(await screen.findByRole("button", { name: /ไปยังรายการ/ }));
+
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+        expect(apiPatch).toHaveBeenCalledWith(
+            API_ROUTES.notifications.read("notification-1"),
+        );
+        resolveRead?.(success({}));
+    });
+
+    it("allows reopening the same actionable notification while its PATCH is pending without duplicating the PATCH", async () => {
+        const notification = buildItem("notification-1", "ไปยังสต็อก", {
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        });
+        vi.mocked(apiGet).mockResolvedValue(success({
+            notifications: [notification],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 1,
+        }));
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        vi.mocked(apiPatch).mockReturnValue(new Promise((resolve) => {
+            resolveRead = resolve;
+        }));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        const row = await screen.findByRole("button", { name: /ไปยังสต็อก/ });
+        fireEvent.click(row);
+        expect(routerPush).toHaveBeenCalledTimes(1);
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+
+        expect(row).toBeEnabled();
+        fireEvent.click(row);
+
+        expect(routerPush).toHaveBeenCalledTimes(2);
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+        resolveRead?.(success({}));
+    });
+
+    it("keeps actionable rows available during another read update", async () => {
+        const first = buildItem("notification-1", "อ่านสถานะช้า", {
+            isRead: false,
+            actionUrl: null,
+        });
+        const second = buildItem("notification-2", "เปิดสต็อก", {
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        });
+        vi.mocked(apiGet).mockResolvedValue(success({
+            notifications: [first, second],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 2,
+        }));
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        vi.mocked(apiPatch)
+            .mockReturnValueOnce(new Promise((resolve) => {
+                resolveRead = resolve;
+            }))
+            .mockResolvedValueOnce(success({}));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        fireEvent.click(await screen.findByRole("button", { name: /อ่านสถานะช้า/ }));
+        await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(1));
+        fireEvent.click(screen.getByRole("button", { name: /เปิดสต็อก/ }));
+
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+        await waitFor(() => expect(apiPatch).toHaveBeenCalledTimes(2));
+        resolveRead?.(success({}));
+    });
+
+    it("keeps read state unchanged and suppresses a stale error toast after navigation", async () => {
+        const notification = buildItem("notification-1", "ไปยังรายการ", {
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        });
+        vi.mocked(apiGet).mockResolvedValue(success({
+            notifications: [notification],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 1,
+        }));
+        vi.mocked(apiPatch).mockRejectedValue(new Error("Network failure"));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        fireEvent.click(await screen.findByRole("button", { name: /ไปยังรายการ/ }));
+
+        expect(routerPush).toHaveBeenCalledWith("/dashboard/stock");
+        await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+        expect(screen.getByLabelText("ยังไม่อ่าน")).toBeInTheDocument();
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("marks a notification without a destination read only after confirmation from the API", async () => {
+        let serverItem = buildItem("notification-1", "อ่านได้", {
+            isRead: false,
+            actionUrl: null,
+        });
+        vi.mocked(apiGet).mockImplementation(async () => success({
+            notifications: [serverItem],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 1,
+        }));
+        vi.mocked(apiPatch).mockImplementation(async () => {
+            serverItem = { ...serverItem, isRead: true };
+            return success({});
+        });
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        fireEvent.click(await screen.findByRole("button", { name: /อ่านได้/ }));
+
+        await waitFor(() => {
+            expect(apiPatch).toHaveBeenCalledWith(
+                API_ROUTES.notifications.read("notification-1"),
+            );
+            expect(screen.queryByLabelText("ยังไม่อ่าน")).not.toBeInTheDocument();
+        });
+        expect(routerPush).not.toHaveBeenCalled();
     });
 });

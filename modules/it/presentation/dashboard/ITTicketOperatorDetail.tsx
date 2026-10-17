@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, CircleAlert, RefreshCw } from "lucide-react";
@@ -8,6 +8,12 @@ import { ArrowLeft, CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import {
     API_ROUTES,
     IT_DASHBOARD_TABS,
@@ -46,6 +52,12 @@ type ReferenceState =
     | { readonly key: number; readonly kind: "error"; readonly message: string };
 
 type MutationReviewReason = "CONCURRENT_CHANGE" | "AMBIGUOUS_RESULT";
+type MutationOutcome = "CONFIRMED" | "FAILED" | "REVIEW_REQUIRED";
+type PendingTerminalTransition = {
+    readonly ticketId: number;
+    readonly ticketVersion: number;
+    readonly targetStatus: ITTicketStatus;
+};
 
 const STATUS_ACTION_LABELS: Readonly<Partial<Record<ITTicketStatus, string>>> = {
     WAITING_REQUESTER: "รอข้อมูลจากผู้แจ้ง",
@@ -88,8 +100,14 @@ export function ITTicketOperatorDetail({
     const [busy, setBusy] = useState(false);
     const [mutationReviewReason, setMutationReviewReason] = useState<MutationReviewReason | null>(null);
     const [mutationAccessDenied, setMutationAccessDenied] = useState(false);
+    const [pendingTerminalTransition, setPendingTerminalTransition] =
+        useState<PendingTerminalTransition | null>(null);
     const inFlightRef = useRef(false);
     const requiredVersionRef = useRef(0);
+    const terminalTransitionTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const terminalTransitionCancelRef = useRef<HTMLButtonElement>(null);
+    const terminalTransitionFallbackRef = useRef<HTMLHeadingElement>(null);
+    const restoreTerminalTransitionFallbackRef = useRef(false);
 
     const detailKey = `${ticketId}:${refreshKey}`;
     const currentDetail = detailState?.key === detailKey ? detailState : null;
@@ -169,8 +187,10 @@ export function ITTicketOperatorDetail({
         route: string,
         body: Record<string, number | string | null>,
         successMessage: string,
-    ): Promise<void> => {
-        if (!ticket || loading || inFlightRef.current || mutationReviewReason !== null || mutationAccessDenied) return;
+    ): Promise<MutationOutcome> => {
+        if (!ticket || loading || inFlightRef.current || mutationReviewReason !== null || mutationAccessDenied) {
+            return "FAILED";
+        }
         inFlightRef.current = true;
         setBusy(true);
 
@@ -187,6 +207,8 @@ export function ITTicketOperatorDetail({
                     if (isITOperatorMutationVersionConflict(payload)) {
                         setMutationReviewReason("CONCURRENT_CHANGE");
                         toast.error("Ticket มีการเปลี่ยนแปลง กรุณาตรวจสอบข้อมูลล่าสุด");
+                        refreshTicket();
+                        return "REVIEW_REQUIRED";
                     } else {
                         toast.error(message);
                         if (isITTicketResponseRecord(payload)) {
@@ -203,14 +225,16 @@ export function ITTicketOperatorDetail({
                 } else if (response.status === 401 || response.status === 403) {
                     toast.error(message);
                     setMutationAccessDenied(true);
+                    return "REVIEW_REQUIRED";
                 } else if (response.status >= 500) {
                     setMutationReviewReason("AMBIGUOUS_RESULT");
                     toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
                     refreshTicket();
+                    return "REVIEW_REQUIRED";
                 } else {
                     toast.error(message);
                 }
-                return;
+                return "FAILED";
             }
 
             const result = parseITOperatorTicketMutationSnapshot(payload);
@@ -219,16 +243,18 @@ export function ITTicketOperatorDetail({
                 setMutationReviewReason("AMBIGUOUS_RESULT");
                 toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
                 refreshTicket();
-                return;
+                return "REVIEW_REQUIRED";
             }
 
             requiredVersionRef.current = result.ticket.version;
             toast.success(successMessage);
             refreshTicket();
+            return "CONFIRMED";
         } catch {
             setMutationReviewReason("AMBIGUOUS_RESULT");
             toast.error("ไม่สามารถยืนยันผลการบันทึกได้ กำลังโหลดข้อมูลล่าสุด");
             refreshTicket();
+            return "REVIEW_REQUIRED";
         } finally {
             inFlightRef.current = false;
             setBusy(false);
@@ -284,13 +310,64 @@ export function ITTicketOperatorDetail({
         );
     };
 
-    const handleTransition = (targetStatus: ITTicketStatus): void => {
-        if (!ticket) return;
+    const handleTransition = (
+        targetStatus: ITTicketStatus,
+        trigger: HTMLButtonElement,
+    ): void => {
+        if (!ticket || !allowedTransitions.includes(targetStatus)) return;
+
+        if (targetStatus === "CLOSED" || targetStatus === "CANCELLED") {
+            terminalTransitionTriggerRef.current = trigger;
+            restoreTerminalTransitionFallbackRef.current = false;
+            setPendingTerminalTransition({
+                ticketId: ticket.id,
+                ticketVersion: ticket.version,
+                targetStatus,
+            });
+            return;
+        }
+
         void runMutation(
             API_ROUTES.itOperatorTickets.statusById(ticket.id),
             { targetStatus },
             `เปลี่ยนสถานะเป็น${IT_TICKET_STATUS_LABELS[targetStatus]}แล้ว`,
         );
+    };
+
+    const activeTerminalTransition = pendingTerminalTransition?.ticketId === ticket?.id
+        ? pendingTerminalTransition
+        : null;
+    const isTerminalTransitionStale = activeTerminalTransition !== null
+        && ticket !== null
+        && (activeTerminalTransition.ticketVersion !== ticket.version
+            || !allowedTransitions.includes(activeTerminalTransition.targetStatus));
+
+    const confirmTerminalTransition = async (): Promise<void> => {
+        const transition = activeTerminalTransition;
+        if (!transition || !ticket) return;
+
+        if (transition.ticketVersion !== ticket.version
+            || !allowedTransitions.includes(transition.targetStatus)) {
+            restoreTerminalTransitionFallbackRef.current = true;
+            setPendingTerminalTransition(null);
+            setMutationReviewReason("CONCURRENT_CHANGE");
+            refreshTicket();
+            return;
+        }
+
+        const successMessage = transition.targetStatus === "CLOSED"
+            ? "ปิด Ticket เรียบร้อยแล้ว"
+            : "ยกเลิก Ticket เรียบร้อยแล้ว";
+        const outcome = await runMutation(
+            API_ROUTES.itOperatorTickets.statusById(transition.ticketId),
+            { targetStatus: transition.targetStatus },
+            successMessage,
+        );
+
+        if (outcome !== "FAILED") {
+            restoreTerminalTransitionFallbackRef.current = true;
+            setPendingTerminalTransition(null);
+        }
     };
 
     const fieldClassName = "mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-content-body outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60";
@@ -333,7 +410,7 @@ export function ITTicketOperatorDetail({
                     <>
                         <header className="flex min-w-0 flex-col justify-between gap-3 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:flex-row sm:items-start sm:p-6">
                             <div className="min-w-0 space-y-2">
-                                <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold leading-tight tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
+                                <h1 ref={terminalTransitionFallbackRef} data-page-heading tabIndex={-1} className="text-2xl font-bold leading-tight tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
                                     {ticket.title}
                                 </h1>
                                 <p className="text-sm font-medium leading-6 text-content-secondary">
@@ -535,7 +612,9 @@ export function ITTicketOperatorDetail({
                                                 key={targetStatus}
                                                 type="button"
                                                 disabled={actionsDisabled}
-                                                onClick={() => handleTransition(targetStatus)}
+                                                onClick={(event) =>
+                                                    handleTransition(targetStatus, event.currentTarget)
+                                                }
                                             >
                                                 {getStatusActionLabel(ticket.status, targetStatus)}
                                             </Button>
@@ -554,6 +633,148 @@ export function ITTicketOperatorDetail({
                     </>
                 ) : null}
             </div>
+
+            <ITTerminalTransitionDialog
+                ticket={ticket}
+                transition={activeTerminalTransition}
+                stale={isTerminalTransitionStale}
+                loading={busy}
+                disabled={actionsDisabled || isTerminalTransitionStale}
+                cancelButtonRef={terminalTransitionCancelRef}
+                triggerRef={terminalTransitionTriggerRef}
+                fallbackFocusRef={terminalTransitionFallbackRef}
+                restoreFallbackRef={restoreTerminalTransitionFallbackRef}
+                onClose={() => setPendingTerminalTransition(null)}
+                onConfirm={() => void confirmTerminalTransition()}
+            />
         </section>
+    );
+}
+
+function ITTerminalTransitionDialog({
+    ticket,
+    transition,
+    stale,
+    loading,
+    disabled,
+    cancelButtonRef,
+    triggerRef,
+    fallbackFocusRef,
+    restoreFallbackRef,
+    onClose,
+    onConfirm,
+}: {
+    ticket: ITOperatorTicketDetail | null;
+    transition: PendingTerminalTransition | null;
+    stale: boolean;
+    loading: boolean;
+    disabled: boolean;
+    cancelButtonRef: RefObject<HTMLButtonElement | null>;
+    triggerRef: RefObject<HTMLButtonElement | null>;
+    fallbackFocusRef: RefObject<HTMLHeadingElement | null>;
+    restoreFallbackRef: RefObject<boolean>;
+    onClose: () => void;
+    onConfirm: () => void;
+}): ReactElement | null {
+    if (!ticket || !transition) return null;
+
+    const isClosing = transition.targetStatus === "CLOSED";
+    const actionLabel = isClosing ? "ปิดงาน" : "ยกเลิก Ticket";
+    const consequence = isClosing
+        ? "การปิด Ticket จะบันทึกว่างานเสร็จสิ้นและเป็นสถานะสิ้นสุด ไม่สามารถดำเนินการ Ticket นี้ต่อได้"
+        : "การยกเลิกจะบันทึกว่าไม่ดำเนินการกับคำขอนี้ต่อ และ Ticket นี้จะเป็นสถานะสิ้นสุด";
+
+    return (
+        <Dialog
+            open
+            onOpenChange={(open) => {
+                if (!open && !loading) onClose();
+            }}
+        >
+            <DialogContent
+                closeLabel="ปิดหน้าต่าง"
+                showCloseButton={!loading}
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    cancelButtonRef.current?.focus();
+                }}
+                onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    const trigger = triggerRef.current;
+                    if (!restoreFallbackRef.current && trigger?.isConnected && !trigger.disabled) {
+                        trigger.focus();
+                    } else {
+                        fallbackFocusRef.current?.focus();
+                    }
+                    restoreFallbackRef.current = false;
+                }}
+                className="gap-5 sm:max-w-lg"
+            >
+                <div className="space-y-2 pr-9">
+                    <DialogTitle className="text-content-heading">
+                        {isClosing ? "ยืนยันปิด Ticket" : "ยืนยันยกเลิก Ticket"} #{ticket.id}
+                    </DialogTitle>
+                    <DialogDescription className="leading-6 text-content-secondary">
+                        {consequence}
+                    </DialogDescription>
+                </div>
+
+                <dl className="grid gap-3 rounded-lg border border-border-subtle bg-surface-subtle p-4 text-sm">
+                    <div className="min-w-0">
+                        <dt className="text-xs font-semibold text-content-muted">Ticket</dt>
+                        <dd className="mt-1 break-words font-semibold text-content-body">
+                            #{ticket.id} · {ticket.title}
+                        </dd>
+                    </div>
+                    <div className="min-w-0">
+                        <dt className="text-xs font-semibold text-content-muted">ผู้แจ้ง</dt>
+                        <dd className="mt-1 break-words font-semibold text-content-body">
+                            {ticket.requester.displayName}
+                        </dd>
+                    </div>
+                    <div className="min-w-0">
+                        <dt className="text-xs font-semibold text-content-muted">สถานะหลังยืนยัน</dt>
+                        <dd className="mt-1 font-semibold text-content-body">
+                            {IT_TICKET_STATUS_LABELS[transition.targetStatus]}
+                        </dd>
+                    </div>
+                </dl>
+
+                {stale ? (
+                    <p role="alert" className="rounded-lg border border-status-warning-border bg-status-warning-surface px-3 py-2 text-sm text-status-warning-foreground">
+                        Ticket นี้มีการเปลี่ยนแปลงแล้ว กรุณากลับไปตรวจสอบข้อมูลล่าสุดก่อนดำเนินการ
+                    </p>
+                ) : null}
+
+                {loading ? (
+                    <p role="status" aria-live="polite" className="flex items-center gap-2 text-sm text-content-secondary">
+                        <RefreshCw className="size-4 animate-spin" aria-hidden="true" />
+                        กำลังบันทึกการเปลี่ยนสถานะ
+                    </p>
+                ) : null}
+
+                <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+                    <Button
+                        ref={cancelButtonRef}
+                        type="button"
+                        variant="outline"
+                        disabled={loading}
+                        onClick={onClose}
+                        className="min-h-11 px-5"
+                    >
+                        กลับไปตรวจสอบ
+                    </Button>
+                    <Button
+                        type="button"
+                        disabled={disabled || loading || stale}
+                        aria-busy={loading}
+                        onClick={onConfirm}
+                        className="min-h-11 px-5"
+                    >
+                        {loading ? "กำลังดำเนินการ…" : `ยืนยัน${actionLabel}`}
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
     NotificationIcon,
     NotificationInlineLoading,
+    normalizeNotificationActionUrl,
 } from "./NotificationShared";
 import type {
     NotificationFilter,
@@ -125,12 +126,12 @@ function FilterButton({
 
 export function NotificationPageList({
     items,
-    pendingId,
+    pendingIds,
     isDisabled,
     onOpen,
 }: {
     items: NotificationItem[];
-    pendingId: string | null;
+    pendingIds: ReadonlySet<string>;
     isDisabled: boolean;
     onOpen: (notification: NotificationItem) => Promise<void>;
 }): React.ReactElement {
@@ -145,8 +146,9 @@ export function NotificationPageList({
                     <NotificationPageRow
                         key={notification.id}
                         notification={notification}
-                        isPending={pendingId === notification.id}
-                        isDisabled={isDisabled}
+                        isPending={pendingIds.has(notification.id)}
+                        isDisabled={!normalizeNotificationActionUrl(notification.actionUrl)
+                            && (pendingIds.has(notification.id) || isDisabled)}
                         onOpen={onOpen}
                     />
                 ))}
