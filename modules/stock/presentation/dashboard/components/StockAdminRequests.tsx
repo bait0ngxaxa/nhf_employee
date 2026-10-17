@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { type StockRequestStatus } from "@prisma/client";
 import { CheckCircle, ClipboardList, Loader2, Search, X, XCircle } from "lucide-react";
 import { Pagination } from "@/components/Pagination";
@@ -23,7 +23,12 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useStockDataContext, useStockUIContext } from "../context";
 import { STOCK_REQUESTS_LIMIT as REQUESTS_PER_PAGE } from "../context/provider.shared";
@@ -67,16 +72,51 @@ export function StockAdminRequests() {
                 refreshRequests();
                 refreshItems();
             },
+            onIssueFailure: () => {
+                refreshRequests();
+                refreshItems();
+            },
             onCancelSuccess: refreshRequests,
         });
+    const [issueRequest, setIssueRequest] = useState<StockRequest | null>(null);
+    const [issueError, setIssueError] = useState<string | null>(null);
+    const issueCancelButtonRef = useRef<HTMLButtonElement>(null);
+    const issueTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const issueFallbackFocusRef = useRef<HTMLInputElement>(null);
     const totalPages = Math.max(1, Math.ceil(totalRequests / REQUESTS_PER_PAGE));
     const hasActiveFilters =
         statusFilter !== undefined || requestSearchQuery.trim().length > 0;
     const isInitialLoading = isLoading && requests.length === 0;
 
-    async function handleIssue(requestId: number): Promise<void> {
-        if (!canProcessRequests) return;
-        await runIssueRequest(requestId);
+    function openIssueConfirmation(
+        request: StockRequest,
+        trigger: HTMLButtonElement,
+    ): void {
+        if (!canProcessRequests || request.status !== "PENDING_ISSUE") return;
+        issueTriggerRef.current = trigger;
+        setIssueError(null);
+        setIssueRequest(request);
+    }
+
+    async function handleIssue(): Promise<void> {
+        const selectedRequest = issueRequest;
+        if (!selectedRequest || processingRequestId !== null) return;
+
+        const latestRequest = requests.find((request) => request.id === selectedRequest.id);
+        if (latestRequest && latestRequest.status !== "PENDING_ISSUE") {
+            setIssueError("สถานะคำขอเปลี่ยนแปลงแล้ว กรุณาตรวจสอบข้อมูลล่าสุดก่อนดำเนินการ");
+            return;
+        }
+
+        setIssueError(null);
+        const result = await runIssueRequest(selectedRequest.id);
+        if (result.success) {
+            setIssueRequest((current) =>
+                current?.id === selectedRequest.id ? null : current,
+            );
+        } else {
+            setIssueError(result.message);
+        }
     }
 
     async function handleCancel(requestId: number, reason: string): Promise<void> {
@@ -111,6 +151,7 @@ export function StockAdminRequests() {
                     <div className="relative flex-1">
                         <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle" aria-hidden="true" />
                         <Input
+                            ref={issueFallbackFocusRef}
                             aria-label="ค้นหาคำขอเบิกวัสดุ"
                             name="stock-admin-request-search"
                             autoComplete="off"
@@ -182,10 +223,13 @@ export function StockAdminRequests() {
                                 <>
                                     {canProcessRequests ? (
                                         <Button
+                                            type="button"
                                             size="sm"
                                             className="h-11 bg-status-success-solid text-content-on-brand shadow-sm transition-colors hover:bg-status-success-solid-hover"
-                                            disabled={processingRequestId === req.id}
-                                            onClick={() => void handleIssue(req.id)}
+                                            disabled={processingRequestId !== null}
+                                            onClick={(event) =>
+                                                openIssueConfirmation(req, event.currentTarget)
+                                            }
                                         >
                                             <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
                                             จ่ายแล้ว
@@ -281,10 +325,13 @@ export function StockAdminRequests() {
                                                 {isPendingIssue && (canProcessRequests || canCancelAnyRequests) ? (
                                                     <div className="flex justify-end gap-2">
                                                         {canProcessRequests ? <Button
+                                                            type="button"
                                                             size="sm"
                                                             className="bg-status-success-solid text-content-on-brand shadow-sm transition-colors hover:bg-status-success-solid-hover"
-                                                            disabled={processingRequestId === req.id}
-                                                            onClick={() => void handleIssue(req.id)}
+                                                            disabled={processingRequestId !== null}
+                                                            onClick={(event) =>
+                                                                openIssueConfirmation(req, event.currentTarget)
+                                                            }
                                                         >
                                                             <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
                                                             จ่ายแล้ว
@@ -325,7 +372,170 @@ export function StockAdminRequests() {
                 </>
             )}
 
+            <StockIssueConfirmationDialog
+                request={issueRequest}
+                latestStatus={requests.find((request) => request.id === issueRequest?.id)?.status}
+                error={issueError}
+                loading={processingRequestId === issueRequest?.id}
+                cancelButtonRef={issueCancelButtonRef}
+                triggerRef={issueTriggerRef}
+                fallbackFocusRef={issueFallbackFocusRef}
+                onClose={() => {
+                    setIssueError(null);
+                    setIssueRequest(null);
+                }}
+                onConfirm={() => void handleIssue()}
+            />
+
         </div>
+    );
+}
+
+function StockIssueConfirmationDialog({
+    request,
+    latestStatus,
+    error,
+    loading,
+    cancelButtonRef,
+    triggerRef,
+    fallbackFocusRef,
+    onClose,
+    onConfirm,
+}: {
+    request: StockRequest | null;
+    latestStatus: StockRequest["status"] | undefined;
+    error: string | null;
+    loading: boolean;
+    cancelButtonRef: RefObject<HTMLButtonElement | null>;
+    triggerRef: RefObject<HTMLButtonElement | null>;
+    fallbackFocusRef: RefObject<HTMLInputElement | null>;
+    onClose: () => void;
+    onConfirm: () => void;
+}) {
+    if (!request) return null;
+
+    const isStale = latestStatus !== undefined && latestStatus !== "PENDING_ISSUE";
+
+    return (
+        <Dialog
+            open
+            onOpenChange={(open) => {
+                if (!open && !loading) onClose();
+            }}
+        >
+            <DialogContent
+                scrollMode="content"
+                closeLabel="ปิดหน้าต่าง"
+                showCloseButton={!loading}
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    cancelButtonRef.current?.focus();
+                }}
+                onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    const trigger = triggerRef.current;
+                    if (trigger?.isConnected && !trigger.disabled) {
+                        trigger.focus();
+                    } else {
+                        fallbackFocusRef.current?.focus();
+                    }
+                }}
+                className="gap-5 sm:max-w-lg"
+            >
+                <div className="space-y-2 pr-9">
+                    <DialogTitle className="text-content-heading">
+                        ยืนยันจ่ายวัสดุคำขอ #{request.id}
+                    </DialogTitle>
+                    <DialogDescription className="leading-6 text-content-secondary">
+                        เมื่อยืนยัน ระบบจะบันทึกการจ่ายวัสดุและปรับยอดคงเหลือในคลังตามรายการนี้
+                    </DialogDescription>
+                </div>
+
+                <dl className="grid gap-3 rounded-lg border border-border-subtle bg-surface-subtle p-4 text-sm sm:grid-cols-2">
+                    <div className="min-w-0">
+                        <dt className="text-xs font-semibold text-content-muted">เลขที่คำขอ</dt>
+                        <dd className="mt-1 break-words font-semibold text-content-body">#{request.id}</dd>
+                    </div>
+                    <div className="min-w-0">
+                        <dt className="text-xs font-semibold text-content-muted">รหัสโครงการ</dt>
+                        <dd className="mt-1 break-words font-semibold text-content-body">{request.projectCode}</dd>
+                    </div>
+                    <div className="min-w-0 sm:col-span-2">
+                        <dt className="text-xs font-semibold text-content-muted">ผู้เบิก</dt>
+                        <dd className="mt-1 break-words font-semibold text-content-body">
+                            {getUserDisplayName(request.requester)}
+                        </dd>
+                    </div>
+                </dl>
+
+                <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-content-heading">รายการวัสดุ</h3>
+                    {request.items.length > 0 ? (
+                        <ul className="space-y-2">
+                            {request.items.map((item) => (
+                                <li
+                                    key={item.id}
+                                    className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 rounded-lg border border-border-subtle bg-surface-raised px-3 py-2 text-sm"
+                                >
+                                    <span className="min-w-0 break-words font-medium text-content-body">
+                                        {getRequestItemDisplayName(item)}
+                                    </span>
+                                    <span className="shrink-0 font-semibold text-content-body">
+                                        {item.quantity} {item.variant?.unit ?? item.item.unit}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-sm text-content-secondary">ไม่พบรายการวัสดุในคำขอนี้</p>
+                    )}
+                </div>
+
+                {isStale ? (
+                    <p role="alert" className="rounded-lg border border-status-warning-border bg-status-warning-surface px-3 py-2 text-sm text-status-warning-foreground">
+                        สถานะคำขอเปลี่ยนเป็น “{getStockRequestStatusMeta(latestStatus).label}” แล้ว จึงไม่สามารถจ่ายคำขอนี้ซ้ำได้ กรุณาตรวจสอบรายการล่าสุด
+                    </p>
+                ) : error ? (
+                    <p role="alert" className="rounded-lg border border-status-danger-border-subtle bg-status-danger-surface px-3 py-2 text-sm text-status-danger-foreground">
+                        {error}
+                    </p>
+                ) : null}
+
+                {loading ? (
+                    <p role="status" aria-live="polite" className="flex items-center gap-2 text-sm text-content-secondary">
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                        กำลังบันทึกการจ่ายวัสดุ
+                    </p>
+                ) : null}
+
+                <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+                    <Button
+                        ref={cancelButtonRef}
+                        type="button"
+                        variant="outline"
+                        disabled={loading}
+                        onClick={onClose}
+                        className="min-h-11 px-5"
+                    >
+                        กลับไปตรวจสอบ
+                    </Button>
+                    <Button
+                        type="button"
+                        disabled={loading || isStale}
+                        aria-busy={loading}
+                        onClick={onConfirm}
+                        className="min-h-11 px-5"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                                กำลังดำเนินการ…
+                            </>
+                        ) : "ยืนยันจ่ายวัสดุ"}
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 

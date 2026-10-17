@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
@@ -13,12 +13,21 @@ type UseStockRequestActionsOptions = {
     onCancelSuccess?: () => void;
     onIssueSettled?: () => void;
     onIssueSuccess?: () => void;
+    onIssueFailure?: () => void;
 };
+
+export type StockIssueRequestResult =
+    | { readonly success: true }
+    | {
+        readonly success: false;
+        readonly message: string;
+        readonly status: number | undefined;
+    };
 
 type UseStockRequestActionsResult = {
     processingRequestId: number | null;
     runCancelRequest: (requestId: number, cancelReason?: string) => Promise<void>;
-    runIssueRequest: (requestId: number) => Promise<void>;
+    runIssueRequest: (requestId: number) => Promise<StockIssueRequestResult>;
 };
 
 export function useStockRequestActions({
@@ -28,8 +37,10 @@ export function useStockRequestActions({
     onCancelSuccess,
     onIssueSettled,
     onIssueSuccess,
+    onIssueFailure,
 }: UseStockRequestActionsOptions): UseStockRequestActionsResult {
     const [processingRequestId, setProcessingRequestId] = useState<number | null>(null);
+    const issueInFlightRef = useRef(false);
 
     async function runCancelRequest(
         requestId: number,
@@ -58,26 +69,51 @@ export function useStockRequestActions({
         }
     }
 
-    async function runIssueRequest(requestId: number): Promise<void> {
+    async function runIssueRequest(requestId: number): Promise<StockIssueRequestResult> {
         if (!canProcessRequests) {
-            return;
+            return {
+                success: false,
+                message: "คุณไม่มีสิทธิ์ดำเนินการนี้",
+                status: undefined,
+            };
         }
+        if (issueInFlightRef.current) {
+            return {
+                success: false,
+                message: "กำลังดำเนินการจ่ายคำขออื่นอยู่",
+                status: undefined,
+            };
+        }
+        issueInFlightRef.current = true;
         setProcessingRequestId(requestId);
 
+        let responseStatus: number | undefined;
+        let result: StockIssueRequestResult;
         try {
+            const response = await apiPost(API_ROUTES.stock.issueById(requestId), {});
+            responseStatus = response.status;
             ensureStockApiSuccess(
-                await apiPost(API_ROUTES.stock.issueById(requestId), {}),
+                response,
                 "เกิดข้อผิดพลาด",
             );
-
-            toast.success(`จ่ายคำขอ #${requestId} เรียบร้อยแล้ว`);
-            onIssueSuccess?.();
+            result = { success: true };
         } catch (error: unknown) {
-            toast.error(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+            const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
+            toast.error(message);
+            onIssueFailure?.();
+            result = { success: false, message, status: responseStatus };
         } finally {
+            issueInFlightRef.current = false;
             setProcessingRequestId(null);
             onIssueSettled?.();
         }
+
+        if (result.success) {
+            toast.success(`จ่ายคำขอ #${requestId} เรียบร้อยแล้ว`);
+            onIssueSuccess?.();
+        }
+
+        return result;
     }
 
     return {
