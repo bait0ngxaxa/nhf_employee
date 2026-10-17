@@ -57,7 +57,9 @@ export function NotificationDropdown({
 }: NotificationDropdownProps): React.ReactElement {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [pendingId, setPendingId] = useState<string | null>(null);
+    const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(
+        () => new Set<string>(),
+    );
     const [isMarkingAll, setIsMarkingAll] = useState(false);
 
     const { data, error, isLoading, mutate } = useSWR<NotificationsData>(
@@ -73,6 +75,44 @@ export function NotificationDropdown({
     const notifications = data?.notifications ?? [];
     const unreadCount = data?.unreadCount ?? 0;
 
+    const persistReadState = async (notificationId: string): Promise<void> => {
+        const result = await apiPatch(
+            API_ROUTES.notifications.read(notificationId),
+        );
+        if (!result.success) {
+            throw new Error(result.errorThai);
+        }
+
+        await mutate((current) => {
+            if (!current) return current;
+            const wasUnread = current.notifications.some(
+                (item) => item.id === notificationId && !item.isRead,
+            );
+            return {
+                notifications: current.notifications.map((item) =>
+                    item.id === notificationId ? { ...item, isRead: true } : item,
+                ),
+                unreadCount: wasUnread
+                    ? Math.max(0, current.unreadCount - 1)
+                    : current.unreadCount,
+            };
+        }, { revalidate: false });
+        void mutate().catch(() => undefined);
+    };
+
+    const addPendingId = (notificationId: string): void => {
+        setPendingIds((current) => new Set(current).add(notificationId));
+    };
+
+    const removePendingId = (notificationId: string): void => {
+        setPendingIds((current) => {
+            if (!current.has(notificationId)) return current;
+            const next = new Set(current);
+            next.delete(notificationId);
+            return next;
+        });
+    };
+
     const handleMarkAsRead = async (
         notification: NotificationItem,
     ): Promise<void> => {
@@ -80,33 +120,32 @@ export function NotificationDropdown({
             notification.actionUrl,
         );
 
-        if (!canUpdateInbox) {
-            if (normalizedActionUrl) {
-                setOpen(false);
-                router.push(normalizedActionUrl);
+        if (normalizedActionUrl) {
+            setOpen(false);
+            router.push(normalizedActionUrl);
+
+            if (canUpdateInbox && !pendingIds.has(notification.id)) {
+                addPendingId(notification.id);
+                void persistReadState(notification.id)
+                    .catch(() => undefined)
+                    .finally(() => removePendingId(notification.id));
             }
             return;
         }
 
-        if (pendingId || isMarkingAll) {
+        if (!canUpdateInbox || pendingIds.size > 0 || isMarkingAll) {
             return;
         }
 
-        setPendingId(notification.id);
+        addPendingId(notification.id);
         try {
-            await apiPatch(API_ROUTES.notifications.read(notification.id));
-            await mutate();
-
-            if (normalizedActionUrl) {
-                setOpen(false);
-                router.push(normalizedActionUrl);
-            }
+            await persistReadState(notification.id);
         } catch {
             toast.error("อัปเดตการแจ้งเตือนไม่สำเร็จ", {
                 description: "ลองเปิดรายการนี้อีกครั้ง หรือโหลดข้อมูลใหม่",
             });
         } finally {
-            setPendingId(null);
+            removePendingId(notification.id);
         }
     };
 
@@ -204,8 +243,12 @@ export function NotificationDropdown({
                                 <NotificationDropdownItem
                                     key={notification.id}
                                     notification={notification}
-                                    isPending={pendingId === notification.id}
-                                    isDisabled={canUpdateInbox && (Boolean(pendingId) || isMarkingAll)}
+                                    isPending={pendingIds.has(notification.id)}
+                                    isDisabled={canUpdateInbox && (
+                                        pendingIds.has(notification.id)
+                                        || (!normalizeNotificationActionUrl(notification.actionUrl)
+                                            && (pendingIds.size > 0 || isMarkingAll))
+                                    )}
                                     onOpen={handleMarkAsRead}
                                 />
                             ))}

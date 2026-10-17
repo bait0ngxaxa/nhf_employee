@@ -98,10 +98,14 @@ describe("normalizeNotificationActionUrl", () => {
         ).toBe("/dashboard");
     });
 
-    it("returns the normalized URL when it cannot be parsed", () => {
-        const malformedUrl = "http://[invalid";
-
-        expect(normalizeNotificationActionUrl(malformedUrl)).toBe(malformedUrl);
+    it.each([
+        "https://example.com/dashboard/stock",
+        "//example.com/dashboard/stock",
+        "/\\\\example.com/dashboard/stock",
+        "javascript:alert(1)",
+        "http://[invalid",
+    ])("rejects malformed or non-internal action URL %s", (actionUrl) => {
+        expect(normalizeNotificationActionUrl(actionUrl)).toBeNull();
     });
 });
 

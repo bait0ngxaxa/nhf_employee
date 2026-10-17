@@ -50,7 +50,12 @@ export type NotificationFilter = "all" | "unread";
 export function normalizeNotificationActionUrl(
     actionUrl: string | null,
 ): string | null {
-    if (!actionUrl) {
+    if (
+        !actionUrl
+        || !actionUrl.startsWith("/")
+        || actionUrl.startsWith("//")
+        || actionUrl.includes("\\")
+    ) {
         return null;
     }
 
@@ -62,7 +67,7 @@ export function normalizeNotificationActionUrl(
             return toDashboardMenuPath("dashboard");
         }
     } catch {
-        return normalizedUrl;
+        return null;
     }
 
     return normalizedUrl;
