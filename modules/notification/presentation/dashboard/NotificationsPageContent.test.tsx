@@ -262,6 +262,41 @@ describe("NotificationsSection history pagination", () => {
         resolveRead?.(success({}));
     });
 
+    it("allows reopening the same actionable notification while its PATCH is pending without duplicating the PATCH", async () => {
+        const notification = buildItem("notification-1", "ไปยังสต็อก", {
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        });
+        vi.mocked(apiGet).mockResolvedValue(success({
+            notifications: [notification],
+            nextCursor: null,
+            hasMore: false,
+            totalCount: 1,
+        }));
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        vi.mocked(apiPatch).mockReturnValue(new Promise((resolve) => {
+            resolveRead = resolve;
+        }));
+
+        render(
+            <SWRConfig value={{ provider: () => new Map() }}>
+                <NotificationsSection canReadInbox canUpdateInbox />
+            </SWRConfig>,
+        );
+
+        const row = await screen.findByRole("button", { name: /ไปยังสต็อก/ });
+        fireEvent.click(row);
+        expect(routerPush).toHaveBeenCalledTimes(1);
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+
+        expect(row).toBeEnabled();
+        fireEvent.click(row);
+
+        expect(routerPush).toHaveBeenCalledTimes(2);
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+        resolveRead?.(success({}));
+    });
+
     it("keeps actionable rows available during another read update", async () => {
         const first = buildItem("notification-1", "อ่านสถานะช้า", {
             isRead: false,

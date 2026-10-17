@@ -47,30 +47,41 @@ export interface NotificationsResponse {
 
 export type NotificationFilter = "all" | "unread";
 
+const NOTIFICATION_ACTION_BASE_URL = "https://nhf-notification.invalid";
+const ASCII_CONTROL_CHARACTER = /[\u0000-\u001F\u007F]/;
+
 export function normalizeNotificationActionUrl(
     actionUrl: string | null,
 ): string | null {
     if (
         !actionUrl
-        || !actionUrl.startsWith("/")
+        || actionUrl[0] !== "/"
         || actionUrl.startsWith("//")
         || actionUrl.includes("\\")
+        || ASCII_CONTROL_CHARACTER.test(actionUrl)
     ) {
         return null;
     }
 
-    const normalizedUrl = actionUrl.replace("tab=it-equipment", "tab=stock");
     try {
-        const parsedUrl = new URL(normalizedUrl, "http://localhost");
+        const parsedUrl = new URL(actionUrl, NOTIFICATION_ACTION_BASE_URL);
+        if (parsedUrl.origin !== NOTIFICATION_ACTION_BASE_URL) {
+            return null;
+        }
+
+        if (parsedUrl.searchParams.get("tab") === "it-equipment") {
+            parsedUrl.searchParams.set("tab", "stock");
+        }
+
         const tab = parsedUrl.searchParams.get("tab");
         if (tab && !isDashboardTabEnabled(tab)) {
             return toDashboardMenuPath("dashboard");
         }
+
+        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
     } catch {
         return null;
     }
-
-    return normalizedUrl;
 }
 
 export function formatNotificationBadge(count: number): string {

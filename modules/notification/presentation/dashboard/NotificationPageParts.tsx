@@ -147,9 +147,8 @@ export function NotificationPageList({
                         key={notification.id}
                         notification={notification}
                         isPending={pendingIds.has(notification.id)}
-                        isDisabled={pendingIds.has(notification.id) || (
-                            isDisabled && !normalizeNotificationActionUrl(notification.actionUrl)
-                        )}
+                        isDisabled={!normalizeNotificationActionUrl(notification.actionUrl)
+                            && (pendingIds.has(notification.id) || isDisabled)}
                         onOpen={onOpen}
                     />
                 ))}

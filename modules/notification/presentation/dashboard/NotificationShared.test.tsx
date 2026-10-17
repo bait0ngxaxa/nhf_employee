@@ -78,10 +78,23 @@ describe("normalizeNotificationActionUrl", () => {
         expect(normalizeNotificationActionUrl(null)).toBeNull();
     });
 
-    it("preserves a valid action URL", () => {
-        const actionUrl = "/dashboard/stock?stockTab=browse";
+    it.each([
+        ["/dashboard", "/dashboard"],
+        ["/dashboard?tab=stock", "/dashboard?tab=stock"],
+        [
+            "/dashboard/stock?stockTab=browse&term=a%20b#items%20list",
+            "/dashboard/stock?stockTab=browse&term=a%20b#items%20list",
+        ],
+    ])("preserves the intended internal destination %s", (actionUrl, expected) => {
+        expect(normalizeNotificationActionUrl(actionUrl)).toBe(expected);
+    });
 
-        expect(normalizeNotificationActionUrl(actionUrl)).toBe(actionUrl);
+    it("returns a canonical pathname while preserving query and hash encoding", () => {
+        expect(
+            normalizeNotificationActionUrl(
+                "/dashboard/stock/../inventory?term=a%20b&tag=%E0%B8%81#items%20list",
+            ),
+        ).toBe("/dashboard/inventory?term=a%20b&tag=%E0%B8%81#items%20list");
     });
 
     it("normalizes the legacy IT equipment tab alias", () => {
@@ -99,9 +112,13 @@ describe("normalizeNotificationActionUrl", () => {
     });
 
     it.each([
-        "https://example.com/dashboard/stock",
-        "//example.com/dashboard/stock",
-        "/\\\\example.com/dashboard/stock",
+        "https://evil.example/path",
+        "//evil.example/path",
+        "/\\\\evil.example/path",
+        "/dashboard\\\\evil.example/path",
+        "/dashboard\n?tab=stock",
+        "/dashboard\r?tab=stock",
+        "/dashboard\t?tab=stock",
         "javascript:alert(1)",
         "http://[invalid",
     ])("rejects malformed or non-internal action URL %s", (actionUrl) => {

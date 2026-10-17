@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import useSWR from "swr";
 import { Bell, Check, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -57,6 +57,7 @@ export function NotificationDropdown({
 }: NotificationDropdownProps): React.ReactElement {
     const router = useRouter();
     const [open, setOpen] = useState(false);
+    const pendingIdsRef = useRef<Set<string>>(new Set<string>());
     const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(
         () => new Set<string>(),
     );
@@ -100,17 +101,16 @@ export function NotificationDropdown({
         void mutate().catch(() => undefined);
     };
 
-    const addPendingId = (notificationId: string): void => {
-        setPendingIds((current) => new Set(current).add(notificationId));
+    const addPendingId = (notificationId: string): boolean => {
+        if (pendingIdsRef.current.has(notificationId)) return false;
+        pendingIdsRef.current.add(notificationId);
+        setPendingIds(new Set(pendingIdsRef.current));
+        return true;
     };
 
     const removePendingId = (notificationId: string): void => {
-        setPendingIds((current) => {
-            if (!current.has(notificationId)) return current;
-            const next = new Set(current);
-            next.delete(notificationId);
-            return next;
-        });
+        if (!pendingIdsRef.current.delete(notificationId)) return;
+        setPendingIds(new Set(pendingIdsRef.current));
     };
 
     const handleMarkAsRead = async (
@@ -124,8 +124,7 @@ export function NotificationDropdown({
             setOpen(false);
             router.push(normalizedActionUrl);
 
-            if (canUpdateInbox && !pendingIds.has(notification.id)) {
-                addPendingId(notification.id);
+            if (canUpdateInbox && addPendingId(notification.id)) {
                 void persistReadState(notification.id)
                     .catch(() => undefined)
                     .finally(() => removePendingId(notification.id));
@@ -133,11 +132,11 @@ export function NotificationDropdown({
             return;
         }
 
-        if (!canUpdateInbox || pendingIds.size > 0 || isMarkingAll) {
+        if (!canUpdateInbox || pendingIdsRef.current.size > 0 || isMarkingAll) {
             return;
         }
 
-        addPendingId(notification.id);
+        if (!addPendingId(notification.id)) return;
         try {
             await persistReadState(notification.id);
         } catch {
@@ -244,11 +243,11 @@ export function NotificationDropdown({
                                     key={notification.id}
                                     notification={notification}
                                     isPending={pendingIds.has(notification.id)}
-                                    isDisabled={canUpdateInbox && (
-                                        pendingIds.has(notification.id)
-                                        || (!normalizeNotificationActionUrl(notification.actionUrl)
-                                            && (pendingIds.size > 0 || isMarkingAll))
-                                    )}
+                                    isDisabled={canUpdateInbox
+                                        && !normalizeNotificationActionUrl(notification.actionUrl)
+                                        && (pendingIds.has(notification.id)
+                                            || pendingIds.size > 0
+                                            || isMarkingAll)}
                                     onOpen={handleMarkAsRead}
                                 />
                             ))}

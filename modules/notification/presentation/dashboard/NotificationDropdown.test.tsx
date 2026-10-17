@@ -183,6 +183,34 @@ describe("NotificationDropdown read/update presentation", () => {
         resolveRead?.(success({}));
     });
 
+    it("allows reopening the same actionable notification while its PATCH is pending without duplicating the PATCH", async () => {
+        let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
+        vi.mocked(apiPatch).mockReturnValue(new Promise((resolve) => {
+            resolveRead = resolve;
+        }));
+        renderDropdown(true, buildItem({
+            isRead: false,
+            actionUrl: "/dashboard/stock",
+        }));
+
+        const trigger = await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ });
+        fireEvent.pointerDown(trigger, { button: 0 });
+        const notification = await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ });
+        fireEvent.click(notification);
+        expect(routerPush).toHaveBeenCalledTimes(1);
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+
+        fireEvent.pointerDown(trigger, { button: 0 });
+        const reopenedNotification = await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ });
+        expect(reopenedNotification).toBeEnabled();
+        fireEvent.click(reopenedNotification);
+
+        expect(routerPush).toHaveBeenCalledTimes(2);
+        expect(routerPush).toHaveBeenLastCalledWith("/dashboard/stock");
+        expect(apiPatch).toHaveBeenCalledTimes(1);
+        resolveRead?.(success({}));
+    });
+
     it("keeps actionable notifications available during another read update", async () => {
         let resolveRead: ((response: ApiResponse<unknown>) => void) | undefined;
         const first = {

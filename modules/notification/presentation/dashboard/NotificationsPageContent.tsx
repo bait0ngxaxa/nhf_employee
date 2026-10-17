@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -48,6 +48,7 @@ export function NotificationsSection({
     const [cursor, setCursor] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const pendingIdsRef = useRef<Set<string>>(new Set<string>());
     const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(
         () => new Set<string>(),
     );
@@ -104,17 +105,16 @@ export function NotificationsSection({
         void mutate().catch(() => undefined);
     };
 
-    const addPendingId = (notificationId: string): void => {
-        setPendingIds((current) => new Set(current).add(notificationId));
+    const addPendingId = (notificationId: string): boolean => {
+        if (pendingIdsRef.current.has(notificationId)) return false;
+        pendingIdsRef.current.add(notificationId);
+        setPendingIds(new Set(pendingIdsRef.current));
+        return true;
     };
 
     const removePendingId = (notificationId: string): void => {
-        setPendingIds((current) => {
-            if (!current.has(notificationId)) return current;
-            const next = new Set(current);
-            next.delete(notificationId);
-            return next;
-        });
+        if (!pendingIdsRef.current.delete(notificationId)) return;
+        setPendingIds(new Set(pendingIdsRef.current));
     };
 
     const loadMore = useCallback(async (): Promise<void> => {
@@ -157,8 +157,7 @@ export function NotificationsSection({
         if (targetUrl) {
             router.push(targetUrl);
 
-            if (canUpdateInbox && !pendingIds.has(notification.id)) {
-                addPendingId(notification.id);
+            if (canUpdateInbox && addPendingId(notification.id)) {
                 void persistReadState(notification)
                     .catch(() => undefined)
                     .finally(() => removePendingId(notification.id));
@@ -166,11 +165,11 @@ export function NotificationsSection({
             return;
         }
 
-        if (!canUpdateInbox || pendingIds.size > 0 || isMarkingAll) {
+        if (!canUpdateInbox || pendingIdsRef.current.size > 0 || isMarkingAll) {
             return;
         }
 
-        addPendingId(notification.id);
+        if (!addPendingId(notification.id)) return;
         try {
             await persistReadState(notification);
         } catch {
@@ -208,7 +207,6 @@ export function NotificationsSection({
         setItems([]);
         setCursor(null);
         setHasMore(false);
-        setPendingIds(new Set<string>());
     };
 
     return (
