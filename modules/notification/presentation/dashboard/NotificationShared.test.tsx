@@ -86,7 +86,13 @@ describe("normalizeNotificationActionUrl", () => {
             "/dashboard/stock?stockTab=browse&term=a%20b#items%20list",
         ],
     ])("preserves the intended internal destination %s", (actionUrl, expected) => {
-        expect(normalizeNotificationActionUrl(actionUrl)).toBe(expected);
+        const normalizedUrl = normalizeNotificationActionUrl(actionUrl);
+        expect(normalizedUrl).toBe(expected);
+        if (normalizedUrl !== null) {
+            expect(
+                new URL(normalizedUrl, "https://nhf-notification.invalid").origin,
+            ).toBe("https://nhf-notification.invalid");
+        }
     });
 
     it("returns a canonical pathname while preserving query and hash encoding", () => {
@@ -112,6 +118,10 @@ describe("normalizeNotificationActionUrl", () => {
     });
 
     it.each([
+        "/..//evil.example/path",
+        "/%2e%2e//evil.example/path",
+        "/a/..//evil.example/path",
+        "/.///evil.example/path",
         "https://evil.example/path",
         "//evil.example/path",
         "/\\\\evil.example/path",

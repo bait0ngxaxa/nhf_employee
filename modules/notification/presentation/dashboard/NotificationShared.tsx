@@ -74,11 +74,20 @@ export function normalizeNotificationActionUrl(
         }
 
         const tab = parsedUrl.searchParams.get("tab");
-        if (tab && !isDashboardTabEnabled(tab)) {
-            return toDashboardMenuPath("dashboard");
+        const canonicalUrl = tab && !isDashboardTabEnabled(tab)
+            ? toDashboardMenuPath("dashboard")
+            : `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+
+        if (
+            !canonicalUrl.startsWith("/")
+            || canonicalUrl.startsWith("//")
+            || new URL(canonicalUrl, NOTIFICATION_ACTION_BASE_URL).origin
+                !== NOTIFICATION_ACTION_BASE_URL
+        ) {
+            return null;
         }
 
-        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+        return canonicalUrl;
     } catch {
         return null;
     }
