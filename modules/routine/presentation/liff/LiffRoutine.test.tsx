@@ -842,6 +842,18 @@ describe("LiffRoutineApp", () => {
         expect(mocks.fetchLiffRoutineReference).toHaveBeenCalledTimes(1);
     });
 
+    it("shows the same live upcoming-date preview in the LIFF form", () => {
+        renderLiffTaskForm();
+
+        const preview = screen.getByRole("region", { name: "ตัวอย่างกำหนดการถัดไป" });
+        expect(preview).toHaveTextContent("ช่วงตัวอย่าง");
+
+        fireEvent.change(screen.getByLabelText("รูปแบบการเกิดงาน"), {
+            target: { value: "ONE_TIME" },
+        });
+        expect(preview).toHaveTextContent("พบ 1 รายการในช่วงนี้");
+    });
+
     it("opens the contract disclosure for data and a new validation event without overriding collapse", async () => {
         Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
             configurable: true,

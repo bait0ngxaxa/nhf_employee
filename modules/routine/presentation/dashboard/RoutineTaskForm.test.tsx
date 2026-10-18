@@ -48,6 +48,8 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(screen.getByLabelText("วันที่ครบกำหนด")).toHaveValue(
             String(getDefaultRoutineScheduleConfig("ONE_TIME", today).date),
         );
+        expect(screen.getByRole("region", { name: "ตัวอย่างกำหนดการถัดไป" }))
+            .toHaveTextContent("พบ 1 รายการในช่วงนี้");
     });
 
     it("does not offer the manual schedule when creating a Routine", () => {

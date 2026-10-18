@@ -237,6 +237,16 @@ function validateRoutineTaskScheduleAndContract(
     }
 }
 
+export const routineSchedulePreviewSchema = z
+    .object({
+        scheduleType: routineScheduleTypeSchema,
+        scheduleConfig: z.record(z.string(), z.json()).nullable().optional(),
+        contractStartDate: dateSchema.nullish(),
+        contractEndDate: dateSchema.nullish(),
+        businessDayPolicy: routineBusinessDayPolicySchema,
+    })
+    .superRefine(validateRoutineTaskScheduleAndContract);
+
 const routineTaskCreateFields = {
     unitId: z.coerce.number().int().positive("กรุณาเลือกหน่วยงาน"),
     categoryId: z.coerce.number().int().positive("กรุณาเลือกหมวดหมู่"),
