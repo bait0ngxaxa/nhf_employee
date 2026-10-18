@@ -12,6 +12,16 @@ import {
 } from "react";
 import Link from "next/link";
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
     ArrowLeft,
     ArrowRight,
     CircleAlert,
@@ -98,6 +108,7 @@ function LiffITTicketList(): ReactElement {
     const [page, setPage] = useState(1);
     const [retry, setRetry] = useState(0);
     const [creating, setCreating] = useState(false);
+    const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
     const [ticketType, setTicketType] = useState<ITTicketType>("INCIDENT");
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
@@ -108,17 +119,63 @@ function LiffITTicketList(): ReactElement {
     const createAttemptRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
     const createInFlightRef = useRef(false);
     const selectedAttachmentsRef = useRef<SelectedITTicketAttachment[]>([]);
+    const pendingAttachmentRevocationsRef = useRef(new Set<string>());
 
     const updateSelectedAttachments = (next: SelectedITTicketAttachment[]): void => {
         selectedAttachmentsRef.current = next;
         setSelectedAttachments(next);
     };
 
-    useEffect(() => () => {
-        for (const attachment of selectedAttachmentsRef.current) {
-            URL.revokeObjectURL(attachment.previewUrl);
+    useEffect(() => {
+        const activePreviewUrls = new Set(selectedAttachments.map((attachment) => attachment.previewUrl));
+        for (const previewUrl of pendingAttachmentRevocationsRef.current) {
+            if (activePreviewUrls.has(previewUrl)) continue;
+            URL.revokeObjectURL(previewUrl);
+            pendingAttachmentRevocationsRef.current.delete(previewUrl);
         }
+    }, [selectedAttachments]);
+
+    useEffect(() => () => {
+        const previewUrls = new Set([
+            ...selectedAttachmentsRef.current.map((attachment) => attachment.previewUrl),
+            ...pendingAttachmentRevocationsRef.current,
+        ]);
+        for (const previewUrl of previewUrls) URL.revokeObjectURL(previewUrl);
+        pendingAttachmentRevocationsRef.current.clear();
     }, []);
+
+    const isCreateFormDirty = ticketType !== "INCIDENT"
+        || title.trim().length > 0
+        || description.trim().length > 0
+        || selectedAttachments.length > 0;
+
+    const resetCreateDraft = (): void => {
+        createAttemptRef.current = null;
+        setTicketType("INCIDENT");
+        setTitle("");
+        setDescription("");
+        setCreateError(null);
+        for (const attachment of selectedAttachmentsRef.current) {
+            pendingAttachmentRevocationsRef.current.add(attachment.previewUrl);
+        }
+        updateSelectedAttachments([]);
+    };
+
+    const closeCreateForm = (): void => {
+        if (createInFlightRef.current) return;
+        resetCreateDraft();
+        setDiscardConfirmOpen(false);
+        setCreating(false);
+    };
+
+    const requestCreateFormExit = (): void => {
+        if (createInFlightRef.current) return;
+        if (isCreateFormDirty) {
+            setDiscardConfirmOpen(true);
+            return;
+        }
+        closeCreateForm();
+    };
 
     const requestKey = `${page}:${retry}`;
     const currentList = listState?.key === requestKey ? listState : null;
@@ -175,7 +232,7 @@ function LiffITTicketList(): ReactElement {
     const removeAttachment = (previewUrl: string): void => {
         const current = selectedAttachmentsRef.current;
         const removed = current.find((attachment) => attachment.previewUrl === previewUrl);
-        if (removed) URL.revokeObjectURL(removed.previewUrl);
+        if (removed) pendingAttachmentRevocationsRef.current.add(removed.previewUrl);
         createAttemptRef.current = null;
         updateSelectedAttachments(current.filter((attachment) => attachment.previewUrl !== previewUrl));
     };
@@ -214,13 +271,7 @@ function LiffITTicketList(): ReactElement {
                 attempt.key,
             );
             createAttemptRef.current = null;
-            setTitle("");
-            setDescription("");
-            setTicketType("INCIDENT");
-            for (const attachment of selectedAttachmentsRef.current) {
-                URL.revokeObjectURL(attachment.previewUrl);
-            }
-            updateSelectedAttachments([]);
+            resetCreateDraft();
             setCreating(false);
             setCreatedTicket(created);
 
@@ -273,7 +324,7 @@ function LiffITTicketList(): ReactElement {
             <main className="space-y-5 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5">
                 <button
                     type="button"
-                    onClick={() => setCreating(false)}
+                    onClick={requestCreateFormExit}
                     disabled={submitting}
                     className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-semibold text-content-secondary underline-offset-4 hover:text-content-heading hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
@@ -390,6 +441,27 @@ function LiffITTicketList(): ReactElement {
                         </div>
                     </form>
                 </section>
+                <AlertDialog
+                    open={discardConfirmOpen}
+                    onOpenChange={(open) => {
+                        if (!createInFlightRef.current) setDiscardConfirmOpen(open);
+                    }}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>มีข้อมูลที่ยังไม่ได้ส่ง</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                หากกลับไปยังรายการ Ticket ข้อมูลที่กรอกและรูปภาพที่เลือกจะหายไป ต้องการทิ้งข้อมูลหรือไม่
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>กลับไปแก้ไข</AlertDialogCancel>
+                            <AlertDialogAction variant="destructive" onClick={closeCreateForm}>
+                                ทิ้งข้อมูลและกลับรายการ
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </main>
         );
     }

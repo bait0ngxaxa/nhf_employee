@@ -199,6 +199,97 @@ describe("LiffITApp requester experience", () => {
         expect(document.getElementById("liff-it-ticket-description-count")).toBeInTheDocument();
     });
 
+    it("returns from a pristine create form without confirmation and reopens with defaults", async () => {
+        render(<LiffITApp />);
+        await openCreateForm();
+
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+
+        expect(await screen.findByRole("heading", { name: "IT Ticket ของฉัน" })).toBeInTheDocument();
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+        await openCreateForm();
+        expect(screen.getByRole("combobox", { name: "ประเภทคำขอ" })).toHaveValue("INCIDENT");
+        expect(screen.getByRole("textbox", { name: "หัวข้อ" })).toHaveValue("");
+        expect(screen.getByRole("textbox", { name: "รายละเอียด" })).toHaveValue("");
+    });
+
+    it.each(["type", "title", "description", "attachment"] as const)(
+        "asks before discarding when the %s field contains unsaved data",
+        async (field) => {
+            render(<LiffITApp />);
+            await openCreateForm();
+
+            if (field === "type") {
+                fireEvent.change(screen.getByRole("combobox", { name: "ประเภทคำขอ" }), {
+                    target: { value: "SERVICE_REQUEST" },
+                });
+            } else if (field === "title") {
+                fireEvent.change(screen.getByRole("textbox", { name: "หัวข้อ" }), {
+                    target: { value: "หัวข้อร่าง" },
+                });
+            } else if (field === "description") {
+                fireEvent.change(screen.getByRole("textbox", { name: "รายละเอียด" }), {
+                    target: { value: "รายละเอียดร่าง" },
+                });
+            } else {
+                fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
+                    target: { files: [new File(["image"], "หน้าจอ.png", { type: "image/png" })] },
+                });
+            }
+
+            fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+
+            const confirmation = await screen.findByRole("alertdialog");
+            expect(within(confirmation).getByText(/ข้อมูลที่กรอกและรูปภาพที่เลือกจะหายไป/)).toBeInTheDocument();
+            expect(within(confirmation).getByRole("button", { name: "กลับไปแก้ไข" })).toBeInTheDocument();
+            expect(within(confirmation).getByRole("button", { name: "ทิ้งข้อมูลและกลับรายการ" })).toBeInTheDocument();
+        },
+    );
+
+    it("preserves the draft when editing resumes, then discards and releases its image preview", async () => {
+        render(<LiffITApp />);
+        await openCreateForm();
+        fireEvent.change(screen.getByRole("combobox", { name: "ประเภทคำขอ" }), {
+            target: { value: "SERVICE_REQUEST" },
+        });
+        fireEvent.change(screen.getByRole("textbox", { name: "หัวข้อ" }), {
+            target: { value: "หัวข้อร่าง" },
+        });
+        fireEvent.change(screen.getByRole("textbox", { name: "รายละเอียด" }), {
+            target: { value: "รายละเอียดร่าง" },
+        });
+        fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
+            target: { files: [new File(["image"], "หน้าจอ.png", { type: "image/png" })] },
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+        const confirmation = await screen.findByRole("alertdialog");
+        fireEvent.click(within(confirmation).getByRole("button", { name: "กลับไปแก้ไข" }));
+
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+        expect(screen.getByRole("combobox", { name: "ประเภทคำขอ" })).toHaveValue("SERVICE_REQUEST");
+        expect(screen.getByRole("textbox", { name: "หัวข้อ" })).toHaveValue("หัวข้อร่าง");
+        expect(screen.getByRole("textbox", { name: "รายละเอียด" })).toHaveValue("รายละเอียดร่าง");
+        expect(screen.getByRole("img", { name: "ตัวอย่างรูป หน้าจอ.png" })).toHaveAttribute(
+            "src",
+            "blob:liff-1",
+        );
+
+        revokeObjectUrl.mockImplementation(() => {
+            expect(screen.queryByRole("img", { name: "ตัวอย่างรูป หน้าจอ.png" })).not.toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ทิ้งข้อมูลและกลับรายการ" }));
+
+        expect(await screen.findByRole("heading", { name: "IT Ticket ของฉัน" })).toBeInTheDocument();
+        await waitFor(() => expect(revokeObjectUrl).toHaveBeenCalledWith("blob:liff-1"));
+        await openCreateForm();
+        expect(screen.getByRole("combobox", { name: "ประเภทคำขอ" })).toHaveValue("INCIDENT");
+        expect(screen.getByRole("textbox", { name: "หัวข้อ" })).toHaveValue("");
+        expect(screen.getByRole("textbox", { name: "รายละเอียด" })).toHaveValue("");
+        expect(screen.queryByRole("img", { name: "ตัวอย่างรูป หน้าจอ.png" })).not.toBeInTheDocument();
+    });
+
     it("preserves a create idempotency key after a failed attempt and links to the new Ticket", async () => {
         let keyIndex = 0;
         vi.stubGlobal("crypto", { randomUUID: () => `create-key-${++keyIndex}` } as unknown as Crypto);
@@ -313,6 +404,10 @@ describe("LiffITApp requester experience", () => {
         fireEvent.submit(form);
         fireEvent.submit(form);
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
+        expect(screen.getByRole("button", { name: "กลับรายการ Ticket" })).toBeDisabled();
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+        expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" })).toBeInTheDocument();
         await act(async () => pending.resolve({ ...TICKET, id: 91, title: "ขอความช่วยเหลือเรื่องระบบ" }));
         expect(await screen.findByRole("heading", { name: "ขอความช่วยเหลือเรื่องระบบ" })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "เปิดรายละเอียดและการสนทนา" })).toHaveAttribute("href", "/liff/it/91");
