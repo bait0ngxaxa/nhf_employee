@@ -50,8 +50,20 @@ import {
 } from "./api";
 
 type ConversationState =
-    | { readonly key: string; readonly kind: "loaded"; readonly page: ITTicketConversationPage }
-    | { readonly key: string; readonly kind: "error"; readonly message: string };
+    | {
+        readonly key: string;
+        readonly ticketId: number;
+        readonly kind: "loaded";
+        readonly page: ITTicketConversationPage;
+    }
+    | {
+        readonly key: string;
+        readonly ticketId: number;
+        readonly kind: "error";
+        readonly message: string;
+        readonly requiresTicketRefresh: boolean;
+        readonly previousPage: ITTicketConversationPage | null;
+    };
 
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof LiffApiError ? error.message : fallback;
@@ -215,23 +227,33 @@ export function LiffITConversation({
     const olderInFlightRef = useRef(false);
     const olderControllerRef = useRef<AbortController | null>(null);
     const commentAttemptRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
+    const mountedRef = useRef(false);
 
     const requestKey = `${ticketId}:${refreshVersion}:${retry}`;
-    const conversation = conversationState?.key === requestKey && conversationState.kind === "loaded"
-        ? conversationState.page
+    const ticketConversationState = conversationState?.ticketId === ticketId ? conversationState : null;
+    const conversation = ticketConversationState?.kind === "loaded"
+        ? ticketConversationState.page
+        : ticketConversationState?.previousPage ?? null;
+    const conversationError = ticketConversationState?.key === requestKey && ticketConversationState.kind === "error"
+        ? ticketConversationState.message
         : null;
-    const conversationError = conversationState?.key === requestKey && conversationState.kind === "error"
-        ? conversationState.message
-        : null;
+    const requiresTicketRefresh = ticketConversationState?.key === requestKey
+        && ticketConversationState.kind === "error"
+        && ticketConversationState.requiresTicketRefresh;
+    const conversationRequestCurrent = ticketConversationState?.key === requestKey;
     const olderError = olderErrorState?.key === requestKey ? olderErrorState.message : null;
     const postError = postErrorState?.refreshVersion === refreshVersion
         ? postErrorState.message
         : null;
-    const loading = conversation === null && conversationError === null;
+    const loading = conversation === null && conversationError === null && !ticketRefreshing;
+    const refreshingConversation = conversation !== null
+        && !conversationRequestCurrent
+        && !ticketRefreshing;
     const commentable = IT_TICKET_COMMENTABLE_STATUSES.some((candidate) => candidate === status);
     const canReply = commentable
         && postingDeniedAt !== refreshVersion
-        && !ticketRefreshing;
+        && !ticketRefreshing
+        && !requiresTicketRefresh;
 
     const updateSelectedAttachments = (next: SelectedITTicketAttachment[]): void => {
         selectedAttachmentsRef.current = next;
@@ -243,15 +265,28 @@ export function LiffITConversation({
         void fetchLiffITTicketConversation(ticketId, { signal: controller.signal })
             .then((page) => {
                 if (!controller.signal.aborted) {
-                    setConversationState({ key: requestKey, kind: "loaded", page });
+                    setConversationState({ key: requestKey, ticketId, kind: "loaded", page });
                 }
             })
             .catch((error: unknown) => {
                 if (controller.signal.aborted) return;
-                setConversationState({
-                    key: requestKey,
-                    kind: "error",
-                    message: getErrorMessage(error, "ไม่สามารถโหลดบทสนทนาได้ กรุณาลองอีกครั้ง"),
+                const status = error instanceof LiffApiError ? error.status : undefined;
+                const accessOrStateChanged = status === 401
+                    || status === 403
+                    || status === 404
+                    || status === 409;
+                setConversationState((current) => {
+                    const previousPage = current?.ticketId === ticketId
+                        ? current.kind === "loaded" ? current.page : current.previousPage
+                        : null;
+                    return {
+                        key: requestKey,
+                        ticketId,
+                        kind: "error",
+                        message: getErrorMessage(error, "ไม่สามารถโหลดบทสนทนาได้ กรุณาลองอีกครั้ง"),
+                        requiresTicketRefresh: accessOrStateChanged,
+                        previousPage: accessOrStateChanged ? null : previousPage,
+                    };
                 });
             });
         return () => {
@@ -260,11 +295,15 @@ export function LiffITConversation({
         };
     }, [requestKey, ticketId]);
 
-    useEffect(() => () => {
-        olderControllerRef.current?.abort();
-        for (const attachment of selectedAttachmentsRef.current) {
-            URL.revokeObjectURL(attachment.previewUrl);
-        }
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            olderControllerRef.current?.abort();
+            for (const attachment of selectedAttachmentsRef.current) {
+                URL.revokeObjectURL(attachment.previewUrl);
+            }
+        };
     }, []);
 
     const loadOlder = async (): Promise<void> => {
@@ -285,6 +324,7 @@ export function LiffITConversation({
                 if (current?.key !== requestKey || current.kind !== "loaded") return current;
                 return {
                     key: requestKey,
+                    ticketId,
                     kind: "loaded",
                     page: {
                         items: mergeITTicketConversationItems(olderPage.items, current.page.items),
@@ -303,7 +343,7 @@ export function LiffITConversation({
             if (olderControllerRef.current === controller) {
                 olderControllerRef.current = null;
                 olderInFlightRef.current = false;
-                setOlderBusy(false);
+                if (mountedRef.current) setOlderBusy(false);
             }
         }
     };
@@ -369,6 +409,7 @@ export function LiffITConversation({
                 body,
                 files,
             );
+            if (!mountedRef.current) return;
             const existingAttempt = commentAttemptRef.current;
             const attempt = existingAttempt?.signature === signature
                 ? existingAttempt
@@ -376,11 +417,15 @@ export function LiffITConversation({
             commentAttemptRef.current = attempt;
 
             const result = await postLiffITTicketComment(ticketId, body, files, attempt.key);
-            if (conversation !== null) {
+            if (!mountedRef.current) return;
+            if (conversation !== null
+                && conversationRequestCurrent
+                && ticketConversationState?.kind === "loaded") {
                 setConversationState((current) => {
                     if (current?.key !== requestKey || current.kind !== "loaded") return current;
                     return {
                         key: requestKey,
+                        ticketId,
                         kind: "loaded",
                         page: {
                             ...current.page,
@@ -401,6 +446,7 @@ export function LiffITConversation({
             commentAttemptRef.current = null;
             setPostMessage(result.replayed ? "ข้อความนี้ส่งเรียบร้อยแล้ว" : "ส่งข้อความเรียบร้อยแล้ว");
         } catch (error) {
+            if (!mountedRef.current) return;
             if (error instanceof LiffApiError && [403, 404, 409].includes(error.status ?? 0)) {
                 setPostingDeniedAt(refreshVersion);
                 setRefreshAfterConflictAt(error.status === 409 ? refreshVersion : null);
@@ -411,7 +457,7 @@ export function LiffITConversation({
             });
         } finally {
             postInFlightRef.current = false;
-            setPosting(false);
+            if (mountedRef.current) setPosting(false);
         }
     };
 
@@ -419,16 +465,28 @@ export function LiffITConversation({
         <div className="space-y-4">
             {loading ? (
                 <div role="status" aria-label="กำลังโหลดการสนทนา" className="space-y-3 rounded-xl border border-border-neutral bg-surface-raised p-4">
+                    <span className="sr-only">กำลังโหลดบทสนทนา</span>
                     <div className="h-16 animate-pulse motion-reduce:animate-none rounded-xl bg-surface-subtle" />
                     <div className="ml-auto h-16 w-4/5 animate-pulse motion-reduce:animate-none rounded-xl bg-surface-subtle" />
                 </div>
             ) : null}
+            {refreshingConversation ? (
+                <p role="status" className="text-sm text-content-secondary">กำลังอัปเดตบทสนทนา…</p>
+            ) : null}
             {conversationError ? (
                 <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
                     <p className="flex items-start gap-2"><CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />{conversationError}</p>
-                    <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => setRetry((value) => value + 1)}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11 w-full"
+                        onClick={() => {
+                            if (requiresTicketRefresh) onTicketRefresh();
+                            else setRetry((value) => value + 1);
+                        }}
+                    >
                         <RefreshCw aria-hidden="true" className="size-4" />
-                        โหลดบทสนทนาอีกครั้ง
+                        {requiresTicketRefresh ? "โหลดสถานะ Ticket ล่าสุด" : "โหลดบทสนทนาอีกครั้ง"}
                     </Button>
                 </div>
             ) : null}
@@ -471,9 +529,9 @@ export function LiffITConversation({
                 <div role="alert" className="space-y-2 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
                     <p className="flex items-start gap-2"><CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />{postError}</p>
                     {refreshAfterConflictAt === refreshVersion ? (
-                        <Button type="button" variant="outline" className="min-h-11 w-full" onClick={onTicketRefresh}>
+                        <Button type="button" variant="outline" className="min-h-11 w-full" onClick={onTicketRefresh} disabled={ticketRefreshing} aria-busy={ticketRefreshing}>
                             <RefreshCw aria-hidden="true" className="size-4" />
-                            โหลดสถานะ Ticket ล่าสุด
+                            {ticketRefreshing ? "กำลังโหลดสถานะ Ticket…" : "โหลดสถานะ Ticket ล่าสุด"}
                         </Button>
                     ) : null}
                 </div>
@@ -539,9 +597,9 @@ export function LiffITConversation({
                         <div role="alert" className="space-y-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
                             <p className="flex items-start gap-2"><CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />{postError}</p>
                             {refreshAfterConflictAt === refreshVersion ? (
-                                <Button type="button" variant="outline" className="min-h-11 w-full" onClick={onTicketRefresh}>
+                                <Button type="button" variant="outline" className="min-h-11 w-full" onClick={onTicketRefresh} disabled={ticketRefreshing} aria-busy={ticketRefreshing}>
                                     <RefreshCw aria-hidden="true" className="size-4" />
-                                    โหลดสถานะ Ticket ล่าสุด
+                                    {ticketRefreshing ? "กำลังโหลดสถานะ Ticket…" : "โหลดสถานะ Ticket ล่าสุด"}
                                 </Button>
                             ) : null}
                         </div>

@@ -148,14 +148,59 @@ describe("LiffITConversation", () => {
 
     it("retries conversation failures and shows a useful empty state", async () => {
         mocks.fetchConversation
-            .mockRejectedValueOnce(new LiffApiError("ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้", 404))
+            .mockRejectedValueOnce(new LiffApiError("ระบบ Ticket ขัดข้องชั่วคราว กรุณาลองอีกครั้ง", 503))
             .mockResolvedValueOnce({ items: [], olderCursor: null, hasMore: false });
         renderConversation();
 
-        expect(await screen.findByRole("alert")).toHaveTextContent("ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้");
+        expect(await screen.findByRole("alert")).toHaveTextContent("ระบบ Ticket ขัดข้องชั่วคราว");
         fireEvent.click(screen.getByRole("button", { name: "โหลดบทสนทนาอีกครั้ง" }));
         expect(await screen.findByText("ยังไม่มีข้อความในบทสนทนา")).toBeInTheDocument();
     });
+
+    it("keeps readable history during refresh and after a transient refresh failure", async () => {
+        const refresh = deferred<{ items: Array<typeof COMMENT>; olderCursor: null; hasMore: false }>();
+        mocks.fetchConversation
+            .mockResolvedValueOnce({ items: [COMMENT], olderCursor: null, hasMore: false })
+            .mockReturnValueOnce(refresh.promise)
+            .mockResolvedValueOnce({
+                items: [{ ...COMMENT, id: "new-comment", body: "บทสนทนาที่โหลดใหม่" }],
+                olderCursor: null,
+                hasMore: false,
+            });
+        const view = renderConversation();
+        await screen.findByText(COMMENT.body);
+
+        view.rerender(
+            <LiffITConversation ticketId={42} status="OPEN" refreshVersion={1} ticketRefreshing={false} onTicketRefresh={vi.fn()} />,
+        );
+
+        expect(screen.getByText(COMMENT.body)).toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent("กำลังอัปเดตบทสนทนา");
+        await act(async () => refresh.reject(new LiffApiError("เชื่อมต่อระบบ Ticket ไม่สำเร็จ", 503)));
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("เชื่อมต่อระบบ Ticket ไม่สำเร็จ");
+        expect(screen.getByText(COMMENT.body)).toBeInTheDocument();
+        expect(screen.getByRole("textbox", { name: "ตอบกลับ" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "โหลดบทสนทนาอีกครั้ง" }));
+
+        expect(await screen.findByText("บทสนทนาที่โหลดใหม่")).toBeInTheDocument();
+        expect(screen.queryByText(COMMENT.body)).not.toBeInTheDocument();
+    });
+
+    it.each([401, 403, 404, 409] as const)(
+        "requires a Ticket status refresh after a conversation read returns %s",
+        async (status) => {
+            const onTicketRefresh = vi.fn();
+            mocks.fetchConversation.mockRejectedValueOnce(new LiffApiError(`อ่านบทสนทนาไม่ได้ (${status})`, status));
+            renderConversation("OPEN", 0, onTicketRefresh);
+
+            expect(await screen.findByRole("alert")).toHaveTextContent(`อ่านบทสนทนาไม่ได้ (${status})`);
+            expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole("button", { name: "โหลดสถานะ Ticket ล่าสุด" }));
+
+            expect(onTicketRefresh).toHaveBeenCalledTimes(1);
+        },
+    );
 
     it.each(["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] as const)(
         "allows a requester reply while the Ticket is %s",
@@ -400,5 +445,26 @@ describe("LiffITConversation", () => {
             <LiffITConversation ticketId={42} status="OPEN" refreshVersion={1} ticketRefreshing={false} onTicketRefresh={onTicketRefresh} />,
         );
         expect(await screen.findByRole("textbox", { name: "ตอบกลับ" })).toBeInTheDocument();
+    });
+
+    it("does not update local state or revoke an attachment twice after a comment finishes post-unmount", async () => {
+        const pending = deferred<{ comment: typeof COMMENT; replayed: false }>();
+        mocks.postComment.mockReturnValueOnce(pending.promise);
+        const view = renderConversation();
+        fireEvent.change(await screen.findByRole("textbox", { name: "ตอบกลับ" }), {
+            target: { value: "ข้อความพร้อมหลักฐาน" },
+        });
+        fireEvent.change(screen.getByLabelText("รูปภาพประกอบ (ไม่บังคับ)"), {
+            target: { files: [new File(["evidence"], "หลักฐาน.png", { type: "image/png" })] },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await waitFor(() => expect(mocks.postComment).toHaveBeenCalledTimes(1));
+
+        view.unmount();
+        expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+        await act(async () => pending.resolve({ comment: COMMENT, replayed: false }));
+
+        expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+        expect(mocks.postComment).toHaveBeenCalledTimes(1);
     });
 });

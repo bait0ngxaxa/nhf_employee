@@ -414,6 +414,26 @@ describe("LiffITApp requester experience", () => {
         expect(mocks.fetchTickets).toHaveBeenCalledTimes(1);
     });
 
+    it("does not process Ticket creation state or revoke previews again after unmount", async () => {
+        const pending = deferred<typeof TICKET>();
+        mocks.createTicket.mockReturnValueOnce(pending.promise);
+        const view = render(<LiffITApp />);
+        await openCreateForm();
+        fillCreateForm();
+        fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
+            target: { files: [new File(["image"], "หลักฐาน.png", { type: "image/png" })] },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
+
+        view.unmount();
+        expect(revokeObjectUrl).toHaveBeenCalledWith("blob:liff-1");
+        await act(async () => pending.resolve({ ...TICKET, id: 92 }));
+
+        expect(revokeObjectUrl).toHaveBeenCalledTimes(1);
+        expect(mocks.createTicket).toHaveBeenCalledTimes(1);
+    });
+
     it("loads requester detail and conversation, keeps WAITING_REQUESTER unchanged after a reply", async () => {
         mocks.fetchTicket.mockResolvedValue(TICKET_DETAIL);
         mocks.fetchActivity.mockResolvedValue({
@@ -509,6 +529,78 @@ describe("LiffITApp requester experience", () => {
         expect(await screen.findByText("ดำเนินการเสร็จสิ้น")).toBeInTheDocument();
         expect(screen.getByText("แก้ไขแล้ว")).toBeInTheDocument();
         expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
+    });
+
+    it.each([401, 403, 404, 409] as const)(
+        "does not keep stale Ticket details visible after a %s status refresh response",
+        async (status) => {
+            mocks.fetchTicket
+                .mockResolvedValueOnce(TICKET_DETAIL)
+                .mockRejectedValueOnce(new LiffApiError(`ตรวจสอบสถานะไม่ได้ (${status})`, status));
+            mocks.postComment.mockRejectedValueOnce(new LiffApiError("Ticket มีการเปลี่ยนแปลง", 409));
+            render(<LiffITApp ticketId="42" />);
+
+            expect(await screen.findByRole("heading", { name: TICKET.title })).toBeInTheDocument();
+            fireEvent.change(await screen.findByRole("textbox", { name: "ตอบกลับ" }), {
+                target: { value: "ขออัปเดต" },
+            });
+            fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+            fireEvent.click(await screen.findByRole("button", { name: "โหลดสถานะ Ticket ล่าสุด" }));
+
+            expect(await screen.findByText(`ตรวจสอบสถานะไม่ได้ (${status})`)).toBeInTheDocument();
+            expect(screen.queryByRole("heading", { name: TICKET.title })).not.toBeInTheDocument();
+            expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
+            expect(mocks.postComment).toHaveBeenCalledTimes(1);
+        },
+    );
+
+    it("retains Ticket and conversation content after a transient refresh failure and applies the next confirmed status", async () => {
+        const refresh = deferred<typeof TICKET_DETAIL>();
+        const existingComment = {
+            id: "requester-history",
+            createdAt: "2026-09-25T04:00:00.000Z",
+            authorDisplayName: "พนักงาน",
+            authorSide: "REQUESTER" as const,
+            body: "ข้อความเดิมในบทสนทนา",
+            attachments: [],
+        };
+        mocks.fetchTicket
+            .mockResolvedValueOnce(TICKET_DETAIL)
+            .mockReturnValueOnce(refresh.promise)
+            .mockResolvedValueOnce({ ...TICKET_DETAIL, status: "CLOSED", resolvedAt: null });
+        mocks.fetchConversation.mockResolvedValue({
+            items: [existingComment],
+            olderCursor: null,
+            hasMore: false,
+        });
+        mocks.postComment.mockRejectedValueOnce(new LiffApiError("Ticket มีการเปลี่ยนแปลง", 409));
+        render(<LiffITApp ticketId="42" />);
+
+        expect(await screen.findByRole("heading", { name: TICKET.title })).toBeInTheDocument();
+        expect(await screen.findByText(existingComment.body)).toBeInTheDocument();
+        fireEvent.change(await screen.findByRole("textbox", { name: "ตอบกลับ" }), {
+            target: { value: "ขออัปเดต" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        fireEvent.click(await screen.findByRole("button", { name: "โหลดสถานะ Ticket ล่าสุด" }));
+
+        expect(screen.getByText("กำลังโหลดสถานะ Ticket ล่าสุด…")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: TICKET.title })).toBeInTheDocument();
+        expect(screen.getByText(existingComment.body)).toBeInTheDocument();
+        await act(async () => refresh.reject(new LiffApiError("ระบบ Ticket ขัดข้องชั่วคราว", 503)));
+
+        expect(await screen.findByText("ระบบ Ticket ขัดข้องชั่วคราว")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: TICKET.title })).toBeInTheDocument();
+        expect(screen.getByText(existingComment.body)).toBeInTheDocument();
+        expect(screen.getByText(/ยังยืนยันสถานะล่าสุดไม่ได้/)).toBeInTheDocument();
+        expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ลองโหลด Ticket อีกครั้ง" }));
+
+        expect(await screen.findByText("ปิดงานแล้ว")).toBeInTheDocument();
+        expect(screen.getByText(existingComment.body)).toBeInTheDocument();
+        expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
+        expect(mocks.postComment).toHaveBeenCalledTimes(1);
     });
 
     it("protects the visible detail from a stale response for a different Ticket", async () => {

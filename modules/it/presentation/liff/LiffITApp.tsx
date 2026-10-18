@@ -77,6 +77,14 @@ type ListState =
     | { readonly key: string; readonly kind: "loaded"; readonly list: ITRequesterTicketList }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
 
+type TicketState =
+    | {
+        readonly kind: "loaded";
+        readonly ticket: ITRequesterTicketDetail;
+        readonly refreshError?: string;
+    }
+    | { readonly kind: "error"; readonly message: string };
+
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof LiffApiError ? error.message : fallback;
 }
@@ -92,6 +100,7 @@ function TicketStatus({ status }: { readonly status: ITTicketStatus }): ReactEle
 function TicketListLoading(): ReactElement {
     return (
         <div role="status" aria-label="กำลังโหลดรายการ Ticket" className="space-y-3">
+            <span className="sr-only">กำลังโหลดรายการ Ticket ของคุณ</span>
             {[0, 1, 2].map((row) => (
                 <div key={row} className="animate-pulse motion-reduce:animate-none space-y-3 rounded-xl border border-border-neutral bg-surface-raised p-4">
                     <div className="h-5 w-2/3 rounded bg-surface-subtle" />
@@ -120,6 +129,7 @@ function LiffITTicketList(): ReactElement {
     const createInFlightRef = useRef(false);
     const selectedAttachmentsRef = useRef<SelectedITTicketAttachment[]>([]);
     const pendingAttachmentRevocationsRef = useRef(new Set<string>());
+    const mountedRef = useRef(false);
 
     const updateSelectedAttachments = (next: SelectedITTicketAttachment[]): void => {
         selectedAttachmentsRef.current = next;
@@ -135,13 +145,18 @@ function LiffITTicketList(): ReactElement {
         }
     }, [selectedAttachments]);
 
-    useEffect(() => () => {
-        const previewUrls = new Set([
-            ...selectedAttachmentsRef.current.map((attachment) => attachment.previewUrl),
-            ...pendingAttachmentRevocationsRef.current,
-        ]);
-        for (const previewUrl of previewUrls) URL.revokeObjectURL(previewUrl);
-        pendingAttachmentRevocationsRef.current.clear();
+    useEffect(() => {
+        mountedRef.current = true;
+        const pendingAttachmentRevocations = pendingAttachmentRevocationsRef.current;
+        return () => {
+            mountedRef.current = false;
+            const previewUrls = new Set([
+                ...selectedAttachmentsRef.current.map((attachment) => attachment.previewUrl),
+                ...pendingAttachmentRevocations,
+            ]);
+            for (const previewUrl of previewUrls) URL.revokeObjectURL(previewUrl);
+            pendingAttachmentRevocations.clear();
+        };
     }, []);
 
     const isCreateFormDirty = ticketType !== "INCIDENT"
@@ -256,9 +271,10 @@ function LiffITTicketList(): ReactElement {
             try {
                 signature = await createITTicketCreationAttemptSignature(payload, selectedFiles);
             } catch {
-                setCreateError("อ่านรูปภาพที่เลือกไม่ได้ กรุณาเลือกรูปภาพอีกครั้ง");
+                if (mountedRef.current) setCreateError("อ่านรูปภาพที่เลือกไม่ได้ กรุณาเลือกรูปภาพอีกครั้ง");
                 return;
             }
+            if (!mountedRef.current) return;
             let attempt = createAttemptRef.current;
             if (attempt === null || attempt.signature !== signature) {
                 attempt = { signature, key: createIdempotencyKey() };
@@ -270,6 +286,7 @@ function LiffITTicketList(): ReactElement {
                 selectedFiles,
                 attempt.key,
             );
+            if (!mountedRef.current) return;
             createAttemptRef.current = null;
             resetCreateDraft();
             setCreating(false);
@@ -303,10 +320,12 @@ function LiffITTicketList(): ReactElement {
                 setRetry((value) => value + 1);
             }
         } catch (error) {
-            setCreateError(getErrorMessage(error, "ไม่สามารถสร้าง Ticket ได้ กรุณาลองอีกครั้ง"));
+            if (mountedRef.current) {
+                setCreateError(getErrorMessage(error, "ไม่สามารถสร้าง Ticket ได้ กรุณาลองอีกครั้ง"));
+            }
         } finally {
             createInFlightRef.current = false;
-            setSubmitting(false);
+            if (mountedRef.current) setSubmitting(false);
         }
     };
 
@@ -579,11 +598,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
     const validId = Number.isSafeInteger(numericId) && numericId > 0;
     const [refreshVersion, setRefreshVersion] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
-    const [ticketState, setTicketState] = useState<
-        | { readonly kind: "loaded"; readonly ticket: ITRequesterTicketDetail }
-        | { readonly kind: "error"; readonly message: string }
-        | null
-    >(null);
+    const [ticketState, setTicketState] = useState<TicketState | null>(null);
 
     useEffect(() => {
         if (!validId) return;
@@ -598,9 +613,17 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
             .catch((error: unknown) => {
                 if (controller.signal.aborted) return;
                 setRefreshing(false);
-                setTicketState({
-                    kind: "error",
-                    message: getErrorMessage(error, "ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง"),
+                const message = getErrorMessage(error, "ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง");
+                const status = error instanceof LiffApiError ? error.status : undefined;
+                const transientFailure = status === undefined
+                    || status === 408
+                    || status === 429
+                    || status >= 500;
+                setTicketState((current) => {
+                    if (current?.kind === "loaded" && transientFailure) {
+                        return { ...current, refreshError: message };
+                    }
+                    return { kind: "error", message };
                 });
             });
         return () => controller.abort();
@@ -608,6 +631,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
 
     const ticket = ticketState?.kind === "loaded" ? ticketState.ticket : null;
     const error = ticketState?.kind === "error" ? ticketState.message : null;
+    const refreshError = ticketState?.kind === "loaded" ? ticketState.refreshError ?? null : null;
 
     return (
         <main className="space-y-5 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5">
@@ -619,6 +643,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
             {!validId ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">หมายเลข Ticket ไม่ถูกต้อง</p> : null}
             {validId && ticketState === null ? (
                 <div role="status" aria-label="กำลังโหลด Ticket" className="space-y-4 rounded-xl border border-border-neutral bg-surface-raised p-5">
+                    <span className="sr-only">กำลังโหลดรายละเอียด Ticket</span>
                     <div className="h-5 w-1/3 animate-pulse motion-reduce:animate-none rounded bg-surface-subtle" />
                     <div className="h-7 w-4/5 animate-pulse motion-reduce:animate-none rounded bg-surface-subtle" />
                     <div className="h-24 animate-pulse motion-reduce:animate-none rounded bg-surface-subtle" />
@@ -631,9 +656,22 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                     <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => {
                         setRefreshing(true);
                         setRefreshVersion((value) => value + 1);
-                    }}>
+                    }} disabled={refreshing} aria-busy={refreshing}>
                         <RefreshCw aria-hidden="true" className="size-4" />
-                        โหลด Ticket อีกครั้ง
+                        {refreshing ? "กำลังโหลด Ticket…" : "โหลด Ticket อีกครั้ง"}
+                    </Button>
+                </div>
+            ) : null}
+            {ticket && refreshError && !refreshing ? (
+                <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+                    <p className="flex items-start gap-2"><CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />{refreshError}</p>
+                    <p>ยังยืนยันสถานะล่าสุดไม่ได้ จึงพักการตอบกลับไว้จนกว่าจะโหลดข้อมูลสำเร็จ</p>
+                    <Button type="button" variant="outline" className="min-h-11 w-full" onClick={() => {
+                        setRefreshing(true);
+                        setRefreshVersion((value) => value + 1);
+                    }} disabled={refreshing} aria-busy={refreshing}>
+                        <RefreshCw aria-hidden="true" className="size-4" />
+                        {refreshing ? "กำลังโหลด Ticket…" : "ลองโหลด Ticket อีกครั้ง"}
                     </Button>
                 </div>
             ) : null}
@@ -688,7 +726,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                             ticketId={ticket.id}
                             status={ticket.status}
                             refreshVersion={refreshVersion}
-                            ticketRefreshing={refreshing}
+                            ticketRefreshing={refreshing || refreshError !== null}
                             onTicketRefresh={() => {
                                 setRefreshing(true);
                                 setRefreshVersion((value) => value + 1);
