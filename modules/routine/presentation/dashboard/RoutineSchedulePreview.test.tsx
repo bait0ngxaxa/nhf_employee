@@ -106,6 +106,7 @@ describe("RoutineSchedulePreview", () => {
 
         const preview = getPreviewRegion();
         expect(getDueDates(preview)).toEqual(["2030-03-04"]);
+        expect(within(preview).getByText(/^ช่วงตัวอย่าง/)).toHaveTextContent("4 มี.ค. 2030");
         expect(preview).toHaveTextContent("วันเดิม");
         expect(preview).toHaveTextContent("ตรงกับวันเสาร์ จึงเลื่อนไปวันทำการถัดไป");
         expect(preview).toHaveTextContent("ไม่รวมวันหยุดนักขัตฤกษ์");

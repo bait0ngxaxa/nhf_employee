@@ -171,11 +171,18 @@ function createPreviewState(
                 compareCalendarDates(left.dueDate, right.dueDate)
                 || compareCalendarDates(left.originalDueDate, right.originalDueDate),
             );
+        const previewTo = upcoming.reduce(
+            (latest, occurrence) =>
+                compareCalendarDates(occurrence.dueDate, latest) > 0
+                    ? occurrence.dueDate
+                    : latest,
+            to,
+        );
 
         return {
             kind: "ready",
             from,
-            to,
+            to: previewTo,
             occurrences: upcoming.slice(0, ROUTINE_PREVIEW_LIMIT),
             totalCount: upcoming.length,
         };
