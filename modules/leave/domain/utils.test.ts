@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    getLeaveDateRangeIssue,
     getCalendarDaysAgo,
     getStartOfDay,
     getWorkingDays,
@@ -18,6 +19,15 @@ import {
 } from "./business-date";
 
 describe("leave business date utilities", () => {
+    it.each([
+        ["2031-02-30", "2031-02-30", "invalid"],
+        ["2030-05-12", "2030-05-09", "reversed"],
+        ["2030-12-31", "2031-01-02", "cross-year"],
+        ["2030-05-09", "2030-05-13", null],
+    ] as const)("identifies the current leave date-range rules", (start, end, issue) => {
+        expect(getLeaveDateRangeIssue(start, end)).toBe(issue);
+    });
+
     it("parses date-only values without using the process timezone", () => {
         expect(getBusinessDate("2026-12-31")).toEqual({
             year: 2026,

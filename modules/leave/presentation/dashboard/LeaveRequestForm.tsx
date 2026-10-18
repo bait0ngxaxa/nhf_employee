@@ -127,7 +127,7 @@ function LeaveErrorAlert({ message }: { message: string | null }) {
 }
 
 function LeaveExceptionNotice({ model }: { model: LeaveRequestFormModel }) {
-    if (!model.needsEmergencyReason && !model.needsSpecialReason) {
+    if (!model.needsEmergencyReason) {
         return null;
     }
 
@@ -136,17 +136,9 @@ function LeaveExceptionNotice({ model }: { model: LeaveRequestFormModel }) {
             <AlertCircle className="size-4" />
             <AlertTitle>รายการนี้ต้องระบุเหตุผลเพิ่มเติม</AlertTitle>
             <AlertDescription className="flex flex-col gap-1 leading-6">
-                {model.needsEmergencyReason ? (
-                    <span>
-                        ลาย้อนหลัง: ระบุเหตุผลในการลาย้อนหลัง เพื่อให้ผู้อนุมัติเห็นว่าทำไมจึงยื่นไม่ทัน
-                    </span>
-                ) : null}
-                {model.needsSpecialReason ? (
-                    <span>
-                        เกินสิทธิ์: คำขอนี้เกินสิทธิ์ {model.overQuotaDays} วัน จากคงเหลือ{" "}
-                        {model.remainingQuota} วัน
-                    </span>
-                ) : null}
+                <span>
+                    ลาย้อนหลัง: ระบุเหตุผลในการลาย้อนหลัง เพื่อให้ผู้อนุมัติเห็นว่าทำไมจึงยื่นไม่ทัน
+                </span>
             </AlertDescription>
         </Alert>
     );

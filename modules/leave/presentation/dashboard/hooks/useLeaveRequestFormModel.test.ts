@@ -84,6 +84,148 @@ describe("useLeaveRequestFormModel", () => {
         expect(result.current.needsSpecialReason).toBe(true);
     });
 
+    it("summarizes a single full working day against the selected leave quota", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [{
+                leaveType: "SICK",
+                effectiveTotalDays: 10,
+                usedDays: 2,
+                remainingDays: 8,
+            }],
+        }));
+
+        act(() => {
+            result.current.form.setValue("startDate", "2030-05-09");
+            result.current.form.setValue("endDate", "2030-05-09");
+        });
+
+        expect(result.current.selectedLeaveType).toBe("SICK");
+        expect(result.current.isDateRangeValid).toBe(true);
+        expect(result.current.requestedDays).toBe(1);
+        expect(result.current.remainingQuota).toBe(8);
+        expect(result.current.projectedRemainingQuota).toBe(7);
+    });
+
+    it.each(["MORNING", "AFTERNOON"] as const)(
+        "calculates a %s half-day using the leave duration helper",
+        (period) => {
+            const { result } = renderHook(() => useLeaveRequestFormModel({
+                onSuccess,
+                quotas: [{
+                    leaveType: "SICK",
+                    effectiveTotalDays: 10,
+                    usedDays: 2,
+                    remainingDays: 8,
+                }],
+            }));
+
+            act(() => {
+                result.current.form.setValue("startDate", "2030-05-09");
+                result.current.form.setValue("endDate", "2030-05-09");
+                result.current.form.setValue("period", period);
+            });
+
+            expect(result.current.requestedDays).toBe(0.5);
+            expect(result.current.projectedRemainingQuota).toBe(7.5);
+        },
+    );
+
+    it("counts weekdays across a weekend and handles a weekend-only range", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [{
+                leaveType: "SICK",
+                effectiveTotalDays: 10,
+                usedDays: 2,
+                remainingDays: 8,
+            }],
+        }));
+
+        act(() => {
+            result.current.switchToMultiDay();
+            result.current.form.setValue("startDate", "2030-05-09");
+            result.current.form.setValue("endDate", "2030-05-13");
+        });
+
+        expect(result.current.requestedDays).toBe(3);
+        expect(result.current.projectedRemainingQuota).toBe(5);
+
+        act(() => {
+            result.current.form.setValue("startDate", "2030-05-11");
+            result.current.form.setValue("endDate", "2030-05-12");
+        });
+
+        expect(result.current.isDateRangeValid).toBe(true);
+        expect(result.current.requestedDays).toBe(0);
+    });
+
+    it.each([
+        ["invalid", "2031-02-30", "2031-02-30"],
+        ["reversed", "2030-05-12", "2030-05-09"],
+        ["cross-year", "2030-12-31", "2031-01-02"],
+    ])("does not project a balance for a %s date range", (_issue, startDate, endDate) => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [{
+                leaveType: "SICK",
+                effectiveTotalDays: 10,
+                usedDays: 2,
+                remainingDays: 8,
+            }],
+        }));
+
+        act(() => {
+            result.current.form.setValue("startDate", startDate);
+            result.current.form.setValue("endDate", endDate);
+        });
+
+        expect(result.current.isDateRangeValid).toBe(false);
+        expect(result.current.requestedDays).toBe(0);
+        expect(result.current.projectedRemainingQuota).toBeNull();
+    });
+
+    it("updates the balance when leave type changes and keeps missing quota unknown", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [
+                {
+                    leaveType: "SICK",
+                    effectiveTotalDays: 10,
+                    usedDays: 2,
+                    remainingDays: 8,
+                },
+                {
+                    leaveType: "PERSONAL",
+                    effectiveTotalDays: 6,
+                    usedDays: 4,
+                    remainingDays: 2,
+                },
+            ],
+        }));
+
+        act(() => {
+            result.current.form.setValue("startDate", "2030-05-09");
+            result.current.form.setValue("endDate", "2030-05-09");
+        });
+        expect(result.current.remainingQuota).toBe(8);
+        expect(result.current.projectedRemainingQuota).toBe(7);
+
+        act(() => {
+            result.current.form.setValue("leaveType", "PERSONAL");
+        });
+        expect(result.current.selectedLeaveType).toBe("PERSONAL");
+        expect(result.current.remainingQuota).toBe(2);
+        expect(result.current.projectedRemainingQuota).toBe(1);
+
+        act(() => {
+            result.current.form.setValue("leaveType", "VACATION");
+        });
+        expect(result.current.remainingQuota).toBeNull();
+        expect(result.current.projectedRemainingQuota).toBeNull();
+        expect(result.current.overQuotaDays).toBe(0);
+    });
+
     it("requires a special reason when the year starts over quota", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({
             onSuccess,

@@ -1,11 +1,10 @@
 import * as z from "zod";
 import {
   EMERGENCY_BACKDATE_LIMIT_DAYS,
+  getLeaveDateRangeIssue,
   isPastDate,
   isWithinEmergencyBackdateWindow,
 } from "@/modules/leave/domain/utils";
-import { compareBusinessDates } from "@/modules/leave/domain/business-date";
-import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
 
 const LEAVE_VALIDATION_MESSAGES = {
   crossYearRequest: "ไม่สามารถลาข้ามปีได้ กรุณาแยกคำขอเป็นคนละปี",
@@ -41,12 +40,12 @@ export const leaveRequestSchema = z.object({
   emergencyReason: optionalLongTextSchema(LEAVE_VALIDATION_MESSAGES.emergencyReasonRequired),
   specialReason: optionalLongTextSchema("กรุณาระบุเหตุผลพิเศษอย่างน้อย 5 ตัวอักษร"),
 }).refine((data) => {
-    return compareBusinessDates(data.endDate, data.startDate) >= 0;
+    return getLeaveDateRangeIssue(data.startDate, data.endDate) !== "reversed";
 }, {
     message: "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น",
     path: ["endDate"]
 }).refine((data) => {
-    return getLeaveYearFromDateValue(data.startDate) === getLeaveYearFromDateValue(data.endDate);
+    return getLeaveDateRangeIssue(data.startDate, data.endDate) !== "cross-year";
 }, {
     message: LEAVE_VALIDATION_MESSAGES.crossYearRequest,
     path: ["endDate"]

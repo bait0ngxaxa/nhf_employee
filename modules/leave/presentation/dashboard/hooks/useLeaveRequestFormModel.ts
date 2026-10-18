@@ -7,9 +7,13 @@ import { submitLeaveRequest } from "../api";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { calculateAdditionalOverQuotaDays } from "../../../domain/over-quota";
 import { LeaveAttachmentValidationError, validateLeaveAttachments } from "../../../schemas/attachments";
-import { calculateLeaveDuration, isPastDate } from "../../../domain/utils";
+import {
+    calculateLeaveDuration,
+    getLeaveDateRangeIssue,
+    isPastDate,
+} from "../../../domain/utils";
 import { type LeavePeriodValue } from "../../types";
-import { compareBusinessDates, isValidDateOnly, toDateOnlyString } from "../../../domain/business-date";
+import { isValidDateOnly, toDateOnlyString } from "../../../domain/business-date";
 
 type LeaveTypeValue = LeaveRequestValues["leaveType"];
 
@@ -45,7 +49,10 @@ interface UseLeaveRequestFormModelResult {
     needsSpecialReason: boolean;
     requestedDays: number;
     overQuotaDays: number;
-    remainingQuota: number;
+    remainingQuota: number | null;
+    projectedRemainingQuota: number | null;
+    selectedLeaveType: LeaveTypeValue;
+    isDateRangeValid: boolean;
     submit: (data: LeaveRequestValues) => Promise<void>;
     addAttachments: (files: readonly File[]) => void;
     removeAttachment: (index: number) => void;
@@ -154,8 +161,13 @@ export function useLeaveRequestFormModel({
     });
 
     const quota = quotas.find((item) => item.leaveType === leaveType);
-    const remainingQuota = quota?.remainingDays ?? 0;
+    const remainingQuota = quota?.remainingDays ?? null;
+    const dateRangeIssue = getLeaveDateRangeIssue(startDateValue, endDateValue);
+    const isDateRangeValid = dateRangeIssue === null;
     const requestedDays = getRequestedDays(startDateValue, endDateValue, periodValue);
+    const projectedRemainingQuota = quota && isDateRangeValid
+        ? quota.remainingDays - requestedDays
+        : null;
     const overQuotaDays = quota
         ? calculateAdditionalOverQuotaDays(
             quota.effectiveTotalDays,
@@ -318,6 +330,9 @@ export function useLeaveRequestFormModel({
         requestedDays,
         overQuotaDays,
         remainingQuota,
+        projectedRemainingQuota,
+        selectedLeaveType: leaveType,
+        isDateRangeValid,
         submit,
         addAttachments,
         removeAttachment,
@@ -338,11 +353,7 @@ function getRequestedDays(
     endDate: string,
     period: LeavePeriodValue,
 ): number {
-    if (!isValidDateString(startDate) || !isValidDateString(endDate)) {
-        return 0;
-    }
-
-    if (compareBusinessDates(endDate, startDate) < 0) {
+    if (getLeaveDateRangeIssue(startDate, endDate) !== null) {
         return 0;
     }
 
