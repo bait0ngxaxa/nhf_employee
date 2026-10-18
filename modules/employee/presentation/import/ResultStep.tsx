@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { downloadFailedRowsCSV } from "./csv";
 import { type ImportError, type ResultStepProps } from "./types";
+import { getImportResultStatus, IMPORT_RESULT_MESSAGES } from "./import-result-status";
 
 const ERROR_PAGE_SIZE = 25;
 
@@ -45,6 +46,7 @@ export function ResultStep({
     const importedCount = importResult.success.length;
     const rejectedCount = importResult.errors.length;
     const attemptedCount = importedCount + rejectedCount;
+    const resultStatus = getImportResultStatus(importResult);
     const pageCount = Math.max(1, Math.ceil(rejectedCount / ERROR_PAGE_SIZE));
     const visibleErrors = importResult.errors.slice(
         (currentPage - 1) * ERROR_PAGE_SIZE,
@@ -65,22 +67,22 @@ export function ResultStep({
             <Card className="rounded-2xl border-border-subtle bg-surface-raised shadow-sm">
                 <CardHeader>
                     <CardTitle className="flex min-w-0 items-center gap-2 text-xl font-bold text-content-heading">
-                        {rejectedCount === 0
-                            ? <CheckCircle className="h-5 w-5 shrink-0 text-status-positive-foreground" />
-                            : <AlertTriangle className="h-5 w-5 shrink-0 text-status-error-icon" />}
+                        {resultStatus === "complete" ? (
+                            <CheckCircle className="h-5 w-5 shrink-0 text-status-positive-foreground" />
+                        ) : resultStatus === "failed" ? (
+                            <XCircle className="h-5 w-5 shrink-0 text-status-error-icon" />
+                        ) : (
+                            <AlertTriangle className="h-5 w-5 shrink-0 text-status-warning-foreground" />
+                        )}
                         <span>
-                            {isRetryAttempt
-                                ? "ผลการนำเข้าเฉพาะแถวที่แก้ไข"
-                                : rejectedCount === 0
-                                    ? "นำเข้าข้อมูลสำเร็จ"
-                                    : "นำเข้าสำเร็จบางรายการ"}
+                            {IMPORT_RESULT_MESSAGES[resultStatus]}
                         </span>
                     </CardTitle>
                     <CardDescription className="text-sm leading-6 text-content-secondary [overflow-wrap:anywhere]">
                         {isRetryAttempt
-                            ? "ผลรอบนี้นับเฉพาะแถวที่ไม่สำเร็จจากครั้งก่อน จำนวน "
+                            ? "ผลรอบนี้เฉพาะ "
                                 + attemptedCount.toLocaleString("th-TH")
-                                + " รายการ"
+                                + " แถวที่แก้ไขจากครั้งก่อน"
                             : "ผลการตรวจรอบนี้ทั้งหมด "
                                 + attemptedCount.toLocaleString("th-TH")
                                 + " รายการ"}

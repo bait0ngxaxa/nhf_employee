@@ -41,6 +41,7 @@ describe("Employee import results", () => {
             />,
         );
 
+        expect(screen.getByText("นำเข้าข้อมูลไม่สำเร็จ")).toBeInTheDocument();
         expect(screen.getByText("แถว CSV ที่ 2")).toBeInTheDocument();
         expect(screen.getByText("employee0@thainhf.org")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: /หน้าถัดไป/ }));

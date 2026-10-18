@@ -11,6 +11,7 @@ import { validateCSVFile } from "@/lib/helpers/file-validation";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { getImportResultStatus, IMPORT_RESULT_MESSAGES } from "./import-result-status";
 
 const MAX_CSV_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 1000;
@@ -106,19 +107,26 @@ export function useImportCSV({
 
             if (response.success) {
                 const result = response.data.result;
+                const resultStatus = getImportResultStatus(result);
                 setImportResult(result);
                 setStep("result");
-                toast.success(
-                    result.errors.length > 0 ? "นำเข้าสำเร็จบางรายการ" : "นำเข้าข้อมูลสำเร็จ",
-                    {
-                        description: "สำเร็จ "
-                            + result.success.length.toLocaleString("th-TH")
-                            + " รายการ · ไม่สำเร็จ "
-                            + result.errors.length.toLocaleString("th-TH")
-                            + " รายการ",
-                    },
-                );
-                onSuccess?.();
+                const toastOptions = {
+                    description: "สำเร็จ "
+                        + result.success.length.toLocaleString("th-TH")
+                        + " รายการ · ไม่สำเร็จ "
+                        + result.errors.length.toLocaleString("th-TH")
+                        + " รายการ",
+                };
+
+                if (resultStatus === "complete") {
+                    toast.success(IMPORT_RESULT_MESSAGES[resultStatus], toastOptions);
+                } else if (resultStatus === "partial" || resultStatus === "empty") {
+                    toast.warning(IMPORT_RESULT_MESSAGES[resultStatus], toastOptions);
+                } else {
+                    toast.error(IMPORT_RESULT_MESSAGES[resultStatus], toastOptions);
+                }
+
+                if (result.success.length > 0) onSuccess?.();
             } else {
                 const errorMsg = response.error || "เกิดข้อผิดพลาดในการนำเข้าข้อมูล";
                 setError(errorMsg);

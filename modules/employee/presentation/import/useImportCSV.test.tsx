@@ -14,6 +14,7 @@ vi.mock("@/lib/client/api-client", () => ({
 vi.mock("sonner", () => ({
     toast: {
         success: vi.fn(),
+        warning: vi.fn(),
         error: vi.fn(),
     },
 }));
@@ -21,6 +22,7 @@ vi.mock("sonner", () => ({
 import { ImportEmployeeCSV } from "./ImportEmployeeCSV";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { ImportResult } from "./types";
+import { toast } from "sonner";
 
 type ImportResponse = {
     success: boolean;
@@ -53,7 +55,12 @@ function createEmployeeCSV(rows: string[]): string {
     ].join("\n");
 }
 
-function createSuccessfulResult(success: ImportResult["success"] = []): ImportResponse {
+function createSuccessfulResult(success: ImportResult["success"] = [{
+    firstName: "สมชาย",
+    lastName: "ใจดี",
+    position: "เจ้าหน้าที่",
+    department: "ADMIN",
+}]): ImportResponse {
     return {
         success: true,
         data: {
@@ -67,6 +74,9 @@ function createSuccessfulResult(success: ImportResult["success"] = []): ImportRe
 
 beforeEach(() => {
     apiPostMock.mockReset();
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.warning).mockClear();
+    vi.mocked(toast.error).mockClear();
 });
 
 describe("Employee CSV import limits", () => {
@@ -216,6 +226,9 @@ describe("Employee CSV import workflow", () => {
         await screen.findByText("ตรวจสอบข้อมูลก่อนนำเข้า");
         fireEvent.click(screen.getByRole("button", { name: "นำเข้าข้อมูล 2 แถว" }));
         expect(await screen.findByText("นำเข้าสำเร็จบางรายการ")).toBeInTheDocument();
+        expect(toast.warning).toHaveBeenCalledWith("นำเข้าสำเร็จบางรายการ", {
+            description: "สำเร็จ 1 รายการ · ไม่สำเร็จ 1 รายการ",
+        });
         expect(screen.getByText("แถว CSV ที่ 3")).toBeInTheDocument();
         expect(screen.getByText("duplicate@thainhf.org")).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", {
@@ -250,8 +263,47 @@ describe("Employee CSV import workflow", () => {
                 ],
             },
         );
-        expect(await screen.findByText("ผลการนำเข้าเฉพาะแถวที่แก้ไข")).toBeInTheDocument();
+        expect(await screen.findByText("นำเข้าข้อมูลสำเร็จ")).toBeInTheDocument();
         expect(screen.getByText("รายการที่นำเข้าสำเร็จในครั้งก่อนจะไม่ถูกส่งซ้ำ")).toBeInTheDocument();
+    });
+
+    it("reports a zero-success import as a complete failure", async () => {
+        const onSuccess = vi.fn();
+        apiPostMock.mockResolvedValue({
+            success: true,
+            data: {
+                result: {
+                    success: [],
+                    errors: [{
+                        row: 2,
+                        data: {
+                            firstName: "สมชาย",
+                            lastName: "ใจดี",
+                            email: "somchai@thainhf.org",
+                            position: "เจ้าหน้าที่",
+                            department: "ADMIN",
+                        },
+                        error: "อีเมลนี้ถูกใช้งานแล้ว",
+                    }],
+                },
+            },
+        });
+        render(<ImportEmployeeCSV onSuccess={onSuccess} />);
+        selectFile(createTextFile(createEmployeeCSV([
+            "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,somchai@thainhf.org",
+        ])));
+
+        await screen.findByText("ตรวจสอบข้อมูลก่อนนำเข้า");
+        fireEvent.click(screen.getByRole("button", { name: "นำเข้าข้อมูล 1 แถว" }));
+
+        expect(await screen.findByText("นำเข้าข้อมูลไม่สำเร็จ")).toBeInTheDocument();
+        expect(screen.queryByText("นำเข้าสำเร็จบางรายการ")).not.toBeInTheDocument();
+        expect(toast.error).toHaveBeenCalledWith("นำเข้าข้อมูลไม่สำเร็จ", {
+            description: "สำเร็จ 0 รายการ · ไม่สำเร็จ 1 รายการ",
+        });
+        expect(toast.success).not.toHaveBeenCalled();
+        expect(toast.warning).not.toHaveBeenCalled();
+        expect(onSuccess).not.toHaveBeenCalled();
     });
 
     it("prevents duplicate POST requests while a submission is pending", async () => {
