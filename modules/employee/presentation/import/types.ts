@@ -31,16 +31,30 @@ export interface ImportResult {
     errors: ImportError[];
 }
 
+export interface CSVEmployeeValidationIssue {
+    field: Exclude<keyof CSVEmployee, "sourceRow">;
+    message: string;
+}
+
+export interface CSVEmployeeRowValidation {
+    index: number;
+    sourceRow: number;
+    issues: CSVEmployeeValidationIssue[];
+}
+
 export interface UseImportCSVReturn {
     step: ImportStep;
     parsedData: CSVEmployee[];
     importResult: ImportResult | null;
+    isRetryAttempt: boolean;
     isLoading: boolean;
     error: string;
     previewError: string;
     fileInputRef: RefObject<HTMLInputElement | null>;
     handleFileSelect: (event: ChangeEvent<HTMLInputElement>) => void;
     handleImport: () => Promise<void>;
+    updateEmployee: (index: number, employee: CSVEmployee) => void;
+    retryFailedRows: () => void;
     resetUpload: () => void;
     downloadSample: () => void;
 }
@@ -69,12 +83,15 @@ export interface PreviewStepProps {
     parsedData: CSVEmployee[];
     error: string;
     isLoading: boolean;
+    onUpdateEmployee: (index: number, employee: CSVEmployee) => void;
     onResetUpload: () => void;
     onImport: () => Promise<void>;
 }
 
 export interface ResultStepProps {
     importResult: ImportResult;
+    isRetryAttempt: boolean;
     onResetUpload: () => void;
+    onRetryFailedRows: () => void;
     onBack?: () => void;
 }

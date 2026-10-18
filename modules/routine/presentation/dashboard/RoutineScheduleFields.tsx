@@ -19,6 +19,7 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { getRoutineFieldErrorId } from "./focus-invalid-field";
+import { RoutineSchedulePreview } from "./RoutineSchedulePreview";
 
 import { ROUTINE_SCHEDULE_LABELS } from "./labels";
 
@@ -318,6 +319,13 @@ export function RoutineScheduleFields({
                     <div className="pt-1">{contractBody}</div>
                 </div>
             )}
+            <RoutineSchedulePreview
+                scheduleType={scheduleType}
+                scheduleConfig={scheduleConfig}
+                businessDayPolicy={businessDayPolicy}
+                contractStartDate={contractStartDate}
+                contractEndDate={contractEndDate}
+            />
             {businessDayPolicy !== "NONE" ? (
                 <p className="text-sm leading-6 text-status-warning-foreground">
                     ระยะนี้เลื่อนเฉพาะเสาร์–อาทิตย์ ยังไม่รวมวันหยุดนักขัตฤกษ์

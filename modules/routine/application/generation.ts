@@ -9,6 +9,7 @@ import {
     compareCalendarDates,
     endOfMonth,
     getRoutineGenerationWindow,
+    isRoutineOccurrenceWithinContract,
     ROUTINE_MAX_REMINDER_DAYS_BEFORE,
     ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
     ROUTINE_RECONCILIATION_MAX_PAST_DAYS,
@@ -161,26 +162,6 @@ async function refreshExistingRoutineOccurrence(
             role: assignee.role,
         })),
     });
-}
-
-function isWithinRoutineContract(
-    occurrence: { dueDate: CalendarDate },
-    contractStartDate: CalendarDate | null,
-    contractEndDate: CalendarDate | null,
-): boolean {
-    if (
-        contractStartDate
-        && compareCalendarDates(occurrence.dueDate, contractStartDate) < 0
-    ) {
-        return false;
-    }
-    if (
-        contractEndDate
-        && compareCalendarDates(occurrence.dueDate, contractEndDate) > 0
-    ) {
-        return false;
-    }
-    return true;
 }
 
 async function deleteStaleFutureOccurrences(
@@ -362,7 +343,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         : null;
 
     const generationCandidates = scheduledOccurrences.filter((occurrence) =>
-        isWithinRoutineContract(occurrence, contractStartDate, contractEndDate),
+        isRoutineOccurrenceWithinContract(occurrence, contractStartDate, contractEndDate),
     );
 
     await assertFutureOccurrencesWithinSafetyBounds(
@@ -429,7 +410,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         },
         task.businessDayPolicy,
     ).filter((occurrence) =>
-        isWithinRoutineContract(occurrence, contractStartDate, contractEndDate),
+        isRoutineOccurrenceWithinContract(occurrence, contractStartDate, contractEndDate),
     );
     const reconciliationCandidatesByPeriodKey = new Map(
         reconciliationValidityCandidates.map((occurrence) => [

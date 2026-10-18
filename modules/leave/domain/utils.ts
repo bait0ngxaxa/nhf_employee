@@ -3,15 +3,35 @@ import {
     compareBusinessDates,
     getBusinessDayOfWeek,
     getCalendarDaysDifference,
+    isValidDateOnly,
     toUtcDate,
     type BusinessDateInput,
 } from "@/modules/leave/domain/business-date";
+import { getLeaveYearFromDateValue } from "./quota-year";
 
 export type LeavePeriodValue = "FULL_DAY" | "MORNING" | "AFTERNOON";
 
 export const EMERGENCY_BACKDATE_LIMIT_DAYS = 7;
 
 export type { BusinessDateInput } from "@/modules/leave/domain/business-date";
+
+export type LeaveDateRangeIssue = "invalid" | "reversed" | "cross-year";
+
+export function getLeaveDateRangeIssue(
+    startDate: string,
+    endDate: string,
+): LeaveDateRangeIssue | null {
+    if (!isValidDateOnly(startDate) || !isValidDateOnly(endDate)) {
+        return "invalid";
+    }
+    if (compareBusinessDates(endDate, startDate) < 0) {
+        return "reversed";
+    }
+    if (getLeaveYearFromDateValue(startDate) !== getLeaveYearFromDateValue(endDate)) {
+        return "cross-year";
+    }
+    return null;
+}
 
 export function getStartOfDay(date: BusinessDateInput): Date {
     return toUtcDate(date);

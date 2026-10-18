@@ -103,30 +103,15 @@ export function LiffLeaveRequestForm({
                                         </AlertDescription>
                                     </Alert>
                                 ) : null}
-                                {model.needsEmergencyReason || model.needsSpecialReason ? (
+                                {model.needsEmergencyReason ? (
                                     <Alert className="border-status-warning-border bg-status-warning-surface text-status-warning-heading [&>svg]:text-status-warning-foreground">
                                         <AlertCircle className="size-4" aria-hidden="true" />
                                         <AlertTitle>ต้องระบุข้อมูลประกอบเพิ่มเติม</AlertTitle>
                                         <AlertDescription className="space-y-1 leading-6">
-                                            {model.needsEmergencyReason ? (
-                                                <p>เป็นการลาย้อนหลัง กรุณาระบุเหตุผลให้ผู้อนุมัติพิจารณา</p>
-                                            ) : null}
-                                            {model.needsSpecialReason ? (
-                                                <p>
-                                                    เกินสิทธิ์ {model.overQuotaDays} วัน จากยอดคงเหลือ {model.remainingQuota} วัน
-                                                </p>
-                                            ) : null}
+                                            <p>เป็นการลาย้อนหลัง กรุณาระบุเหตุผลให้ผู้อนุมัติพิจารณา</p>
                                         </AlertDescription>
                                     </Alert>
                                 ) : null}
-                                <div className="border-y border-module-leave-border px-1 py-3">
-                                    <p className="text-xs font-semibold text-module-leave-badge-foreground">
-                                        ระยะเวลาที่ขอ
-                                    </p>
-                                    <p className="mt-1 tabular-nums text-xl font-bold text-content-heading">
-                                        {model.requestedDays} วัน
-                                    </p>
-                                </div>
                                 <LeaveDialogFields model={model} />
                             </div>
                         </SheetScrollArea>

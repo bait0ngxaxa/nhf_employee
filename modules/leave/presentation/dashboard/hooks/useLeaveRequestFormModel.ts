@@ -7,13 +7,18 @@ import { submitLeaveRequest } from "../api";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { calculateAdditionalOverQuotaDays } from "../../../domain/over-quota";
 import { LeaveAttachmentValidationError, validateLeaveAttachments } from "../../../schemas/attachments";
-import { calculateLeaveDuration, isPastDate } from "../../../domain/utils";
+import {
+    calculateLeaveDuration,
+    getLeaveDateRangeIssue,
+    isPastDate,
+} from "../../../domain/utils";
 import { type LeavePeriodValue } from "../../types";
-import { compareBusinessDates, isValidDateOnly, toDateOnlyString } from "../../../domain/business-date";
+import { isValidDateOnly, toDateOnlyString } from "../../../domain/business-date";
 
 type LeaveTypeValue = LeaveRequestValues["leaveType"];
 
 interface LeaveQuotaSnapshot {
+    year: number;
     leaveType: LeaveTypeValue;
     effectiveTotalDays: number;
     usedDays: number;
@@ -45,7 +50,10 @@ interface UseLeaveRequestFormModelResult {
     needsSpecialReason: boolean;
     requestedDays: number;
     overQuotaDays: number;
-    remainingQuota: number;
+    remainingQuota: number | null;
+    projectedRemainingQuota: number | null;
+    selectedLeaveType: LeaveTypeValue;
+    isDateRangeValid: boolean;
     submit: (data: LeaveRequestValues) => Promise<void>;
     addAttachments: (files: readonly File[]) => void;
     removeAttachment: (index: number) => void;
@@ -153,9 +161,14 @@ export function useLeaveRequestFormModel({
         name: "period",
     });
 
-    const quota = quotas.find((item) => item.leaveType === leaveType);
-    const remainingQuota = quota?.remainingDays ?? 0;
+    const quota = findQuotaForDate(quotas, leaveType, startDateValue);
+    const remainingQuota = quota?.remainingDays ?? null;
+    const dateRangeIssue = getLeaveDateRangeIssue(startDateValue, endDateValue);
+    const isDateRangeValid = dateRangeIssue === null;
     const requestedDays = getRequestedDays(startDateValue, endDateValue, periodValue);
+    const projectedRemainingQuota = quota && isDateRangeValid
+        ? quota.remainingDays - requestedDays
+        : null;
     const overQuotaDays = quota
         ? calculateAdditionalOverQuotaDays(
             quota.effectiveTotalDays,
@@ -230,7 +243,7 @@ export function useLeaveRequestFormModel({
             return;
         }
 
-        const submitQuota = quotas.find((item) => item.leaveType === data.leaveType);
+        const submitQuota = findQuotaForDate(quotas, data.leaveType, data.startDate);
         const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
         const submitOverQuotaDays = submitQuota
             ? calculateAdditionalOverQuotaDays(
@@ -318,6 +331,9 @@ export function useLeaveRequestFormModel({
         requestedDays,
         overQuotaDays,
         remainingQuota,
+        projectedRemainingQuota,
+        selectedLeaveType: leaveType,
+        isDateRangeValid,
         submit,
         addAttachments,
         removeAttachment,
@@ -333,16 +349,25 @@ function isValidDateString(value: string): boolean {
     return value.length > 0 && isValidDateOnly(value);
 }
 
+function findQuotaForDate(
+    quotas: readonly LeaveQuotaSnapshot[],
+    leaveType: LeaveTypeValue,
+    startDate: string,
+): LeaveQuotaSnapshot | undefined {
+    if (!isValidDateString(startDate)) return undefined;
+
+    const leaveYear = Number(startDate.slice(0, 4));
+    return quotas.find((item) =>
+        item.leaveType === leaveType && item.year === leaveYear,
+    );
+}
+
 function getRequestedDays(
     startDate: string,
     endDate: string,
     period: LeavePeriodValue,
 ): number {
-    if (!isValidDateString(startDate) || !isValidDateString(endDate)) {
-        return 0;
-    }
-
-    if (compareBusinessDates(endDate, startDate) < 0) {
+    if (getLeaveDateRangeIssue(startDate, endDate) !== null) {
         return 0;
     }
 

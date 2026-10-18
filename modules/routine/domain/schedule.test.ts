@@ -8,6 +8,7 @@ import {
     getDefaultRoutineScheduleConfig,
     getCurrentBangkokDate,
     getRoutineGenerationWindow,
+    isRoutineOccurrenceWithinContract,
     isRoutineReminderDue,
     parseRoutineSendTime,
     ROUTINE_DEFAULT_REMINDER_TIME,
@@ -213,6 +214,30 @@ describe("NHF Routine schedule engine", () => {
                 "NONE",
             ),
         ).toEqual([]);
+    });
+
+    it("filters contracts by adjusted due date", () => {
+        expect(
+            isRoutineOccurrenceWithinContract(
+                { dueDate: "2030-05-01" },
+                "2030-05-01",
+                "2030-05-31",
+            ),
+        ).toBe(true);
+        expect(
+            isRoutineOccurrenceWithinContract(
+                { dueDate: "2030-06-01" },
+                "2030-05-01",
+                "2030-05-31",
+            ),
+        ).toBe(false);
+        expect(
+            isRoutineOccurrenceWithinContract(
+                { dueDate: "2030-04-30" },
+                "2030-05-01",
+                null,
+            ),
+        ).toBe(false);
     });
 
     it("keeps the baseline generation horizon when no reminder is active", () => {

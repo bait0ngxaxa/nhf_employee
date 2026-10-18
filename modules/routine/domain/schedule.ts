@@ -191,6 +191,26 @@ export function compareCalendarDates(
     return left < right ? -1 : 1;
 }
 
+export function isRoutineOccurrenceWithinContract(
+    occurrence: Pick<ScheduledRoutineOccurrence, "dueDate">,
+    contractStartDate: CalendarDate | null,
+    contractEndDate: CalendarDate | null,
+): boolean {
+    if (
+        contractStartDate
+        && compareCalendarDates(occurrence.dueDate, contractStartDate) < 0
+    ) {
+        return false;
+    }
+    if (
+        contractEndDate
+        && compareCalendarDates(occurrence.dueDate, contractEndDate) > 0
+    ) {
+        return false;
+    }
+    return true;
+}
+
 export function calendarDateToDate(value: CalendarDate): Date {
     dateParts(value);
     return new Date(`${value}T00:00:00.000Z`);

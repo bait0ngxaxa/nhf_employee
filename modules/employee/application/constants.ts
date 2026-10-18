@@ -8,9 +8,6 @@ export const EMPLOYEE_PAGINATION_DEFAULTS = {
     maxLimit: 100,
 } as const;
 
-export const EMPLOYEE_DEPARTMENT_CODE_MAP: Readonly<Record<string, string>> = {
-    ADMIN: "ADMIN",
-    บริหาร: "ADMIN",
-    ACADEMIC: "ACADEMIC",
-    วิชาการ: "ACADEMIC",
-};
+export {
+    EMPLOYEE_IMPORT_DEPARTMENT_CODE_MAP as EMPLOYEE_DEPARTMENT_CODE_MAP,
+} from "../domain/import-values";
