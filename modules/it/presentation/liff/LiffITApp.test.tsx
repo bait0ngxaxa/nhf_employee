@@ -21,6 +21,7 @@ vi.mock("./api", () => ({
     fetchLiffITAttachment: mocks.fetchAttachment,
 }));
 
+import { APP_ROUTES } from "@/lib/ssot/routes";
 import { LiffApiError } from "@/modules/line/client";
 import { LiffITApp } from "./LiffITApp";
 
@@ -529,6 +530,19 @@ describe("LiffITApp requester experience", () => {
         expect(await screen.findByText("ดำเนินการเสร็จสิ้น")).toBeInTheDocument();
         expect(screen.getByText("แก้ไขแล้ว")).toBeInTheDocument();
         expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
+    });
+
+    it("returns a directly opened Ticket to the stable IT list without firing a mutation", async () => {
+        render(<LiffITApp ticketId="42" />);
+        expect(await screen.findByRole("heading", { name: TICKET.title })).toBeInTheDocument();
+
+        const backToList = screen.getByRole("link", { name: "กลับรายการ Ticket" });
+        expect(backToList).toHaveAttribute("href", APP_ROUTES.line.it);
+        backToList.addEventListener("click", (event) => event.preventDefault(), { once: true });
+        fireEvent.click(backToList);
+
+        expect(mocks.createTicket).not.toHaveBeenCalled();
+        expect(mocks.postComment).not.toHaveBeenCalled();
     });
 
     it.each([401, 403, 404, 409] as const)(

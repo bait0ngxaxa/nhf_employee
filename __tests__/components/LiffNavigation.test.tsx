@@ -99,4 +99,51 @@ describe("LIFF application shell navigation", () => {
         );
         expect(within(screen.getByRole("banner")).getByText(section)).toBeInTheDocument();
     });
+
+    it("tracks back and forward pathname changes across LIFF module roots", () => {
+        usePathnameMock.mockReturnValue(APP_ROUTES.line.routine);
+        const view = render(
+            <LiffAppShell>
+                <main>Module content</main>
+            </LiffAppShell>,
+        );
+        const navigation = screen.getByRole("navigation", { name: "เมนูบริการ NHFapp ผ่าน LINE" });
+
+        expect(within(navigation).getByRole("link", { name: "งานประจำ" })).toHaveAttribute("aria-current", "page");
+        usePathnameMock.mockReturnValue(APP_ROUTES.line.itTicket(42));
+        view.rerender(
+            <LiffAppShell>
+                <main>Module content</main>
+            </LiffAppShell>,
+        );
+        expect(within(navigation).getByRole("link", { name: "IT" })).toHaveAttribute("aria-current", "page");
+        expect(within(navigation).getByRole("link", { name: "งานประจำ" })).not.toHaveAttribute("aria-current");
+
+        usePathnameMock.mockReturnValue(APP_ROUTES.line.routine);
+        view.rerender(
+            <LiffAppShell>
+                <main>Module content</main>
+            </LiffAppShell>,
+        );
+        expect(within(navigation).getByRole("link", { name: "งานประจำ" })).toHaveAttribute("aria-current", "page");
+        expect(within(navigation).getAllByRole("link")).toHaveLength(5);
+    });
+
+    it("renders an unknown LIFF path without selecting an unrelated module", () => {
+        usePathnameMock.mockReturnValue(`${APP_ROUTES.line.root}/invalid`);
+
+        render(
+            <LiffAppShell>
+                <main>Not found</main>
+            </LiffAppShell>,
+        );
+
+        const navigation = screen.getByRole("navigation", { name: "เมนูบริการ NHFapp ผ่าน LINE" });
+        expect(within(navigation).getAllByRole("link")).toHaveLength(5);
+        for (const link of within(navigation).getAllByRole("link")) {
+            expect(link).not.toHaveAttribute("aria-current");
+        }
+        expect(within(screen.getByRole("banner")).getByText("บริการของฉัน")).toBeInTheDocument();
+        expect(screen.getByText("Not found")).toBeInTheDocument();
+    });
 });
