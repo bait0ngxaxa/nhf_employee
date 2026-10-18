@@ -3,10 +3,14 @@ import { listDepartmentReferences } from "@/modules/department";
 import { getEmployeeDisplayName } from "../domain/identity";
 import { parseEmployeeImportStatus } from "../domain/import-status";
 import {
+    getEmployeeImportDepartmentCode,
+    normalizeEmployeeImportEmail,
+    normalizeEmployeeImportName,
+} from "../domain/import-values";
+import {
     createImportedEmployee,
     loadExistingEmployeeImportIdentities,
 } from "../infrastructure/persistence/employee-import";
-import { EMPLOYEE_DEPARTMENT_CODE_MAP } from "./constants";
 import type { CsvImportEmployee, EmployeeImportResult } from "./types";
 
 function assertRequiredFields(
@@ -18,18 +22,6 @@ function assertRequiredFields(
             throw new Error(`ข้อมูล ${field} เป็นข้อมูลที่จำเป็น`);
         }
     }
-}
-
-function normalizeImportEmail(email: string | undefined): string | null {
-    if (!email || email.trim() === "" || email.trim() === "-") return null;
-    const normalized = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-        throw new Error("รูปแบบอีเมลไม่ถูกต้อง");
-    }
-    if (!normalized.endsWith("@thainhf.org")) {
-        throw new Error("กรุณาใช้อีเมลองค์กร (@thainhf.org) เท่านั้น");
-    }
-    return normalized;
 }
 
 function generateTempEmail(): string {
@@ -47,24 +39,25 @@ export async function importEmployeesFromCsvRows(
         .filter((employee) => employee.email && !employee.email.includes("@temp.local"))
         .map((employee) => employee.email.toLowerCase()));
     const existingNames = new Set(existingEmployees.map((employee) =>
-        `${employee.firstName.trim().toLowerCase()} ${employee.lastName.trim().toLowerCase()}`));
+        normalizeEmployeeImportName(employee.firstName, employee.lastName)));
 
     for (let index = 0; index < employees.length; index += 1) {
         const employeeData = employees[index];
         const rowNumber = employeeData.sourceRow ?? index + 1;
         try {
             assertRequiredFields(employeeData);
-            const normalizedEmail = normalizeImportEmail(employeeData.email);
+            const normalizedEmail = normalizeEmployeeImportEmail(employeeData.email);
             if (normalizedEmail && existingEmails.has(normalizedEmail)) {
                 throw new Error("อีเมลนี้ถูกใช้งานแล้ว");
             }
-            const normalizedFullName = `${employeeData.firstName.trim().toLowerCase()} ${employeeData.lastName.trim().toLowerCase()}`;
+            const normalizedFullName = normalizeEmployeeImportName(
+                employeeData.firstName,
+                employeeData.lastName,
+            );
             if (existingNames.has(normalizedFullName)) {
                 throw new Error(`พนักงานชื่อ "${getEmployeeDisplayName(employeeData)}" มีอยู่ในระบบแล้ว`);
             }
-            const departmentKey = employeeData.department.toUpperCase();
-            const departmentCode = EMPLOYEE_DEPARTMENT_CODE_MAP[departmentKey]
-                ?? EMPLOYEE_DEPARTMENT_CODE_MAP[employeeData.department];
+            const departmentCode = getEmployeeImportDepartmentCode(employeeData.department);
             const departmentId = departmentCode ? departmentMap.get(departmentCode) : undefined;
             if (departmentId === undefined) {
                 throw new Error("รหัสแผนกไม่ถูกต้อง ใช้ได้เฉพาะ ADMIN (บริหาร) หรือ ACADEMIC (วิชาการ)");

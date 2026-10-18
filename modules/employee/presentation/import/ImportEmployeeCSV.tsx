@@ -16,12 +16,15 @@ export function ImportEmployeeCSV({
         step,
         parsedData,
         importResult,
+        isRetryAttempt,
         isLoading,
         error,
         previewError,
         fileInputRef,
         handleFileSelect,
         handleImport,
+        updateEmployee,
+        retryFailedRows,
         resetUpload,
         downloadSample,
     } = useImportCSV({ onSuccess });
@@ -46,6 +49,7 @@ export function ImportEmployeeCSV({
                         parsedData={parsedData}
                         error={error}
                         isLoading={isLoading}
+                        onUpdateEmployee={updateEmployee}
                         onResetUpload={resetUpload}
                         onImport={handleImport}
                     />
@@ -54,7 +58,9 @@ export function ImportEmployeeCSV({
                 {step === "result" && importResult && (
                     <ResultStep
                         importResult={importResult}
+                        isRetryAttempt={isRetryAttempt}
                         onResetUpload={resetUpload}
+                        onRetryFailedRows={retryFailedRows}
                         onBack={onBack}
                     />
                 )}
