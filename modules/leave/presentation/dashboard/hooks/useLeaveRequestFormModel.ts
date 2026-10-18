@@ -18,6 +18,7 @@ import { isValidDateOnly, toDateOnlyString } from "../../../domain/business-date
 type LeaveTypeValue = LeaveRequestValues["leaveType"];
 
 interface LeaveQuotaSnapshot {
+    year: number;
     leaveType: LeaveTypeValue;
     effectiveTotalDays: number;
     usedDays: number;
@@ -160,7 +161,7 @@ export function useLeaveRequestFormModel({
         name: "period",
     });
 
-    const quota = quotas.find((item) => item.leaveType === leaveType);
+    const quota = findQuotaForDate(quotas, leaveType, startDateValue);
     const remainingQuota = quota?.remainingDays ?? null;
     const dateRangeIssue = getLeaveDateRangeIssue(startDateValue, endDateValue);
     const isDateRangeValid = dateRangeIssue === null;
@@ -242,7 +243,7 @@ export function useLeaveRequestFormModel({
             return;
         }
 
-        const submitQuota = quotas.find((item) => item.leaveType === data.leaveType);
+        const submitQuota = findQuotaForDate(quotas, data.leaveType, data.startDate);
         const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
         const submitOverQuotaDays = submitQuota
             ? calculateAdditionalOverQuotaDays(
@@ -346,6 +347,19 @@ export function useLeaveRequestFormModel({
 
 function isValidDateString(value: string): boolean {
     return value.length > 0 && isValidDateOnly(value);
+}
+
+function findQuotaForDate(
+    quotas: readonly LeaveQuotaSnapshot[],
+    leaveType: LeaveTypeValue,
+    startDate: string,
+): LeaveQuotaSnapshot | undefined {
+    if (!isValidDateString(startDate)) return undefined;
+
+    const leaveYear = Number(startDate.slice(0, 4));
+    return quotas.find((item) =>
+        item.leaveType === leaveType && item.year === leaveYear,
+    );
 }
 
 function getRequestedDays(

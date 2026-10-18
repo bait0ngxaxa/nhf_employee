@@ -37,7 +37,7 @@ describe("Leave request summary", () => {
         );
 
         const summary = screen.getByRole("region", { name: "สรุปคำขอลา" });
-        expect(summary).toHaveTextContent("ยังไม่มีข้อมูลยอดคงเหลือสำหรับประเภทนี้");
+        expect(summary).toHaveTextContent("ไม่ทราบยอดคงเหลือของปีที่เลือก");
         expect(summary).toHaveTextContent("ยังคำนวณไม่ได้");
         expect(summary).not.toHaveTextContent("0 วัน");
     });

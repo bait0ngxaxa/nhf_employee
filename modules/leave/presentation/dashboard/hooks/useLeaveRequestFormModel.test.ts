@@ -65,6 +65,7 @@ describe("useLeaveRequestFormModel", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({
             onSuccess,
             quotas: [{
+                year: 2030,
                 leaveType: "PERSONAL",
                 effectiveTotalDays: 15,
                 usedDays: 14,
@@ -88,6 +89,7 @@ describe("useLeaveRequestFormModel", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({
             onSuccess,
             quotas: [{
+                year: 2030,
                 leaveType: "SICK",
                 effectiveTotalDays: 10,
                 usedDays: 2,
@@ -113,6 +115,7 @@ describe("useLeaveRequestFormModel", () => {
             const { result } = renderHook(() => useLeaveRequestFormModel({
                 onSuccess,
                 quotas: [{
+                    year: 2030,
                     leaveType: "SICK",
                     effectiveTotalDays: 10,
                     usedDays: 2,
@@ -135,6 +138,7 @@ describe("useLeaveRequestFormModel", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({
             onSuccess,
             quotas: [{
+                year: 2030,
                 leaveType: "SICK",
                 effectiveTotalDays: 10,
                 usedDays: 2,
@@ -168,6 +172,7 @@ describe("useLeaveRequestFormModel", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({
             onSuccess,
             quotas: [{
+                year: 2030,
                 leaveType: "SICK",
                 effectiveTotalDays: 10,
                 usedDays: 2,
@@ -190,12 +195,14 @@ describe("useLeaveRequestFormModel", () => {
             onSuccess,
             quotas: [
                 {
+                    year: 2030,
                     leaveType: "SICK",
                     effectiveTotalDays: 10,
                     usedDays: 2,
                     remainingDays: 8,
                 },
                 {
+                    year: 2030,
                     leaveType: "PERSONAL",
                     effectiveTotalDays: 6,
                     usedDays: 4,
@@ -230,6 +237,7 @@ describe("useLeaveRequestFormModel", () => {
         const { result } = renderHook(() => useLeaveRequestFormModel({
             onSuccess,
             quotas: [{
+                year: 2030,
                 leaveType: "PERSONAL",
                 effectiveTotalDays: -2,
                 usedDays: 0,
@@ -245,6 +253,61 @@ describe("useLeaveRequestFormModel", () => {
 
         expect(result.current.overQuotaDays).toBe(1);
         expect(result.current.needsSpecialReason).toBe(true);
+    });
+
+    it("does not use a quota from another year for the preview", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [{
+                year: 2026,
+                leaveType: "VACATION",
+                effectiveTotalDays: 10,
+                usedDays: 2,
+                remainingDays: 8,
+            }],
+        }));
+
+        act(() => {
+            result.current.form.setValue("leaveType", "VACATION");
+            result.current.form.setValue("startDate", "2027-01-05");
+            result.current.form.setValue("endDate", "2027-01-05");
+        });
+
+        expect(result.current.remainingQuota).toBeNull();
+        expect(result.current.projectedRemainingQuota).toBeNull();
+        expect(result.current.overQuotaDays).toBe(0);
+        expect(result.current.needsSpecialReason).toBe(false);
+    });
+
+    it("uses the quota that matches the selected leave year", () => {
+        const { result } = renderHook(() => useLeaveRequestFormModel({
+            onSuccess,
+            quotas: [
+                {
+                    year: 2026,
+                    leaveType: "VACATION",
+                    effectiveTotalDays: 10,
+                    usedDays: 2,
+                    remainingDays: 8,
+                },
+                {
+                    year: 2027,
+                    leaveType: "VACATION",
+                    effectiveTotalDays: 7,
+                    usedDays: 3,
+                    remainingDays: 4,
+                },
+            ],
+        }));
+
+        act(() => {
+            result.current.form.setValue("leaveType", "VACATION");
+            result.current.form.setValue("startDate", "2027-01-05");
+            result.current.form.setValue("endDate", "2027-01-05");
+        });
+
+        expect(result.current.remainingQuota).toBe(4);
+        expect(result.current.projectedRemainingQuota).toBe(3);
     });
 
     it("resets multi-day state and clears form values", () => {

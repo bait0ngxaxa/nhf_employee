@@ -86,7 +86,7 @@ export function LeaveRequestSummary({
                 <SummaryItem
                     label="ยอดคงเหลือก่อนยื่น"
                     value={remainingQuota === null
-                        ? "ยังไม่มีข้อมูลยอดคงเหลือสำหรับประเภทนี้"
+                        ? "ไม่ทราบยอดคงเหลือของปีที่เลือก"
                         : formatDays(remainingQuota)}
                 />
                 <SummaryItem
