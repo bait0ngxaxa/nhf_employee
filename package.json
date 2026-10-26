@@ -12,6 +12,7 @@
     "architecture:check": "node scripts/check-architecture.mjs",
     "db:seed": "npx prisma db seed",
     "test": "vitest run",
+    "test:it-analytics:browser": "node scripts/check-it-analytics-chart.mjs",
     "test:coverage": "vitest run --coverage",
     "test:integration:mysql": "node scripts/run-mysql-integration-tests.mjs",
     "authorization:production:preflight": "tsx scripts/authorization-production-preflight.ts",

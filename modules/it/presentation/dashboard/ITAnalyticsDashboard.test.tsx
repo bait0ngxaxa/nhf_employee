@@ -317,6 +317,8 @@ describe("IT analytics Dashboard presentation", () => {
         const chart = screen.getByRole("application");
         fireEvent.focus(chart);
         const tooltip = await screen.findByRole("tooltip");
+        expect(within(screen.getByRole("region", { name: "ตัวเลขช่วงที่เลือก" })).getByRole("tooltip"))
+            .toBe(tooltip);
         expect(tooltip).toHaveTextContent(period === "90D" ? "12 ตุลาคม 2569 – 13 ตุลาคม 2569" : "12 ตุลาคม 2569");
         expect(tooltip).toHaveTextContent("Ticket ใหม่");
         expect(tooltip).toHaveTextContent("แก้ไขแล้ว");

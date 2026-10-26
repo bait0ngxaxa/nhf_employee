@@ -21,6 +21,7 @@ export function ITAnalyticsTrendChart({ trend, period }: {
 }): ReactElement {
     const descriptionId = useId();
     const [tooltipPortal, setTooltipPortal] = useState<HTMLDivElement | null>(null);
+    const [tooltipTrigger, setTooltipTrigger] = useState<"hover" | "click">("hover");
     const buckets = buildITTrendBuckets(trend, period);
     const weekly = period === "90D";
     const createdTotal = trend.reduce((total, row) => total + row.created, 0);
@@ -61,20 +62,24 @@ export function ITAnalyticsTrendChart({ trend, period }: {
                     ยังไม่มีข้อมูลในช่วงเวลานี้
                 </p>
             ) : null}
-            {buckets.length > 0 ? <div className="relative">
-                {/* Keep the tooltip visible outside the horizontally scrolling plot. */}
-                <div ref={setTooltipPortal} className="pointer-events-none absolute inset-x-0 top-0 z-10" />
+            {buckets.length > 0 ? <div>
                 <div
                     role="region"
                     aria-label="กราฟ Ticket ใหม่และแก้ไขแล้ว เลื่อนแนวนอนเพื่อดูข้อมูลทั้งหมด"
                     aria-describedby={descriptionId}
                     tabIndex={0}
+                    onPointerDownCapture={(event) => {
+                        if (event.pointerType !== "mouse") setTooltipTrigger("click");
+                    }}
+                    onPointerMoveCapture={(event) => {
+                        if (event.pointerType === "mouse") setTooltipTrigger("hover");
+                    }}
                     className="mt-3 min-w-0 overflow-x-auto overscroll-x-contain focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ChartContainer
                         config={chartConfig}
                         className="h-80 w-full aspect-auto [&_.recharts-cartesian-axis-tick_text]:fill-content-secondary [&_.recharts-surface:focus-visible]:outline-2 [&_.recharts-surface:focus-visible]:outline-ring"
-                        style={{ minWidth: weekly ? `${Math.max(36, buckets.length * 6)}rem` : `${Math.max(20, buckets.length * 2.5)}rem` }}
+                        style={{ minWidth: `${Math.max(20, buckets.length * (weekly ? 3 : 2.5))}rem` }}
                     >
                         <BarChart accessibilityLayer data={chartData} margin={{ top: 16, right: 16, bottom: 8 }}
                             aria-label={`แนวโน้ม Ticket ใหม่และแก้ไขแล้ว${weekly ? "รายสัปดาห์" : "รายวัน"}`}
@@ -87,11 +92,11 @@ export function ITAnalyticsTrendChart({ trend, period }: {
                                 tickLine={false} axisLine={false} tickFormatter={countText} />
                             <ChartTooltip
                                 isAnimationActive={false}
+                                trigger={tooltipTrigger}
                                 portal={tooltipPortal}
-                                position={{ x: 0, y: 0 }}
                                 content={<ChartTooltipContent
                                     role="tooltip"
-                                    className="max-w-64 bg-surface-raised text-content-body"
+                                    className="w-full border-0 bg-transparent px-0 py-2 text-content-body shadow-none"
                                     labelFormatter={(label) => chartData.find((row) => row.label === label)?.fullLabel ?? label}
                                     formatter={(value, name) => <>
                                         <span className="flex-1">{name === "created" ? chartConfig.created.label : chartConfig.resolved.label}</span>
@@ -107,6 +112,12 @@ export function ITAnalyticsTrendChart({ trend, period }: {
                 <p className="mt-2 text-xs leading-5 text-content-muted">
                     เลื่อนกราฟไปด้านข้างเพื่อดูข้อมูล แตะกราฟหรือใช้ปุ่มลูกศรเพื่อดูตัวเลข
                 </p>
+                <section aria-label="ตัวเลขช่วงที่เลือก" className="mt-3 rounded-lg bg-surface-subtle px-3 py-2">
+                    <h3 className="text-sm font-medium text-content-heading">ตัวเลขช่วงที่เลือก</h3>
+                    <p className="text-xs leading-5 text-content-secondary">ชี้หรือแตะแท่งกราฟ หรือใช้ปุ่มลูกศรเพื่อเลือกช่วง</p>
+                    {/* The portal uses normal document flow, outside the scrollable plot. */}
+                    <div ref={setTooltipPortal} aria-live="polite" aria-atomic="true" className="min-h-20" />
+                </section>
             </div> : null}
             <details className="mt-2 border-t border-border-neutral">
                 <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-sky-800 underline underline-offset-4 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300">
