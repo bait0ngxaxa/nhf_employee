@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 
 import { IT_TICKET_STATUS_LABELS, IT_TICKET_TYPE_LABELS } from "../../contracts";
 import { ITAnalyticsDashboard } from "./ITAnalyticsDashboard";
+import { ITAnalyticsTrendChart } from "./ITAnalyticsTrendChart";
 
 interface MockResponse {
     readonly ok: boolean;
@@ -95,6 +96,14 @@ describe("IT analytics Dashboard presentation", () => {
             value: vi.fn(),
         });
         vi.stubGlobal("fetch", fetchMock);
+        vi.stubGlobal("ResizeObserver", class {
+            constructor(private readonly callback: ResizeObserverCallback) {}
+            observe(): void {
+                this.callback([{ contentRect: { width: 1200, height: 320 } } as ResizeObserverEntry], this);
+            }
+            unobserve(): void {}
+            disconnect(): void {}
+        });
     });
 
     afterEach(() => {
@@ -127,8 +136,12 @@ describe("IT analytics Dashboard presentation", () => {
             name: "กราฟ Ticket ใหม่และแก้ไขแล้ว เลื่อนแนวนอนเพื่อดูข้อมูลทั้งหมด",
         });
         expect(chartRegion).toHaveAttribute("tabindex", "0");
-        expect(within(chartRegion).getByRole("img", { name: /แนวโน้ม Ticket ใหม่และแก้ไขแล้วรายวัน/ }))
+        expect(within(chartRegion).getByRole("application", { name: /แนวโน้ม Ticket ใหม่และแก้ไขแล้วรายวัน/ }))
             .toBeInTheDocument();
+        const legend = screen.getByRole("list", { name: "คำอธิบายกราฟ" });
+        expect(legend).toHaveTextContent("Ticket ใหม่ 6");
+        expect(legend).toHaveTextContent("แก้ไขแล้ว 2");
+        expect(chartRegion).toHaveAccessibleDescription(/รายละเอียดตัวเลขทุกวัน/);
         expect(screen.getByText("ดูตัวเลขรายวัน")).toBeInTheDocument();
         expect(fetchMock).toHaveBeenCalledWith(
             "/api/it/analytics?period=30D",
@@ -244,6 +257,8 @@ describe("IT analytics Dashboard presentation", () => {
         await screen.findByRole("region", { name: "ภาพรวม" });
 
         await choosePeriod("7 วัน");
+        expect(screen.getByRole("status", { name: "กำลังโหลดรายงาน IT" })).toBeInTheDocument();
+        expect(screen.queryByRole("application")).not.toBeInTheDocument();
         await waitFor(() => expect(pending).toHaveLength(1));
         await choosePeriod("90 วัน");
         await waitFor(() => expect(pending).toHaveLength(2));
@@ -255,6 +270,11 @@ describe("IT analytics Dashboard presentation", () => {
         });
         expect(await screen.findByRole("region", { name: "ภาพรวม" }))
             .toHaveTextContent("90");
+        expect(screen.getByRole("application", { name: /รายสัปดาห์/ })).toBeInTheDocument();
+        expect(screen.getByText(/เปรียบเทียบรายสัปดาห์ เริ่มวันจันทร์/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText("ดูตัวเลขรายวัน"));
+        expect(screen.getByText("25 กันยายน 2569", { selector: "time" })).toBeVisible();
+        expect(screen.getByText("26 กันยายน 2569", { selector: "time" })).toBeVisible();
 
         await act(async () => {
             pending[0]?.resolve(response(dashboardPayload("7D", 7)));
@@ -277,5 +297,54 @@ describe("IT analytics Dashboard presentation", () => {
         fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
         expect(await screen.findByRole("region", { name: "ภาพรวม" }))
             .toHaveTextContent("4");
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenLastCalledWith("/api/it/analytics?period=30D", expect.anything());
+    });
+
+    it("renders an empty source without a broken chart and retains the daily disclosure", () => {
+        render(<ITAnalyticsTrendChart trend={[]} period="90D" />);
+        expect(screen.getByRole("status")).toHaveTextContent("ยังไม่มีข้อมูลในช่วงเวลานี้");
+        expect(screen.queryByRole("application")).not.toBeInTheDocument();
+        expect(screen.getByText("ดูตัวเลขรายวัน")).toBeInTheDocument();
+        expect(screen.getByRole("list", { name: "คำอธิบายกราฟ" })).toHaveTextContent("Ticket ใหม่ 0แก้ไขแล้ว 0");
+    });
+
+    it.each(["7D", "30D", "90D"] as const)("exposes both series and full dates through keyboard tooltips for %s", async (period) => {
+        render(<ITAnalyticsTrendChart period={period} trend={[
+            { date: "2026-10-12", created: 1000, resolved: 0 },
+            { date: "2026-10-13", created: 2, resolved: 6 },
+        ]} />);
+        const chart = screen.getByRole("application");
+        fireEvent.focus(chart);
+        const tooltip = await screen.findByRole("tooltip");
+        expect(tooltip).toHaveTextContent(period === "90D" ? "12 ตุลาคม 2569 – 13 ตุลาคม 2569" : "12 ตุลาคม 2569");
+        expect(tooltip).toHaveTextContent("Ticket ใหม่");
+        expect(tooltip).toHaveTextContent("แก้ไขแล้ว");
+        expect(tooltip).toHaveTextContent(period === "90D" ? "1,002" : "1,000");
+        expect(tooltip).toHaveTextContent(period === "90D" ? "6" : "0");
+        if (period !== "90D") {
+            fireEvent.keyDown(chart, { key: "ArrowRight" });
+            await waitFor(() => expect(tooltip).toHaveTextContent("13 ตุลาคม 2569"));
+            expect(tooltip).toHaveTextContent("6");
+        }
+    });
+
+    it("keeps all 90 original daily records available below the weekly chart", () => {
+        const trend = Array.from({ length: 90 }, (_, index) => ({
+            date: new Date(Date.UTC(2026, 7, 1 + index)).toISOString().slice(0, 10),
+            created: index,
+            resolved: index % 5,
+        }));
+        render(<ITAnalyticsTrendChart trend={trend} period="90D" />);
+        fireEvent.click(screen.getByText("ดูตัวเลขรายวัน"));
+        const details = screen.getByText("ดูตัวเลขรายวัน").closest("details");
+        expect(details).not.toBeNull();
+        const records = within(details as HTMLDetailsElement).getAllByRole("listitem");
+        expect(records).toHaveLength(90);
+        for (const [index, record] of records.entries()) {
+            expect(record.querySelector("time")).toHaveAttribute("datetime", trend[index]?.date);
+            expect(record).toHaveTextContent(`ใหม่ ${index}`);
+            expect(record).toHaveTextContent(`แก้ไข ${index % 5}`);
+        }
     });
 });

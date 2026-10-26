@@ -480,6 +480,8 @@ Earlier repository-wide runs during initial IT6 verification had resource-sensit
 
 ## 24. IT7 implementation — Operational Analytics Dashboard
 
+The created/resolved visualization uses Recharts v3 with the shared shadcn/ui Chart component. IT presentation keeps `7D`/`30D` daily and groups only the supplied `90D` daily counts into Monday-based Bangkok calendar weeks. Partial-week labels use the first/last included dates; each series retains its source total. The expandable daily report always retains the original API rows, including for `90D`. No Ticket events are reconstructed in the browser, and the authoritative analytics contract, queries, authorization, and current-backlog snapshot semantics are unchanged.
+
 IT7 implements section 10's fixed aggregate contract at `/dashboard/it/analytics` and `GET /api/it/analytics`. The Thai page uses `7D`, `30D`, or `90D`, defaults to `30D`, presents current backlog and period facts, and includes zero-filled created/resolved daily buckets plus the approved current and period distributions. Loading, safe error/retry, zero-data, and rapid period-change states are covered. The page and menu use the server-derived `canReadAnalytics` projection; the application query independently rechecks active workforce and `it.analytics.read / ALL` inside its consistent read transaction.
 
 Infrastructure uses database-side `count`, `groupBy`, and `min` operations, period-bounded timestamp projections, distinct Ticket grouping for resolution events, and no per-Ticket query loop. The multiple reads use one InnoDB `REPEATABLE READ` snapshot. No schema field, migration, index, materialized table, scheduled aggregation, or new dependency was added.

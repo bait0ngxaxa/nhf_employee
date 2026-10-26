@@ -22,6 +22,8 @@ import {
     readITAnalyticsError,
 } from "./analytics-presentation";
 
+import { ITAnalyticsTrendChart } from "./ITAnalyticsTrendChart";
+
 type RequestState =
     | { readonly key: string; readonly kind: "loaded"; readonly data: ITAnalyticsDashboardDTO }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
@@ -137,160 +139,6 @@ function SummaryOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
     );
 }
 
-interface TrendChartProps {
-    readonly trend: ITAnalyticsDashboardDTO["trend"];
-}
-
-function TrendChart({ trend }: TrendChartProps): ReactElement {
-    const width = 960;
-    const height = 300;
-    const left = 46;
-    const right = 12;
-    const top = 16;
-    const bottom = 40;
-    const plotHeight = height - top - bottom;
-    const plotWidth = width - left - right;
-    const maxValue = Math.max(1, ...trend.flatMap((row) => [row.created, row.resolved]));
-    const step = trend.length > 0 ? plotWidth / trend.length : plotWidth;
-    const barWidth = Math.max(1, Math.min(9, step * 0.28));
-    const gap = Math.max(1, Math.min(3, step * 0.08));
-    const tickValues = [...new Set([0, Math.ceil(maxValue / 3), Math.ceil((maxValue * 2) / 3), maxValue])];
-    const createdTotal = trend.reduce((total, row) => total + row.created, 0);
-    const resolvedTotal = trend.reduce((total, row) => total + row.resolved, 0);
-    const labelStride = Math.max(1, Math.ceil(trend.length / 8));
-    const hasActivity = createdTotal > 0 || resolvedTotal > 0;
-
-    return (
-        <figure className="min-w-0 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:p-6">
-            <figcaption className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                    <h2 className="text-lg font-semibold text-content-heading">Ticket ใหม่และแก้ไขแล้ว</h2>
-                    <p className="mt-1 text-sm leading-6 text-content-secondary">
-                        เปรียบเทียบตามวันปฏิทินเวลา Asia/Bangkok
-                    </p>
-                </div>
-                <ul aria-label="คำอธิบายกราฟ" className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-                    <li className="inline-flex items-center gap-2 text-content-body">
-                        <span aria-hidden="true" className="size-3 rounded-sm bg-sky-600" />
-                        <span>Ticket ใหม่ <strong className="tabular-nums">{countText(createdTotal)}</strong></span>
-                    </li>
-                    <li className="inline-flex items-center gap-2 text-content-body">
-                        <span aria-hidden="true" className="size-3 rounded-full border-2 border-teal-700 bg-teal-100 dark:bg-teal-950" />
-                        <span>แก้ไขแล้ว <strong className="tabular-nums">{countText(resolvedTotal)}</strong></span>
-                    </li>
-                </ul>
-            </figcaption>
-
-            {!hasActivity ? (
-                <p role="status" className="mt-5 rounded-lg bg-surface-subtle px-3 py-2 text-sm text-content-secondary">
-                    ยังไม่มีข้อมูลในช่วงเวลานี้
-                </p>
-            ) : null}
-
-            <div
-                role="region"
-                aria-label="กราฟ Ticket ใหม่และแก้ไขแล้ว เลื่อนแนวนอนเพื่อดูข้อมูลทั้งหมด"
-                tabIndex={0}
-                className="mt-3 min-w-0 overflow-x-auto overscroll-x-contain focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <svg
-                    role="img"
-                    aria-labelledby="it-analytics-trend-title it-analytics-trend-description"
-                    viewBox={`0 0 ${width} ${height}`}
-                    className="block h-auto w-full min-w-[48rem] overflow-visible text-content-muted lg:min-w-0"
-                    preserveAspectRatio="xMinYMin meet"
-                >
-                    <title id="it-analytics-trend-title">แนวโน้ม Ticket ใหม่และแก้ไขแล้วรายวัน</title>
-                    <desc id="it-analytics-trend-description">
-                        กราฟแท่งเปรียบเทียบ Ticket ใหม่ {countText(createdTotal)} รายการ กับ Ticket ที่แก้ไขแล้ว {countText(resolvedTotal)} รายการ
-                        รายละเอียดตัวเลขทุกวันอยู่ในตารางด้านล่าง
-                    </desc>
-                    <defs>
-                        <pattern id="it-analytics-resolved-pattern" width="4" height="4" patternUnits="userSpaceOnUse">
-                            <rect width="4" height="4" fill="#0f766e" />
-                            <path d="M-1 1l2-2M0 4l4-4M3 5l2-2" stroke="#ffffff" strokeWidth="1" />
-                        </pattern>
-                    </defs>
-                    {tickValues.map((tick) => {
-                        const y = top + plotHeight - (tick / maxValue) * plotHeight;
-                        return (
-                            <g key={tick}>
-                                <line x1={left} x2={width - right} y1={y} y2={y} className="stroke-border-neutral" strokeWidth="1" />
-                                <text x={left - 8} y={y + 4} textAnchor="end" className="fill-content-muted" fontSize="12">
-                                    {countText(tick)}
-                                </text>
-                            </g>
-                        );
-                    })}
-                    {trend.map((row, index) => {
-                        const center = left + index * step + step / 2;
-                        const createdHeight = (row.created / maxValue) * plotHeight;
-                        const resolvedHeight = (row.resolved / maxValue) * plotHeight;
-                        const showDate = index === 0
-                            || index === trend.length - 1
-                            || index % labelStride === 0;
-                        return (
-                            <g key={row.date}>
-                                <rect
-                                    x={center - gap / 2 - barWidth}
-                                    y={top + plotHeight - createdHeight}
-                                    width={barWidth}
-                                    height={createdHeight}
-                                    rx="1.5"
-                                    fill="#0284c7"
-                                >
-                                    <title>{`${row.date}: Ticket ใหม่ ${row.created}`}</title>
-                                </rect>
-                                <rect
-                                    x={center + gap / 2}
-                                    y={top + plotHeight - resolvedHeight}
-                                    width={barWidth}
-                                    height={resolvedHeight}
-                                    rx="1.5"
-                                    fill="url(#it-analytics-resolved-pattern)"
-                                >
-                                    <title>{`${row.date}: แก้ไขแล้ว ${row.resolved}`}</title>
-                                </rect>
-                                {showDate ? (
-                                    <text
-                                        x={center}
-                                        y={height - 12}
-                                        textAnchor="middle"
-                                        className="fill-content-muted"
-                                        fontSize="11"
-                                    >
-                                        {`${row.date.slice(8, 10)}/${row.date.slice(5, 7)}`}
-                                    </text>
-                                ) : null}
-                            </g>
-                        );
-                    })}
-                </svg>
-            </div>
-            <p className="mt-2 text-xs text-content-muted lg:hidden">
-                เลื่อนกราฟไปด้านข้างเพื่อดูข้อมูล
-            </p>
-
-            <details className="mt-2 border-t border-border-neutral">
-                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-sky-800 underline underline-offset-4 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300">
-                    ดูตัวเลขรายวัน
-                </summary>
-                <ol className="grid gap-2 pb-2 sm:grid-cols-2 xl:grid-cols-3">
-                    {trend.map((row) => (
-                        <li key={row.date} className="grid min-w-0 grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg bg-surface-subtle px-3 py-2 text-xs sm:text-sm">
-                            <time dateTime={row.date} className="font-medium tabular-nums text-content-body">
-                                {row.date}
-                            </time>
-                            <span className="text-content-secondary">ใหม่ <strong className="tabular-nums text-content-heading">{countText(row.created)}</strong></span>
-                            <span className="text-content-secondary">แก้ไข <strong className="tabular-nums text-content-heading">{countText(row.resolved)}</strong></span>
-                        </li>
-                    ))}
-                </ol>
-            </details>
-        </figure>
-    );
-}
-
 function DistributionPanel({
     title,
     description,
@@ -393,7 +241,7 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
     return (
         <div className="space-y-6">
             <SummaryOverview dashboard={dashboard} />
-            <TrendChart trend={dashboard.trend} />
+            <ITAnalyticsTrendChart trend={dashboard.trend} period={dashboard.period.key} />
 
             <section aria-labelledby="it-analytics-breakdowns-heading" className="min-w-0 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:p-6">
                 <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
