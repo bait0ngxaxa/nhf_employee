@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import qrCodeImage from "@/assets/qr/950gaxzt.png";
 import { LINE_OA_ID, LINE_OA_ADD_FRIEND_URL } from "@/lib/line/official-account";
 import { buildLiffUrl } from "@/lib/line/liff-links";
@@ -30,6 +30,24 @@ function LineLogoIcon({ className }: { className: string }): ReactElement {
 
 export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): ReactElement {
     const [copyResult, setCopyResult] = useState<"success" | "error" | null>(null);
+    const [status, setStatus] = useState<"loading" | "linked" | "unlinked" | "unavailable" | "error">("loading");
+    const [retry, setRetry] = useState(0);
+    useEffect(() => {
+        const controller = new AbortController();
+        async function loadStatus(): Promise<void> {
+            try {
+                const response = await fetch("/api/line/account-status", { cache: "no-store", signal: controller.signal });
+                if (!response.ok) throw new Error("Status unavailable");
+                const data: unknown = await response.json();
+                if (typeof data !== "object" || data === null || !("status" in data) || !["linked", "unlinked", "unavailable"].includes(String(data.status))) throw new Error("Invalid status");
+                if (!controller.signal.aborted) setStatus(data.status as "linked" | "unlinked" | "unavailable");
+            } catch {
+                if (!controller.signal.aborted) setStatus("error");
+            }
+        }
+        void loadStatus();
+        return () => controller.abort();
+    }, [retry]);
     let liffUrl: string | null = null;
     try {
         liffUrl = buildLiffUrl(APP_ROUTES.line.root);
@@ -62,11 +80,17 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                         <li>• แจ้งปัญหา IT และติดตาม Ticket</li>
                     </ul>
                     <p className="mt-2 text-xs leading-5 text-content-muted">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>
-                    <p className="mt-3 text-sm leading-6 text-content-secondary">เพิ่มเพื่อน แล้วเชื่อมบัญชี NHFapp เพียงครั้งเดียวเพื่อใช้บริการ</p>
-                    <div className="mt-3 flex flex-col gap-2 md:hidden">
+                    {status === "loading" ? <p className="mt-3 text-sm text-content-secondary" role="status">กำลังตรวจสอบสถานะการเชื่อมบัญชี…</p> : null}
+                    {status === "error" ? <div className="mt-3 text-sm text-content-secondary"><p>ไม่สามารถตรวจสอบสถานะได้ กรุณาลองใหม่</p><button type="button" onClick={() => { setStatus("loading"); setRetry((value) => value + 1); }} className="min-h-11 font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">ลองใหม่</button></div> : null}
+                    {status === "unavailable" ? <p className="mt-3 text-sm text-content-secondary">บัญชีนี้ยังไม่พร้อมใช้บริการผ่าน LINE</p> : null}
+                    {status === "linked" ? <p className="mt-3 text-sm font-semibold text-content-primary">บัญชี NHFapp เชื่อมกับ LINE แล้ว</p> : null}
+                    {status === "unlinked" ? <p className="mt-3 text-sm leading-6 text-content-secondary">เพิ่มเพื่อน แล้วเชื่อมบัญชี NHFapp เพียงครั้งเดียวเพื่อใช้บริการ</p> : null}
+                    {status === "unlinked" ? <div className="mt-3 flex flex-col gap-2 md:hidden">
                         <a href={LINE_OA_ADD_FRIEND_URL} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-4 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2">เพิ่มเพื่อนใน LINE</a>
                         {liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-subtle px-4 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2">เชื่อมบัญชี NHFapp</a> : <p className="text-sm text-content-secondary">บริการเชื่อมบัญชียังไม่พร้อมใช้งาน</p>}
-                    </div>
+                    </div> : null}
+                    {status === "linked" && liffUrl ? <a href={liffUrl} className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-status-success-solid-strong px-4 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2 md:hidden">เปิดบริการ NHFapp ใน LINE</a> : null}
+                    {status === "linked" && !liffUrl ? <p className="mt-3 text-sm text-content-secondary">บริการ LINE ยังไม่พร้อมใช้งาน</p> : null}
                 </div>
             </div>
             <div className="mt-4 hidden items-center gap-4 border-t border-border-subtle pt-4 md:flex">
