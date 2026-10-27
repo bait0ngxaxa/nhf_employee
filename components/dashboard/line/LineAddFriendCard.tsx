@@ -39,8 +39,10 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                 const response = await fetch("/api/line/account-status", { cache: "no-store", signal: controller.signal });
                 if (!response.ok) throw new Error("Status unavailable");
                 const data: unknown = await response.json();
-                if (typeof data !== "object" || data === null || !("status" in data) || !["linked", "unlinked", "unavailable"].includes(String(data.status))) throw new Error("Invalid status");
-                if (!controller.signal.aborted) setStatus(data.status as "linked" | "unlinked" | "unavailable");
+                if (typeof data !== "object" || data === null || !("status" in data)) throw new Error("Invalid status");
+                const value = data.status;
+                if (value !== "linked" && value !== "unlinked" && value !== "unavailable") throw new Error("Invalid status");
+                if (!controller.signal.aborted) setStatus(value);
             } catch {
                 if (!controller.signal.aborted) setStatus("error");
             }
@@ -72,14 +74,14 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                 </span>
                 <div className="min-w-0 flex-1">
                     <h2 id="line-add-friend-heading" className="text-lg font-bold leading-7 text-content-heading">ใช้ NHFapp บนมือถือ ผ่าน LINE ได้ง่ายขึ้น</h2>
-                    <p className="mt-1 text-sm leading-6 text-content-secondary">ไม่ต้องคอยเปิดเว็บไซต์ เพียงเข้า LINE ก็สามารถเข้าถึงบริการของ NHFapp ที่คุณมีสิทธิ์ใช้งานได้</p>
+                    {status !== "linked" ? <><p className="mt-1 text-sm leading-6 text-content-secondary">ไม่ต้องคอยเปิดเว็บไซต์ เพียงเข้า LINE ก็สามารถเข้าถึงบริการของ NHFapp ที่คุณมีสิทธิ์ใช้งานได้</p>
                     <ul className="mt-3 grid gap-1 text-sm leading-6 text-content-secondary sm:grid-cols-2">
                         <li>• เบิกวัสดุและติดตามคำขอ</li>
                         <li>• ดูข้อมูลและจัดการวันลา</li>
                         <li>• ติดตามงาน Routine</li>
                         <li>• แจ้งปัญหา IT และติดตาม Ticket</li>
                     </ul>
-                    <p className="mt-2 text-xs leading-5 text-content-muted">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>
+                    <p className="mt-2 text-xs leading-5 text-content-muted">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p></> : <p className="mt-1 text-xs leading-5 text-content-muted">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>}
                     {status === "loading" ? <p className="mt-3 text-sm text-content-secondary" role="status">กำลังตรวจสอบสถานะการเชื่อมบัญชี…</p> : null}
                     {status === "error" ? <div className="mt-3 text-sm text-content-secondary"><p>ไม่สามารถตรวจสอบสถานะได้ กรุณาลองใหม่</p><button type="button" onClick={() => { setStatus("loading"); setRetry((value) => value + 1); }} className="min-h-11 font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">ลองใหม่</button></div> : null}
                     {status === "unavailable" ? <p className="mt-3 text-sm text-content-secondary">บัญชีนี้ยังไม่พร้อมใช้บริการผ่าน LINE</p> : null}
