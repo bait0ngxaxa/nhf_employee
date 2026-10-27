@@ -125,17 +125,27 @@ export function LineAddFriendCard({
                                     : "text-content-on-brand",
                             )}
                         >
-                            เพิ่ม NHF ใน LINE
+                            ใช้ NHFapp บนมือถือ ผ่าน LINE ได้ง่ายขึ้น
                         </h2>
                         <p
                             className={cn(
-                                "mt-1 line-clamp-2 max-w-[28ch] text-xs font-medium leading-5 [overflow-wrap:anywhere] sm:text-sm",
+                                "mt-1 max-w-[60ch] text-xs font-medium leading-5 [overflow-wrap:anywhere] sm:text-sm",
                                 isLightTone
                                     ? "text-content-secondary"
                                     : "text-dashboard-hero-muted",
                             )}
                         >
-                            รับการแจ้งเตือนและเข้าใช้บริการของ NHF ผ่าน LINE ได้เลย
+                            ไม่ต้องคอยเปิดเว็บไซต์ เพียงเข้า LINE ก็สามารถเข้าถึงบริการของ NHFapp ที่คุณมีสิทธิ์ใช้งานได้
+                        </p>
+
+                        <ul className={cn("mt-3 grid gap-1 text-xs font-medium leading-5 sm:grid-cols-2 sm:text-sm", isLightTone ? "text-content-secondary" : "text-dashboard-hero-muted")}>
+                            <li>• เบิกวัสดุและติดตามคำขอ</li>
+                            <li>• ดูข้อมูลและจัดการวันลา</li>
+                            <li>• ติดตามงาน Routine</li>
+                            <li>• แจ้งปัญหา IT และติดตาม Ticket</li>
+                        </ul>
+                        <p className={cn("mt-2 text-xs", isLightTone ? "text-content-secondary" : "text-dashboard-hero-muted")}>
+                            บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ
                         </p>
 
                         {normalizedAddFriendUrl ? (
