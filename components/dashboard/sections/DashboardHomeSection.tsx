@@ -325,7 +325,7 @@ export function DashboardHomeSection() {
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
                 <section
                     aria-labelledby="dashboard-home-heading"
-                    className="grid gap-8 border-b border-border-subtle pb-8 @3xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] @3xl:items-end"
+                    className="border-b border-border-subtle pb-8"
                 >
                     <div className="min-w-0 max-w-3xl">
                         <div className="mb-5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-foreground">
@@ -381,11 +381,8 @@ export function DashboardHomeSection() {
                         </dl>
                     </div>
 
-                    <LineAddFriendCard
-                        tone="light"
-                        className="shadow-sm"
-                    />
                 </section>
+                <LineAddFriendCard tone="light" />
 
                 <div className="pt-4">
                     {allMenuItems.length === 0 && (
