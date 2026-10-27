@@ -37,6 +37,10 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
         async function loadStatus(): Promise<void> {
             try {
                 const response = await fetch("/api/line/account-status", { cache: "no-store", signal: controller.signal });
+                if (response.status === 403 || response.status === 404) {
+                    if (!controller.signal.aborted) setStatus("unavailable");
+                    return;
+                }
                 if (!response.ok) throw new Error("Status unavailable");
                 const data: unknown = await response.json();
                 if (typeof data !== "object" || data === null || !("status" in data)) throw new Error("Invalid status");
@@ -87,12 +91,12 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                     {status === "unavailable" ? <p className="mt-3 text-sm text-content-secondary">บัญชีนี้ยังไม่พร้อมใช้บริการผ่าน LINE</p> : null}
                     {status === "linked" ? <p className="mt-3 text-sm font-semibold text-content-primary">บัญชี NHFapp เชื่อมกับ LINE แล้ว</p> : null}
                     {status === "unlinked" ? <p className="mt-3 text-sm leading-6 text-content-secondary">เพิ่มเพื่อน แล้วเชื่อมบัญชี NHFapp เพียงครั้งเดียวเพื่อใช้บริการ</p> : null}
-                    {status === "unlinked" ? <div className="mt-3 flex flex-col gap-2 md:hidden">
-                        <a href={LINE_OA_ADD_FRIEND_URL} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-4 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2">เพิ่มเพื่อนใน LINE</a>
-                        {liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-subtle px-4 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2">เชื่อมบัญชี NHFapp</a> : <p className="text-sm text-content-secondary">บริการเชื่อมบัญชียังไม่พร้อมใช้งาน</p>}
-                    </div> : null}
-                    {status === "linked" && liffUrl ? <a href={liffUrl} className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-status-success-solid-strong px-4 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2 md:hidden">เปิดบริการ NHFapp ใน LINE</a> : null}
-                    {status === "linked" && !liffUrl ? <p className="mt-3 text-sm text-content-secondary">บริการ LINE ยังไม่พร้อมใช้งาน</p> : null}
+                    <div className="mt-3 flex flex-col gap-2 [@media(min-width:768px)_and_(pointer:fine)]:hidden">
+                        {status === "linked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-4 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2">เปิดบริการ NHFapp ใน LINE</a> : null}
+                        <a href={LINE_OA_ADD_FRIEND_URL} className={cn("inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2", status === "linked" ? "border border-border-subtle text-content-primary" : "bg-status-success-solid-strong text-content-on-brand")}>เพิ่มเพื่อนใน LINE</a>
+                        {status === "unlinked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-subtle px-4 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2">เชื่อมบัญชี NHFapp</a> : null}
+                        {(status === "linked" || status === "unlinked") && !liffUrl ? <p className="text-sm text-content-secondary">บริการ LINE ยังไม่พร้อมใช้งาน</p> : null}
+                    </div>
                 </div>
             </div>
             <div className="mt-4 hidden items-center gap-4 border-t border-border-subtle pt-4 md:flex">

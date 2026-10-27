@@ -21,7 +21,9 @@ describe("LINE account status", () => {
         vi.mocked(requireActiveWorkforceSession).mockResolvedValueOnce({ ok: false, response: NextResponse.json({}, { status: 401 }) });
         expect((await GET()).status).toBe(401);
         vi.mocked(requireActiveWorkforceSession).mockResolvedValueOnce({ ok: false, response: NextResponse.json({}, { status: 404 }) });
-        expect(await (await GET()).json()).toEqual({ status: "unavailable" });
+        expect((await GET()).status).toBe(404);
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValueOnce({ ok: false, response: NextResponse.json({}, { status: 403 }) });
+        expect((await GET()).status).toBe(403);
         expect(findLinkedUserIdsByUserIds).not.toHaveBeenCalled();
     });
     it("sanitizes lookup errors", async () => {

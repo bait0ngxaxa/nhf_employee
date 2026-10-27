@@ -7,9 +7,6 @@ export async function GET(): Promise<NextResponse> {
     try {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) {
-            if (auth.response.status === 403 || auth.response.status === 404) {
-                return NextResponse.json({ status: "unavailable" }, { headers: { "Cache-Control": "no-store" } });
-            }
             return auth.response;
         }
         const links = await findLinkedUserIdsByUserIds([auth.user.id]);
