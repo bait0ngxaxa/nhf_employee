@@ -1,25 +1,16 @@
-import Image from "next/image";
-import { ChevronDown, ExternalLink, QrCode } from "lucide-react";
-import type { ReactElement } from "react";
+"use client";
 
+import Image from "next/image";
+import { useState, type ReactElement } from "react";
 import qrCodeImage from "@/assets/qr/950gaxzt.png";
+import { LINE_OA_ID, LINE_OA_ADD_FRIEND_URL } from "@/lib/line/official-account";
+import { buildLiffUrl } from "@/lib/line/liff-links";
+import { APP_ROUTES } from "@/lib/ssot/routes";
 import { cn } from "@/lib/ui/utils";
 
 interface LineAddFriendCardProps {
-    /**
-     * Pass this only when the value comes from a verified NHF LINE Add Friend
-     * configuration. The dashboard intentionally has no fallback URL.
-     */
-    addFriendUrl?: string | null;
     tone?: "brand" | "light";
     className?: string;
-}
-
-interface QrCodeFigureProps {
-    tone?: "brand" | "light";
-    className?: string;
-    imageClassName?: string;
-    captionClassName?: string;
 }
 
 // LINE glyph from Bootstrap Icons (MIT): https://icons.getbootstrap.com/icons/line/
@@ -36,176 +27,57 @@ function LineLogoIcon({ className }: { className: string }): ReactElement {
     );
 }
 
-function QrCodeFigure({
-    tone = "brand",
-    className,
-    imageClassName,
-    captionClassName,
-}: QrCodeFigureProps): ReactElement {
+
+export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): ReactElement {
+    const [copyResult, setCopyResult] = useState<"success" | "error" | null>(null);
+    let liffUrl: string | null = null;
+    try {
+        liffUrl = buildLiffUrl(APP_ROUTES.line.root);
+    } catch {
+        // The rest of the dashboard remains available without LIFF configuration.
+    }
+
+    async function copyId(): Promise<void> {
+        try {
+            await navigator.clipboard.writeText(LINE_OA_ID);
+            setCopyResult("success");
+        } catch {
+            setCopyResult("error");
+        }
+    }
+
     return (
-        <figure
-            className={cn(
-                "flex min-w-0 flex-col items-center gap-2",
-                className,
-            )}
-        >
-            <div
-                className={cn(
-                    "shrink-0 rounded-xl border p-1.5",
-                    tone === "light"
-                        ? "border-border-subtle bg-surface-raised"
-                        : "border-content-on-brand/25 bg-white",
-                )}
-            >
-                <Image
-                    src={qrCodeImage}
-                    width={360}
-                    height={360}
-                    sizes="(min-width: 768px) 112px, (min-width: 640px) 160px, 144px"
-                    unoptimized
-                    alt="QR Code สำหรับเพิ่ม NHF เป็นเพื่อนใน LINE"
-                    className={cn("block h-auto w-28", imageClassName)}
-                />
+        <section aria-labelledby="line-add-friend-heading" className={cn("min-w-0 rounded-2xl border border-brand-border bg-surface-raised p-4 sm:p-5", className)}>
+            <div className="flex min-w-0 items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-status-success-solid text-content-on-brand">
+                    <LineLogoIcon className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                    <h2 id="line-add-friend-heading" className="text-lg font-bold leading-7 text-content-heading">ใช้ NHFapp บนมือถือ ผ่าน LINE ได้ง่ายขึ้น</h2>
+                    <p className="mt-1 text-sm leading-6 text-content-secondary">ไม่ต้องคอยเปิดเว็บไซต์ เพียงเข้า LINE ก็สามารถเข้าถึงบริการของ NHFapp ที่คุณมีสิทธิ์ใช้งานได้</p>
+                    <ul className="mt-3 grid gap-1 text-sm leading-6 text-content-secondary sm:grid-cols-2">
+                        <li>• เบิกวัสดุและติดตามคำขอ</li>
+                        <li>• ดูข้อมูลและจัดการวันลา</li>
+                        <li>• ติดตามงาน Routine</li>
+                        <li>• แจ้งปัญหา IT และติดตาม Ticket</li>
+                    </ul>
+                    <p className="mt-2 text-xs leading-5 text-content-muted">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>
+                    <p className="mt-3 text-sm leading-6 text-content-secondary">เพิ่มเพื่อน แล้วเชื่อมบัญชี NHFapp เพียงครั้งเดียวเพื่อใช้บริการ</p>
+                    <div className="mt-3 flex flex-col gap-2 md:hidden">
+                        <a href={LINE_OA_ADD_FRIEND_URL} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-4 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2">เพิ่มเพื่อนใน LINE</a>
+                        {liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-subtle px-4 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2">เชื่อมบัญชี NHFapp</a> : <p className="text-sm text-content-secondary">บริการเชื่อมบัญชียังไม่พร้อมใช้งาน</p>}
+                    </div>
+                </div>
             </div>
-            <figcaption
-                className={cn(
-                    "max-w-full text-center text-xs font-semibold leading-5 [overflow-wrap:anywhere]",
-                    tone === "light"
-                        ? "text-content-secondary"
-                        : "text-dashboard-hero-muted",
-                    captionClassName,
-                )}
-            >
-                สแกนเพื่อเพิ่มเพื่อน
-            </figcaption>
-        </figure>
-    );
-}
-
-export function LineAddFriendCard({
-    addFriendUrl,
-    tone = "brand",
-    className,
-}: LineAddFriendCardProps = {}): ReactElement {
-    const normalizedAddFriendUrl = addFriendUrl?.trim() || undefined;
-    const isLightTone = tone === "light";
-
-    return (
-        <section
-            aria-labelledby="line-add-friend-heading"
-            className={cn(
-                "w-full overflow-hidden rounded-2xl border @container",
-                isLightTone
-                    ? "border-brand-border bg-brand-surface"
-                    : "border-content-on-brand/20 bg-content-on-brand/10",
-                className,
-            )}
-        >
-            <div className="grid min-w-0 items-center gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
-                    <div
-                        className={cn(
-                            "flex size-9 shrink-0 items-center justify-center rounded-xl text-content-on-brand shadow-sm sm:size-10",
-                            isLightTone
-                                ? "bg-status-success-solid"
-                                : "bg-status-success-solid-strong",
-                        )}
-                        aria-hidden="true"
-                    >
-                        <LineLogoIcon className="size-5" />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                        <h2
-                            id="line-add-friend-heading"
-                            className={cn(
-                                "text-base font-bold leading-6 tracking-tight [overflow-wrap:anywhere] sm:text-lg",
-                                isLightTone
-                                    ? "text-content-heading"
-                                    : "text-content-on-brand",
-                            )}
-                        >
-                            ใช้ NHFapp บนมือถือ ผ่าน LINE ได้ง่ายขึ้น
-                        </h2>
-                        <p
-                            className={cn(
-                                "mt-1 max-w-[60ch] text-xs font-medium leading-5 [overflow-wrap:anywhere] sm:text-sm",
-                                isLightTone
-                                    ? "text-content-secondary"
-                                    : "text-dashboard-hero-muted",
-                            )}
-                        >
-                            ไม่ต้องคอยเปิดเว็บไซต์ เพียงเข้า LINE ก็สามารถเข้าถึงบริการของ NHFapp ที่คุณมีสิทธิ์ใช้งานได้
-                        </p>
-
-                        <ul className={cn("mt-3 grid gap-1 text-xs font-medium leading-5 sm:grid-cols-2 sm:text-sm", isLightTone ? "text-content-secondary" : "text-dashboard-hero-muted")}>
-                            <li>• เบิกวัสดุและติดตามคำขอ</li>
-                            <li>• ดูข้อมูลและจัดการวันลา</li>
-                            <li>• ติดตามงาน Routine</li>
-                            <li>• แจ้งปัญหา IT และติดตาม Ticket</li>
-                        </ul>
-                        <p className={cn("mt-2 text-xs", isLightTone ? "text-content-secondary" : "text-dashboard-hero-muted")}>
-                            บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ
-                        </p>
-
-                        {normalizedAddFriendUrl ? (
-                            <a
-                                href={normalizedAddFriendUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label="เพิ่มเพื่อนใน LINE (เปิดในแท็บใหม่)"
-                                className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-status-success-solid-strong px-3 py-2 text-xs font-bold text-content-on-brand shadow-sm transition-[background-color,box-shadow,transform] duration-200 hover:bg-status-success-solid-hover hover:shadow-md active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2 sm:w-fit sm:text-sm"
-                            >
-                                <LineLogoIcon className="size-3.5" />
-                                เพิ่มเพื่อนใน LINE
-                                <ExternalLink className="size-3.5" aria-hidden="true" />
-                            </a>
-                        ) : null}
-                    </div>
+            <div className="mt-4 hidden items-center gap-4 border-t border-border-subtle pt-4 md:flex">
+                <Image src={qrCodeImage} width={128} height={128} unoptimized alt="QR Code สำหรับเพิ่ม NHF เป็นเพื่อนใน LINE" className="size-32 shrink-0 rounded-md bg-white" />
+                <div className="min-w-0 text-sm leading-6 text-content-secondary">
+                    <p className="font-bold text-content-primary">สแกน QR Code ด้วย LINE บนมือถือ</p>
+                    <p className="mt-1">LINE OA ID: {LINE_OA_ID}</p>
+                    <button type="button" onClick={() => void copyId()} className="mt-1 min-h-11 rounded-md border border-border-subtle px-3 font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2">คัดลอก ID</button>
+                    <p role="status" aria-live="polite" className="text-xs">{copyResult === "success" ? "คัดลอก ID แล้ว" : copyResult === "error" ? "คัดลอกไม่สำเร็จ กรุณาคัดลอก ID ด้วยตนเอง" : ""}</p>
+                    <p className="mt-1 text-xs">ใช้ LINE บนคอมพิวเตอร์? ไปที่เพิ่มเพื่อน → ค้นหาด้วย ID → วาง {LINE_OA_ID}</p>
                 </div>
-
-                <div className="hidden shrink-0 md:flex md:justify-end">
-                    <QrCodeFigure
-                        tone={tone}
-                        className="@sm:flex-row @sm:items-center"
-                        captionClassName="max-w-[12ch]"
-                    />
-                </div>
-
-                <details className="group md:hidden">
-                    <summary
-                        className={cn(
-                            "flex min-h-10 list-none items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs font-bold transition-[background-color,border-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:text-sm [&::-webkit-details-marker]:hidden",
-                            isLightTone
-                                ? "border-border-subtle bg-surface-raised text-content-primary hover:border-brand-border hover:bg-brand-surface-strong focus-visible:ring-brand-solid"
-                                : "border-content-on-brand/20 bg-content-on-brand/10 text-content-on-brand hover:border-content-on-brand/30 hover:bg-content-on-brand/15 focus-visible:ring-dashboard-focus",
-                        )}
-                    >
-                        <span className="flex min-w-0 items-center gap-2">
-                            <QrCode className="size-3.5 shrink-0" aria-hidden="true" />
-                            <span className="[overflow-wrap:anywhere]">ดู QR Code</span>
-                        </span>
-                        <ChevronDown
-                            className="size-3.5 shrink-0 transition-transform duration-200 group-open:rotate-180"
-                            aria-hidden="true"
-                        />
-                    </summary>
-                    <div
-                        className={cn(
-                            "mt-3 border-t pt-3",
-                            isLightTone
-                                ? "border-border-subtle"
-                                : "border-content-on-brand/15",
-                        )}
-                    >
-                        <QrCodeFigure
-                            tone={tone}
-                            className="flex-col gap-2"
-                            imageClassName="w-36 sm:w-40"
-                            captionClassName="text-center"
-                        />
-                    </div>
-                </details>
             </div>
         </section>
     );
