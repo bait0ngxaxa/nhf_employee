@@ -110,25 +110,35 @@ function AccessPanel() {
                 ))}
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row lg:flex-col">
-                <Button
-                    asChild
-                    size="lg"
-                    className="rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
-                >
-                    <Link href={APP_ROUTES.login}>
-                        เข้าสู่ระบบ
-                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                    </Link>
-                </Button>
-                <Button
-                    asChild
-                    size="lg"
-                    variant="outline"
-                    className="rounded-xl border-action-primary-border bg-surface-raised/80 text-action-primary-foreground hover:bg-action-primary-surface hover:text-action-primary-strong"
-                >
-                    <Link href={APP_ROUTES.signup}>ลงทะเบียนบัญชี</Link>
-                </Button>
+            <div className="mt-8 space-y-5">
+                <div className="space-y-2">
+                    <p className="text-sm font-semibold text-content-heading">
+                        ผู้ใช้ใหม่ ลงทะเบียนก่อนเข้าใช้งาน
+                    </p>
+                    <Button
+                        asChild
+                        size="lg"
+                        className="w-full rounded-xl bg-gradient-to-r from-action-gradient-start to-action-gradient-end text-content-on-brand hover:from-action-gradient-hover-start hover:to-action-gradient-hover-end"
+                    >
+                        <Link href={APP_ROUTES.signup}>
+                            ลงทะเบียนบัญชี
+                            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                    </Button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-border-neutral-default/60 pt-4">
+                    <p className="text-sm font-medium text-content-secondary">
+                        มีบัญชีแล้ว
+                    </p>
+                    <Button
+                        asChild
+                        size="lg"
+                        variant="outline"
+                        className="rounded-xl border-action-primary-border bg-surface-raised/80 text-action-primary-foreground hover:bg-action-primary-surface hover:text-action-primary-strong"
+                    >
+                        <Link href={APP_ROUTES.login}>เข้าสู่ระบบ</Link>
+                    </Button>
+                </div>
             </div>
         </aside>
     );
