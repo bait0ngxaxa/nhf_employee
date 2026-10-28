@@ -20,6 +20,7 @@ import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 import { useLeaveRequestFormModel } from "./hooks/useLeaveRequestFormModel";
 import type { LeaveQuota } from "./hooks/useLeaveProfile";
 import { LeaveDialogFields } from "./components/LeaveRequestFormFields";
+import { LeaveRequestReview } from "./components/LeaveRequestReview";
 
 interface Props {
     open: boolean;
@@ -43,6 +44,7 @@ export function LeaveRequestForm({
         quotas,
         canSubmit: canCreateRequests,
     });
+    const isReview = model.step === "review";
 
     return (
         <AsyncFormDialog
@@ -63,33 +65,52 @@ export function LeaveRequestForm({
                     aria-label="ปิดแบบฟอร์มยื่นคำขอลา"
                 />
                 <DialogHeader className="shrink-0 gap-2 border-b border-border bg-muted/30 px-5 py-4 pr-12 text-left sm:px-6">
+                    <p className="text-xs font-medium text-muted-foreground" aria-live="polite">
+                        {isReview ? "ขั้นตอน 2 จาก 2 · ตรวจสอบก่อนส่ง" : "ขั้นตอน 1 จาก 2 · กรอกข้อมูล"}
+                    </p>
                     <DialogTitle className="text-lg font-semibold text-foreground">
                         ยื่นคำขอลา
                     </DialogTitle>
                     <DialogDescription className="max-w-[64ch] text-sm leading-6 text-muted-foreground">
-                        กรอกช่วงวันที่และเหตุผลให้ครบถ้วน ระบบจะตรวจเงื่อนไขลาย้อนหลังและการลาเกินสิทธิ์ให้ก่อนส่งคำขอ
+                        {isReview
+                            ? "ตรวจสอบรายละเอียดให้ถูกต้องก่อนยืนยันส่งคำขอ"
+                            : "กรอกช่วงวันที่และเหตุผลให้ครบถ้วน ระบบจะตรวจเงื่อนไขลาย้อนหลังและการลาเกินสิทธิ์ให้ก่อนส่งคำขอ"}
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...model.form}>
                     <form
-                        onSubmit={model.form.handleSubmit(model.submit)}
+                        onSubmit={model.form.handleSubmit(isReview ? model.submit : model.goToReview)}
                         className="flex min-h-0 flex-1 flex-col"
                     >
                         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
                             <div className="flex flex-col gap-5">
                                 <LeaveErrorAlert message={model.errorMsg} />
-                                <LeaveExceptionNotice model={model} />
-                                <LeaveDialogFields model={model} />
+                                {isReview ? <LeaveRequestReview model={model} /> : null}
+                                <div className="flex flex-col gap-5" hidden={isReview}>
+                                    <LeaveExceptionNotice model={model} />
+                                    <LeaveDialogFields model={model} />
+                                </div>
                             </div>
                         </div>
                         <Separator />
                         <DialogFooter className="shrink-0 gap-2 px-5 py-4 sm:px-6">
-                            <AsyncFormDialogClose
-                                variant="outline"
-                            >
-                                ยกเลิก
-                            </AsyncFormDialogClose>
+                            {isReview ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={model.isSubmitting}
+                                    onClick={model.backToEdit}
+                                >
+                                    แก้ไข
+                                </Button>
+                            ) : (
+                                <AsyncFormDialogClose
+                                    variant="outline"
+                                >
+                                    ยกเลิก
+                                </AsyncFormDialogClose>
+                            )}
                             <Button
                                 type="submit"
                                 className={LEAVE_THEME_BUTTON_CLASS}
@@ -103,7 +124,7 @@ export function LeaveRequestForm({
                                         aria-hidden="true"
                                     />
                                 ) : null}
-                                {model.isSubmitting ? "กำลังส่งคำขอ" : "ส่งคำขอลา"}
+                                {getSubmitLabel(isReview, model.isSubmitting)}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -111,6 +132,11 @@ export function LeaveRequestForm({
             </AsyncFormDialogContent>
         </AsyncFormDialog>
     );
+}
+
+function getSubmitLabel(isReview: boolean, isSubmitting: boolean): string {
+    if (!isReview) return "ตรวจสอบคำขอ";
+    return isSubmitting ? "กำลังส่งคำขอ" : "ยืนยันส่งคำขอลา";
 }
 
 function LeaveErrorAlert({ message }: { message: string | null }) {

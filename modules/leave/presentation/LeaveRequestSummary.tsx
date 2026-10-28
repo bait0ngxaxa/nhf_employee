@@ -106,7 +106,7 @@ export function LeaveRequestSummary({
                     <p className="font-semibold">
                         คำขอนี้เกินสิทธิ์ {formatDays(overQuotaDays)}
                     </p>
-                    <p>กรุณาระบุเหตุผลพิเศษประกอบคำขอตามขั้นตอนเดิม</p>
+                    <p>ผู้อนุมัติจะพิจารณาจากเหตุผลพิเศษที่ระบุ</p>
                 </div>
             ) : null}
             <p className="text-xs leading-5 text-content-secondary">

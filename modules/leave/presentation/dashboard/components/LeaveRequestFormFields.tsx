@@ -14,21 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import type { useLeaveRequestFormModel } from "../hooks/useLeaveRequestFormModel";
 import { cn } from "@/lib/ui/utils";
 import { LeaveEvidenceUploadField } from "./LeaveEvidenceUploadField";
-import { LeaveRequestSummary } from "../../LeaveRequestSummary";
+import { formatLeaveDays } from "../../liff/leave-format";
 
 type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
 
 export function LeaveDialogFields({ model }: { model: LeaveRequestFormModel }) {
     return (
         <div className="flex flex-col gap-5">
-            <LeaveRequestSummary
-                leaveType={model.selectedLeaveType}
-                requestedDays={model.requestedDays}
-                remainingQuota={model.remainingQuota}
-                projectedRemainingQuota={model.projectedRemainingQuota}
-                overQuotaDays={model.overQuotaDays}
-                isDateRangeValid={model.isDateRangeValid}
-            />
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
             <LeaveDateFields model={model} />
@@ -269,7 +261,7 @@ function SpecialReasonField({ model }: { model: LeaveRequestFormModel }) {
                         />
                     </FormControl>
                     <FormDescription>
-                        กรุณาระบุเหตุผลประกอบการขอใช้สิทธิ์เกินโควต้า
+                        คำขอนี้เกินสิทธิ์ {formatLeaveDays(model.overQuotaDays)} วัน กรุณาระบุเหตุผลประกอบ
                     </FormDescription>
                     <FormMessage />
                 </FormItem>
