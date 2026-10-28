@@ -4,6 +4,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { LeaveDialogFields } from "../dashboard/components/LeaveRequestFormFields";
+import { LeaveRequestReview } from "../dashboard/components/LeaveRequestReview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -54,6 +55,8 @@ export function LiffLeaveRequestForm({
         },
     });
 
+    const isReview = model.step === "review";
+
     const requestClose = (): void => {
         if (model.isSubmitting) return;
         if (
@@ -80,17 +83,22 @@ export function LiffLeaveRequestForm({
                 className="h-screen max-h-screen supports-[height:100dvh]:h-[100dvh] supports-[height:100dvh]:max-h-[100dvh] gap-0 rounded-none border-0 p-0 sm:left-1/2 sm:max-w-lg sm:-translate-x-1/2"
             >
                 <SheetHeader className="shrink-0 border-b border-border-subtle bg-surface px-5 pb-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-16 text-left">
+                    <p className="text-xs font-medium text-content-secondary" aria-live="polite">
+                        {isReview ? "ขั้นตอน 2 จาก 2 · ตรวจสอบก่อนส่ง" : "ขั้นตอน 1 จาก 2 · กรอกข้อมูล"}
+                    </p>
                     <SheetTitle className="text-xl font-bold tracking-tight text-content-heading">
                         ยื่นคำขอลา
                     </SheetTitle>
                     <SheetDescription className="leading-6 text-content-secondary">
-                        เลือกวันลาและระบุเหตุผล ระบบจะตรวจเงื่อนไขก่อนส่งคำขอ
+                        {isReview
+                            ? "ตรวจสอบรายละเอียดให้ถูกต้องก่อนยืนยันส่งคำขอ"
+                            : "เลือกวันลาและระบุเหตุผล ระบบจะตรวจเงื่อนไขก่อนส่งคำขอ"}
                     </SheetDescription>
                 </SheetHeader>
 
                 <Form {...model.form}>
                     <form
-                        onSubmit={model.form.handleSubmit(model.submit)}
+                        onSubmit={model.form.handleSubmit(isReview ? model.submit : model.goToReview)}
                         className="flex min-h-0 flex-1 flex-col bg-surface-subtle"
                     >
                         <SheetScrollArea className="scroll-pb-6 px-4 py-5">
@@ -103,16 +111,19 @@ export function LiffLeaveRequestForm({
                                         </AlertDescription>
                                     </Alert>
                                 ) : null}
-                                {model.needsEmergencyReason ? (
-                                    <Alert className="border-status-warning-border bg-status-warning-surface text-status-warning-heading [&>svg]:text-status-warning-foreground">
-                                        <AlertCircle className="size-4" aria-hidden="true" />
-                                        <AlertTitle>ต้องระบุข้อมูลประกอบเพิ่มเติม</AlertTitle>
-                                        <AlertDescription className="space-y-1 leading-6">
-                                            <p>เป็นการลาย้อนหลัง กรุณาระบุเหตุผลให้ผู้อนุมัติพิจารณา</p>
-                                        </AlertDescription>
-                                    </Alert>
-                                ) : null}
-                                <LeaveDialogFields model={model} />
+                                {isReview ? <LeaveRequestReview model={model} /> : null}
+                                <div className="space-y-4" hidden={isReview}>
+                                    {model.needsEmergencyReason ? (
+                                        <Alert className="border-status-warning-border bg-status-warning-surface text-status-warning-heading [&>svg]:text-status-warning-foreground">
+                                            <AlertCircle className="size-4" aria-hidden="true" />
+                                            <AlertTitle>ต้องระบุข้อมูลประกอบเพิ่มเติม</AlertTitle>
+                                            <AlertDescription className="space-y-1 leading-6">
+                                                <p>เป็นการลาย้อนหลัง กรุณาระบุเหตุผลให้ผู้อนุมัติพิจารณา</p>
+                                            </AlertDescription>
+                                        </Alert>
+                                    ) : null}
+                                    <LeaveDialogFields model={model} />
+                                </div>
                             </div>
                         </SheetScrollArea>
 
@@ -122,9 +133,9 @@ export function LiffLeaveRequestForm({
                                 variant="outline"
                                 className="min-h-12"
                                 disabled={model.isSubmitting}
-                                onClick={requestClose}
+                                onClick={isReview ? model.backToEdit : requestClose}
                             >
-                                ยกเลิก
+                                {isReview ? "แก้ไข" : "ยกเลิก"}
                             </Button>
                             <Button
                                 type="submit"
@@ -135,7 +146,7 @@ export function LiffLeaveRequestForm({
                                 {model.isSubmitting ? (
                                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                                 ) : null}
-                                {model.isSubmitting ? "กำลังส่ง…" : "ส่งคำขอลา"}
+                                {getSubmitLabel(isReview, model.isSubmitting)}
                             </Button>
                         </div>
                     </form>
@@ -143,4 +154,9 @@ export function LiffLeaveRequestForm({
             </SheetContent>
         </Sheet>
     );
+}
+
+function getSubmitLabel(isReview: boolean, isSubmitting: boolean): string {
+    if (!isReview) return "ตรวจสอบคำขอ";
+    return isSubmitting ? "กำลังส่ง…" : "ยืนยันส่งคำขอลา";
 }

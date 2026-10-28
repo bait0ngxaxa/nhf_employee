@@ -17,6 +17,8 @@ import { isValidDateOnly, toDateOnlyString } from "../../../domain/business-date
 
 type LeaveTypeValue = LeaveRequestValues["leaveType"];
 
+export type LeaveRequestStep = "edit" | "review";
+
 interface LeaveQuotaSnapshot {
     year: number;
     leaveType: LeaveTypeValue;
@@ -54,6 +56,9 @@ interface UseLeaveRequestFormModelResult {
     projectedRemainingQuota: number | null;
     selectedLeaveType: LeaveTypeValue;
     isDateRangeValid: boolean;
+    step: LeaveRequestStep;
+    goToReview: (data: LeaveRequestValues) => void;
+    backToEdit: () => void;
     submit: (data: LeaveRequestValues) => Promise<void>;
     addAttachments: (files: readonly File[]) => void;
     removeAttachment: (index: number) => void;
@@ -135,6 +140,7 @@ export function useLeaveRequestFormModel({
     const [attachments, setAttachments] = useState<File[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [isMultiDay, setIsMultiDay] = useState(false);
+    const [step, setStep] = useState<LeaveRequestStep>("edit");
     const submittingRef = useRef(false);
     const idempotencyRef = useRef<{ payloadSignature: string; key: string } | null>(null);
 
@@ -235,14 +241,11 @@ export function useLeaveRequestFormModel({
         clearAttachments();
         setErrorMsg(null);
         setIsMultiDay(false);
+        setStep("edit");
         idempotencyRef.current = null;
     };
 
-    const submit = async (data: LeaveRequestValues): Promise<void> => {
-        if (!canSubmit || submittingRef.current) {
-            return;
-        }
-
+    const hasRequiredSpecialReason = (data: LeaveRequestValues): boolean => {
         const submitQuota = findQuotaForDate(quotas, data.leaveType, data.startDate);
         const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
         const submitOverQuotaDays = submitQuota
@@ -257,6 +260,34 @@ export function useLeaveRequestFormModel({
                 type: "manual",
                 message: LEAVE_REQUEST_MESSAGES.specialReasonRequired,
             });
+            return false;
+        }
+        return true;
+    };
+
+    const goToReview = (data: LeaveRequestValues): void => {
+        if (!hasRequiredSpecialReason(data)) {
+            return;
+        }
+        setErrorMsg(null);
+        setStep("review");
+    };
+
+    const backToEdit = (): void => {
+        if (submittingRef.current) {
+            return;
+        }
+        setStep("edit");
+        setTimeout(() => form.setFocus("reason"), 0);
+    };
+
+    const submit = async (data: LeaveRequestValues): Promise<void> => {
+        if (!canSubmit || submittingRef.current) {
+            return;
+        }
+
+        if (!hasRequiredSpecialReason(data)) {
+            setStep("edit");
             return;
         }
 
@@ -334,6 +365,9 @@ export function useLeaveRequestFormModel({
         projectedRemainingQuota,
         selectedLeaveType: leaveType,
         isDateRangeValid,
+        step,
+        goToReview,
+        backToEdit,
         submit,
         addAttachments,
         removeAttachment,

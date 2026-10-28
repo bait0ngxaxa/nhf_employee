@@ -42,7 +42,7 @@ describe("Leave request summary", () => {
         expect(summary).not.toHaveTextContent("0 วัน");
     });
 
-    it("shows quota impact and the existing special-reason guidance when over quota", () => {
+    it("shows quota impact and special-reason review guidance when over quota", () => {
         render(
             <LeaveRequestSummary
                 leaveType="PERSONAL"
@@ -56,11 +56,11 @@ describe("Leave request summary", () => {
 
         const summary = screen.getByRole("region", { name: "สรุปคำขอลา" });
         expect(summary).toHaveTextContent("คำขอนี้เกินสิทธิ์ 1 วัน");
-        expect(summary).toHaveTextContent("กรุณาระบุเหตุผลพิเศษประกอบคำขอตามขั้นตอนเดิม");
+        expect(summary).toHaveTextContent("ผู้อนุมัติจะพิจารณาจากเหตุผลพิเศษที่ระบุ");
         expect(summary).toHaveTextContent("ผลสุดท้ายยังขึ้นกับการตรวจสอบของระบบและการอนุมัติ");
     });
 
-    it("shows the same live request summary in Dashboard and LIFF", () => {
+    it("keeps the summary for the review step and shows the same summary in Dashboard and LIFF", async () => {
         const dashboardView = render(
             <LeaveRequestForm
                 open
@@ -79,12 +79,7 @@ describe("Leave request summary", () => {
                 }]}
             />,
         );
-        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
-            target: { value: "2031-01-06" },
-        });
-        const dashboardSummary = screen.getByRole("region", {
-            name: "สรุปคำขอลา",
-        }).textContent;
+        const dashboardSummary = await reviewSummary();
         expect(dashboardSummary).toContain("1 วัน");
         expect(dashboardSummary).toContain("8 วัน");
         expect(dashboardSummary).toContain("7 วัน");
@@ -106,14 +101,25 @@ describe("Leave request summary", () => {
                 onSuccess={vi.fn()}
             />,
         );
-        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
-            target: { value: "2031-01-06" },
-        });
-        const liffSummary = screen.getByRole("region", {
-            name: "สรุปคำขอลา",
-        }).textContent;
+        const liffSummary = await reviewSummary();
 
         expect(liffSummary).toBe(dashboardSummary);
         expect(liffSummary).toContain("ยังไม่ตัดวันหยุดนักขัตฤกษ์ออก");
     });
 });
+
+async function reviewSummary(): Promise<string | null> {
+    fireEvent.change(screen.getByLabelText("วันที่ลา"), {
+        target: { value: "2031-01-06" },
+    });
+    fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+        target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+    });
+    expect(screen.queryByRole("region", { name: "สรุปคำขอลา" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
+
+    const summary = await screen.findByRole("region", { name: "สรุปคำขอลา" });
+    expect(screen.getByRole("button", { name: "ยืนยันส่งคำขอลา" })).toBeInTheDocument();
+    return summary.textContent;
+}

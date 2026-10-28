@@ -9,15 +9,15 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { KeyRound, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { KeyRound, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { authApiPost } from "./browser-api";
+import { PasswordInput } from "./PasswordInput";
 
 interface PasswordRequirement {
     label: string;
@@ -37,8 +37,6 @@ export function ResetPasswordForm({
 }: React.ComponentProps<"div">) {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const router = useRouter();
@@ -155,39 +153,17 @@ export function ResetPasswordForm({
                                 <Label htmlFor="password" className="text-content-neutral-body">
                                     รหัสผ่านใหม่
                                 </Label>
-                                <div className="relative">
-                                    <Input
-                                        id="password"
-                                        type={showPassword ? "text" : "password"}
-                                        autoComplete="new-password"
-                                        value={password}
-                                        onChange={(e) =>
-                                            setPassword(e.target.value)
-                                        }
-                                        required
-                                        aria-invalid={error ? true : undefined}
-                                        className="rounded-xl border-border-neutral-default bg-surface-raised/70 pr-10 focus:border-action-primary-focus focus:ring-action-primary-focus/20"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setShowPassword(!showPassword)
-                                        }
-                                        aria-label={
-                                            showPassword
-                                                ? "ซ่อนรหัสผ่าน"
-                                                : "แสดงรหัสผ่าน"
-                                        }
-                                        aria-pressed={showPassword}
-                                        className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-content-neutral-muted hover:bg-action-primary-surface hover:text-action-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary-focus/40 sm:h-8 sm:w-8"
-                                    >
-                                        {showPassword ? (
-                                            <EyeOff className="h-4 w-4" />
-                                        ) : (
-                                            <Eye className="h-4 w-4" />
-                                        )}
-                                    </button>
-                                </div>
+                                <PasswordInput
+                                    id="password"
+                                    autoComplete="new-password"
+                                    value={password}
+                                    onChange={(e) =>
+                                        setPassword(e.target.value)
+                                    }
+                                    required
+                                    aria-invalid={error ? true : undefined}
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-action-primary-focus focus:ring-action-primary-focus/20"
+                                />
                             </div>
 
                             {/* Password Requirements */}
@@ -224,46 +200,24 @@ export function ResetPasswordForm({
                                 <Label htmlFor="confirmPassword" className="text-content-neutral-body">
                                     ยืนยันรหัสผ่านใหม่
                                 </Label>
-                                <div className="relative">
-                                    <Input
-                                        id="confirmPassword"
-                                        type={showConfirmPassword ? "text" : "password"}
-                                        autoComplete="new-password"
-                                        value={confirmPassword}
-                                        onChange={(e) =>
-                                            setConfirmPassword(e.target.value)
-                                        }
-                                        required
-                                        aria-invalid={
-                                            confirmPassword.length > 0 &&
-                                            password !== confirmPassword
-                                                ? true
-                                                : undefined
-                                        }
-                                        className="rounded-xl border-border-neutral-default bg-surface-raised/70 pr-10 focus:border-action-primary-focus focus:ring-action-primary-focus/20"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setShowConfirmPassword(
-                                                !showConfirmPassword,
-                                            )
-                                        }
-                                        aria-label={
-                                            showConfirmPassword
-                                                ? "ซ่อนรหัสผ่านยืนยัน"
-                                                : "แสดงรหัสผ่านยืนยัน"
-                                        }
-                                        aria-pressed={showConfirmPassword}
-                                        className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-content-neutral-muted hover:bg-action-primary-surface hover:text-action-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-primary-focus/40 sm:h-8 sm:w-8"
-                                    >
-                                        {showConfirmPassword ? (
-                                            <EyeOff className="h-4 w-4" />
-                                        ) : (
-                                            <Eye className="h-4 w-4" />
-                                        )}
-                                    </button>
-                                </div>
+                                <PasswordInput
+                                    id="confirmPassword"
+                                    showLabel="แสดงรหัสผ่านยืนยัน"
+                                    hideLabel="ซ่อนรหัสผ่านยืนยัน"
+                                    autoComplete="new-password"
+                                    value={confirmPassword}
+                                    onChange={(e) =>
+                                        setConfirmPassword(e.target.value)
+                                    }
+                                    required
+                                    aria-invalid={
+                                        confirmPassword.length > 0 &&
+                                        password !== confirmPassword
+                                            ? true
+                                            : undefined
+                                    }
+                                    className="rounded-xl border-border-neutral-default bg-surface-raised/70 focus:border-action-primary-focus focus:ring-action-primary-focus/20"
+                                />
                                 {confirmPassword.length > 0 &&
                                     password !== confirmPassword && (
                                         <p className="text-xs text-status-error-icon">

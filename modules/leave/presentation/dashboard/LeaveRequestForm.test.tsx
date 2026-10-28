@@ -143,6 +143,48 @@ describe("LeaveRequestForm", () => {
         ).toBeInTheDocument();
     });
 
+    it("shows the request summary only after the form passes review validation", async () => {
+        render(
+            <LeaveRequestForm
+                open
+                onCancel={onCancel}
+                onSuccess={onSuccess}
+                quotas={[createQuota(10, 0)]}
+            />,
+        );
+
+        expect(screen.queryByRole("region", { name: "สรุปคำขอลา" })).not.toBeInTheDocument();
+        expect(screen.getByText("ขั้นตอน 1 จาก 2 · กรอกข้อมูล")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
+        expect(await screen.findByText("กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร")).toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "สรุปคำขอลา" })).not.toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
+            target: { value: "2031-01-06" },
+        });
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
+            target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
+
+        const review = await screen.findByRole("group", { name: "ตรวจสอบคำขอลา" });
+        expect(screen.getByText("ขั้นตอน 2 จาก 2 · ตรวจสอบก่อนส่ง")).toBeInTheDocument();
+        expect(review).toHaveFocus();
+        expect(review).toHaveTextContent("สรุปคำขอลา");
+        expect(review).toHaveTextContent("พักรักษาตัวตามคำแนะนำแพทย์");
+        expect(review).toHaveTextContent("เต็มวัน");
+        expect(screen.getByLabelText("เหตุผลการลา")).not.toBeVisible();
+        expect(submitLeaveRequest).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข" }));
+
+        expect(screen.queryByRole("group", { name: "ตรวจสอบคำขอลา" })).not.toBeInTheDocument();
+        expect(screen.getByLabelText("เหตุผลการลา")).toHaveValue("พักรักษาตัวตามคำแนะนำแพทย์");
+        await waitFor(() => expect(screen.getByLabelText("เหตุผลการลา")).toHaveFocus());
+        expect(submitLeaveRequest).not.toHaveBeenCalled();
+    });
+
     it("submits a leave request without attachments", async () => {
         render(
             <LeaveRequestForm
@@ -156,7 +198,7 @@ describe("LeaveRequestForm", () => {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
 
-        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+        await reviewAndSubmit();
 
         await waitFor(() =>
             expect(submitLeaveRequest).toHaveBeenCalledWith(
@@ -190,7 +232,7 @@ describe("LeaveRequestForm", () => {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
 
-        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+        await reviewAndSubmit();
 
         await waitFor(() =>
             expect(submitLeaveRequest).toHaveBeenCalledWith(
@@ -224,7 +266,7 @@ describe("LeaveRequestForm", () => {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
 
-        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+        await reviewAndSubmit();
 
         await screen.findByText("ระบบไม่พร้อมใช้งาน");
         expect(
@@ -254,7 +296,7 @@ describe("LeaveRequestForm", () => {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
 
-        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+        await reviewAndSubmit();
 
         await waitFor(() =>
             expect(
@@ -359,7 +401,7 @@ describe("LeaveRequestForm", () => {
         fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอลา" }));
+        await reviewAndSubmit();
 
         await waitFor(() =>
             expect(submitLeaveRequest).toHaveBeenCalledTimes(1),
@@ -370,9 +412,12 @@ describe("LeaveRequestForm", () => {
 
         fireEvent.keyDown(document, { key: "Escape" });
         fireBackdropClick();
-        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+        const backToEdit = screen.getByRole("button", { name: "แก้ไข" });
+        expect(backToEdit).toBeDisabled();
+        fireEvent.click(backToEdit);
 
         expect(onCancel).not.toHaveBeenCalled();
+        expect(screen.getByRole("group", { name: "ตรวจสอบคำขอลา" })).toBeInTheDocument();
         expect(
             screen.getByRole("dialog", { name: "ยื่นคำขอลา" }),
         ).toBeInTheDocument();
@@ -427,4 +472,9 @@ async function waitForDismissLayer(): Promise<void> {
             window.setTimeout(resolve, 0);
         });
     });
+}
+
+async function reviewAndSubmit(): Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
+    fireEvent.click(await screen.findByRole("button", { name: "ยืนยันส่งคำขอลา" }));
 }
