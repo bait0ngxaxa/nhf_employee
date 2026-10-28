@@ -20,6 +20,7 @@ import { resolveSafeInternalPath } from "@/lib/auth/return-path";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { authApiPost } from "./browser-api";
 import { useAuth } from "./HybridAuthProvider";
+import { PasswordInput } from "./PasswordInput";
 
 // Type definitions for login
 interface LoginFormData {
@@ -128,7 +129,7 @@ export function LoginForm({
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="m@example.com"
+                                    placeholder="name@yourcompany.com"
                                     autoComplete="email"
                                     spellCheck={false}
                                     value={formData.email}
@@ -158,9 +159,8 @@ export function LoginForm({
                                         ลืมรหัสผ่าน?
                                     </Link>
                                 </div>
-                                <Input
+                                <PasswordInput
                                     id="password"
-                                    type="password"
                                     autoComplete="current-password"
                                     value={formData.password}
                                     onChange={(e) =>

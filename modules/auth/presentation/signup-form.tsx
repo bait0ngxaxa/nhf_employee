@@ -20,6 +20,7 @@ import { Loader2 } from "lucide-react";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 import { authApiPost } from "./browser-api";
 import { useAuth } from "./HybridAuthProvider";
+import { PasswordInput } from "./PasswordInput";
 
 // Type definitions for API response
 interface User {
@@ -149,7 +150,7 @@ export function SignupForm({
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="example@thainhf.org"
+                                    placeholder="name@yourcompany.com"
                                     autoComplete="email"
                                     spellCheck={false}
                                     value={formData.email}
@@ -172,9 +173,8 @@ export function SignupForm({
                                 >
                                     รหัสผ่าน
                                 </Label>
-                                <Input
+                                <PasswordInput
                                     id="password"
-                                    type="password"
                                     placeholder="กรอกรหัสผ่าน"
                                     autoComplete="new-password"
                                     value={formData.password}
@@ -197,9 +197,10 @@ export function SignupForm({
                                 >
                                     ยืนยันรหัสผ่าน
                                 </Label>
-                                <Input
+                                <PasswordInput
                                     id="confirmPassword"
-                                    type="password"
+                                    showLabel="แสดงรหัสผ่านยืนยัน"
+                                    hideLabel="ซ่อนรหัสผ่านยืนยัน"
                                     placeholder="กรอกรหัสผ่านอีกครั้ง"
                                     autoComplete="new-password"
                                     value={formData.confirmPassword}
