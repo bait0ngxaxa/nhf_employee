@@ -417,6 +417,40 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.queryByText(/รุ่น|version|revision/i)).not.toBeInTheDocument();
     });
 
+    it("keeps assignment and category saves disabled until the selection differs from the Ticket", async () => {
+        let patchCount = 0;
+        mockApiImplementation(async (input, init) => {
+            if (String(input).includes("/reference")) return referenceResponse();
+            if (String(input).includes("/activity")) return activityResponse();
+            if (init?.method === "PATCH") patchCount += 1;
+            return detailResponse(ticket);
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+
+        await screen.findByRole("option", { name: "สมชาย ใจดี" });
+        const assigneeSelector = screen.getByRole("combobox", { name: "ผู้รับผิดชอบ Ticket" });
+        const categorySelector = screen.getByRole("combobox", { name: "หมวดหมู่ Ticket" });
+        const assignmentSave = screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" });
+        const categorySave = screen.getByRole("button", { name: "บันทึกหมวดหมู่" });
+
+        expect(assignmentSave).toBeDisabled();
+        expect(categorySave).toBeDisabled();
+        fireEvent.click(assignmentSave);
+        fireEvent.click(categorySave);
+
+        fireEvent.change(assigneeSelector, { target: { value: "51" } });
+        fireEvent.change(categorySelector, { target: { value: String(reference.categories[0].id) } });
+        expect(assignmentSave).toBeEnabled();
+        expect(categorySave).toBeEnabled();
+
+        fireEvent.change(assigneeSelector, { target: { value: "" } });
+        fireEvent.change(categorySelector, { target: { value: "" } });
+        expect(assignmentSave).toBeDisabled();
+        expect(categorySave).toBeDisabled();
+        expect(patchCount).toBe(0);
+    });
+
     it("shows ordinary mutation failures through one safe toast", async () => {
         mockApiImplementation(async (input, init) => {
             if (String(input).includes("/reference")) return referenceResponse();
@@ -429,7 +463,11 @@ describe("IT operator Ticket detail presentation", () => {
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
-        fireEvent.click(await screen.findByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+        await screen.findByRole("option", { name: "สมชาย ใจดี" });
+        fireEvent.change(screen.getByRole("combobox", { name: "ผู้รับผิดชอบ Ticket" }), {
+            target: { value: "51" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
 
         await waitFor(() => expect(toast.error).toHaveBeenCalledWith("ไม่สามารถบันทึกข้อมูลได้ในขณะนี้"));
         expect(toast.error).toHaveBeenCalledTimes(1);
@@ -509,7 +547,11 @@ describe("IT operator Ticket detail presentation", () => {
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
-        fireEvent.click(await screen.findByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+        await screen.findByRole("option", { name: "สมชาย ใจดี" });
+        fireEvent.change(screen.getByRole("combobox", { name: "ผู้รับผิดชอบ Ticket" }), {
+            target: { value: "51" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
 
         const accessWarning = await screen.findByText(
             "สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงปิดการดำเนินการไว้ กรุณาโหลดหน้าใหม่เพื่อตรวจสอบสิทธิ์ปัจจุบัน",
@@ -743,6 +785,9 @@ describe("IT operator Ticket detail presentation", () => {
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
         expect(await screen.findByText("ผู้ดำเนินการ: อารี ใจเย็น")).toBeInTheDocument();
+        fireEvent.change(screen.getByRole("combobox", { name: "ผู้รับผิดชอบ Ticket" }), {
+            target: { value: "" },
+        });
         fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
         await waitFor(() => expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeEnabled());
 
@@ -910,7 +955,7 @@ describe("IT operator Ticket detail presentation", () => {
             expect(patchCount).toBe(1);
 
             fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบข้อมูลล่าสุดแล้ว" }));
-            expect(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" })).toBeEnabled();
+            expect(screen.getByRole("button", { name: "รอข้อมูลจากผู้แจ้ง" })).toBeEnabled();
             expect(patchCount).toBe(1);
         },
     );

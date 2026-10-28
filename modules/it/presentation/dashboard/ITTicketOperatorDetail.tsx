@@ -270,12 +270,16 @@ export function ITTicketOperatorDetail({
         readonly key: string;
         readonly value: string;
     } | null>(null);
+    const savedAssignmentValue = ticket?.assignee ? String(ticket.assignee.userId) : "";
+    const savedCategoryValue = ticket?.category ? String(ticket.category.id) : "";
     const assignmentValue = assignmentDraft?.key === assignmentDraftKey
         ? assignmentDraft.value
-        : ticket?.assignee ? String(ticket.assignee.userId) : "";
+        : savedAssignmentValue;
     const categoryValue = categoryDraft?.key === assignmentDraftKey
         ? categoryDraft.value
-        : ticket?.category ? String(ticket.category.id) : "";
+        : savedCategoryValue;
+    const assignmentChanged = assignmentValue !== savedAssignmentValue;
+    const categoryChanged = categoryValue !== savedCategoryValue;
     const canManage = capabilities.canManageTickets && !mutationAccessDenied;
     const actionsDisabled = busy || loading || mutationReviewReason !== null || !ticket;
     const allowedTransitions = ticket
@@ -283,7 +287,7 @@ export function ITTicketOperatorDetail({
         : [];
 
     const handleAssignment = (): void => {
-        if (!ticket) return;
+        if (!ticket || !assignmentChanged) return;
         const assigneeUserId = assignmentValue === "" ? null : Number(assignmentValue);
         if (assigneeUserId !== null && !Number.isSafeInteger(assigneeUserId)) {
             toast.error("ผู้รับผิดชอบที่เลือกไม่ถูกต้อง");
@@ -297,7 +301,7 @@ export function ITTicketOperatorDetail({
     };
 
     const handleCategory = (): void => {
-        if (!ticket) return;
+        if (!ticket || !categoryChanged) return;
         const categoryId = categoryValue === "" ? null : Number(categoryValue);
         if (categoryId !== null && !Number.isSafeInteger(categoryId)) {
             toast.error("หมวดหมู่ที่เลือกไม่ถูกต้อง");
@@ -553,7 +557,7 @@ export function ITTicketOperatorDetail({
                                                 ))}
                                             </select>
                                         </label>
-                                        <Button type="button" variant="outline" disabled={actionsDisabled} onClick={handleAssignment}>
+                                        <Button type="button" variant="outline" disabled={actionsDisabled || !assignmentChanged} onClick={handleAssignment}>
                                             บันทึกผู้รับผิดชอบ
                                         </Button>
                                     </div>
@@ -591,7 +595,7 @@ export function ITTicketOperatorDetail({
                                                 ยังไม่มีหมวดหมู่ที่เปิดใช้งาน คุณยังบันทึก Ticket แบบไม่จัดหมวดหมู่ได้
                                             </p>
                                         ) : null}
-                                        <Button type="button" variant="outline" disabled={actionsDisabled} onClick={handleCategory}>
+                                        <Button type="button" variant="outline" disabled={actionsDisabled || !categoryChanged} onClick={handleCategory}>
                                             บันทึกหมวดหมู่
                                         </Button>
                                     </div>
