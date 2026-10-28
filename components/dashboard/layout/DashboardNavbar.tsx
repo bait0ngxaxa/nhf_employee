@@ -122,7 +122,7 @@ export function DashboardNavbar(): ReactElement {
 
     return (
         <header className="sticky top-0 z-30 shrink-0 border-b border-border-faint bg-surface/95 pt-[env(safe-area-inset-top)]">
-            <div className="flex min-w-0 items-center justify-between px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] sm:px-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.5rem+env(safe-area-inset-right))] lg:pl-[calc(2.5rem+env(safe-area-inset-left))] lg:pr-[calc(2.5rem+env(safe-area-inset-right))]">
+            <div className="flex min-w-0 items-center justify-between py-3 px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] sm:px-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.5rem+env(safe-area-inset-right))] lg:pl-[calc(2.5rem+env(safe-area-inset-left))] lg:pr-[calc(2.5rem+env(safe-area-inset-right))]">
                 {/* Left: Mobile menu + Page title */}
                 <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <Sheet

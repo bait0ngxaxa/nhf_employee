@@ -415,7 +415,7 @@ export function ITTicketSelfService({
                         </DialogDescription>
                     </DialogHeader>
                     <form className="min-h-0 flex flex-1 flex-col" onSubmit={handleCreate}>
-                        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+                        <div className="-mx-6 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-1">
                             <div className="space-y-2">
                                 <label htmlFor="it-ticket-type" className="block text-sm font-medium text-content-heading">ประเภทคำขอ</label>
                                 <select
