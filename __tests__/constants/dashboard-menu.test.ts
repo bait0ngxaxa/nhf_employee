@@ -160,6 +160,11 @@ afterEach(() => {
 });
 
 describe("dashboard menu", () => {
+    it("shows announcement management only to system administrators", () => {
+        expect(getMenuIds(true)).toContain("announcements");
+        expect(getMenuIds(false)).not.toContain("announcements");
+    });
+
     it("groups sidebar destinations by work area", () => {
         expect(DASHBOARD_MENU_GROUPS.map((group) => [
             group.label,
@@ -167,7 +172,7 @@ describe("dashboard menu", () => {
         ])).toEqual([
             ["บริการภายใน", ["leave-management", "stock", "routine", "it-workspace"]],
             ["บุคลากร", ["employee-management", "add-employee", "email-request"]],
-            ["ระบบและสิทธิ์", ["audit-logs", "authorization-administration"]],
+            ["ระบบและสิทธิ์", ["announcements", "audit-logs", "authorization-administration"]],
         ]);
     });
 

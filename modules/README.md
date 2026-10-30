@@ -138,6 +138,16 @@ presentation. Generic Dashboard shell/context/navigation and route access
 remain outside Employee. Other legacy locations remain valid until their
 feature is deliberately migrated; Employee compatibility cleanup is complete.
 
+Announcement ticker ownership is under `modules/announcements/`. Its server
+entry owns validation, the singleton lifecycle, optimistic version checks,
+Prisma persistence and transactional Audit production. Its browser entry is
+`@/modules/announcements/client` (manager and accessible ticker only). HTTP
+and Dashboard composition enforce active web sessions; management additionally
+requires the trusted system `ADMIN` role. This is a system administration
+feature and does not change the generic Authorization Resolver or business
+capabilities. See [announcement-ticker.md](../docs/architecture/announcement-ticker.md)
+for lifecycle, migration and verification details.
+
 Rules for new work:
 
 - Put a substantial new business feature under `modules/<feature>/`.

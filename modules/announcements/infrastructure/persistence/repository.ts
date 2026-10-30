@@ -1,5 +1,6 @@
 import type { Announcement } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { lockUserRows } from "@/lib/db/row-locks";
 import type { UserContext } from "@/lib/auth/context";
 import { appendAuditInTransaction } from "@/modules/audit";
 import { AnnouncementError, type AnnouncementMutation, type AnnouncementState } from "../../domain/contracts";
@@ -14,6 +15,7 @@ export async function findAnnouncement(): Promise<AnnouncementState> {
 
 export async function persistAnnouncement(principal: UserContext, input: AnnouncementMutation): Promise<AnnouncementState> {
     return prisma.$transaction(async (tx) => {
+        await lockUserRows(tx, [principal.id]);
         // Re-read trusted account state at the mutation boundary as well as route authorization.
         const actor = await tx.user.findUnique({
             where: { id: principal.id },
@@ -31,7 +33,7 @@ export async function persistAnnouncement(principal: UserContext, input: Announc
                 ...(input.action !== "unpublish" ? { content: input.content } : {}),
                 published: input.action === "publish",
                 version: { increment: 1 },
-                ...(before.authorId === null ? { authorId: principal.id } : {}),
+                ...(before.version === 0 ? { authorId: principal.id, createdAt: new Date() } : {}),
                 updatedById: principal.id,
             },
         });

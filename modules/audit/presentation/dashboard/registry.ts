@@ -30,6 +30,10 @@ const DEFAULT_AUDIT_ACTION_META: AuditActionMeta = {
 };
 
 export const AUDIT_ACTION_META = {
+    ANNOUNCEMENT_UPDATE: {
+        label: "จัดการประกาศ",
+        badgeClassName: AUDIT_BADGE_TONES.update,
+    },
     LOGIN_SUCCESS: {
         label: "เข้าสู่ระบบสำเร็จ",
         badgeClassName: AUDIT_BADGE_TONES.success,
@@ -296,6 +300,7 @@ export const AUDIT_ACTION_FILTER_OPTIONS = [
 ];
 
 export const AUDIT_ENTITY_LABELS = {
+    Announcement: "ประกาศองค์กร",
     User: "ผู้ใช้ระบบ",
     ITTicket: "ทิกเก็ต IT",
     Team: "Team",

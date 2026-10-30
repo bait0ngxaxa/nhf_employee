@@ -27,6 +27,7 @@ const NODE_TESTS = [
 ];
 
 const DOM_TESTS = [
+    "modules/announcements/presentation/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "__tests__/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",
     "__tests__/{components,hooks,context}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}",
     "modules/stock/__tests__/**/*.{test,spec}.{jsx,mjsx,cjsx,tsx,mtsx,ctsx}",

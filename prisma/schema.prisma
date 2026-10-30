@@ -478,7 +478,6 @@ model AuditLog {
 }
 
 enum AuditAction {
-  ANNOUNCEMENT_UPDATE
   // Authentication
   LOGIN_SUCCESS
   LOGIN_FAILED
@@ -559,6 +558,9 @@ enum AuditAction {
   ROUTINE_IMPORT_ROW_UPDATE
   ROUTINE_IMPORT_APPLY
   ROUTINE_IMPORT_CANCEL
+
+  // Organizational announcement management
+  ANNOUNCEMENT_UPDATE
 }
 
 // Email Request History for tracking new employee email requests
