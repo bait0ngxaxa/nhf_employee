@@ -74,7 +74,8 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
 
     return (
         <Dialog>
-            <section aria-labelledby="line-add-friend-heading" className={cn("flex min-w-0 flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-surface-raised p-4", className)}>
+            <section aria-labelledby="line-add-friend-heading" className={cn("flex min-w-0 flex-col gap-3 rounded-2xl border border-border-subtle bg-surface-raised p-4 sm:flex-row sm:items-center", className)}>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-status-success-solid text-content-on-brand">
                     <LineLogoIcon className="size-5" />
                 </span>
@@ -82,10 +83,13 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                     <h2 id="line-add-friend-heading" className="font-bold text-content-heading">NHFapp ผ่าน LINE</h2>
                     <p className="text-sm text-content-secondary">{status === "linked" ? "เชื่อมบัญชี NHFapp กับ LINE แล้ว" : "เข้าถึงบริการพนักงานได้สะดวกจากมือถือ"}</p>
                 </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                 {status === "linked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-3 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2 [@media(min-width:768px)_and_(pointer:fine)]:hidden">เปิด NHFapp ใน LINE</a> : null}
                 <DialogTrigger asChild>
-                    <button type="button" className="min-h-11 rounded-md border border-border-subtle px-3 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">ดูวิธีเริ่มใช้งาน</button>
+                    <button type="button" className="min-h-11 rounded-md border border-border-subtle px-3 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">{status === "linked" ? "วิธีใช้งาน" : "ดูวิธีเริ่มใช้งาน"}</button>
                 </DialogTrigger>
+                </div>
             </section>
             <DialogContent closeLabel="ปิด" className="p-4 sm:p-6" onOpenAutoFocus={(event) => { event.preventDefault(); titleRef.current?.focus(); }}>
                 <DialogHeader className="pr-10 text-left">
@@ -115,7 +119,6 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                     {status === "linked" ? <p className="mt-3 text-sm font-semibold text-content-primary">บัญชี NHFapp เชื่อมกับ LINE แล้ว</p> : null}
                     {status === "unlinked" ? <p className="mt-3 text-sm leading-6 text-content-secondary">เพิ่มเพื่อน แล้วเชื่อมบัญชี NHFapp เพียงครั้งเดียวเพื่อใช้บริการ</p> : null}
                     <div className="mt-3 flex flex-col gap-2 [@media(min-width:768px)_and_(pointer:fine)]:hidden">
-                        {status === "linked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-4 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2">เปิดบริการ NHFapp ใน LINE</a> : null}
                         <a href={LINE_OA_ADD_FRIEND_URL} className={cn("inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2", status === "linked" ? "border border-border-subtle text-content-primary" : "bg-status-success-solid-strong text-content-on-brand")}>เพิ่มเพื่อนใน LINE</a>
                         {status === "unlinked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-subtle px-4 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2">เชื่อมบัญชี NHFapp</a> : null}
                         {(status === "linked" || status === "unlinked") && !liffUrl ? <p className="text-sm text-content-secondary">บริการ LINE ยังไม่พร้อมใช้งาน</p> : null}
