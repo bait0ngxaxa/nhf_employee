@@ -5,7 +5,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/ui/utils";
 import {
@@ -286,7 +286,7 @@ function getFeaturedRank(id: string): number {
     return FEATURED_ORDER.get(id) ?? Number.MAX_SAFE_INTEGER;
 }
 
-export function DashboardHomeSection() {
+export function DashboardHomeSection({ announcement }: { announcement?: ReactNode }): React.ReactElement {
     const { user, availableMenuGroups } = useDashboardDataContext();
     const { handleMenuClick } = useDashboardUIContext();
 
@@ -323,6 +323,7 @@ export function DashboardHomeSection() {
     return (
         <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="relative z-10 mx-auto max-w-7xl space-y-6">
+                {announcement}
                 <section
                     aria-labelledby="dashboard-home-heading"
                     className="border-b border-border-subtle pb-8"

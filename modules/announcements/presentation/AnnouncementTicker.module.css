@@ -1,0 +1,63 @@
+.viewport {
+    container-type: inline-size;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.track {
+    display: flex;
+    width: max-content;
+    animation: announcement-scroll var(--announcement-duration) linear infinite;
+}
+
+.item {
+    flex: 0 0 auto;
+    min-width: 100cqi;
+    padding-inline-end: 3rem;
+    white-space: nowrap;
+    line-height: 1.75;
+}
+
+.ticker:hover .track,
+.ticker:focus-within .track {
+    animation-play-state: paused;
+}
+
+/* The pause control also reveals the complete text on any screen width. */
+.ticker[data-paused="true"] .track {
+    animation: none;
+    width: 100%;
+}
+
+.ticker[data-paused="true"] .item {
+    min-width: 0;
+    width: 100%;
+    padding: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.ticker[data-paused="true"] .copy {
+    display: none;
+}
+
+@keyframes announcement-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .track {
+        animation: none;
+        width: 100%;
+    }
+    .item {
+        min-width: 0;
+        width: 100%;
+        padding: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .copy { display: none; }
+    .ticker button { display: none; }
+}
