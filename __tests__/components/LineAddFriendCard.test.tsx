@@ -17,10 +17,12 @@ describe("LineAddFriendCard", () => {
         render(<LineAddFriendCard />);
         expect(screen.getByRole("heading", { name: "NHFapp ผ่าน LINE" })).toBeInTheDocument();
         expect(screen.queryByAltText("QR Code สำหรับเพิ่ม NHF เป็นเพื่อนใน LINE")).not.toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: "เปิด NHFapp ใน LINE" })).not.toBeInTheDocument();
         expect(screen.queryByText(/เพิ่มเพื่อน LINE Official Account/)).not.toBeInTheDocument();
         const trigger = screen.getByRole("button", { name: "ดูวิธีเริ่มใช้งาน" });
         fireEvent.click(trigger);
         expect(screen.getByRole("dialog", { name: "เริ่มใช้งาน NHFapp ผ่าน LINE" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "เริ่มใช้งาน NHFapp ผ่าน LINE" })).toHaveFocus();
         for (const step of ["1. เพิ่มเพื่อน LINE Official Account", "2. เชื่อมบัญชี NHFapp", "3. เริ่มใช้บริการ"]) expect(screen.getByText(step)).toBeInTheDocument();
         for (const text of ["เบิกวัสดุและติดตามคำขอ", "ดูข้อมูลและจัดการวันลา", "ติดตามงาน Routine", "แจ้งปัญหา IT และติดตาม Ticket"]) expect(screen.getByText(new RegExp(text))).toBeInTheDocument();
         expect(screen.getByText("บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ")).toBeInTheDocument();
@@ -51,6 +53,9 @@ describe("LineAddFriendCard", () => {
     });
     it("shows linked status without claiming friendship and limits LIFF action to mobile", async () => {
         respond("linked"); render(<LineAddFriendCard />);
+        const directLink = await screen.findByRole("link", { name: "เปิด NHFapp ใน LINE" });
+        expect(directLink).toHaveAttribute("href", "https://liff.line.me/test");
+        expect(directLink).toHaveClass("[@media(min-width:768px)_and_(pointer:fine)]:hidden");
         fireEvent.click(screen.getByRole("button", { name: "ดูวิธีเริ่มใช้งาน" }));
         await screen.findByText("บัญชี NHFapp เชื่อมกับ LINE แล้ว");
         const link = screen.getByRole("link", { name: "เปิดบริการ NHFapp ใน LINE" });

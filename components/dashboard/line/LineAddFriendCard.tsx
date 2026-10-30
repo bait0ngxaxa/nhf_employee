@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import qrCodeImage from "@/assets/qr/950gaxzt.png";
 import { LINE_OA_ID, LINE_OA_ADD_FRIEND_URL } from "@/lib/line/official-account";
 import { buildLiffUrl } from "@/lib/line/liff-links";
@@ -30,6 +30,7 @@ function LineLogoIcon({ className }: { className: string }): ReactElement {
 
 
 export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): ReactElement {
+    const titleRef = useRef<HTMLHeadingElement>(null);
     const [copyResult, setCopyResult] = useState<"success" | "error" | null>(null);
     const [status, setStatus] = useState<"loading" | "linked" | "unlinked" | "unavailable" | "error">("loading");
     const [retry, setRetry] = useState(0);
@@ -81,13 +82,14 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                     <h2 id="line-add-friend-heading" className="font-bold text-content-heading">NHFapp ผ่าน LINE</h2>
                     <p className="text-sm text-content-secondary">{status === "linked" ? "เชื่อมบัญชี NHFapp กับ LINE แล้ว" : "เข้าถึงบริการพนักงานได้สะดวกจากมือถือ"}</p>
                 </div>
+                {status === "linked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-3 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2 [@media(min-width:768px)_and_(pointer:fine)]:hidden">เปิด NHFapp ใน LINE</a> : null}
                 <DialogTrigger asChild>
                     <button type="button" className="min-h-11 rounded-md border border-border-subtle px-3 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">ดูวิธีเริ่มใช้งาน</button>
                 </DialogTrigger>
             </section>
-            <DialogContent closeLabel="ปิด" className="p-4 sm:p-6">
+            <DialogContent closeLabel="ปิด" className="p-4 sm:p-6" onOpenAutoFocus={(event) => { event.preventDefault(); titleRef.current?.focus(); }}>
                 <DialogHeader className="pr-10 text-left">
-                    <DialogTitle className="leading-7 text-content-heading">เริ่มใช้งาน NHFapp ผ่าน LINE</DialogTitle>
+                    <DialogTitle ref={titleRef} tabIndex={-1} className="leading-7 text-content-heading">เริ่มใช้งาน NHFapp ผ่าน LINE</DialogTitle>
                     <DialogDescription className="leading-6 text-content-secondary">เพิ่มเพื่อน LINE Official Account และเชื่อมบัญชี NHFapp เพื่อใช้บริการต่าง ๆ ตามสิทธิ์ของคุณ</DialogDescription>
                 </DialogHeader>
                 <DialogScrollArea className="pr-1">
