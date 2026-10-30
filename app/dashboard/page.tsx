@@ -1,4 +1,8 @@
 import { Suspense } from "react";
+import { requireApiSession } from "@/lib/auth/api";
+import { APP_ROUTES } from "@/lib/ssot/routes";
+import { getPublishedAnnouncement } from "@/modules/announcements";
+import { AnnouncementTicker } from "@/modules/announcements/client";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -14,6 +18,13 @@ export const metadata: Metadata = {
     description: "Employee Management Dashboard for NHF",
 };
 
+async function DashboardAnnouncement(): Promise<React.ReactElement | null> {
+    const auth = await requireApiSession();
+    if (!auth.ok) redirect(APP_ROUTES.login);
+    const announcement = await getPublishedAnnouncement();
+    return announcement ? <AnnouncementTicker content={announcement.content} /> : null;
+}
+
 export default async function DashboardPage({
     searchParams,
 }: {
@@ -26,7 +37,7 @@ export default async function DashboardPage({
 
     return (
         <Suspense fallback={<DashboardHomeSkeleton />}>
-            <DashboardHomeSection />
+            <DashboardHomeSection announcement={<DashboardAnnouncement />} />
         </Suspense>
     );
 }

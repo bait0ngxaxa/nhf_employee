@@ -11,6 +11,7 @@ import {
     ClipboardCheck,
     KeyRound,
     Headset,
+    Megaphone,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -91,6 +92,13 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         description: "ดูประวัติการใช้งานระบบ",
     },
     {
+        id: "announcements",
+        label: "จัดการประกาศ",
+        icon: Megaphone,
+        description: "เขียนและเผยแพร่ประกาศบนหน้าหลัก",
+        requiredRole: "ADMIN",
+    },
+    {
         id: "authorization-administration",
         label: "จัดการสิทธิ์การใช้งาน",
         icon: KeyRound,
@@ -153,6 +161,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         label: "ระบบและสิทธิ์",
         icon: ShieldCheck,
         items: [
+            getDashboardMenuItem("announcements"),
             getDashboardMenuItem("audit-logs"),
             getDashboardMenuItem("authorization-administration"),
         ],

@@ -20,6 +20,8 @@ model User {
   isActive                    Boolean                     @default(true)
   deletedAt                   DateTime?
   employee                    Employee?                   @relation(fields: [employeeId], references: [id])
+  authoredAnnouncements       Announcement[]               @relation("AnnouncementAuthor")
+  updatedAnnouncements        Announcement[]              @relation("AnnouncementUpdater")
   auditLogs                   AuditLog[]
   emailRequests               EmailRequest[]
   emailRequestIdempotencies   EmailRequestIdempotency[]
@@ -556,6 +558,9 @@ enum AuditAction {
   ROUTINE_IMPORT_ROW_UPDATE
   ROUTINE_IMPORT_APPLY
   ROUTINE_IMPORT_CANCEL
+
+  // Organizational announcement management
+  ANNOUNCEMENT_UPDATE
 }
 
 // Email Request History for tracking new employee email requests
@@ -1180,4 +1185,18 @@ enum RoutineReminderRecipientScope {
   ASSIGNEES
   ALL_READERS
   ASSIGNEES_AND_ALL_READERS
+}
+
+// A migration-seeded singleton; id=1 is enforced by a database CHECK.
+model Announcement {
+  id          Int      @id @default(1)
+  content     String   @default("") @db.VarChar(500)
+  published   Boolean  @default(false)
+  version     Int      @default(0)
+  authorId    Int?
+  updatedById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  author      User?    @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  updatedBy   User?    @relation("AnnouncementUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
 }
