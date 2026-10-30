@@ -56,10 +56,14 @@ describe("LineAddFriendCard", () => {
         const directLink = await screen.findByRole("link", { name: "เปิด NHFapp ใน LINE" });
         expect(directLink).toHaveAttribute("href", "https://liff.line.me/test");
         expect(directLink).toHaveClass("[@media(min-width:768px)_and_(pointer:fine)]:hidden");
-        fireEvent.click(screen.getByRole("button", { name: "ดูวิธีเริ่มใช้งาน" }));
+        expect(screen.getAllByRole("link", { name: "เปิด NHFapp ใน LINE" })).toHaveLength(1);
+        const trigger = screen.getByRole("button", { name: "วิธีใช้งาน" });
+        fireEvent.click(trigger);
         await screen.findByText("บัญชี NHFapp เชื่อมกับ LINE แล้ว");
-        const link = screen.getByRole("link", { name: "เปิดบริการ NHFapp ใน LINE" });
-        expect(link.parentElement).toHaveClass("[@media(min-width:768px)_and_(pointer:fine)]:hidden");
+        expect(screen.getByRole("dialog").querySelector('a[href="https://liff.line.me/test"]')).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "ปิด" }));
+        await waitFor(() => expect(trigger).toHaveFocus());
+        fireEvent.click(trigger);
         expect(screen.getByRole("link", { name: "เพิ่มเพื่อนใน LINE" })).toBeInTheDocument();
         expect(screen.queryByText(/เป็นเพื่อนแล้ว/)).not.toBeInTheDocument();
     });
@@ -85,7 +89,9 @@ describe("LineAddFriendCard", () => {
     it.each(["linked", "unlinked"])("handles missing LIFF configuration for %s", async (status) => {
         vi.mocked(buildLiffUrl).mockImplementation(() => { throw new Error(); });
         respond(status); render(<LineAddFriendCard />);
-        fireEvent.click(screen.getByRole("button", { name: "ดูวิธีเริ่มใช้งาน" }));
+        const trigger = await screen.findByRole("button", { name: status === "linked" ? "วิธีใช้งาน" : "ดูวิธีเริ่มใช้งาน" });
+        expect(screen.queryByRole("link", { name: "เปิด NHFapp ใน LINE" })).not.toBeInTheDocument();
+        fireEvent.click(trigger);
         await screen.findByText(status === "linked" ? "บัญชี NHFapp เชื่อมกับ LINE แล้ว" : "เพิ่มเพื่อน แล้วเชื่อมบัญชี NHFapp เพียงครั้งเดียวเพื่อใช้บริการ");
         expect(screen.getByRole("link", { name: "เพิ่มเพื่อนใน LINE" })).toBeInTheDocument();
         expect(screen.queryByRole("link", { name: /เชื่อมบัญชี NHFapp|เปิดบริการ NHFapp/ })).not.toBeInTheDocument();

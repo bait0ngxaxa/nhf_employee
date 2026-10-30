@@ -118,6 +118,19 @@ describe("DashboardHomeSection identity presentation", () => {
         expect(getCurrentGreeting(new Date(timestamp))).toBe(expected);
     });
 
+    it("preserves a long Thai name and nickname in the greeting", () => {
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated", user: { id: "1", name: "สมชาย วัฒนศิริกุลมหาประเสริฐ (ชาย)", role: "ADMIN", department: "IT", teams: [] },
+            isAdmin: true, availableMenuGroups: [],
+        });
+        vi.mocked(useDashboardUIContext).mockReturnValue({
+            selectedMenu: "dashboard", mobileNavOpen: false, setMobileNavOpen: vi.fn(),
+            desktopSidebarCollapsed: false, setDesktopSidebarCollapsed: vi.fn(), handleMenuClick: vi.fn(), handleSignOut: vi.fn(), router: {} as never,
+        });
+        render(<DashboardHomeSection />);
+        expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("สมชาย วัฒนศิริกุลมหาประเสริฐ (ชาย)");
+    });
+
     it("uses Team context instead of exposing the internal system role", () => {
         vi.mocked(useDashboardDataContext).mockReturnValue({
             status: "authenticated",
