@@ -91,7 +91,22 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                     <DialogDescription className="leading-6 text-content-secondary">เพิ่มเพื่อน LINE Official Account และเชื่อมบัญชี NHFapp เพื่อใช้บริการต่าง ๆ ตามสิทธิ์ของคุณ</DialogDescription>
                 </DialogHeader>
                 <DialogScrollArea className="pr-1">
-                    <div>
+                    <ol className="space-y-3 text-sm leading-6 text-content-secondary">
+                        <li><span className="font-semibold text-content-primary">1. เพิ่มเพื่อน LINE Official Account</span><p>เพิ่มเพื่อนผ่านลิงก์หรือสแกน QR Code ด้วย LINE</p></li>
+                        <li><span className="font-semibold text-content-primary">2. เชื่อมบัญชี NHFapp</span><p>ผู้ที่มีสิทธิ์เชื่อมบัญชี NHFapp กับ LINE เพียงครั้งเดียว</p></li>
+                        <li><span className="font-semibold text-content-primary">3. เริ่มใช้บริการ</span><p>เข้าใช้บริการ NHFapp ที่รองรับผ่าน LINE ได้ตามสิทธิ์</p></li>
+                    </ol>
+                    <div className="mt-5 border-t border-border-subtle pt-4">
+                        <h3 className="font-semibold text-content-heading">บริการที่รองรับ</h3>
+                        <ul className="mt-2 list-inside list-disc space-y-1 text-sm leading-6 text-content-secondary">
+                            <li>เบิกวัสดุและติดตามคำขอ</li>
+                            <li>ดูข้อมูลและจัดการวันลา</li>
+                            <li>ติดตามงาน Routine</li>
+                            <li>แจ้งปัญหา IT และติดตาม Ticket</li>
+                        </ul>
+                        <p className="mt-2 text-sm text-content-secondary">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>
+                    </div>
+                    <div className="mt-4 border-t border-border-subtle pt-1">
                     {status === "loading" ? <p className="mt-3 text-sm text-content-secondary" role="status">กำลังตรวจสอบสถานะการเชื่อมบัญชี…</p> : null}
                     {status === "error" ? <div className="mt-3 text-sm text-content-secondary"><p>ไม่สามารถตรวจสอบสถานะได้ กรุณาลองใหม่</p><button type="button" onClick={() => { setStatus("loading"); setRetry((value) => value + 1); }} className="min-h-11 font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">ลองใหม่</button></div> : null}
                     {status === "unavailable" ? <p className="mt-3 text-sm text-content-secondary">บัญชีนี้ยังไม่พร้อมใช้บริการผ่าน LINE</p> : null}
