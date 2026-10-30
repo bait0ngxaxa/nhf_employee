@@ -26,7 +26,7 @@ export async function persistAnnouncement(principal: UserContext, input: Announc
         }
         const before = await tx.announcement.findUniqueOrThrow({ where: { id: 1 } });
         if (before.version !== input.version) throw new AnnouncementError("CONFLICT");
-        if (input.action === "unpublish" && before.version === 0) throw new AnnouncementError("INVALID_INPUT");
+        if (input.action === "unpublish" && !before.published) throw new AnnouncementError("INVALID_INPUT");
         const result = await tx.announcement.updateMany({
             where: { id: 1, version: input.version },
             data: {

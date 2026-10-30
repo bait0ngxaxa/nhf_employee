@@ -39,7 +39,7 @@ describe("Announcement presentation", () => {
         render(<AnnouncementTicker content={"ประกาศยาว".repeat(50)} />);
         const pause = screen.getByRole("button", { name: "หยุดและอ่านข้อความ" });
         pause.focus(); expect(pause).toHaveFocus(); fireEvent.click(pause);
-        expect(screen.getByRole("region", { name: "ประกาศองค์กร" })).toHaveAttribute("data-paused", "true");
+        expect(screen.getByRole("region", { name: "ประกาศ" })).toHaveAttribute("data-paused", "true");
         expect(screen.getByRole("button", { name: "เลื่อนข้อความต่อ" })).toHaveAttribute("aria-pressed", "true");
         fireEvent.click(screen.getByRole("button", { name: "เลื่อนข้อความต่อ" }));
         expect(screen.getByRole("region")).toHaveAttribute("data-paused", "false");

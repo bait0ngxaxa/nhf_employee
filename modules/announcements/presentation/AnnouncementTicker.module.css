@@ -18,8 +18,8 @@
     line-height: 1.75;
 }
 
-.ticker:hover .track,
-.ticker:focus-within .track {
+.viewport:hover .track,
+.viewport:focus-within .track {
     animation-play-state: paused;
 }
 

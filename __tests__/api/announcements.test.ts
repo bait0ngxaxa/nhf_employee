@@ -77,6 +77,17 @@ describe("Announcement authenticated lifecycle", () => {
         expect(await (await manage()).json()).toMatchObject({ announcement: { content: "ฉบับร่าง", published: false } });
     });
 
+    it.each(["draft", "unpublished"])("rejects unpublish on an already inactive %s without writes or audit", async (state) => {
+        row = { ...row, content: "ฉบับร่าง", version: 1, published: false };
+        if (state === "unpublished") row.version = 3;
+        const before = { ...row };
+        expect((await POST(request({ action: "unpublish", version: row.version }))).status).toBe(400);
+        expect(row).toEqual(before);
+        expect(mocks.update).not.toHaveBeenCalled();
+        expect(mocks.audit).not.toHaveBeenCalled();
+        expect(mocks.revalidate).not.toHaveBeenCalled();
+    });
+
     it.each(["ADMIN", "USER"] as const)("allows every active authenticated %s to read without Team or Department", async (role) => {
         row.content = "ข่าวสำหรับทุกคน"; row.published = true; session(role);
         const response = await read();

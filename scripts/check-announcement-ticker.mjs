@@ -84,7 +84,7 @@ try {
                 await page.setViewport({ width, height: 900 });
                 await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: reduced ? "reduce" : "no-preference" }]);
                 await page.goto(`${pathToFileURL(join(output, "index.html"))}${long ? "?long" : ""}`);
-                await page.waitForSelector('section[aria-label="ประกาศองค์กร"]');
+                await page.waitForSelector('section[aria-label="ประกาศ"]');
                 await page.evaluate(() => document.fonts.ready);
                 if (long && [320, 1280].includes(width)) {
                     await page.screenshot({ path: join(output, `ticker-${width}-${reduced ? "static" : "moving"}.png`), fullPage: true });
@@ -108,16 +108,25 @@ try {
                     if (long && width === 320) assert.ok(metrics.textHeight > 100, "long mobile text wraps in reduced motion");
                 } else {
                     assert.notEqual(metrics.animation, "none");
-                    await page.hover("section");
+                    await page.hover('[aria-label="ข้อความประกาศ"]');
                     assert.equal(await page.$eval("section p", (p) => getComputedStyle(p.parentElement).animationPlayState), "paused");
                     await page.mouse.move(0, 0);
-                    await page.focus("section button");
+                    await page.focus('[aria-label="ข้อความประกาศ"]');
                     assert.equal(await page.$eval("section p", (p) => getComputedStyle(p.parentElement).animationPlayState), "paused");
+                    await page.focus("section button");
                     await page.keyboard.press("Enter");
                     assert.equal(await page.$eval("section", (s) => s.dataset.paused), "true");
                     const paused = await page.$eval("section p", (p) => ({ animation: getComputedStyle(p.parentElement).animationName,
                         wrap: getComputedStyle(p).whiteSpace, overflow: p.scrollWidth > p.clientWidth + 1 }));
                     assert.equal(paused.animation, "none"); assert.equal(paused.wrap, "pre-wrap"); assert.equal(paused.overflow, false);
+                    await page.keyboard.press("Enter");
+                    assert.equal(await page.$eval("section", (s) => s.dataset.paused), "false");
+                    assert.equal(await page.$eval("section button", (button) => document.activeElement === button), true);
+                    await page.hover("section button");
+                    assert.equal(await page.$eval("section p", (p) => getComputedStyle(p.parentElement).animationPlayState), "running",
+                        "keyboard Resume must restart animation while the button retains focus");
+                    const position = await page.$eval("section p", (p) => p.getBoundingClientRect().x);
+                    await page.waitForFunction((previous) => document.querySelector("section p").getBoundingClientRect().x < previous - 1, {}, position);
                 }
                 if (long && [320, 1280].includes(width) && reduced) {
                     await page.screenshot({ path: join(output, `ticker-${width}.png`), fullPage: true });
@@ -125,6 +134,24 @@ try {
                     await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
                     await page.screenshot({ path: join(output, `ticker-${width}-dark.png`), fullPage: true });
                 }
+                const contrast = await page.evaluate(() => {
+                    const section = document.querySelector("section");
+                    const context = document.createElement("canvas").getContext("2d");
+                    function luminance(color) {
+                        context.clearRect(0, 0, 1, 1);
+                        context.fillStyle = color; context.fillRect(0, 0, 1, 1);
+                        const channels = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map((value) => {
+                            const s = value / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+                        });
+                        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+                    }
+                    const background = luminance(getComputedStyle(section).backgroundColor);
+                    return ["h2", "p", "button"].map((selector) => {
+                        const foreground = luminance(getComputedStyle(section.querySelector(selector)).color);
+                        return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+                    });
+                });
+                assert.ok(contrast.every((ratio) => ratio >= 4.5), `announcement text contrast: ${contrast}`);
                 assert.deepEqual(errors, []);
                 cases += 1;
                 await page.close();
@@ -141,7 +168,7 @@ try {
             await page.evaluate(() => document.fonts.ready);
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
             if (view === "home") {
-                const placed = await page.evaluate(() => document.querySelector('[aria-label="ประกาศองค์กร"]').getBoundingClientRect().bottom
+                const placed = await page.evaluate(() => document.querySelector('[aria-label="ประกาศ"]').getBoundingClientRect().bottom
                     <= document.querySelector("#dashboard-home-heading").getBoundingClientRect().top);
                 assert.equal(placed, true, "ticker appears above dashboard greeting");
             }

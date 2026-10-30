@@ -11,15 +11,15 @@ export function AnnouncementTicker({ content }: { content: string | null }): Rea
     if (!content) return null;
 
     return (
-        <section aria-label="ประกาศองค์กร" data-paused={paused} className={`${styles.ticker} min-w-0 rounded-xl border border-border-subtle bg-surface-raised p-4 text-content-body`}>
+        <section aria-label="ประกาศ" data-paused={paused} className={`${styles.ticker} min-w-0 rounded-xl border border-status-info-border bg-status-info-surface-strong p-4 text-status-info-strong`}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 font-semibold text-brand-strong"><Megaphone className="size-5" aria-hidden="true" />ประกาศองค์กร</h2>
-                <Button variant="ghost" aria-pressed={paused} onClick={() => setPaused(!paused)}>
+                <h2 className="flex items-center gap-3 font-semibold"><span className="flex size-9 items-center justify-center rounded-md bg-status-info-solid text-content-on-brand"><Megaphone className="size-5" aria-hidden="true" /></span>ประกาศ</h2>
+                <Button variant="ghost" className="text-status-info-strong hover:bg-status-info-border-subtle hover:text-status-info-emphasis focus-visible:ring-status-info-strong" aria-pressed={paused} onClick={() => setPaused(!paused)}>
                     {paused ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
                     {paused ? "เลื่อนข้อความต่อ" : "หยุดและอ่านข้อความ"}
                 </Button>
             </div>
-            <div className={styles.viewport}>
+            <div role="group" aria-label="ข้อความประกาศ" tabIndex={0} className={`${styles.viewport} rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info-strong focus-visible:ring-offset-2`}>
                 <div className={styles.track} style={{ "--announcement-duration": `${Math.max(24, content.length * 0.25)}s` } as CSSProperties}>
                     <p className={styles.item} dir="auto">{content}</p>
                     <p className={`${styles.item} ${styles.copy}`} dir="auto" aria-hidden="true">{content}</p>

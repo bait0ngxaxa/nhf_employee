@@ -31,7 +31,8 @@ account deletion cannot remove the announcement or its text. Audit retains
 the actor email as well as the user reference.
 
 `save` stores an unpublished draft, `publish` saves and publishes, and
-`unpublish` retains the text while hiding it. Saving a draft also hides any
+`unpublish` retains the text while hiding it and rejects already unpublished
+content without writing or auditing. Saving a draft also hides any
 previously published text; the form explains this explicitly. This is one
 editable slot, without a separate draft revision or publication history CMS.
 
@@ -62,7 +63,8 @@ and refreshes read current state; an already open Dashboard does not update
 until navigation/refresh. No polling or realtime transport is added.
 
 The ticker has one accessible text copy and one aria-hidden visual copy. CSS
-animates matching halves right-to-left. Hover and focus pause movement. The
+animates matching halves right-to-left. Hover and keyboard focus within the
+text viewport pause movement, independently of the Pause/Resume button. The
 keyboard-operable pause button removes animation and wraps the entire text,
 including long unbroken strings, within mobile widths. Reduced motion uses
 that readable static layout and hides the motion control. No live region or
