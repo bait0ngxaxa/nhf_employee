@@ -6,6 +6,7 @@ export const APP_ROUTES = {
     signup: "/signup",
     refreshSession: "/auth/refresh",
     dashboard: "/dashboard",
+    dashboardAnnouncements: "/dashboard/announcements",
     dashboardLeave: "/dashboard/leave",
     dashboardStock: "/dashboard/stock",
     dashboardRoutine: "/dashboard/routine",
@@ -40,6 +41,7 @@ export function isLiffAppPath(pathname: string | null | undefined): boolean {
 
 export const APP_DASHBOARD_TABS = {
     dashboard: "dashboard",
+    announcements: "announcements",
     leaveManagement: "leave-management",
     leaveHistory: "leave-history",
     managerApproval: "manager-approval",
@@ -77,6 +79,7 @@ export function toDashboardITTabPath(tab: ITDashboardTab): string {
 
 export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     dashboard: APP_ROUTES.dashboard,
+    announcements: APP_ROUTES.dashboardAnnouncements,
     "leave-management": APP_ROUTES.dashboardLeave,
     "leave-history": `${APP_ROUTES.dashboardLeave}?leaveTab=my-leave`,
     "manager-approval": `${APP_ROUTES.dashboardLeave}?leaveTab=approvals`,
@@ -100,6 +103,7 @@ export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
 const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     readonly [string, DashboardMenuId]
 > = [
+    [APP_ROUTES.dashboardAnnouncements, APP_DASHBOARD_TABS.announcements],
     [APP_ROUTES.dashboardEmployeeImport, APP_DASHBOARD_TABS.importEmployee],
     [APP_ROUTES.dashboardEmployeeNew, APP_DASHBOARD_TABS.addEmployee],
     [APP_ROUTES.dashboardEmployees, APP_DASHBOARD_TABS.employeeManagement],
@@ -206,6 +210,7 @@ const LEGACY_DASHBOARD_TAB_TARGETS: Readonly<
     },
     "add-employee": { menuId: APP_DASHBOARD_TABS.addEmployee },
     "import-employee": { menuId: APP_DASHBOARD_TABS.importEmployee },
+    announcements: { menuId: APP_DASHBOARD_TABS.announcements },
     "audit-logs": { menuId: APP_DASHBOARD_TABS.auditLogs },
     notifications: { menuId: APP_DASHBOARD_TABS.notifications },
     sessions: { menuId: APP_DASHBOARD_TABS.sessions },
@@ -338,6 +343,7 @@ export function resolveLegacyDashboardRedirect(
 }
 
 export const API_ROUTES = {
+    announcements: { published: "/api/announcements", manage: "/api/announcements/manage" },
     auth: {
         forgotPassword: "/api/auth/forgot-password",
         hybridLogin: "/api/auth/hybrid-login",

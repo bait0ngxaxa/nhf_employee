@@ -13,6 +13,7 @@ interface MutationRateLimitPolicy {
 }
 
 export type PreAuthRateLimitScope =
+    | "announcement-update"
     | "auth-login"
     | "auth-refresh"
     | "leave-request-create"
@@ -37,6 +38,7 @@ export type AuthenticatedMutationRateLimitScope = Exclude<
 >;
 
 export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
+    "announcement-update": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
     "auth-login": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "auth-refresh": { windowMs: 15 * 60 * 1000, maxRequests: 300 },
     "leave-request-create": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
@@ -57,6 +59,7 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
 } as const satisfies Record<PreAuthRateLimitScope, MutationRateLimitPolicy>;
 
 export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
+    "announcement-update": { windowMs: 60 * 1000, maxRequests: 20 },
     "leave-request-create": { windowMs: 60 * 1000, maxRequests: 10 },
     "leave-cancel": { windowMs: 60 * 1000, maxRequests: 20 },
     "leave-decision": { windowMs: 60 * 1000, maxRequests: 20 },
