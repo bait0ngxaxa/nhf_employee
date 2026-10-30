@@ -344,7 +344,7 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
                                 tabIndex={-1}
                                 className="max-w-[22ch] text-3xl font-bold leading-[1.12] tracking-[-0.03em] text-content-heading [overflow-wrap:anywhere] sm:text-4xl @3xl:text-[2.75rem]"
                             >
-                                <span><ClientDashboardGreeting />,</span>{" "}
+                                <span className="block sm:inline"><ClientDashboardGreeting />,</span>{" "}
                                 <span className="text-brand-foreground">
                                     {primaryName}
                                 </span>
