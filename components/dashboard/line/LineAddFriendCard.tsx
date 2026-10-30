@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import qrCodeImage from "@/assets/qr/950gaxzt.png";
 import { LINE_OA_ID, LINE_OA_ADD_FRIEND_URL } from "@/lib/line/official-account";
 import { buildLiffUrl } from "@/lib/line/liff-links";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { cn } from "@/lib/ui/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogScrollArea, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface LineAddFriendCardProps {
     tone?: "brand" | "light";
@@ -29,6 +30,7 @@ function LineLogoIcon({ className }: { className: string }): ReactElement {
 
 
 export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): ReactElement {
+    const titleRef = useRef<HTMLHeadingElement>(null);
     const [copyResult, setCopyResult] = useState<"success" | "error" | null>(null);
     const [status, setStatus] = useState<"loading" | "linked" | "unlinked" | "unavailable" | "error">("loading");
     const [retry, setRetry] = useState(0);
@@ -71,21 +73,42 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
     }
 
     return (
-        <section aria-labelledby="line-add-friend-heading" className={cn("min-w-0 rounded-2xl border border-brand-border bg-surface-raised p-4 sm:p-5", className)}>
-            <div className="flex min-w-0 items-start gap-3">
+        <Dialog>
+            <section aria-labelledby="line-add-friend-heading" className={cn("flex min-w-0 flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-surface-raised p-4", className)}>
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-status-success-solid text-content-on-brand">
                     <LineLogoIcon className="size-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                    <h2 id="line-add-friend-heading" className="text-lg font-bold leading-7 text-content-heading">ใช้ NHFapp บนมือถือ ผ่าน LINE ได้ง่ายขึ้น</h2>
-                    {status !== "linked" ? <><p className="mt-1 text-sm leading-6 text-content-secondary">ไม่ต้องคอยเปิดเว็บไซต์ เพียงเข้า LINE ก็สามารถเข้าถึงบริการของ NHFapp ที่คุณมีสิทธิ์ใช้งานได้</p>
-                    <ul className="mt-3 grid gap-1 text-sm leading-6 text-content-secondary sm:grid-cols-2">
-                        <li>• เบิกวัสดุและติดตามคำขอ</li>
-                        <li>• ดูข้อมูลและจัดการวันลา</li>
-                        <li>• ติดตามงาน Routine</li>
-                        <li>• แจ้งปัญหา IT และติดตาม Ticket</li>
-                    </ul>
-                    <p className="mt-2 text-xs leading-5 text-content-muted">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p></> : <p className="mt-1 text-xs leading-5 text-content-muted">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>}
+                    <h2 id="line-add-friend-heading" className="font-bold text-content-heading">NHFapp ผ่าน LINE</h2>
+                    <p className="text-sm text-content-secondary">{status === "linked" ? "เชื่อมบัญชี NHFapp กับ LINE แล้ว" : "เข้าถึงบริการพนักงานได้สะดวกจากมือถือ"}</p>
+                </div>
+                {status === "linked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md bg-status-success-solid-strong px-3 text-sm font-bold text-content-on-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success-focus focus-visible:ring-offset-2 [@media(min-width:768px)_and_(pointer:fine)]:hidden">เปิด NHFapp ใน LINE</a> : null}
+                <DialogTrigger asChild>
+                    <button type="button" className="min-h-11 rounded-md border border-border-subtle px-3 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">ดูวิธีเริ่มใช้งาน</button>
+                </DialogTrigger>
+            </section>
+            <DialogContent closeLabel="ปิด" className="p-4 sm:p-6" onOpenAutoFocus={(event) => { event.preventDefault(); titleRef.current?.focus(); }}>
+                <DialogHeader className="pr-10 text-left">
+                    <DialogTitle ref={titleRef} tabIndex={-1} className="leading-7 text-content-heading">เริ่มใช้งาน NHFapp ผ่าน LINE</DialogTitle>
+                    <DialogDescription className="leading-6 text-content-secondary">เพิ่มเพื่อน LINE Official Account และเชื่อมบัญชี NHFapp เพื่อใช้บริการต่าง ๆ ตามสิทธิ์ของคุณ</DialogDescription>
+                </DialogHeader>
+                <DialogScrollArea className="pr-1">
+                    <ol className="space-y-3 text-sm leading-6 text-content-secondary">
+                        <li><span className="font-semibold text-content-primary">1. เพิ่มเพื่อน LINE Official Account</span><p>เพิ่มเพื่อนผ่านลิงก์หรือสแกน QR Code ด้วย LINE</p></li>
+                        <li><span className="font-semibold text-content-primary">2. เชื่อมบัญชี NHFapp</span><p>ผู้ที่มีสิทธิ์เชื่อมบัญชี NHFapp กับ LINE เพียงครั้งเดียว</p></li>
+                        <li><span className="font-semibold text-content-primary">3. เริ่มใช้บริการ</span><p>เข้าใช้บริการ NHFapp ที่รองรับผ่าน LINE ได้ตามสิทธิ์</p></li>
+                    </ol>
+                    <div className="mt-5 border-t border-border-subtle pt-4">
+                        <h3 className="font-semibold text-content-heading">บริการที่รองรับ</h3>
+                        <ul className="mt-2 list-inside list-disc space-y-1 text-sm leading-6 text-content-secondary">
+                            <li>เบิกวัสดุและติดตามคำขอ</li>
+                            <li>ดูข้อมูลและจัดการวันลา</li>
+                            <li>ติดตามงาน Routine</li>
+                            <li>แจ้งปัญหา IT และติดตาม Ticket</li>
+                        </ul>
+                        <p className="mt-2 text-sm text-content-secondary">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>
+                    </div>
+                    <div className="mt-4 border-t border-border-subtle pt-1">
                     {status === "loading" ? <p className="mt-3 text-sm text-content-secondary" role="status">กำลังตรวจสอบสถานะการเชื่อมบัญชี…</p> : null}
                     {status === "error" ? <div className="mt-3 text-sm text-content-secondary"><p>ไม่สามารถตรวจสอบสถานะได้ กรุณาลองใหม่</p><button type="button" onClick={() => { setStatus("loading"); setRetry((value) => value + 1); }} className="min-h-11 font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid">ลองใหม่</button></div> : null}
                     {status === "unavailable" ? <p className="mt-3 text-sm text-content-secondary">บัญชีนี้ยังไม่พร้อมใช้บริการผ่าน LINE</p> : null}
@@ -97,8 +120,7 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                         {status === "unlinked" && liffUrl ? <a href={liffUrl} className="inline-flex min-h-11 items-center justify-center rounded-md border border-border-subtle px-4 text-sm font-semibold text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-solid focus-visible:ring-offset-2">เชื่อมบัญชี NHFapp</a> : null}
                         {(status === "linked" || status === "unlinked") && !liffUrl ? <p className="text-sm text-content-secondary">บริการ LINE ยังไม่พร้อมใช้งาน</p> : null}
                     </div>
-                </div>
-            </div>
+                    </div>
             <div className="mt-4 hidden items-center gap-4 border-t border-border-subtle pt-4 md:flex">
                 <Image src={qrCodeImage} width={128} height={128} unoptimized alt="QR Code สำหรับเพิ่ม NHF เป็นเพื่อนใน LINE" className="size-32 shrink-0 rounded-md bg-white" />
                 <div className="min-w-0 text-sm leading-6 text-content-secondary">
@@ -109,6 +131,8 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                     <p className="mt-1 text-xs">ใช้ LINE บนคอมพิวเตอร์? ไปที่เพิ่มเพื่อน → ค้นหาด้วย ID → วาง {LINE_OA_ID}</p>
                 </div>
             </div>
-        </section>
+                </DialogScrollArea>
+            </DialogContent>
+        </Dialog>
     );
 }
