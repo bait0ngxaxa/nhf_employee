@@ -80,7 +80,7 @@ export function LeaveRequestForm({
 
                 <Form {...model.form}>
                     <form
-                        onSubmit={model.form.handleSubmit(isReview ? model.submit : model.goToReview)}
+                        onSubmit={model.form.handleSubmit(isReview ? model.submit : model.goToReview, () => { if (isReview) model.backToEdit(); })}
                         className="flex min-h-0 flex-1 flex-col"
                     >
                         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">

@@ -54,6 +54,65 @@ export function getLeaveDateRangeIssue(
     return null;
 }
 
+export interface LeaveDurationBreakdown {
+    calendarDays: number;
+    weekendDays: number;
+    workingDays: number;
+    requestedDays: number;
+}
+
+export type LeaveSelectionResult =
+    | { valid: true; breakdown: LeaveDurationBreakdown }
+    | { valid: false; issue: LeaveDateRangeIssue | "half-day-multi-date" | "weekend-single" | "weekend-start" | "weekend-end" | "weekend-both" | "no-working-days"; message: string };
+
+export function evaluateLeaveSelection(
+    startDate: string,
+    endDate: string,
+    period: LeavePeriodValue,
+): LeaveSelectionResult {
+    const rangeIssue = getLeaveDateRangeIssue(startDate, endDate);
+    if (rangeIssue) {
+        const messages = {
+            invalid: "กรุณาระบุวันที่ลาให้ถูกต้อง",
+            reversed: "วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่มต้น",
+            "cross-year": "ไม่สามารถลาข้ามปีได้ กรุณาแยกคำขอเป็นคนละปี",
+        };
+        return { valid: false, issue: rangeIssue, message: messages[rangeIssue] };
+    }
+    if (period !== "FULL_DAY" && startDate !== endDate) {
+        return { valid: false, issue: "half-day-multi-date", message: "การลาครึ่งวันต้องเลือกวันลาเพียงวันเดียว" };
+    }
+    const workingDays = getWorkingDays(startDate, endDate);
+    const startWeekend = !isWorkingDay(startDate);
+    const endWeekend = !isWorkingDay(endDate);
+    if (startDate === endDate && startWeekend) {
+        return { valid: false, issue: "weekend-single", message: "วันที่ลาเป็นวันเสาร์หรือวันอาทิตย์ กรุณาเลือกวันทำงาน" };
+    }
+    if (workingDays === 0) {
+        return { valid: false, issue: "no-working-days", message: "ช่วงวันที่เลือกไม่มีวันทำงาน กรุณาเลือกวันใหม่" };
+    }
+    if (startWeekend && endWeekend) {
+        return { valid: false, issue: "weekend-both", message: "วันเริ่มต้นและวันสิ้นสุดเป็นวันเสาร์หรือวันอาทิตย์ กรุณาเลือกวันทำงาน" };
+    }
+    if (startWeekend || endWeekend) {
+        return {
+            valid: false,
+            issue: startWeekend ? "weekend-start" : "weekend-end",
+            message: startWeekend ? "วันเริ่มต้นเป็นวันเสาร์หรือวันอาทิตย์ กรุณาเลือกวันทำงาน" : "วันสิ้นสุดเป็นวันเสาร์หรือวันอาทิตย์ กรุณาเลือกวันทำงาน",
+        };
+    }
+    const calendarDays = getCalendarDaysDifference(endDate, startDate) + 1;
+    return {
+        valid: true,
+        breakdown: {
+            calendarDays,
+            weekendDays: calendarDays - workingDays,
+            workingDays,
+            requestedDays: calculateLeaveDuration(startDate, endDate, period),
+        },
+    };
+}
+
 export function getStartOfDay(date: BusinessDateInput): Date {
     return toUtcDate(date);
 }

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
     getLeaveDateRangeIssue,
+    evaluateLeaveSelection,
+    calculateLeaveDuration,
     getCalendarDaysAgo,
     getStartOfDay,
     getWorkingDays,
@@ -69,5 +71,35 @@ describe("leave business date utilities", () => {
         expect(getStartOfDay("2026-01-01").toISOString()).toBe(
             "2026-01-01T00:00:00.000Z",
         );
+    });
+});
+
+
+describe("leave selection", () => {
+    it.each([
+        ["2030-05-11", "2030-05-11", "FULL_DAY", "weekend-single"],
+        ["2030-05-12", "2030-05-12", "FULL_DAY", "weekend-single"],
+        ["2030-05-11", "2030-05-13", "FULL_DAY", "weekend-start"],
+        ["2030-05-10", "2030-05-12", "FULL_DAY", "weekend-end"],
+        ["2030-05-11", "2030-05-19", "FULL_DAY", "weekend-both"],
+        ["2030-05-11", "2030-05-12", "FULL_DAY", "no-working-days"],
+        ["2030-05-09", "2030-05-10", "MORNING", "half-day-multi-date"],
+        ["2030-05-13", "2030-05-09", "FULL_DAY", "reversed"],
+        ["2030-12-31", "2031-01-01", "FULL_DAY", "cross-year"],
+        ["2030-02-30", "2030-02-30", "FULL_DAY", "invalid"],
+    ] as const)("rejects %s to %s", (start, end, period, issue) => {
+        const result = evaluateLeaveSelection(start, end, period);
+        expect(result.valid).toBe(false);
+        if (!result.valid) { expect(result.issue).toBe(issue); expect(result.message).toBeTruthy(); }
+    });
+
+    it.each(["MORNING", "AFTERNOON"] as const)("counts %s as half a day", (period) => {
+        expect(evaluateLeaveSelection("2030-05-09", "2030-05-09", period)).toEqual({ valid: true, breakdown: { calendarDays: 1, weekendDays: 0, workingDays: 1, requestedDays: 0.5 } });
+    });
+    it("explains weekends and refuses a zero-day calculation", () => {
+        expect(evaluateLeaveSelection("2030-05-09", "2030-05-13", "FULL_DAY")).toEqual({ valid: true, breakdown: { calendarDays: 5, weekendDays: 2, workingDays: 3, requestedDays: 3 } });
+        expect(evaluateLeaveSelection("2030-05-06", "2030-05-10", "FULL_DAY")).toEqual({ valid: true, breakdown: { calendarDays: 5, weekendDays: 0, workingDays: 5, requestedDays: 5 } });
+        expect(calculateLeaveDuration("2030-05-11", "2030-05-12", "FULL_DAY")).toBe(0);
+        expect(evaluateLeaveSelection("2030-05-11", "2030-05-12", "FULL_DAY").valid).toBe(false);
     });
 });

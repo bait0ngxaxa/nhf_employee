@@ -25,6 +25,7 @@ export function LeaveDialogFields({ model }: { model: LeaveRequestFormModel }) {
             <LeaveDateModeField model={model} />
             <LeaveDateFields model={model} />
             {!model.isMultiDay ? <LeavePeriodField model={model} /> : null}
+            <LeaveDurationCalculation model={model} />
             <LeaveReasonField model={model} />
             {model.needsEmergencyReason ? <EmergencyReasonField model={model} /> : null}
             {model.needsSpecialReason ? <SpecialReasonField model={model} /> : null}
@@ -147,6 +148,7 @@ function LeaveEndDateField({ model }: { model: LeaveRequestFormModel }) {
                             min={model.startDateValue}
                             disabled={model.isSubmitting}
                             {...field}
+                            onChange={(event) => { model.clearDateError(); field.onChange(event); }}
                         />
                     </FormControl>
                     <FormMessage />
@@ -166,7 +168,7 @@ function LeavePeriodField({ model }: { model: LeaveRequestFormModel }) {
                     <FormLabel>ช่วงเวลา</FormLabel>
                     <Select
                         value={field.value}
-                        onValueChange={field.onChange}
+                        onValueChange={(value) => { model.clearDateError(); field.onChange(value); }}
                         disabled={model.isSubmitting}
                     >
                         <FormControl>
@@ -267,5 +269,15 @@ function SpecialReasonField({ model }: { model: LeaveRequestFormModel }) {
                 </FormItem>
             )}
         />
+    );
+}
+
+export function LeaveDurationCalculation({ model }: { model: LeaveRequestFormModel }) {
+    const breakdown = model.breakdown;
+    if (!breakdown) return null;
+    return (
+        <p className="rounded-lg border border-border-subtle bg-surface-neutral-subtle p-3 text-sm leading-6 text-content-secondary" aria-live="polite">
+            จำนวนวันตามปฏิทิน {breakdown.calendarDays} วัน − วันเสาร์–อาทิตย์ {breakdown.weekendDays} วัน = วันทำงาน {breakdown.workingDays} วัน · ขอลา {formatLeaveDays(breakdown.requestedDays)} วัน
+        </p>
     );
 }

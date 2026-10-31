@@ -8,8 +8,8 @@ import { createIdempotencyKey } from "@/lib/client/idempotency-key";
 import { calculateAdditionalOverQuotaDays } from "../../../domain/over-quota";
 import { LeaveAttachmentValidationError, validateLeaveAttachments } from "../../../schemas/attachments";
 import {
-    calculateLeaveDuration,
-    getLeaveDateRangeIssue,
+    evaluateLeaveSelection,
+    type LeaveDurationBreakdown,
     isPastDate,
 } from "../../../domain/utils";
 import { type LeavePeriodValue } from "../../types";
@@ -56,6 +56,7 @@ interface UseLeaveRequestFormModelResult {
     projectedRemainingQuota: number | null;
     selectedLeaveType: LeaveTypeValue;
     isDateRangeValid: boolean;
+    breakdown: LeaveDurationBreakdown | null;
     step: LeaveRequestStep;
     goToReview: (data: LeaveRequestValues) => void;
     backToEdit: () => void;
@@ -67,6 +68,7 @@ interface UseLeaveRequestFormModelResult {
     switchToSingleDay: () => void;
     switchToMultiDay: () => void;
     handleStartDateChange: (value: string, onFieldChange: (value: string) => void) => void;
+    clearDateError: () => void;
 }
 
 const getTodayString = (): string => {
@@ -137,6 +139,7 @@ export function useLeaveRequestFormModel({
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [dateError, setDateError] = useState<{ selection: string; message: string } | null>(null);
     const [attachments, setAttachments] = useState<File[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [isMultiDay, setIsMultiDay] = useState(false);
@@ -169,9 +172,11 @@ export function useLeaveRequestFormModel({
 
     const quota = findQuotaForDate(quotas, leaveType, startDateValue);
     const remainingQuota = quota?.remainingDays ?? null;
-    const dateRangeIssue = getLeaveDateRangeIssue(startDateValue, endDateValue);
-    const isDateRangeValid = dateRangeIssue === null;
-    const requestedDays = getRequestedDays(startDateValue, endDateValue, periodValue);
+    const selection = evaluateLeaveSelection(startDateValue, endDateValue, periodValue);
+    const breakdown = selection.valid ? selection.breakdown : null;
+    const isDateRangeValid = selection.valid;
+    const requestedDays = breakdown?.requestedDays ?? 0;
+    const selectionKey = JSON.stringify([startDateValue, endDateValue, periodValue]);
     const projectedRemainingQuota = quota && isDateRangeValid
         ? quota.remainingDays - requestedDays
         : null;
@@ -188,11 +193,13 @@ export function useLeaveRequestFormModel({
         : false;
 
     const switchToSingleDay = (): void => {
+        setDateError(null);
         setIsMultiDay(false);
         form.setValue("endDate", form.getValues("startDate"));
     };
 
     const switchToMultiDay = (): void => {
+        setDateError(null);
         setIsMultiDay(true);
         form.setValue("period", "FULL_DAY");
     };
@@ -201,6 +208,7 @@ export function useLeaveRequestFormModel({
         value: string,
         onFieldChange: (value: string) => void,
     ): void => {
+        setDateError(null);
         onFieldChange(value);
         if (!isMultiDay) {
             form.setValue("endDate", value);
@@ -240,6 +248,7 @@ export function useLeaveRequestFormModel({
         form.reset(createDefaultLeaveRequestValues());
         clearAttachments();
         setErrorMsg(null);
+        setDateError(null);
         setIsMultiDay(false);
         setStep("edit");
         idempotencyRef.current = null;
@@ -265,7 +274,19 @@ export function useLeaveRequestFormModel({
         return true;
     };
 
+    const validateSelection = (data: LeaveRequestValues): boolean => {
+        const result = evaluateLeaveSelection(data.startDate, data.endDate, data.period);
+        if (!result.valid) {
+            setDateError({ selection: JSON.stringify([data.startDate, data.endDate, data.period]), message: result.message });
+            setStep("edit");
+            return false;
+        }
+        setDateError(null);
+        return true;
+    };
+
     const goToReview = (data: LeaveRequestValues): void => {
+        if (!validateSelection(data)) return;
         if (!hasRequiredSpecialReason(data)) {
             return;
         }
@@ -285,6 +306,8 @@ export function useLeaveRequestFormModel({
         if (!canSubmit || submittingRef.current) {
             return;
         }
+
+        if (!validateSelection(data)) return;
 
         if (!hasRequiredSpecialReason(data)) {
             setStep("edit");
@@ -352,7 +375,7 @@ export function useLeaveRequestFormModel({
         form,
         isDirty,
         isSubmitting,
-        errorMsg,
+        errorMsg: dateError?.selection === selectionKey ? dateError.message : errorMsg,
         attachments,
         attachmentError,
         isMultiDay,
@@ -365,6 +388,7 @@ export function useLeaveRequestFormModel({
         projectedRemainingQuota,
         selectedLeaveType: leaveType,
         isDateRangeValid,
+        breakdown,
         step,
         goToReview,
         backToEdit,
@@ -376,6 +400,7 @@ export function useLeaveRequestFormModel({
         switchToSingleDay,
         switchToMultiDay,
         handleStartDateChange,
+        clearDateError: () => setDateError(null),
     };
 }
 
@@ -401,9 +426,6 @@ function getRequestedDays(
     endDate: string,
     period: LeavePeriodValue,
 ): number {
-    if (getLeaveDateRangeIssue(startDate, endDate) !== null) {
-        return 0;
-    }
-
-    return calculateLeaveDuration(startDate, endDate, period);
+    const selection = evaluateLeaveSelection(startDate, endDate, period);
+    return selection.valid ? selection.breakdown.requestedDays : 0;
 }

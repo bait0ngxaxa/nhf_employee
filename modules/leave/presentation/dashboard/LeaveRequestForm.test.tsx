@@ -475,6 +475,7 @@ async function waitForDismissLayer(): Promise<void> {
 }
 
 async function reviewAndSubmit(): Promise<void> {
+    fireEvent.change(screen.getByLabelText("วันที่ลา"), { target: { value: "2031-01-06" } });
     fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
     fireEvent.click(await screen.findByRole("button", { name: "ยืนยันส่งคำขอลา" }));
 }

@@ -160,8 +160,8 @@ describe("useLeaveRequestFormModel", () => {
             result.current.form.setValue("endDate", "2030-05-12");
         });
 
-        expect(result.current.isDateRangeValid).toBe(true);
-        expect(result.current.requestedDays).toBe(0);
+        expect(result.current.isDateRangeValid).toBe(false);
+        expect(result.current.breakdown).toBeNull();
     });
 
     it.each([
@@ -641,8 +641,8 @@ describe("useLeaveRequestFormModel", () => {
         await act(async () => {
             await result.current.submit({
                 leaveType: "PERSONAL",
-                startDate: "2031-02-01",
-                endDate: "2031-02-01",
+                startDate: "2031-02-03",
+                endDate: "2031-02-03",
                 period: "FULL_DAY",
                 reason: "err",
             });
@@ -689,4 +689,34 @@ describe("useLeaveRequestFormModel", () => {
         expect(result.current.errorMsg).toBe("ยังไม่ได้ตั้งค่าผู้อนุมัติ");
         expect(toast.error).toHaveBeenCalledWith("ยังไม่ได้ตั้งค่าผู้อนุมัติ");
     });
+});
+
+it("blocks review for a Saturday selection", () => {
+    const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess: vi.fn() }));
+    act(() => {
+        result.current.goToReview({ ...result.current.form.getValues(), startDate: "2030-05-11", endDate: "2030-05-11" });
+    });
+    expect(result.current.step).toBe("edit");
+});
+
+
+it("revalidates before submission and preserves the form", async () => {
+    const submitRequest = vi.fn();
+    const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess: vi.fn(), submitRequest }));
+    act(() => {
+        result.current.form.setValue("startDate", "2030-05-09");
+        result.current.form.setValue("endDate", "2030-05-09");
+        result.current.form.setValue("reason", "ทดสอบเหตุผล");
+        result.current.goToReview(result.current.form.getValues());
+    });
+    expect(result.current.step).toBe("review");
+    act(() => {
+        result.current.form.setValue("startDate", "2030-05-11");
+        result.current.form.setValue("endDate", "2030-05-11");
+    });
+    await act(async () => { await result.current.submit(result.current.form.getValues()); });
+    expect(result.current.step).toBe("edit");
+    expect(result.current.errorMsg).toContain("วันเสาร์");
+    expect(result.current.form.getValues("reason")).toBe("ทดสอบเหตุผล");
+    expect(submitRequest).not.toHaveBeenCalled();
 });

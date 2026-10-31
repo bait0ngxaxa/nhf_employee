@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactElement } from "react";
 import type { useLeaveRequestFormModel } from "../hooks/useLeaveRequestFormModel";
+import { LeaveDurationCalculation } from "./LeaveRequestFormFields";
 import { LeaveRequestSummary } from "../../LeaveRequestSummary";
 import { formatLeaveDateRange, getLeavePeriodLabel } from "../../liff/leave-format";
 
@@ -50,6 +51,7 @@ export function LeaveRequestReview({ model }: { readonly model: LeaveRequestForm
                 overQuotaDays={model.overQuotaDays}
                 isDateRangeValid={model.isDateRangeValid}
             />
+            <LeaveDurationCalculation model={model} />
             <dl className="grid gap-4 rounded-xl border border-border-subtle p-4 sm:grid-cols-2">
                 <ReviewItem label={model.isMultiDay ? "ช่วงวันที่ลา" : "วันที่ลา"}>
                     {formatLeaveDateRange(values.startDate, values.endDate)}

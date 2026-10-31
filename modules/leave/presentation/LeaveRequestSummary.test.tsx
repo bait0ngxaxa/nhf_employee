@@ -123,3 +123,25 @@ async function reviewSummary(): Promise<string | null> {
     expect(screen.getByRole("button", { name: "ยืนยันส่งคำขอลา" })).toBeInTheDocument();
     return summary.textContent;
 }
+
+
+it.each(["dashboard", "liff"] as const)("validates and explains dates in %s", async (surface) => {
+    if (surface === "dashboard") {
+        render(<LeaveRequestForm open onCancel={vi.fn()} onSuccess={vi.fn()} quotas={[]} />);
+    } else {
+        render(<LiffLeaveRequestForm open onOpenChange={vi.fn()} onSuccess={vi.fn()} quotas={[]} />);
+    }
+    fireEvent.change(screen.getByLabelText("วันที่ลา"), { target: { value: "2030-05-11" } });
+    fireEvent.change(screen.getByLabelText("เหตุผลการลา"), { target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" } });
+    fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
+    expect(await screen.findByText(/วันที่ลาเป็นวันเสาร์/)).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "ตรวจสอบคำขอลา" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("วันที่ลา"), { target: { value: "2030-05-09" } });
+    expect(screen.queryByText(/วันที่ลาเป็นวันเสาร์/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "หลายวัน" }));
+    fireEvent.change(screen.getByLabelText("วันที่สิ้นสุด"), { target: { value: "2030-05-13" } });
+    expect(screen.getByText(/จำนวนวันตามปฏิทิน 5 วัน/)).toHaveTextContent("วันเสาร์–อาทิตย์ 2 วัน = วันทำงาน 3 วัน · ขอลา 3 วัน");
+    fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
+    const review = await screen.findByRole("group", { name: "ตรวจสอบคำขอลา" });
+    expect(review).toHaveTextContent("วันเสาร์–อาทิตย์ 2 วัน = วันทำงาน 3 วัน · ขอลา 3 วัน");
+});

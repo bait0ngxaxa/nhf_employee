@@ -98,7 +98,7 @@ export function LiffLeaveRequestForm({
 
                 <Form {...model.form}>
                     <form
-                        onSubmit={model.form.handleSubmit(isReview ? model.submit : model.goToReview)}
+                        onSubmit={model.form.handleSubmit(isReview ? model.submit : model.goToReview, () => { if (isReview) model.backToEdit(); })}
                         className="flex min-h-0 flex-1 flex-col bg-surface-subtle"
                     >
                         <SheetScrollArea className="scroll-pb-6 px-4 py-5">
