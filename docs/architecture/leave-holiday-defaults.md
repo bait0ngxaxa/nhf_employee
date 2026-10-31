@@ -69,6 +69,18 @@ Source verification, publication note, optimistic revisions, empty-year holiday
 confirmation and eligible System ADMIN authorization all remain required for
 manual publication. Authentication and Leave business permissions are unchanged.
 
+Calendar ADMIN operations resolve the Employee ID lock hint before entering the
+serializable transaction. Reading that hint inside Serializable held a shared
+User lock before requesting Employee/User exclusive locks, so overlapping reads
+could deadlock. The transaction still locks Employee then User and checks the
+current ADMIN role, account/Employee eligibility and matching Employee ID. A stale
+hint fails closed. The hint itself grants no authority. Shared retries also handle
+raw-query `P2010` with MySQL code `1213`, in addition to `P2034`; syntax errors,
+business errors and other raw SQL errors are not retried. Retry/backoff limits
+remain unchanged. Prisma may log a transient raw failure before recovery; logging
+is retained. Real MySQL tests require overlapping calendar reads to finish on
+their first attempts and verify rollback of an intentionally forced deadlock.
+
 Apply forward migrations, regenerate Prisma Client and deploy the application.
 Enable `LEAVE_HOLIDAY_CALENDAR_ENABLED=true` on all instances as normal feature
 activation. Bundled years need no manual draft/publication. Disabled/setup mode

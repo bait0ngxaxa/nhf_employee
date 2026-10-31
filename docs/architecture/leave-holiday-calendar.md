@@ -90,7 +90,8 @@ Creation and approval use `calculateEffectiveLeaveInTransaction()`. It locks the
 annual calendar row with `FOR UPDATE` through mutation commit, using the same
 serializable transaction/lock as publication. Thus a publication and submission
 serialize in either order; no request can commit an old snapshot read outside its
-final transaction. Existing P2034 bounded backoff handles deadlock retries. This
+final transaction. Bounded backoff handles P2034 and raw-query MySQL 1213
+(`P2010`) deadlocks by restarting the entire transaction. This
 lock also protects first publication via the missing-year index gap. Request
 idempotency is checked before calculation: retrying a successful original payload
 returns that original request, even after a new publication.
@@ -158,7 +159,7 @@ Concurrent identical confirmations commit one adjustment and replay one result;
 same key with different confirmation content conflicts. Stale active versions
 are rejected even for retries. A retry after cancellation/not-taken is rejected
 rather than reopening a terminal request. Deadlocks use the existing bounded
-P2034 retry mechanism. Failures roll back all quota, carry, request and audit writes.
+transaction retry mechanism. Failures roll back all quota, carry, request and audit writes.
 
 Forward reconciliation preserves future usage and recalculates PERSONAL/VACATION
 carry through existing quota records (including gaps). SICK remains zero carry.

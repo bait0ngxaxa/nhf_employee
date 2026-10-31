@@ -3,7 +3,7 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { appendAuditInTransaction } from "@/modules/audit";
 import { toDateOnlyString, toUtcDate } from "../../domain/business-date";
 import { calendarMutationSchema, HolidayCalendarError, validateHolidayDays, type ManagedHolidayCalendar, type PublishedHolidayCalendar } from "../../domain/holiday-calendar";
-import { assertCalendarAdmin, type CalendarAdminContext } from "./authorization";
+import { assertCalendarAdmin, getCalendarAdminEmployeeIdHint, type CalendarAdminContext } from "./authorization";
 import { ensureHolidayCalendarInTransaction, lockHolidayCalendar } from "./defaults";
 
 export { lockHolidayCalendar } from "./defaults";
@@ -33,8 +33,9 @@ async function managedInTransaction(tx: Prisma.TransactionClient, year: number):
 }
 
 export async function getManagedHolidayCalendar(context: CalendarAdminContext, year: number): Promise<ManagedHolidayCalendar> {
+    const employeeIdHint = await getCalendarAdminEmployeeIdHint(context);
     return runSerializableTransaction(async (tx) => {
-        await assertCalendarAdmin(tx, context);
+        await assertCalendarAdmin(tx, context, employeeIdHint);
         await ensureHolidayCalendarInTransaction(tx, year);
         return managedInTransaction(tx, year);
     });
@@ -60,8 +61,9 @@ export async function mutateHolidayCalendar(context: CalendarAdminContext, raw: 
     if (!parsed.success) throw new HolidayCalendarError("ข้อมูลปฏิทินไม่ถูกต้อง กรุณาตรวจปี วันที่ และแหล่งอ้างอิง", 400);
     const input = parsed.data;
     if (input.action === "save") validateHolidayDays(input.year, input.days);
+    const employeeIdHint = await getCalendarAdminEmployeeIdHint(context);
     return runSerializableTransaction(async (tx) => {
-        const actor = await assertCalendarAdmin(tx, context);
+        const actor = await assertCalendarAdmin(tx, context, employeeIdHint);
         // Upsert serializes first creation too. Existing calendars are never reset.
         await tx.holidayCalendar.upsert({ where: { year: input.year }, create: { year: input.year }, update: {} });
         await lockHolidayCalendar(tx, input.year);

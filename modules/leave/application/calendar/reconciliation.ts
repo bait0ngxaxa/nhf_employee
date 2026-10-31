@@ -22,7 +22,7 @@ import {
     reconcileLeaveQuotaForward,
 } from "../../domain/quota-entitlement";
 import { lockLeaveRequestRow } from "../../infrastructure/persistence/transaction";
-import { assertCalendarAdmin, type CalendarAdminContext } from "./authorization";
+import { assertCalendarAdmin, getCalendarAdminEmployeeIdHint, type CalendarAdminContext } from "./authorization";
 import { lockHolidayCalendar } from "./calendar";
 
 const ADJUSTMENT_INCLUDE = {
@@ -53,8 +53,9 @@ export async function getCalendarImpact(
     const parsed = calendarImpactInputSchema.safeParse(raw);
     if (!parsed.success) throw new HolidayCalendarError("ข้อมูลการตรวจผลกระทบไม่ถูกต้อง", 400);
     const input = parsed.data;
+    const employeeIdHint = await getCalendarAdminEmployeeIdHint(context);
     return runSerializableTransaction(async (tx) => {
-        await assertCalendarAdmin(tx, context);
+        await assertCalendarAdmin(tx, context, employeeIdHint);
         await lockHolidayCalendar(tx, input.year);
         const calendar = await tx.holidayCalendar.findUnique({
             where: { year: input.year },
@@ -158,8 +159,9 @@ export async function reconcileCalendarLeave(
         );
     const input = parsed.data;
     const hash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+    const employeeIdHint = await getCalendarAdminEmployeeIdHint(context);
     return runSerializableTransaction(async (tx) => {
-        const actor = await assertCalendarAdmin(tx, context);
+        const actor = await assertCalendarAdmin(tx, context, employeeIdHint);
         await lockHolidayCalendar(tx, input.year);
         const calendar = await tx.holidayCalendar.findUnique({
             where: { year: input.year },

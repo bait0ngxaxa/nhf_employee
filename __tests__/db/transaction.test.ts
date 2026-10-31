@@ -15,6 +15,7 @@ vi.mock("@/lib/db/prisma", () => ({
 describe("shared transaction helpers", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(prisma.$transaction).mockReset();
         vi.spyOn(Math, "random").mockReturnValue(0.5);
     });
 
@@ -34,6 +35,19 @@ describe("shared transaction helpers", () => {
         await vi.advanceTimersByTimeAsync(28);
 
         await expect(resultPromise).resolves.toBe("done");
+        expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries a raw MySQL deadlock by opening a new transaction", async () => {
+        vi.useFakeTimers();
+        const deadlock = { code: "P2010", meta: { code: "1213", message: "Deadlock found when trying to get lock; try restarting transaction" } };
+        vi.mocked(prisma.$transaction).mockRejectedValueOnce(deadlock).mockResolvedValueOnce("calendar" as never);
+        const result = runSerializableTransaction(async () => "calendar").then(
+            (value) => ({ value }),
+            (error: unknown) => ({ error }),
+        );
+        await vi.advanceTimersByTimeAsync(1_000);
+        await expect(result).resolves.toEqual({ value: "calendar" });
         expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     });
 
@@ -61,6 +75,13 @@ describe("shared transaction helpers", () => {
 
     it.each([
         ["P2034 object", { code: "P2034" }, true],
+        ["raw MySQL deadlock", { code: "P2010", meta: { code: "1213" } }, true],
+        ["numeric MySQL deadlock", { code: "P2010", meta: { code: 1213 } }, true],
+        ["unrelated raw SQL error", { code: "P2010", meta: { code: "1064" } }, false],
+        ["lock timeout is not a deadlock", { code: "P2010", meta: { code: "1205" } }, false],
+        ["missing raw SQL metadata", { code: "P2010" }, false],
+        ["null raw SQL metadata", { code: "P2010", meta: null }, false],
+        ["misleading error message", { code: "P2010", meta: { message: "Deadlock", code: "1064" } }, false],
         ["different Prisma code", { code: "P2002" }, false],
         ["business conflict", { statusCode: 409 }, false],
         ["ordinary error", new Error("database unavailable"), false],
@@ -76,6 +97,8 @@ describe("shared transaction helpers", () => {
         ["403", { statusCode: 403 }],
         ["404", { statusCode: 404 }],
         ["409", { statusCode: 409 }],
+        ["raw SQL syntax", { code: "P2010", meta: { code: "1064" } }],
+        ["raw SQL lock timeout", { code: "P2010", meta: { code: "1205" } }],
         ["non-P2034", new Error("database unavailable")],
     ])("does not retry a business or unrelated %s error", async (_label, error) => {
         vi.mocked(prisma.$transaction).mockRejectedValue(error);
@@ -94,6 +117,16 @@ describe("shared transaction helpers", () => {
         await vi.advanceTimersByTimeAsync(1_000);
 
         await resultExpectation;
+        expect(prisma.$transaction).toHaveBeenCalledTimes(4);
+    });
+
+    it("stops retrying raw MySQL deadlocks at the existing limit", async () => {
+        vi.useFakeTimers();
+        const deadlock = { code: "P2010", meta: { code: "1213" } };
+        vi.mocked(prisma.$transaction).mockRejectedValue(deadlock);
+        const expectation = expect(runSerializableTransaction(async () => "calendar")).rejects.toBe(deadlock);
+        await vi.advanceTimersByTimeAsync(1_000);
+        await expectation;
         expect(prisma.$transaction).toHaveBeenCalledTimes(4);
     });
 });

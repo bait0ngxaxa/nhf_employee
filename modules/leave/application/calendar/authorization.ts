@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db/prisma";
 import { lockEmployeeRows, lockUserRows } from "@/lib/db/row-locks";
 import { HolidayCalendarError } from "../../domain/holiday-calendar";
 
@@ -8,18 +9,27 @@ export interface CalendarAdminContext {
     channel: "DASHBOARD";
 }
 
+/** A lock-order hint only; authorization is always revalidated under transaction locks. */
+export async function getCalendarAdminEmployeeIdHint(context: CalendarAdminContext): Promise<number | null> {
+    if (context.channel !== "DASHBOARD") throw new HolidayCalendarError("ไม่มีสิทธิ์จัดการปฏิทิน", 403);
+    // Outside Serializable: a hint SELECT inside it holds User S before Employee X,
+    // creating a User/Employee lock-upgrade cycle between overlapping ADMIN reads.
+    const hint = await prisma.user.findUnique({ where: { id: context.userId }, select: { employeeId: true } });
+    return hint?.employeeId ?? null;
+}
+
 export async function assertCalendarAdmin(
     tx: Prisma.TransactionClient,
     context: CalendarAdminContext,
+    employeeIdHint: number | null,
 ): Promise<{ id: number; email: string }> {
     if (context.channel !== "DASHBOARD") throw new HolidayCalendarError("ไม่มีสิทธิ์จัดการปฏิทิน", 403);
-    const hint = await tx.user.findUnique({ where: { id: context.userId }, select: { employeeId: true } });
-    await lockEmployeeRows(tx, !hint || hint.employeeId === null ? [] : [hint.employeeId]);
+    await lockEmployeeRows(tx, employeeIdHint === null ? [] : [employeeIdHint]);
     await lockUserRows(tx, [context.userId]);
     const user = await tx.user.findFirst({
         where: {
             id: context.userId, role: "ADMIN", isActive: true, deletedAt: null,
-            employeeId: hint?.employeeId ?? null,
+            employeeId: employeeIdHint,
             employee: { is: { status: "ACTIVE", deletedAt: null } },
         },
         select: { id: true, email: true },

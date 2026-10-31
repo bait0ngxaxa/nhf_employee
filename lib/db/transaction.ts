@@ -16,7 +16,18 @@ export function hasPrismaErrorCode(error: unknown, code: string): boolean {
 }
 
 export function isRetryableTransactionError(error: unknown): boolean {
-    return hasPrismaErrorCode(error, "P2034");
+    if (hasPrismaErrorCode(error, "P2034")) return true;
+    // Prisma reports raw MySQL locking deadlocks as P2010 instead of P2034.
+    // Retry the entire rolled-back transaction, never just its failed statement.
+    return typeof error === "object"
+        && error !== null
+        && "code" in error
+        && error.code === "P2010"
+        && "meta" in error
+        && typeof error.meta === "object"
+        && error.meta !== null
+        && "code" in error.meta
+        && (error.meta.code === "1213" || error.meta.code === 1213);
 }
 
 function getRetryDelayMs(attempt: number): number {
