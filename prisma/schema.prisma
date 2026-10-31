@@ -23,6 +23,8 @@ model User {
   authoredAnnouncements       Announcement[]               @relation("AnnouncementAuthor")
   updatedAnnouncements        Announcement[]              @relation("AnnouncementUpdater")
   auditLogs                   AuditLog[]
+  createdCalendarVersions     HolidayCalendarVersion[] @relation("CalendarCreator")
+  publishedCalendarVersions   HolidayCalendarVersion[] @relation("CalendarPublisher")
   emailRequests               EmailRequest[]
   emailRequestIdempotencies   EmailRequestIdempotency[]
   notifications               Notification[]
@@ -561,6 +563,9 @@ enum AuditAction {
 
   // Organizational announcement management
   ANNOUNCEMENT_UPDATE
+  LEAVE_CALENDAR_DRAFT
+  LEAVE_CALENDAR_PUBLISH
+  LEAVE_CALENDAR_RECONCILE
 }
 
 // Email Request History for tracking new employee email requests
@@ -718,6 +723,60 @@ model LeaveQuota {
 
   @@unique([employeeId, year, leaveType]) // 1 คนมีโควตา 1 ประเภทต่อ 1 ปี
   @@map("leave_quotas")
+}
+
+// Published versions are immutable; SQL triggers also protect direct database writes.
+model HolidayCalendar {
+  year                Int @id
+  activeVersionNumber Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  versions            HolidayCalendarVersion[] @relation("CalendarVersions")
+  activeVersion       HolidayCalendarVersion? @relation("ActiveCalendarVersion", fields: [year, activeVersionNumber], references: [year, number], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("holiday_calendars")
+}
+
+model HolidayCalendarVersion {
+  id             String @id @default(cuid())
+  year           Int
+  number         Int
+  revision       Int @default(0)
+  baseVersionNumber Int?
+  createdById    Int
+  createdAt      DateTime @default(now())
+  publishedAt    DateTime?
+  publishedById  Int?
+  publicationNote String? @db.VarChar(1000)
+  calendar       HolidayCalendar @relation("CalendarVersions", fields: [year], references: [year], onDelete: Restrict)
+  activeFor      HolidayCalendar[] @relation("ActiveCalendarVersion")
+  creator        User @relation("CalendarCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  publisher      User? @relation("CalendarPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  days           HolidayCalendarDay[]
+
+  @@unique([year, number])
+  @@unique([year, id])
+  @@map("holiday_calendar_versions")
+}
+
+model HolidayCalendarDay {
+  id        String @id @default(cuid())
+  year      Int
+  versionId String
+  date      DateTime @db.Date
+  name      String @db.VarChar(200)
+  category  HolidayCategory
+  source    String @db.VarChar(1000)
+  note      String? @db.VarChar(1000)
+  version   HolidayCalendarVersion @relation(fields: [year, versionId], references: [year, id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([versionId, date])
+  @@map("holiday_calendar_days")
+}
+
+enum HolidayCategory {
+  OFFICIAL
+  ORGANIZATION
 }
 
 model LeaveRequest {
