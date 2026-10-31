@@ -27,6 +27,10 @@ if (!isDedicatedTestDatabase) {
 }
 
 const require = createRequire(import.meta.url);
+const testFiles = process.argv.slice(2);
+if (testFiles.some((file) => file.startsWith("-") || !file.endsWith(".integration.test.ts") || !existsSync(file))) {
+    throw new Error("ระบุ path ของไฟล์ .integration.test.ts ที่มีอยู่เท่านั้น");
+}
 const prismaCli = require.resolve("prisma/build/index.js");
 const vitestPackageDirectory = dirname(require.resolve("vitest/package.json"));
 const vitestCli = resolve(vitestPackageDirectory, "vitest.mjs");
@@ -69,4 +73,5 @@ run("รัน Vitest", vitestCli, [
     "run",
     "--config",
     "vitest.integration.config.ts",
+    ...testFiles,
 ]);

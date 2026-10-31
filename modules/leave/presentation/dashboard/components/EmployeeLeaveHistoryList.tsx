@@ -5,6 +5,7 @@ import { Pagination } from "@/components/Pagination";
 import type { LeaveRequest } from "../hooks/useLeaveProfile";
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import { getEmployeeLeaveActions } from "../../../domain/action-availability";
+import { isQuotaChargedStatus } from "../../../domain/charged-units";
 import { LeaveAttachmentViewerButton } from "./LeaveAttachmentViewerButton";
 import { LeaveStatusBadge } from "./LeaveStatusBadge";
 
@@ -132,6 +133,7 @@ function LeaveHistoryItem({
                         <p className="text-xs/5 font-medium text-content-muted">
                             {periodLabel(request.period)} ({request.durationDays} วัน)
                         </p>
+                        {isQuotaChargedStatus(request.status) && request.chargedDays !== undefined && request.chargedDays !== request.durationDays && <p className="text-xs/5 text-content-secondary">ยอดหักโควต้าปัจจุบัน {request.chargedDays} วัน (ปรับตามปฏิทินองค์กร)</p>}
                     </div>
                     <div className="min-w-0 space-y-1 sm:text-right">
                         <p className="text-xs/5 font-semibold text-content-muted">ส่งคำขอเมื่อ</p>

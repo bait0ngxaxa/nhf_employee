@@ -330,6 +330,7 @@ function createLeaveRequestReportSelect() {
         endDate: true,
         period: true,
         durationHalfDays: true,
+        chargedHalfDays: true,
         reason: true,
         emergencyReason: true,
         specialReason: true,

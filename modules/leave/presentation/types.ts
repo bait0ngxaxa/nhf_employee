@@ -62,6 +62,7 @@ export interface LeaveRequestSummary {
     endDate: string;
     period: LeavePeriodValue;
     durationDays: number;
+    chargedDays?: number;
     reason: string;
     emergencyReason: string | null;
     specialReason: string | null;

@@ -108,6 +108,7 @@ export async function decideLeaveRequest(
             status: newStatus,
             approvedAt: new Date(),
             rejectReason: input.action === "REJECT" ? input.reason : null,
+            chargedHalfDays: input.action === "APPROVE" ? leaveRequest.durationHalfDays : 0,
         };
         if (input.action === "APPROVE") {
             const calculation = await calculateEffectiveLeaveInTransaction(tx, leaveRequest.startDate, leaveRequest.endDate, leaveRequest.period);

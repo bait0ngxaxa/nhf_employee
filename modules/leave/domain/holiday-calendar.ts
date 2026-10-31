@@ -29,6 +29,9 @@ export type CalendarMutation = z.infer<typeof calendarMutationSchema>;
 export function validateHolidayDays(year: number, days: readonly HolidayDayInput[]): void {
     const dates = new Set<string>();
     for (const day of days) {
+        if (!holidayDaySchema.safeParse(day).success) {
+            throw new HolidayCalendarError("ข้อมูลวันหยุดไม่ถูกต้อง กรุณาตรวจชื่อ ประเภท และแหล่งอ้างอิง", 400);
+        }
         if (!isValidDateOnly(day.date) || Number(day.date.slice(0, 4)) !== year) {
             throw new HolidayCalendarError("วันที่ต้องถูกต้องและอยู่ในปีปฏิทินที่เลือก", 400);
         }

@@ -18,6 +18,7 @@ describe("annual holiday calendar validation", () => {
     });
     it("requires a source and explicit verification for publication", () => {
         expect(holidayDaySchema.safeParse({ ...day, source: " " }).success).toBe(false);
+        expect(() => validateHolidayDays(2026, [{ ...day, source: " " }])).toThrow("แหล่งอ้างอิง");
         expect(calendarMutationSchema.safeParse({ action: "publish", year: 2026, versionId: "a", revision: 0, expectedActiveVersion: null, confirmEmpty: false, note: "ตรวจสอบแล้ว" }).success).toBe(false);
     });
 });

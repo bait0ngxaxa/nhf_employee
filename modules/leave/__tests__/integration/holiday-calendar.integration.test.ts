@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cleanCalendarFixtures } from "./calendar-cleanup";
 import { prisma } from "@/lib/db/prisma";
 import { getManagedHolidayCalendar, getPublishedHolidayCalendar, mutateHolidayCalendar } from "../../application/calendar/calendar";
 import type { CalendarAdminContext } from "../../application/calendar/authorization";
 
 describe.sequential("holiday calendar real MySQL persistence", () => {
+    afterAll(cleanCalendarFixtures);
     let admin: CalendarAdminContext;
     let user: CalendarAdminContext;
     let year: number;
@@ -46,9 +48,14 @@ describe.sequential("holiday calendar real MySQL persistence", () => {
         await expect(save([{ ...day, date: `${year}-02-30` }], 0)).rejects.toMatchObject({ statusCode: 400 });
         await expect(save([{ ...day, date: `${year + 1}-01-01` }], 0)).rejects.toMatchObject({ statusCode: 400 });
         calendar = await save([day], 0);
+        await prisma.holidayCalendarDay.updateMany({ where: { versionId: draft.id }, data: { source: " " } });
+        await expect(mutateHolidayCalendar(admin, { action: "publish", year, versionId: draft.id, revision: 1, expectedActiveVersion: null, verified: true, confirmEmpty: false, note: "Persisted invalid source must not publish" })).rejects.toMatchObject({ statusCode: 400 });
+        await expect(prisma.holidayCalendarDay.create({ data: { year, versionId: draft.id, date: new Date(`${year + 1}-01-01T00:00:00Z`), name: "wrong year fixture", category: "ORGANIZATION", source: "integration only" } })).rejects.toThrow();
+        await expect(prisma.holidayCalendarDay.create({ data: { year, versionId: draft.id, date: new Date(`${year}-01-01T00:00:00Z`), name: "duplicate fixture", category: "ORGANIZATION", source: "integration only" } })).rejects.toThrow();
         calendar = await save([{ ...day, name: "แก้ไขชื่อวันทดสอบ" }], 1);
         calendar = await save([], 2);
         expect(calendar.versions[0].days).toEqual([]);
+        await expect(mutateHolidayCalendar(admin, { action: "publish", year, versionId: draft.id, revision: 3, expectedActiveVersion: null, verified: true, confirmEmpty: false, note: "must confirm an empty calendar" })).rejects.toMatchObject({ statusCode: 400 });
         calendar = await save([day], 3);
         expect(await getPublishedHolidayCalendar(year)).toEqual({ year, version: null, days: [] });
         const publish = { action: "publish", year, versionId: draft.id, revision: 4, expectedActiveVersion: null, verified: true, confirmEmpty: false, note: "ยืนยันข้อมูลทดสอบ" };

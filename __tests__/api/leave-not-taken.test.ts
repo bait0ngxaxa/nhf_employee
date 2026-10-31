@@ -288,7 +288,7 @@ describe("/api/leave/not-taken", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null, chargedHalfDays: null,
             createdAt: new Date("2000-01-01T00:00:00.000Z"),
             updatedAt: new Date("2000-01-01T00:00:00.000Z"),
             employee: {
@@ -378,7 +378,7 @@ describe("/api/leave/not-taken", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null, chargedHalfDays: null,
             createdAt: new Date("2000-01-01T00:00:00.000Z"),
             updatedAt: new Date("2000-01-01T00:00:00.000Z"),
             employee: {
@@ -491,7 +491,7 @@ describe("/api/leave/not-taken", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null, chargedHalfDays: null,
             createdAt: new Date("2000-01-01T00:00:00.000Z"),
             updatedAt: new Date("2000-01-01T00:00:00.000Z"),
             employee: {
@@ -564,7 +564,7 @@ describe("/api/leave/not-taken", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null, chargedHalfDays: null,
             createdAt: new Date("2000-02-01T00:00:00.000Z"),
             updatedAt: new Date("2000-02-02T00:00:00.000Z"),
             employee: {
@@ -1223,7 +1223,7 @@ describe("/api/leave/not-taken", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null, chargedHalfDays: null,
             createdAt: new Date("2000-02-01T00:00:00.000Z"),
             updatedAt: new Date("2000-02-02T00:00:00.000Z"),
             employee: {

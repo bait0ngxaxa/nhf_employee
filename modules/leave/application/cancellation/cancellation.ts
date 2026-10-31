@@ -40,6 +40,7 @@ import {
 } from "@/modules/leave/infrastructure/persistence/transaction";
 import { isBeforeLeaveStart } from "@/modules/leave/domain/utils";
 import { halfDaysToDays } from "@/modules/leave/domain/half-days";
+import { getEffectiveChargedHalfDays } from "../../domain/charged-units";
 import { buildLeaveAuditContext } from "@/modules/leave/application/notifications/audit-details";
 import { reconcileLeaveQuotaForward } from "@/modules/leave/domain/quota-entitlement";
 import {
@@ -358,6 +359,7 @@ export async function confirmLeaveCancellation(
             },
             data: {
                 status: "CANCELLED_AFTER_APPROVAL",
+                chargedHalfDays: 0,
                 cancellationConfirmedAt: confirmedAt,
                 cancellationConfirmedById: actor.userId,
             },
@@ -379,7 +381,7 @@ export async function confirmLeaveCancellation(
 
         const updatedQuota = await tx.leaveQuota.update({
             where: { id: quota.id },
-            data: { usedHalfDays: { decrement: leaveRequest.durationHalfDays } },
+            data: { usedHalfDays: { decrement: getEffectiveChargedHalfDays(leaveRequest) } },
         });
         if (updatedQuota.usedHalfDays < 0) {
             throw new LeaveCancellationError(LEAVE_CANCELLATION_MESSAGES.quotaNotFound, 409);
@@ -427,8 +429,8 @@ export async function confirmLeaveCancellation(
             actor.userId,
             actor.userEmail ?? "",
             {
-                before: { status: "CANCELLATION_REQUESTED" },
-                after: { status: "CANCELLED_AFTER_APPROVAL" },
+                before: { status: "CANCELLATION_REQUESTED", chargedHalfDays: getEffectiveChargedHalfDays(leaveRequest) },
+                after: { status: "CANCELLED_AFTER_APPROVAL", chargedHalfDays: 0 },
                 metadata: {
                     ...buildLeaveAuditContext(leaveRequest, {
                         reason: adminOverrideReason,

@@ -151,7 +151,7 @@ function getApprovedUsedTotals(requests: LeaveReportRequest[]): LeaveTypeTotals 
     const totals = createEmptyLeaveTypeTotals();
     for (const request of requests) {
         if (request.status === "APPROVED" || request.status === "CANCELLATION_REQUESTED") {
-            totals[request.leaveType] += request.durationDays;
+            totals[request.leaveType] += request.chargedDays ?? request.durationDays;
         }
     }
     return totals;
@@ -208,7 +208,7 @@ function findLatestApprovedDate(requests: LeaveReportRequest[]): Date | null {
 
 function getEffectiveLeaveDays(request: LeaveReportRequest): number {
     return isQuotaConsumingStatus(request.status)
-        ? request.durationDays
+        ? request.chargedDays ?? request.durationDays
         : 0;
 }
 

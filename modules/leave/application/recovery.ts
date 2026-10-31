@@ -26,10 +26,11 @@ type LeaveRecoveryRequestWithSummaries = Omit<
 
 export type SerializedLeaveRecoveryRequest = Omit<
     LeaveRecoveryRequestWithSummaries,
-    "durationHalfDays" | "overQuotaHalfDays" | "approvalActionVersion"
+    "durationHalfDays" | "overQuotaHalfDays" | "approvalActionVersion" | "chargedHalfDays"
 > & {
     durationDays: number;
     overQuotaDays: number;
+    chargedDays?: number;
 };
 
 export interface LeaveAdminRecoveryData {

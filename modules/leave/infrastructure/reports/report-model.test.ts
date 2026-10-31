@@ -4,6 +4,14 @@ import { buildLeaveReportRows } from "./report-model";
 import type { LeaveReportEmployee } from "./report-types";
 
 describe("leave report model", () => {
+    it("reports effective charges while preserving submitted durations after reconciliation", () => {
+        const employee = createEmployee();
+        employee.leaveRequests[0].chargedDays = 0.5;
+        employee.leaveRequests[1].chargedDays = 0;
+        const rows = buildLeaveReportRows([employee]);
+        expect(rows.summaryRows[0]).toMatchObject({ sickUsed: 0.5, vacationUsed: 0, totalUsed: 0.5 });
+        expect(rows.detailRows.slice(0, 2).map((row) => [row.requestedDays, row.effectiveDays])).toEqual([[1, 0.5], [1.5, 0]]);
+    });
     it("summarizes current team employees and keeps detail rows reconciled", () => {
         const rows = buildLeaveReportRows([createEmployee()]);
         const [employeeSummary, teamSummary] = rows.summaryRows;

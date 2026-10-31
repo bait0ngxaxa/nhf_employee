@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanCalendarFixtures } from "./calendar-cleanup";
 import { prisma } from "@/lib/db/prisma";
 import { decideLeaveRequest } from "../../application/approvals/decision";
 import { cancelLeaveRequest } from "../../application/cancellation/cancellation";
@@ -8,6 +9,7 @@ import { buildLeaveAuthorizationContext } from "../../application/authorization"
 import { calendarDraft, createCalendarFixture, holiday, publishCalendar, publishInput, requestCalendarLeave, type CalendarFixture } from "./calendar-fixture";
 
 describe.sequential("calendar-aware lifecycle with real MySQL", () => {
+    afterAll(cleanCalendarFixtures);
     let f: CalendarFixture;
     beforeEach(async () => { vi.stubEnv("LEAVE_HOLIDAY_CALENDAR_ENABLED", "true"); f = await createCalendarFixture(); });
     afterEach(() => vi.unstubAllEnvs());
@@ -34,6 +36,15 @@ describe.sequential("calendar-aware lifecycle with real MySQL", () => {
         const approved = await decideLeaveRequest(f.approver, { leaveId: request.id, action: "APPROVE" });
         expect(approved.approvalCalendarVersionId).toBe(versionId);
         expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: f.owner.employeeId } })).usedHalfDays).toBe(4);
+    });
+
+    it("preserves complementary half-day occupancy with calendar enforcement active", async () => {
+        await publishCalendar(f, [holiday(f.middle)]);
+        await requestCalendarLeave(f, { endDate: f.start, period: "MORNING" });
+        await requestCalendarLeave(f, { endDate: f.start, period: "AFTERNOON", leaveType: "PERSONAL" });
+        await expect(requestCalendarLeave(f, { endDate: f.start, period: "MORNING", leaveType: "SICK" })).rejects.toMatchObject({ statusCode: 409 });
+        await expect(requestCalendarLeave(f, { endDate: f.start, period: "AFTERNOON" })).rejects.toMatchObject({ statusCode: 409 });
+        await expect(requestCalendarLeave(f, { endDate: f.start, period: "FULL_DAY" })).rejects.toMatchObject({ statusCode: 409 });
     });
 
     it.each(["MORNING", "AFTERNOON", "FULL_DAY"] as const)("rejects %s entirely on a published holiday", async (period) => {

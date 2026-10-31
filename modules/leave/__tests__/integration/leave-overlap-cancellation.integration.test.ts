@@ -372,6 +372,7 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
             where: { id: originalLeaveId },
             data: {
                 status: LeaveStatus.APPROVED,
+                chargedHalfDays: 2,
                 approvedAt: new Date(),
             },
         });
@@ -425,6 +426,7 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
             where: { id: originalLeaveId },
             data: {
                 status: LeaveStatus.APPROVED,
+                chargedHalfDays: 2,
                 approvedAt: new Date(),
             },
         });
@@ -527,6 +529,7 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
             where: { id: originalLeaveId },
             data: {
                 status: LeaveStatus.APPROVED,
+                chargedHalfDays: 2,
                 approvedAt: new Date(),
             },
         });

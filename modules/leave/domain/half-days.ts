@@ -2,6 +2,8 @@ import {
     calculateEffectiveEntitlementHalfDays,
     calculateRemainingBalanceHalfDays,
 } from "@/modules/leave/domain/quota-accounting";
+import type { LeaveStatus } from "@prisma/client";
+import { getEffectiveChargedHalfDays } from "./charged-units";
 
 export const HALF_DAYS_PER_DAY = 2;
 
@@ -37,6 +39,8 @@ type StoredLeaveRequest = {
     durationHalfDays: number;
     overQuotaHalfDays: number;
     approvalActionVersion?: number;
+    chargedHalfDays?: number | null;
+    status?: LeaveStatus;
 };
 
 export function toLeaveQuotaDays<T extends StoredLeaveQuota>(
@@ -75,19 +79,22 @@ export function toLeaveQuotaDays<T extends StoredLeaveQuota>(
 
 export function toLeaveRequestDays<T extends StoredLeaveRequest>(
     request: T,
-): Omit<T, keyof StoredLeaveRequest> & {
+): Omit<T, "durationHalfDays" | "overQuotaHalfDays" | "approvalActionVersion" | "chargedHalfDays"> & {
     durationDays: number;
     overQuotaDays: number;
+    chargedDays?: number;
 } {
     const {
         durationHalfDays,
         overQuotaHalfDays,
         approvalActionVersion: _approvalActionVersion,
+        chargedHalfDays,
         ...rest
     } = request;
     return {
         ...rest,
         durationDays: halfDaysToDays(durationHalfDays),
         overQuotaDays: halfDaysToDays(overQuotaHalfDays),
+        ...("chargedHalfDays" in request ? { chargedDays: halfDaysToDays(getEffectiveChargedHalfDays({ status: request.status ?? "PENDING", durationHalfDays, chargedHalfDays })) } : {}),
     };
 }

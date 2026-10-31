@@ -12,6 +12,7 @@ export type LeaveReportRequest = {
     endDate: Date;
     period: LeavePeriod;
     durationDays: number;
+    chargedDays?: number;
     reason: string;
     emergencyReason: string | null;
     specialReason: string | null;

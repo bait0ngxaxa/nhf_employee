@@ -1,5 +1,7 @@
 "use client";
 
+import { isQuotaChargedStatus } from "../../domain/charged-units";
+
 import { ChevronLeft, ChevronRight, Filter, Paperclip, RotateCcw, X } from "lucide-react";
 import { useState, type ReactElement } from "react";
 
@@ -177,6 +179,7 @@ function HistoryCard({
                     <p className="text-xs leading-5 text-content-muted">
                         {getLeavePeriodLabel(request.period)} · {formatLeaveDays(request.durationDays)} วัน
                     </p>
+                    {isQuotaChargedStatus(request.status) && request.chargedDays !== undefined && request.chargedDays !== request.durationDays && <p className="text-xs leading-5 text-content-secondary">ยอดหักโควต้าปัจจุบัน {formatLeaveDays(request.chargedDays)} วัน (ปรับตามปฏิทินองค์กร)</p>}
                 </div>
                 <RequestStatusBadge meta={getLeaveRequestStatusMeta(request.status)} />
             </div>

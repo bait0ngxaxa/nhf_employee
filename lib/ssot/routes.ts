@@ -381,6 +381,8 @@ export const API_ROUTES = {
     leave: {
         calendar: "/api/leave/calendar",
         calendarManage: "/api/leave/calendar/manage",
+        calendarImpact: "/api/leave/calendar/impact",
+        calendarReconcile: "/api/leave/calendar/reconcile",
         calculation: "/api/leave/calculation",
         me: "/api/leave/me",
         approvals: "/api/leave/approvals",

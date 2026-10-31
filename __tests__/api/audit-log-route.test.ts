@@ -116,7 +116,7 @@ describe("Audit log API compatibility", () => {
             endDate: undefined,
             page: 1,
             limit: 20,
-        });
+        }, { id: 1, role: "ADMIN" });
     });
 
     it("allows a USER when the centralized adapter reports an explicit grant", async () => {

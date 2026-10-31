@@ -37,6 +37,7 @@ import {
     lockLeaveRequestRow,
 } from "../infrastructure/persistence/transaction";
 import { runSerializableTransaction } from "@/lib/db/transaction";
+import { getEffectiveChargedHalfDays } from "../domain/charged-units";
 import { getEmployeeDisplayName } from "@/modules/employee";
 import { APP_DASHBOARD_TABS, toDashboardMenuPath } from "@/lib/ssot/routes";
 import {
@@ -382,6 +383,7 @@ export async function confirmLeaveNotTaken(
             },
             data: {
                 status: "NOT_TAKEN",
+                chargedHalfDays: 0,
                 notTakenConfirmedAt: new Date(),
                 notTakenConfirmedById: managerId,
             },
@@ -403,7 +405,7 @@ export async function confirmLeaveNotTaken(
 
         const updatedQuota = await tx.leaveQuota.update({
             where: { id: quota.id },
-            data: { usedHalfDays: { decrement: leaveRequest.durationHalfDays } },
+            data: { usedHalfDays: { decrement: getEffectiveChargedHalfDays(leaveRequest) } },
         });
         if (updatedQuota.usedHalfDays < 0) {
             throw new LeaveNotTakenError(NOT_TAKEN_MESSAGES.quotaNotFound, 409);
@@ -457,13 +459,14 @@ export async function confirmLeaveNotTaken(
             input.actor.user.email,
             {
                 before: { status: "APPROVED" },
-                after: { status: "NOT_TAKEN" },
+                after: { status: "NOT_TAKEN", chargedHalfDays: 0 },
                 metadata: {
                     ...buildLeaveAuditContext(leaveRequest),
                     // Historical audit key retained for compatibility. Its
                     // value now reflects the explicit recovery decision.
                     adminOverride: recoveryOverride,
                     decision: "CONFIRM_NOT_TAKEN",
+                    refundedHalfDays: getEffectiveChargedHalfDays(leaveRequest),
                     originalApproverId: leaveRequest.approverId,
                     exceptionApproverId: leaveRequest.exceptionApproverId,
                     ...(adminOverrideReason ? { overrideReason: adminOverrideReason } : {}),

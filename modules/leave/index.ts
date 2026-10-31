@@ -14,6 +14,7 @@ export { getManagedHolidayCalendar, getPublishedHolidayCalendar, mutateHolidayCa
 export { HolidayCalendarError, calendarYearSchema } from "./domain/holiday-calendar";
 export { previewLeaveCalculation, isHolidayCalendarEnforced } from "./application/calendar/calculation";
 export { handleLeaveCalculationPreview } from "./server/calculation-api";
+export { getCalendarImpact, reconcileCalendarLeave } from "./application/calendar/reconciliation";
 export { assertLeaveRequestBodySize } from "./application/requests/request-input";
 export {
     LeaveApprovalError,

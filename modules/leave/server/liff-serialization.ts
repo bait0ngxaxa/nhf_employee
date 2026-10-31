@@ -46,6 +46,7 @@ interface LeaveRequestSource {
     endDate: DateValue;
     period: LeavePeriodValue;
     durationDays: number;
+    chargedDays?: number;
     reason: string;
     emergencyReason: string | null;
     specialReason: string | null;
@@ -208,6 +209,7 @@ function toLiffLeaveRequestSummary(
         endDate: serializeDate(request.endDate),
         period: request.period,
         durationDays: request.durationDays,
+        ...(request.chargedDays !== undefined ? { chargedDays: request.chargedDays } : {}),
         reason: request.reason,
         emergencyReason: request.emergencyReason,
         specialReason: request.specialReason,

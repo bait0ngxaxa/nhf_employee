@@ -4,7 +4,7 @@ import { HolidayCalendarPage } from "./HolidayCalendarPage";
 import { loadHolidayCalendar, saveHolidayCalendar } from "./api";
 import { formatHolidayDate } from "./HolidayDraftEditor";
 
-vi.mock("./api", () => ({ loadHolidayCalendar: vi.fn(), saveHolidayCalendar: vi.fn() }));
+vi.mock("./api", () => ({ loadHolidayCalendar: vi.fn(), saveHolidayCalendar: vi.fn(), loadCalendarImpact: vi.fn().mockResolvedValue({ rows: [], addedHolidays: [], removedHolidays: [], year: 2027, proposedVersion: 1, activeVersion: null, nextCursor: null }), confirmCalendarReconciliation: vi.fn() }));
 
 describe("organization calendar dashboard", () => {
     beforeEach(() => vi.clearAllMocks());

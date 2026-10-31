@@ -51,7 +51,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         assertAuditCapabilityScope(authorization, "ALL");
 
         const filters = parseQueryParams(request.url);
-        const result = await getAuditLogs(filters);
+        const result = await getAuditLogs(filters, auth.user);
 
         return NextResponse.json(result, { status: 200 });
     } catch (error) {

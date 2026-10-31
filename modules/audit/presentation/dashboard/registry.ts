@@ -30,6 +30,18 @@ const DEFAULT_AUDIT_ACTION_META: AuditActionMeta = {
 };
 
 export const AUDIT_ACTION_META = {
+    LEAVE_CALENDAR_DRAFT: {
+        label: "จัดการฉบับร่างปฏิทินวันหยุด",
+        badgeClassName: AUDIT_BADGE_TONES.update,
+    },
+    LEAVE_CALENDAR_PUBLISH: {
+        label: "เผยแพร่ปฏิทินวันหยุดองค์กร",
+        badgeClassName: AUDIT_BADGE_TONES.approved,
+    },
+    LEAVE_CALENDAR_RECONCILE: {
+        label: "ปรับโควต้าตามปฏิทินวันหยุด",
+        badgeClassName: AUDIT_BADGE_TONES.stateChange,
+    },
     ANNOUNCEMENT_UPDATE: {
         label: "จัดการประกาศ",
         badgeClassName: AUDIT_BADGE_TONES.update,
@@ -300,6 +312,7 @@ export const AUDIT_ACTION_FILTER_OPTIONS = [
 ];
 
 export const AUDIT_ENTITY_LABELS = {
+    HolidayCalendar: "ปฏิทินวันหยุดองค์กร",
     Announcement: "ประกาศองค์กร",
     User: "ผู้ใช้ระบบ",
     ITTicket: "ทิกเก็ต IT",

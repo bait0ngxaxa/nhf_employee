@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { AuditAction, type Prisma } from "@prisma/client";
+import type { UserContext } from "@/lib/auth/context";
 
 import {
     countAuditLogs,
@@ -13,6 +14,10 @@ import type {
     AuditLogWithUser,
     PaginatedAuditLogsResult,
 } from "./contracts";
+
+const CALENDAR_ADMIN_AUDIT_ACTIONS: readonly AuditAction[] = [
+    "LEAVE_CALENDAR_DRAFT", "LEAVE_CALENDAR_PUBLISH", "LEAVE_CALENDAR_RECONCILE",
+];
 
 function buildWhereClause(
     filters: AuditLogFilters,
@@ -99,12 +104,17 @@ function parseAuditLogDetails(
 
 /** Get the paginated generic audit-log view with request-level deduplication. */
 export const getAuditLogs = cache(
-    async (filters: AuditLogFilters): Promise<PaginatedAuditLogsResult> => {
+    async (filters: AuditLogFilters, viewer?: Pick<UserContext, "id" | "role">): Promise<PaginatedAuditLogsResult> => {
         const page = Math.max(1, filters.page);
         const limit = Math.min(Math.max(1, filters.limit), 100);
         const skip = (page - 1) * limit;
 
         const where = buildWhereClause(filters);
+        // Calendar control-plane history is ADMIN-only even for a USER granted audit.read / ALL.
+        // The optional viewer must come from the server session; omission fails closed.
+        if (viewer?.role !== "ADMIN") {
+            where.AND = [{ action: { notIn: [...CALENDAR_ADMIN_AUDIT_ACTIONS] } }];
+        }
 
         const [auditLogs, totalCount] = await Promise.all([
             findAuditLogs(where, skip, limit),

@@ -327,6 +327,7 @@ async function createInTransaction(
             endDate: prepared.end,
             period: prepared.payload.period,
             durationHalfDays: prepared.durationHalfDays,
+            chargedHalfDays: 0,
             calculationCalendarVersionId: calculation.calendarVersionId,
             reason: prepared.payload.reason,
             emergencyReason: prepared.emergencyReason,

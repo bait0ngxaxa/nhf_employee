@@ -18,6 +18,20 @@ describe("Audit Log Queries", () => {
     });
 
     describe("getAuditLogs", () => {
+        it.each([undefined, { id: 7, role: "USER" }])("filters calendar administration from generic audit reads and counts for %s", async (viewer) => {
+            prismaMock.auditLog.count.mockResolvedValue(0);
+            prismaMock.auditLog.findMany.mockResolvedValue([]);
+            await getAuditLogs({ page: 1, limit: 10, action: "LEAVE_CALENDAR_RECONCILE" }, viewer);
+            const where = { action: "LEAVE_CALENDAR_RECONCILE", AND: [{ action: { notIn: ["LEAVE_CALENDAR_DRAFT", "LEAVE_CALENDAR_PUBLISH", "LEAVE_CALENDAR_RECONCILE"] } }] };
+            expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ where }));
+            expect(prismaMock.auditLog.count).toHaveBeenCalledWith({ where });
+        });
+        it("preserves authorized ADMIN visibility of calendar audit history", async () => {
+            prismaMock.auditLog.count.mockResolvedValue(0);
+            prismaMock.auditLog.findMany.mockResolvedValue([]);
+            await getAuditLogs({ page: 1, limit: 10, entityType: "HolidayCalendar" }, { id: 1, role: "ADMIN" });
+            expect(prismaMock.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { entityType: "HolidayCalendar" } }));
+        });
         it("should fetch paginated logs", async () => {
             prismaMock.auditLog.count.mockResolvedValue(1);
             prismaMock.auditLog.findMany.mockResolvedValue([

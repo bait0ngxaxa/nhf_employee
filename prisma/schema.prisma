@@ -25,6 +25,7 @@ model User {
   auditLogs                   AuditLog[]
   createdCalendarVersions     HolidayCalendarVersion[] @relation("CalendarCreator")
   publishedCalendarVersions   HolidayCalendarVersion[] @relation("CalendarPublisher")
+  calendarAdjustments         LeaveCalendarAdjustment[]
   emailRequests               EmailRequest[]
   emailRequestIdempotencies   EmailRequestIdempotency[]
   notifications               Notification[]
@@ -755,6 +756,7 @@ model HolidayCalendarVersion {
   days           HolidayCalendarDay[]
   calculatedRequests LeaveRequest[] @relation("RequestCalendarCalculation")
   approvedRequests LeaveRequest[] @relation("RequestCalendarApproval")
+  adjustments LeaveCalendarAdjustment[]
 
   @@unique([year, number])
   @@unique([year, id])
@@ -789,6 +791,8 @@ model LeaveRequest {
   endDate           DateTime
   period            LeavePeriod @default(FULL_DAY)
   durationHalfDays  Int // ระยะเวลาลาสุทธิ หน่วยครึ่งวัน (เช่น 3 = 1.5 วัน)
+  // NULL means legacy: derive charge from status and original duration until the first accounting write.
+  chargedHalfDays Int?
   calculationCalendarVersionId String?
   approvalCalendarVersionId String?
   calculationCalendarVersion HolidayCalendarVersion? @relation("RequestCalendarCalculation", fields: [calculationCalendarVersionId], references: [id], onDelete: Restrict)
@@ -827,6 +831,7 @@ model LeaveRequest {
   exceptionApprover Employee?    @relation("LeaveExceptionApprover", fields: [exceptionApproverId], references: [id], onDelete: SetNull)
   attachments LeaveAttachment[]
   idempotency LeaveRequestIdempotency?
+  calendarAdjustments LeaveCalendarAdjustment[]
 
   @@index([employeeId])
   @@index([approverId])
@@ -834,7 +839,28 @@ model LeaveRequest {
   @@index([status])
   @@index([notTakenRequestedAt])
   @@index([cancellationRequestedAt])
+  @@index([startDate, id])
   @@map("leave_requests")
+}
+
+model LeaveCalendarAdjustment {
+  id                String @id @default(cuid())
+  leaveRequestId    String
+  calendarVersionId String
+  previousHalfDays  Int
+  resultingHalfDays Int
+  reason            String @db.VarChar(1000)
+  overQuotaJustification String? @db.VarChar(1000)
+  confirmationHash  String @db.Char(64)
+  administratorId   Int
+  createdAt         DateTime @default(now())
+  request           LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Restrict)
+  calendarVersion   HolidayCalendarVersion @relation(fields: [calendarVersionId], references: [id], onDelete: Restrict)
+  administrator     User @relation(fields: [administratorId], references: [id], onDelete: Restrict)
+
+  @@unique([leaveRequestId, calendarVersionId])
+  @@index([calendarVersionId])
+  @@map("leave_calendar_adjustments")
 }
 
 model LeaveRequestIdempotency {
