@@ -744,14 +744,15 @@ model HolidayCalendarVersion {
   number         Int
   revision       Int @default(0)
   baseVersionNumber Int?
-  createdById    Int
+  createdById    Int?
+  defaultDatasetRevision String? @db.VarChar(100)
   createdAt      DateTime @default(now())
   publishedAt    DateTime?
   publishedById  Int?
   publicationNote String? @db.VarChar(1000)
   calendar       HolidayCalendar @relation("CalendarVersions", fields: [year], references: [year], onDelete: Restrict)
   activeFor      HolidayCalendar[] @relation("ActiveCalendarVersion")
-  creator        User @relation("CalendarCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  creator        User? @relation("CalendarCreator", fields: [createdById], references: [id], onDelete: Restrict)
   publisher      User? @relation("CalendarPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
   days           HolidayCalendarDay[]
   calculatedRequests LeaveRequest[] @relation("RequestCalendarCalculation")

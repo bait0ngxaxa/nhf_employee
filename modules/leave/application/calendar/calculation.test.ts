@@ -15,7 +15,7 @@ describe("effective calendar rollout and missing-year policy", () => {
         vi.stubEnv("LEAVE_HOLIDAY_CALENDAR_ENABLED", "true");
         const tx = mockDeep<Prisma.TransactionClient>();
         tx.holidayCalendar.findUnique.mockResolvedValue(null);
-        await expect(calculateEffectiveLeaveInTransaction(tx, "2027-01-04", "2027-01-04", "MORNING")).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining("2570") });
+        await expect(calculateEffectiveLeaveInTransaction(tx, "2028-01-04", "2028-01-04", "MORNING")).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining("2571") });
         expect(tx.$queryRaw).toHaveBeenCalled();
     });
     it("does not silently disable enforcement for malformed environment values", () => {

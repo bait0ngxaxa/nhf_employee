@@ -8,6 +8,15 @@ import { prisma } from "@/lib/db/prisma";
  * must be disposed after each file rather than surviving into another suite.
  */
 export async function cleanCalendarFixtures(): Promise<void> {
+    return disposeCalendarFixtures(false);
+}
+
+/** Opt-in only for the actual bundled-year suite; normal fixtures still reject real years. */
+export async function cleanCalendarDefaultFixtures(): Promise<void> {
+    return disposeCalendarFixtures(true);
+}
+
+async function disposeCalendarFixtures(includeBuiltInDefaults: boolean): Promise<void> {
     const rawUrl = process.env.DATABASE_URL;
     const url = new URL(rawUrl ?? "");
     if (process.env.NODE_ENV !== "test" || !rawUrl || url.protocol !== "mysql:" || !/(?:_integration|_test)$/.test(url.pathname)) {
@@ -24,9 +33,12 @@ export async function cleanCalendarFixtures(): Promise<void> {
     const userIds = users.map((row) => row.id);
     const employeeIds = employees.map((row) => row.id);
     const calendars = await prisma.holidayCalendar.findMany({ select: { year: true } });
-    const versions = await prisma.holidayCalendarVersion.findMany({ select: { id: true, createdById: true, publishedById: true } });
-    if (calendars.some((row) => row.year < 8000 || row.year > 9998)
-        || versions.some((row) => !userIds.includes(row.createdById) || (row.publishedById !== null && !userIds.includes(row.publishedById)))) {
+    const versions = await prisma.holidayCalendarVersion.findMany({ select: { id: true, year: true, defaultDatasetRevision: true, createdById: true, publishedById: true } });
+    const bundledYear = (year: number): boolean => includeBuiltInDefaults && [2026, 2027].includes(year);
+    if (calendars.some((row) => !bundledYear(row.year) && (row.year < 8000 || row.year > 9998))
+        || versions.some((row) => (row.createdById === null
+            ? !bundledYear(row.year) || row.defaultDatasetRevision !== `bot-${row.year}-r1` || row.publishedById !== null
+            : !userIds.includes(row.createdById)) || (row.publishedById !== null && !userIds.includes(row.publishedById)))) {
         throw new Error("Refusing cleanup: calendar data is not owned by synthetic calendar fixtures");
     }
     const externalReferences = await prisma.leaveRequest.count({
@@ -59,6 +71,9 @@ export async function cleanCalendarFixtures(): Promise<void> {
     await prisma.notificationOutbox.deleteMany({ where: { OR: requestIds.map((id) => ({ payload: { contains: id } })) } });
     await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.auditLog.deleteMany({ where: { userId: { in: userIds } } });
+    if (includeBuiltInDefaults) {
+        await prisma.auditLog.deleteMany({ where: { userId: null, entityType: "HolidayCalendar", entityId: { in: [2026, 2027] }, action: "LEAVE_CALENDAR_PUBLISH" } });
+    }
     await prisma.leaveQuota.deleteMany({ where: { employeeId: { in: employeeIds } } });
     await prisma.employee.updateMany({ where: { id: { in: employeeIds } }, data: { managerId: null } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });

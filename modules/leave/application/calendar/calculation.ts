@@ -7,9 +7,9 @@ import { HolidayCalendarError } from "../../domain/holiday-calendar";
 import { assertLeaveCapabilityScope, resolveLeaveCapabilityInTransaction, type LeaveAuthorizationContext } from "../authorization";
 import { calculateEffectiveEntitlementForYearHalfDays } from "../../domain/quota-entitlement";
 import { calculateAdditionalOverQuotaHalfDays } from "../../domain/over-quota";
-import { lockHolidayCalendar } from "./calendar";
+import { ensureHolidayCalendarInTransaction } from "./defaults";
 
-/** Explicit safe deployment stage. Set true only after verified initial calendars are published. */
+/** Explicit feature activation. Bundled verified years initialize automatically after activation. */
 export function isHolidayCalendarEnforced(): boolean {
     const value = process.env.LEAVE_HOLIDAY_CALENDAR_ENABLED;
     if (value === undefined || value === "false") return false;
@@ -32,7 +32,7 @@ export async function calculateEffectiveLeaveInTransaction(
     if (!isHolidayCalendarEnforced()) return { ...calculateCalendarLeave(start, end, period, new Set()), calendarVersionId: null, calendarVersion: null, mode: "SETUP_WEEKDAYS" };
     const year = getBusinessDate(start).year;
     // Same annual lock as publication. Held through mutation commit, never read outside the final transaction.
-    await lockHolidayCalendar(tx, year);
+    await ensureHolidayCalendarInTransaction(tx, year);
     const calendar = await tx.holidayCalendar.findUnique({ where: { year }, include: { activeVersion: { include: { days: true } } } });
     if (!calendar?.activeVersion?.publishedAt) throw new HolidayCalendarError(`ยังไม่ได้เผยแพร่ปฏิทินวันหยุดปี พ.ศ. ${year + 543} (ค.ศ. ${year}) กรุณาติดต่อผู้ดูแลระบบ`, 409);
     const version = calendar.activeVersion;

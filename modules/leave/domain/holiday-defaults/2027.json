@@ -1,0 +1,123 @@
+{
+  "year": 2027,
+  "revision": "bot-2027-r1",
+  "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175",
+  "verifiedOn": "2026-10-31",
+  "note": "ใช้รายการวันหยุดทั่วไปของสถาบันการเงินเป็นค่าเริ่มต้น NHF ไม่ใช่ข้อสรุปวันหยุดตามกฎหมายสำหรับทุกองค์กร ไม่รวมวันหยุดเฉพาะพื้นที่หรือเงื่อนไขสาขา ADMIN ปรับแต่งได้",
+  "exclusions": [
+    {
+      "source": "https://www.bot.or.th/th/financial-institutions-holiday.html",
+      "note": "ไม่รวมวันตรุษจีนและวันอีฎิ้ลฟิตริ/อีฎิ้ลอัดฮาตามเงื่อนไขสาขาในห้าจังหวัดชายแดนภาคใต้ และวันหยุดเพิ่มเติมเฉพาะธนาคารอิสลามแห่งประเทศไทย"
+    }
+  ],
+  "days": [
+    {
+      "date": "2027-01-01",
+      "name": "วันขึ้นปีใหม่",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-02-22",
+      "name": "ชดเชยวันมาฆบูชา (21 กุมภาพันธ์ 2570)",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-04-06",
+      "name": "วันพระบาทสมเด็จพระพุทธยอดฟ้าจุฬาโลกมหาราช และวันที่ระลึกมหาจักรีบรมราชวงศ์",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-04-13",
+      "name": "วันสงกรานต์",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-04-14",
+      "name": "วันสงกรานต์",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-04-15",
+      "name": "วันสงกรานต์",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-05-03",
+      "name": "ชดเชยวันแรงงานแห่งชาติ (1 พฤษภาคม 2570)",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-05-04",
+      "name": "วันฉัตรมงคล",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-05-20",
+      "name": "วันวิสาขบูชา",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-06-03",
+      "name": "วันเฉลิมพระชนมพรรษา สมเด็จพระนางเจ้าสุทิดา พัชรสุธาพิมลลักษณ พระบรมราชินี",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-07-19",
+      "name": "ชดเชยวันอาสาฬหบูชา (18 กรกฎาคม 2570)",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-07-28",
+      "name": "วันเฉลิมพระชนมพรรษา พระบาทสมเด็จพระวชิรเกล้าเจ้าอยู่หัว",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-08-12",
+      "name": "วันคล้ายวันพระราชสมภพ สมเด็จพระนางเจ้าสิริกิติ์ พระบรมราชินีนาถ พระบรมราชชนนีพันปีหลวง และวันแม่แห่งชาติ",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-10-13",
+      "name": "วันนวมินทรมหาราช",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-10-25",
+      "name": "ชดเชยวันปิยมหาราช (23 ตุลาคม 2570)",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-12-06",
+      "name": "ชดเชยวันคล้ายวันพระบรมราชสมภพ รัชกาลที่ 9 วันชาติ และวันพ่อแห่งชาติ (5 ธันวาคม 2570)",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-12-10",
+      "name": "วันรัฐธรรมนูญ",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    },
+    {
+      "date": "2027-12-31",
+      "name": "วันสิ้นปี",
+      "category": "OFFICIAL",
+      "source": "https://app.bot.or.th/FIPCS/thai/PFIPCS_summary.aspx?packId=25690175"
+    }
+  ]
+}

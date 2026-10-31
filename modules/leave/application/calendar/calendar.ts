@@ -4,10 +4,9 @@ import { appendAuditInTransaction } from "@/modules/audit";
 import { toDateOnlyString, toUtcDate } from "../../domain/business-date";
 import { calendarMutationSchema, HolidayCalendarError, validateHolidayDays, type ManagedHolidayCalendar, type PublishedHolidayCalendar } from "../../domain/holiday-calendar";
 import { assertCalendarAdmin, type CalendarAdminContext } from "./authorization";
+import { ensureHolidayCalendarInTransaction, lockHolidayCalendar } from "./defaults";
 
-export async function lockHolidayCalendar(tx: Prisma.TransactionClient, year: number): Promise<void> {
-    await tx.$queryRaw`SELECT year FROM holiday_calendars WHERE year = ${year} FOR UPDATE`;
-}
+export { lockHolidayCalendar } from "./defaults";
 
 async function managedInTransaction(tx: Prisma.TransactionClient, year: number): Promise<ManagedHolidayCalendar> {
     const calendar = await tx.holidayCalendar.findUnique({
@@ -27,12 +26,14 @@ async function managedInTransaction(tx: Prisma.TransactionClient, year: number):
 export async function getManagedHolidayCalendar(context: CalendarAdminContext, year: number): Promise<ManagedHolidayCalendar> {
     return runSerializableTransaction(async (tx) => {
         await assertCalendarAdmin(tx, context);
+        await ensureHolidayCalendarInTransaction(tx, year);
         return managedInTransaction(tx, year);
     });
 }
 
 export async function getPublishedHolidayCalendar(year: number): Promise<PublishedHolidayCalendar> {
     return runSerializableTransaction(async (tx) => {
+        await ensureHolidayCalendarInTransaction(tx, year);
         const calendar = await tx.holidayCalendar.findUnique({ where: { year }, include: { activeVersion: { include: { days: { orderBy: { date: "asc" } } } } } });
         return {
             year, version: calendar?.activeVersion?.number ?? null,
@@ -51,6 +52,7 @@ export async function mutateHolidayCalendar(context: CalendarAdminContext, raw: 
         // Upsert serializes first creation too. Existing calendars are never reset.
         await tx.holidayCalendar.upsert({ where: { year: input.year }, create: { year: input.year }, update: {} });
         await lockHolidayCalendar(tx, input.year);
+        await ensureHolidayCalendarInTransaction(tx, input.year);
         const before = await managedInTransaction(tx, input.year);
         if (input.action === "create") {
             if (before.activeVersionNumber !== input.expectedActiveVersion) throw new HolidayCalendarError("ปฏิทินเปลี่ยนแล้ว กรุณาโหลดใหม่");
