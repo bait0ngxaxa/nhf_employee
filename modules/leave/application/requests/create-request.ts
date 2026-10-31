@@ -31,7 +31,7 @@ import {
     reconcileLeaveQuotaForward,
 } from "@/modules/leave/domain/quota-entitlement";
 import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
-import { calculateLeaveDurationHalfDays, isWorkingDay } from "@/modules/leave/domain/utils";
+import { calculateLeaveDurationHalfDays, doLeaveRequestsOverlap, isWorkingDay } from "@/modules/leave/domain/utils";
 import { toUtcDate } from "@/modules/leave/domain/business-date";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { INITIAL_LEAVE_APPROVAL_ACTION_VERSION } from "@/modules/leave/domain/approval-action-version";
@@ -187,8 +187,9 @@ async function assertNoOverlap(
     employeeId: number,
     start: Date,
     end: Date,
+    period: LeaveRequestValues["period"],
 ): Promise<void> {
-    const overlap = await tx.leaveRequest.findFirst({
+    const candidates = await tx.leaveRequest.findMany({
         where: {
             employeeId,
             status: { in: ["PENDING", "APPROVED", "CANCELLATION_REQUESTED"] },
@@ -197,8 +198,12 @@ async function assertNoOverlap(
                 { endDate: { gte: start } },
             ],
         },
+        select: { startDate: true, endDate: true, period: true },
     });
-    if (overlap) {
+    if (candidates.some((candidate) => doLeaveRequestsOverlap(
+        candidate,
+        { startDate: start, endDate: end, period },
+    ))) {
         throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.overlapConflict, 409);
     }
 }
@@ -284,7 +289,9 @@ async function createInTransaction(
     }
 
     const employee = await getEligibleEmployee(tx, input);
-    await assertNoOverlap(tx, input.employeeId, prepared.start, prepared.end);
+    await assertNoOverlap(
+        tx, input.employeeId, prepared.start, prepared.end, prepared.payload.period,
+    );
     const quota = await ensureLeaveQuotaForYear(tx, {
         employeeId: input.employeeId,
         year: prepared.currentYear,

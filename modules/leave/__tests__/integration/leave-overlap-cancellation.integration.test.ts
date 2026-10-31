@@ -181,6 +181,7 @@ async function createFixture(): Promise<Fixture> {
 async function createRequest(
     fixture: Fixture,
     idempotencyKey: string,
+    payload: Partial<Parameters<typeof createLeaveRequest>[0]["payload"]> = {},
 ): Promise<string> {
     const result = await createLeaveRequest({
         id: randomUUID(),
@@ -188,7 +189,7 @@ async function createRequest(
         userEmail: fixture.employeeUserEmail,
         employeeId: fixture.employeeId,
         idempotencyKey,
-        payload: LEAVE_PAYLOAD,
+        payload: { ...LEAVE_PAYLOAD, ...payload },
         attachments: [],
         authorization: authorization(
             fixture.employeeUserId,
@@ -214,6 +215,152 @@ describe.sequential("leave cancellation lifecycle with real MySQL", () => {
     afterAll(async () => {
         await cleanFixture();
         await prisma.$disconnect();
+    });
+
+    it.each([
+        ["MORNING", "AFTERNOON"],
+        ["AFTERNOON", "MORNING"],
+    ] as const)("persists complementary %s then %s across leave types", async (first, second) => {
+        await createRequest(fixture, randomUUID(), { period: first, leaveType: "SICK" });
+        await createRequest(fixture, randomUUID(), { period: second, leaveType: "PERSONAL" });
+        const requests = await prisma.leaveRequest.findMany({
+            where: { employeeId: fixture.employeeId },
+        });
+        expect(requests).toHaveLength(2);
+        expect(requests.map(({ period }) => period).sort()).toEqual(["AFTERNOON", "MORNING"]);
+        expect(requests.every(({ durationHalfDays, status }) => durationHalfDays === 1 && status === "PENDING")).toBe(true);
+        const quotas = await prisma.leaveQuota.findMany({ where: { employeeId: fixture.employeeId } });
+        expect(quotas.every(({ usedHalfDays }) => usedHalfDays === 0)).toBe(true);
+        for (const request of requests) {
+            expect(await prisma.notificationOutbox.count({ where: { payload: { contains: request.id } } })).toBe(1);
+        }
+        // Both candidates must be inspected: neither slot is now free.
+        for (const period of ["MORNING", "AFTERNOON"] as const) {
+            await expect(createRequest(fixture, randomUUID(), { period, leaveType: "VACATION" }))
+                .rejects.toMatchObject({ statusCode: 409 });
+        }
+        expect(await prisma.leaveRequest.count({ where: { employeeId: fixture.employeeId } })).toBe(2);
+    });
+
+    it.each(["MORNING", "AFTERNOON"] as const)("rejects duplicate %s across leave types", async (period) => {
+        await createRequest(fixture, randomUUID(), { period, leaveType: "SICK" });
+        await expect(createRequest(fixture, randomUUID(), { period, leaveType: "PERSONAL" }))
+            .rejects.toMatchObject({ statusCode: 409, message: "มีคำขอลาในช่วงวันที่นี้อยู่แล้ว" });
+        expect(await prisma.leaveRequest.count({ where: { employeeId: fixture.employeeId } })).toBe(1);
+    });
+
+    it.each(["MORNING", "AFTERNOON"] as const)("full-day range blocks %s on an interior date", async (period) => {
+        await createRequest(fixture, randomUUID(), { endDate: "2031-05-14" });
+        await expect(createRequest(fixture, randomUUID(), {
+            period, startDate: "2031-05-13", endDate: "2031-05-13",
+        })).rejects.toMatchObject({ statusCode: 409 });
+    });
+
+    it.each(["MORNING", "AFTERNOON"] as const)("%s blocks a covering full-day range but permits a disjoint day", async (period) => {
+        await createRequest(fixture, randomUUID(), {
+            period, startDate: "2031-05-13", endDate: "2031-05-13",
+        });
+        await expect(createRequest(fixture, randomUUID(), { endDate: "2031-05-14" }))
+            .rejects.toMatchObject({ statusCode: 409 });
+        await createRequest(fixture, randomUUID(), { startDate: "2031-05-14", endDate: "2031-05-14" });
+    });
+
+    it.each(["PENDING", "APPROVED", "CANCELLATION_REQUESTED"] as const)(
+        "%s blocks its occupied half-day while allowing the complementary slot",
+        async (status) => {
+            const id = await createRequest(fixture, randomUUID(), { period: "MORNING", leaveType: "SICK" });
+            await prisma.leaveRequest.update({ where: { id }, data: { status } });
+            await expect(createRequest(fixture, randomUUID(), { period: "MORNING", leaveType: "PERSONAL" }))
+                .rejects.toMatchObject({ statusCode: 409 });
+            await createRequest(fixture, randomUUID(), { period: "AFTERNOON" });
+        },
+    );
+
+    it.each(["REJECTED", "CANCELLED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] as const)(
+        "%s permits reuse of its half-day slot",
+        async (status) => {
+            const id = await createRequest(fixture, randomUUID(), { period: "MORNING" });
+            await prisma.leaveRequest.update({ where: { id }, data: { status } });
+            await createRequest(fixture, randomUUID(), { period: "MORNING" });
+            expect(await prisma.leaveRequest.count({ where: { employeeId: fixture.employeeId } })).toBe(2);
+        },
+    );
+
+    it.each([
+        ["MORNING", "MORNING", 1],
+        ["AFTERNOON", "AFTERNOON", 1],
+        ["MORNING", "AFTERNOON", 2],
+        ["FULL_DAY", "MORNING", 1],
+    ] as const)("concurrent %s and %s persist exactly %i requests", async (first, second, count) => {
+        // Start both real transaction flows before awaiting either result.
+        const outcomes = await Promise.allSettled([
+            createRequest(fixture, randomUUID(), { period: first }),
+            createRequest(fixture, randomUUID(), { period: second }),
+        ]);
+        expect(outcomes.filter(({ status }) => status === "fulfilled")).toHaveLength(count);
+        for (const outcome of outcomes) {
+            if (outcome.status === "rejected") {
+                expect(outcome.reason).toMatchObject({ statusCode: 409 });
+            }
+        }
+        const persisted = await prisma.leaveRequest.findMany({ where: { employeeId: fixture.employeeId } });
+        expect(persisted).toHaveLength(count);
+        if (count === 2) {
+            expect(persisted.map(({ period }) => period).sort()).toEqual(["AFTERNOON", "MORNING"]);
+            expect(persisted.every(({ durationHalfDays }) => durationHalfDays === 1)).toBe(true);
+        }
+    });
+
+    it("keeps different employees independent during concurrent same-slot requests", async () => {
+        const employee = await prisma.employee.create({ data: {
+            firstName: "Second", lastName: "Requester", position: "Employee",
+            email: "leave-overlap-second-employee@integration.test",
+            departmentId: (await prisma.employee.findUniqueOrThrow({ where: { id: fixture.employeeId } })).departmentId,
+            managerId: fixture.approverEmployeeId,
+        } });
+        const user = await prisma.user.create({ data: {
+            email: "leave-overlap-second@integration.test", name: "Second Requester",
+            password: "integration-only", employeeId: employee.id,
+        } });
+        const other = { ...fixture, employeeId: employee.id, employeeUserId: user.id, employeeUserEmail: user.email };
+        await Promise.all([
+            createRequest(fixture, randomUUID(), { period: "MORNING" }),
+            createRequest(other, randomUUID(), { period: "MORNING" }),
+        ]);
+        for (const employeeId of [fixture.employeeId, other.employeeId]) {
+            expect(await prisma.leaveRequest.count({ where: { employeeId } })).toBe(1);
+        }
+    });
+
+    it("concurrent identical keys replay one persisted half-day and one outbox event", async () => {
+        const key = randomUUID();
+        const ids = await Promise.all([
+            createRequest(fixture, key, { period: "MORNING" }),
+            createRequest(fixture, key, { period: "MORNING" }),
+        ]);
+        expect(ids[0]).toBe(ids[1]);
+        expect(await prisma.leaveRequest.count({ where: { employeeId: fixture.employeeId } })).toBe(1);
+        expect(await prisma.leaveRequestIdempotency.count({ where: { userId: fixture.employeeUserId } })).toBe(1);
+        expect(await prisma.notificationOutbox.count({ where: { payload: { contains: ids[0] } } })).toBe(1);
+    });
+
+    it("replays a half-day key without duplicate requests or side effects and rejects changed payloads", async () => {
+        const key = randomUUID();
+        const id = await createRequest(fixture, key, { period: "MORNING" });
+        await createRequest(fixture, randomUUID(), { period: "AFTERNOON" });
+        expect(await createRequest(fixture, key, { period: "MORNING" })).toBe(id);
+        await expect(createRequest(fixture, key, { period: "AFTERNOON" }))
+            .rejects.toMatchObject({ name: "LeaveRequestIdempotencyConflictError" });
+        expect(await prisma.leaveRequest.count({ where: { employeeId: fixture.employeeId } })).toBe(2);
+        expect(await prisma.leaveRequestIdempotency.count({ where: { userId: fixture.employeeUserId } })).toBe(2);
+        expect(await prisma.notificationOutbox.count({ where: { payload: { contains: id } } })).toBe(1);
+        expect(await prisma.auditLog.count({ where: { action: "LEAVE_REQUEST_CREATE", details: { contains: id } } })).toBe(1);
+    });
+
+    it.each(["MORNING", "AFTERNOON"] as const)("still rejects multi-date %s", async (period) => {
+        await expect(createRequest(fixture, randomUUID(), { period, endDate: "2031-05-14" }))
+            .rejects.toMatchObject({ statusCode: 400 });
+        expect(await prisma.leaveRequest.count({ where: { employeeId: fixture.employeeId } })).toBe(0);
     });
 
     it("rejects a new request while cancellation is awaiting confirmation", async () => {

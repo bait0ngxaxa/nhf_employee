@@ -11,6 +11,27 @@ import { getLeaveYearFromDateValue } from "./quota-year";
 
 export type LeavePeriodValue = "FULL_DAY" | "MORNING" | "AFTERNOON";
 
+interface LeaveOccupancy {
+    startDate: BusinessDateInput;
+    endDate: BusinessDateInput;
+    period: LeavePeriodValue;
+}
+
+export function doLeaveRequestsOverlap(
+    existing: LeaveOccupancy,
+    requested: LeaveOccupancy,
+): boolean {
+    if (
+        compareBusinessDates(existing.startDate, requested.endDate) > 0
+        || compareBusinessDates(existing.endDate, requested.startDate) < 0
+    ) {
+        return false;
+    }
+    return existing.period === "FULL_DAY"
+        || requested.period === "FULL_DAY"
+        || existing.period === requested.period;
+}
+
 export const EMERGENCY_BACKDATE_LIMIT_DAYS = 7;
 
 export type { BusinessDateInput } from "@/modules/leave/domain/business-date";
