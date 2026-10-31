@@ -1,4 +1,7 @@
 import { useRef, useState } from "react";
+import useSWR from "swr";
+import { fetchDashboardLeavePreview, type LeavePreviewInput } from "../../calendar/leave-preview";
+import type { LeaveCalculationPreview } from "../../../domain/calendar-calculation";
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -37,6 +40,7 @@ interface UseLeaveRequestFormModelArgs {
         idempotencyKey: string,
     ) => Promise<void>;
     canSubmit?: boolean;
+    previewRequest?: (input: LeavePreviewInput) => Promise<LeaveCalculationPreview>;
 }
 
 interface UseLeaveRequestFormModelResult {
@@ -44,6 +48,7 @@ interface UseLeaveRequestFormModelResult {
     isDirty: boolean;
     isSubmitting: boolean;
     errorMsg: string | null;
+    calculationNotice: string;
     attachments: File[];
     attachmentError: string | null;
     isMultiDay: boolean;
@@ -134,6 +139,7 @@ export function useLeaveRequestFormModel({
     quotas = [],
     submitRequest = submitLeaveRequest,
     canSubmit = true,
+    previewRequest = fetchDashboardLeavePreview,
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -168,14 +174,22 @@ export function useLeaveRequestFormModel({
     });
 
     const quota = findQuotaForDate(quotas, leaveType, startDateValue);
-    const remainingQuota = quota?.remainingDays ?? null;
     const dateRangeIssue = getLeaveDateRangeIssue(startDateValue, endDateValue);
     const isDateRangeValid = dateRangeIssue === null;
-    const requestedDays = getRequestedDays(startDateValue, endDateValue, periodValue);
-    const projectedRemainingQuota = quota && isDateRangeValid
+    const { data: preview, error: previewError } = useSWR<LeaveCalculationPreview, unknown>(
+        canSubmit && isDateRangeValid ? [previewRequest === fetchDashboardLeavePreview ? "dashboard-leave-calculation" : "liff-leave-calculation", startDateValue, endDateValue, periodValue, leaveType] : null,
+        () => previewRequest({ startDate: startDateValue, endDate: endDateValue, period: periodValue, leaveType }),
+        { revalidateOnFocus: true, shouldRetryOnError: false, dedupingInterval: 2000 },
+    );
+    const calculationNotice = previewError instanceof Error ? previewError.message : preview
+        ? preview.mode === "SETUP_WEEKDAYS" ? "อยู่ระหว่างเตรียมปฏิทิน: คิดวันลาตามวันจันทร์–ศุกร์" : `คำนวณตามปฏิทินองค์กรฉบับ ${preview.calendarVersion} ระบบจะตรวจอีกครั้งเมื่อส่งคำขอ`
+        : "ตัวเลขเบื้องต้นตามวันจันทร์–ศุกร์ กำลังตรวจสอบปฏิทินและโควต้าจากระบบ";
+    const remainingQuota = preview ? preview.remainingHalfDays / 2 : quota?.remainingDays ?? null;
+    const requestedDays = preview ? preview.durationHalfDays / 2 : getRequestedDays(startDateValue, endDateValue, periodValue);
+    const projectedRemainingQuota = preview ? preview.projectedRemainingHalfDays / 2 : quota && isDateRangeValid
         ? quota.remainingDays - requestedDays
         : null;
-    const overQuotaDays = quota
+    const overQuotaDays = preview ? preview.overQuotaHalfDays / 2 : quota
         ? calculateAdditionalOverQuotaDays(
             quota.effectiveTotalDays,
             quota.usedDays,
@@ -247,8 +261,8 @@ export function useLeaveRequestFormModel({
 
     const hasRequiredSpecialReason = (data: LeaveRequestValues): boolean => {
         const submitQuota = findQuotaForDate(quotas, data.leaveType, data.startDate);
-        const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
-        const submitOverQuotaDays = submitQuota
+        const submitRequestedDays = preview ? preview.durationHalfDays / 2 : getRequestedDays(data.startDate, data.endDate, data.period);
+        const submitOverQuotaDays = preview ? preview.overQuotaHalfDays / 2 : submitQuota
             ? calculateAdditionalOverQuotaDays(
                 submitQuota.effectiveTotalDays,
                 submitQuota.usedDays,
@@ -353,6 +367,7 @@ export function useLeaveRequestFormModel({
         isDirty,
         isSubmitting,
         errorMsg,
+        calculationNotice,
         attachments,
         attachmentError,
         isMultiDay,

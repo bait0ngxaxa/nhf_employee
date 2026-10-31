@@ -27,6 +27,7 @@ import {
 import { toLeaveRequestDays } from "@/modules/leave/domain/half-days";
 import { jsonError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import { HolidayCalendarError } from "../domain/holiday-calendar";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 import {
     deleteLeaveAttachment,
@@ -74,6 +75,7 @@ async function cleanupAttachments(
 }
 
 function createErrorResponse(error: unknown): NextResponse {
+    if (error instanceof HolidayCalendarError) return jsonError(error.message, error.statusCode);
     if (error instanceof LeaveRequestInputError) {
         return jsonError(error.message, error.statusCode, error.details);
     }

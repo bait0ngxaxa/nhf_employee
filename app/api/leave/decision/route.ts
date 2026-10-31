@@ -8,6 +8,7 @@ import {
     readLeaveJsonBody,
     decideLeaveRequest,
     LeaveApprovalError,
+    HolidayCalendarError,
     LeaveCapabilityDeniedError,
     leaveActionSchema,
     toLeaveRequestDays,
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         console.error("Intranet Leave Approval Error:", {
             errorType: error instanceof Error ? error.name : "UnknownError",
         });
-        if (error instanceof LeaveApprovalError) {
+        if (error instanceof LeaveApprovalError || error instanceof HolidayCalendarError) {
             return jsonError(error.message, error.statusCode);
         }
         if (error instanceof LeaveCapabilityDeniedError) {

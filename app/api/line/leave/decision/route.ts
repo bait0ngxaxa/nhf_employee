@@ -8,6 +8,7 @@ import {
     readLeaveJsonBody,
     decideLeaveRequest,
     LeaveApprovalError,
+    HolidayCalendarError,
     LeaveCapabilityDeniedError,
     leaveActionSchema,
     toLiffLeaveMutationResponse,
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             data: toLiffLeaveMutationResponse(result),
         });
     } catch (error) {
-        if (error instanceof LeaveApprovalError) {
+        if (error instanceof LeaveApprovalError || error instanceof HolidayCalendarError) {
             return jsonError(error.message, error.statusCode);
         }
         if (error instanceof LeaveCapabilityDeniedError) {

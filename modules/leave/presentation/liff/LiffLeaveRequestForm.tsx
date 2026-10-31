@@ -22,6 +22,7 @@ import {
 } from "@/modules/line/client";
 import { submitLiffLeaveRequest } from "./api";
 import type { LiffLeaveQuotaSummary } from "../types";
+import { fetchLiffLeavePreview } from "../calendar/leave-preview";
 
 interface LiffLeaveRequestFormProps {
     open: boolean;
@@ -43,6 +44,7 @@ export function LiffLeaveRequestForm({
     const model = useLeaveRequestFormModel({
         quotas,
         submitRequest: submitLiffLeaveRequest,
+        previewRequest: fetchLiffLeavePreview,
         canSubmit: canCreateRequests,
         onSuccess: async () => {
             await onSuccess();

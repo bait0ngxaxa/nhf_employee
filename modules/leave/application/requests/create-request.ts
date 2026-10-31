@@ -31,7 +31,8 @@ import {
     reconcileLeaveQuotaForward,
 } from "@/modules/leave/domain/quota-entitlement";
 import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
-import { calculateLeaveDurationHalfDays, doLeaveRequestsOverlap, isWorkingDay } from "@/modules/leave/domain/utils";
+import { calculateLeaveDurationHalfDays, doLeaveRequestsOverlap, getLeaveDateRangeIssue, isWorkingDay } from "@/modules/leave/domain/utils";
+import { calculateEffectiveLeaveInTransaction } from "../calendar/calculation";
 import { toUtcDate } from "@/modules/leave/domain/business-date";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { INITIAL_LEAVE_APPROVAL_ACTION_VERSION } from "@/modules/leave/domain/approval-action-version";
@@ -97,6 +98,7 @@ export interface CreatedLeaveRequestResult {
 
 function prepareLeaveRequest(payload: LeaveRequestValues): PreparedLeaveRequest {
     const { startDate, endDate, period } = payload;
+    if (getLeaveDateRangeIssue(startDate, endDate)) throw new LeaveRequestError("ช่วงวันที่ลาไม่ถูกต้อง หรือเป็นการลาข้ามปี กรุณาแยกคำขอเป็นคนละปี", 400);
     if (period !== "FULL_DAY" && startDate !== endDate) {
         throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.halfDayMultiDate, 400);
     }
@@ -265,7 +267,7 @@ async function enqueueLeaveNotification(
 async function createInTransaction(
     tx: Prisma.TransactionClient,
     input: CreateLeaveRequestInput,
-    prepared: PreparedLeaveRequest,
+    initialPrepared: PreparedLeaveRequest,
     requestHash: string,
 ): Promise<CreatedLeaveRequestResult> {
     await assertActiveRequester(tx, input);
@@ -288,6 +290,9 @@ async function createInTransaction(
         return { request: replayedRequest, replayed: true };
     }
 
+    const calculation = await calculateEffectiveLeaveInTransaction(tx, input.payload.startDate, input.payload.endDate, input.payload.period);
+    if (!calculation.valid) throw new LeaveRequestError(LEAVE_REQUEST_MESSAGES.holidayConflict, 400);
+    const prepared = { ...initialPrepared, durationHalfDays: calculation.durationHalfDays, durationDays: halfDaysToDays(calculation.durationHalfDays) };
     const employee = await getEligibleEmployee(tx, input);
     await assertNoOverlap(
         tx, input.employeeId, prepared.start, prepared.end, prepared.payload.period,
@@ -322,6 +327,7 @@ async function createInTransaction(
             endDate: prepared.end,
             period: prepared.payload.period,
             durationHalfDays: prepared.durationHalfDays,
+            calculationCalendarVersionId: calculation.calendarVersionId,
             reason: prepared.payload.reason,
             emergencyReason: prepared.emergencyReason,
             specialReason: prepared.specialReason,

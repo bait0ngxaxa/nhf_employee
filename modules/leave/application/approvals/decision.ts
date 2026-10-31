@@ -26,6 +26,7 @@ import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
 import { createLeaveAuditInTransaction } from "@/modules/leave/infrastructure/persistence/transaction";
 import type { LeaveActionValues } from "@/modules/leave/schemas/leave";
 import { markUnreadByReferenceForUser } from "@/modules/notification";
+import { calculateEffectiveLeaveInTransaction } from "../calendar/calculation";
 
 const LEAVE_APPROVAL_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลา",
@@ -103,11 +104,18 @@ export async function decideLeaveRequest(
         }
 
         const newStatus = input.action === "APPROVE" ? "APPROVED" : "REJECTED";
-        const updateData: Prisma.LeaveRequestUpdateInput = {
+        const updateData: Prisma.LeaveRequestUncheckedUpdateManyInput = {
             status: newStatus,
             approvedAt: new Date(),
             rejectReason: input.action === "REJECT" ? input.reason : null,
         };
+        if (input.action === "APPROVE") {
+            const calculation = await calculateEffectiveLeaveInTransaction(tx, leaveRequest.startDate, leaveRequest.endDate, leaveRequest.period);
+            if (!calculation.valid || calculation.durationHalfDays !== leaveRequest.durationHalfDays) {
+                throw new LeaveApprovalError("ปฏิทินวันหยุดเปลี่ยนและกระทบคำขอนี้ กรุณาให้เจ้าของยกเลิกและยื่นคำขอใหม่ ไม่สามารถแก้ไขคำขอเดิมได้", 409);
+            }
+            if (calculation.calendarVersionId) updateData.approvalCalendarVersionId = calculation.calendarVersionId;
+        }
         const claimedRequest = await tx.leaveRequest.updateMany({
             where: {
                 id: input.leaveId,

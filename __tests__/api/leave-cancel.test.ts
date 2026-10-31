@@ -195,7 +195,7 @@ function buildCancellationRequest(
         cancellationRequestedAt: new Date("2098-12-21T00:00:00.000Z"),
         cancellationConfirmedAt: null,
         cancellationConfirmedById: null,
-        attachmentUrl: null,
+        attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
         createdAt: new Date("2098-12-20T00:00:00.000Z"),
         updatedAt: new Date("2098-12-21T00:00:00.000Z"),
         employee: {
@@ -263,7 +263,7 @@ describe("POST /api/leave/cancel", () => {
             overQuotaHalfDays: 0, status: "PENDING", approverId: 20, exceptionApproverId: null, exceptionApproverAssignedAt: null, approvalActionVersion: 1, approvedAt: null, rejectReason: null,
             notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
             cancellationReason: null, cancellationRequestedAt: null, cancellationConfirmedAt: null, cancellationConfirmedById: null,
-            attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null, createdAt: new Date(), updatedAt: new Date(),
             employee: { id: 10, firstName: "Employee", lastName: "User", email: "employee@example.com", user: { id: 10 } },
             approver: null,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
@@ -313,7 +313,7 @@ describe("POST /api/leave/cancel", () => {
             overQuotaHalfDays: 0, status: "PENDING", approverId: 20, exceptionApproverId: null, exceptionApproverAssignedAt: null, approvalActionVersion: 1, approvedAt: null, rejectReason: null,
             notTakenReason: null, notTakenRequestedAt: null, notTakenConfirmedAt: null, notTakenConfirmedById: null,
             cancellationReason: null, cancellationRequestedAt: null, cancellationConfirmedAt: null, cancellationConfirmedById: null,
-            attachmentUrl: null, createdAt: new Date(), updatedAt: new Date(),
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null, createdAt: new Date(), updatedAt: new Date(),
             employee: { id: 10, firstName: "Employee", lastName: "User", email: "employee@example.com", user: { id: 10 } },
              approver: { id: 20, firstName: "Manager", lastName: "User", email: "manager@example.com", status: "ACTIVE", deletedAt: null, user: { id: 20, email: "manager@example.com", isActive: true, deletedAt: null } },
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
@@ -372,7 +372,7 @@ describe("POST /api/leave/cancel", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
             createdAt: new Date("2098-12-20T00:00:00.000Z"),
             updatedAt: new Date("2098-12-20T00:00:00.000Z"),
             employee: {
@@ -666,7 +666,7 @@ describe("POST /api/leave/cancel", () => {
             cancellationRequestedAt: new Date("2098-12-21T00:00:00.000Z"),
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
             createdAt: new Date("2098-12-20T00:00:00.000Z"),
             updatedAt: new Date("2098-12-21T00:00:00.000Z"),
             employee: {

@@ -21,6 +21,7 @@ type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
 export function LeaveDialogFields({ model }: { model: LeaveRequestFormModel }) {
     return (
         <div className="flex flex-col gap-5">
+            <p role="status" className="text-sm leading-6 text-content-secondary">{model.calculationNotice}</p>
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
             <LeaveDateFields model={model} />

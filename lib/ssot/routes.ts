@@ -381,6 +381,7 @@ export const API_ROUTES = {
     leave: {
         calendar: "/api/leave/calendar",
         calendarManage: "/api/leave/calendar/manage",
+        calculation: "/api/leave/calculation",
         me: "/api/leave/me",
         approvals: "/api/leave/approvals",
         adminRecovery: "/api/leave/admin/recovery",
@@ -473,6 +474,7 @@ export const API_ROUTES = {
         liffSession: "/api/line/liff/session",
         home: "/api/line/home",
         leaveMe: "/api/line/leave/me",
+        leaveCalculation: "/api/line/leave/calculation",
         leaveRequest: "/api/line/leave/request",
         leaveApprovals: "/api/line/leave/approvals",
         leaveCancel: "/api/line/leave/cancel",

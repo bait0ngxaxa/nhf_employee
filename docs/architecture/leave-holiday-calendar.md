@@ -54,3 +54,38 @@ preview the complete list and added/removed dates, enter a publication note,
 confirm verification, then publish. An empty calendar needs its own confirmation.
 Future years use the same workflow without redeployment. Published dates are
 displayed in Thai/Buddhist Era while storage and API years remain Gregorian.
+
+## Shared calculation and controlled activation
+
+`LEAVE_HOLIDAY_CALENDAR_ENABLED` is a **server-only** rollout switch. Absent or
+`false` means setup mode: existing weekday behavior continues, previews and the
+calendar page label this explicitly. Only literal `true` enables enforcement;
+malformed values fail rather than silently disabling it. Publish verified 2026
+and any upcoming 2027 calendars before enabling this switch on all application
+instances together. After activation, a missing published year blocks new requests
+and approval, with the Gregorian/Buddhist Era year and ADMIN setup instructions.
+There is no automatic weekday fallback in enforced mode.
+
+Creation and approval use `calculateEffectiveLeaveInTransaction()`. It locks the
+annual calendar row with `FOR UPDATE` through mutation commit, using the same
+serializable transaction/lock as publication. Thus a publication and submission
+serialize in either order; no request can commit an old snapshot read outside its
+final transaction. Existing P2034 bounded backoff handles deadlock retries. This
+lock also protects first publication via the missing-year index gap. Request
+idempotency is checked before calculation: retrying a successful original payload
+returns that original request, even after a new publication.
+
+The stored calculation/approval version FKs remain nullable for legacy/setup
+requests. Original `durationHalfDays` is never recalculated on reads. Pending
+approval recalculates the entire range, including endpoint validity. If duration
+or validity differs it requires owner cancellation and resubmission. Unaffected
+requests may be approved against the new version. Rejection, history, exports,
+cancellation and not-taken do not require any current calendar.
+
+Dashboard and LIFF expose read-only `/api/leave/calculation` and
+`/api/line/leave/calculation` adapters to the same application preview. Preview
+reads entitlement/carry without creating quota rows. Their shared form model
+uses these results for duration and quota projections and labels initial weekday
+estimates while loading. Final submission always calculates again on the server.
+Weekend/holiday endpoints remain invalid; a fully holiday half-day is invalid;
+interior holidays remove integer half-day units without double-counting weekends.

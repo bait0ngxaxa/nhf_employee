@@ -447,7 +447,7 @@ describe("POST /api/leave/decision", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
             createdAt: new Date("2031-05-01T00:00:00.000Z"),
             updatedAt: new Date("2031-05-01T00:00:00.000Z"),
             employee: {
@@ -622,7 +622,7 @@ describe("POST /api/leave/decision", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
             createdAt: new Date("2031-05-01T00:00:00.000Z"),
             updatedAt: new Date("2031-05-01T00:00:00.000Z"),
             employee: {
@@ -706,7 +706,7 @@ describe("POST /api/leave/decision", () => {
             cancellationRequestedAt: null,
             cancellationConfirmedAt: null,
             cancellationConfirmedById: null,
-            attachmentUrl: null,
+            attachmentUrl: null, calculationCalendarVersionId: null, approvalCalendarVersionId: null,
             createdAt: new Date("2031-05-01T00:00:00.000Z"),
             updatedAt: new Date("2031-05-01T00:00:00.000Z"),
             employee: {

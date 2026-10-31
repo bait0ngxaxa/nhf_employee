@@ -8,7 +8,7 @@ import { getCurrentLeaveYear } from "../../domain/quota-year";
 import { loadHolidayCalendar, saveHolidayCalendar } from "./api";
 import { HolidayDraftEditor, HolidayRows } from "./HolidayDraftEditor";
 
-export function HolidayCalendarPage({ isAdmin }: { isAdmin: boolean }): ReactElement {
+export function HolidayCalendarPage({ isAdmin, calendarEnforced = false }: { isAdmin: boolean; calendarEnforced?: boolean }): ReactElement {
     const [year, setYear] = useState(getCurrentLeaveYear);
     const [yearInput, setYearInput] = useState(String(year));
     const [state, setState] = useState<ManagedHolidayCalendar | PublishedHolidayCalendar | null>(null);
@@ -43,6 +43,7 @@ export function HolidayCalendarPage({ isAdmin }: { isAdmin: boolean }): ReactEle
             <h1 id="holiday-heading" className="text-2xl font-bold text-content-heading">ปฏิทินวันหยุดองค์กร</h1>
             <p className="max-w-prose text-sm leading-6 text-content-secondary">ใช้ร่วมกันทั้งองค์กร วันเสาร์–อาทิตย์เป็นวันหยุดประจำสัปดาห์ รายการด้านล่างคือวันหยุดที่กำหนดเพิ่มเติม</p>
         </header>
+        {!calendarEnforced && <p role="status" className="rounded-lg bg-status-warning-surface p-4 text-sm text-status-warning-heading">อยู่ระหว่างเตรียมปฏิทิน ระบบยังคิดวันลาตามวันจันทร์–ศุกร์ ผู้ดูแลระบบต้องเปิดใช้การคำนวณวันหยุดหลังเผยแพร่ปฏิทินที่ตรวจสอบแล้ว</p>}
         <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); const parsed = calendarYearSchema.safeParse(yearInput); if (!parsed.success) { setError("กรุณาระบุปี ค.ศ. ระหว่าง 1900–9999"); return; } if (parsed.data !== year) { setState(null); setError(""); setYear(parsed.data); } setNotice(""); }}>
             <div className="space-y-2"><label htmlFor="holiday-year" className="text-sm font-medium">ปี ค.ศ.</label><Input id="holiday-year" type="number" min={1900} max={9999} value={yearInput} disabled={busy} onChange={(event) => setYearInput(event.target.value)} /></div>
             <Button type="submit" variant="outline" disabled={busy}>แสดงปีที่เลือก</Button>

@@ -753,6 +753,8 @@ model HolidayCalendarVersion {
   creator        User @relation("CalendarCreator", fields: [createdById], references: [id], onDelete: Restrict)
   publisher      User? @relation("CalendarPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
   days           HolidayCalendarDay[]
+  calculatedRequests LeaveRequest[] @relation("RequestCalendarCalculation")
+  approvedRequests LeaveRequest[] @relation("RequestCalendarApproval")
 
   @@unique([year, number])
   @@unique([year, id])
@@ -787,6 +789,10 @@ model LeaveRequest {
   endDate           DateTime
   period            LeavePeriod @default(FULL_DAY)
   durationHalfDays  Int // ระยะเวลาลาสุทธิ หน่วยครึ่งวัน (เช่น 3 = 1.5 วัน)
+  calculationCalendarVersionId String?
+  approvalCalendarVersionId String?
+  calculationCalendarVersion HolidayCalendarVersion? @relation("RequestCalendarCalculation", fields: [calculationCalendarVersionId], references: [id], onDelete: Restrict)
+  approvalCalendarVersion HolidayCalendarVersion? @relation("RequestCalendarApproval", fields: [approvalCalendarVersionId], references: [id], onDelete: Restrict)
   reason            String      @db.Text
   emergencyReason   String?     @db.Text // เหตุผลฉุกเฉินเมื่อยื่นลาย้อนหลัง
   specialReason     String?     @db.Text // เหตุผลพิเศษเมื่อขอลาเกินโควต้า

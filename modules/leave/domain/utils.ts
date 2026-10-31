@@ -5,6 +5,7 @@ import {
     getCalendarDaysDifference,
     isValidDateOnly,
     toUtcDate,
+    toDateOnlyString,
     type BusinessDateInput,
 } from "@/modules/leave/domain/business-date";
 import { getLeaveYearFromDateValue } from "./quota-year";
@@ -58,9 +59,9 @@ export function getStartOfDay(date: BusinessDateInput): Date {
     return toUtcDate(date);
 }
 
-export function isWorkingDay(date: BusinessDateInput): boolean {
+export function isWorkingDay(date: BusinessDateInput, holidays?: ReadonlySet<string>): boolean {
     const dayOfWeek = getBusinessDayOfWeek(date);
-    return dayOfWeek !== 0 && dayOfWeek !== 6;
+    return dayOfWeek !== 0 && dayOfWeek !== 6 && !holidays?.has(toDateOnlyString(date));
 }
 
 export function isPastDate(
@@ -102,12 +103,13 @@ export function isWithinEmergencyBackdateWindow(
 export function getWorkingDays(
     startDate: BusinessDateInput,
     endDate: BusinessDateInput,
+    holidays?: ReadonlySet<string>,
 ): number {
     let count = 0;
     let current: BusinessDateInput = startDate;
 
     while (compareBusinessDates(current, endDate) <= 0) {
-        if (isWorkingDay(current)) {
+        if (isWorkingDay(current, holidays)) {
             count++;
         }
         current = addCalendarDays(current, 1);
@@ -120,8 +122,9 @@ export function calculateLeaveDuration(
     startDate: BusinessDateInput,
     endDate: BusinessDateInput,
     period: LeavePeriodValue,
+    holidays?: ReadonlySet<string>,
 ): number {
-    const workingDays = getWorkingDays(startDate, endDate);
+    const workingDays = getWorkingDays(startDate, endDate, holidays);
     if (period === "FULL_DAY") {
         return workingDays;
     }
@@ -132,8 +135,9 @@ export function calculateLeaveDurationHalfDays(
     startDate: BusinessDateInput,
     endDate: BusinessDateInput,
     period: LeavePeriodValue,
+    holidays?: ReadonlySet<string>,
 ): number {
-    const workingDays = getWorkingDays(startDate, endDate);
+    const workingDays = getWorkingDays(startDate, endDate, holidays);
     if (period === "FULL_DAY") {
         return workingDays * 2;
     }
