@@ -132,6 +132,7 @@ it.each(["dashboard", "liff"] as const)("validates and explains dates in %s", as
         render(<LiffLeaveRequestForm open onOpenChange={vi.fn()} onSuccess={vi.fn()} quotas={[]} />);
     }
     fireEvent.change(screen.getByLabelText("วันที่ลา"), { target: { value: "2030-05-11" } });
+    expect(screen.getByText(/วันที่ลาเป็นวันเสาร์/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("เหตุผลการลา"), { target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" } });
     fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
     expect(await screen.findByText(/วันที่ลาเป็นวันเสาร์/)).toBeInTheDocument();
@@ -144,4 +145,35 @@ it.each(["dashboard", "liff"] as const)("validates and explains dates in %s", as
     fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
     const review = await screen.findByRole("group", { name: "ตรวจสอบคำขอลา" });
     expect(review).toHaveTextContent("วันเสาร์–อาทิตย์ 2 วัน = วันทำงาน 3 วัน · ขอลา 3 วัน");
+});
+
+
+it.each(["dashboard", "liff"] as const)("updates date warnings reactively in %s", (surface) => {
+    if (surface === "dashboard") render(<LeaveRequestForm open onCancel={vi.fn()} onSuccess={vi.fn()} quotas={[]} />);
+    else render(<LiffLeaveRequestForm open onOpenChange={vi.fn()} onSuccess={vi.fn()} quotas={[]} />);
+    const date = screen.getByLabelText("วันที่ลา");
+    fireEvent.change(date, { target: { value: "2030-05-12" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("วันที่ลาเป็นวันเสาร์หรือวันอาทิตย์");
+    expect(screen.queryByText(/จำนวนวันตามปฏิทิน/)).not.toBeInTheDocument();
+    fireEvent.change(date, { target: { value: "2030-05-09" } });
+    fireEvent.click(screen.getByRole("button", { name: "หลายวัน" }));
+    const start = screen.getByLabelText("วันที่เริ่มต้น");
+    const end = screen.getByLabelText("วันที่สิ้นสุด");
+    fireEvent.change(end, { target: { value: "2030-05-13" } });
+    fireEvent.change(start, { target: { value: "2030-05-11" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("วันเริ่มต้นเป็นวันเสาร์");
+    fireEvent.change(start, { target: { value: "2030-05-09" } });
+    fireEvent.change(end, { target: { value: "2030-05-12" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("วันสิ้นสุดเป็นวันเสาร์");
+    fireEvent.change(start, { target: { value: "2030-05-04" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("วันเริ่มต้นและวันสิ้นสุด");
+    fireEvent.change(start, { target: { value: "2030-05-11" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("ไม่มีวันทำงาน");
+    fireEvent.change(start, { target: { value: "2030-05-13" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("วันที่สิ้นสุดต้องไม่ก่อน");
+    fireEvent.change(start, { target: { value: "2030-12-31" } });
+    fireEvent.change(end, { target: { value: "2031-01-02" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("ไม่สามารถลาข้ามปี");
+    fireEvent.click(screen.getByRole("button", { name: "วันเดียว" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

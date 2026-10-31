@@ -99,6 +99,7 @@ describe("leave selection", () => {
     it("explains weekends and refuses a zero-day calculation", () => {
         expect(evaluateLeaveSelection("2030-05-09", "2030-05-13", "FULL_DAY")).toEqual({ valid: true, breakdown: { calendarDays: 5, weekendDays: 2, workingDays: 3, requestedDays: 3 } });
         expect(evaluateLeaveSelection("2030-05-06", "2030-05-10", "FULL_DAY")).toEqual({ valid: true, breakdown: { calendarDays: 5, weekendDays: 0, workingDays: 5, requestedDays: 5 } });
+        expect(evaluateLeaveSelection("2030-05-10", "2030-05-13", "FULL_DAY")).toEqual({ valid: true, breakdown: { calendarDays: 4, weekendDays: 2, workingDays: 2, requestedDays: 2 } });
         expect(calculateLeaveDuration("2030-05-11", "2030-05-12", "FULL_DAY")).toBe(0);
         expect(evaluateLeaveSelection("2030-05-11", "2030-05-12", "FULL_DAY").valid).toBe(false);
     });

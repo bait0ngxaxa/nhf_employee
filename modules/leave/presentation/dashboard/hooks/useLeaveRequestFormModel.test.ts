@@ -716,7 +716,47 @@ it("revalidates before submission and preserves the form", async () => {
     });
     await act(async () => { await result.current.submit(result.current.form.getValues()); });
     expect(result.current.step).toBe("edit");
-    expect(result.current.errorMsg).toContain("วันเสาร์");
+    expect(result.current.dateWarning).toContain("วันเสาร์");
     expect(result.current.form.getValues("reason")).toBe("ทดสอบเหตุผล");
     expect(submitRequest).not.toHaveBeenCalled();
+});
+
+
+it("updates half-day validation without clearing an unrelated submission error", async () => {
+    const submitRequest = vi.fn().mockRejectedValue(new Error("ระบบไม่พร้อมใช้งาน"));
+    const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess: vi.fn(), submitRequest }));
+    act(() => {
+        result.current.form.setValue("startDate", "2030-05-09");
+        result.current.form.setValue("endDate", "2030-05-09");
+        result.current.form.setValue("reason", "เหตุผลทดสอบ");
+    });
+    await act(async () => { await result.current.submit(result.current.form.getValues()); });
+    expect(result.current.errorMsg).toBe("ระบบไม่พร้อมใช้งาน");
+    act(() => {
+        result.current.form.setValue("endDate", "2030-05-10");
+        result.current.form.setValue("period", "MORNING");
+    });
+    expect(result.current.dateWarning).toContain("ครึ่งวัน");
+    expect(result.current.projectedRemainingQuota).toBeNull();
+    expect(result.current.breakdown).toBeNull();
+    expect(result.current.errorMsg).toBe("ระบบไม่พร้อมใช้งาน");
+    act(() => { result.current.form.setValue("period", "FULL_DAY"); });
+    expect(result.current.dateWarning).toBeNull();
+    expect(result.current.breakdown?.requestedDays).toBe(2);
+    expect(result.current.errorMsg).toBe("ระบบไม่พร้อมใช้งาน");
+    expect(result.current.form.getValues("reason")).toBe("เหตุผลทดสอบ");
+});
+
+
+it("shows an invalid default weekend date immediately", () => {
+    vi.useFakeTimers();
+    try {
+        vi.setSystemTime(new Date("2030-05-11T04:00:00Z"));
+        const { result } = renderHook(() => useLeaveRequestFormModel({ onSuccess: vi.fn() }));
+        expect(result.current.dateWarning).toContain("วันที่ลาเป็นวันเสาร์");
+        expect(result.current.breakdown).toBeNull();
+        expect(result.current.projectedRemainingQuota).toBeNull();
+    } finally {
+        vi.useRealTimers();
+    }
 });

@@ -24,6 +24,9 @@ export function LeaveDialogFields({ model }: { model: LeaveRequestFormModel }) {
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
             <LeaveDateFields model={model} />
+            {model.dateWarning ? (
+                <p role="alert" className="-mt-3 text-sm leading-6 text-status-danger-strong">{model.dateWarning}</p>
+            ) : null}
             {!model.isMultiDay ? <LeavePeriodField model={model} /> : null}
             <LeaveDurationCalculation model={model} />
             <LeaveReasonField model={model} />
@@ -148,10 +151,9 @@ function LeaveEndDateField({ model }: { model: LeaveRequestFormModel }) {
                             min={model.startDateValue}
                             disabled={model.isSubmitting}
                             {...field}
-                            onChange={(event) => { model.clearDateError(); field.onChange(event); }}
                         />
                     </FormControl>
-                    <FormMessage />
+                    {model.form.formState.errors.endDate?.message !== model.dateWarning ? <FormMessage /> : null}
                 </FormItem>
             )}
         />
@@ -168,7 +170,7 @@ function LeavePeriodField({ model }: { model: LeaveRequestFormModel }) {
                     <FormLabel>ช่วงเวลา</FormLabel>
                     <Select
                         value={field.value}
-                        onValueChange={(value) => { model.clearDateError(); field.onChange(value); }}
+                        onValueChange={field.onChange}
                         disabled={model.isSubmitting}
                     >
                         <FormControl>
