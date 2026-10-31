@@ -22,6 +22,7 @@ export function calculateCalendarLeave(
 
 export interface LeaveCalculationPreview {
     durationHalfDays: number;
+    holidayDates?: string[];
     calendarVersionId: string | null;
     calendarVersion: number | null;
     mode: "PUBLISHED_CALENDAR" | "SETUP_WEEKDAYS";

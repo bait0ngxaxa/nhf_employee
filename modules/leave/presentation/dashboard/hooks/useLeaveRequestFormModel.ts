@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import useSWR from "swr";
 import { fetchDashboardLeavePreview, type LeavePreviewInput } from "../../calendar/leave-preview";
-import type { LeaveCalculationPreview } from "../../../domain/calendar-calculation";
+import { calculateCalendarLeave, type LeaveCalculationPreview } from "../../../domain/calendar-calculation";
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -48,7 +48,7 @@ interface UseLeaveRequestFormModelResult {
     isDirty: boolean;
     isSubmitting: boolean;
     errorMsg: string | null;
-    calculationNotice: string;
+    calculationNotice: string | null;
     attachments: File[];
     attachmentError: string | null;
     isMultiDay: boolean;
@@ -176,14 +176,19 @@ export function useLeaveRequestFormModel({
     const quota = findQuotaForDate(quotas, leaveType, startDateValue);
     const dateRangeIssue = getLeaveDateRangeIssue(startDateValue, endDateValue);
     const isDateRangeValid = dateRangeIssue === null;
+    // Check weekday endpoints locally; published holidays and quotas remain server-authoritative.
+    const canCalculate = isDateRangeValid
+        && calculateCalendarLeave(startDateValue, endDateValue, periodValue, new Set()).valid;
     const { data: preview, error: previewError } = useSWR<LeaveCalculationPreview, unknown>(
-        canSubmit && isDateRangeValid ? [previewRequest === fetchDashboardLeavePreview ? "dashboard-leave-calculation" : "liff-leave-calculation", startDateValue, endDateValue, periodValue, leaveType] : null,
+        canSubmit && canCalculate ? [previewRequest === fetchDashboardLeavePreview ? "dashboard-leave-calculation" : "liff-leave-calculation", startDateValue, endDateValue, periodValue, leaveType] : null,
         () => previewRequest({ startDate: startDateValue, endDate: endDateValue, period: periodValue, leaveType }),
         { revalidateOnFocus: true, shouldRetryOnError: false, dedupingInterval: 2000 },
     );
-    const calculationNotice = previewError instanceof Error ? previewError.message : preview
-        ? preview.mode === "SETUP_WEEKDAYS" ? "อยู่ระหว่างเตรียมปฏิทิน: คิดวันลาตามวันจันทร์–ศุกร์" : `คำนวณตามปฏิทินองค์กรฉบับ ${preview.calendarVersion} ระบบจะตรวจอีกครั้งเมื่อส่งคำขอ`
-        : "ตัวเลขเบื้องต้นตามวันจันทร์–ศุกร์ กำลังตรวจสอบปฏิทินและโควต้าจากระบบ";
+    const calculationNotice = !isDateRangeValid ? "กรุณาเลือกช่วงวันที่ลาให้ถูกต้องและอยู่ในปีเดียวกัน"
+        : periodValue !== "FULL_DAY" && startDateValue !== endDateValue ? LEAVE_REQUEST_MESSAGES.halfDayMultiDate
+        : !canCalculate ? LEAVE_REQUEST_MESSAGES.holidayConflict
+        : previewError instanceof Error ? previewError.message
+        : preview?.holidayDates?.length ? "ช่วงวันที่ลามีวันหยุด" : null;
     const remainingQuota = preview ? preview.remainingHalfDays / 2 : quota?.remainingDays ?? null;
     const requestedDays = preview ? preview.durationHalfDays / 2 : getRequestedDays(startDateValue, endDateValue, periodValue);
     const projectedRemainingQuota = preview ? preview.projectedRemainingHalfDays / 2 : quota && isDateRangeValid

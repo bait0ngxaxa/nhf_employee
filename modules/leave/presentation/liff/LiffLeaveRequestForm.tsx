@@ -45,7 +45,7 @@ export function LiffLeaveRequestForm({
         quotas,
         submitRequest: submitLiffLeaveRequest,
         previewRequest: fetchLiffLeavePreview,
-        canSubmit: canCreateRequests,
+        canSubmit: open && canCreateRequests,
         onSuccess: async () => {
             await onSuccess();
             onOpenChange(false);

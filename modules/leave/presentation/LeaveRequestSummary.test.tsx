@@ -57,7 +57,7 @@ describe("Leave request summary", () => {
         const summary = screen.getByRole("region", { name: "สรุปคำขอลา" });
         expect(summary).toHaveTextContent("คำขอนี้เกินสิทธิ์ 1 วัน");
         expect(summary).toHaveTextContent("ผู้อนุมัติจะพิจารณาจากเหตุผลพิเศษที่ระบุ");
-        expect(summary).toHaveTextContent("ผลสุดท้ายยังขึ้นกับการตรวจสอบของระบบและการอนุมัติ");
+        expect(summary).not.toHaveTextContent("จำนวนวันคำนวณจาก");
     });
 
     it("keeps the summary for the review step and shows the same summary in Dashboard and LIFF", async () => {
@@ -104,7 +104,7 @@ describe("Leave request summary", () => {
         const liffSummary = await reviewSummary();
 
         expect(liffSummary).toBe(dashboardSummary);
-        expect(liffSummary).toContain("ยังไม่ตัดวันหยุดนักขัตฤกษ์ออก");
+        expect(liffSummary).not.toContain("ยังไม่ตัดวันหยุดนักขัตฤกษ์ออก");
     });
 });
 

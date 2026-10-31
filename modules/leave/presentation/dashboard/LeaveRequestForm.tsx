@@ -42,7 +42,7 @@ export function LeaveRequestForm({
     const model = useLeaveRequestFormModel({
         onSuccess,
         quotas,
-        canSubmit: canCreateRequests,
+        canSubmit: open && canCreateRequests,
     });
     const isReview = model.step === "review";
 

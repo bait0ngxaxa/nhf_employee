@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { useLeaveRequestFormModel } from "../hooks/useLeaveRequestFormModel";
 import { cn } from "@/lib/ui/utils";
 import { LeaveEvidenceUploadField } from "./LeaveEvidenceUploadField";
+import { LeaveCalculationWarning } from "./LeaveCalculationWarning";
 import { formatLeaveDays } from "../../liff/leave-format";
 
 type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
@@ -21,7 +22,7 @@ type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
 export function LeaveDialogFields({ model }: { model: LeaveRequestFormModel }) {
     return (
         <div className="flex flex-col gap-5">
-            <p role="status" className="text-sm leading-6 text-content-secondary">{model.calculationNotice}</p>
+            <LeaveCalculationWarning message={model.calculationNotice} />
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
             <LeaveDateFields model={model} />

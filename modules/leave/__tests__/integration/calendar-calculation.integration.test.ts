@@ -27,7 +27,7 @@ describe.sequential("calendar-aware lifecycle with real MySQL", () => {
         const web = await previewLeaveCalculation(f.owner.authorization, payload);
         const liff = await previewLeaveCalculation(buildLeaveAuthorizationContext({ id: f.owner.userId, role: "USER" }, f.owner.employeeId, "LIFF_SELF_SERVICE"), payload);
         expect(web).toEqual(liff);
-        expect(web).toMatchObject({ durationHalfDays: 4, calendarVersionId: versionId });
+        expect(web).toMatchObject({ durationHalfDays: 4, calendarVersionId: versionId, holidayDates: [f.middle] });
         expect(await prisma.leaveQuota.count({ where: { employeeId: f.owner.employeeId } })).toBe(0);
         const { request } = await requestCalendarLeave(f);
         expect(request.durationHalfDays).toBe(4);
@@ -49,6 +49,9 @@ describe.sequential("calendar-aware lifecycle with real MySQL", () => {
 
     it.each(["MORNING", "AFTERNOON", "FULL_DAY"] as const)("rejects %s entirely on a published holiday", async (period) => {
         await publishCalendar(f, [holiday(f.start)]);
+        for (const authorization of [f.owner.authorization, buildLeaveAuthorizationContext({ id: f.owner.userId, role: "USER" }, f.owner.employeeId, "LIFF_SELF_SERVICE")]) {
+            await expect(previewLeaveCalculation(authorization, { startDate: f.start, endDate: f.start, period, leaveType: "VACATION" })).rejects.toMatchObject({ statusCode: 400, message: "วันที่ลาตรงกับวันหยุด" });
+        }
         await expect(requestCalendarLeave(f, { startDate: f.start, endDate: f.start, period })).rejects.toMatchObject({ statusCode: 400 });
     });
 

@@ -18,6 +18,7 @@ export function isHolidayCalendarEnforced(): boolean {
 }
 
 export interface EffectiveCalendarCalculation extends CalendarLeaveCalculation {
+    holidayDates: string[];
     calendarVersionId: string | null;
     calendarVersion: number | null;
     mode: LeaveCalculationPreview["mode"];
@@ -29,14 +30,17 @@ export async function calculateEffectiveLeaveInTransaction(
     end: BusinessDateInput,
     period: "FULL_DAY" | "MORNING" | "AFTERNOON",
 ): Promise<EffectiveCalendarCalculation> {
-    if (!isHolidayCalendarEnforced()) return { ...calculateCalendarLeave(start, end, period, new Set()), calendarVersionId: null, calendarVersion: null, mode: "SETUP_WEEKDAYS" };
+    if (!isHolidayCalendarEnforced()) return { ...calculateCalendarLeave(start, end, period, new Set()), holidayDates: [], calendarVersionId: null, calendarVersion: null, mode: "SETUP_WEEKDAYS" };
     const year = getBusinessDate(start).year;
     // Same annual lock as publication. Held through mutation commit, never read outside the final transaction.
     await ensureHolidayCalendarInTransaction(tx, year);
     const calendar = await tx.holidayCalendar.findUnique({ where: { year }, include: { activeVersion: { include: { days: true } } } });
     if (!calendar?.activeVersion?.publishedAt) throw new HolidayCalendarError(`ยังไม่ได้เผยแพร่ปฏิทินวันหยุดปี พ.ศ. ${year + 543} (ค.ศ. ${year}) กรุณาติดต่อผู้ดูแลระบบ`, 409);
     const version = calendar.activeVersion;
-    return { ...calculateCalendarLeave(start, end, period, new Set(version.days.map((day) => toDateOnlyString(day.date)))), calendarVersionId: version.id, calendarVersion: version.number, mode: "PUBLISHED_CALENDAR" };
+    const holidayDates = version.days.map((day) => toDateOnlyString(day.date));
+    const startDate = toDateOnlyString(start);
+    const endDate = toDateOnlyString(end);
+    return { ...calculateCalendarLeave(start, end, period, new Set(holidayDates)), holidayDates: holidayDates.filter((date) => date >= startDate && date <= endDate).sort(), calendarVersionId: version.id, calendarVersion: version.number, mode: "PUBLISHED_CALENDAR" };
 }
 
 export const leaveCalculationInputSchema = z.object({
@@ -51,7 +55,12 @@ export async function previewLeaveCalculation(authorization: LeaveAuthorizationC
         if (access.actor.employeeId === null) throw new HolidayCalendarError("ไม่มีสิทธิ์ยื่นลา", 403);
         const { startDate, endDate, period, leaveType } = parsed.data;
         const calculation = await calculateEffectiveLeaveInTransaction(tx, startDate, endDate, period);
-        if (!calculation.valid) throw new HolidayCalendarError("ช่วงวันลาไม่ถูกต้อง วันที่เริ่มและสิ้นสุดต้องเป็นวันทำงาน และไม่ลาข้ามปี", 400);
+        if (!calculation.valid) {
+            if (calculation.holidayDates.includes(startDate) || calculation.holidayDates.includes(endDate)) {
+                throw new HolidayCalendarError("วันที่ลาตรงกับวันหยุด", 400);
+            }
+            throw new HolidayCalendarError("ช่วงวันลาไม่ถูกต้อง วันที่เริ่มและสิ้นสุดต้องเป็นวันทำงาน และไม่ลาข้ามปี", 400);
+        }
         // Read-only preview: calculate carry without creating/updating a quota row.
         const latestQuota = await tx.leaveQuota.findFirst({ where: { employeeId: access.actor.employeeId, leaveType, year: { lte: getBusinessDate(startDate).year } }, orderBy: { year: "desc" } });
         const total = calculateEffectiveEntitlementForYearHalfDays({ leaveType, year: getBusinessDate(startDate).year, latestQuota });
