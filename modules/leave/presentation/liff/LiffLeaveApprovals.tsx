@@ -1,3 +1,4 @@
+import { LeaveStoredDurationExplanation } from "../LeaveStoredDurationExplanation";
 import {
     AlertTriangle,
     Check,
@@ -220,6 +221,7 @@ function ApprovalCard({
                 <p className="mt-1 text-sm leading-6 text-content-secondary">
                     {formatLeaveDateRange(item.startDate, item.endDate)} · {getLeavePeriodLabel(item.period)}
                 </p>
+                <LeaveStoredDurationExplanation {...item} />
             </div>
             <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-content-body">
                 {item.reason}

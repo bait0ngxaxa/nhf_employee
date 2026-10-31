@@ -1,3 +1,4 @@
+import { LeaveStoredDurationExplanation } from "../../LeaveStoredDurationExplanation";
 import {
     AlertTriangle,
     Briefcase,
@@ -116,6 +117,7 @@ function PendingApprovalCard({
                             <p className="mt-1 text-sm/6 font-medium text-content-secondary">
                                 {periodLabel(leave.period)} ({leave.durationDays} วัน)
                             </p>
+                            <LeaveStoredDurationExplanation {...leave} />
                         </div>
                     </div>
 

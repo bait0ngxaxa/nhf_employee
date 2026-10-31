@@ -497,3 +497,33 @@ describe("LIFF Leave mobile components", () => {
         expect(canUseLiffLeaveAction("REJECT_CANCELLATION", LIFF_CAPABILITIES)).toBe(true);
     });
 });
+
+
+it("explains consistent stored duration in approval cards and direct detail", () => {
+    const item = {
+        ...HISTORY_ITEM,
+        startDate: "2030-05-09T00:00:00.000Z",
+        endDate: "2030-05-13T00:00:00.000Z",
+        durationDays: 3,
+        employee: { firstName: "พนักงาน", lastName: "ทดสอบ", nickname: null, position: "เจ้าหน้าที่", departmentId: 1, dept: null },
+        availableActions: ["APPROVE", "REJECT"] as ("APPROVE" | "REJECT")[],
+    };
+    const onAction = vi.fn();
+    const approvals: LiffLeaveApprovalsResponse = {
+        ...EMPTY_APPROVALS,
+        pending: [item],
+        metadata: { ...EMPTY_APPROVALS.metadata, pending: { currentPage: 1, totalPages: 1, totalItems: 1, itemsPerPage: 10 } },
+        hasActionableWork: true,
+    };
+    const view = render(<LiffLeaveApprovals approvals={approvals} isLoading={false} onOpenDetail={vi.fn()} onAction={onAction} onPageChange={vi.fn()} />);
+    expect(screen.getByText(/จำนวนวันตามปฏิทิน 5 วัน/)).toHaveTextContent("วันเสาร์–อาทิตย์ 2 วัน = วันลาที่นับ 3 วัน");
+    fireEvent.click(screen.getByRole("button", { name: "อนุมัติ" }));
+    expect(onAction).toHaveBeenCalledWith("APPROVE", item);
+    view.unmount();
+    const detail: LiffLeaveRequestDetailData = { ...item, viewerRole: "APPROVER" };
+    const detailView = render(<LiffLeaveRequestDetail detail={detail} actionIntent="approve" onOpenChange={vi.fn()} onAction={onAction} />);
+    expect(screen.getByText(/จำนวนวันตามปฏิทิน 5 วัน/)).toHaveTextContent("วันลาที่นับ 3 วัน");
+    detailView.rerender(<LiffLeaveRequestDetail detail={{ ...detail, durationDays: 4 }} actionIntent="approve" onOpenChange={vi.fn()} onAction={onAction} />);
+    expect(screen.queryByText(/จำนวนวันตามปฏิทิน/)).not.toBeInTheDocument();
+    expect(screen.getByText(/4 วัน/)).toBeInTheDocument();
+});

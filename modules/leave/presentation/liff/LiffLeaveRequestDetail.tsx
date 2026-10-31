@@ -17,6 +17,7 @@ import {
 import { formatThaiDateTimeWithTimeWord } from "@/lib/helpers/date-helpers";
 import type { ApproverLeaveAction, EmployeeLeaveAction, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
 
+import { LeaveStoredDurationExplanation } from "../LeaveStoredDurationExplanation";
 import { LiffLeaveAttachments } from "./LiffLeaveAttachments";
 import {
     formatLeaveDateRange,
@@ -71,6 +72,7 @@ export function LiffLeaveRequestDetail({
                             </SheetDescription>
                         </SheetHeader>
                         <SheetScrollArea className="space-y-5 bg-surface-subtle px-4 py-5 pb-5">
+                            <LeaveStoredDurationExplanation {...detail} />
                             {hasAuthorizedApproveIntent ? (
                                 <div
                                     role="status"
