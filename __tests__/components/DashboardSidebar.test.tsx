@@ -116,6 +116,20 @@ describe("DashboardSidebar", () => {
         ).not.toBeInTheDocument();
     });
 
+    it("shows the unavailable state and retains navigation in the sidebar", () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
+        try {
+            mockSidebarContext(false, getAvailableMenuGroups(false));
+            render(<DashboardSidebar />);
+            const item = screen.getByRole("button", { name: /การลา.*ยังไม่พร้อมให้บริการ/ });
+            expect(item).toBeEnabled();
+            fireEvent.click(item);
+            expect(handleMenuClick).toHaveBeenCalledWith("leave-management");
+        } finally {
+            vi.unstubAllEnvs();
+        }
+    });
+
     it("keeps explicit group collapse separate from menu availability", () => {
         const groupA = {
             id: "group-a",

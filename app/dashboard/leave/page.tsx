@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { CalendarRange } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -24,13 +27,21 @@ export default async function LeaveDashboardPage({
 }: {
     searchParams: Promise<DashboardPageSearchParams>;
 }) {
-    if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
-        redirect(APP_ROUTES.dashboard);
-    }
-
     const user = await getCurrentUserProjection();
     if (!user) {
         redirect(APP_ROUTES.login);
+    }
+
+    if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
+        return (
+            <section className="mx-auto w-full max-w-3xl rounded-xl border border-border-subtle bg-surface-raised p-6 sm:p-8" aria-labelledby="leave-unavailable-title">
+                <CalendarRange className="size-6 text-content-muted" aria-hidden="true" />
+                <h1 id="leave-unavailable-title" data-page-heading tabIndex={-1} className="mt-4 text-2xl font-bold text-content-heading">NHF Leave</h1>
+                <p className="mt-2 font-semibold text-content-heading">ยังไม่พร้อมให้บริการ</p>
+                <p className="mt-2 text-sm leading-6 text-content-secondary">ระบบการลายังไม่เปิดให้ใช้งานในขณะนี้</p>
+                <Button asChild variant="outline" className="mt-6"><Link href={APP_ROUTES.dashboard}>กลับหน้าหลัก</Link></Button>
+            </section>
+        );
     }
 
     const leaveAvailability = {

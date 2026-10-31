@@ -101,6 +101,10 @@ export function DashboardProvider({
             const menuItem = DASHBOARD_MENU_ITEMS.find(
                 (item) => item.id === menuId,
             );
+            if (menuId === "leave-management" && !isDashboardTabEnabled(menuId)) {
+                router.push(toDashboardMenuPath(menuId), { scroll: false });
+                return;
+            }
             if (menuItem?.feature && !isDashboardTabEnabled(menuId)) {
                 router.push(APP_ROUTES.dashboard, { scroll: false });
                 return;

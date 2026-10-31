@@ -57,6 +57,7 @@ type SidebarFooterProps = {
 
 function getItemLabel(item: MenuItem): string {
     const label = item.sidebarLabel ?? item.label;
+    if (item.unavailable) return `${label} (ยังไม่พร้อมให้บริการ)`;
     return item.comingSoon ? `${label} (เร็วๆ นี้)` : label;
 }
 
@@ -102,7 +103,10 @@ function SidebarMenuItem({
                         <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
                     </span>
                     {sidebarOpen && (
-                        <span className="min-w-0 flex-1 truncate text-left">{itemLabel}</span>
+                        <span className="min-w-0 flex-1 text-left">
+                            <span className="block truncate">{item.unavailable ? (item.sidebarLabel ?? item.label) : itemLabel}</span>
+                            {item.unavailable ? <span className="block truncate text-xs text-sidebar-foreground/70">ยังไม่พร้อมให้บริการ</span> : null}
+                        </span>
                     )}
                     {sidebarOpen && disabled && (
                         <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">

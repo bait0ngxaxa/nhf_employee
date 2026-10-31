@@ -287,6 +287,7 @@ export function getAvailableMenuGroups(
 ): MenuGroup[] {
     const stockAvailable = canAccessStockDashboard(stockCapabilities);
     const employeeAvailable = canAccessEmployeeDashboard(employeeCapabilities);
+    const leaveFeatureEnabled = isFeatureEnabled(FEATURE_KEYS.leave);
     const leaveAvailable = canAccessLeaveDashboard({
         ...(leaveAvailability ?? {}),
     });
@@ -312,7 +313,7 @@ export function getAvailableMenuGroups(
                 || (item.requiredRole === "ADMIN" && isAdmin);
         })
             .filter(
-                (item) => !item.feature || isFeatureEnabled(item.feature),
+                (item) => item.id === "leave-management" || !item.feature || isFeatureEnabled(item.feature),
             )
             .filter(
                 (item) => item.id !== "routine"
@@ -322,10 +323,15 @@ export function getAvailableMenuGroups(
             (item) => item.id !== "stock" || stockAvailable,
         );
         const leaveFilteredItems = stockFilteredItems.filter(
-            (item) => item.id !== "leave-management" || leaveAvailable,
+            (item) => item.id !== "leave-management" || !leaveFeatureEnabled || leaveAvailable,
         );
         if (leaveFilteredItems.length === 0) return null;
-        return { ...group, items: leaveFilteredItems };
+        return {
+            ...group,
+            items: leaveFilteredItems.map((item) => item.id === "leave-management" && !leaveFeatureEnabled
+                ? { ...item, unavailable: true, description: "ระบบการลายังไม่เปิดให้ใช้งานในขณะนี้" }
+                : item),
+        };
     }).filter((g): g is MenuGroup => g !== null);
 }
 

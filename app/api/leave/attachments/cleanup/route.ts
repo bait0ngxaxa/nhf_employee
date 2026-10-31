@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { cleanupOrphanedLeaveAttachments } from "@/modules/leave";
-import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
+import { forbidden, jsonError, notFound, serverError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
 const CLEANUP_SECRET_HEADER = "x-cleanup-secret";
@@ -18,6 +19,8 @@ function parseDryRun(request: Request): boolean | null {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+    if (!isFeatureEnabled(FEATURE_KEYS.leave)) return notFound();
+
     const expectedSecret = process.env.LEAVE_ATTACHMENT_CLEANUP_SECRET?.trim();
     if (!expectedSecret) {
         return jsonError(COMMON_API_MESSAGES.cleanupNotConfigured, 503);

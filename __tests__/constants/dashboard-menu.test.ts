@@ -571,13 +571,13 @@ describe("dashboard menu", () => {
         }).recovery).toBe(false);
     });
 
-    it("keeps Leave unavailable when its feature flag is disabled", () => {
+    it("keeps disabled Leave discoverable without capabilities while operations remain disabled", () => {
         process.env.NEXT_PUBLIC_FEATURE_LEAVE = "false";
-
         expect(isDashboardTabEnabled("leave-management")).toBe(false);
-        expect(getMenuIds(true, {
-            leaveCapabilities: ownLeaveCapabilities,
-        })).not.toContain("leave-management");
+        const groups = getAvailableMenuGroups(false, routineCapabilities, stockCapabilities, { leaveCapabilities: noLeaveCapabilities }, undefined, undefined, undefined, itReadCapabilities);
+        const items = groups.flatMap((group) => group.items);
+        expect(items.find((item) => item.id === "leave-management")).toMatchObject({ unavailable: true });
+        expect(items.map((item) => item.id)).toEqual(expect.arrayContaining(["stock", "routine", "it-workspace"]));
     });
 
     it("normalizes inaccessible Leave deep links to the first visible surface", () => {

@@ -333,6 +333,20 @@ describe("DashboardProvider navigation state", () => {
         );
     });
 
+    it("opens the disabled Leave landing without Leave capabilities", () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
+        navigationMocks.user = { ...navigationMocks.user, leaveCapabilities: noLeaveCapabilities };
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return <button onClick={() => handleMenuClick("leave-management")}>Leave</button>;
+        }
+        render(<DashboardProvider><DashboardMenuState /><NavigationProbe /></DashboardProvider>);
+        expect(screen.getByTestId("available-menu-ids")).toHaveTextContent("leave-management");
+        fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledWith("/dashboard/leave", { scroll: false });
+        vi.unstubAllEnvs();
+    });
+
     it("hides and denies Leave navigation when no Leave surface is usable", () => {
         navigationMocks.user = {
             ...navigationMocks.user,

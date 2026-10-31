@@ -133,6 +133,7 @@ interface FeaturedCardProps {
         id: string;
         label: string;
         description?: string;
+        unavailable?: boolean;
         icon: React.ElementType;
     };
     onClick: () => void;
@@ -187,7 +188,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                             config.featuredBadge,
                         )}
                     >
-                        Quick action
+                        {item.unavailable ? "ยังไม่พร้อมให้บริการ" : "Quick action"}
                     </span>
                 </div>
                 <h3 className="line-clamp-2 text-2xl font-bold leading-tight text-content-on-brand [overflow-wrap:anywhere] @min-[72rem]:min-h-[4.6875rem] @min-[72rem]:text-3xl">

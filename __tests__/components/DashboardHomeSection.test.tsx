@@ -8,6 +8,7 @@ import {
     useDashboardUIContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { DashboardHomeSection } from "@/components/dashboard/sections/DashboardHomeSection";
+import { getAvailableMenuGroups } from "@/constants/dashboard";
 import { getCurrentGreeting } from "@/components/dashboard/sections/DashboardGreeting";
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
@@ -161,4 +162,17 @@ describe("DashboardHomeSection identity presentation", () => {
         expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
     });
+});
+
+
+it("marks disabled Leave as unavailable on the dashboard home", () => {
+    vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
+    try {
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: { id: "1", name: "ทดสอบ", role: "USER" }, isAdmin: false, availableMenuGroups: getAvailableMenuGroups(false) });
+        vi.mocked(useDashboardUIContext).mockReturnValue({ selectedMenu: "dashboard", mobileNavOpen: false, setMobileNavOpen: vi.fn(), desktopSidebarCollapsed: false, setDesktopSidebarCollapsed: vi.fn(), handleMenuClick: vi.fn(), handleSignOut: vi.fn(), router: {} as never });
+        render(<DashboardHomeSection />);
+        expect(screen.getByRole("button", { name: /NHF Leave/ })).toHaveTextContent("ยังไม่พร้อมให้บริการ");
+    } finally {
+        vi.unstubAllEnvs();
+    }
 });

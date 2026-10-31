@@ -12,6 +12,8 @@ export interface MenuItem {
     feature?: FeatureKey;
     /** Mark module as under development — visible but non-interactive */
     comingSoon?: boolean;
+    /** Discoverable entry for a feature that is currently disabled. */
+    unavailable?: boolean;
 }
 
 export interface MenuGroup {

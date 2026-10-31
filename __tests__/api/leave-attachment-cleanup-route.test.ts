@@ -25,6 +25,7 @@ function createRequest(secret?: string, dryRun?: boolean): NextRequest {
 describe("leave attachment cleanup route", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
         vi.stubEnv("LEAVE_ATTACHMENT_CLEANUP_SECRET", "cleanup-secret");
         vi.mocked(cleanupOrphanedLeaveAttachments).mockResolvedValue({
             scannedCount: 4,
@@ -35,6 +36,12 @@ describe("leave attachment cleanup route", () => {
             dryRun: false,
             cutoff: new Date("2035-01-01T00:00:00.000Z"),
         });
+    });
+
+    it("rejects cleanup even with a valid secret when Leave is disabled", async () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
+        expect((await POST(createRequest("cleanup-secret"))).status).toBe(404);
+        expect(cleanupOrphanedLeaveAttachments).not.toHaveBeenCalled();
     });
 
     it("requires the configured secret", async () => {

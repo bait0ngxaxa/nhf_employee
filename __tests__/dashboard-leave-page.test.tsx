@@ -1,5 +1,6 @@
 // @vitest-environment node
 import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -80,12 +81,23 @@ describe("Leave Dashboard route access", () => {
         }
     });
 
-    it("checks the Leave feature before loading the user projection", async () => {
+    it("shows the authenticated unavailable landing without mounting Leave", async () => {
         process.env.NEXT_PUBLIC_FEATURE_LEAVE = "false";
+        mocks.getCurrentUserProjection.mockResolvedValue({ ...user, leaveCapabilities: noLeaveCapabilities });
+        const page = await LeaveDashboardPage({ searchParams: Promise.resolve({ leaveTab: "approvals" }) });
+        const html = renderToStaticMarkup(page);
+        expect(html).toContain("NHF Leave");
+        expect(html).toContain("ยังไม่พร้อมให้บริการ");
+        expect(html).toContain("ระบบการลายังไม่เปิดให้ใช้งานในขณะนี้");
+        expect(html).toContain('href="/dashboard"');
+        expect(html).not.toContain("อนุมัติ");
+        expect(mocks.leaveSection).not.toHaveBeenCalled();
+    });
 
-        await expect(LeaveDashboardPage({ searchParams: Promise.resolve({}) }))
-            .rejects.toThrow("NEXT_REDIRECT:/dashboard");
-        expect(mocks.getCurrentUserProjection).not.toHaveBeenCalled();
+    it("requires authentication even when Leave is disabled", async () => {
+        process.env.NEXT_PUBLIC_FEATURE_LEAVE = "false";
+        mocks.getCurrentUserProjection.mockResolvedValue(null);
+        await expect(LeaveDashboardPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("NEXT_REDIRECT:/login");
     });
 
     it("redirects an unauthenticated actor to login", async () => {
