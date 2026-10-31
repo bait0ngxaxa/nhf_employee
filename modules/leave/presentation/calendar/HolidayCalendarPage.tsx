@@ -1,0 +1,68 @@
+"use client";
+
+import { useEffect, useRef, useState, type ReactElement } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { calendarYearSchema, type ManagedHolidayCalendar, type PublishedHolidayCalendar } from "../../domain/holiday-calendar";
+import { getCurrentLeaveYear } from "../../domain/quota-year";
+import { loadHolidayCalendar, saveHolidayCalendar } from "./api";
+import { HolidayDraftEditor, HolidayRows } from "./HolidayDraftEditor";
+
+export function HolidayCalendarPage({ isAdmin }: { isAdmin: boolean }): ReactElement {
+    const [year, setYear] = useState(getCurrentLeaveYear);
+    const [yearInput, setYearInput] = useState(String(year));
+    const [state, setState] = useState<ManagedHolidayCalendar | PublishedHolidayCalendar | null>(null);
+    const [error, setError] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [notice, setNotice] = useState("");
+    const inFlight = useRef(false);
+
+    useEffect(() => {
+        let current = true;
+        const request = isAdmin ? loadHolidayCalendar(year, true) : loadHolidayCalendar(year, false);
+        void request.then((next) => { if (current) setState(next); }).catch((cause: unknown) => { if (current) setError(cause instanceof Error ? cause.message : "โหลดข้อมูลไม่สำเร็จ"); });
+        return () => { current = false; };
+    }, [year, isAdmin]);
+
+    const managed = state && "versions" in state ? state : null;
+    const draft = managed?.versions.find((version) => !version.publishedAt);
+    const published = managed?.versions.find((version) => version.number === managed.activeVersionNumber);
+
+    async function createDraft(): Promise<void> {
+        if (inFlight.current || !managed) return;
+        inFlight.current = true; setBusy(true); setError("");
+        try {
+            setState(await saveHolidayCalendar({ action: "create", year, expectedActiveVersion: managed.activeVersionNumber }));
+            setNotice("สร้างฉบับร่างแล้ว ยังไม่ส่งผลต่อการคำนวณวันลา");
+        } catch (cause) { setError(cause instanceof Error ? cause.message : "สร้างฉบับร่างไม่สำเร็จ"); }
+        finally { inFlight.current = false; setBusy(false); }
+    }
+
+    return <section className="mx-auto max-w-5xl space-y-6 text-content-body" aria-labelledby="holiday-heading">
+        <header className="space-y-2">
+            <h1 id="holiday-heading" className="text-2xl font-bold text-content-heading">ปฏิทินวันหยุดองค์กร</h1>
+            <p className="max-w-prose text-sm leading-6 text-content-secondary">ใช้ร่วมกันทั้งองค์กร วันเสาร์–อาทิตย์เป็นวันหยุดประจำสัปดาห์ รายการด้านล่างคือวันหยุดที่กำหนดเพิ่มเติม</p>
+        </header>
+        <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); const parsed = calendarYearSchema.safeParse(yearInput); if (!parsed.success) { setError("กรุณาระบุปี ค.ศ. ระหว่าง 1900–9999"); return; } if (parsed.data !== year) { setState(null); setError(""); setYear(parsed.data); } setNotice(""); }}>
+            <div className="space-y-2"><label htmlFor="holiday-year" className="text-sm font-medium">ปี ค.ศ.</label><Input id="holiday-year" type="number" min={1900} max={9999} value={yearInput} disabled={busy} onChange={(event) => setYearInput(event.target.value)} /></div>
+            <Button type="submit" variant="outline" disabled={busy}>แสดงปีที่เลือก</Button>
+            <p className="py-2 text-sm text-content-secondary">พ.ศ. {year + 543} / ค.ศ. {year}</p>
+        </form>
+        {error && <p role="alert" className="text-destructive">{error}</p>}
+        <p role="status" className="text-sm">{busy ? "กำลังดำเนินการ…" : notice}</p>
+        {!state && !error && <p role="status">กำลังโหลดปฏิทิน…</p>}
+        {state && <section className="space-y-4 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-6" aria-labelledby="published-heading">
+            <h2 id="published-heading" className="text-lg font-semibold text-content-heading">ฉบับเผยแพร่ {managed ? managed.activeVersionNumber ?? "—" : "version" in state ? state.version ?? "—" : "—"}</h2>
+            {managed ? published ? <HolidayRows days={published.days} /> : <p>ยังไม่มีปฏิทินที่เผยแพร่สำหรับปีนี้ กรุณาติดต่อผู้ดูแลระบบ</p> : "version" in state && (state.version === null ? <p>ยังไม่มีปฏิทินที่เผยแพร่สำหรับปีนี้ กรุณาติดต่อผู้ดูแลระบบ</p> : <HolidayRows days={state.days} />)}
+            {isAdmin && !draft && <Button disabled={busy} onClick={() => void createDraft()}>{published ? "สร้างฉบับแก้ไขจากฉบับเผยแพร่" : "สร้างปฏิทินฉบับร่าง"}</Button>}
+        </section>}
+        {managed && draft && <HolidayDraftEditor key={`${year}:${draft.id}:${draft.revision}`} calendar={managed} draft={draft} onSaved={(next, message) => { setState(next); setNotice(message); }} />}
+        {managed && managed.versions.some((version) => version.publishedAt) && <section className="space-y-3" aria-labelledby="calendar-history">
+            <h2 id="calendar-history" className="text-lg font-semibold text-content-heading">ประวัติการเผยแพร่</h2>
+            {managed.versions.filter((version) => version.publishedAt).map((version) => <details key={version.id} className="rounded-lg border border-border-subtle bg-surface-raised p-4">
+                <summary className="cursor-pointer font-medium">ฉบับ {version.number} · {version.number === managed.activeVersionNumber ? "เผยแพร่อยู่" : "ฉบับก่อนหน้า"} · {version.publishedAt && new Date(version.publishedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}</summary>
+                <p className="my-3 whitespace-pre-wrap text-sm">{version.publicationNote}</p><HolidayRows days={version.days} showReferences />
+            </details>)}
+        </section>}
+    </section>;
+}

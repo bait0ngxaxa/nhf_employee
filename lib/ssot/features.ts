@@ -6,7 +6,7 @@ export const FEATURE_KEYS = {
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
 
 const FEATURE_DASHBOARD_TABS: Record<FeatureKey, readonly string[]> = {
-    leave: ["leave-management", "manager-approval", "leave-history"],
+    leave: ["leave-management", "manager-approval", "leave-history", "holidays"],
     routine: ["routine"],
 };
 

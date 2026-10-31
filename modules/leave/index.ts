@@ -10,6 +10,8 @@ export { leaveApproverAssignmentsSchema } from "./schemas/approvers";
 export { leaveReportScopeSchema } from "./schemas/report";
 
 // Route-facing application use cases, queries, and errors.
+export { getManagedHolidayCalendar, getPublishedHolidayCalendar, mutateHolidayCalendar } from "./application/calendar/calendar";
+export { HolidayCalendarError, calendarYearSchema } from "./domain/holiday-calendar";
 export { assertLeaveRequestBodySize } from "./application/requests/request-input";
 export {
     LeaveApprovalError,

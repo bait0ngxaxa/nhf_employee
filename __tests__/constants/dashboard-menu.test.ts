@@ -170,7 +170,7 @@ describe("dashboard menu", () => {
             group.label,
             group.items.map((item) => item.id),
         ])).toEqual([
-            ["บริการภายใน", ["leave-management", "stock", "routine", "it-workspace"]],
+            ["บริการภายใน", ["leave-management", "holidays", "stock", "routine", "it-workspace"]],
             ["บุคลากร", ["employee-management", "add-employee", "email-request"]],
             ["ระบบและสิทธิ์", ["announcements", "audit-logs", "authorization-administration"]],
         ]);

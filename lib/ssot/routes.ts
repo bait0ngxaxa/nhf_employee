@@ -8,6 +8,7 @@ export const APP_ROUTES = {
     dashboard: "/dashboard",
     dashboardAnnouncements: "/dashboard/announcements",
     dashboardLeave: "/dashboard/leave",
+    dashboardHolidays: "/dashboard/holidays",
     dashboardStock: "/dashboard/stock",
     dashboardRoutine: "/dashboard/routine",
     dashboardEmailRequest: "/dashboard/email-request",
@@ -42,6 +43,7 @@ export function isLiffAppPath(pathname: string | null | undefined): boolean {
 export const APP_DASHBOARD_TABS = {
     dashboard: "dashboard",
     announcements: "announcements",
+    holidays: "holidays",
     leaveManagement: "leave-management",
     leaveHistory: "leave-history",
     managerApproval: "manager-approval",
@@ -80,6 +82,7 @@ export function toDashboardITTabPath(tab: ITDashboardTab): string {
 export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     dashboard: APP_ROUTES.dashboard,
     announcements: APP_ROUTES.dashboardAnnouncements,
+    holidays: APP_ROUTES.dashboardHolidays,
     "leave-management": APP_ROUTES.dashboardLeave,
     "leave-history": `${APP_ROUTES.dashboardLeave}?leaveTab=my-leave`,
     "manager-approval": `${APP_ROUTES.dashboardLeave}?leaveTab=approvals`,
@@ -104,6 +107,7 @@ const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     readonly [string, DashboardMenuId]
 > = [
     [APP_ROUTES.dashboardAnnouncements, APP_DASHBOARD_TABS.announcements],
+    [APP_ROUTES.dashboardHolidays, APP_DASHBOARD_TABS.holidays],
     [APP_ROUTES.dashboardEmployeeImport, APP_DASHBOARD_TABS.importEmployee],
     [APP_ROUTES.dashboardEmployeeNew, APP_DASHBOARD_TABS.addEmployee],
     [APP_ROUTES.dashboardEmployees, APP_DASHBOARD_TABS.employeeManagement],
@@ -375,6 +379,8 @@ export const API_ROUTES = {
         routineScheduler: "/api/cron/routine-scheduler",
     },
     leave: {
+        calendar: "/api/leave/calendar",
+        calendarManage: "/api/leave/calendar/manage",
         me: "/api/leave/me",
         approvals: "/api/leave/approvals",
         adminRecovery: "/api/leave/admin/recovery",

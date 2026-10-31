@@ -31,6 +31,13 @@ export { canAccessITWorkspaceDashboard };
 /** Flat lookup used by handleMenuClick for feature and capability validation */
 export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
     {
+        id: "holidays",
+        label: "ปฏิทินวันหยุดองค์กร",
+        icon: CalendarRange,
+        description: "วันหยุดที่องค์กรยืนยันและเผยแพร่แล้ว",
+        feature: FEATURE_KEYS.leave,
+    },
+    {
         id: "leave-management",
         label: "NHF Leave",
         sidebarLabel: "การลา",
@@ -141,6 +148,7 @@ export const DASHBOARD_MENU_GROUPS: MenuGroup[] = [
         icon: AppWindow,
         items: [
             getDashboardMenuItem("leave-management"),
+            getDashboardMenuItem("holidays"),
             getDashboardMenuItem("stock"),
             getDashboardMenuItem("routine"),
             getDashboardMenuItem("it-workspace"),

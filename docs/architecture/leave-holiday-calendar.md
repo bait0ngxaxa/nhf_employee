@@ -36,3 +36,21 @@ no historical snapshot needs updating.
 Tests use explicitly labeled synthetic dates only in a dedicated `_test` or
 `_integration` database. Immutable calendar fixtures remain in that disposable
 database, using fresh years 8000–8999; they are never production reference data.
+
+## Dashboard administration and initial setup
+
+Open `/dashboard/holidays` (ปฏิทินวันหยุดองค์กร). All authenticated users can
+read published dates; only current ADMIN sessions can load drafts and publication
+history or mutate. `/api/leave/calendar/manage` is Dashboard session only, uses
+trusted-origin/AJAX CSRF protection, bounded JSON and existing process-local
+rate limiting. `/api/leave/calendar` projects published date/name/category only.
+Neither endpoint accepts a client role as authority.
+
+For 2026 or 2027, select the Gregorian year, create a draft, and add verified dates
+with source citations and optional notes. Bulk input accepts UTF-8 TSV copied from
+a reviewed source: `YYYY-MM-DD<TAB>name<TAB>OFFICIAL|ORGANIZATION<TAB>citation<TAB>optional note`.
+It validates all rows before adding any. Review and correct the draft, save,
+preview the complete list and added/removed dates, enter a publication note,
+confirm verification, then publish. An empty calendar needs its own confirmation.
+Future years use the same workflow without redeployment. Published dates are
+displayed in Thai/Buddhist Era while storage and API years remain Gregorian.

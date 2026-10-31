@@ -1,5 +1,7 @@
 "use client";
 
+export { HolidayCalendarPage } from "./presentation/calendar/HolidayCalendarPage";
+
 export { LeaveManagementSection } from "./presentation/dashboard/LeaveManagementSection";
 export { LeaveManagementSectionSkeleton } from "./presentation/dashboard/LeaveSkeletons";
 export { LiffLeaveApp } from "./presentation/liff/LiffLeaveApp";
