@@ -20,7 +20,7 @@ export const holidayDaySchema = z.object({
 export const calendarMutationSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("create"), year: calendarYearSchema, expectedActiveVersion: z.number().int().positive().nullable() }).strict(),
     z.object({ action: z.literal("save"), year: calendarYearSchema, versionId: z.string().min(1).max(191), revision: z.number().int().nonnegative(), days: z.array(holidayDaySchema).max(366) }).strict(),
-    z.object({ action: z.literal("publish"), year: calendarYearSchema, versionId: z.string().min(1).max(191), revision: z.number().int().nonnegative(), expectedActiveVersion: z.number().int().positive().nullable(), verified: z.literal(true), confirmEmpty: z.boolean(), note: z.string().trim().min(1).max(1000) }).strict(),
+    z.object({ action: z.literal("publish"), year: calendarYearSchema, versionId: z.string().min(1).max(191), revision: z.number().int().nonnegative(), expectedActiveVersion: z.number().int().positive().nullable(), verified: z.literal(true), confirmEmpty: z.boolean(), skipImpactReview: z.literal(true).optional(), note: z.string().trim().min(1).max(1000) }).strict(),
 ]);
 
 export type HolidayDayInput = z.infer<typeof holidayDaySchema>;
@@ -46,6 +46,7 @@ export interface HolidayVersionView {
     revision: number;
     publishedAt: string | null;
     publicationNote: string | null;
+    defaultDatasetRevision?: string;
     days: HolidayDayInput[];
 }
 
@@ -53,10 +54,14 @@ export interface ManagedHolidayCalendar {
     year: number;
     activeVersionNumber: number | null;
     versions: HolidayVersionView[];
+    /** Missing on older clients/test fixtures: conservatively retain impact review. */
+    hasLeaveRequests?: boolean;
 }
 
 export interface PublishedHolidayCalendar {
     year: number;
     version: number | null;
+    defaultDatasetRevision?: string;
+    source?: string;
     days: Pick<HolidayDayInput, "date" | "name" | "category">[];
 }

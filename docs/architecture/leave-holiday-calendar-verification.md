@@ -1,5 +1,10 @@
 # Phase B verification evidence
 
+This document records the B1–B4 baseline at `a645d37a`. The initial manual setup
+instructions in this historical record are superseded by
+[B5/B6 annual defaults](leave-holiday-defaults.md); see that document for the
+current workflow and activation sequence.
+
 All database checks used `integration.env` and the repository runner against the
 dedicated local MySQL integration database. No production/staging deployment,
 calendar seed, migration, or reconciliation was performed.

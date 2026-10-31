@@ -94,6 +94,7 @@ export function HolidayDraftEditor({
     const [note, setNote] = useState("");
     const inFlight = useRef(false);
     const dirty = JSON.stringify(days) !== JSON.stringify(draft.days);
+    const noLeaveRequests = calendar.hasLeaveRequests === false;
     const active = calendar.versions.find(
         (version) => version.number === calendar.activeVersionNumber,
     );
@@ -130,7 +131,7 @@ export function HolidayDraftEditor({
                 publish &&
                 (!verified ||
                     !preview ||
-                    !impactReviewed ||
+                    (!noLeaveRequests && !impactReviewed) ||
                     dirty ||
                     (days.length === 0 && !confirmEmpty))
             )
@@ -145,6 +146,7 @@ export function HolidayDraftEditor({
                           expectedActiveVersion: calendar.activeVersionNumber,
                           verified: true,
                           confirmEmpty,
+                          ...(noLeaveRequests ? { skipImpactReview: true as const } : {}),
                           note,
                       }
                     : {
@@ -181,8 +183,7 @@ export function HolidayDraftEditor({
                     ฉบับร่าง {draft.number} · ยังไม่เผยแพร่
                 </h2>
                 <p className="text-sm text-content-secondary">
-                    วันหยุดอ้างอิงจะมีผลเมื่อองค์กรตรวจสอบและเผยแพร่เท่านั้น
-                    การบันทึกไม่เปลี่ยนฉบับที่ใช้งานอยู่
+                    การปรับแต่งจะมีผลเมื่อเผยแพร่ฉบับนี้ การบันทึกไม่เปลี่ยนปฏิทินที่ใช้อยู่
                 </p>
             </div>
             <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
@@ -370,7 +371,8 @@ export function HolidayDraftEditor({
                         </div>
                     )}
                     <HolidayRows days={days} showReferences />
-                    {!dirty && (
+                    {noLeaveRequests && <p role="status" className="text-sm">ยังไม่มีคำขอลาในปีนี้ จึงไม่ต้องตรวจผลกระทบต่อคำขอเดิม</p>}
+                    {!dirty && !noLeaveRequests && (
                         <CalendarImpactReview
                             calendar={calendar}
                             autoLoad
@@ -416,7 +418,7 @@ export function HolidayDraftEditor({
                         disabled={
                             busy ||
                             dirty ||
-                            !impactReviewed ||
+                            (!noLeaveRequests && !impactReviewed) ||
                             !verified ||
                             !note.trim() ||
                             (days.length === 0 && !confirmEmpty)

@@ -1,5 +1,10 @@
 # Organization holiday calendar (Phase B)
 
+Current MVP: [built-in annual defaults and customization (B5/B6)](leave-holiday-defaults.md).
+Verified 2026/2027 defaults activate automatically; the manual workflow below is
+for NHF overrides or years without bundled data. No holiday API/sync infrastructure
+or later B7 work is planned in this scope.
+
 ## Existing behavior and boundaries
 
 Before Phase B, `utils.ts` counted weekdays only, creation calculated before its
@@ -30,7 +35,8 @@ A new revision copies the active snapshot. Draft writes use a revision number;
 publication also compares the expected active version. All operations lock the
 annual calendar in a serializable transaction, and publication and Audit commit
 together. An empty calendar requires separate explicit confirmation. Publication
-requires ADMIN verification and a note; no reference data is seeded or published.
+requires ADMIN verification and a note. SYSTEM initialization of a verified bundled
+year is the only automatic publication path, with explicit dataset/Audit provenance.
 
 Date-only entries have a unique version/date key, same-year composite FK and
 `YEAR(date) = year` CHECK. MySQL triggers reject edits, inserts and deletes against
@@ -57,8 +63,10 @@ trusted-origin/AJAX CSRF protection, bounded JSON and existing process-local
 rate limiting. `/api/leave/calendar` projects published date/name/category only.
 Neither endpoint accepts a client role as authority.
 
-For 2026 or 2027, select the Gregorian year, create a draft, and add verified dates
-with source citations and optional notes. Bulk input accepts UTF-8 TSV copied from
+For 2026 or 2027, select the Gregorian year to see the effective default immediately.
+ADMIN selects “ปรับแต่งวันหยุด” only when NHF needs different dates. A revision
+copies the active immutable snapshot. For an unbundled year, create a draft and
+add verified dates with source citations and optional notes. Bulk input accepts UTF-8 TSV copied from
 a reviewed source: `YYYY-MM-DD<TAB>name<TAB>OFFICIAL|ORGANIZATION<TAB>citation<TAB>optional note`.
 It validates all rows before adding any. Review and correct the draft, save,
 preview the complete list and added/removed dates, enter a publication note,
@@ -71,9 +79,10 @@ displayed in Thai/Buddhist Era while storage and API years remain Gregorian.
 `LEAVE_HOLIDAY_CALENDAR_ENABLED` is a **server-only** rollout switch. Absent or
 `false` means setup mode: existing weekday behavior continues, previews and the
 calendar page label this explicitly. Only literal `true` enables enforcement;
-malformed values fail rather than silently disabling it. Publish verified 2026
-and any upcoming 2027 calendars before enabling this switch on all application
-instances together. After activation, a missing published year blocks new requests
+malformed values fail rather than silently disabling it. Enable this switch on all
+application instances together. Verified bundled 2026/2027 calendars initialize
+on demand without an annual ADMIN publication. After activation, a year without
+either an existing publication or a bundled dataset blocks new requests
 and approval, with the Gregorian/Buddhist Era year and ADMIN setup instructions.
 There is no automatic weekday fallback in enforced mode.
 
@@ -127,7 +136,11 @@ requests remain historically valid even if their endpoints are newly holidays;
 their new net charge excludes those days, potentially reaching zero. No request
 details are edited.
 
-The Dashboard requires loading impact before publishing a saved draft. Impact is
+The Dashboard requires loading impact before publishing a saved draft when that
+year has requests. With no requests, it skips impact review and the publication
+transaction verifies the year is still empty; new history requires reloading and
+review. Source verification, revision/active checks, note and empty confirmation
+remain required. Impact is
 ADMIN-only, keyset-paginated (25 requests), and shows all yearly statuses, including
 terminal rows with adjustment history. Pending requests report a proposed
 duration but no charge; affected ones require cancellation/resubmission. Approved
@@ -167,7 +180,8 @@ idempotency retain their existing workflows and event keys.
 1. Take the normal production backup and test restore procedure. Review migrations
    `20261031090000_organization_holiday_calendar`,
    `20261031100000_leave_calendar_calculation`, and
-   `20261031110000_leave_calendar_reconciliation`. They add tables, nullable
+   `20261031110000_leave_calendar_reconciliation`, and
+   `20261031120000_leave_calendar_defaults`. They add tables, nullable
    columns, FKs, indexes, CHECKs and immutability triggers, expand AuditAction, and
    never update/delete existing request or quota rows. MySQL must enforce CHECKs
    (8.0.16+) and the migration account must have CREATE TRIGGER permission.
@@ -175,20 +189,21 @@ idempotency retain their existing workflows and event keys.
    generate the client for this schema. MySQL DDL can lock tables and is not
    transactionally rolled back; estimate `leave_requests` index/ALTER time on a
    restored production-sized database first. Do not use reset/db-push or seed.
-3. Deploy **the complete B4 release** with
+3. Deploy **the complete B6 release** with
    `LEAVE_HOLIDAY_CALENDAR_ENABLED=false` (or unset for initial setup) on all
    instances. Do not enable B3 alone: B4 contains charge-aware reversal safety.
-4. ADMIN prepares and explicitly publishes verified current/upcoming calendars.
-   No official holiday dates are bundled. An intentionally empty year is valid
+4. Verified 2026/2027 defaults need no ADMIN action. ADMIN can customize them
+   or import a verified calendar for an unbundled year. An intentionally empty year is valid
    only after explicit confirmation. Confirm the ordinary USER view exposes only
-   published date/name/category, and ADMIN impact/history is inaccessible to USER
+   published date/name/category and default provenance, and ADMIN impact/history is inaccessible to USER
    and LIFF. Existing histories/refunds work without a published calendar.
 5. Inspect impact for legacy/pending requests and inform owners of affected
    PENDING requests. Activate `LEAVE_HOLIDAY_CALENDAR_ENABLED=true` on **all
    instances together**, draining/replacing old/setup-mode processes to avoid
    mixed calculation policies. Smoke-test Dashboard and LIFF previews, missing
    future-year refusal, request creation, unaffected approval and affected approval
-   rejection. Publish each next year before employees start requesting it.
+   rejection. Add a verified dataset for a future year before employees request it,
+   or use ADMIN import/publication when no bundled dataset exists.
 6. After each calendar publication, ADMIN selects the **active version** in impact,
    filters requests requiring action, loads every cursor page, reviews pending
    resubmission notices, and confirms approved corrections individually. Reload

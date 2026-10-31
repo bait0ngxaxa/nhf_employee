@@ -8,16 +8,25 @@ import { ensureHolidayCalendarInTransaction, lockHolidayCalendar } from "./defau
 
 export { lockHolidayCalendar } from "./defaults";
 
+async function hasCalendarLeaveRequests(tx: Prisma.TransactionClient, year: number): Promise<boolean> {
+    return (await tx.leaveRequest.findFirst({
+        where: { startDate: { gte: toUtcDate(`${year}-01-01`), lte: new Date(`${year}-12-31T23:59:59.999Z`) } },
+        select: { id: true },
+    })) !== null;
+}
+
 async function managedInTransaction(tx: Prisma.TransactionClient, year: number): Promise<ManagedHolidayCalendar> {
     const calendar = await tx.holidayCalendar.findUnique({
         where: { year }, include: { versions: { orderBy: { number: "desc" }, include: { days: { orderBy: { date: "asc" } } } } },
     });
     return {
         year, activeVersionNumber: calendar?.activeVersionNumber ?? null,
+        hasLeaveRequests: await hasCalendarLeaveRequests(tx, year),
         versions: (calendar?.versions ?? []).map((version) => ({
             id: version.id, number: version.number, revision: version.revision,
             publishedAt: version.publishedAt?.toISOString() ?? null,
             publicationNote: version.publicationNote,
+            ...(version.defaultDatasetRevision ? { defaultDatasetRevision: version.defaultDatasetRevision } : {}),
             days: version.days.map((day) => ({ date: toDateOnlyString(day.date), name: day.name, category: day.category, source: day.source, note: day.note ?? "" })),
         })),
     };
@@ -37,6 +46,10 @@ export async function getPublishedHolidayCalendar(year: number): Promise<Publish
         const calendar = await tx.holidayCalendar.findUnique({ where: { year }, include: { activeVersion: { include: { days: { orderBy: { date: "asc" } } } } } });
         return {
             year, version: calendar?.activeVersion?.number ?? null,
+            ...(calendar?.activeVersion?.defaultDatasetRevision ? {
+                defaultDatasetRevision: calendar.activeVersion.defaultDatasetRevision,
+                source: calendar.activeVersion.days[0]?.source,
+            } : {}),
             days: (calendar?.activeVersion?.days ?? []).map((day) => ({ date: toDateOnlyString(day.date), name: day.name, category: day.category })),
         };
     });
@@ -74,6 +87,7 @@ export async function mutateHolidayCalendar(context: CalendarAdminContext, raw: 
                 await tx.holidayCalendarVersion.update({ where: { id: draft.id }, data: { revision: { increment: 1 } } });
             } else {
                 if (before.activeVersionNumber !== input.expectedActiveVersion) throw new HolidayCalendarError("ฉบับเผยแพร่เปลี่ยนแล้ว กรุณาทบทวนใหม่");
+                if (input.skipImpactReview && before.hasLeaveRequests !== false) throw new HolidayCalendarError("มีคำขอลาในปีนี้แล้ว กรุณาโหลดใหม่และตรวจผลกระทบก่อนเผยแพร่");
                 validateHolidayDays(input.year, draft.days);
                 if (draft.days.length === 0 && !input.confirmEmpty) throw new HolidayCalendarError("กรุณายืนยันว่าปีนี้ไม่มีวันหยุดองค์กร", 400);
                 await tx.holidayCalendarVersion.update({ where: { id: draft.id }, data: { publishedAt: new Date(), publishedById: actor.id, publicationNote: input.note } });

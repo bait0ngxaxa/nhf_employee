@@ -54,6 +54,10 @@ export function HolidayCalendarPage({
     const published = managed?.versions.find(
         (version) => version.number === managed.activeVersionNumber,
     );
+    const defaultRevision = published?.defaultDatasetRevision ?? (state && "version" in state ? state.defaultDatasetRevision : undefined);
+    const effectiveSource = defaultRevision
+        ? (published?.days[0]?.source ?? (state && "source" in state ? state.source : undefined))
+        : null;
 
     async function createDraft(): Promise<void> {
         if (inFlight.current || !managed) return;
@@ -97,7 +101,7 @@ export function HolidayCalendarPage({
                     className="rounded-lg bg-status-warning-surface p-4 text-sm text-status-warning-heading"
                 >
                     อยู่ระหว่างเตรียมปฏิทิน ระบบยังคิดวันลาตามวันจันทร์–ศุกร์
-                    ผู้ดูแลระบบต้องเปิดใช้การคำนวณวันหยุดหลังเผยแพร่ปฏิทินที่ตรวจสอบแล้ว
+                    ผู้ดูแลระบบต้องเปิดใช้การคำนวณวันหยุด ค่าเริ่มต้นของปีที่มีข้อมูลพร้อมใช้โดยไม่ต้องเผยแพร่เอง
                 </p>
             )}
             <form
@@ -155,13 +159,20 @@ export function HolidayCalendarPage({
                         id="published-heading"
                         className="text-lg font-semibold text-content-heading"
                     >
-                        ฉบับเผยแพร่{" "}
+                        {defaultRevision ? "ใช้ปฏิทินค่าเริ่มต้น · ฉบับ " : "ปฏิทิน NHF · ฉบับ "}
                         {managed
                             ? (managed.activeVersionNumber ?? "—")
                             : "version" in state
                               ? (state.version ?? "—")
                               : "—"}
                     </h2>
+                    {defaultRevision && (
+                        <div className="space-y-2 text-sm text-content-secondary">
+                            <p>อ้างอิงวันหยุดทั่วไปของสถาบันการเงินจากธนาคารแห่งประเทศไทย · {defaultRevision}</p>
+                            <p>ใช้เป็นค่าเริ่มต้นของ NHF ไม่รวมวันหยุดเฉพาะพื้นที่หรือสถาบัน ADMIN ปรับแต่งได้</p>
+                            {effectiveSource && <a className="break-words underline underline-offset-4" href={effectiveSource} target="_blank" rel="noopener noreferrer">ดูประกาศต้นทาง ธปท.</a>}
+                        </div>
+                    )}
                     {managed ? (
                         published ? (
                             <HolidayRows days={published.days} />
@@ -178,7 +189,7 @@ export function HolidayCalendarPage({
                     )}
                     {isAdmin && !draft && (
                         <Button disabled={busy} onClick={() => void createDraft()}>
-                            {published ? "สร้างฉบับแก้ไขจากฉบับเผยแพร่" : "สร้างปฏิทินฉบับร่าง"}
+                            {published ? "ปรับแต่งวันหยุด" : "สร้างปฏิทินฉบับร่าง"}
                         </Button>
                     )}
                 </section>
@@ -194,20 +205,20 @@ export function HolidayCalendarPage({
                     }}
                 />
             )}
-            {managed && managed.versions.length > 0 && (
+            {managed && managed.versions.length > 0 && managed.hasLeaveRequests !== false && (
                 <CalendarImpactReview
                     key={`${year}:${managed.activeVersionNumber}:${draft?.revision ?? "published"}`}
                     calendar={managed}
                 />
             )}
-            {managed && managed.versions.some((version) => version.publishedAt) && (
-                <section className="space-y-3" aria-labelledby="calendar-history">
-                    <h2
+            {managed && managed.versions.some((version) => version.publishedAt && !version.defaultDatasetRevision) && (
+                <details className="space-y-3">
+                    <summary
                         id="calendar-history"
                         className="text-lg font-semibold text-content-heading"
                     >
                         ประวัติการเผยแพร่
-                    </h2>
+                    </summary>
                     {managed.versions
                         .filter((version) => version.publishedAt)
                         .map((version) => (
@@ -232,7 +243,7 @@ export function HolidayCalendarPage({
                                 <HolidayRows days={version.days} showReferences />
                             </details>
                         ))}
-                </section>
+                </details>
             )}
         </section>
     );
