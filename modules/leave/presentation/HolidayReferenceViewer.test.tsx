@@ -130,7 +130,10 @@ describe.each(["dashboard", "liff"] as const)("%s holiday calendar integration",
         mount();
         fireEvent.change(screen.getByLabelText("วันที่ลา"), { target: { value: "2026-12-26" } });
         fireEvent.change(screen.getByLabelText("เหตุผลการลา"), { target: { value: "ตรวจสุขภาพ" } });
-        const warning = screen.getByRole("alert").textContent;
+        const alert = screen.getByRole("alert");
+        expect(alert.previousElementSibling).toContainElement(screen.getByLabelText("วันที่ลา"));
+        expect(alert.nextElementSibling).toBe(screen.getByRole("button", { name: "ดูปฏิทินวันหยุด" }));
+        const warning = alert.textContent;
         open();
         expect(await screen.findByText("กำลังโหลดข้อมูลวันหยุด...")).toBeInTheDocument();
         await act(async () => resolve?.({ success: false, error: "Failure", errorThai: "Failure", code: "NETWORK_ERROR" }));

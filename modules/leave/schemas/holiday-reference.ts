@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const MAX_HOLIDAY_REFERENCE_EVENTS = 2000;
+
 // Display-only contract. Never use these events as Leave policy inputs.
 export const holidayReferenceEventSchema = z.object({
     date: z.iso.date(),
@@ -9,7 +11,7 @@ export const holidayReferenceEventSchema = z.object({
 
 export const holidayReferenceSchema = z.object({
     year: z.number().int().min(1900).max(9999),
-    events: z.array(holidayReferenceEventSchema).min(1).max(2000),
+    events: z.array(holidayReferenceEventSchema).min(1).max(MAX_HOLIDAY_REFERENCE_EVENTS),
 }).refine(({ year, events }) => events.every((event) => event.date.startsWith(`${year}-`)));
 
 export type HolidayReferenceEvent = z.infer<typeof holidayReferenceEventSchema>;

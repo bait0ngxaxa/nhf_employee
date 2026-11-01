@@ -17,11 +17,14 @@ describe("Google holiday reference normalization", () => {
             { date: "2026-01-01", name: "New Year's Day", classification: "public-holiday" },
             { date: "2026-02-14", name: "ชื่อวันสำคัญที่พับบรรทัด", classification: "observance" },
             { date: "2026-02-14", name: "Another event", classification: "unverified" },
+            { date: "2026-05-10", name: "Second quarter reference", classification: "observance" },
+            { date: "2026-08-10", name: "Third quarter reference", classification: "public-holiday" },
+            { date: "2026-11-10", name: "Fourth quarter reference", classification: "unverified" },
         ] });
     });
     it("retains different events on a date and deduplicates exact display records", () => {
         const data = parseGoogleHolidayReference(withEvent("UID:duplicate\nDTSTART;VALUE=DATE:20260101\nSUMMARY:New Year's Day\nDESCRIPTION:Public holiday"), 2026);
-        expect(data.events).toHaveLength(3);
+        expect(data.events).toHaveLength(6);
         expect(data.events.filter((event) => event.date === "2026-02-14")).toHaveLength(2);
     });
     it("normalizes UTC instants at the Bangkok date/year boundary", () => {
@@ -74,11 +77,80 @@ describe("Google holiday reference normalization", () => {
     });
 });
 
+function calendar(...events: string[]): string {
+    return `BEGIN:VCALENDAR\nVERSION:2.0\n${events.map((event) => `BEGIN:VEVENT\n${event}\nEND:VEVENT`).join("\n")}\nEND:VCALENDAR`;
+}
+function datedEvent(date: string, name = date, extra = ""): string {
+    return `UID:${name}\nDTSTART;VALUE=DATE:${date}\nSUMMARY:${name}\n${extra}`;
+}
+const distributed = ["20260210", "20260510", "20260810", "20261110"].map((date) => datedEvent(date));
+const adjacent = [datedEvent("20250101"), datedEvent("20271231")];
+
+describe("target-year coverage", () => {
+    it.each([
+        [],
+        adjacent,
+        [...adjacent, datedEvent("20260601")],
+        [...adjacent, datedEvent("20260102"), datedEvent("20260210"), datedEvent("20260320")],
+        [datedEvent("20260102"), datedEvent("20261220")],
+    ].map((events) => ({ events })))("rejects empty, missing or insufficiently distributed target-year dates: $events", ({ events }) => {
+        expect(() => parseGoogleHolidayReference(calendar(...events), 2026)).toThrow("incomplete");
+    });
+    it("accepts events distributed through every quarter without exact year endpoints", () => {
+        const expected = parseGoogleHolidayReference(calendar(...distributed), 2026);
+        expect(expected.events).toHaveLength(4);
+        expect(parseGoogleHolidayReference(calendar(...adjacent, ...distributed), 2026)).toEqual(expected);
+    });
+    it("uses expanded all-day dates in the target year, including a boundary-crossing span", () => {
+        const data = parseGoogleHolidayReference(calendar(datedEvent("20251231", "Span", "DTEND;VALUE=DATE:20261002")), 2026);
+        expect(data.events[0]?.date).toBe("2026-01-01");
+        expect(data.events.at(-1)?.date).toBe("2026-10-01");
+        expect(data.events).toHaveLength(274);
+    });
+    it("uses recurring occurrences crossing into the target year for coverage", () => {
+        const data = parseGoogleHolidayReference(calendar(datedEvent("20251110", "Quarterly", "RRULE:FREQ=MONTHLY;INTERVAL=3;COUNT=5")), 2026);
+        expect(data.events.map((event) => event.date)).toEqual(["2026-02-10", "2026-05-10", "2026-08-10", "2026-11-10"]);
+    });
+    it("clips an all-day span ending in the next year without including its exclusive end", () => {
+        const data = parseGoogleHolidayReference(calendar(...distributed, datedEvent("20261230", "Boundary", "DTEND;VALUE=DATE:20270103")), 2026);
+        expect(data.events.filter((event) => event.name === "Boundary").map((event) => event.date)).toEqual(["2026-12-30", "2026-12-31"]);
+    });
+});
+
+describe("normalized expansion limits", () => {
+    const yearSpan = (name: string): string => datedEvent("20260101", name, "DTEND;VALUE=DATE:20270101");
+    it("rejects collectively oversized non-recurring spans instead of returning partial results", () => {
+        expect(() => parseGoogleHolidayReference(calendar(...Array.from({ length: 6 }, (_, index) => yearSpan(`Span ${index}`))), 2026)).toThrow("invalid-source");
+    });
+    it("counts expanded days even when all overlapping events deduplicate", () => {
+        expect(() => parseGoogleHolidayReference(calendar(...Array.from({ length: 28 }, () => yearSpan("Same"))), 2026)).toThrow("invalid-source");
+    });
+    it("accepts exactly 10,000 processed days and rejects the next duplicate day", () => {
+        const events = [
+            ...Array.from({ length: 27 }, () => yearSpan("Same")),
+            datedEvent("20260101", "Same", "DTEND;VALUE=DATE:20260526"),
+        ];
+        expect(parseGoogleHolidayReference(calendar(...events), 2026).events).toHaveLength(365);
+        expect(() => parseGoogleHolidayReference(calendar(...events, datedEvent("20260526", "Same")), 2026)).toThrow("invalid-source");
+    });
+    it("accepts exactly 2,000 unique records with exclusive DTEND and rejects the next record", () => {
+        const events = [
+            ...Array.from({ length: 5 }, (_, index) => yearSpan(`Span ${index}`)),
+            datedEvent("20260101", "Remainder", "DTEND;VALUE=DATE:20260625"),
+        ];
+        expect(parseGoogleHolidayReference(calendar(...events), 2026).events).toHaveLength(2000);
+        expect(() => parseGoogleHolidayReference(calendar(...events, datedEvent("20260625", "Extra")), 2026)).toThrow("invalid-source");
+    });
+    it("bounds expanded days outside the target year too", () => {
+        expect(() => parseGoogleHolidayReference(calendar(...Array.from({ length: 28 }, () => datedEvent("20250101", "Previous", "DTEND;VALUE=DATE:20260101"))), 2026)).toThrow("invalid-source");
+    });
+});
+
 describe("bounded external retrieval", () => {
     it("fetches only the fixed server-controlled URL and validates the response", async () => {
         const fetch = vi.fn().mockResolvedValue(response());
         vi.stubGlobal("fetch", fetch);
-        expect((await fetchGoogleHolidayReference(2026)).events).toHaveLength(3);
+        expect((await fetchGoogleHolidayReference(2026)).events).toHaveLength(6);
         expect(fetch).toHaveBeenCalledWith("https://calendar.google.com/calendar/ical/en.th%23holiday%40group.v.calendar.google.com/public/basic.ics", expect.objectContaining({ cache: "no-store", redirect: "error", signal: expect.any(AbortSignal) }));
     });
     it("aborts external requests after eight seconds", async () => {

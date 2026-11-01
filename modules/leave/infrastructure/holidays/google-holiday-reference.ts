@@ -2,6 +2,7 @@ import ICAL from "ical.js";
 import { isValidDateOnly, toDateOnlyString } from "../../domain/business-date";
 import {
     holidayReferenceSchema,
+    MAX_HOLIDAY_REFERENCE_EVENTS,
     type HolidayReference,
     type HolidayReferenceEvent,
 } from "../../schemas/holiday-reference";
@@ -42,7 +43,7 @@ export function parseGoogleHolidayReference(ics: string, year: number): HolidayR
             throw new HolidayReferenceError("invalid-source");
         }
         const components = calendar.getAllSubcomponents("vevent");
-        if (components.length > 2000) throw new HolidayReferenceError("invalid-source");
+        if (components.length > MAX_HOLIDAY_REFERENCE_EVENTS) throw new HolidayReferenceError("invalid-source");
         const events = components.map((component) => {
             // Reject unresolved TZIDs instead of silently treating them as local/UTC.
             for (const property of component.getAllProperties()) {
@@ -76,27 +77,33 @@ export function parseGoogleHolidayReference(ics: string, year: number): HolidayR
             master.relateException(exception);
         }
         const normalized = new Map<string, HolidayReferenceEvent>();
-        let first = "9999-12-31";
-        let last = "0000-01-01";
+        const coveredQuarters = new Set<number>();
+        let expandedDays = 0;
         let occurrences = 0;
         const add = (start: ICAL.Time, end: ICAL.Time, event: ICAL.Event): void => {
             if (event.component.getFirstPropertyValue("status") === "CANCELLED") return;
-            const date = normalizeDate(start);
-            first = date < first ? date : first;
-            last = date > last ? date : last;
-            const dates = [date];
+            const addDay = (time: ICAL.Time): void => {
+                // Count all processed days, even outside the year or exact duplicates.
+                if (++expandedDays > MAX_OCCURRENCES) throw new HolidayReferenceError("invalid-source");
+                const day = normalizeDate(time);
+                if (!day.startsWith(`${year}-`)) return;
+                const item = { date: day, name: event.summary.trim(), classification: classify(event) };
+                const key = JSON.stringify(item);
+                if (!normalized.has(key)) {
+                    if (normalized.size >= MAX_HOLIDAY_REFERENCE_EVENTS) throw new HolidayReferenceError("invalid-source");
+                    normalized.set(key, item);
+                }
+                coveredQuarters.add(Math.floor((Number(day.slice(5, 7)) - 1) / 3));
+            };
+            addDay(start);
             if (start.isDate && end.isDate) {
                 const cursor = start.clone();
+                let days = 1;
                 // DTEND is exclusive for all-day events (RFC 5545).
                 for (cursor.adjust(1, 0, 0, 0); cursor.compare(end) < 0; cursor.adjust(1, 0, 0, 0)) {
-                    if (dates.length >= 366) throw new HolidayReferenceError("invalid-source");
-                    dates.push(normalizeDate(cursor));
+                    if (++days > 366) throw new HolidayReferenceError("invalid-source");
+                    addDay(cursor);
                 }
-            }
-            for (const day of dates) {
-                if (!day.startsWith(`${year}-`)) continue;
-                const item = { date: day, name: event.summary.trim(), classification: classify(event) };
-                normalized.set(JSON.stringify(item), item);
             }
         };
         for (const event of masters) {
@@ -118,10 +125,13 @@ export function parseGoogleHolidayReference(ics: string, year: number): HolidayR
                 if (next.year > year + 1) break;
             }
         }
-        // Google supplies no explicit verified-empty/coverage metadata. A range
-        // spanning this year plus events in it is the minimum evidence of availability;
-        // it is not a guarantee that Google lists every official holiday.
-        if (first > `${year}-01-01` || last < `${year}-12-31` || normalized.size === 0) {
+        // The verified Google Thailand feed distributes reference dates throughout
+        // the year but provides no completeness/verified-empty metadata. Require a
+        // normalized occurrence in every quarter of the requested year as a conservative
+        // availability heuristic. Expanded all-day and recurring dates count; adjacent
+        // years do not. No particular holiday date or count is assumed. This rejects
+        // obvious gaps, not proof that every government holiday is present.
+        if (coveredQuarters.size !== 4) {
             throw new HolidayReferenceError("incomplete");
         }
         return holidayReferenceSchema.parse({

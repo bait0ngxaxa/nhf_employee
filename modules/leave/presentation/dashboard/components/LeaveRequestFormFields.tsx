@@ -27,10 +27,10 @@ export function LeaveDialogFields({ model, holidayChannel = "dashboard" }: { mod
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
             <LeaveDateFields model={model} />
-            <HolidayReferenceViewer channel={holidayChannel} />
             {model.dateWarning ? (
                 <p role="alert" className="-mt-3 text-sm leading-6 text-status-danger-strong">{model.dateWarning}</p>
             ) : null}
+            <HolidayReferenceViewer channel={holidayChannel} />
             {!model.isMultiDay ? <LeavePeriodField model={model} /> : null}
             <LeaveDurationCalculation model={model} />
             <LeaveReasonField model={model} />
