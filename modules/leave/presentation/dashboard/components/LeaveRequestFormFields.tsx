@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import {
     FormControl,
     FormDescription,
@@ -15,15 +16,18 @@ import type { useLeaveRequestFormModel } from "../hooks/useLeaveRequestFormModel
 import { cn } from "@/lib/ui/utils";
 import { LeaveEvidenceUploadField } from "./LeaveEvidenceUploadField";
 import { formatLeaveDays } from "../../liff/leave-format";
+import { HolidayReferenceViewer } from "../../HolidayReferenceViewer";
+import type { HolidayReferenceChannel } from "../../holiday-reference-client";
 
 type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
 
-export function LeaveDialogFields({ model }: { model: LeaveRequestFormModel }) {
+export function LeaveDialogFields({ model, holidayChannel = "dashboard" }: { model: LeaveRequestFormModel; holidayChannel?: HolidayReferenceChannel }): ReactElement {
     return (
         <div className="flex flex-col gap-5">
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
             <LeaveDateFields model={model} />
+            <HolidayReferenceViewer channel={holidayChannel} />
             {model.dateWarning ? (
                 <p role="alert" className="-mt-3 text-sm leading-6 text-status-danger-strong">{model.dateWarning}</p>
             ) : null}

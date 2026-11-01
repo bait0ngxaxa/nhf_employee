@@ -375,6 +375,7 @@ export const API_ROUTES = {
         routineScheduler: "/api/cron/routine-scheduler",
     },
     leave: {
+        holidays: "/api/leave/holidays",
         me: "/api/leave/me",
         approvals: "/api/leave/approvals",
         adminRecovery: "/api/leave/admin/recovery",
@@ -467,6 +468,7 @@ export const API_ROUTES = {
         liffSession: "/api/line/liff/session",
         home: "/api/line/home",
         leaveMe: "/api/line/leave/me",
+        leaveHolidays: "/api/line/leave/holidays",
         leaveRequest: "/api/line/leave/request",
         leaveApprovals: "/api/line/leave/approvals",
         leaveCancel: "/api/line/leave/cancel",

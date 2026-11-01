@@ -8,6 +8,7 @@ import { LeaveRequestReview } from "../dashboard/components/LeaveRequestReview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import {
     Sheet,
     SheetContent,
@@ -71,7 +72,7 @@ export function LiffLeaveRequestForm({
 
     return (
         <Sheet
-            open={open}
+            open={open && isFeatureEnabled(FEATURE_KEYS.leave)}
             onOpenChange={(nextOpen) => {
                 if (!nextOpen) requestClose();
             }}
@@ -122,7 +123,7 @@ export function LiffLeaveRequestForm({
                                             </AlertDescription>
                                         </Alert>
                                     ) : null}
-                                    <LeaveDialogFields model={model} />
+                                    <LeaveDialogFields model={model} holidayChannel="liff" />
                                 </div>
                             </div>
                         </SheetScrollArea>

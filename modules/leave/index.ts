@@ -83,6 +83,7 @@ export { LeaveCapabilityDeniedError } from "./application/authorization";
 export type { LeavePresentationCapabilities } from "./application/types";
 
 // HTTP adapters and response serializers used by the existing route families.
+export { getHolidayReferenceResponse } from "./server/holiday-reference-api";
 export {
     enforceLeaveJsonBodySize,
     readLeaveJsonBody,

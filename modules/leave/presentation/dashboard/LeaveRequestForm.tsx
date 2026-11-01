@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactElement } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -15,6 +16,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { Separator } from "@/components/ui/separator";
 import { LEAVE_THEME_BUTTON_CLASS } from "./leaveTheme";
 import { useLeaveRequestFormModel } from "./hooks/useLeaveRequestFormModel";
@@ -38,7 +40,7 @@ export function LeaveRequestForm({
     onCancel,
     quotas,
     canCreateRequests = true,
-}: Props) {
+}: Props): ReactElement {
     const model = useLeaveRequestFormModel({
         onSuccess,
         quotas,
@@ -48,7 +50,7 @@ export function LeaveRequestForm({
 
     return (
         <AsyncFormDialog
-            open={open}
+            open={open && isFeatureEnabled(FEATURE_KEYS.leave)}
             busy={model.isSubmitting}
             dirty={model.isDirty}
             onClose={onCancel}
