@@ -146,6 +146,7 @@ export async function requestLiffLeaveNotTaken(
 
 export async function submitLiffLeaveDecision(input: {
     leaveId: string;
+    expectedSpecialReason?: string | null;
     action: "APPROVE" | "REJECT";
     reason?: string;
 }): Promise<void> {

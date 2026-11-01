@@ -8,6 +8,7 @@ import {
     getLeaveReportMeta,
     getLeaveReportYears,
     leaveReportScopeSchema,
+    parseLeaveQueryYear,
 } from "@/modules/leave";
 import { jsonError, notFound, operationFailed } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
@@ -25,11 +26,13 @@ export async function GET(request: NextRequest): Promise<Response> {
         const currentEmployeeId = auth.employeeId;
 
         const url = new URL(request.url);
-        const yearParam = url.searchParams.get("year");
         const yearsOnly = url.searchParams.get("yearsOnly") === "1";
         const metaOnly = url.searchParams.get("metaOnly") === "1";
         const format = url.searchParams.get("format");
-        const year = yearParam ? Number.parseInt(yearParam, 10) : getCurrentLeaveYear();
+        const year = url.searchParams.has("year")
+            ? parseLeaveQueryYear(url.searchParams)
+            : getCurrentLeaveYear();
+        if (year === null) return jsonError("ปีที่ต้องการส่งออกไม่ถูกต้อง", 400);
         const scopeResult = leaveReportScopeSchema.safeParse(url.searchParams.get("scope") ?? undefined);
         if (!scopeResult.success) {
             return jsonError("ประเภทรีพอร์ตการลาไม่ถูกต้อง", 400);
@@ -39,10 +42,6 @@ export async function GET(request: NextRequest): Promise<Response> {
         if (yearsOnly) {
             const years = await getLeaveReportYears(currentEmployeeId, scope);
             return NextResponse.json({ years });
-        }
-
-        if (Number.isNaN(year) || year < 2000 || year > 2100) {
-            return jsonError("ปีที่ต้องการส่งออกไม่ถูกต้อง", 400);
         }
 
         const meta = await getLeaveReportMeta(currentEmployeeId, year, scope);

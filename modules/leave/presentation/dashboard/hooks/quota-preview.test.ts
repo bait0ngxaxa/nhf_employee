@@ -32,6 +32,11 @@ describe.each(["dashboard", "liff"] as const)("%s selected-year preview", (quota
         expect(result.current.needsSpecialReason).toBe(true);
         expect(result.current.form.getValues("reason")).toBe("เหตุผลเดิมต้องไม่หาย");
         expect(fetchLeaveQuotaProjection).toHaveBeenCalledWith(quotaChannel, 2032);
+        choose(2031);
+        choose(2032);
+        // Returning while another year is loading must not revive the old balance.
+        expect(result.current.remainingQuota).toBeNull();
+        expect(result.current.quotaStatus).toBe("loading");
     });
 
     it("distinguishes calculation failure and unavailable data, with retry", async () => {

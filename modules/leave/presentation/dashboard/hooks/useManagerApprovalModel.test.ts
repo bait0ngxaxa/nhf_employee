@@ -136,6 +136,7 @@ describe("useManagerApprovalModel", () => {
             leaveId: "leave-1",
             action: "APPROVE",
             reason: undefined,
+            expectedSpecialReason: null,
         });
         expect(mutate).toHaveBeenCalledTimes(1);
         expect(toast.success).toHaveBeenCalledTimes(1);
@@ -201,6 +202,7 @@ describe("useManagerApprovalModel", () => {
             leaveId: "leave-1",
             action: "APPROVE",
             reason: undefined,
+            expectedSpecialReason: specialLeave.specialReason,
         });
     });
 

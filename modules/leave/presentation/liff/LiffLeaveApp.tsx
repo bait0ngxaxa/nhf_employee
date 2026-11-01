@@ -490,6 +490,7 @@ export function LiffLeaveApp(): ReactElement {
             requestId: request.id,
             action,
             title: getLeaveTypeLabel(request.leaveType),
+            specialReason: request.specialReason,
             summary: formatLeaveDateRange(request.startDate, request.endDate),
             hasWarnings: Boolean(
                 "overQuotaDays" in request
@@ -519,6 +520,7 @@ export function LiffLeaveApp(): ReactElement {
                     leaveId: requestId,
                     action,
                     reason,
+                    ...(action === "APPROVE" ? { expectedSpecialReason: mutationIntent.specialReason ?? null } : {}),
                 });
             } else if (action === "CONFIRM_NOT_TAKEN") {
                 await confirmLiffLeaveNotTaken(requestId, reason);

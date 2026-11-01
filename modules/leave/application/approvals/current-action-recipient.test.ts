@@ -88,6 +88,7 @@ function buildPayload(): LeaveActionPayload {
 }
 
 function createHarness(options: {
+    specialReason?: string;
     workerCreated?: { signal: Deferred; release: Deferred };
     cancelUpdated?: { signal: Deferred; release: Deferred };
 } = {}) {
@@ -135,6 +136,7 @@ function createHarness(options: {
             findUnique: async () => ({
                 id: "leave-1",
                 status: state.requestStatus,
+                specialReason: options.specialReason ?? null,
                 approverId: 20,
                 exceptionApproverId: null,
                 approvalActionVersion: 1,
@@ -227,6 +229,15 @@ describe("LEAVE_ACTION worker and cancellation serialization", () => {
                 await context.notification.create({ data: _input });
             }
         });
+    });
+
+    it("delivers the persisted amended reason rather than the queued original", async () => {
+        const harness = createHarness({ specialReason: "เหตุผลที่ผู้ยื่นคำขอแก้ไขล่าสุด" });
+        harness.queue("worker");
+        await expect(dispatchCurrentLeaveAction(100, buildPayload())).resolves.toBe("SENT");
+        expect(leaveEmailMocks.sendLeaveActionNotification).toHaveBeenCalledWith(expect.objectContaining({
+            specialReason: "เหตุผลที่ผู้ยื่นคำขอแก้ไขล่าสุด",
+        }), expect.any(String));
     });
 
     it("lets the worker create the notification, then cancellation reads it and marks it read", async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -206,21 +206,22 @@ export function useLeaveRequestFormModel({
 
     const selectedYear = isValidDateOnly(startDateValue) ? Number(startDateValue.slice(0, 4)) : null;
     const suppliedQuota = findQuotaForDate(quotas, leaveType, startDateValue);
-    const [preview, setPreview] = useState<{ year: number; quotas?: LeaveQuotaSnapshot[]; failed?: boolean } | null>(null);
     const [quotaAttempt, setQuotaAttempt] = useState(0);
+    const previewKey = useMemo(() => ({ year: selectedYear, channel: quotaChannel, attempt: quotaAttempt }), [selectedYear, quotaChannel, quotaAttempt]);
+    const [preview, setPreview] = useState<{ key: typeof previewKey; quotas?: LeaveQuotaSnapshot[]; failed?: boolean } | null>(null);
     useEffect(() => {
-        if (selectedYear === null || suppliedQuota) return;
+        if (previewKey.year === null || suppliedQuota) return;
         let active = true;
-        void fetchLeaveQuotaProjection(quotaChannel, selectedYear).then(
-            (result) => { if (active) setPreview({ year: selectedYear, quotas: result }); },
-            () => { if (active) setPreview({ year: selectedYear, failed: true }); },
+        void fetchLeaveQuotaProjection(previewKey.channel, previewKey.year).then(
+            (result) => { if (active) setPreview({ key: previewKey, quotas: result }); },
+            () => { if (active) setPreview({ key: previewKey, failed: true }); },
         );
         return () => { active = false; };
-    }, [selectedYear, suppliedQuota, quotaChannel, quotaAttempt]);
-    const quota = suppliedQuota ?? (preview?.year === selectedYear && !preview.failed
+    }, [previewKey, suppliedQuota]);
+    const quota = suppliedQuota ?? (preview?.key === previewKey && !preview.failed
         ? findQuotaForDate(preview.quotas ?? [], leaveType, startDateValue) : undefined);
-    const quotaStatus = quota ? "available" : preview?.year === selectedYear && preview.failed ? "error"
-        : selectedYear === null || (preview?.year === selectedYear && preview.quotas) ? "unavailable" : "loading";
+    const quotaStatus = quota ? "available" : preview?.key === previewKey && preview.failed ? "error"
+        : selectedYear === null || (preview?.key === previewKey && preview.quotas) ? "unavailable" : "loading";
     const retryQuota = (): void => { setPreview(null); setQuotaAttempt((value) => value + 1); };
     const remainingQuota = quota?.remainingDays ?? null;
     const selection = evaluateLeaveSelection(startDateValue, endDateValue, periodValue);

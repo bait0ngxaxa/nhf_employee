@@ -1,23 +1,29 @@
+import { PUT as dashboardAmend } from "@/app/api/leave/special-reason/route";
+import { PUT as liffAmend } from "@/app/api/line/leave/special-reason/route";
+import type * as LineModule from "@/modules/line";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { amendPendingLeaveSpecialReason, buildLeaveAuthorizationContext, decideLeaveRequest, getEmployeeLeaveQuotaProjection } from "@/modules/leave";
+import { amendPendingLeaveSpecialReason } from "../../application/requests/amend-special-reason";
+import { buildLeaveAuthorizationContext } from "../../application/authorization";
+import { decideLeaveRequest } from "../../application/approvals/decision";
+import { getEmployeeLeaveQuotaProjection } from "../../application/queries/quota-projection";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { prisma } from "@/lib/db/prisma";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 
 const mocks = vi.hoisted(() => ({
     session: vi.fn(),
+    liffSession: vi.fn(),
 }));
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
     return {
         ...actual,
-        after: (callback: () => void): void => {
-            callback();
-        },
+        // Verify persisted outbox intent without dispatching external notifications.
+        after: vi.fn(),
     };
 });
 
@@ -25,8 +31,9 @@ vi.mock("@/lib/auth/workforce", () => ({
     requireActiveWorkforceSession: mocks.session,
 }));
 
-vi.mock("@/lib/services/outbox/processor", () => ({
-    processOutbox: vi.fn().mockResolvedValue(undefined),
+vi.mock("@/modules/line", async (original) => ({
+    ...await original<typeof LineModule>(),
+    requireLiffWorkforceSession: mocks.liffSession,
 }));
 
 const DEPARTMENT_NAME = "Leave Quota Concurrency Integration";
@@ -236,14 +243,20 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
         expect(await prisma.leaveQuota.findMany({ where: { employeeId: fixture.employeeId } })).toEqual(before);
     });
 
-    async function submitPair(): Promise<string[]> {
+    async function submitPair(initialUsedHalfDays = 0): Promise<string[]> {
+        if (initialUsedHalfDays > 0) {
+            await prisma.leaveQuota.create({ data: {
+                employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL",
+                totalHalfDays: 20, carryBalanceHalfDays: 0, usedHalfDays: initialUsedHalfDays,
+            } });
+        }
         for (const [index, date] of ["2031-05-12", "2031-05-13"].entries()) {
             const response = await submitLeaveRequest(createRequest(`pending-pair-${index}`, date));
             expect(response.status).toBe(201);
         }
         const requests = await prisma.leaveRequest.findMany({ where: { employeeId: fixture.employeeId }, orderBy: { startDate: "asc" } });
         expect(requests.every((request) => request.status === "PENDING")).toBe(true);
-        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(0);
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(initialUsedHalfDays);
         return requests.map((request) => request.id);
     }
 
@@ -266,8 +279,7 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
     });
 
     it.each(["DASHBOARD", "LIFF_SELF_SERVICE"] as const)("B/F: %s recovers from pending quota collision with one audited amendment", async (channel) => {
-        const ids = await submitPair();
-        await prisma.leaveQuota.updateMany({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" }, data: { usedHalfDays: 18 } });
+        const ids = await submitPair(18);
         const actor = await approverActor();
         await decideLeaveRequest(actor, { leaveId: ids[0], action: "APPROVE" });
         await expect(decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE" })).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining("ผู้ยื่นคำขอ") });
@@ -282,7 +294,8 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
         const audits = await prisma.auditLog.findMany({ where: { action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", details: { contains: ids[1] } } });
         expect(audits).toHaveLength(1);
         expect(audits[0].userId).toBe(fixture.employeeUserId);
-        await decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE" });
+        await expect(decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE", expectedSpecialReason: null })).rejects.toMatchObject({ statusCode: 409 });
+        await decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE", expectedSpecialReason: amendment.specialReason });
         expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(22);
         expect((await prisma.leaveRequest.findUniqueOrThrow({ where: { id: ids[1] } })).overQuotaHalfDays).toBe(2);
     });
@@ -301,6 +314,53 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
         else expect(results[0].reason).toMatchObject({ statusCode: 409 });
         await expect(decideLeaveRequest(actor, { leaveId, action: "APPROVE" })).rejects.toMatchObject({ statusCode: 409 });
         expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(2);
+    });
+
+    it("C: over-quota approval racing amendment uses the committed reason or rolls back", async () => {
+        const [leaveId] = await submitPair();
+        await prisma.leaveQuota.updateMany({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" }, data: { usedHalfDays: 20 } });
+        const actor = await approverActor();
+        const results = await Promise.allSettled([
+            amendPendingLeaveSpecialReason(requesterActor(), { leaveId, specialReason: "มีเหตุจำเป็นเป็นกรณีพิเศษ", expectedSpecialReason: null }),
+            decideLeaveRequest(actor, { leaveId, action: "APPROVE" }),
+        ]);
+        expect(results[0].status).toBe("fulfilled");
+        if (results[1].status === "rejected") {
+            expect(results[1].reason).toMatchObject({ statusCode: 409 });
+            expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(20);
+            await decideLeaveRequest(actor, { leaveId, action: "APPROVE" });
+        }
+        const request = await prisma.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
+        expect(request.status).toBe("APPROVED");
+        expect(request.specialReason).toBe("มีเหตุจำเป็นเป็นกรณีพิเศษ");
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(22);
+    });
+
+    it.each(["DASHBOARD", "LIFF_SELF_SERVICE"] as const)("D/E/F: %s amendment route enforces owner, input, PENDING and retry semantics in MySQL", async (channel) => {
+        const [leaveId] = await submitPair();
+        const put = channel === "DASHBOARD" ? dashboardAmend : liffAmend;
+        const session = channel === "DASHBOARD" ? mocks.session : mocks.liffSession;
+        const requesterSession = await mocks.session();
+        session.mockResolvedValue(requesterSession);
+        const request = (extra: Record<string, unknown> = {}) => new NextRequest(`http://localhost/api/${channel === "DASHBOARD" ? "" : "line/"}leave/special-reason`, {
+            method: "PUT", headers: { Origin: "http://localhost", "X-Requested-With": "XMLHttpRequest", "Content-Type": "application/json" },
+            body: JSON.stringify({ leaveId, specialReason: "มีเหตุจำเป็นต้องดูแลครอบครัว", expectedSpecialReason: null, ...extra }),
+        });
+        const other = await approverActor();
+        session.mockResolvedValue({ ok: true, user: { id: other.userId, role: "USER", email: other.userEmail }, employeeId: other.employeeId });
+        expect((await put(request())).status).toBe(404);
+        session.mockResolvedValue(requesterSession);
+        expect((await put(request({ employeeId: other.employeeId }))).status).toBe(400);
+        expect((await put(request({ specialReason: "1234" }))).status).toBe(400);
+        expect((await put(request({ specialReason: "x".repeat(1001) }))).status).toBe(400);
+        expect((await put(request())).status).toBe(200);
+        expect((await put(request())).status).toBe(200);
+        expect(await prisma.auditLog.count({ where: { action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", details: { contains: leaveId } } })).toBe(1);
+        for (const status of ["APPROVED", "REJECTED", "CANCELLED", "CANCELLATION_REQUESTED", "NOT_TAKEN", "CANCELLED_AFTER_APPROVAL"] as const) {
+            await prisma.leaveRequest.update({ where: { id: leaveId }, data: { status } });
+            expect((await put(request())).status).toBe(409);
+        }
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(0);
     });
 
     it("creates one quota for concurrent non-overlapping requests with different keys", async () => {

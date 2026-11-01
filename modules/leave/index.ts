@@ -147,5 +147,4 @@ export { toLeaveRequestDays } from "./domain/half-days";
 export { getEmployeeLeaveQuotaProjection } from "./application/queries/quota-projection";
 export { parseLeaveQueryYear } from "./schemas/query-year";
 
-export { amendPendingLeaveSpecialReason, LeaveAmendmentError } from "./application/requests/amend-special-reason";
 export { handleLeaveSpecialReasonAmendment } from "./server/special-reason-api";

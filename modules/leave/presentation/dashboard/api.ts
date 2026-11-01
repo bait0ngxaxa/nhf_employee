@@ -45,6 +45,7 @@ export type LeaveDecisionAction = "APPROVE" | "REJECT";
 
 interface LeaveDecisionPayload {
     leaveId: string;
+    expectedSpecialReason?: string | null;
     action: LeaveDecisionAction;
     reason?: string;
 }

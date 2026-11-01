@@ -75,11 +75,12 @@ try {
             assert.match(await page.$eval('[aria-label="เลือกวันที่ลา"]', (section) => section.textContent), /กำลังเลือก: 6 พฤศจิกายน 2569/);
             await page.evaluate(() => [...document.querySelectorAll("button")].find((button) => button.textContent === "ยกเลิกวันที่ที่กำลังเลือก").click());
             assert.equal(await page.$eval('[aria-label="เลือกวันที่ลา"]', (section) => section.dataset.calendarMonth), "2026-11");
+            await page.$eval('[aria-label="เลือกเดือน"]', (select) => select.scrollIntoView({ block: "center" }));
             const layout = await page.evaluate(() => ({
                 overflow: document.documentElement.scrollWidth > innerWidth,
                 selectors: [...document.querySelectorAll('[aria-label="เลือกเดือน"], [aria-label="เลือกปี พ.ศ."]')].map((select) => {
                     const rect = select.getBoundingClientRect();
-                    return rect.left >= 0 && rect.right <= innerWidth && rect.height >= 44;
+                    return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight && rect.height >= 44;
                 }),
             }));
             assert.equal(layout.overflow, false);

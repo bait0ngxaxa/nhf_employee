@@ -1,5 +1,5 @@
 import type * as AmendmentModule from "@/modules/leave/application/requests/amend-special-reason";
-import type * as LeaveModule from "@/modules/leave";
+import type * as AuthorizationModule from "../application/authorization";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,14 +7,16 @@ const mocks = vi.hoisted(() => ({ dashboard: vi.fn(), liff: vi.fn(), quota: vi.f
 vi.mock("@/lib/auth/workforce", () => ({ requireActiveWorkforceSession: mocks.dashboard }));
 vi.mock("@/modules/line", () => ({ requireLiffWorkforceSession: mocks.liff }));
 vi.mock("@/modules/leave/application/requests/amend-special-reason", async (original) => ({ ...await original<typeof AmendmentModule>(), amendPendingLeaveSpecialReason: mocks.amend }));
-vi.mock("@/modules/leave", async (original) => ({ ...await original<typeof LeaveModule>(), assertLeaveCapability: mocks.capability, getEmployeeLeaveQuotaProjection: mocks.quota }));
+vi.mock("../application/authorization", async (original) => ({ ...await original<typeof AuthorizationModule>(), assertLeaveCapability: mocks.capability }));
+vi.mock("../application/queries/quota-projection", () => ({ getEmployeeLeaveQuotaProjection: mocks.quota }));
 
 import { GET as dashboardGet } from "@/app/api/leave/me/route";
 import { GET as liffGet } from "@/app/api/line/leave/me/route";
 import { PUT as dashboardPut } from "@/app/api/leave/special-reason/route";
 import { PUT as liffPut } from "@/app/api/line/leave/special-reason/route";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
-import { LeaveAmendmentError, LeaveCapabilityDeniedError } from "@/modules/leave";
+import { LeaveAmendmentError } from "../application/requests/amend-special-reason";
+import { LeaveCapabilityDeniedError } from "../application/authorization";
 
 const auth = { ok: true, user: { id: 7, role: "USER", email: "employee@example.test" }, employeeId: 31 };
 const payload = { leaveId: "leave-1", specialReason: "จำเป็นต้องดูแลครอบครัว", expectedSpecialReason: null };

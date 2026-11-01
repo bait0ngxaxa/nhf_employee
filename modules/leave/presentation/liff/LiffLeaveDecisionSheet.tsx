@@ -21,6 +21,7 @@ export interface LiffLeaveMutationIntent {
     title: string;
     summary: string;
     hasWarnings?: boolean;
+    specialReason?: string | null;
 }
 
 interface LiffLeaveDecisionSheetProps {
@@ -175,6 +176,9 @@ function LiffLeaveDecisionSession({
                             <div className="border-y border-border-subtle py-3 text-sm leading-6 text-content-body">
                                 {content.consequence}
                             </div>
+                            {intent.specialReason && intent.action === "APPROVE" ? <p className="break-words border-y border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong">
+                                <span className="font-semibold">เหตุผลพิเศษจากผู้ยื่นคำขอ: </span>{intent.specialReason}
+                            </p> : null}
                             {intent.hasWarnings ? (
                                 <div className="flex items-start gap-2 border-y border-status-warning-border bg-status-warning-surface px-3 py-3 text-sm leading-6 text-status-warning-strong">
                                     <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

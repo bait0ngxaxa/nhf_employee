@@ -132,6 +132,7 @@ export const leaveNotTakenConfirmSchema = z.object({
 
 export const leaveActionSchema = z.object({
   leaveId: leaveIdSchema,
+  expectedSpecialReason: z.string().max(1000).nullable().optional(),
   action: z.enum(["APPROVE", "REJECT"], {
     message: "การดำเนินการไม่ถูกต้อง",
   }),

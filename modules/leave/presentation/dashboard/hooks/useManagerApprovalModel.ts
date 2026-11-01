@@ -155,11 +155,12 @@ export function useManagerApprovalModel({
         action: LeaveDecisionAction,
         leaveId: string,
         reason?: string,
+        expectedSpecialReason?: string | null,
     ): Promise<boolean> => {
         if (!canApproveAssignedRequests) return false;
         setIsProcessing(true);
         try {
-            await submitLeaveDecision({ leaveId, action, reason });
+            await submitLeaveDecision({ leaveId, action, reason, ...(action === "APPROVE" ? { expectedSpecialReason } : {}) });
             await refreshFirstPages();
             if (action === "APPROVE") {
                 toast.success("อนุมัติคำขอลาเรียบร้อยแล้ว");
@@ -181,7 +182,7 @@ export function useManagerApprovalModel({
 
     const approveLeave = async (leave: PendingLeave): Promise<boolean> => {
         if (!canApproveAssignedRequests) return false;
-        return executeAction("APPROVE", leave.id);
+        return executeAction("APPROVE", leave.id, undefined, leave.specialReason ?? null);
     };
 
     const rejectLeave = async (

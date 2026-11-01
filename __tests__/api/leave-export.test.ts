@@ -160,6 +160,44 @@ describe("GET /api/leave/export", () => {
         expect(getLeaveReportMeta).toHaveBeenCalledWith(200, 2031, "approver-history");
     });
 
+    it.each(["2026abc", "2026.5", "2026xyz", "-2026", "NaN", "Infinity", "1999", "2101", "", "2026&year=2027"])("rejects malformed or ambiguous year=%s", async (year) => {
+        const response = await leaveExportRoute(new NextRequest(`http://localhost/api/leave/export?metaOnly=1&year=${year}`));
+        expect(response.status).toBe(400);
+        expect(getLeaveReportMeta).not.toHaveBeenCalled();
+        expect(createLeaveReportXlsxResponse).not.toHaveBeenCalled();
+    });
+
+    it("defaults an absent year to the Bangkok leave year", async () => {
+        const response = await leaveExportRoute(new NextRequest("http://localhost/api/leave/export?metaOnly=1"));
+        expect(response.status).toBe(200);
+        const year = Number(new Intl.DateTimeFormat("en", { timeZone: "Asia/Bangkok", year: "numeric" }).format(new Date()));
+        expect(getLeaveReportMeta).toHaveBeenCalledWith(200, year, "approver-history");
+    });
+
+    it.each([2000, 2100])("accepts supported boundary year %s", async (year) => {
+        expect((await leaveExportRoute(new NextRequest(`http://localhost/api/leave/export?metaOnly=1&year=${year}`))).status).toBe(200);
+        expect(getLeaveReportMeta).toHaveBeenCalledWith(200, year, "approver-history");
+    });
+
+    it("rejects invalid supplied year even for yearsOnly", async () => {
+        expect((await leaveExportRoute(new NextRequest("http://localhost/api/leave/export?yearsOnly=1&year=2031abc"))).status).toBe(400);
+        expect(getLeaveReportYears).not.toHaveBeenCalled();
+    });
+
+    it("preserves valid yearsOnly requests and unsupported format errors", async () => {
+        vi.mocked(getLeaveReportYears).mockResolvedValue([2031]);
+        expect((await leaveExportRoute(new NextRequest("http://localhost/api/leave/export?yearsOnly=1&year=2031&scope=current-team"))).status).toBe(200);
+        expect((await leaveExportRoute(new NextRequest("http://localhost/api/leave/export?year=2031&format=csv"))).status).toBe(400);
+        expect(createLeaveReportXlsxResponse).not.toHaveBeenCalled();
+    });
+
+    it("requires authentication before report retrieval", async () => {
+        vi.mocked(getApiAuthSession).mockResolvedValue(null);
+        expect((await leaveExportRoute(new NextRequest("http://localhost/api/leave/export?year=2031&format=xlsx"))).status).toBe(401);
+        expect(getLeaveReportMeta).not.toHaveBeenCalled();
+        expect(createLeaveReportXlsxResponse).not.toHaveBeenCalled();
+    });
+
     it("rejects an unknown report scope", async () => {
         const response = await leaveExportRoute(
             new NextRequest("http://localhost/api/leave/export?scope=someone-else&metaOnly=1"),

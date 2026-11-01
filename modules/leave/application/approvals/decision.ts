@@ -103,6 +103,10 @@ export async function decideLeaveRequest(
             throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.alreadyProcessed, 409);
         }
 
+        if (input.action === "APPROVE" && input.expectedSpecialReason !== undefined
+            && input.expectedSpecialReason !== leaveRequest.specialReason) {
+            throw new LeaveApprovalError("เหตุผลพิเศษมีการแก้ไข กรุณารีเฟรชและอ่านเหตุผลล่าสุดก่อนอนุมัติ", 409);
+        }
         const newStatus = input.action === "APPROVE" ? "APPROVED" : "REJECTED";
         const updateData: Prisma.LeaveRequestUpdateInput = {
             status: newStatus,
