@@ -13,6 +13,18 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("holiday reference HTTP response", () => {
+    it("accepts explicit supported years including window endpoints", async () => {
+        mocks.get.mockResolvedValue({ year: 2025, events: [] });
+        for (const year of [2025, 2027, 2029]) {
+            expect((await getHolidayReferenceResponse(new Request(`https://nhf.test/holidays?year=${year}`))).status).toBe(200);
+            expect(mocks.get).toHaveBeenLastCalledWith(year);
+        }
+    });
+    it.each(["2024", "2030", "", "abc", "2026.5", "02026", "2026&year=2027"])("rejects unsupported or malformed year %s without retrieval", async (year) => {
+        const response = await getHolidayReferenceResponse(new Request(`https://nhf.test/holidays?year=${year}`));
+        expect(response.status).toBe(400);
+        expect(mocks.get).not.toHaveBeenCalled();
+    });
     it("uses the Bangkok year and returns only normalized reference data with private no-store delivery", async () => {
         const data = { year: 2027, events: [{ date: "2027-01-01", name: "New Year", classification: "public-holiday" }] };
         mocks.get.mockResolvedValue(data);

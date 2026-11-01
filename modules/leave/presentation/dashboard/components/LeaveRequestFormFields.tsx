@@ -9,14 +9,13 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { useLeaveRequestFormModel } from "../hooks/useLeaveRequestFormModel";
 import { cn } from "@/lib/ui/utils";
 import { LeaveEvidenceUploadField } from "./LeaveEvidenceUploadField";
 import { formatLeaveDays } from "../../liff/leave-format";
-import { HolidayReferenceViewer } from "../../HolidayReferenceViewer";
+import { LeaveDateCalendar } from "../../LeaveDateCalendar";
 import type { HolidayReferenceChannel } from "../../holiday-reference-client";
 
 type LeaveRequestFormModel = ReturnType<typeof useLeaveRequestFormModel>;
@@ -26,11 +25,7 @@ export function LeaveDialogFields({ model, holidayChannel = "dashboard" }: { mod
         <div className="flex flex-col gap-5">
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
-            <LeaveDateFields model={model} />
-            {model.dateWarning ? (
-                <p role="alert" className="-mt-3 text-sm leading-6 text-status-danger-strong">{model.dateWarning}</p>
-            ) : null}
-            <HolidayReferenceViewer channel={holidayChannel} />
+            <LeaveDateCalendar model={model} channel={holidayChannel} />
             {!model.isMultiDay ? <LeavePeriodField model={model} /> : null}
             <LeaveDurationCalculation model={model} />
             <LeaveReasonField model={model} />
@@ -110,57 +105,6 @@ function getDateModeButtonClassName(isSelected: boolean): string {
         isSelected
             ? "bg-background text-primary shadow-xs"
             : "text-muted-foreground hover:text-foreground",
-    );
-}
-
-function LeaveDateFields({ model }: { model: LeaveRequestFormModel }) {
-    return (
-        <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-                control={model.form.control}
-                name="startDate"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>{model.isMultiDay ? "วันที่เริ่มต้น" : "วันที่ลา"}</FormLabel>
-                        <FormControl>
-                            <Input
-                                type="date"
-                                disabled={model.isSubmitting}
-                                {...field}
-                                onChange={(event) =>
-                                    model.handleStartDateChange(event.target.value, field.onChange)
-                                }
-                            />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-            {model.isMultiDay ? <LeaveEndDateField model={model} /> : null}
-        </div>
-    );
-}
-
-function LeaveEndDateField({ model }: { model: LeaveRequestFormModel }) {
-    return (
-        <FormField
-            control={model.form.control}
-            name="endDate"
-            render={({ field }) => (
-                <FormItem>
-                    <FormLabel>วันที่สิ้นสุด</FormLabel>
-                    <FormControl>
-                        <Input
-                            type="date"
-                            min={model.startDateValue}
-                            disabled={model.isSubmitting}
-                            {...field}
-                        />
-                    </FormControl>
-                    {model.form.formState.errors.endDate?.message !== model.dateWarning ? <FormMessage /> : null}
-                </FormItem>
-            )}
-        />
     );
 }
 

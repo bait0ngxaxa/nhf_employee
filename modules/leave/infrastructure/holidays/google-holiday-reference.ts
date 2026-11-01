@@ -8,6 +8,7 @@ import {
 } from "../../schemas/holiday-reference";
 
 const SOURCE_URL = "https://calendar.google.com/calendar/ical/en.th%23holiday%40group.v.calendar.google.com/public/basic.ics";
+const THAI_SOURCE_URL = "https://calendar.google.com/calendar/ical/th.th%23holiday%40group.v.calendar.google.com/public/basic.ics";
 const MAX_BYTES = 512 * 1024;
 const MAX_OCCURRENCES = 10000;
 
@@ -21,8 +22,8 @@ export class HolidayReferenceError extends Error {
 function classify(event: ICAL.Event): HolidayReferenceEvent["classification"] {
     // Verified Google DESCRIPTION vocabulary; CLASS:PUBLIC is visibility, not holiday type.
     const description = event.component.getFirstPropertyValue("description");
-    if (description === "Public holiday") return "public-holiday";
-    if (typeof description === "string" && description.split("\n")[0] === "Observance") return "observance";
+    if (description === "Public holiday" || description === "วันหยุดนักขัตฤกษ์") return "public-holiday";
+    if (typeof description === "string" && ["Observance", "วันสำคัญ"].includes(description.split("\n")[0])) return "observance";
     return "unverified";
 }
 
@@ -150,11 +151,11 @@ export function parseGoogleHolidayReference(ics: string, year: number): HolidayR
     }
 }
 
-export async function fetchGoogleHolidayReference(year: number): Promise<HolidayReference> {
+async function fetchSource(year: number, url: string): Promise<HolidayReference> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-        const response = await fetch(SOURCE_URL, {
+        const response = await fetch(url, {
             signal: controller.signal,
             redirect: "error",
             cache: "no-store",
@@ -196,5 +197,14 @@ export async function fetchGoogleHolidayReference(year: number): Promise<Holiday
         throw new HolidayReferenceError("network");
     } finally {
         clearTimeout(timer);
+    }
+}
+
+export async function fetchGoogleHolidayReference(year: number): Promise<HolidayReference> {
+    try {
+        return await fetchSource(year, THAI_SOURCE_URL);
+    } catch {
+        // Each source must independently satisfy all parser and coverage safeguards.
+        return fetchSource(year, SOURCE_URL);
     }
 }

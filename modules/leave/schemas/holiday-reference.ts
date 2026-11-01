@@ -2,6 +2,11 @@ import { z } from "zod";
 
 export const MAX_HOLIDAY_REFERENCE_EVENTS = 2000;
 
+// Reference availability only; this window never restricts leave eligibility.
+export function isSupportedHolidayYear(year: number, currentYear: number): boolean {
+    return Number.isInteger(year) && year >= currentYear - 2 && year <= currentYear + 2;
+}
+
 // Display-only contract. Never use these events as Leave policy inputs.
 export const holidayReferenceEventSchema = z.object({
     date: z.iso.date(),

@@ -11,6 +11,7 @@ import {
     evaluateLeaveSelection,
     type LeaveDurationBreakdown,
     isPastDate,
+    isWorkingDay,
 } from "../../../domain/utils";
 import { type LeavePeriodValue } from "../../types";
 import { isValidDateOnly, toDateOnlyString } from "../../../domain/business-date";
@@ -48,6 +49,13 @@ interface UseLeaveRequestFormModelResult {
     attachmentError: string | null;
     isMultiDay: boolean;
     startDateValue: string;
+    endDateValue: string;
+    draftDates: { start: string; end: string };
+    hasPendingDates: boolean;
+    draftDateWarning: string | null;
+    selectDraftDate: (date: string) => void;
+    confirmDraftDates: () => void;
+    discardDraftDates: () => void;
     needsEmergencyReason: boolean;
     needsSpecialReason: boolean;
     requestedDays: number;
@@ -142,6 +150,7 @@ export function useLeaveRequestFormModel({
     const [attachments, setAttachments] = useState<File[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [isMultiDay, setIsMultiDay] = useState(false);
+    const [draft, setDraft] = useState<{ start: string; end: string } | null>(null);
     const [step, setStep] = useState<LeaveRequestStep>("edit");
     const submittingRef = useRef(false);
     const idempotencyRef = useRef<{ payloadSignature: string; key: string } | null>(null);
@@ -150,7 +159,7 @@ export function useLeaveRequestFormModel({
         resolver: zodResolver(leaveRequestSchema),
         defaultValues: createDefaultLeaveRequestValues(),
     });
-    const isDirty = form.formState.isDirty || attachments.length > 0;
+    const isDirty = form.formState.isDirty || attachments.length > 0 || draft !== null;
 
     const leaveType = useWatch({
         control: form.control,
@@ -168,6 +177,32 @@ export function useLeaveRequestFormModel({
         control: form.control,
         name: "period",
     });
+
+    const draftDates = draft ?? { start: startDateValue, end: endDateValue };
+    const hasPendingDates = draft !== null && (draft.start !== startDateValue || draft.end !== endDateValue);
+    const draftSelection = evaluateLeaveSelection(draftDates.start, draftDates.end, periodValue);
+    const draftDateWarning = !draftDates.start ? "กรุณาเลือกวันที่เริ่มต้น" : !draftDates.end ? "กรุณาเลือกวันที่สิ้นสุด" : !draftSelection.valid ? draftSelection.message : null;
+    const discardDraftDates = (): void => {
+        if (isSubmitting) return;
+        setDraft(null);
+        setErrorMsg(null);
+    };
+    const selectDraftDate = (date: string): void => {
+        if (isSubmitting || !isValidDateOnly(date) || !isWorkingDay(date)) return;
+        if (!isMultiDay) setDraft({ start: date, end: date });
+        else if (!draft?.start || draft.end || date < draft.start) setDraft({ start: date, end: "" });
+        else setDraft({ start: draft.start, end: date });
+    };
+    const confirmDraftDates = (): void => {
+        if (isSubmitting || !draftSelection.valid) return;
+        const options = { shouldDirty: true, shouldTouch: true };
+        handleStartDateChange(draftDates.start, (value) => form.setValue("startDate", value, options));
+        form.setValue("endDate", draftDates.end, options);
+        setDraft(null);
+        setErrorMsg(null);
+        // Validate after both fields are committed, so old range errors cannot linger.
+        void form.trigger(["startDate", "endDate", "emergencyReason", "specialReason"]);
+    };
 
     const quota = findQuotaForDate(quotas, leaveType, startDateValue);
     const remainingQuota = quota?.remainingDays ?? null;
@@ -194,13 +229,17 @@ export function useLeaveRequestFormModel({
         : false;
 
     const switchToSingleDay = (): void => {
+        if (isSubmitting) return;
         setIsMultiDay(false);
-        form.setValue("endDate", form.getValues("startDate"));
+        setDraft(null);
+        form.setValue("endDate", form.getValues("startDate"), { shouldDirty: true, shouldTouch: true, shouldValidate: true });
     };
 
     const switchToMultiDay = (): void => {
+        if (isSubmitting) return;
         setIsMultiDay(true);
-        form.setValue("period", "FULL_DAY");
+        setDraft({ start: "", end: "" });
+        form.setValue("period", "FULL_DAY", { shouldDirty: true, shouldValidate: true });
     };
 
     const handleStartDateChange = (
@@ -243,6 +282,7 @@ export function useLeaveRequestFormModel({
     };
 
     const resetForm = (): void => {
+        setDraft(null);
         form.reset(createDefaultLeaveRequestValues());
         clearAttachments();
         setErrorMsg(null);
@@ -272,6 +312,11 @@ export function useLeaveRequestFormModel({
     };
 
     const validateSelection = (data: LeaveRequestValues): boolean => {
+        if (hasPendingDates) {
+            setStep("edit");
+            setErrorMsg("กรุณายืนยันวันที่ลา หรือยกเลิกวันที่ที่กำลังเลือกก่อนตรวจสอบคำขอ");
+            return false;
+        }
         const result = evaluateLeaveSelection(data.startDate, data.endDate, data.period);
         if (!result.valid) {
             setStep("edit");
@@ -375,6 +420,13 @@ export function useLeaveRequestFormModel({
         attachmentError,
         isMultiDay,
         startDateValue,
+        endDateValue,
+        draftDates,
+        hasPendingDates,
+        draftDateWarning,
+        selectDraftDate,
+        confirmDraftDates,
+        discardDraftDates,
         needsEmergencyReason,
         needsSpecialReason,
         requestedDays,

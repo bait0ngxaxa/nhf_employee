@@ -1,3 +1,4 @@
+import { chooseLeaveDate } from "@/__tests__/helpers/leave-calendar";
 import { useState, type ReactElement } from "react";
 import {
     act,
@@ -10,6 +11,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LeaveRequestForm } from "./LeaveRequestForm";
 import type { LeaveQuota } from "./hooks/useLeaveProfile";
 import { submitLeaveRequest } from "./api";
+
+vi.mock("@/lib/client/api-client", () => ({ apiGet: vi.fn().mockResolvedValue({ success: false }) }));
 
 vi.mock("./api", () => ({
     submitLeaveRequest: vi.fn(),
@@ -44,6 +47,8 @@ describe("LeaveRequestForm", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2031-01-06T12:00:00+07:00"));
         vi.mocked(submitLeaveRequest).mockResolvedValue(undefined);
         Object.defineProperty(URL, "createObjectURL", {
             configurable: true,
@@ -107,16 +112,14 @@ describe("LeaveRequestForm", () => {
             />,
         );
 
-        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
-            target: { value: "2031-01-06" },
-        });
+        chooseLeaveDate("2031-01-06");
 
         expect(screen.getByLabelText("เหตุผลพิเศษ")).toBeInTheDocument();
         expect(screen.getAllByText(/คำขอนี้เกินสิทธิ์ 1 วัน/).length).toBeGreaterThan(0);
     });
 
     it("uses clear backdated leave copy when the leave date is in the past", () => {
-        vi.useFakeTimers();
+        vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(new Date("2031-01-10T12:00:00.000Z"));
 
         render(
@@ -128,9 +131,7 @@ describe("LeaveRequestForm", () => {
             />,
         );
 
-        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
-            target: { value: "2031-01-08" },
-        });
+        chooseLeaveDate("2031-01-08");
 
         expect(
             screen.getByText(
@@ -160,9 +161,7 @@ describe("LeaveRequestForm", () => {
         expect(await screen.findByText("กรุณาระบุเหตุผลอย่างน้อย 5 ตัวอักษร")).toBeInTheDocument();
         expect(screen.queryByRole("region", { name: "สรุปคำขอลา" })).not.toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText("วันที่ลา"), {
-            target: { value: "2031-01-06" },
-        });
+        chooseLeaveDate("2031-01-06");
         fireEvent.change(screen.getByLabelText("เหตุผลการลา"), {
             target: { value: "พักรักษาตัวตามคำแนะนำแพทย์" },
         });
@@ -475,7 +474,7 @@ async function waitForDismissLayer(): Promise<void> {
 }
 
 async function reviewAndSubmit(): Promise<void> {
-    fireEvent.change(screen.getByLabelText("วันที่ลา"), { target: { value: "2031-01-06" } });
+    chooseLeaveDate("2031-01-06");
     fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
     fireEvent.click(await screen.findByRole("button", { name: "ยืนยันส่งคำขอลา" }));
 }

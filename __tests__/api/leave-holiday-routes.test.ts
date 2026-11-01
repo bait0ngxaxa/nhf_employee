@@ -23,25 +23,25 @@ describe.each([
     ["LIFF", liffGet, mocks.liffAuth, mocks.dashboardAuth],
 ] as const)("%s read-only holiday route", (_channel, get, auth, otherAuth) => {
     it("requires its own workforce session before reading public reference data", async () => {
-        expect((await get()).status).toBe(200);
+        expect((await get(new Request("https://nhf.test/api/leave/holidays?year=2026"))).status).toBe(200);
         expect(auth).toHaveBeenCalledOnce();
         expect(otherAuth).not.toHaveBeenCalled();
-        expect(mocks.reference).toHaveBeenCalledWith();
+        expect(mocks.reference).toHaveBeenCalledWith(expect.any(Request));
     });
     it.each([401, 403, 404])("preserves workforce rejection %i without fetching holidays", async (status) => {
         auth.mockResolvedValue({ ok: false, response: NextResponse.json({ error: "Denied" }, { status }) });
-        expect((await get()).status).toBe(status);
+        expect((await get(new Request("https://nhf.test/api/leave/holidays?year=2026"))).status).toBe(status);
         expect(mocks.reference).not.toHaveBeenCalled();
     });
     it("gates disabled Leave before authentication and retrieval", async () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
-        expect((await get()).status).toBe(404);
+        expect((await get(new Request("https://nhf.test/api/leave/holidays?year=2026"))).status).toBe(404);
         expect(auth).not.toHaveBeenCalled();
         expect(mocks.reference).not.toHaveBeenCalled();
     });
     it("fails closed and sanitizes unexpected authentication failures", async () => {
         auth.mockRejectedValue(new Error("private SQL or session details"));
-        const result = await get();
+        const result = await get(new Request("https://nhf.test/api/leave/holidays?year=2026"));
         expect(result.status).toBe(500);
         expect(await result.text()).not.toContain("private SQL");
         expect(mocks.reference).not.toHaveBeenCalled();

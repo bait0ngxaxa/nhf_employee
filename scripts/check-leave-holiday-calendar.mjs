@@ -13,12 +13,14 @@ import puppeteer from "puppeteer";
 const output = await mkdtemp(join(tmpdir(), "nhf-holiday-smoke-"));
 const screenshots = join(output, "screenshots");
 await mkdir(screenshots, { recursive: true });
-const mockClient = `export const apiGet = async () => {
+const mockClient = `export const apiGet = async (url) => {
     window.holidayFetchCount = (window.holidayFetchCount || 0) + 1;
-    return { success: true, data: { year: 2026, events: [
-        { date: "2026-01-01", name: "New Year's Day", classification: "public-holiday" },
-        { date: "2026-02-14", name: "Valentine's Day", classification: "observance" },
-        { date: "2026-02-14", name: "รายการทดสอบเพิ่มเติมในวันเดียวกัน", classification: "unverified" }
+    if (window.holidayFailure) return { success: false, error: "Unavailable" };
+    const year = Number(new URL(url, "https://nhf.test").searchParams.get("year") || 2026);
+    return { success: true, data: { year, events: [
+        { date: "2026-11-02", name: "New Year's Day", classification: "public-holiday" },
+        { date: "2026-11-07", name: "Valentine's Day", classification: "observance" },
+        { date: "2026-11-07", name: "รายการทดสอบเพิ่มเติมในวันเดียวกัน", classification: "unverified" }
     ] } };
 };
 export const apiPost = async () => { throw new Error("Mutations are forbidden in this smoke test"); };
@@ -62,60 +64,97 @@ try {
         for (const width of [320, 390, 768, 1280]) {
             const page = await browser.newPage();
             const errors = [];
-            page.on("pageerror", (error) => { errors.push(error.message); console.error(`${channel}/${width}: ${error.message}`); });
+            page.on("pageerror", (error) => errors.push(error.message));
             page.setDefaultTimeout(10000);
             await page.setViewport({ width, height: 900 });
+            await page.evaluateOnNewDocument(() => {
+                const NativeDate = Date;
+                window.Date = class extends NativeDate {
+                    constructor(...args) { super(...(args.length ? args : ["2026-11-01T12:00:00+07:00"])); }
+                    static now() { return new NativeDate("2026-11-01T12:00:00+07:00").getTime(); }
+                };
+            });
             await page.goto(`${pathToFileURL(join(output, "index.html"))}?channel=${channel}`);
-            await page.waitForSelector('input[type="date"]');
+            await page.waitForSelector('[data-calendar-month="2026-11"]');
+            const parent = channel === "liff" ? '[data-slot="sheet-content"]' : '[data-slot="dialog-content"]';
+            const day = (number) => `[data-day="2026-11-${String(number).padStart(2, "0")}"] button`;
+            const clickText = async (text) => {
+                const element = await page.waitForSelector(`button ::-p-text(${text})`);
+                await element.click();
+            };
+            const clickDay = async (number) => {
+                const element = await page.waitForSelector(day(number));
+                await element.click();
+            };
+            await page.waitForFunction(() => document.body.textContent.includes("รายการวันหยุดทั้งปี"));
+            await clickDay(2);
+            await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]');
+            const bounds = await page.$eval('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', (node) => {
+                const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+            });
+            assert.ok(bounds.left >= 0 && bounds.right <= width && bounds.top >= 0 && bounds.bottom <= 900, `${channel}/${width}: popover viewport bounds`);
+            const parentBounds = await page.$eval(parent, (node) => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; });
+            assert.ok(bounds.left >= parentBounds.left && bounds.right <= parentBounds.right && bounds.top >= parentBounds.top && bounds.bottom <= parentBounds.bottom, `${channel}/${width}: popover modal clipping bounds`);
+            await page.keyboard.press("Escape");
+            await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', { hidden: true });
+            assert.equal(await page.evaluate(() => window.parentClosed), undefined);
+            assert.ok(await page.$eval(day(2), (node) => node === document.activeElement), "Escape restores day focus");
+            await page.keyboard.press("ArrowRight");
+            assert.ok(await page.$eval(day(3), (node) => node === document.activeElement), "arrow-key navigation");
+            await page.keyboard.press("Enter");
+            await clickText("ยืนยันวันที่ลา");
+            // Tab remains inside the actual parent Dialog/Sheet.
+            for (let index = 0; index < 35; index++) {
+                await page.keyboard.press("Tab");
+                assert.ok(await page.$eval(parent, (node) => node.contains(document.activeElement)), `${channel}/${width}: focus containment`);
+            }
+            await clickText("หลายวัน");
+            await clickDay(6);
+            assert.ok(await page.$eval('button ::-p-text(ยืนยันวันที่ลา)', (node) => node.closest("button").disabled), "incomplete range");
+            await clickDay(9);
+            assert.equal(await page.$eval(day(7), (node) => node.getAttribute("aria-pressed")), "true", "weekend inside range");
+            assert.equal(await page.$eval(day(8), (node) => node.getAttribute("aria-pressed")), "true");
+            await clickText("ยืนยันวันที่ลา");
+            assert.ok(await page.evaluate(() => document.body.textContent.includes("วันทำงาน 2 วัน · ขอลา 2 วัน")));
+            await clickDay(7);
+            await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]');
+            assert.ok(await page.$eval('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', (node) => node.textContent.includes("รายการทดสอบเพิ่มเติมในวันเดียวกัน")));
+            const weekendBounds = await page.$eval('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', (node) => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; });
+            assert.ok(weekendBounds.left >= parentBounds.left && weekendBounds.right <= parentBounds.right && weekendBounds.top >= parentBounds.top && weekendBounds.bottom <= parentBounds.bottom, `${channel}/${width}: weekend details clipped by modal`);
+            await page.screenshot({ path: join(screenshots, `${channel}-${width}.png`), fullPage: true });
+            // Outside-click dismisses only the reference popover and still selects a date.
+            await clickDay(10);
+            await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', { hidden: true });
+            await clickText("ยกเลิกวันที่ที่กำลังเลือก");
             await page.$eval("textarea", (node) => {
-                const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
-                setter.call(node, "ข้อความที่ต้องคงอยู่หลังปิดปฏิทิน");
+                Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(node, "พักรักษาตัว");
                 node.dispatchEvent(new Event("input", { bubbles: true }));
             });
-            const trigger = await page.waitForSelector('button ::-p-text(ดูปฏิทินวันหยุด)');
-            await trigger.click();
-            await page.waitForSelector("table");
-            const holiday = '[role="dialog"]:has(table)';
-            const geometry = await page.$eval(holiday, (dialog) => {
-                const box = dialog.getBoundingClientRect();
-                const annual = dialog.querySelector('[aria-label="เลื่อนดูรายการทั้งปี"]');
-                return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: dialog.clientWidth, scrollWidth: dialog.scrollWidth, annualScrollable: annual.scrollHeight > annual.clientHeight };
-            });
-            assert.ok(geometry.left >= 0 && geometry.right <= width && geometry.top >= 0 && geometry.bottom <= 900, `${channel}/${width}: dialog bounds`);
+            await clickText("ตรวจสอบคำขอ");
+            await page.waitForSelector('[role="group"][aria-label="ตรวจสอบคำขอลา"]');
+            assert.ok(await page.$eval('[role="group"][aria-label="ตรวจสอบคำขอลา"]', (node) => node.textContent.includes("28 วัน")));
+            await clickText("แก้ไข");
+            assert.equal(await page.$eval("textarea", (node) => node.value), "พักรักษาตัว");
+            assert.equal(await page.$eval(day(6), (node) => node.getAttribute("aria-pressed")), "true");
+            await clickDay(2);
+            await page.click('button[aria-label="เดือนถัดไป"]');
+            await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', { hidden: true });
+            const geometry = await page.$eval(parent, (node) => ({ width: node.clientWidth, scrollWidth: node.scrollWidth }));
             assert.ok(geometry.scrollWidth <= geometry.width + 1, `${channel}/${width}: horizontal overflow`);
-            // Verify focus containment with the browser's real Tab behavior.
-            for (let i = 0; i < 38; i++) {
-                await page.keyboard.press("Tab");
-                assert.ok(await page.$eval(holiday, (dialog) => dialog.contains(document.activeElement)), `${channel}/${width}: focus escaped`);
-            }
-            // February contains all classification states and multiple events on one date.
-            for (let i = 0; i < 12; i++) {
-                const previous = await page.$(`${holiday} button[aria-label="เดือนก่อนหน้า"]`);
-                if (await previous.evaluate((node) => node.disabled)) break;
-                await previous.click();
-            }
-            await page.click(`${holiday} button[aria-label="เดือนถัดไป"]`);
-            await page.click(`${holiday} button[aria-label^="14 กุมภาพันธ์"]`);
-            await page.$eval(`${holiday} [data-slot="dialog-scroll-area"]`, (node) => { node.scrollTop = 0; });
-            await page.screenshot({ path: join(screenshots, `${channel}-${width}.png`), fullPage: true });
-            // On mobile the annual list and close action must remain reachable by scrolling.
-            await page.$eval(`${holiday} [data-slot="dialog-scroll-area"]`, (node) => { node.scrollTop = node.scrollHeight; });
-            assert.ok(await page.$eval(`${holiday} [aria-label="รายการวันหยุดทั้งปี"]`, (node) => node.getBoundingClientRect().width > 0));
-            await page.keyboard.press("Escape");
-            await page.waitForSelector("table", { hidden: true });
-            await page.waitForFunction(() => !document.querySelector('[data-slot="dialog-overlay"][data-state="closed"]'));
-            assert.equal(await page.$eval("textarea", (node) => node.value), "ข้อความที่ต้องคงอยู่หลังปิดปฏิทิน");
-            assert.ok(await page.evaluate(() => document.activeElement?.textContent.includes("ดูปฏิทินวันหยุด")));
+            // A new year creates a fresh reference request; failed data must not block selection.
+            await page.evaluate(() => { window.holidayFailure = true; });
+            await page.click('button[aria-label="เดือนถัดไป"]');
+            await page.waitForFunction(() => document.body.textContent.includes("ยังเลือกวันที่ลาได้ตามปกติ"));
+            await clickText("วันเดียว");
+            await page.click('[data-day="2027-01-04"] button');
+            await clickText("ยืนยันวันที่ลา");
+            assert.ok(await page.evaluate(() => document.body.textContent.includes("วันที่ในคำขอ: 4 มกราคม 2570")));
             assert.equal(await page.evaluate(() => window.parentClosed), undefined);
-            await page.click('button ::-p-text(ดูปฏิทินวันหยุด)');
-            await page.waitForSelector("table");
-            assert.equal(await page.evaluate(() => window.holidayFetchCount), 1);
             assert.deepEqual(errors, []);
-            await page.close();
-            cases++;
+            await page.close(); cases++;
         }
     }
-    process.stdout.write(`Holiday calendar browser checks passed: ${cases} channel/viewport cases (320, 390, 768, 1280px). Screenshots: ${screenshots}\n`);
+    process.stdout.write(`Leave date-picker Chromium checks passed: ${cases} cases (Dashboard/LIFF × 320/390/768/1280px). Screenshots: ${screenshots}\n`);
 } finally {
     await browser.close();
 }

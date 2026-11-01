@@ -12,9 +12,10 @@ export class HolidayReferenceClientError extends Error {
     }
 }
 
-export async function fetchHolidayReference(channel: HolidayReferenceChannel): Promise<HolidayReference> {
+export async function fetchHolidayReference(channel: HolidayReferenceChannel, year?: number): Promise<HolidayReference> {
+    const route = channel === "liff" ? API_ROUTES.line.leaveHolidays : API_ROUTES.leave.holidays;
     const response = await apiGet<unknown>(
-        channel === "liff" ? API_ROUTES.line.leaveHolidays : API_ROUTES.leave.holidays,
+        year === undefined ? route : `${route}?year=${year}`,
         { ...(channel === "liff" ? LIFF_API_REQUEST_OPTIONS : {}), cache: "no-store", retryCount: 0 },
     );
     if (!response.success) {

@@ -6,7 +6,7 @@ import type { HolidayReference } from "../../schemas/holiday-reference";
 // performed outside this cache in each channel's route; failures are not cached.
 const getCachedReference = unstable_cache(
     fetchGoogleHolidayReference,
-    ["leave-google-holiday-reference-v1"],
+    ["leave-google-holiday-reference-v2-th"],
     { revalidate: 86400 },
 );
 

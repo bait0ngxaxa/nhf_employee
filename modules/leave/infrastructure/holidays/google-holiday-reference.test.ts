@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchGoogleHolidayReference, parseGoogleHolidayReference } from "./google-holiday-reference";
 
 const fixture = readFileSync(new URL("./fixtures/reference.ics", import.meta.url), "utf8");
+const thaiFixture = readFileSync(new URL("./fixtures/thai-reference.ics", import.meta.url), "utf8");
 function withEvent(properties: string): string {
     return fixture.replace("END:VCALENDAR", `BEGIN:VEVENT\n${properties}\nEND:VEVENT\nEND:VCALENDAR`);
 }
@@ -12,6 +13,13 @@ function response(body = fixture, status = 200): Response {
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Google holiday reference normalization", () => {
+    it("recognizes verified Thai DESCRIPTION terminology without classifying by title", () => {
+        const thai = fixture.replaceAll("Public holiday", "วันหยุดนักขัตฤกษ์").replaceAll("Observance", "วันสำคัญ");
+        const parsed = parseGoogleHolidayReference(thai, 2026);
+        expect(parsed.events.map((event) => event.classification)).toEqual(parseGoogleHolidayReference(fixture, 2026).events.map((event) => event.classification));
+        const unknown = parseGoogleHolidayReference(withEvent("UID:thai-title\nDTSTART;VALUE=DATE:20261013\nSUMMARY:วันหยุดนักขัตฤกษ์\nDESCRIPTION:Unknown"), 2026);
+        expect(unknown.events.find((event) => event.date === "2026-10-13")?.classification).toBe("unverified");
+    });
     it("parses valid all-day dates without shifting and retains folded Thai titles and classification", () => {
         expect(parseGoogleHolidayReference(fixture, 2026)).toEqual({ year: 2026, events: [
             { date: "2026-01-01", name: "New Year's Day", classification: "public-holiday" },
@@ -187,11 +195,29 @@ describe("normalized expansion limits", () => {
 });
 
 describe("bounded external retrieval", () => {
+    it("renders source Thai titles from the verified feed through the existing parser without fallback", async () => {
+        const fetch = vi.fn().mockImplementation(() => Promise.resolve(response(thaiFixture)));
+        vi.stubGlobal("fetch", fetch);
+        const result = await fetchGoogleHolidayReference(2026);
+        expect(result.events.find((event) => event.date === "2026-04-06")).toMatchObject({ name: "วันจักรี", classification: "public-holiday" });
+        expect(result.events).toHaveLength(4);
+        expect(fetch).toHaveBeenCalledOnce();
+    });
+    it.each(["network", "incomplete"])("falls back from Thai %s to an independently validated English feed", async (reason) => {
+        const fetch = vi.fn().mockImplementationOnce(() => reason === "network"
+            ? Promise.reject(new TypeError("unavailable"))
+            : Promise.resolve(response(fixture.replaceAll("2026", "2025"))))
+            .mockImplementationOnce(() => Promise.resolve(response()));
+        vi.stubGlobal("fetch", fetch);
+        expect((await fetchGoogleHolidayReference(2026)).events).toHaveLength(6);
+        expect(fetch.mock.calls[0][0]).toContain("/th.th%23");
+        expect(fetch.mock.calls[1][0]).toContain("/en.th%23");
+    });
     it("fetches only the fixed server-controlled URL and validates the response", async () => {
         const fetch = vi.fn().mockResolvedValue(response());
         vi.stubGlobal("fetch", fetch);
         expect((await fetchGoogleHolidayReference(2026)).events).toHaveLength(6);
-        expect(fetch).toHaveBeenCalledWith("https://calendar.google.com/calendar/ical/en.th%23holiday%40group.v.calendar.google.com/public/basic.ics", expect.objectContaining({ cache: "no-store", redirect: "error", signal: expect.any(AbortSignal) }));
+        expect(fetch).toHaveBeenCalledWith("https://calendar.google.com/calendar/ical/th.th%23holiday%40group.v.calendar.google.com/public/basic.ics", expect.objectContaining({ cache: "no-store", redirect: "error", signal: expect.any(AbortSignal) }));
     });
     it("aborts external requests after eight seconds", async () => {
         vi.useFakeTimers();
@@ -199,7 +225,7 @@ describe("bounded external retrieval", () => {
             init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
         })));
         const result = expect(fetchGoogleHolidayReference(2026)).rejects.toThrow("timeout");
-        await vi.advanceTimersByTimeAsync(8000);
+        await vi.advanceTimersByTimeAsync(16000);
         await result;
     });
     it("keeps the timeout active while reading the body", async () => {
@@ -208,7 +234,7 @@ describe("bounded external retrieval", () => {
             init.signal?.addEventListener("abort", () => controller.error(new DOMException("Aborted", "AbortError")));
         } }), { headers: { "Content-Type": "text/calendar" } }))));
         const result = expect(fetchGoogleHolidayReference(2026)).rejects.toThrow("timeout");
-        await vi.advanceTimersByTimeAsync(8000);
+        await vi.advanceTimersByTimeAsync(16000);
         await result;
     });
     it("reports server and network failures separately from parsing and incomplete data", async () => {
@@ -218,7 +244,7 @@ describe("bounded external retrieval", () => {
         await expect(fetchGoogleHolidayReference(2026)).rejects.toThrow("network");
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response("broken")));
         await expect(fetchGoogleHolidayReference(2026)).rejects.toThrow("invalid-source");
-        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(fixture.replaceAll("2026", "2025"))));
+        vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(response(fixture.replaceAll("2026", "2025")))));
         await expect(fetchGoogleHolidayReference(2026)).rejects.toThrow("incomplete");
     });
     it("enforces both content type and streaming response size limits", async () => {
