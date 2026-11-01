@@ -82,6 +82,12 @@ export function parseGoogleHolidayReference(ics: string, year: number): HolidayR
         let occurrences = 0;
         const add = (start: ICAL.Time, end: ICAL.Time, event: ICAL.Event): void => {
             if (event.component.getFirstPropertyValue("status") === "CANCELLED") return;
+            // One occurrence supplies coverage only at its actual business-date start.
+            // Its duration can populate the viewer, but cannot fill other quarters.
+            const occurrenceDate = normalizeDate(start);
+            if (occurrenceDate.startsWith(`${year}-`)) {
+                coveredQuarters.add(Math.floor((Number(occurrenceDate.slice(5, 7)) - 1) / 3));
+            }
             const addDay = (time: ICAL.Time): void => {
                 // Count all processed days, even outside the year or exact duplicates.
                 if (++expandedDays > MAX_OCCURRENCES) throw new HolidayReferenceError("invalid-source");
@@ -93,7 +99,6 @@ export function parseGoogleHolidayReference(ics: string, year: number): HolidayR
                     if (normalized.size >= MAX_HOLIDAY_REFERENCE_EVENTS) throw new HolidayReferenceError("invalid-source");
                     normalized.set(key, item);
                 }
-                coveredQuarters.add(Math.floor((Number(day.slice(5, 7)) - 1) / 3));
             };
             addDay(start);
             if (start.isDate && end.isDate) {
@@ -126,11 +131,12 @@ export function parseGoogleHolidayReference(ics: string, year: number): HolidayR
             }
         }
         // The verified Google Thailand feed distributes reference dates throughout
-        // the year but provides no completeness/verified-empty metadata. Require a
-        // normalized occurrence in every quarter of the requested year as a conservative
-        // availability heuristic. Expanded all-day and recurring dates count; adjacent
-        // years do not. No particular holiday date or count is assumed. This rejects
-        // obvious gaps, not proof that every government holiday is present.
+        // the year but provides no completeness/verified-empty metadata. Require an
+        // occurrence starting in every quarter of the requested year as a conservative
+        // availability heuristic. Recurring starts count after exceptions/cancellations;
+        // dates expanded from a duration and starts in adjacent years do not. No particular
+        // holiday date or count is assumed. This only rejects obvious gaps; it does not
+        // prove that every government holiday is present.
         if (coveredQuarters.size !== 4) {
             throw new HolidayReferenceError("incomplete");
         }

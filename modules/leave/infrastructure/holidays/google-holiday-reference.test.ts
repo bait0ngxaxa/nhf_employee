@@ -101,15 +101,51 @@ describe("target-year coverage", () => {
         expect(expected.events).toHaveLength(4);
         expect(parseGoogleHolidayReference(calendar(...adjacent, ...distributed), 2026)).toEqual(expected);
     });
-    it("uses expanded all-day dates in the target year, including a boundary-crossing span", () => {
-        const data = parseGoogleHolidayReference(calendar(datedEvent("20251231", "Span", "DTEND;VALUE=DATE:20261002")), 2026);
-        expect(data.events[0]?.date).toBe("2026-01-01");
-        expect(data.events.at(-1)?.date).toBe("2026-10-01");
-        expect(data.events).toHaveLength(274);
+    it.each(["20251231", "20260101"])("does not treat expanded days of one long event starting %s as independent coverage", (start) => {
+        const span = datedEvent(start, "Span", "DTEND;VALUE=DATE:20261002");
+        expect(() => parseGoogleHolidayReference(calendar(span), 2026)).toThrow("incomplete");
+        expect(() => parseGoogleHolidayReference(calendar(...adjacent, span), 2026)).toThrow("incomplete");
+    });
+    it("does not let duplicates of a long event establish independent coverage", () => {
+        const span = datedEvent("20260101", "Span", "DTEND;VALUE=DATE:20270101");
+        expect(() => parseGoogleHolidayReference(calendar(span, span, span, span), 2026)).toThrow("incomplete");
+    });
+    it("preserves expanded all-day dates once independent occurrences establish coverage", () => {
+        const data = parseGoogleHolidayReference(calendar(...distributed, datedEvent("20251231", "Span", "DTEND;VALUE=DATE:20261002")), 2026);
+        const span = data.events.filter((event) => event.name === "Span");
+        expect(span[0]?.date).toBe("2026-01-01");
+        expect(span.at(-1)?.date).toBe("2026-10-01");
+        expect(span).toHaveLength(274);
     });
     it("uses recurring occurrences crossing into the target year for coverage", () => {
         const data = parseGoogleHolidayReference(calendar(datedEvent("20251110", "Quarterly", "RRULE:FREQ=MONTHLY;INTERVAL=3;COUNT=5")), 2026);
         expect(data.events.map((event) => event.date)).toEqual(["2026-02-10", "2026-05-10", "2026-08-10", "2026-11-10"]);
+    });
+    it("does not use the duration of recurring occurrences to fill missing quarters", () => {
+        const event = datedEvent("20251231", "Long recurring event", "DTEND;VALUE=DATE:20261002\nRRULE:FREQ=YEARLY;COUNT=2");
+        expect(() => parseGoogleHolidayReference(calendar(event), 2026)).toThrow("incomplete");
+    });
+    it("preserves multi-day recurring occurrences as independent coverage at their starts", () => {
+        const event = datedEvent("20251110", "Quarterly", "DTEND;VALUE=DATE:20251112\nRRULE:FREQ=MONTHLY;INTERVAL=3;COUNT=5");
+        expect(parseGoogleHolidayReference(calendar(event), 2026).events.map((item) => item.date)).toEqual([
+            "2026-02-10", "2026-02-11", "2026-05-10", "2026-05-11",
+            "2026-08-10", "2026-08-11", "2026-11-10", "2026-11-11",
+        ]);
+    });
+    it("does not use excluded or cancelled occurrences as coverage evidence", () => {
+        const excluded = datedEvent("20251110", "Quarterly", "RRULE:FREQ=MONTHLY;INTERVAL=3;COUNT=5\nEXDATE;VALUE=DATE:20261110");
+        expect(() => parseGoogleHolidayReference(calendar(excluded), 2026)).toThrow("incomplete");
+        const cancelled = datedEvent("20261110", "Cancelled", "STATUS:CANCELLED");
+        expect(() => parseGoogleHolidayReference(calendar(...distributed.slice(0, 3), cancelled), 2026)).toThrow("incomplete");
+    });
+    it("uses a recurrence exception's actual start instead of its original quarter", () => {
+        const master = datedEvent("20251110", "Quarterly", "RRULE:FREQ=MONTHLY;INTERVAL=3;COUNT=5");
+        const moved = datedEvent("20260820", "Quarterly", "RECURRENCE-ID;VALUE=DATE:20261110");
+        expect(() => parseGoogleHolidayReference(calendar(master, moved), 2026)).toThrow("incomplete");
+    });
+    it("normalizes occurrence starts to Bangkok dates before determining coverage", () => {
+        const utc = "UID:utc-start\nDTSTART:20251231T180000Z\nSUMMARY:Bangkok new year";
+        expect(parseGoogleHolidayReference(calendar(...distributed.slice(1), utc), 2026).events[0]?.date).toBe("2026-01-01");
     });
     it("clips an all-day span ending in the next year without including its exclusive end", () => {
         const data = parseGoogleHolidayReference(calendar(...distributed, datedEvent("20261230", "Boundary", "DTEND;VALUE=DATE:20270103")), 2026);
@@ -126,17 +162,21 @@ describe("normalized expansion limits", () => {
         expect(() => parseGoogleHolidayReference(calendar(...Array.from({ length: 28 }, () => yearSpan("Same"))), 2026)).toThrow("invalid-source");
     });
     it("accepts exactly 10,000 processed days and rejects the next duplicate day", () => {
+        // 27 * 365 + 142 span days + 3 independent quarter starts = 10,000.
         const events = [
             ...Array.from({ length: 27 }, () => yearSpan("Same")),
-            datedEvent("20260101", "Same", "DTEND;VALUE=DATE:20260526"),
+            datedEvent("20260101", "Same", "DTEND;VALUE=DATE:20260523"),
+            ...distributed.slice(1),
         ];
-        expect(parseGoogleHolidayReference(calendar(...events), 2026).events).toHaveLength(365);
+        expect(parseGoogleHolidayReference(calendar(...events), 2026).events).toHaveLength(368);
         expect(() => parseGoogleHolidayReference(calendar(...events, datedEvent("20260526", "Same")), 2026)).toThrow("invalid-source");
     });
     it("accepts exactly 2,000 unique records with exclusive DTEND and rejects the next record", () => {
+        // 5 * 365 + 172 span days + 3 independent quarter starts = 2,000.
         const events = [
             ...Array.from({ length: 5 }, (_, index) => yearSpan(`Span ${index}`)),
-            datedEvent("20260101", "Remainder", "DTEND;VALUE=DATE:20260625"),
+            datedEvent("20260101", "Remainder", "DTEND;VALUE=DATE:20260622"),
+            ...distributed.slice(1),
         ];
         expect(parseGoogleHolidayReference(calendar(...events), 2026).events).toHaveLength(2000);
         expect(() => parseGoogleHolidayReference(calendar(...events, datedEvent("20260625", "Extra")), 2026)).toThrow("invalid-source");
