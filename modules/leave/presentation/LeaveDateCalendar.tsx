@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactElement } from "react";
+import { createContext, useContext, useRef, useState, type ReactElement } from "react";
 import { DayPicker, TZDate, DayButton, type DayButtonProps } from "react-day-picker";
 import { th } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ export function LeaveDateCalendar({ model, channel }: { model: Model; channel: H
     const [month, setMonth] = useState<Date>(() => new TZDate(`${model.startDateValue}T12:00:00+07:00`, LEAVE_BUSINESS_TIME_ZONE));
     const [detail, setDetail] = useState<{ date: string; anchor: HTMLButtonElement } | null>(null);
     const [host, setHost] = useState<HTMLDivElement | null>(null);
+    const committedSummaryRef = useRef<HTMLParagraphElement>(null);
     const year = Number(toDateOnlyString(month).slice(0, 4));
     const { data, error, isLoading, mutate, supported } = useHolidayReference(channel, year);
     const events = !error ? data?.events ?? [] : [];
@@ -58,14 +59,21 @@ export function LeaveDateCalendar({ model, channel }: { model: Model; channel: H
         </div>
         <p className="text-xs leading-5 text-muted-foreground">วันนี้: ขีดใต้ · เสาร์–อาทิตย์: พื้นเทา · ขีดทึบ: วันหยุดตาม Google · วงกลมโปร่ง: วันสำคัญ · กรอบเส้นประ: ยังไม่ยืนยันประเภท</p>
         <div aria-live="polite" className="space-y-2 text-sm leading-6">
-            <p>กำลังเลือก: {formatCalendarDate(start)}{model.isMultiDay ? ` – ${formatCalendarDate(end)}` : ""}</p>
+            {model.hasPendingDates ? <p>กำลังเลือก: {formatCalendarDate(start)}{model.isMultiDay ? ` – ${formatCalendarDate(end)}` : ""}</p> : null}
             {model.draftDateWarning ? <p role="alert" className="text-status-danger-strong">{model.draftDateWarning}</p> : null}
             {model.hasPendingDates ? <p>ยังไม่ยืนยันวันที่ กรุณายืนยันหรือยกเลิกก่อนตรวจสอบคำขอ</p> : null}
-            <div className="flex flex-wrap gap-2">
-                <Button type="button" disabled={model.isSubmitting || !!model.draftDateWarning} onClick={() => { setDetail(null); model.confirmDraftDates(); }}>ยืนยันวันที่ลา</Button>
-                {model.hasPendingDates ? <Button type="button" variant="outline" disabled={model.isSubmitting} onClick={model.discardDraftDates}>ยกเลิกวันที่ที่กำลังเลือก</Button> : null}
-            </div>
-            <p className="text-muted-foreground">วันที่ในคำขอ: {formatCalendarDate(model.startDateValue)}{model.isMultiDay ? ` – ${formatCalendarDate(model.endDateValue)}` : ""}</p>
+            {model.hasPendingDates ? <div className="flex flex-wrap gap-2">
+                <Button type="button" disabled={model.isSubmitting || !!model.draftDateWarning} onClick={() => {
+                    setDetail(null);
+                    model.confirmDraftDates();
+                    committedSummaryRef.current?.focus();
+                }}>ยืนยันวันที่ลา</Button>
+                <Button type="button" variant="outline" disabled={model.isSubmitting} onClick={() => {
+                    model.discardDraftDates();
+                    committedSummaryRef.current?.focus();
+                }}>ยกเลิกวันที่ที่กำลังเลือก</Button>
+            </div> : null}
+            <p ref={committedSummaryRef} tabIndex={-1} className="rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">วันที่ในคำขอ: {formatCalendarDate(model.startDateValue)}{model.isMultiDay ? ` – ${formatCalendarDate(model.endDateValue)}` : ""}</p>
         </div>
         <p className="text-xs leading-5 text-muted-foreground">ข้อมูลจาก Google Calendar ใช้อ้างอิงเท่านั้น อาจไม่ครบถ้วน ไม่มีผลต่อการนับวันลาหรือสิทธิ์ลาของ NHF</p>
         {isLoading ? <p role="status" className="text-xs">กำลังโหลดข้อมูลวันหยุด...</p> : null}

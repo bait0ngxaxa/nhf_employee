@@ -54,6 +54,26 @@ describe.each(["dashboard", "liff"] as const)("%s primary date calendar", (chann
         expect(annual).not.toHaveAttribute("open");
     });
 
+    it.each([false, true])("hides confirmation after committing and restores it only for changed drafts (multi-day: %s)", async (multiDay) => {
+        mount();
+        await screen.findByText(/รายการวันหยุดทั้งปี/);
+        if (multiDay) fireEvent.click(screen.getByRole("button", { name: "หลายวัน" }));
+        chooseLeaveDate("2026-11-02", false);
+        if (multiDay) chooseLeaveDate("2026-11-03", false);
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันวันที่ลา" }));
+        expect(screen.queryByRole("button", { name: "ยืนยันวันที่ลา" })).toBeNull();
+        expect(screen.queryByText(/กำลังเลือก:/)).toBeNull();
+        expect(screen.getByText(/วันที่ในคำขอ:/)).toHaveTextContent("2 พฤศจิกายน 2569");
+        expect(screen.getByText(/วันที่ในคำขอ:/)).toHaveFocus();
+
+        chooseLeaveDate("2026-11-04", false);
+        expect(screen.getByRole("button", { name: "ยืนยันวันที่ลา" })).toBeInTheDocument();
+        if (multiDay) expect(screen.getByRole("button", { name: "ยืนยันวันที่ลา" })).toBeDisabled();
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิกวันที่ที่กำลังเลือก" }));
+        expect(screen.queryByRole("button", { name: "ยืนยันวันที่ลา" })).toBeNull();
+        expect(screen.getByText(/วันที่ในคำขอ:/)).toHaveTextContent("2 พฤศจิกายน 2569");
+    });
+
     it("selects holiday weekdays and shows multiple events without committing or blocking rapid range selection", async () => {
         mount(); await screen.findByText(/รายการวันหยุดทั้งปี/);
         fireEvent.click(screen.getByRole("button", { name: "หลายวัน" }));
@@ -119,7 +139,7 @@ describe.each(["dashboard", "liff"] as const)("%s primary date calendar", (chann
         chooseLeaveDate("2026-11-10", false);
         expect(screen.getByRole("button", { name: "ยืนยันวันที่ลา" })).toBeDisabled();
         fireEvent.click(screen.getByRole("button", { name: "ยกเลิกวันที่ที่กำลังเลือก" }));
-        expect(screen.getByText(/กำลังเลือก:/)).toHaveTextContent("6 พฤศจิกายน 2569 – 9 พฤศจิกายน 2569");
+        expect(screen.getByText(/วันที่ในคำขอ:/)).toHaveTextContent("6 พฤศจิกายน 2569 – 9 พฤศจิกายน 2569");
     });
 
     it("rejects cross-year drafts while allowing navigation beyond supported reference years", async () => {
