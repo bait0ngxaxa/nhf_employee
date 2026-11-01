@@ -143,3 +143,6 @@ export {
     getEmployeeLeaveActions,
 } from "./domain/action-availability";
 export { toLeaveRequestDays } from "./domain/half-days";
+
+export { getEmployeeLeaveQuotaProjection } from "./application/queries/quota-projection";
+export { parseLeaveQueryYear } from "./schemas/query-year";

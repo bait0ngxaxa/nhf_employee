@@ -28,6 +28,10 @@ export function LeaveDialogFields({ model, holidayChannel = "dashboard" }: { mod
             <LeaveDateCalendar key={model.step} model={model} channel={holidayChannel} />
             {!model.isMultiDay ? <LeavePeriodField model={model} /> : null}
             <LeaveDurationCalculation model={model} />
+            {model.quotaStatus !== "available" ? <div role="status" className="space-y-2 text-sm text-content-secondary">
+                <p>{model.quotaStatus === "loading" ? "กำลังตรวจสอบสิทธิ์ลาของปีที่เลือก..." : model.quotaStatus === "error" ? "ตรวจสอบสิทธิ์ลาไม่สำเร็จ กรุณาลองใหม่ก่อนส่งคำขอ" : "ไม่มีข้อมูลสิทธิ์ลาของปีที่เลือก ยังส่งคำขอไม่ได้"}</p>
+                {model.quotaStatus !== "loading" ? <button type="button" className="min-h-11 underline focus-visible:ring-2 focus-visible:ring-ring" onClick={model.retryQuota}>ตรวจสอบสิทธิ์ลาอีกครั้ง</button> : null}
+            </div> : null}
             <LeaveReasonField model={model} />
             {model.needsEmergencyReason ? <EmergencyReasonField model={model} /> : null}
             {model.needsSpecialReason ? <SpecialReasonField model={model} /> : null}
@@ -213,7 +217,7 @@ function SpecialReasonField({ model }: { model: LeaveRequestFormModel }) {
                         />
                     </FormControl>
                     <FormDescription>
-                        คำขอนี้เกินสิทธิ์ {formatLeaveDays(model.overQuotaDays)} วัน กรุณาระบุเหตุผลประกอบ
+                        คำขอนี้เกินสิทธิ์ {model.overQuotaDays === null ? "ยังคำนวณไม่ได้" : formatLeaveDays(model.overQuotaDays)} วัน กรุณาระบุเหตุผลประกอบ
                     </FormDescription>
                     <FormMessage />
                 </FormItem>

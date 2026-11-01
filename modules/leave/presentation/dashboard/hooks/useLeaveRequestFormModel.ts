@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -16,17 +16,12 @@ import {
 import { type LeavePeriodValue } from "../../types";
 import { isValidDateOnly, toDateOnlyString } from "../../../domain/business-date";
 
+import { fetchLeaveQuotaProjection, type LeaveQuotaSnapshot } from "../../quota-client";
+import type { HolidayReferenceChannel } from "../../holiday-reference-client";
+
 type LeaveTypeValue = LeaveRequestValues["leaveType"];
 
 export type LeaveRequestStep = "edit" | "review";
-
-interface LeaveQuotaSnapshot {
-    year: number;
-    leaveType: LeaveTypeValue;
-    effectiveTotalDays: number;
-    usedDays: number;
-    remainingDays: number;
-}
 
 interface UseLeaveRequestFormModelArgs {
     onSuccess: () => void | Promise<void>;
@@ -38,6 +33,7 @@ interface UseLeaveRequestFormModelArgs {
         idempotencyKey: string,
     ) => Promise<void>;
     canSubmit?: boolean;
+    quotaChannel?: HolidayReferenceChannel;
 }
 
 interface UseLeaveRequestFormModelResult {
@@ -59,7 +55,9 @@ interface UseLeaveRequestFormModelResult {
     needsEmergencyReason: boolean;
     needsSpecialReason: boolean;
     requestedDays: number;
-    overQuotaDays: number;
+    overQuotaDays: number | null;
+    quotaStatus: "available" | "loading" | "unavailable" | "error";
+    retryQuota: () => void;
     remainingQuota: number | null;
     projectedRemainingQuota: number | null;
     selectedLeaveType: LeaveTypeValue;
@@ -144,6 +142,7 @@ export function useLeaveRequestFormModel({
     quotas = [],
     submitRequest = submitLeaveRequest,
     canSubmit = true,
+    quotaChannel = "dashboard",
 }: UseLeaveRequestFormModelArgs): UseLeaveRequestFormModelResult {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -205,7 +204,24 @@ export function useLeaveRequestFormModel({
         void form.trigger(["startDate", "endDate", "emergencyReason", "specialReason"]);
     };
 
-    const quota = findQuotaForDate(quotas, leaveType, startDateValue);
+    const selectedYear = isValidDateOnly(startDateValue) ? Number(startDateValue.slice(0, 4)) : null;
+    const suppliedQuota = findQuotaForDate(quotas, leaveType, startDateValue);
+    const [preview, setPreview] = useState<{ year: number; quotas?: LeaveQuotaSnapshot[]; failed?: boolean } | null>(null);
+    const [quotaAttempt, setQuotaAttempt] = useState(0);
+    useEffect(() => {
+        if (selectedYear === null || suppliedQuota) return;
+        let active = true;
+        void fetchLeaveQuotaProjection(quotaChannel, selectedYear).then(
+            (result) => { if (active) setPreview({ year: selectedYear, quotas: result }); },
+            () => { if (active) setPreview({ year: selectedYear, failed: true }); },
+        );
+        return () => { active = false; };
+    }, [selectedYear, suppliedQuota, quotaChannel, quotaAttempt]);
+    const quota = suppliedQuota ?? (preview?.year === selectedYear && !preview.failed
+        ? findQuotaForDate(preview.quotas ?? [], leaveType, startDateValue) : undefined);
+    const quotaStatus = quota ? "available" : preview?.year === selectedYear && preview.failed ? "error"
+        : selectedYear === null || (preview?.year === selectedYear && preview.quotas) ? "unavailable" : "loading";
+    const retryQuota = (): void => { setPreview(null); setQuotaAttempt((value) => value + 1); };
     const remainingQuota = quota?.remainingDays ?? null;
     const selection = evaluateLeaveSelection(startDateValue, endDateValue, periodValue);
     const breakdown = selection.valid ? selection.breakdown : null;
@@ -223,8 +239,8 @@ export function useLeaveRequestFormModel({
             quota.usedDays,
             requestedDays,
         )
-        : 0;
-    const needsSpecialReason = overQuotaDays > 0;
+        : null;
+    const needsSpecialReason = overQuotaDays !== null && overQuotaDays > 0;
     const needsEmergencyReason = isValidDateString(startDateValue)
         ? isPastDate(startDateValue)
         : false;
@@ -293,7 +309,12 @@ export function useLeaveRequestFormModel({
     };
 
     const hasRequiredSpecialReason = (data: LeaveRequestValues): boolean => {
-        const submitQuota = findQuotaForDate(quotas, data.leaveType, data.startDate);
+        const submitQuota = findQuotaForDate(quotas, data.leaveType, data.startDate)
+            ?? (data.startDate === startDateValue && data.leaveType === leaveType ? quota : undefined);
+        if (!submitQuota) {
+            setErrorMsg("ยังตรวจสอบสิทธิ์ลาของปีที่เลือกไม่ได้ กรุณารอหรือลองตรวจสอบอีกครั้ง");
+            return false;
+        }
         const submitRequestedDays = getRequestedDays(data.startDate, data.endDate, data.period);
         const submitOverQuotaDays = submitQuota
             ? calculateAdditionalOverQuotaDays(
@@ -432,6 +453,8 @@ export function useLeaveRequestFormModel({
         needsSpecialReason,
         requestedDays,
         overQuotaDays,
+        quotaStatus,
+        retryQuota,
         remainingQuota,
         projectedRemainingQuota,
         selectedLeaveType: leaveType,

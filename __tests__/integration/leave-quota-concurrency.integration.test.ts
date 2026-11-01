@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getEmployeeLeaveQuotaProjection } from "@/modules/leave";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { prisma } from "@/lib/db/prisma";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
@@ -222,6 +223,17 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
     afterAll(async () => {
         await cleanFixture();
         await prisma.$disconnect();
+    });
+
+    it("concurrent quota reads do not initialize rows and retain signed carry", async () => {
+        await prisma.leaveQuota.create({ data: {
+            employeeId: fixture.employeeId, year: 2029, leaveType: "PERSONAL",
+            totalHalfDays: 20, usedHalfDays: 25, carryBalanceHalfDays: 0,
+        } });
+        const before = await prisma.leaveQuota.findMany({ where: { employeeId: fixture.employeeId } });
+        const projections = await Promise.all(Array.from({ length: 5 }, () => getEmployeeLeaveQuotaProjection(fixture.employeeId, 2031)));
+        expect(projections[0].find((quota) => quota.leaveType === "PERSONAL")).toMatchObject({ carryBalanceDays: 7.5, remainingDays: 17.5 });
+        expect(await prisma.leaveQuota.findMany({ where: { employeeId: fixture.employeeId } })).toEqual(before);
     });
 
     it("creates one quota for concurrent non-overlapping requests with different keys", async () => {

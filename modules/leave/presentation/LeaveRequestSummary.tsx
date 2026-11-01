@@ -11,7 +11,7 @@ export interface LeaveRequestSummaryProps {
     requestedDays: number;
     remainingQuota: number | null;
     projectedRemainingQuota: number | null;
-    overQuotaDays: number;
+    overQuotaDays: number | null;
     isDateRangeValid: boolean;
 }
 
@@ -97,7 +97,7 @@ export function LeaveRequestSummary({
                     isWarning={projectedRemainingQuota !== null && projectedRemainingQuota < 0}
                 />
             </dl>
-            {overQuotaDays > 0 ? (
+            {overQuotaDays !== null && overQuotaDays > 0 ? (
                 <div
                     className="rounded-lg border border-status-warning-border bg-status-warning-surface px-3 py-2.5 text-sm leading-6 text-status-warning-foreground"
                     role="status"

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
-import { runSerializableTransaction } from "@/lib/db/transaction";
+import { getEmployeeLeaveQuotaProjection } from "./quota-projection";
 import {
     leaveAttachmentSummaryOrderBy,
     leaveAttachmentSummarySelect,
@@ -14,8 +14,7 @@ import {
     type LeaveHistoryFilters,
     type LeaveHistoryMetadata,
 } from "@/modules/leave/application/queries/history-filters";
-import { toLeaveQuotaDays, toLeaveRequestDays } from "@/modules/leave/domain/half-days";
-import { ensureLeaveQuotasForYear } from "@/modules/leave/domain/quota-entitlement";
+import { type toLeaveQuotaDays, toLeaveRequestDays } from "@/modules/leave/domain/half-days";
 import { getCurrentLeaveYear } from "@/modules/leave/domain/quota-year";
 
 const EMPLOYEE_LEAVE_HISTORY_INCLUDE = {
@@ -65,9 +64,7 @@ export async function getEmployeeLeaveProfile(
         ...employeeHistoryScopeWhere,
         ...(historyFilterWhere ?? {}),
     };
-    const quotas = await runSerializableTransaction((tx) =>
-        ensureLeaveQuotasForYear(tx, input.employeeId, getCurrentLeaveYear()),
-    );
+    const quotas = await getEmployeeLeaveQuotaProjection(input.employeeId, getCurrentLeaveYear());
     const skip = (input.page - 1) * input.limit;
     const [history, totalCount, availableYearRange] = await Promise.all([
         prisma.leaveRequest.findMany({
@@ -86,7 +83,7 @@ export async function getEmployeeLeaveProfile(
     ]);
 
     return {
-        quotas: quotas.map(toLeaveQuotaDays),
+        quotas,
         history: history.map((request) =>
             toLeaveRequestDays(
                 withLeaveAttachmentSummaries(request, input.buildAttachmentUrl),

@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { requireLiffWorkforceSession } from "@/modules/line";
 import {
     assertLeaveCapability,
+    assertLeaveCapabilityScope,
+    getEmployeeLeaveQuotaProjection,
+    parseLeaveQueryYear,
     buildLeaveAuthorizationContext,
     getEmployeeLeaveActions,
     getEmployeeLeaveProfile,
@@ -25,6 +28,17 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     try {
         const url = new URL(request.url);
+        if (url.searchParams.has("quotaYear")) {
+            const year = parseLeaveQueryYear(url.searchParams, "quotaYear");
+            if (year === null) return jsonError("ปีที่ต้องการตรวจสอบสิทธิ์ลาไม่ถูกต้อง", 400);
+            assertLeaveCapabilityScope(await assertLeaveCapability(
+                buildLeaveAuthorizationContext(auth.user, auth.employeeId, "LIFF_SELF_SERVICE"),
+                "leave.request.read",
+            ), "OWN");
+            const quotas = await getEmployeeLeaveQuotaProjection(auth.employeeId, year);
+            return NextResponse.json({ quotas: quotas.map(toLiffLeaveQuota) }, { headers: { "Cache-Control": "private, no-store" } });
+        }
+
         const rawPage = url.searchParams.get("page") ?? "1";
         if (!/^\d+$/.test(rawPage)) {
             return jsonError("หมายเลขหน้าต้องเป็นจำนวนเต็มที่มากกว่าหรือเท่ากับ 1", 400);

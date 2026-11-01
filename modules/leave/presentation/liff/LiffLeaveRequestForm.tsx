@@ -43,6 +43,7 @@ export function LiffLeaveRequestForm({
 }: LiffLeaveRequestFormProps): ReactElement {
     const model = useLeaveRequestFormModel({
         quotas,
+        quotaChannel: "liff",
         submitRequest: submitLiffLeaveRequest,
         canSubmit: canCreateRequests,
         onSuccess: async () => {

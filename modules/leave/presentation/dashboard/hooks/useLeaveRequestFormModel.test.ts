@@ -1,10 +1,15 @@
 import { renderHook, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
-import { useLeaveRequestFormModel } from "./useLeaveRequestFormModel";
+import { useLeaveRequestFormModel as useActualLeaveRequestFormModel } from "./useLeaveRequestFormModel";
 import { submitLeaveRequest } from "../api";
 import { LiffApiError } from "@/modules/line/client";
 import { LEAVE_ATTACHMENT_MAX_BYTES, LEAVE_ATTACHMENT_MAX_FILES } from "../../../infrastructure/attachments/constants";
+
+// Submission tests supply known entitlement; unknown entitlement has separate blocking tests.
+const defaultQuotas = [2030, 2031].flatMap((year) => (["SICK", "PERSONAL", "VACATION"] as const).map((leaveType) => ({ year, leaveType, effectiveTotalDays: 30, usedDays: 0, remainingDays: 30 })));
+const useLeaveRequestFormModel = (args: Parameters<typeof useActualLeaveRequestFormModel>[0]) => useActualLeaveRequestFormModel({ quotas: defaultQuotas, ...args });
+vi.mock("../../quota-client", () => ({ fetchLeaveQuotaProjection: vi.fn(() => new Promise(() => undefined)) }));
 
 vi.mock("../api", () => ({
     submitLeaveRequest: vi.fn(),
@@ -230,7 +235,7 @@ describe("useLeaveRequestFormModel", () => {
         });
         expect(result.current.remainingQuota).toBeNull();
         expect(result.current.projectedRemainingQuota).toBeNull();
-        expect(result.current.overQuotaDays).toBe(0);
+        expect(result.current.overQuotaDays).toBeNull();
     });
 
     it("requires a special reason when the year starts over quota", () => {
@@ -275,7 +280,7 @@ describe("useLeaveRequestFormModel", () => {
 
         expect(result.current.remainingQuota).toBeNull();
         expect(result.current.projectedRemainingQuota).toBeNull();
-        expect(result.current.overQuotaDays).toBe(0);
+        expect(result.current.overQuotaDays).toBeNull();
         expect(result.current.needsSpecialReason).toBe(false);
     });
 

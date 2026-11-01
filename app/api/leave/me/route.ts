@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
     assertLeaveCapability,
+    assertLeaveCapabilityScope,
+    getEmployeeLeaveQuotaProjection,
+    parseLeaveQueryYear,
     buildLeaveAuthorizationContext,
     getEmployeeLeaveProfile,
     LeaveCapabilityDeniedError,
@@ -28,6 +31,17 @@ export async function GET(req: Request): Promise<NextResponse> {
         const { employeeId } = auth;
 
         const url = new URL(req.url);
+        if (url.searchParams.has("quotaYear")) {
+            const year = parseLeaveQueryYear(url.searchParams, "quotaYear");
+            if (year === null) return jsonError("ปีที่ต้องการตรวจสอบสิทธิ์ลาไม่ถูกต้อง", 400);
+            assertLeaveCapabilityScope(await assertLeaveCapability(
+                buildLeaveAuthorizationContext(auth.user, auth.employeeId, "DASHBOARD"),
+                "leave.request.read",
+            ), "OWN");
+            const quotas = await getEmployeeLeaveQuotaProjection(auth.employeeId, year);
+            return NextResponse.json({ quotas }, { headers: { "Cache-Control": "private, no-store" } });
+        }
+
         const page = Number.parseInt(url.searchParams.get("page") || "1", 10);
         const limit = Number.parseInt(url.searchParams.get("limit") || "10", 10);
 

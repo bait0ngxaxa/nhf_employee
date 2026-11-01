@@ -127,84 +127,26 @@ describe("GET /api/leave/me", () => {
         vi.clearAllMocks();
     });
 
-    it("creates new-year quotas using Thailand business year", async () => {
-        const response = await getLeaveProfile(
+    it("projects new-year quotas without writing using Thailand business year", async () => {
+        const responses = await Promise.all(Array.from({ length: 3 }, () => getLeaveProfile(
             new Request("http://localhost/api/leave/me?page=1&limit=10"),
-        );
-
-        expect(response.status).toBe(200);
-        expect(prisma.leaveQuota.upsert).toHaveBeenCalledTimes(3);
-        for (const leaveType of ["SICK", "PERSONAL", "VACATION"] as const) {
-            expect(prisma.leaveQuota.upsert).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    where: {
-                        employeeId_year_leaveType: {
-                            employeeId: 100,
-                            year: 2027,
-                            leaveType,
-                        },
-                    },
-                    create: expect.objectContaining({
-                        year: 2027,
-                        leaveType,
-                        carryBalanceHalfDays: 0,
-                        usedHalfDays: 0,
-                    }),
-                }),
-            );
+        )));
+        for (const response of responses) {
+            expect(response.status).toBe(200);
+            const body = await response.json();
+            expect(body.quotas.map((quota: { year: number }) => quota.year)).toEqual([2027, 2027, 2027]);
         }
+        expect(prisma.leaveQuota.upsert).not.toHaveBeenCalled();
+        expect(prisma.leaveQuota.update).not.toHaveBeenCalled();
     });
 
     it("returns signed carry, effective entitlement, and remaining balance", async () => {
-        vi.mocked(prisma.leaveQuota.findFirst)
-            .mockReset()
-            .mockResolvedValueOnce({
-                id: "personal-2026",
-                employeeId: 100,
-                year: 2026,
-                leaveType: "PERSONAL",
-                totalHalfDays: 20,
-                carryBalanceHalfDays: 0,
-                usedHalfDays: 6,
-            })
-            .mockResolvedValueOnce({
-                id: "vacation-2026",
-                employeeId: 100,
-                year: 2026,
-                leaveType: "VACATION",
-                totalHalfDays: 12,
-                carryBalanceHalfDays: 0,
-                usedHalfDays: 16,
-            });
-        vi.mocked(prisma.leaveQuota.upsert)
-            .mockReset()
-            .mockResolvedValueOnce({
-                id: "sick-2027",
-                employeeId: 100,
-                year: 2027,
-                leaveType: "SICK",
-                totalHalfDays: 60,
-                carryBalanceHalfDays: 0,
-                usedHalfDays: 0,
-            })
-            .mockResolvedValueOnce({
-                id: "personal-2027",
-                employeeId: 100,
-                year: 2027,
-                leaveType: "PERSONAL",
-                totalHalfDays: 20,
-                carryBalanceHalfDays: 14,
-                usedHalfDays: 10,
-            })
-            .mockResolvedValueOnce({
-                id: "vacation-2027",
-                employeeId: 100,
-                year: 2027,
-                leaveType: "VACATION",
-                totalHalfDays: 12,
-                carryBalanceHalfDays: -4,
-                usedHalfDays: 2,
-            });
+        vi.mocked(prisma.leaveQuota.findMany).mockResolvedValue([
+            { id: "p26", employeeId: 100, year: 2026, leaveType: "PERSONAL", totalHalfDays: 20, carryBalanceHalfDays: 0, usedHalfDays: 6 },
+            { id: "v26", employeeId: 100, year: 2026, leaveType: "VACATION", totalHalfDays: 12, carryBalanceHalfDays: 0, usedHalfDays: 16 },
+            { id: "p27", employeeId: 100, year: 2027, leaveType: "PERSONAL", totalHalfDays: 20, carryBalanceHalfDays: 14, usedHalfDays: 10 },
+            { id: "v27", employeeId: 100, year: 2027, leaveType: "VACATION", totalHalfDays: 12, carryBalanceHalfDays: -4, usedHalfDays: 2 },
+        ]);
 
         const response = await getLeaveProfile(
             new Request("http://localhost/api/leave/me?page=1&limit=10"),
