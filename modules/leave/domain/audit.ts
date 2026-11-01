@@ -36,6 +36,22 @@ export interface LeaveMutationAuditDetails extends AuditDetails {
     };
 }
 
+/**
+ * Special-reason amendments are personal explanations visible only through
+ * Leave ownership/approver boundaries. The generic audit trail records that a
+ * change happened, never the explanation text itself.
+ */
+export type LeaveSpecialReasonChangeType = "ADDED" | "UPDATED";
+
+export interface LeaveSpecialReasonAuditDetails extends AuditDetails {
+    before: { status: "PENDING"; hasSpecialReason: boolean; specialReason?: never };
+    after: { status: "PENDING"; hasSpecialReason: true; specialReason?: never };
+    metadata: LeaveAuditContext & {
+        changedField: "specialReason";
+        changeType: LeaveSpecialReasonChangeType;
+    };
+}
+
 export interface EmployeeApproverAuditDetails extends AuditDetails {
     before: {
         managerId: number | null;
@@ -57,7 +73,7 @@ export interface EmployeeApproverAuditDetails extends AuditDetails {
 
 interface LeaveAuditDetailsByAction {
     LEAVE_REQUEST_CREATE: LeaveCreateAuditDetails;
-    LEAVE_REQUEST_SPECIAL_REASON_UPDATE: LeaveMutationAuditDetails;
+    LEAVE_REQUEST_SPECIAL_REASON_UPDATE: LeaveSpecialReasonAuditDetails;
     LEAVE_REQUEST_APPROVE: LeaveMutationAuditDetails;
     LEAVE_REQUEST_REJECT: LeaveMutationAuditDetails;
     LEAVE_REQUEST_CANCEL: LeaveMutationAuditDetails;

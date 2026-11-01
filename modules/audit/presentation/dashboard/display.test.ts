@@ -380,4 +380,67 @@ describe("formatAuditLogDisplay", () => {
         expect(result.summary).not.toContain("new-secret");
         expect(result.changedFields).toEqual([]);
     });
+
+    describe("leave special-reason amendments", () => {
+        const CANARY = "CANARY-SPECIAL-REASON-ข้อมูลส่วนตัว";
+        const leaveContext = {
+            leaveRequestId: "leave-1",
+            leaveType: "PERSONAL",
+            period: "FULL_DAY",
+            startDate: "2031-01-06T00:00:00.000Z",
+            endDate: "2031-01-06T00:00:00.000Z",
+            durationDays: 1,
+        };
+
+        it("shows a change marker for the minimized payload", () => {
+            const result = formatAuditLogDisplay({
+                action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE",
+                entityType: "LeaveRequest",
+                entityId: null,
+                details: {
+                    before: { status: "PENDING", hasSpecialReason: true },
+                    after: { status: "PENDING", hasSpecialReason: true },
+                    metadata: { ...leaveContext, changedField: "specialReason", changeType: "UPDATED" },
+                },
+            });
+
+            expect(result.summary).toContain("แก้ไขเหตุผลพิเศษคำขอลากิจ");
+            expect(result.changedFields).toEqual(["เหตุผลพิเศษได้รับการแก้ไข"]);
+        });
+
+        it("distinguishes an initial addition", () => {
+            const result = formatAuditLogDisplay({
+                action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE",
+                entityType: "LeaveRequest",
+                entityId: null,
+                details: {
+                    before: { status: "PENDING", hasSpecialReason: false },
+                    after: { status: "PENDING", hasSpecialReason: true },
+                    metadata: { ...leaveContext, changedField: "specialReason", changeType: "ADDED" },
+                },
+            });
+
+            expect(result.changedFields).toEqual(["เหตุผลพิเศษได้รับการเพิ่ม"]);
+        });
+
+        it.each([
+            ["with leave context", leaveContext],
+            ["without leave context", {}],
+        ])("never renders raw legacy reason text %s", (_label, metadata) => {
+            const result = formatAuditLogDisplay({
+                action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE",
+                entityType: "LeaveRequest",
+                entityId: null,
+                details: {
+                    before: { status: "PENDING", specialReason: `${CANARY}-old` },
+                    after: { status: "PENDING", specialReason: CANARY, reason: CANARY },
+                    metadata: { ...metadata, reason: CANARY },
+                },
+            });
+
+            expect(JSON.stringify(result)).not.toContain("CANARY");
+            expect(result.summary).toContain("แก้ไขเหตุผลพิเศษ");
+            expect(result.changedFields).toEqual(["เหตุผลพิเศษได้รับการแก้ไข"]);
+        });
+    });
 });

@@ -13,6 +13,10 @@ import type {
     AuditLogWithUser,
     PaginatedAuditLogsResult,
 } from "./contracts";
+import {
+    projectAuditDetails,
+    projectSerializedAuditDetails,
+} from "./details-projection";
 
 function buildWhereClause(
     filters: AuditLogFilters,
@@ -113,7 +117,10 @@ export const getAuditLogs = cache(
 
         const logsWithParsedDetails: AuditLogWithUser[] = auditLogs.map((log) => ({
             ...log,
-            details: parseAuditLogDetails(log.details),
+            details: projectAuditDetails(
+                log.action,
+                parseAuditLogDetails(log.details),
+            ),
         }));
 
         return {
@@ -132,14 +139,20 @@ export const getAuditLogs = cache(
  * Read raw audit history for a feature-owned entity response.
  *
  * This intentionally has no user projection, pagination semantics, or JSON
- * parsing; the producing feature owns how the rows are presented.
+ * parsing; the producing feature owns how the rows are presented. Only the
+ * action-aware privacy projection is applied, so protected actions never
+ * surface raw sensitive details through any generic reader.
  */
-export function getAuditEntityHistory(
+export async function getAuditEntityHistory(
     query: AuditEntityHistoryQuery,
 ): Promise<AuditEntityHistoryRow[]> {
-    return findAuditEntityHistory(
+    const rows = await findAuditEntityHistory(
         query.entityType,
         query.entityId,
         query.limit,
     );
+    return rows.map((row) => ({
+        ...row,
+        details: projectSerializedAuditDetails(row.action, row.details),
+    }));
 }

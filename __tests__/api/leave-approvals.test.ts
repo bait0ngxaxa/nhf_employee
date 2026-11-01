@@ -150,6 +150,29 @@ describe("GET /api/leave/approvals", () => {
         } as never);
     });
 
+    it("shows the actual special reason to the assigned approver only", async () => {
+        const specialReason = "ต้องดูแลบิดาที่โรงพยาบาลเป็นกรณีพิเศษ";
+        vi.mocked(prisma.leaveRequest.findMany)
+            .mockReset()
+            .mockResolvedValueOnce([{ ...createLeaveRequest("pending-1", "PENDING"), specialReason, overQuotaHalfDays: 2 }] as never)
+            .mockResolvedValue([] as never);
+
+        const response = await getLeaveApprovals(new Request("http://localhost/api/leave/approvals"));
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.pending[0].specialReason).toBe(specialReason);
+        expect(vi.mocked(prisma.leaveRequest.findMany).mock.calls[0]?.[0]?.where).toEqual(
+            expect.objectContaining({
+                employeeId: { not: 200 },
+                OR: [
+                    { exceptionApproverId: 200 },
+                    { exceptionApproverId: null, approverId: 200 },
+                ],
+            }),
+        );
+    });
+
     it("returns attachment summaries in every approval list without changing pagination", async () => {
         const response = await getLeaveApprovals(
             new Request(

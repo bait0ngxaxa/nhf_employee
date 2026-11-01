@@ -3,10 +3,30 @@ import { runSerializableTransaction } from "@/lib/db/transaction";
 import { assertLeaveCapabilityScope, resolveLeaveCapabilityInTransaction, type LeaveAuthorizationContext } from "../authorization";
 import { createLeaveAuditInTransaction, lockLeaveRequestRow } from "../../infrastructure/persistence/transaction";
 import { buildLeaveAuditContext } from "../notifications/audit-details";
+import { defineLeaveAuditDetails, type LeaveAuditDetailsFor } from "../../domain/audit";
 import { leaveSpecialReasonAmendmentSchema, type LeaveSpecialReasonAmendment } from "../../schemas/leave";
 
 export class LeaveAmendmentError extends Error {
     constructor(message: string, public readonly statusCode: number) { super(message); }
+}
+
+/**
+ * Data-minimized audit record: the generic audit trail is readable outside the
+ * Leave OWN/ASSIGNED boundary, so it records only that the reason changed.
+ */
+function buildSpecialReasonAmendmentAuditDetails(
+    request: LeaveRequest,
+): LeaveAuditDetailsFor<"LEAVE_REQUEST_SPECIAL_REASON_UPDATE"> {
+    const hadSpecialReason = Boolean(request.specialReason);
+    return defineLeaveAuditDetails("LEAVE_REQUEST_SPECIAL_REASON_UPDATE", {
+        before: { status: "PENDING", hasSpecialReason: hadSpecialReason },
+        after: { status: "PENDING", hasSpecialReason: true },
+        metadata: {
+            ...buildLeaveAuditContext(request),
+            changedField: "specialReason",
+            changeType: hadSpecialReason ? "UPDATED" : "ADDED",
+        },
+    });
 }
 
 export async function amendPendingLeaveSpecialReason(
@@ -33,11 +53,10 @@ export async function amendPendingLeaveSpecialReason(
             data: { specialReason: data.specialReason },
         });
         if (claimed.count !== 1) throw new LeaveAmendmentError("คำขอมีการเปลี่ยนแปลง กรุณารีเฟรชรายการ", 409);
-        await createLeaveAuditInTransaction(tx, "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", request.id, userId, actor.userEmail, {
-            before: { status: "PENDING", specialReason: request.specialReason },
-            after: { status: "PENDING", specialReason: data.specialReason },
-            metadata: buildLeaveAuditContext(request),
-        });
+        await createLeaveAuditInTransaction(
+            tx, "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", request.id, userId, actor.userEmail,
+            buildSpecialReasonAmendmentAuditDetails(request),
+        );
         return { request: { ...request, specialReason: data.specialReason }, changed: true };
     });
 }

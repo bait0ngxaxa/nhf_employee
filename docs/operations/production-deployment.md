@@ -368,6 +368,9 @@ npx prisma migrate deploy
 
 ต้อง backup database ตาม deployment policy ก่อน migration ห้ามใช้ `prisma migrate dev`, `prisma db push` หรือ destructive manual SQL เป็นขั้นตอนปกติของ production rollback
 
+Audit record เก่าของ `LEAVE_REQUEST_SPECIAL_REASON_UPDATE` ที่เคยเก็บข้อความเหตุผลพิเศษดิบ ถูกป้องกันที่ API แล้ว
+การแก้ข้อมูลใน database เป็นงานแยกที่ต้องได้รับอนุมัติก่อน ดู [Leave special-reason audit remediation](./leave-special-reason-audit-remediation.md)
+
 Application rollback หลัง forward migration ต้องใช้ application version ที่รองรับ schema ปัจจุบัน หากมี attachment schema อยู่ ให้เก็บ schema และไฟล์ไว้ แล้ว deploy forward fix ที่ทดสอบแล้วแทนการ drop/ย้อน migration แบบฉุกละหุก
 
 ## 7. Routine scheduler และ notification outbox

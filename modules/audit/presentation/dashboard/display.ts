@@ -555,7 +555,10 @@ function formatLeaveAction(
     metadata: Record<string, unknown>,
 ): string {
     const context = getLeaveContext(metadata);
-    const reason = getLeaveReason(after, metadata);
+    // Special-reason text is personal; never derive summary text from it.
+    const reason = action === "LEAVE_REQUEST_SPECIAL_REASON_UPDATE"
+        ? null
+        : getLeaveReason(after, metadata);
     if (!context) {
         return reason
             ? `${getAuditActionLabel(action)}: ${truncateText(reason)}`
@@ -776,6 +779,12 @@ function getActionChangedFields(
         return input.entityType === "StockVariant"
             ? getChangedFields(before, after, STOCK_VARIANT_CHANGE_FIELDS)
             : getStockItemChangedFields(before, after);
+    }
+    if (input.action === "LEAVE_REQUEST_SPECIAL_REASON_UPDATE") {
+        // A fixed marker instead of a generic diff, which would print values.
+        return getText(metadata, "changeType") === "ADDED"
+            ? ["เหตุผลพิเศษได้รับการเพิ่ม"]
+            : ["เหตุผลพิเศษได้รับการแก้ไข"];
     }
     if (input.action === "ROUTINE_TASK_UPDATE") {
         const changedFields = getChangedFields(

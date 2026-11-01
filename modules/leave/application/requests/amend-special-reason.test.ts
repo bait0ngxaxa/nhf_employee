@@ -32,8 +32,39 @@ describe.each(["DASHBOARD", "LIFF_SELF_SERVICE"] as const)("%s pending amendment
         expect(assertLeaveCapabilityScope).toHaveBeenCalledWith(expect.anything(), "OWN");
         expect(lockLeaveRequestRow).toHaveBeenCalledWith(tx, request.id);
         expect(tx.leaveRequest.updateMany).toHaveBeenCalledWith({ where: { id: request.id, employeeId: 1, status: "PENDING", specialReason: null }, data: { specialReason: input.specialReason } });
-        expect(createLeaveAuditInTransaction).toHaveBeenCalledWith(tx, "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", request.id, 10, actor.userEmail, expect.objectContaining({ before: { status: "PENDING", specialReason: null }, after: { status: "PENDING", specialReason: input.specialReason } }));
+        expect(createLeaveAuditInTransaction).toHaveBeenCalledTimes(1);
+        expect(createLeaveAuditInTransaction).toHaveBeenCalledWith(tx, "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", request.id, 10, actor.userEmail, {
+            before: { status: "PENDING", hasSpecialReason: false },
+            after: { status: "PENDING", hasSpecialReason: true },
+            metadata: expect.objectContaining({ leaveRequestId: request.id, employeeId: 1, changedField: "specialReason", changeType: "ADDED" }),
+        });
+        expect(JSON.stringify(vi.mocked(createLeaveAuditInTransaction).mock.calls)).not.toContain(input.specialReason);
         expect(tx.leaveQuota.update).not.toHaveBeenCalled();
+    });
+
+    it("audits a subsequent update without storing either explanation", async () => {
+        const previous = "PRIVATE-PREVIOUS-REASON-ห้ามรั่ว";
+        const next = "PRIVATE-NEXT-REASON-ห้ามรั่วเช่นกัน";
+        tx.leaveRequest.findUnique.mockResolvedValue({ ...request, specialReason: previous });
+        await expect(amendPendingLeaveSpecialReason(actor, { leaveId: request.id, specialReason: next, expectedSpecialReason: previous }))
+            .resolves.toMatchObject({ changed: true, request: { specialReason: next } });
+        expect(tx.leaveRequest.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { specialReason: next } }));
+        expect(createLeaveAuditInTransaction).toHaveBeenCalledTimes(1);
+        expect(createLeaveAuditInTransaction).toHaveBeenCalledWith(tx, "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", request.id, 10, actor.userEmail, {
+            before: { status: "PENDING", hasSpecialReason: true },
+            after: { status: "PENDING", hasSpecialReason: true },
+            metadata: expect.objectContaining({ changedField: "specialReason", changeType: "UPDATED" }),
+        });
+        const serialized = JSON.stringify(vi.mocked(createLeaveAuditInTransaction).mock.calls);
+        expect(serialized).not.toContain(previous);
+        expect(serialized).not.toContain(next);
+        expect(serialized).not.toContain("PRIVATE");
+    });
+
+    it("propagates an audit write failure so the transaction rolls back", async () => {
+        vi.mocked(createLeaveAuditInTransaction).mockRejectedValueOnce(new Error("audit unavailable"));
+        await expect(amendPendingLeaveSpecialReason(actor, input)).rejects.toThrow("audit unavailable");
+        expect(runSerializableTransaction).toHaveBeenCalledTimes(1);
     });
 
     it("rejects another owner", async () => {

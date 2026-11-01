@@ -294,6 +294,12 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
         const audits = await prisma.auditLog.findMany({ where: { action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", details: { contains: ids[1] } } });
         expect(audits).toHaveLength(1);
         expect(audits[0].userId).toBe(fixture.employeeUserId);
+        expect(audits[0].details).not.toContain(amendment.specialReason);
+        expect(JSON.parse(audits[0].details ?? "null")).toMatchObject({
+            before: { status: "PENDING", hasSpecialReason: false },
+            after: { status: "PENDING", hasSpecialReason: true },
+            metadata: { leaveRequestId: ids[1], changedField: "specialReason", changeType: "ADDED" },
+        });
         await expect(decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE", expectedSpecialReason: null })).rejects.toMatchObject({ statusCode: 409 });
         await decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE", expectedSpecialReason: amendment.specialReason });
         expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(22);

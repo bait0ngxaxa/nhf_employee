@@ -194,4 +194,56 @@ describe("Audit Log Queries", () => {
             });
         });
     });
+
+    describe("sensitive leave special-reason records", () => {
+        const CANARY = "CANARY-QUERY-เหตุผลพิเศษส่วนตัว";
+        const legacyDetails = JSON.stringify({
+            before: { status: "PENDING", specialReason: null },
+            after: { status: "PENDING", specialReason: CANARY },
+            metadata: { leaveRequestId: "cm0leave0002", leaveType: "VACATION", reason: CANARY },
+        });
+
+        it("never returns raw legacy reason text from the paginated audit view", async () => {
+            const unrelated = {
+                id: 2,
+                action: "LEAVE_REQUEST_REJECT",
+                details: JSON.stringify({ after: { status: "REJECTED", reason: "เอกสารไม่ครบ" } }),
+            };
+            prismaMock.auditLog.count.mockResolvedValue(3);
+            prismaMock.auditLog.findMany.mockResolvedValue([
+                { id: 1, action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", userId: 8, userEmail: "requester@thainhf.org", details: legacyDetails },
+                unrelated,
+                { id: 3, action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", details: `{"after":"${CANARY}"` },
+            ] as never);
+
+            const result = await getAuditLogs({ page: 1, limit: 10 });
+
+            expect(JSON.stringify(result)).not.toContain("CANARY");
+            expect(result.auditLogs[0]).toMatchObject({
+                id: 1,
+                action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE",
+                userId: 8,
+                userEmail: "requester@thainhf.org",
+                details: {
+                    before: { status: "PENDING", hasSpecialReason: false },
+                    after: { status: "PENDING", hasSpecialReason: true },
+                    metadata: { leaveRequestId: "cm0leave0002", leaveType: "VACATION", changeType: "ADDED" },
+                },
+            });
+            expect(result.auditLogs[1].details).toEqual({ after: { status: "REJECTED", reason: "เอกสารไม่ครบ" } });
+            expect(result.auditLogs[2].details).toBeNull();
+            expect(result.pagination.total).toBe(3);
+        });
+
+        it("projects protected rows returned to feature-owned history readers", async () => {
+            prismaMock.auditLog.findMany.mockResolvedValue([
+                { id: 9, action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", userId: 8, userEmail: null, details: legacyDetails, createdAt: new Date() },
+            ] as never);
+
+            const rows = await getAuditEntityHistory({ entityType: "LeaveRequest", entityId: 1, limit: 10 });
+
+            expect(JSON.stringify(rows)).not.toContain("CANARY");
+            expect(rows[0]).toMatchObject({ id: 9, action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", userId: 8 });
+        });
+    });
 });

@@ -12,6 +12,7 @@
 - [Storage and Attachments](./operations/storage-and-attachments.md): persistent `.uploads/`, backup/restore, Leave และ IT private files
 - [Cloudflare Tunnel](./operations/cloudflare-tunnel.md): network path ที่รองรับผ่าน Nginx
 - [Routine reminder verification](./operations/verification/routine-reminder.md): ขั้นตอนทดสอบเฉพาะ reminder
+- [Leave special-reason audit remediation](./operations/leave-special-reason-audit-remediation.md): แผน (ต้องอนุมัติก่อนรัน) สำหรับลบข้อความเหตุผลพิเศษดิบออกจาก audit record เก่า
 - [Notification architecture](./integrations/notifications.md): channel matrix, outbox และการเชื่อมต่อ LINE/Email
 - [Leave notification specification](./features/leave-notifications.md): กฎ workflow การแจ้งเตือนการลา
 

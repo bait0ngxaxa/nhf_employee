@@ -250,6 +250,51 @@ describe("GET /api/leave/me", () => {
         );
     });
 
+    it("returns the actual special reason only from the requester's own history", async () => {
+        const specialReason = "ต้องดูแลบิดาที่โรงพยาบาลเป็นกรณีพิเศษ";
+        vi.mocked(prisma.leaveRequest.findMany).mockResolvedValue([
+            {
+                id: "leave-2",
+                employeeId: 100,
+                leaveType: "PERSONAL",
+                startDate: new Date("2027-01-04T00:00:00.000Z"),
+                endDate: new Date("2027-01-04T00:00:00.000Z"),
+                period: "FULL_DAY",
+                durationHalfDays: 2,
+                reason: "ธุระครอบครัว",
+                emergencyReason: null,
+                specialReason,
+                overQuotaHalfDays: 2,
+                status: "PENDING",
+                approverId: 200,
+                approvedAt: null,
+                rejectReason: null,
+                notTakenReason: null,
+                notTakenRequestedAt: null,
+                notTakenConfirmedAt: null,
+                notTakenConfirmedById: null,
+                attachmentUrl: null,
+                createdAt: new Date("2027-01-01T00:00:00.000Z"),
+                updatedAt: new Date("2027-01-01T00:00:00.000Z"),
+                approver: null,
+                attachments: [],
+            },
+        ] as never);
+        vi.mocked(prisma.leaveRequest.count).mockResolvedValue(1);
+
+        const response = await getLeaveProfile(
+            new Request("http://localhost/api/leave/me?page=1&limit=10&employeeId=999"),
+        );
+        const body = await response.json();
+
+        expect(body.history[0].specialReason).toBe(specialReason);
+        expect(prisma.leaveRequest.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ employeeId: 100 }),
+            }),
+        );
+    });
+
     it("applies employee history filters before pagination and reuses the where for count", async () => {
         const response = await getLeaveProfile(
             new Request(
