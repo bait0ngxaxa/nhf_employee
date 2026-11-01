@@ -1,5 +1,6 @@
 "use client";
 
+import { PendingSpecialReasonEditor } from "../PendingSpecialReasonEditor";
 import { AlertTriangle, Check, RotateCcw, X } from "lucide-react";
 import type { ReactElement } from "react";
 
@@ -31,6 +32,8 @@ export type LiffLeaveAvailableAction = EmployeeLeaveAction | ApproverLeaveAction
 interface LiffLeaveRequestDetailProps {
     detail: LiffLeaveRequestDetailData | null;
     actionIntent?: string | null;
+    canAmendOwnRequests?: boolean;
+    onAmendSuccess?: () => void | Promise<void>;
     onOpenChange: (open: boolean) => void;
     onAction: (action: LiffLeaveAvailableAction, detail: LiffLeaveRequestDetailData) => void;
     canUseAction?: (action: LiffLeaveAvailableAction) => boolean;
@@ -39,6 +42,8 @@ interface LiffLeaveRequestDetailProps {
 export function LiffLeaveRequestDetail({
     detail,
     actionIntent,
+    canAmendOwnRequests = false,
+    onAmendSuccess,
     onOpenChange,
     onAction,
     canUseAction = () => true,
@@ -113,6 +118,9 @@ export function LiffLeaveRequestDetail({
                                     value={formatThaiDateTimeWithTimeWord(detail.createdAt)}
                                 />
                                 <LiffLeaveAttachments attachments={detail.attachments} />
+                                {detail.viewerRole === "REQUESTER" && detail.status === "PENDING" && canAmendOwnRequests && onAmendSuccess ? <PendingSpecialReasonEditor
+                                    key={detail.id} leaveId={detail.id} specialReason={detail.specialReason} channel="liff" onSuccess={onAmendSuccess}
+                                /> : null}
                             </section>
                         </SheetScrollArea>
                         {availableActions.length > 0 ? (

@@ -23,7 +23,7 @@ import {
     reconcileLeaveQuotaForward,
 } from "@/modules/leave/domain/quota-entitlement";
 import { getLeaveYearFromDateValue } from "@/modules/leave/domain/quota-year";
-import { createLeaveAuditInTransaction } from "@/modules/leave/infrastructure/persistence/transaction";
+import { createLeaveAuditInTransaction, lockLeaveRequestRow } from "@/modules/leave/infrastructure/persistence/transaction";
 import type { LeaveActionValues } from "@/modules/leave/schemas/leave";
 import { markUnreadByReferenceForUser } from "@/modules/notification";
 
@@ -31,7 +31,7 @@ const LEAVE_APPROVAL_MESSAGES = {
     requestNotFound: "ไม่พบคำขอลา",
     alreadyProcessed: "คำขอนี้ถูกดำเนินการไปแล้ว",
     forbidden: "คุณไม่มีสิทธิ์อนุมัติคำขอนี้",
-    specialReasonRequired: "สิทธิ์ลาคงเหลือไม่เพียงพอ ต้องมีเหตุผลพิเศษก่อนอนุมัติ",
+    specialReasonRequired: "สิทธิ์ลาคงเหลือไม่เพียงพอ ต้องมีเหตุผลพิเศษก่อนอนุมัติ กรุณาให้ผู้ยื่นคำขอเพิ่มเหตุผลกรณีลาเกินสิทธิ์ในประวัติการลา แล้วลองอนุมัติอีกครั้ง",
 } as const;
 
 export class LeaveApprovalError extends Error {
@@ -74,6 +74,7 @@ export async function decideLeaveRequest(
         ) {
             throw new LeaveApprovalError(LEAVE_APPROVAL_MESSAGES.forbidden, 403);
         }
+        await lockLeaveRequestRow(tx, input.leaveId);
         const leaveRequest = await tx.leaveRequest.findUnique({
             where: { id: input.leaveId },
             include: {

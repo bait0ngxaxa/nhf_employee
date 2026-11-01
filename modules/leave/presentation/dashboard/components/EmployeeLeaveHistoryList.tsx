@@ -1,3 +1,4 @@
+import { PendingSpecialReasonEditor } from "../../PendingSpecialReasonEditor";
 import { RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,6 +24,8 @@ interface EmployeeLeaveHistoryListProps {
     onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
     onPageChange: (page: number) => void;
+    canAmendOwnRequests?: boolean;
+    onAmendSuccess?: () => void | Promise<void>;
     canCancelOwnRequests: boolean;
     canRequestOwnNotTaken: boolean;
 }
@@ -47,6 +50,8 @@ export function EmployeeLeaveHistoryList({
     onCancelRequest,
     onNotTakenRequest,
     onPageChange,
+    canAmendOwnRequests,
+    onAmendSuccess,
     canCancelOwnRequests,
     canRequestOwnNotTaken,
 }: EmployeeLeaveHistoryListProps) {
@@ -63,6 +68,8 @@ export function EmployeeLeaveHistoryList({
                     isSubmitting={isSubmitting}
                     onCancelRequest={onCancelRequest}
                     onNotTakenRequest={onNotTakenRequest}
+                    canAmendOwnRequests={canAmendOwnRequests}
+                    onAmendSuccess={onAmendSuccess}
                     canCancelOwnRequests={canCancelOwnRequests}
                     canRequestOwnNotTaken={canRequestOwnNotTaken}
                 />
@@ -89,6 +96,8 @@ function LeaveHistoryItem({
     isSubmitting,
     onCancelRequest,
     onNotTakenRequest,
+    canAmendOwnRequests,
+    onAmendSuccess,
     canCancelOwnRequests,
     canRequestOwnNotTaken,
 }: {
@@ -96,6 +105,8 @@ function LeaveHistoryItem({
     isSubmitting: boolean;
     onCancelRequest: (request: LeaveRequest) => void;
     onNotTakenRequest: (leaveId: string) => void;
+    canAmendOwnRequests?: boolean;
+    onAmendSuccess?: () => void | Promise<void>;
     canCancelOwnRequests: boolean;
     canRequestOwnNotTaken: boolean;
 }) {
@@ -173,6 +184,9 @@ function LeaveHistoryItem({
                     ) : null}
                 </div>
 
+                {request.status === "PENDING" && canAmendOwnRequests && onAmendSuccess ? <PendingSpecialReasonEditor
+                    leaveId={request.id} specialReason={request.specialReason} channel="dashboard" onSuccess={onAmendSuccess}
+                /> : null}
                 {hasActions ? (
                     <div className="flex flex-col gap-3 border-t border-border-subtle pt-4 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs/5 font-semibold text-content-muted">การดำเนินการ</p>

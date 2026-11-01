@@ -25,6 +25,7 @@ import {
 const CURRENT_LEAVE_ACTION_SELECT = {
     id: true,
     status: true,
+    specialReason: true,
     startDate: true,
     notTakenRequestedAt: true,
     notTakenConfirmedAt: true,
@@ -124,6 +125,7 @@ export async function resolveCurrentLeaveAction(
 
     return {
         ...payload,
+        specialReason: leaveRequest.specialReason,
         deliveryIdentity: currentIdentity,
         approver: buildConfiguredApproverSnapshot(approver),
     };

@@ -154,6 +154,7 @@ const ROUTINE_TASK_CHANGE_FIELDS = [
 
 const LEAVE_ACTIONS = new Set([
     "LEAVE_REQUEST_CREATE",
+    "LEAVE_REQUEST_SPECIAL_REASON_UPDATE",
     "LEAVE_REQUEST_APPROVE",
     "LEAVE_REQUEST_REJECT",
     "LEAVE_REQUEST_CANCEL",
@@ -567,6 +568,9 @@ function formatLeaveAction(
     const leaveDescription = `คำขอ${context.leaveTypeLabel}${employee} วันที่ ${context.dateRange}`;
     if (action === "LEAVE_REQUEST_CREATE") {
         return `ยื่น${leaveDescription} จำนวน ${context.duration} วัน (${context.periodLabel})`;
+    }
+    if (action === "LEAVE_REQUEST_SPECIAL_REASON_UPDATE") {
+        return `แก้ไขเหตุผลพิเศษ${leaveDescription}`;
     }
     if (action === "LEAVE_REQUEST_APPROVE") {
         return `อนุมัติ${leaveDescription}`;

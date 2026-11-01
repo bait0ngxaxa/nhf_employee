@@ -178,6 +178,10 @@ export const AUDIT_ACTION_META = {
         label: "ยื่นคำขอลา",
         badgeClassName: AUDIT_BADGE_TONES.signOut,
     },
+    LEAVE_REQUEST_SPECIAL_REASON_UPDATE: {
+        label: "แก้ไขเหตุผลพิเศษคำขอลา",
+        badgeClassName: AUDIT_BADGE_TONES.update,
+    },
     LEAVE_REQUEST_APPROVE: {
         label: "อนุมัติคำขอลา",
         badgeClassName: AUDIT_BADGE_TONES.approved,

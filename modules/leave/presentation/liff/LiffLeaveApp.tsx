@@ -748,6 +748,12 @@ export function LiffLeaveApp(): ReactElement {
                 }}
             />
             <LiffLeaveRequestDetail
+                canAmendOwnRequests={canCreateOwnRequests}
+                onAmendSuccess={async () => {
+                    setSelectedDetail(null);
+                    setSelectedDetailActionIntent(null);
+                    await refreshProfile();
+                }}
                 detail={selectedDetail}
                 actionIntent={selectedDetailActionIntent}
                 onOpenChange={(open) => {

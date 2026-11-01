@@ -377,6 +377,7 @@ export const API_ROUTES = {
     leave: {
         holidays: "/api/leave/holidays",
         me: "/api/leave/me",
+        specialReason: "/api/leave/special-reason",
         approvals: "/api/leave/approvals",
         adminRecovery: "/api/leave/admin/recovery",
         cancel: "/api/leave/cancel",
@@ -468,6 +469,7 @@ export const API_ROUTES = {
         liffSession: "/api/line/liff/session",
         home: "/api/line/home",
         leaveMe: "/api/line/leave/me",
+        leaveSpecialReason: "/api/line/leave/special-reason",
         leaveHolidays: "/api/line/leave/holidays",
         leaveRequest: "/api/line/leave/request",
         leaveApprovals: "/api/line/leave/approvals",

@@ -57,6 +57,7 @@ export interface EmployeeApproverAuditDetails extends AuditDetails {
 
 interface LeaveAuditDetailsByAction {
     LEAVE_REQUEST_CREATE: LeaveCreateAuditDetails;
+    LEAVE_REQUEST_SPECIAL_REASON_UPDATE: LeaveMutationAuditDetails;
     LEAVE_REQUEST_APPROVE: LeaveMutationAuditDetails;
     LEAVE_REQUEST_REJECT: LeaveMutationAuditDetails;
     LEAVE_REQUEST_CANCEL: LeaveMutationAuditDetails;

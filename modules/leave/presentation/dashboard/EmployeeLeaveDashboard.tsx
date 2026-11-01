@@ -165,6 +165,8 @@ function LeaveHistoryActionCapabilitySurface({
                 onCancelRequest={onCancelRequest}
                 onNotTakenRequest={onNotTakenRequest}
                 onPageChange={model.setPage}
+                canAmendOwnRequests={model.canCreateOwnRequests}
+                onAmendSuccess={model.onRequestSuccess}
                 canCancelOwnRequests={model.canCancelOwnRequests}
                 canRequestOwnNotTaken={model.canRequestOwnNotTaken}
             />

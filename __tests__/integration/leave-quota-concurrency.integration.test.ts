@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getEmployeeLeaveQuotaProjection } from "@/modules/leave";
+import { amendPendingLeaveSpecialReason, buildLeaveAuthorizationContext, decideLeaveRequest, getEmployeeLeaveQuotaProjection } from "@/modules/leave";
 import { POST as submitLeaveRequest } from "@/app/api/leave/request/route";
 import { prisma } from "@/lib/db/prisma";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
@@ -234,6 +234,73 @@ describe.sequential("leave quota creation concurrency with real MySQL", () => {
         const projections = await Promise.all(Array.from({ length: 5 }, () => getEmployeeLeaveQuotaProjection(fixture.employeeId, 2031)));
         expect(projections[0].find((quota) => quota.leaveType === "PERSONAL")).toMatchObject({ carryBalanceDays: 7.5, remainingDays: 17.5 });
         expect(await prisma.leaveQuota.findMany({ where: { employeeId: fixture.employeeId } })).toEqual(before);
+    });
+
+    async function submitPair(): Promise<string[]> {
+        for (const [index, date] of ["2031-05-12", "2031-05-13"].entries()) {
+            const response = await submitLeaveRequest(createRequest(`pending-pair-${index}`, date));
+            expect(response.status).toBe(201);
+        }
+        const requests = await prisma.leaveRequest.findMany({ where: { employeeId: fixture.employeeId }, orderBy: { startDate: "asc" } });
+        expect(requests.every((request) => request.status === "PENDING")).toBe(true);
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(0);
+        return requests.map((request) => request.id);
+    }
+
+    async function approverActor() {
+        const employee = await prisma.employee.findUniqueOrThrow({ where: { id: fixture.employeeId }, include: { manager: { include: { user: true } } } });
+        const manager = employee.manager;
+        if (!manager?.user) throw new Error("Missing approver fixture");
+        return { userId: manager.user.id, employeeId: manager.id, userEmail: manager.user.email, name: manager.user.name, authorization: buildLeaveAuthorizationContext(manager.user, manager.id, "DASHBOARD") };
+    }
+
+    function requesterActor(channel: "DASHBOARD" | "LIFF_SELF_SERVICE" = "DASHBOARD") {
+        return { userEmail: fixture.employeeUserEmail, authorization: buildLeaveAuthorizationContext({ id: fixture.employeeUserId, role: "USER" }, fixture.employeeId, channel) };
+    }
+
+    it("A: pending requests consume nothing and both approve within entitlement", async () => {
+        const ids = await submitPair();
+        const actor = await approverActor();
+        for (const leaveId of ids) await decideLeaveRequest(actor, { leaveId, action: "APPROVE" });
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(4);
+    });
+
+    it.each(["DASHBOARD", "LIFF_SELF_SERVICE"] as const)("B/F: %s recovers from pending quota collision with one audited amendment", async (channel) => {
+        const ids = await submitPair();
+        await prisma.leaveQuota.updateMany({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" }, data: { usedHalfDays: 18 } });
+        const actor = await approverActor();
+        await decideLeaveRequest(actor, { leaveId: ids[0], action: "APPROVE" });
+        await expect(decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE" })).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining("ผู้ยื่นคำขอ") });
+        expect((await prisma.leaveRequest.findUniqueOrThrow({ where: { id: ids[1] } })).status).toBe("PENDING");
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(20);
+        const before = await prisma.leaveRequest.findUniqueOrThrow({ where: { id: ids[1] } });
+        const amendment = { leaveId: ids[1], specialReason: "มีเหตุจำเป็นต้องดูแลครอบครัว", expectedSpecialReason: null };
+        await amendPendingLeaveSpecialReason(requesterActor(channel), amendment);
+        await amendPendingLeaveSpecialReason(requesterActor(channel), amendment);
+        const after = await prisma.leaveRequest.findUniqueOrThrow({ where: { id: ids[1] } });
+        expect(after).toEqual({ ...before, specialReason: amendment.specialReason, updatedAt: after.updatedAt });
+        const audits = await prisma.auditLog.findMany({ where: { action: "LEAVE_REQUEST_SPECIAL_REASON_UPDATE", details: { contains: ids[1] } } });
+        expect(audits).toHaveLength(1);
+        expect(audits[0].userId).toBe(fixture.employeeUserId);
+        await decideLeaveRequest(actor, { leaveId: ids[1], action: "APPROVE" });
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(22);
+        expect((await prisma.leaveRequest.findUniqueOrThrow({ where: { id: ids[1] } })).overQuotaHalfDays).toBe(2);
+    });
+
+    it("C: simultaneous amendment and approval serialize without losing or double-deducting", async () => {
+        const [leaveId] = await submitPair();
+        const actor = await approverActor();
+        const results = await Promise.allSettled([
+            amendPendingLeaveSpecialReason(requesterActor(), { leaveId, specialReason: "มีเหตุจำเป็นเป็นกรณีพิเศษ", expectedSpecialReason: null }),
+            decideLeaveRequest(actor, { leaveId, action: "APPROVE" }),
+        ]);
+        expect(results[1].status).toBe("fulfilled");
+        const request = await prisma.leaveRequest.findUniqueOrThrow({ where: { id: leaveId } });
+        expect(request.status).toBe("APPROVED");
+        if (results[0].status === "fulfilled") expect(request.specialReason).toBe("มีเหตุจำเป็นเป็นกรณีพิเศษ");
+        else expect(results[0].reason).toMatchObject({ statusCode: 409 });
+        await expect(decideLeaveRequest(actor, { leaveId, action: "APPROVE" })).rejects.toMatchObject({ statusCode: 409 });
+        expect((await prisma.leaveQuota.findFirstOrThrow({ where: { employeeId: fixture.employeeId, year: LEAVE_YEAR, leaveType: "PERSONAL" } })).usedHalfDays).toBe(2);
     });
 
     it("creates one quota for concurrent non-overlapping requests with different keys", async () => {

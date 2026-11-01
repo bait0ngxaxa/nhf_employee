@@ -84,6 +84,13 @@ export const leaveAttachmentIdParamSchema = z
 
 export const leaveRequestIdParamSchema = leaveAttachmentIdParamSchema;
 
+export const leaveSpecialReasonAmendmentSchema = z.strictObject({
+  leaveId: leaveRequestIdParamSchema,
+  specialReason: leaveReasonSchema,
+  expectedSpecialReason: z.string().max(1000).nullable(),
+});
+export type LeaveSpecialReasonAmendment = z.infer<typeof leaveSpecialReasonAmendmentSchema>;
+
 const emptyToNull = (value: unknown): unknown => {
   if (typeof value !== "string") {
     return value;
