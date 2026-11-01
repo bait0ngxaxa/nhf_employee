@@ -1,6 +1,18 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
+import { availableParallelism } from "os";
+
+/**
+ * Vitest's run-mode default is `availableParallelism() - 1`, which counts SMT
+ * threads. On a 4-core/8-thread machine that starts 7 workers, and the
+ * CPU-bound jsdom calendar/form tests slowed ~3x uniformly until the slowest
+ * ones crossed the 5s timeout. Measured on that machine:
+ * 7 workers: 6 timeouts; 4: 1 timeout; 3: 0 (max 3.3s); 2: 0 (max 2.5s).
+ * Use roughly one worker per physical core, leaving one core for the main
+ * process. `--maxWorkers` on the CLI still overrides this.
+ */
+const MAX_TEST_WORKERS = Math.max(1, Math.floor(availableParallelism() / 2) - 1);
 
 const BASE_EXCLUDES = [
     "node_modules",
@@ -56,6 +68,7 @@ export default defineConfig({
     plugins: [react()],
     test: {
         globals: true,
+        maxWorkers: MAX_TEST_WORKERS,
         env: {
             NEXT_PUBLIC_FEATURE_LEAVE: "true",
         },
