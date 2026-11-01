@@ -12,6 +12,32 @@ function setup() {
 }
 
 describe("date drafts in the authoritative form model", () => {
+    it("tracks actual pending changes rather than the existence of a date draft", () => {
+        const { result } = setup();
+        act(() => result.current.selectDraftDate("2026-11-02"));
+        expect(result.current.hasPendingDates).toBe(false);
+        expect(result.current.isDirty).toBe(false);
+        act(() => result.current.selectDraftDate("2026-11-03"));
+        expect(result.current.isDirty).toBe(true);
+        act(() => result.current.selectDraftDate("2026-11-02"));
+        expect(result.current.hasPendingDates).toBe(false);
+        expect(result.current.isDirty).toBe(false);
+        act(() => result.current.discardDraftDates());
+        expect(result.current.isDirty).toBe(false);
+    });
+
+    it("preserves form and attachment dirtiness when the date draft matches committed dates", () => {
+        const { result } = setup();
+        act(() => result.current.form.setValue("reason", "พักรักษาตัว", { shouldDirty: true }));
+        act(() => result.current.selectDraftDate("2026-11-02"));
+        expect(result.current.hasPendingDates).toBe(false);
+        expect(result.current.isDirty).toBe(true);
+        act(() => result.current.resetForm());
+        act(() => result.current.addAttachments([new File(["proof"], "proof.jpg", { type: "image/jpeg" })]));
+        act(() => result.current.selectDraftDate("2026-11-02"));
+        expect(result.current.hasPendingDates).toBe(false);
+        expect(result.current.isDirty).toBe(true);
+    });
     it.each(["FULL_DAY", "MORNING", "AFTERNOON"] as const)("commits single-day %s with dirty/touched state and quota recalculation", async (period) => {
         const { result } = setup();
         act(() => { result.current.form.setValue("period", period); result.current.selectDraftDate("2026-11-03"); });

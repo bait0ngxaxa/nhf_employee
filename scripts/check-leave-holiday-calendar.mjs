@@ -20,7 +20,8 @@ const mockClient = `export const apiGet = async (url) => {
     return { success: true, data: { year, events: [
         { date: "2026-11-02", name: "New Year's Day", classification: "public-holiday" },
         { date: "2026-11-07", name: "Valentine's Day", classification: "observance" },
-        { date: "2026-11-07", name: "รายการทดสอบเพิ่มเติมในวันเดียวกัน", classification: "unverified" }
+        { date: "2026-11-07", name: "รายการทดสอบเพิ่มเติมในวันเดียวกัน", classification: "unverified" },
+        ...Array.from({ length: 24 }, (_, index) => ({ date: "2026-11-02", name: "รายการวันหยุดยาวสำหรับทดสอบการเลื่อนอ่านบนมือถือ ลำดับ " + (index + 1), classification: "observance" }))
     ] } };
 };
 export const apiPost = async () => { throw new Error("Mutations are forbidden in this smoke test"); };
@@ -66,7 +67,7 @@ try {
             const errors = [];
             page.on("pageerror", (error) => errors.push(error.message));
             page.setDefaultTimeout(10000);
-            await page.setViewport({ width, height: 900 });
+            await page.setViewport({ width, height: 900, hasTouch: true });
             await page.evaluateOnNewDocument(() => {
                 const NativeDate = Date;
                 window.Date = class extends NativeDate {
@@ -95,6 +96,53 @@ try {
             assert.ok(bounds.left >= 0 && bounds.right <= width && bounds.top >= 0 && bounds.bottom <= 900, `${channel}/${width}: popover viewport bounds`);
             const parentBounds = await page.$eval(parent, (node) => { const r = node.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; });
             assert.ok(bounds.left >= parentBounds.left && bounds.right <= parentBounds.right && bounds.top >= parentBounds.top && bounds.bottom <= parentBounds.bottom, `${channel}/${width}: popover modal clipping bounds`);
+            // Exercise real wheel and touch input; DOM presence alone cannot prove scrollability.
+            const detailsSelector = '[role="dialog"][aria-label="ข้อมูลวันหยุด"]';
+            const listSelector = `${detailsSelector} [aria-label="รายการวันหยุดในวันที่เลือก"]`;
+            const scrollRegion = await page.$(listSelector) ? listSelector : detailsSelector;
+            const scrollBox = await page.$eval(scrollRegion, (node) => {
+                const r = node.getBoundingClientRect();
+                return { x: r.x + r.width / 2, top: r.top, height: r.height, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight };
+            });
+            assert.ok(scrollBox.scrollHeight > scrollBox.clientHeight && scrollBox.height >= 44, `${channel}/${width}: long reference scroll region`);
+            await page.mouse.move(scrollBox.x, scrollBox.top + scrollBox.height / 2);
+            await page.mouse.wheel({ deltaY: 120 });
+            await page.waitForFunction((selector) => document.querySelector(selector).scrollTop > 0, { timeout: 3000 }, scrollRegion);
+            await page.mouse.move(scrollBox.x, scrollBox.top + scrollBox.height / 2);
+            await page.mouse.wheel({ deltaY: 5000 });
+            await page.waitForFunction((selector) => {
+                const node = document.querySelector(selector);
+                const region = node.getBoundingClientRect();
+                const last = node.querySelector("li:last-child").getBoundingClientRect();
+                return last.top >= region.top && last.bottom <= region.bottom + 1;
+            }, { timeout: 3000 }, scrollRegion).catch(async (error) => {
+                const metrics = await page.$eval(scrollRegion, (node) => {
+                    const region = node.getBoundingClientRect();
+                    const last = node.querySelector("li:last-child").getBoundingClientRect();
+                    return { top: region.top, bottom: region.bottom, lastTop: last.top, lastBottom: last.bottom, scrollTop: node.scrollTop, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight };
+                });
+                await page.screenshot({ path: join(screenshots, `${channel}-${width}-scroll-failure.png`), fullPage: true });
+                throw new Error(`${channel}/${width}: last reference event not visible: ${JSON.stringify(metrics)}`, { cause: error });
+            });
+            assert.equal(await page.evaluate(() => window.parentClosed), undefined, "scrolling must not dismiss parent");
+            await page.screenshot({ path: join(screenshots, `${channel}-${width}-long-events.png`), fullPage: true });
+            const beforeTouch = await page.$eval(scrollRegion, (node) => node.scrollTop);
+            const touchBox = await page.$eval(scrollRegion, (node) => {
+                const r = node.getBoundingClientRect(); return { x: r.x + r.width / 2, top: r.top, height: r.height };
+            });
+            const direction = beforeTouch > 0 ? 1 : -1;
+            const touchStart = direction > 0 ? touchBox.top + 8 : touchBox.top + touchBox.height - 8;
+            const distance = Math.min(120, touchBox.height - 16);
+            await page.touchscreen.touchStart(touchBox.x, touchStart);
+            for (let step = 1; step <= 10; step++) {
+                await page.touchscreen.touchMove(touchBox.x, touchStart + direction * distance * step / 10);
+                await new Promise((resolve) => setTimeout(resolve, 20));
+            }
+            await page.touchscreen.touchEnd();
+            await page.waitForFunction((selector, previous, movement) => movement > 0
+                ? document.querySelector(selector).scrollTop < previous
+                : document.querySelector(selector).scrollTop > previous,
+            { timeout: 3000 }, scrollRegion, beforeTouch, direction);
             await page.keyboard.press("Escape");
             await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', { hidden: true });
             assert.equal(await page.evaluate(() => window.parentClosed), undefined);
@@ -109,6 +157,17 @@ try {
                 assert.ok(await page.$eval(parent, (node) => node.contains(document.activeElement)), `${channel}/${width}: focus containment`);
             }
             await clickText("หลายวัน");
+            await clickDay(2);
+            await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]');
+            const separation = await page.evaluate(() => {
+                const grid = document.querySelector('[aria-label="เลือกวันที่ลา"] [role="grid"]').getBoundingClientRect();
+                const details = document.querySelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]').getBoundingClientRect();
+                return details.bottom <= grid.top || details.top >= grid.bottom || details.right <= grid.left || details.left >= grid.right;
+            });
+            assert.ok(separation, `${channel}/${width}: reference details must not cover date boundaries`);
+            await clickDay(6);
+            await page.waitForSelector('[role="dialog"][aria-label="ข้อมูลวันหยุด"]', { hidden: true });
+            assert.equal(await page.$eval(day(4), (node) => node.getAttribute("aria-pressed")), "true", "range endpoint remains clickable after holiday start");
             await clickDay(6);
             assert.ok(await page.$eval('button ::-p-text(ยืนยันวันที่ลา)', (node) => node.closest("button").disabled), "incomplete range");
             await clickDay(9);

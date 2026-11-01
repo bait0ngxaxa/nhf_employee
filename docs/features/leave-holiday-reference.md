@@ -10,7 +10,7 @@ React Hook Form ใน useLeaveRequestFormModel ยังคงเป็นเ�
 - หลายวัน: คลิกแรกเริ่มช่วง คลิกถัดไปจบช่วง คลิกหลังช่วงสมบูรณ์เริ่มใหม่ คลิกก่อนวันเริ่มจะเริ่มช่วงใหม่ ณ วันนั้น
 - เปลี่ยนเป็นหลายวัน: ตั้งเต็มวันตามพฤติกรรมเดิมและเริ่ม draft ว่าง; กลับวันเดียว: ยกเลิก draft และใช้วันเริ่มที่ยืนยันไว้
 - ยืนยันไม่ได้เมื่อช่วงไม่ครบหรือผิดกฎ; goToReview และ submit ปฏิเสธ draft ที่ต่างจาก committed แม้เรียกโดยตรงหรือส่งฟอร์มผ่าน Enter
-- **ยกเลิกวันที่ที่กำลังเลือก** คืนวันที่ committed โดยไม่แตะประเภทลา เหตุผล ไฟล์แนบ หรือโควตา กลับจากขั้นตอน 2 รักษาค่าเดิม
+- **ยกเลิกวันที่ที่กำลังเลือก** คืนวันที่และเดือนที่แสดงตาม committed โดยไม่แตะประเภทลา เหตุผล ไฟล์แนบ หรือโควตา กลับจากขั้นตอน 2 คืนเดือนที่ยืนยันไว้โดย remount เฉพาะ calendar และรักษาฟอร์มเดิม การเลื่อนเดือนระหว่างเลือกช่วงไม่ถูกรีเซ็ต
 - เสาร์–อาทิตย์เลือกเป็นขอบช่วงไม่ได้ แต่รวมใน highlight ได้ ศุกร์–จันทร์คิดลา 2 วันตาม domain เดิม
 - ไม่จำกัดวันย้อนหลังเพิ่ม ไม่อนุญาตช่วงข้ามปี และไม่เปลี่ยน server-side leave validation
 - Google events เป็นข้อมูลแสดงผลเท่านั้น ไม่มีผลต่อสูตรวันลา สิทธิ์ลา การตรวจซ้อน การอนุมัติ หรือ persistence
@@ -19,7 +19,7 @@ React Hook Form ใน useLeaveRequestFormModel ยังคงเป็นเ�
 
 วันนี้มีขีดใต้ วันที่เลือกมีพื้นเน้นและ aria-pressed ช่วงต่อเนื่องมี highlight เสาร์–อาทิตย์มีพื้นเทาและข้อความว่าเลือกไม่ได้ ตัวบ่งชี้แยกรูปร่าง: ขีดทึบ (public holiday), วงกลมโปร่ง (observance), กรอบเส้นประ (unverified)
 
-HolidayDetails ใช้ Radix Popover จาก radix-ui เดิม เป็น non-modal ไม่ย้าย focus เมื่อเปิด ยึดกับปุ่มวันที่จริง มี collision handling และขนาดตาม viewport ปิดเมื่อ Escape, คลิกภายนอก, เลือกวันอื่น หรือเปลี่ยนเดือน Escape คืน focus ไปวันที่เดิมและไม่ส่งต่อไป parent modal พื้นที่อ่านข้อความรับคลิกผ่านไปยังปฏิทินเพื่อไม่บังขอบช่วงถัดไป ประกาศรายละเอียดผ่าน aria-live รายการทั้งปีเป็น details แบบ read-only จัดกลุ่มตามเดือนและใช้ข้อมูลชุดเดียวกัน
+HolidayDetails ใช้ Radix Popover จาก radix-ui เดิม เป็น non-modal ไม่ย้าย focus เมื่อเปิด มี collision handling และขนาดตาม viewport ปิดเมื่อ Escape, คลิกภายนอก, เลือกวันอื่น หรือเปลี่ยนเดือน Escape คืน focus ไปวันที่เดิมและไม่ส่งต่อไป parent modal วาง popover นอกพื้นที่ grid โดยยึดขอบปฏิทิน เพื่อให้ยังเลือกขอบช่วงถัดไปได้ เนื้อหารับ pointer interaction และเลื่อนด้วย wheel/touch/keyboard ได้จริง มีปุ่มปิดที่คงอยู่เหนือรายการเลื่อน ประกาศรายละเอียดผ่าน aria-live รายการทั้งปีเป็น details แบบ read-only จัดกลุ่มตามเดือนและใช้ข้อมูลชุดเดียวกัน
 
 เอกสารที่ใช้: [DayPicker custom selection](https://daypicker.dev/guides/custom-selections), [Radix Popover](https://www.radix-ui.com/primitives/docs/components/popover)
 
@@ -58,7 +58,7 @@ node scripts/check-leave-holiday-calendar.mjs bundle ฟอร์ม/CSS จร�
 
 Chromium smoke ไม่เท่ากับการทดสอบ LINE WebView บนอุปกรณ์จริง ไม่มี deployment หรือการส่ง Leave Request อัตโนมัติ
 
-## ผลตรวจส่งมอบ
+## ผลตรวจส่งมอบฟีเจอร์เดิม (ก่อนแก้ findings P2/P3)
 
 - npm run typecheck: ผ่าน
 - npm run lint: ผ่าน ไม่มี warning
@@ -81,3 +81,14 @@ Chromium smoke ไม่เท่ากับการทดสอบ LINE WebVi
 - Tests/fixtures: modules/leave/presentation/LeaveDateCalendar.test.tsx, holiday-display.test.ts, LeaveRequestSummary.test.tsx, dashboard/LeaveRequestForm.test.tsx, dashboard/hooks/leave-date-draft.test.ts; modules/leave/infrastructure/holidays/google-holiday-reference.test.ts และ fixtures/thai-reference.ics; modules/leave/server/holiday-reference-api.test.ts; __tests__/api/leave-holiday-routes.test.ts; __tests__/helpers/leave-calendar.ts
 - Browser/dependency/docs: scripts/check-leave-holiday-calendar.mjs, package.json, package-lock.json, docs/features/leave-holiday-reference.md
 - นำออก: modules/leave/presentation/HolidayReferenceViewer.tsx และ HolidayReferenceViewer.test.tsx โดยย้ายความรับผิดชอบและ regression coverage ไปยัง primary calendar
+
+## Regression ของ findings P2/P3
+
+- Dirty tracking ใช้ hasPendingDates แทน draft exists การคลิกวันเดิมไม่ทำให้ต้องยืนยันการทิ้งข้อมูล แต่การแก้ฟอร์มจริงและไฟล์แนบยังคงทำให้ dirty
+- Browser fixture เพิ่ม 24 events ในวันเดียวกัน ใช้ mouse wheel และ touchStart/touchMove/touchEnd จริงใน Chromium ยืนยัน scrollTop เปลี่ยนและเลื่อนไปจนรายการสุดท้ายอยู่ในกรอบที่มองเห็น ไม่ใช้การกำหนด scrollTop เพื่อทำให้เทสต์ผ่าน
+- ตรวจว่า popover ไม่ทับ grid และยังคลิกปลายช่วงหลังเลือกวันหยุดเป็นวันเริ่มได้ โดย parent Dialog/Sheet ไม่ปิด
+- ทดสอบทั้ง Dashboard/LIFF ที่ 320, 390, 768 และ 1280px พร้อมภาพรายการยาวและสถานะเลือกช่วง
+
+ผลตรวจรอบแก้ findings: calendar/form integration 34 เคสและ form model 44 เคสผ่าน รวม 78 เคส; Chromium wheel/touch smoke ผ่านทั้ง 8 ชุด พร้อมภาพรายการยาวและการตรวจ grid ไม่ถูกบัง; typecheck, lint และ architecture:check ผ่าน ไม่มีการเปลี่ยน domain/schema/authentication หรือกฎโควตา
+
+ช่วงรัน focused tests พร้อม browser เคยพบ timeout ใน UI tests จึงแยกรันจนผ่าน โดยไม่เพิ่ม timeout หรือลด assertions ไม่รัน full repository suite ซ้ำสำหรับการแก้ UI/form-state เฉพาะจุดนี้ ผล full suite ก่อนหน้ายังบันทึกแยกไว้ข้างต้น การจำลอง touch ใน Chromium ไม่ใช่การตรวจ LINE WebView บนอุปกรณ์จริง

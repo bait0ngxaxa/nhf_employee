@@ -70,6 +70,8 @@ export function LeaveDateCalendar({ model, channel }: { model: Model; channel: H
                 }}>ยืนยันวันที่ลา</Button>
                 <Button type="button" variant="outline" disabled={model.isSubmitting} onClick={() => {
                     model.discardDraftDates();
+                    setDetail(null);
+                    setMonth(new TZDate(`${model.startDateValue}T12:00:00+07:00`, LEAVE_BUSINESS_TIME_ZONE));
                     committedSummaryRef.current?.focus();
                 }}>ยกเลิกวันที่ที่กำลังเลือก</Button>
             </div> : null}

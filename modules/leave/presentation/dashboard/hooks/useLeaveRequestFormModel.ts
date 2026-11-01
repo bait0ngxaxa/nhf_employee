@@ -159,7 +159,7 @@ export function useLeaveRequestFormModel({
         resolver: zodResolver(leaveRequestSchema),
         defaultValues: createDefaultLeaveRequestValues(),
     });
-    const isDirty = form.formState.isDirty || attachments.length > 0 || draft !== null;
+    const isFormDirty = form.formState.isDirty;
 
     const leaveType = useWatch({
         control: form.control,
@@ -180,6 +180,7 @@ export function useLeaveRequestFormModel({
 
     const draftDates = draft ?? { start: startDateValue, end: endDateValue };
     const hasPendingDates = draft !== null && (draft.start !== startDateValue || draft.end !== endDateValue);
+    const isDirty = isFormDirty || attachments.length > 0 || hasPendingDates;
     const draftSelection = evaluateLeaveSelection(draftDates.start, draftDates.end, periodValue);
     const draftDateWarning = !draftDates.start ? "กรุณาเลือกวันที่เริ่มต้น" : !draftDates.end ? "กรุณาเลือกวันที่สิ้นสุด" : !draftSelection.valid ? draftSelection.message : null;
     const discardDraftDates = (): void => {

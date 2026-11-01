@@ -25,7 +25,7 @@ export function LeaveDialogFields({ model, holidayChannel = "dashboard" }: { mod
         <div className="flex flex-col gap-5">
             <LeaveTypeField model={model} />
             <LeaveDateModeField model={model} />
-            <LeaveDateCalendar model={model} channel={holidayChannel} />
+            <LeaveDateCalendar key={model.step} model={model} channel={holidayChannel} />
             {!model.isMultiDay ? <LeavePeriodField model={model} /> : null}
             <LeaveDurationCalculation model={model} />
             <LeaveReasonField model={model} />

@@ -1,7 +1,9 @@
 "use client";
 
 import { Popover } from "radix-ui";
+import { X } from "lucide-react";
 import type { ReactElement } from "react";
+import { Button } from "@/components/ui/button";
 import type { HolidayReferenceEvent } from "../schemas/holiday-reference";
 import { formatCalendarDate, holidayDisplayName, HOLIDAY_LABELS } from "./holiday-display";
 
@@ -18,12 +20,11 @@ export function HolidayDetails({ date, events, anchor, calendar, close }: {
 }): ReactElement {
     const modal = calendar.closest('[role="dialog"]');
     return <Popover.Root open onOpenChange={(open) => { if (!open) close(); }}>
-        <Popover.Anchor virtualRef={{ current: anchor }} />
+        {/* Anchor outside the whole grid so scrollable details never cover a range endpoint. */}
+        <Popover.Anchor virtualRef={{ current: calendar }} />
         <Popover.Portal container={modal ?? calendar}>
-            <div className="pointer-events-none">
             <Popover.Content aria-label="ข้อมูลวันหยุด" aria-live="polite" sideOffset={6} collisionPadding={12} collisionBoundary={modal}
-                style={{ pointerEvents: "none" }}
-                className="pointer-events-none z-50 max-h-[var(--radix-popover-content-available-height)] w-64 max-w-[var(--radix-popover-content-available-width)] overflow-y-auto rounded-lg border bg-popover p-3 text-popover-foreground shadow-md"
+                className="z-50 flex max-h-[var(--radix-popover-content-available-height)] w-64 max-w-[var(--radix-popover-content-available-width)] flex-col overflow-hidden rounded-lg border bg-popover p-3 text-popover-foreground shadow-md"
                 onOpenAutoFocus={(event) => event.preventDefault()}
                 onCloseAutoFocus={(event) => event.preventDefault()}
                 onInteractOutside={(event) => {
@@ -33,11 +34,17 @@ export function HolidayDetails({ date, events, anchor, calendar, close }: {
                     if (target instanceof Node && calendar.contains(target)) event.preventDefault();
                 }}
                 onEscapeKeyDown={(event) => { event.preventDefault(); event.stopPropagation(); close(); anchor.focus(); }}>
-                <p className="mb-2 text-sm font-semibold">{formatCalendarDate(date)}</p>
-                <HolidayEventList events={events} />
-                <p className="mt-2 text-xs text-muted-foreground">เลือกวันอื่น หรือกด Escape เพื่อปิด</p>
+                <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">{formatCalendarDate(date)}</p>
+                    <Popover.Close asChild>
+                        <Button type="button" variant="ghost" size="icon" aria-label="ปิดข้อมูลวันหยุด" onClick={() => anchor.focus()}><X aria-hidden="true" /></Button>
+                    </Popover.Close>
+                </div>
+                <div role="region" aria-label="รายการวันหยุดในวันที่เลือก" tabIndex={0}
+                    className="min-h-0 overflow-y-auto overscroll-contain rounded-sm touch-pan-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [-webkit-overflow-scrolling:touch]">
+                    <HolidayEventList events={events} />
+                </div>
             </Popover.Content>
-            </div>
         </Popover.Portal>
     </Popover.Root>;
 }

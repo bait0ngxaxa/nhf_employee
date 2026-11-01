@@ -39,6 +39,7 @@ describe.each(["dashboard", "liff"] as const)("%s primary date calendar", (chann
     });
     afterEach(() => {
         vi.useRealTimers(); vi.unstubAllEnvs();
+        vi.restoreAllMocks();
         if (originalScrollIntoView) Object.defineProperty(Element.prototype, "scrollIntoView", originalScrollIntoView);
         else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
     });
@@ -52,6 +53,45 @@ describe.each(["dashboard", "liff"] as const)("%s primary date calendar", (chann
         expect(apiGet).toHaveBeenCalledWith(`${channel === "liff" ? API_ROUTES.line.leaveHolidays : API_ROUTES.leave.holidays}?year=2026`, expect.objectContaining(channel === "liff" ? { skipAuthRefresh: true } : { cache: "no-store" }));
         const annual = document.querySelector("details");
         expect(annual).not.toHaveAttribute("open");
+    });
+
+    it("returns to the committed month on draft discard without interrupting draft browsing", async () => {
+        mount();
+        await screen.findByText(/รายการวันหยุดทั้งปี/);
+        chooseLeaveDate("2026-11-02");
+        chooseLeaveDate("2027-01-04", false);
+        expect(screen.getByRole("region", { name: "เลือกวันที่ลา" })).toHaveAttribute("data-calendar-month", "2027-01");
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิกวันที่ที่กำลังเลือก" }));
+        expect(screen.getByRole("region", { name: "เลือกวันที่ลา" })).toHaveAttribute("data-calendar-month", "2026-11");
+        expect(screen.getByRole("button", { name: /^2 พฤศจิกายน/ })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("returns to the committed month after review without resetting form values", async () => {
+        mount();
+        await screen.findByText(/รายการวันหยุดทั้งปี/);
+        chooseLeaveDate("2026-11-02");
+        fireEvent.change(screen.getByLabelText("เหตุผลการลา"), { target: { value: "พักรักษาตัว" } });
+        fireEvent.click(screen.getByRole("button", { name: "เดือนถัดไป" }));
+        fireEvent.click(screen.getByRole("button", { name: "เดือนถัดไป" }));
+        fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบคำขอ" }));
+        await screen.findByRole("group", { name: "ตรวจสอบคำขอลา" });
+        fireEvent.click(screen.getByRole("button", { name: "แก้ไข" }));
+        expect(screen.getByRole("region", { name: "เลือกวันที่ลา" })).toHaveAttribute("data-calendar-month", "2026-11");
+        expect(screen.getByLabelText("เหตุผลการลา")).toHaveValue("พักรักษาตัว");
+        expect(screen.getByText(/วันที่ในคำขอ:/)).toHaveTextContent("2 พฤศจิกายน 2569");
+    });
+
+    it("closes without a discard prompt after clicking the unchanged committed day", async () => {
+        vi.setSystemTime(new Date("2026-11-02T12:00:00+07:00"));
+        const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+        mount();
+        await screen.findByText(/รายการวันหยุดทั้งปี/);
+        chooseLeaveDate("2026-11-02", false);
+        fireEvent.click(await screen.findByRole("button", { name: "ปิดข้อมูลวันหยุด" }));
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิก" }));
+        expect(screen.queryByRole("alertdialog")).toBeNull();
+        expect(confirm).not.toHaveBeenCalled();
+        expect(onClose).toHaveBeenCalledOnce();
     });
 
     it.each([false, true])("hides confirmation after committing and restores it only for changed drafts (multi-day: %s)", async (multiDay) => {
