@@ -46,13 +46,36 @@ describe.each(["dashboard", "liff"] as const)("%s primary date calendar", (chann
 
     it("renders directly in Bangkok month with Thai BE caption and the authenticated reference channel", async () => {
         mount();
-        expect(screen.getByText("พฤศจิกายน 2569")).toBeInTheDocument();
+        expect(screen.getByRole("grid", { name: "พฤศจิกายน 2569" })).toBeInTheDocument();
         expect(screen.queryByText("ดูปฏิทินวันหยุด")).not.toBeInTheDocument();
         expect(document.querySelector('input[type="date"]')).toBeNull();
         await screen.findByText(/รายการวันหยุดทั้งปี/);
         expect(apiGet).toHaveBeenCalledWith(`${channel === "liff" ? API_ROUTES.line.leaveHolidays : API_ROUTES.leave.holidays}?year=2026`, expect.objectContaining(channel === "liff" ? { skipAuthRefresh: true } : { cache: "no-store" }));
         const annual = document.querySelector("details");
         expect(annual).not.toHaveAttribute("open");
+    });
+
+    it("jumps month and BE year without committing dates or losing incomplete ranges", async () => {
+        mount();
+        await screen.findByText(/รายการวันหยุดทั้งปี/);
+        const month = screen.getByRole("combobox", { name: "เลือกเดือน" });
+        const year = screen.getByRole("combobox", { name: "เลือกปี พ.ศ." });
+        expect(within(month).getByRole("option", { name: "มกราคม" })).toHaveValue("0");
+        expect(within(year).getByRole("option", { name: "2572" })).toHaveValue("2029");
+        fireEvent.click(screen.getByRole("button", { name: "หลายวัน" }));
+        chooseLeaveDate("2026-11-06", false);
+        fireEvent.change(month, { target: { value: "11" } });
+        expect(screen.getByRole("region", { name: "เลือกวันที่ลา" })).toHaveAttribute("data-calendar-month", "2026-12");
+        fireEvent.change(year, { target: { value: "2029" } });
+        expect(screen.getByRole("region", { name: "เลือกวันที่ลา" })).toHaveAttribute("data-calendar-month", "2029-12");
+        expect(screen.getByText(/กำลังเลือก:/)).toHaveTextContent("6 พฤศจิกายน 2569");
+        expect(screen.getByRole("button", { name: "ยืนยันวันที่ลา" })).toBeDisabled();
+        expect(screen.getByText(/วันที่ในคำขอ:/)).toHaveTextContent("1 พฤศจิกายน 2569");
+        expect(screen.getByText(/ไม่มีข้อมูลวันหยุดอ้างอิงสำหรับปีนี้/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "เดือนถัดไป" }));
+        expect(screen.getByRole("region", { name: "เลือกวันที่ลา" })).toHaveAttribute("data-calendar-month", "2030-01");
+        fireEvent.click(screen.getByRole("button", { name: "ยกเลิกวันที่ที่กำลังเลือก" }));
+        expect(screen.getByRole("region", { name: "เลือกวันที่ลา" })).toHaveAttribute("data-calendar-month", "2026-11");
     });
 
     it("returns to the committed month on draft discard without interrupting draft browsing", async () => {

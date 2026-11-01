@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useRef, useState, type ReactElement } from "react";
-import { DayPicker, TZDate, DayButton, type DayButtonProps } from "react-day-picker";
+import { DayPicker, TZDate, DayButton, type DayButtonProps, type DropdownProps } from "react-day-picker";
 import { th } from "react-day-picker/locale";
 import { Button } from "@/components/ui/button";
 import { toDateOnlyString, LEAVE_BUSINESS_TIME_ZONE } from "../domain/business-date";
@@ -35,6 +35,9 @@ export function LeaveDateCalendar({ model, channel }: { model: Model; channel: H
         <p className="text-xs leading-5 text-muted-foreground">{model.isMultiDay ? "เลือกวันเริ่มต้น แล้วเลือกวันสิ้นสุด" : "เลือกวันทำงานที่ต้องการลา"} · เสาร์–อาทิตย์เลือกเป็นวันเริ่มต้นหรือสิ้นสุดไม่ได้</p>
         <div ref={setHost} className="relative min-w-0 rounded-lg border p-2 sm:p-3">
             <DayPicker locale={th} weekStartsOn={0} timeZone={LEAVE_BUSINESS_TIME_ZONE} month={month}
+                captionLayout="dropdown"
+                startMonth={new TZDate(year - 100, 0, 1, LEAVE_BUSINESS_TIME_ZONE)}
+                endMonth={new TZDate(year + 100, 11, 1, LEAVE_BUSINESS_TIME_ZONE)}
                 onMonthChange={(next) => { setDetail(null); setMonth(next); }} navLayout="around"
                 disabled={model.isSubmitting} onDayClick={(date, modifiers, event) => {
                     if (modifiers.disabled) return;
@@ -46,15 +49,16 @@ export function LeaveDateCalendar({ model, channel }: { model: Model; channel: H
                     range_end: (date) => dateKey(date) === end, range_middle: (date) => inRange(date) && dateKey(date) !== start && dateKey(date) !== end,
                     weekend: (date) => !isWorkingDay(dateKey(date)) }}
                 modifiersClassNames={{ weekend: "bg-muted text-muted-foreground", range_middle: "bg-primary/15", range_start: "rounded-l-md bg-primary text-primary-foreground", range_end: "rounded-r-md bg-primary text-primary-foreground" }}
-                formatters={{ formatCaption: (date) => formatCalendarDate(dateKey(date), true), formatWeekdayName: (date) => ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"][date.getDay()] }}
+                formatters={{ formatCaption: (date) => formatCalendarDate(dateKey(date), true), formatYearDropdown: (date) => String(Number(dateKey(date).slice(0, 4)) + 543), formatWeekdayName: (date) => ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"][date.getDay()] }}
                 labels={{ labelPrevious: () => "เดือนก่อนหน้า", labelNext: () => "เดือนถัดไป", labelGrid: (date) => formatCalendarDate(dateKey(date), true),
+                    labelMonthDropdown: () => "เลือกเดือน", labelYearDropdown: () => "เลือกปี พ.ศ.",
                     labelDayButton: (date) => {
                         const key = dateKey(date);
                         const items = byDate.get(key) ?? [];
                         return `${formatCalendarDate(key)}${!isWorkingDay(key) ? " · วันหยุดสุดสัปดาห์ เลือกไม่ได้" : ""}${items.length ? ` · ${items.map((item) => HOLIDAY_LABELS[item.classification]).join(" / ")}` : ""}`;
                     } }}
-                classNames={{ root: "w-full", months: "w-full", month: "relative w-full", month_caption: "flex h-11 items-center justify-center px-11 font-semibold", caption_label: "text-sm sm:text-base", nav: "flex justify-between", button_previous: "absolute left-0 top-0 size-11 rounded-md hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring", button_next: "absolute right-0 top-0 size-11 rounded-md hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring", chevron: "mx-auto size-5 fill-current", month_grid: "w-full table-fixed border-collapse text-center text-sm", weekday: "h-9 text-xs font-medium text-muted-foreground", day: "p-0 text-center", day_button: "relative flex min-h-11 w-full flex-col items-center justify-center rounded-md hover:ring-1 hover:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50", today: "font-bold underline underline-offset-4" }}
-                components={{ DayButton: HolidayDayButton }} />
+                classNames={{ root: "w-full", months: "w-full", month: "relative w-full", month_caption: "flex h-11 items-center justify-center px-11 font-semibold", caption_label: "text-sm sm:text-base", dropdowns: "flex min-w-0 items-center gap-1", nav: "flex justify-between", button_previous: "absolute left-0 top-0 size-11 rounded-md hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring", button_next: "absolute right-0 top-0 size-11 rounded-md hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring", chevron: "mx-auto size-5 fill-current", month_grid: "w-full table-fixed border-collapse text-center text-sm", weekday: "h-9 text-xs font-medium text-muted-foreground", day: "p-0 text-center", day_button: "relative flex min-h-11 w-full flex-col items-center justify-center rounded-md hover:ring-1 hover:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50", today: "font-bold underline underline-offset-4" }}
+                components={{ DayButton: HolidayDayButton, Dropdown: CalendarNavigationDropdown }} />
             {model.step === "edit" && detail && host && byDate.has(detail.date) ? <HolidayDetails key={detail.date} {...detail} events={byDate.get(detail.date) ?? []} calendar={host} close={() => setDetail(null)} /> : null}
         </div>
         <p className="text-xs leading-5 text-muted-foreground">วันนี้: ขีดใต้ · เสาร์–อาทิตย์: พื้นเทา · ขีดทึบ: วันหยุดตาม Google · วงกลมโปร่ง: วันสำคัญ · กรอบเส้นประ: ยังไม่ยืนยันประเภท</p>
@@ -87,6 +91,12 @@ export function LeaveDateCalendar({ model, channel }: { model: Model; channel: H
 }
 
 const CalendarEvents = createContext(new Map<string, readonly HolidayReferenceEvent[]>());
+
+function CalendarNavigationDropdown({ options, className: _className, ...props }: DropdownProps): ReactElement {
+    return <select {...props} className="min-h-11 min-w-0 rounded-md border border-input bg-background px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+        {options?.map(({ value, label, disabled }) => <option key={value} value={value} disabled={disabled}>{label}</option>)}
+    </select>;
+}
 
 function HolidayDayButton(props: DayButtonProps): ReactElement {
     const byDate = useContext(CalendarEvents);
