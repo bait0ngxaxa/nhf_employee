@@ -33,7 +33,7 @@ function EmployeeManagementContent() {
     ].some((capability) => capability === true);
 
     return (
-        <div className="min-h-[calc(100dvh-6rem)]">
+        <div className="min-h-[calc(100dvh-6rem)] rounded-xl border border-border-subtle/70 bg-dashboard-workspace dark:border-0 dark:bg-background sm:rounded-2xl">
             <div className="min-w-0 space-y-8 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 <header className="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-center">
                     <div className="min-w-0 space-y-1">
@@ -44,7 +44,7 @@ function EmployeeManagementContent() {
                         >
                             {canManageEmployees ? "จัดการพนักงาน" : "ข้อมูลพนักงาน"}
                         </h1>
-                        <p className="font-medium text-content-neutral-muted">
+                        <p className="font-medium text-content-neutral-secondary dark:text-content-neutral-muted">
                             {canManageEmployees
                                 ? "จัดการข้อมูลพนักงานและสิทธิ์การเข้าถึง"
                                 : "ดูข้อมูลพนักงานในองค์กร"}

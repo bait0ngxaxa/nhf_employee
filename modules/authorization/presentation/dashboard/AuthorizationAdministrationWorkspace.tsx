@@ -101,7 +101,7 @@ export function AuthorizationAdministrationWorkspace({
     }, []);
 
     return (
-        <main className="mx-auto w-full max-w-[1440px] space-y-5 px-4 py-5 sm:px-6 sm:py-7 xl:px-8">
+        <main className="mx-auto w-full max-w-[1440px] space-y-5 rounded-xl border border-border-subtle/70 bg-dashboard-workspace px-4 py-5 sm:rounded-2xl sm:px-6 sm:py-7 xl:px-8 dark:border-0 dark:bg-background">
             <header className="flex flex-col gap-4 border-b border-border-subtle pb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-4xl">
                     <h1 className="text-2xl font-semibold tracking-tight text-content-heading sm:text-3xl">การจัดการสิทธิ์</h1>

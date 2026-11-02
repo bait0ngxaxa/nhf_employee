@@ -24,6 +24,14 @@ export function DashboardLayoutClient({
     const [pageAnnouncement, setPageAnnouncement] = useState("");
 
     useEffect(() => {
+        document.body.dataset.dashboardInputScope = "true";
+
+        return () => {
+            delete document.body.dataset.dashboardInputScope;
+        };
+    }, []);
+
+    useEffect(() => {
         if (
             status !== "authenticated" ||
             lastHandledMenuRef.current === selectedMenu

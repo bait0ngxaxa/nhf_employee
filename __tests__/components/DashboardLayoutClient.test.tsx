@@ -106,4 +106,25 @@ describe("DashboardLayoutClient page navigation", () => {
             ).toHaveFocus();
         });
     });
+
+    it("scopes Dashboard input tokens to the body for portaled controls", async () => {
+        const { unmount } = render(
+            <DashboardLayoutClient>
+                <h1 data-page-heading tabIndex={-1}>
+                    หน้าหลัก
+                </h1>
+            </DashboardLayoutClient>,
+        );
+
+        await waitFor(() => {
+            expect(document.body).toHaveAttribute(
+                "data-dashboard-input-scope",
+                "true",
+            );
+        });
+
+        unmount();
+
+        expect(document.body).not.toHaveAttribute("data-dashboard-input-scope");
+    });
 });
