@@ -41,7 +41,7 @@ function DashboardSidebarSkeleton(): ReactElement {
 
 function DashboardNavbarSkeleton(): ReactElement {
     return (
-        <header className="sticky top-0 z-30 shrink-0 border-b border-border-faint bg-surface/95 pt-[env(safe-area-inset-top)]">
+        <header className="sticky top-0 z-30 shrink-0 border-b border-border-subtle bg-surface-raised/95 dark:bg-background/95 pt-[env(safe-area-inset-top)]">
             <div className="flex min-h-12 min-w-0 items-center justify-between px-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] sm:px-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.5rem+env(safe-area-inset-right))] lg:pl-[calc(2.5rem+env(safe-area-inset-left))] lg:pr-[calc(2.5rem+env(safe-area-inset-right))]">
                 <Skeleton className="h-10 w-10 rounded-2xl lg:hidden" />
                 <div className="ml-auto flex items-center gap-2 sm:gap-4">
@@ -58,7 +58,7 @@ function DashboardNavbarSkeleton(): ReactElement {
 export function DashboardShellSkeleton(): ReactElement {
     return (
         <div
-            className="app-shell-background flex h-dvh min-h-0"
+            className="bg-dashboard-canvas flex h-dvh min-h-0"
             role="status"
             aria-live="polite"
             aria-busy="true"

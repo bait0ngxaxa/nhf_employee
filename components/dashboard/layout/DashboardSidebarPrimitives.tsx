@@ -86,7 +86,7 @@ function SidebarMenuItem({
                     title={sidebarOpen ? undefined : itemLabel}
                     className={cn(
                         "group/sidebar-item h-11 min-h-11 w-full cursor-pointer justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity] duration-150 ease-out focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px]",
-                        isActive ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        isActive ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-surface-muted hover:text-sidebar-accent-foreground",
                         !sidebarOpen && "justify-center px-0",
                         indented && sidebarOpen && "h-11 pl-9",
                         disabled && "cursor-not-allowed opacity-55",
@@ -150,7 +150,7 @@ function SidebarMenuGroup({
                 onClick={onToggle}
                 className={cn(
                     "flex h-11 min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg px-5 text-left text-xs font-semibold transition-[background-color,color] duration-150 ease-out focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50",
-                    active ? "text-sidebar-foreground" : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    active ? "text-sidebar-foreground" : "text-sidebar-foreground/60 hover:bg-surface-muted hover:text-sidebar-accent-foreground",
                 )}
             >
                 <span className="min-w-0 flex-1 truncate">{group.label}</span>

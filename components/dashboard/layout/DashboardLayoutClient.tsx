@@ -75,7 +75,7 @@ export function DashboardLayoutClient({
     }
 
     return (
-        <div className="app-shell-background flex h-dvh min-h-0">
+        <div className="bg-dashboard-canvas flex h-dvh min-h-0">
             {/* Desktop Sidebar */}
             <div className="hidden h-full flex-shrink-0 lg:block">
                 <DashboardSidebar variant="desktop" />

@@ -14,7 +14,7 @@ export function SectionShell({
     return (
         <div
             className={cn(
-                "min-h-[calc(100dvh-6rem)] min-w-0 rounded-xl border border-border-soft bg-surface sm:rounded-2xl",
+                "min-h-[calc(100dvh-6rem)] min-w-0 rounded-xl border border-border-soft bg-dashboard-workspace dark:bg-background sm:rounded-2xl",
                 className,
             )}
         >
