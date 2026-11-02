@@ -228,7 +228,7 @@ function BrowseCardBase(props: BrowseCardProps) {
                             <span
                                 className={`rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums leading-5 shadow-sm ${
                                     availableQuantity === 0
-                                        ? "bg-surface-muted text-content-muted"
+                                        ? "bg-surface-muted text-content-secondary dark:text-content-muted"
                                         : "bg-surface-raised text-content-strong"
                                 }`}
                             >

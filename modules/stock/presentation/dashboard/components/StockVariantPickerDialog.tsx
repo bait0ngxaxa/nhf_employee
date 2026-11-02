@@ -316,7 +316,7 @@ function StockVariantPickerDialogSession({
                                                     <div
                                                         className={`max-w-full rounded-lg px-2.5 py-1 text-right text-sm font-bold [overflow-wrap:anywhere] ${
                                                             availableQuantity === 0
-                                                                ? "bg-surface-muted text-content-muted"
+                                                                ? "bg-surface-muted text-content-secondary dark:text-content-muted"
                                                                 : isSelected
                                                                     ? "bg-surface-raised text-status-success-strong"
                                                                     : "bg-surface-muted text-content-strong"

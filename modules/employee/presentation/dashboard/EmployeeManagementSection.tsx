@@ -44,7 +44,7 @@ function EmployeeManagementContent() {
                         >
                             {canManageEmployees ? "จัดการพนักงาน" : "ข้อมูลพนักงาน"}
                         </h1>
-                        <p className="font-medium text-content-neutral-muted">
+                        <p className="font-medium text-content-neutral-secondary dark:text-content-neutral-muted">
                             {canManageEmployees
                                 ? "จัดการข้อมูลพนักงานและสิทธิ์การเข้าถึง"
                                 : "ดูข้อมูลพนักงานในองค์กร"}

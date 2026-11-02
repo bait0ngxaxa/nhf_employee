@@ -308,7 +308,7 @@
     --accent-foreground: oklch(0.21 0.006 285.885);
     --destructive: oklch(0.577 0.245 27.325);
     --border: #e2e8f0;
-    --input: #8291a5;
+    --input: oklch(0.92 0.004 286.32);
     --ring: oklch(0.588 0.158 241.966);
     --chart-1: oklch(0.646 0.222 41.116);
     --chart-2: oklch(0.6 0.118 184.704);
@@ -877,6 +877,10 @@
     --brand-logo-shadow: 0 4px 8px rgb(0 0 0 / 30%), 0 1px 2px rgb(0 0 0 / 20%);
     --employee-table-sticky-shadow: -10px 0 18px -18px rgb(0 0 0 / 45%);
     --brand-sheen-subtle: linear-gradient(135deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 0%) 45%);
+}
+
+:root:not(.dark) body[data-dashboard-input-scope] {
+    --input: #8291a5;
 }
 
 @layer base {

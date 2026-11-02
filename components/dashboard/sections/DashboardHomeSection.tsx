@@ -252,7 +252,7 @@ function RegularCard({
             )}
         >
             {disabled && (
-                <span className="absolute right-4 top-4 z-10 rounded-full border border-border-subtle bg-surface-muted px-3 py-1 text-xs font-semibold text-content-muted">
+                <span className="absolute right-4 top-4 z-10 rounded-full border border-border-subtle bg-surface-muted px-3 py-1 text-xs font-semibold text-content-secondary dark:text-content-muted">
                     เร็วๆ นี้
                 </span>
             )}
