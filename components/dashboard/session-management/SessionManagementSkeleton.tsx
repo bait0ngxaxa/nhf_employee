@@ -30,7 +30,7 @@ function SessionRowSkeleton(): ReactElement {
 export function SessionManagementSkeleton(): ReactElement {
     return (
         <section
-            className="min-h-[calc(100dvh-6rem)] bg-surface-subtle px-4 py-6 md:px-8 md:py-8"
+            className="min-h-[calc(100dvh-6rem)] bg-dashboard-workspace px-4 py-6 md:px-8 md:py-8"
             role="status"
             aria-live="polite"
             aria-busy="true"

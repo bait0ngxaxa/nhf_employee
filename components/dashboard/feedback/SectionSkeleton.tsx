@@ -56,7 +56,7 @@ export function PaginationSkeleton(): ReactElement {
 export function DashboardHomeSkeleton(): ReactElement {
     return (
         <div
-            className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-surface-subtle p-4 sm:rounded-3xl md:p-8"
+            className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-dashboard-workspace p-4 sm:rounded-3xl md:p-8"
             role="status"
             aria-live="polite"
             aria-busy="true"

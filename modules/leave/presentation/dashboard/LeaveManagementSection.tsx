@@ -57,7 +57,7 @@ export function LeaveManagementSection({ routeTab = "my-leave" }: LeaveManagemen
     }
 
     return (
-        <SectionShell className="border-border-subtle/70 bg-surface">
+        <SectionShell className="border-border-subtle/70 bg-dashboard-workspace">
             <SectionHeader
                 title="NHF Leave"
                 subtitle="จัดการวันลาพักผ่อน ลากิจ ลาป่วย และตรวจสอบโควต้าของคุณ"

@@ -68,7 +68,7 @@ function StockContent() {
     ];
 
     return (
-        <SectionShell className="border-border-subtle/70 bg-surface">
+        <SectionShell className="border-border-subtle/70 bg-dashboard-workspace">
             <SectionHeader
                 title="NHF Stock"
                 subtitle="เบิกจ่ายวัสดุสำนักงาน"
