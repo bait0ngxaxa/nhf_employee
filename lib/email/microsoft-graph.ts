@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 import type { EmailData } from "./types";
 
@@ -28,7 +28,7 @@ interface CachedAccessToken {
     expiresAt: number;
 }
 
-let mimeTransporter: nodemailer.Transporter | null = null;
+let mimeTransporter: Transporter | null = null;
 let cachedAccessToken: CachedAccessToken | null = null;
 let pendingTokenRequest: Promise<CachedAccessToken | null> | null = null;
 
@@ -58,7 +58,7 @@ function getMicrosoftGraphConfig(): MicrosoftGraphConfig | null {
     };
 }
 
-function getMimeTransporter(): nodemailer.Transporter {
+function getMimeTransporter(): Transporter {
     if (!mimeTransporter) {
         mimeTransporter = nodemailer.createTransport({
             streamTransport: true,

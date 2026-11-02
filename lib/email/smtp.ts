@@ -1,8 +1,8 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 import type { EmailData } from "./types";
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 let isTransporterReady = false;
 const DEFAULT_EMAIL_FROM_NAME = "NHFapp";
 
@@ -24,7 +24,7 @@ function getSafeErrorMessage(error: unknown): string {
     return message;
 }
 
-function getTransporter(): nodemailer.Transporter {
+function getTransporter(): Transporter {
     if (!transporter) {
         transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || "smtp.gmail.com",
