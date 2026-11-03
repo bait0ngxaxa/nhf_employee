@@ -1,16 +1,18 @@
 import { loadEnvConfig } from "@next/env";
 
 import type { LineFlexMessage } from "@/types/api";
+import {
+    assessLineValidationResponse,
+    type LineValidationExpectation,
+} from "./line-flex-validation-response";
 
 const VALIDATION_ENDPOINT = "https://api.line.me/v2/bot/message/validate/push";
 const ACTION_URI_PREFIX = "https://example.com/";
 
-type ProbeExpectation = "accept" | "reject" | "observe";
-
 type BoundaryProbe = {
     readonly name: string;
     readonly message: LineFlexMessage;
-    readonly expectation: ProbeExpectation;
+    readonly expectation: LineValidationExpectation;
 };
 
 function createMessage(label: string, uri = "https://example.com/details", includeBody = true): LineFlexMessage {
@@ -37,34 +39,42 @@ function createProbes(): readonly BoundaryProbe[] {
     const uri10001 = `${ACTION_URI_PREFIX}${"x".repeat(10_001 - ACTION_URI_PREFIX.length)}`;
 
     return [
-        { name: "ASCII label: 40 characters", message: createMessage("a".repeat(40)), expectation: "accept" },
-        { name: "ASCII label: 41 characters", message: createMessage("a".repeat(41)), expectation: "reject" },
+        { name: "ASCII label: 40 characters", message: createMessage("a".repeat(40)), expectation: { kind: "accept" } },
+        {
+            name: "ASCII label: 41 characters",
+            message: createMessage("a".repeat(41)),
+            expectation: { kind: "reject", boundary: { property: "action.label", maxCharacters: 40 } },
+        },
         {
             name: "Thai base + tone mark: 40 graphemes / 80 code points / 80 UTF-16 units",
             message: createMessage("ก้".repeat(40)),
-            expectation: "observe",
+            expectation: { kind: "observe", boundary: { property: "action.label", maxCharacters: 40 } },
         },
         {
             name: "Thai base + tone mark: 41 graphemes / 82 code points / 82 UTF-16 units",
             message: createMessage("ก้".repeat(41)),
-            expectation: "observe",
+            expectation: { kind: "observe", boundary: { property: "action.label", maxCharacters: 40 } },
         },
         {
             name: "Emoji: 40 graphemes / 40 code points / 80 UTF-16 units",
             message: createMessage("😀".repeat(40)),
-            expectation: "observe",
+            expectation: { kind: "observe", boundary: { property: "action.label", maxCharacters: 40 } },
         },
         {
             name: "Emoji: 41 graphemes / 41 code points / 82 UTF-16 units",
             message: createMessage("😀".repeat(41)),
-            expectation: "observe",
+            expectation: { kind: "observe", boundary: { property: "action.label", maxCharacters: 40 } },
         },
-        { name: "URI: 10,000 characters", message: createMessage("เปิด", uri10000), expectation: "accept" },
-        { name: "URI: 10,001 characters", message: createMessage("เปิด", uri10001), expectation: "reject" },
+        { name: "URI: 10,000 characters", message: createMessage("เปิด", uri10000), expectation: { kind: "accept" } },
+        {
+            name: "URI: 10,001 characters",
+            message: createMessage("เปิด", uri10001),
+            expectation: { kind: "reject", boundary: { property: "action.uri", maxCharacters: 10_000 } },
+        },
         {
             name: "Bubble without body and with an empty Box contents array",
             message: createMessage("เปิดรายละเอียด", undefined, false),
-            expectation: "accept",
+            expectation: { kind: "accept" },
         },
     ];
 }
@@ -78,21 +88,9 @@ async function validateProbe(probe: BoundaryProbe, token: string): Promise<boole
         },
         body: JSON.stringify({ messages: [probe.message] }),
     });
-
-    if (response.status === 401 || response.status === 403) {
-        throw new Error(`LINE validation endpoint rejected credentials (HTTP ${response.status}).`);
-    }
-
-    const accepted = response.ok;
-    const status = accepted ? "accepted" : `rejected (HTTP ${response.status})`;
-    const expectation = probe.expectation === "observe"
-        ? "provider result recorded"
-        : `expected ${probe.expectation === "accept" ? "acceptance" : "rejection"}`;
-    process.stdout.write(`${probe.name}: ${status}; ${expectation}\n`);
-
-    if (probe.expectation === "accept") return accepted;
-    if (probe.expectation === "reject") return !accepted;
-    return true;
+    const result = assessLineValidationResponse(response.status, await response.text(), probe.expectation);
+    process.stdout.write(`${probe.name}: ${result.summary}\n`);
+    return result.passed;
 }
 
 async function main(): Promise<void> {

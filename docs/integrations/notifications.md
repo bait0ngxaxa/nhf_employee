@@ -444,7 +444,11 @@ emoji at the boundary, run `npm run line:flex:validate-contract` with a valid
 `LINE_APP_CHANNEL_ACCESS_TOKEN`. It calls LINE's
 [`validate/push` endpoint](https://developers.line.biz/en/reference/messaging-api/nojs/)
 with message objects only; the endpoint validates the `messages` array and does
-not send messages. It reports the provider result for Unicode boundary probes.
+not send messages. The probe treats only HTTP 200 and 400 as validation results;
+all other statuses fail. Expected 400 responses must include structured LINE
+error details identifying the specific action field and its tested length limit.
+Unicode boundary probes report acceptance or a matching length rejection, and
+fail if LINE reports an unrelated validation error.
 
 Shared Flex text and buttons set `scaling: true` so supported LINE clients can
 honor the user's font-size setting. Clients that ignore `scaling` still receive
