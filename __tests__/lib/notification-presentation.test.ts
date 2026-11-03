@@ -1,9 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { generateNotificationEmailHTML } from "@/lib/email/templates/notification";
-import { NOTIFICATION_MODULES, notificationSubject, notificationAltText, type NotificationModule } from "@/shared/notifications/presentation";
+import {
+    NOTIFICATION_COLORS,
+    NOTIFICATION_MODULES,
+    NOTIFICATION_STATUS_COLORS,
+    notificationSubject,
+    notificationAltText,
+    type NotificationModule,
+} from "@/shared/notifications/presentation";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
 
 describe("NHFapp notification presentation contract", () => {
+    it("keeps brand and semantic status colors in separate serializable token maps", () => {
+        expect(NOTIFICATION_COLORS).toMatchObject({
+            brandPrimary: "#174A63",
+            brandAction: "#176B87",
+            surface: "#FFFFFF",
+            surfaceSubtle: "#F3F7F9",
+        });
+        expect(NOTIFICATION_STATUS_COLORS).toEqual({
+            information: "#2563EB",
+            success: "#047857",
+            warning: "#B45309",
+            danger: "#B91C1C",
+            neutral: NOTIFICATION_COLORS.muted,
+        });
+        expect(JSON.parse(JSON.stringify(NOTIFICATION_STATUS_COLORS))).toEqual(NOTIFICATION_STATUS_COLORS);
+    });
+
     it.each(["IT", "Leave", "Routine", "Stock", "Account"] as const)("renders the same Email structure with %s identity", (module) => {
         const html = generateNotificationEmailHTML({ module, categoryLabel: "หมวดทดสอบ", title: "ผลการดำเนินการ",
             intro: "กรุณาตรวจสอบรายละเอียด", details: [{ label: "เลขที่", value: "#123" }],

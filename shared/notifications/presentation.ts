@@ -1,4 +1,25 @@
 /** Presentation identity only; event meaning and audiences remain domain-owned. */
+export const NOTIFICATION_COLORS = {
+    brandPrimary: "#174A63",
+    brandAction: "#176B87",
+    heading: "#173B50",
+    body: "#374151",
+    muted: "#6B7280",
+    surface: "#FFFFFF",
+    surfaceSubtle: "#F3F7F9",
+    border: "#E5E7EB",
+} as const;
+
+export const NOTIFICATION_STATUS_COLORS = {
+    information: "#2563EB",
+    success: "#047857",
+    warning: "#B45309",
+    danger: "#B91C1C",
+    neutral: NOTIFICATION_COLORS.muted,
+} as const;
+
+export type NotificationStatus = keyof typeof NOTIFICATION_STATUS_COLORS;
+
 export const NOTIFICATION_MODULES = {
     IT: { label: "IT", sender: "NHFapp | ระบบ IT" },
     Leave: { label: "วันลา", sender: "NHFapp | ระบบวันลา" },
