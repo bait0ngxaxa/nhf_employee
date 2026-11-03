@@ -9,11 +9,14 @@ import {
     notificationFlexStatus,
 } from "@/lib/line/notification-flex";
 import {
+    MAX_APPLICATION_ACTION_LABEL_UTF16_CODE_UNITS,
     MAX_ACTION_LABEL_CHARACTERS,
     MAX_ACTION_URI_CHARACTERS,
     MAX_APPLICATION_ALT_TEXT_CHARACTERS,
     MAX_BUBBLE_JSON_BYTES,
     MAX_PROVIDER_ALT_TEXT_CHARACTERS,
+    validateLineFlexProviderContract,
+    validateNotificationFlexApplicationContract,
     validateNotificationFlexMessage,
 } from "@/__tests__/lib/notification-flex-contract";
 
@@ -43,16 +46,23 @@ function createContractFixture(options: ContractFixtureOptions = {}): unknown {
     if (!options.omitBodyWrap) text.wrap = true;
     if (options.unsupportedTextProperty) text.fontFamily = "Noto Sans Thai";
 
+    const action = options.actionType === "postback"
+        ? {
+            type: "postback",
+            label: options.actionLabel ?? "เปิดรายละเอียด",
+            data: "request=123",
+        }
+        : {
+            type: options.actionType ?? "uri",
+            label: options.actionLabel ?? "เปิดรายละเอียด",
+            uri: options.actionUri ?? "https://app.example.com/details",
+        };
     const button = {
         type: "button",
         style: "primary",
         height: "sm",
         scaling: true,
-        action: {
-            type: options.actionType ?? "uri",
-            label: options.actionLabel ?? "เปิดรายละเอียด",
-            uri: options.actionUri ?? "https://app.example.com/details",
-        },
+        action,
     };
     const bodyContents: unknown[] = [text];
     if (options.bodyIncludeButton) bodyContents.push(button);
@@ -84,7 +94,7 @@ function createContractFixture(options: ContractFixtureOptions = {}): unknown {
     };
 }
 
-describe("LINE Flex provider and application contract", () => {
+describe("LINE Flex provider constraints and NHFapp application contract", () => {
     it("scales shared identity, title, detail, status and action text", () => {
         const message = buildNotificationFlex({
             module: "Stock",
@@ -177,6 +187,46 @@ describe("LINE Flex provider and application contract", () => {
         expect(validateNotificationFlexMessage(message)).toEqual([]);
     });
 
+    it("uses an explicitly conservative UTF-16 limit for NHFapp action labels", () => {
+        const atLimit = createContractFixture({ actionLabel: "ก้".repeat(MAX_APPLICATION_ACTION_LABEL_UTF16_CODE_UNITS / 2) });
+        const beyondLimit = createContractFixture({ actionLabel: "ก้".repeat((MAX_APPLICATION_ACTION_LABEL_UTF16_CODE_UNITS / 2) + 1) });
+
+        expect(validateNotificationFlexApplicationContract(atLimit)).toEqual([]);
+        expect(validateNotificationFlexApplicationContract(beyondLimit).join("\n"))
+            .toContain(`${MAX_APPLICATION_ACTION_LABEL_UTF16_CODE_UNITS} UTF-16 code units`);
+    });
+
+    it("documents why Unicode label boundaries require the LINE endpoint probe", () => {
+        const label = "ก้".repeat(40);
+        const graphemeCount = Array.from(new Intl.Segmenter("th", { granularity: "grapheme" }).segment(label)).length;
+        const codePointCount = Array.from(label).length;
+
+        expect(graphemeCount).toBe(40);
+        expect(codePointCount).toBe(80);
+        expect(label.length).toBe(80);
+        expect(validateNotificationFlexApplicationContract(createContractFixture({ actionLabel: label })).join("\n"))
+            .toContain("UTF-16 code units");
+    });
+
+    it("counts emoji surrogate pairs in the conservative NHFapp action-label limit", () => {
+        const atLimit = createContractFixture({ actionLabel: "😀".repeat(20) });
+        const beyondLimit = createContractFixture({ actionLabel: "😀".repeat(21) });
+
+        expect(validateNotificationFlexApplicationContract(atLimit)).toEqual([]);
+        expect(validateNotificationFlexApplicationContract(beyondLimit).join("\n"))
+            .toContain("UTF-16 code units");
+    });
+
+    it("accepts valid provider button action types and enforces NHFapp's URI-only action convention", () => {
+        const postback = createContractFixture({ actionType: "postback" });
+
+        expect(validateLineFlexProviderContract(postback)).toEqual([]);
+        expect(validateNotificationFlexApplicationContract(postback).join("\n"))
+            .toContain("action.type must be uri for NHFapp notification actions");
+        expect(validateLineFlexProviderContract(createContractFixture({ actionType: "not-a-line-action" })).join("\n"))
+            .toContain("action.type is not a supported Flex button action");
+    });
+
     it.each([
         "http://app.example.com/details",
         "https://app.example.com/details",
@@ -188,14 +238,14 @@ describe("LINE Flex provider and application contract", () => {
 
     it.each([
         ["overlong button label", createContractFixture({ actionLabel: "a".repeat(41) }), "action.label exceeds 40"],
-        ["overlong button URL", createContractFixture({ actionUri: `https://app.example.com/${"x".repeat(1_000)}` }), "action.uri exceeds 1000"],
+        ["overlong button URL", createContractFixture({ actionUri: `https://app.example.com/${"x".repeat(10_000)}` }), "action.uri exceeds 10000"],
         ["unsupported action scheme", createContractFixture({ actionUri: "javascript:alert(1)" }), "action.uri uses an unsupported scheme"],
-        ["unsupported button action type", createContractFixture({ actionType: "postback" }), "action.type must be uri"],
-        ["discontinued spacer component", createContractFixture({ extraBodyComponentType: "spacer" }), "not a supported Flex component"],
+        ["unsupported button action type", createContractFixture({ actionType: "not-a-line-action" }), "action.type is not a supported Flex button action"],
+        ["discontinued spacer component", createContractFixture({ extraBodyComponentType: "spacer" }), "NHFapp-supported Flex component subset"],
         ["unsupported component property", createContractFixture({ unsupportedTextProperty: true }), "unsupported property fontFamily"],
         ["unsupported component nesting", createContractFixture({ bodyLayout: "baseline", bodyIncludeButton: true }), "type button is unsupported in baseline layout"],
         ["long text without wrapping", createContractFixture({ bodyText: "รายละเอียดงานภาษาไทยที่ต้องอ่านได้ครบถ้วนแม้หน้าจอจะแคบ", omitBodyWrap: true }), "wrap must be true for long notification text"],
-        ["overlong application alt text", createContractFixture({ altText: "ก".repeat(401) }), "400-character application convention"],
+        ["overlong application alt text", createContractFixture({ altText: "ก".repeat(401) }), "400-character NHFapp convention"],
         ["overlong LINE alt text", createContractFixture({ altText: "ก".repeat(1_501) }), "1500-character LINE limit"],
         ["oversized UTF-8 bubble JSON", createContractFixture({ bodyText: "ก".repeat(12_000) }), "bubble JSON exceeds"],
     ])("rejects %s", (_name, message, expectedError) => {
@@ -230,5 +280,22 @@ describe("LINE Flex provider and application contract", () => {
 
         expect(validateNotificationFlexMessage(missingText).join("\n")).toContain(".text is required");
         expect(validateNotificationFlexMessage(missingAction).join("\n")).toContain(".action is required");
+    });
+
+    it("allows empty Box contents under provider rules and keeps Bubble body required only for NHFapp", () => {
+        const message = createContractFixture();
+        if (!isRecord(message) || !isRecord(message.contents) || !isRecord(message.contents.header)) {
+            throw new Error("Bubble fixture is invalid");
+        }
+        message.contents.header.contents = [];
+
+        expect(validateLineFlexProviderContract(message)).toEqual([]);
+        expect(validateNotificationFlexApplicationContract(message)).toEqual([]);
+
+        delete message.contents.body;
+
+        expect(validateLineFlexProviderContract(message)).toEqual([]);
+        expect(validateNotificationFlexApplicationContract(message).join("\n"))
+            .toContain("body is required by the NHFapp notification contract");
     });
 });

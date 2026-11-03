@@ -419,7 +419,7 @@ acceptance on supported LINE devices.
 #### LINE Flex constraints and accessibility
 
 The shared renderer uses URI buttons. LINE limits a Flex button action label to
-40 characters and its URI to 1,000 characters; accepted URI schemes are `http`,
+40 characters and its URI to 10,000 characters; accepted URI schemes are `http`,
 `https`, `line` and `tel`. LINE deprecates the `line://` URI scheme and recommends
 HTTPS links for LINE and LIFF features. A Bubble's JSON definition is limited to
 30 KB, and Flex `altText` to 1,500 characters. The contract test measures Bubble
@@ -427,6 +427,24 @@ size using UTF-8 bytes. The application keeps its shorter 400-character `altText
 convention through `notificationAltText()`; 400 is an NHFapp limit, not the
 provider limit. See the [Messaging API reference](https://developers.line.biz/en/reference/messaging-api/nojs/)
 and [LINE URL scheme guidance](https://developers.line.biz/en/docs/messaging-api/using-line-url-scheme/).
+
+The test helper separates LINE constraints from NHFapp conventions. Provider
+checks accept empty Box `contents` arrays and do not require the optional Bubble
+`body`; the NHFapp application contract requires a body, a 400-character
+`altText` cap, scalable text and buttons, wrapping for long text, and URI-only
+notification actions. The helper models the Flex component subset emitted by
+NHFapp; LINE's endpoint remains the provider authority for message validation.
+
+LINE documents a 40-character action-label limit but does not define whether
+Unicode labels are counted as grapheme clusters, code points, or UTF-16 units.
+The local provider check enforces the limit for ASCII labels, where those units
+agree. The NHFapp test contract applies a conservative 40 UTF-16 code-unit cap
+for action labels. To inspect provider handling of Thai combining marks and
+emoji at the boundary, run `npm run line:flex:validate-contract` with a valid
+`LINE_APP_CHANNEL_ACCESS_TOKEN`. It calls LINE's
+[`validate/push` endpoint](https://developers.line.biz/en/reference/messaging-api/nojs/)
+with message objects only; the endpoint validates the `messages` array and does
+not send messages. It reports the provider result for Unicode boundary probes.
 
 Shared Flex text and buttons set `scaling: true` so supported LINE clients can
 honor the user's font-size setting. Clients that ignore `scaling` still receive
