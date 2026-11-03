@@ -16,6 +16,7 @@ export interface LineFlexText {
   color?: string;
   size?: 'xxs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl' | '3xl' | '4xl' | '5xl';
   wrap?: boolean;
+  scaling?: boolean;
   flex?: number;
   margin?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
 }
@@ -40,6 +41,7 @@ export interface LineFlexButton {
     uri: string;
   };
   color?: string;
+  scaling?: boolean;
 }
 
 export interface LineFlexBox {

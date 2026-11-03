@@ -35,9 +35,9 @@ type SupportedFlexComponentType = Exclude<LineFlexComponent["type"], "spacer">;
 
 const FLEX_COMPONENT_PROPERTIES = {
     box: ["type", "layout", "contents", "spacing", "margin", "backgroundColor", "paddingAll", "flex"],
-    button: ["type", "style", "height", "action", "color"],
+    button: ["type", "style", "height", "action", "color", "scaling"],
     separator: ["type", "margin"],
-    text: ["type", "text", "weight", "color", "size", "wrap", "flex", "margin"],
+    text: ["type", "text", "weight", "color", "size", "wrap", "flex", "margin", "scaling"],
 } satisfies Record<SupportedFlexComponentType, readonly string[]>;
 
 const FLEX_COMPONENT_TYPES = Object.keys(FLEX_COMPONENT_PROPERTIES);
@@ -146,6 +146,7 @@ function validateFlexComponent(
         if (value.wrap !== undefined && typeof value.wrap !== "boolean") {
             errors.push(`${path}.wrap is invalid`);
         }
+        if (value.scaling !== true) errors.push(`${path}.scaling must be true for notification text`);
         if (value.size !== undefined && (typeof value.size !== "string" || !FLEX_SIZES.has(String(value.size)))) {
             errors.push(`${path}.size is invalid`);
         }
@@ -166,6 +167,7 @@ function validateFlexComponent(
     }
 
     if (componentType === "button") {
+        if (value.scaling !== true) errors.push(`${path}.scaling must be true for notification buttons`);
         if (value.style !== undefined && !["link", "primary", "secondary"].includes(String(value.style))) {
             errors.push(`${path}.style is invalid`);
         }
@@ -264,6 +266,7 @@ function createContractFixture(options: ContractFixtureOptions = {}): unknown {
     const text: Record<string, unknown> = {
         type: "text",
         text: options.bodyText ?? "รายละเอียด",
+        scaling: true,
     };
     if (!options.omitBodyWrap) text.wrap = true;
     if (options.unsupportedTextProperty) text.fontFamily = "Noto Sans Thai";
@@ -272,6 +275,7 @@ function createContractFixture(options: ContractFixtureOptions = {}): unknown {
         type: "button",
         style: "primary",
         height: "sm",
+        scaling: true,
         action: {
             type: options.actionType ?? "uri",
             label: options.actionLabel ?? "เปิดรายละเอียด",
@@ -292,7 +296,7 @@ function createContractFixture(options: ContractFixtureOptions = {}): unknown {
             header: {
                 type: "box",
                 layout: "vertical",
-                contents: [{ type: "text", text: "NHFapp", wrap: true }],
+                contents: [{ type: "text", text: "NHFapp", wrap: true, scaling: true }],
             },
             body: {
                 type: "box",
@@ -439,7 +443,7 @@ describe("LINE Flex provider and application contract", () => {
             title: longTaskTitle,
             altText: longTaskTitle,
             contents: [
-                notificationFlexDetail("หน่วยงาน", longOrganization),
+                notificationFlexDetail("หน่วยงาน", longOrganization, "stacked"),
                 notificationFlexStatus("สถานะ: รอดำเนินการ", "warning"),
             ],
             actionLabel: "ตรวจสอบรายละเอียด",
@@ -460,6 +464,32 @@ describe("LINE Flex provider and application contract", () => {
             type: "button",
             color: NOTIFICATION_COLORS.brandAction,
             action: { type: "uri", label: "ตรวจสอบรายละเอียด", uri: longActionUri },
+        });
+    });
+
+    it("uses compact details by default and stacks long content when requested", () => {
+        const compact = notificationFlexDetail("วันครบกำหนด", "10 พ.ย. 2569");
+        const stacked = notificationFlexDetail(
+            "รายละเอียดงาน",
+            "ตรวจสอบระบบสำรองข้อมูลและอุปกรณ์ประจำเดือนของหน่วยงาน",
+            "stacked",
+        );
+
+        expect(compact).toMatchObject({
+            type: "box",
+            layout: "horizontal",
+            contents: [
+                { type: "text", text: "วันครบกำหนด:", wrap: true, scaling: true, flex: 1 },
+                { type: "text", text: "10 พ.ย. 2569", wrap: true, scaling: true, flex: 2 },
+            ],
+        });
+        expect(stacked).toMatchObject({
+            type: "box",
+            layout: "vertical",
+            contents: [
+                { type: "text", text: "รายละเอียดงาน:", wrap: true, scaling: true },
+                { type: "text", text: "ตรวจสอบระบบสำรองข้อมูลและอุปกรณ์ประจำเดือนของหน่วยงาน", wrap: true, scaling: true },
+            ],
         });
     });
 

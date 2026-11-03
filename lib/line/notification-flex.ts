@@ -1,4 +1,4 @@
-import type { LineFlexComponent, LineFlexMessage } from "@/types/api";
+import type { LineFlexBox, LineFlexComponent, LineFlexMessage, LineFlexText } from "@/types/api";
 import {
     NOTIFICATION_COLORS,
     NOTIFICATION_MODULES,
@@ -19,6 +19,13 @@ interface NotificationFlexData {
     readonly status?: NotificationStatus;
 }
 
+export type NotificationFlexTextOptions = Pick<
+    Partial<LineFlexText>,
+    "color" | "flex" | "margin" | "size" | "weight"
+>;
+
+export type NotificationFlexDetailLayout = "compact" | "stacked";
+
 /** Provider presentation only: no audience, routing, event or delivery decisions. */
 export function buildNotificationFlex(data: NotificationFlexData): LineFlexMessage {
     return {
@@ -38,6 +45,7 @@ export function buildNotificationFlex(data: NotificationFlexData): LineFlexMessa
                     size: "sm",
                     weight: "bold",
                     wrap: true,
+                    scaling: true,
                 }],
             },
             body: {
@@ -55,6 +63,7 @@ export function buildNotificationFlex(data: NotificationFlexData): LineFlexMessa
                             ? NOTIFICATION_STATUS_COLORS[data.status]
                             : NOTIFICATION_COLORS.heading,
                         wrap: true,
+                        scaling: true,
                     },
                     ...data.contents,
                 ],
@@ -74,24 +83,45 @@ export function buildNotificationFlex(data: NotificationFlexData): LineFlexMessa
                         label: data.actionLabel,
                         uri: data.actionUrl,
                     },
+                    scaling: true,
                 }],
             },
         },
     };
 }
 
-export function notificationFlexText(text: string): LineFlexComponent {
-    return { type: "text", text, size: "sm", color: NOTIFICATION_COLORS.body, wrap: true };
+export function notificationFlexText(
+    text: string,
+    options: NotificationFlexTextOptions = {},
+): LineFlexText {
+    return {
+        ...options,
+        type: "text",
+        text,
+        size: options.size ?? "sm",
+        color: options.color ?? NOTIFICATION_COLORS.body,
+        wrap: true,
+        scaling: true,
+    };
 }
 
-export function notificationFlexDetail(label: string, value: string): LineFlexComponent {
+export function notificationFlexDetail(
+    label: string,
+    value: string,
+    layout: NotificationFlexDetailLayout = "compact",
+): LineFlexBox {
+    const compact = layout === "compact";
     return {
         type: "box",
-        layout: "vertical",
-        spacing: "xs",
+        layout: compact ? "horizontal" : "vertical",
+        spacing: compact ? "sm" : "xs",
         contents: [
-            { type: "text", text: `${label}:`, size: "xs", color: NOTIFICATION_COLORS.muted, wrap: true },
-            { type: "text", text: value, size: "sm", color: NOTIFICATION_COLORS.body, wrap: true },
+            notificationFlexText(`${label}:`, {
+                size: "xs",
+                color: NOTIFICATION_COLORS.muted,
+                ...(compact ? { flex: 1 } : {}),
+            }),
+            notificationFlexText(value, compact ? { flex: 2 } : {}),
         ],
     };
 }
@@ -107,5 +137,6 @@ export function notificationFlexStatus(
         weight: "bold",
         color: NOTIFICATION_STATUS_COLORS[status],
         wrap: true,
+        scaling: true,
     };
 }

@@ -3,7 +3,7 @@ import {
     notificationFlexDetail,
     notificationFlexText,
 } from "@/lib/line/notification-flex";
-import { NOTIFICATION_ACTIONS, NOTIFICATION_COLORS } from "@/shared/notifications/presentation";
+import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 import type { StockRequestLineData } from "../../../contracts/notifications";
 import { formatDate } from "@/lib/line/helpers";
@@ -37,14 +37,8 @@ export function generateStockRequestFlexMessage(
         title: "มีคำขอเบิกวัสดุใหม่",
         altText: `มีคำขอเบิกวัสดุใหม่ #${data.requestId}`,
         contents: [
-            notificationFlexText(`เลขที่คำขอ #${data.requestId}`),
-            {
-                type: "text",
-                text: data.requesterName,
-                weight: "bold",
-                size: "md",
-                wrap: true,
-            },
+            notificationFlexDetail("เลขที่คำขอ", `#${data.requestId}`),
+            notificationFlexText(data.requesterName, { weight: "bold", size: "md" }),
             {
                 type: "separator",
                 margin: "md",
@@ -59,28 +53,15 @@ export function generateStockRequestFlexMessage(
                     notificationFlexDetail("จำนวนรายการ", `${data.itemCount} รายการ`),
                     notificationFlexDetail("รวมจำนวนเบิก", `${data.totalQuantity}`),
                     notificationFlexDetail("วันที่ขอ", formatDate(data.requestedAt)),
-                    notificationFlexDetail("หมายเหตุ", noteText),
+                    notificationFlexDetail("หมายเหตุ", noteText, "stacked"),
                 ],
             },
             {
                 type: "separator",
                 margin: "lg",
             },
-            {
-                type: "text",
-                text: "รายการที่ขอเบิก",
-                weight: "bold",
-                size: "sm",
-                margin: "lg",
-            },
-            {
-                type: "text",
-                text: buildItemsPreview(data.items),
-                size: "sm",
-                color: NOTIFICATION_COLORS.body,
-                wrap: true,
-                margin: "sm",
-            },
+            notificationFlexText("รายการที่ขอเบิก", { weight: "bold", margin: "lg" }),
+            notificationFlexText(buildItemsPreview(data.items), { margin: "sm" }),
         ],
         actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests)}`,

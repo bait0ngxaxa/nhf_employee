@@ -45,26 +45,20 @@ type LeaveFlexMessageData = {
 
 function buildLeaveFlexMessage(data: LeaveFlexMessageData): LineFlexMessage {
     const detailContents: LineFlexComponent[] = [
-        {
-            type: "text",
-            text: "รายละเอียดคำขอ",
+        notificationFlexText("รายละเอียดคำขอ", {
             color: NOTIFICATION_COLORS.body,
             size: "sm",
             weight: "bold",
-            wrap: true,
-        },
+        }),
     ];
     if (data.statusLabel) {
         detailContents.push(notificationFlexStatus(`สถานะ: ${data.statusLabel}`, data.status));
     }
     if (data.details) {
-        detailContents.push({
-            type: "text",
-            text: data.details,
+        detailContents.push(notificationFlexText(data.details, {
             color: NOTIFICATION_COLORS.muted,
             size: "sm",
-            wrap: true,
-        });
+        }));
     }
 
     return buildNotificationFlex({

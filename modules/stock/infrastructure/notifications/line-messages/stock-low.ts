@@ -1,5 +1,9 @@
-import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
-import { NOTIFICATION_ACTIONS, NOTIFICATION_COLORS } from "@/shared/notifications/presentation";
+import {
+    buildNotificationFlex,
+    notificationFlexDetail,
+    notificationFlexText,
+} from "@/lib/line/notification-flex";
+import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 import type { StockLowLineData } from "../../../contracts/notifications";
 import { formatDate } from "@/lib/line/helpers";
@@ -34,26 +38,16 @@ export function generateStockLowFlexMessage(
         title: "วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ",
         altText: `วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ ${data.itemCount} รายการ`,
         contents: [
-            notificationFlexText(`แจ้งเตือนเมื่อ ${formatDate(data.alertedAt)}`),
-            {
-                type: "text",
-                text: `จำนวนรายการที่ต้องติดตาม ${data.itemCount} รายการ`,
+            notificationFlexDetail("แจ้งเตือนเมื่อ", formatDate(data.alertedAt)),
+            notificationFlexText(`จำนวนรายการที่ต้องติดตาม ${data.itemCount} รายการ`, {
                 weight: "bold",
                 size: "md",
-                wrap: true,
-            },
+            }),
             {
                 type: "separator",
                 margin: "md",
             },
-            {
-                type: "text",
-                text: buildItemsPreview(data.items),
-                size: "sm",
-                color: NOTIFICATION_COLORS.body,
-                wrap: true,
-                margin: "md",
-            },
+            notificationFlexText(buildItemsPreview(data.items), { margin: "md" }),
         ],
         actionLabel: NOTIFICATION_ACTIONS.inventory,
         actionUrl: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.inventory)}`,
