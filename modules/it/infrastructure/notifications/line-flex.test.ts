@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildITTicketLineFlexMessage } from "./line-flex";
 import { parseITTicketNotificationPayload } from "../../domain/ticket-notification";
 import { NOTIFICATION_COLORS, NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
+import { validateNotificationFlexMessage } from "@/__tests__/lib/notification-flex-contract";
 
 describe("IT Ticket personal LINE Flex message", () => {
     afterEach(() => {
@@ -96,6 +97,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         const serialized = JSON.stringify(message);
 
         expect(message.type).toBe("flex");
+        expect(validateNotificationFlexMessage(message)).toEqual([]);
         expect(message.contents.header?.backgroundColor).toBe(NOTIFICATION_COLORS.brandPrimary);
         expect(message.contents.footer?.contents[0]).toMatchObject({
             type: "button", color: NOTIFICATION_COLORS.brandAction, action: { label: input.action },

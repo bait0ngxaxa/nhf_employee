@@ -7,6 +7,7 @@ vi.mock("@/lib/line/app-notification", () => ({
 }));
 
 import { sendEmailRequestLineNotification } from "./email-request-line";
+import { validateNotificationFlexMessage } from "@/__tests__/lib/notification-flex-contract";
 
 describe("Email Request personal NHFapp LINE notification", () => {
     beforeEach(() => {
@@ -33,6 +34,7 @@ describe("Email Request personal NHFapp LINE notification", () => {
             retryKey: "stable-line-retry-key",
         });
         expect(input.message.altText).toBe("IT: มีคำขออีเมลพนักงานใหม่ #77");
+        expect(validateNotificationFlexMessage(input.message)).toEqual([]);
         expect(input.message.contents.body?.contents[0]).toMatchObject({ text: "มีคำขออีเมลพนักงานใหม่" });
         const serialized = JSON.stringify(input.message);
         expect(serialized).toContain("คำขออีเมลพนักงานใหม่ #77");

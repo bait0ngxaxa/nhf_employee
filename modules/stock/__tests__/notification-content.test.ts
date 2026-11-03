@@ -3,12 +3,14 @@ import { generateStockRequestFlexMessage } from "../infrastructure/notifications
 import { generateStockRequestResultFlexMessage } from "../infrastructure/notifications/line-messages/stock-request-result";
 import { generateStockLowFlexMessage } from "../infrastructure/notifications/line-messages/stock-low";
 import { NOTIFICATION_COLORS, NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
+import { validateNotificationFlexMessage } from "@/__tests__/lib/notification-flex-contract";
 
 describe("Stock LINE presentation", () => {
     it("keeps operational request destination and review intent", () => {
         const message = generateStockRequestFlexMessage({ requestId: 123, requesterName: "ผู้ขอ", projectCode: "PRJ",
             requestedAt: "2026-07-01T03:00:00Z", note: null, itemCount: 1, totalQuantity: 2,
             items: [{ name: "กระดาษ", quantity: 2, unit: "รีม" }] }, "https://app.example.com");
+        expect(validateNotificationFlexMessage(message)).toEqual([]);
         expect(message.altText).toBe("Stock: มีคำขอเบิกวัสดุใหม่ #123");
         expect(message.contents.header?.backgroundColor).toBe(NOTIFICATION_COLORS.brandPrimary);
         expect(message.contents.body?.contents[0]).toMatchObject({ text: "มีคำขอเบิกวัสดุใหม่" });
@@ -24,6 +26,7 @@ describe("Stock LINE presentation", () => {
             projectCode: "PRJ", recipient: { userId: 3, name: "ผู้ขอ", email: "private@example.com" },
             items: [{ name: "กระดาษ", quantity: 2, unit: "รีม" }], cancelReason: status === "CANCELLED" ? "มีวัสดุทดแทน" : null,
             actedAt: "2026-07-01T03:00:00Z", retryKey: "retry" }, "https://liff.line.me/app/stock?requestId=123");
+        expect(validateNotificationFlexMessage(message)).toEqual([]);
         expect(message.altText).toBe(`Stock: คำขอเบิกวัสดุ #123 ${status === "ISSUED" ? "ถูกจ่ายแล้ว" : "ถูกยกเลิก"}`);
         expect(message.contents.header?.contents[0]).toMatchObject({ text: "NHFapp | Stock · คำขอเบิกวัสดุ" });
         expect(message.contents.header?.backgroundColor).toBe(NOTIFICATION_COLORS.brandPrimary);
@@ -44,11 +47,104 @@ describe("Stock LINE presentation", () => {
     it("describes the low-stock threshold consistently without adding an audience", () => {
         const message = generateStockLowFlexMessage({ alertedAt: "2026-07-01T03:00:00Z", itemCount: 1,
             items: [{ itemId: 1, name: "กระดาษ", sku: "PAPER", quantity: 2, minStock: 3, unit: "รีม" }] }, "https://app.example.com");
+        expect(validateNotificationFlexMessage(message)).toEqual([]);
         expect(message.altText).toBe("Stock: วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ 1 รายการ");
         expect(message.contents.body?.contents[0]).toMatchObject({
             text: "วัสดุถึงจุดแจ้งเตือนสต็อกต่ำ",
             color: NOTIFICATION_STATUS_COLORS.warning,
         });
         expect(message.contents.footer?.contents[0]).toMatchObject({ action: { label: "เปิดคลังวัสดุ", uri: "https://app.example.com/dashboard/stock?stockTab=inventory" } });
+    });
+
+    it("keeps a long multiline request note and item overflow readable", () => {
+        const note = "กรุณาจัดส่งก่อนวันที่กำหนด & ตรวจสอบรายการ <ก่อนจ่าย>\n".repeat(12);
+        const itemName = "วัสดุสำนักงานสำหรับงานประจำเดือน".repeat(5);
+        const items = Array.from({ length: 4 }, (_, index) => ({
+            name: `${itemName} ${index + 1}`,
+            quantity: index + 1,
+            unit: "ชิ้น",
+        }));
+        const message = generateStockRequestFlexMessage({
+            requestId: 456,
+            requesterName: "ผู้ขอวัสดุ",
+            projectCode: "PRJ-2569/01",
+            requestedAt: "2026-11-03T03:00:00.000Z",
+            note,
+            itemCount: items.length,
+            totalQuantity: items.reduce((total, item) => total + item.quantity, 0),
+            items,
+        }, "https://app.example.com");
+        const body = message.contents.body?.contents;
+        const detailSection = body?.[4];
+        const itemPreview = body?.[7];
+        const firstItem = items[0];
+
+        expect(validateNotificationFlexMessage(message)).toEqual([]);
+        expect(note.length).toBeLessThanOrEqual(1_000);
+        expect(Array.from(itemName).length).toBeLessThanOrEqual(200);
+        if (!firstItem) throw new Error("Stock request fixture needs an item");
+        if (detailSection?.type !== "box") throw new Error("Stock request details are missing");
+        expect(detailSection.contents[4]).toMatchObject({
+            type: "box",
+            layout: "vertical",
+            contents: [
+                { text: "หมายเหตุ:", scaling: true, wrap: true },
+                { text: note, scaling: true, wrap: true },
+            ],
+        });
+        expect(itemPreview).toMatchObject({
+            type: "text",
+            text: expect.stringContaining(firstItem.name),
+            scaling: true,
+            wrap: true,
+        });
+        expect(JSON.stringify(itemPreview)).toContain("และอีก 1 รายการ");
+        expect(message.contents.footer?.contents[0]).toMatchObject({
+            action: {
+                label: "ตรวจสอบคำขอ",
+                uri: "https://app.example.com/dashboard/stock?stockTab=admin-requests",
+            },
+        });
+    });
+
+    it("keeps a long cancellation reason stacked and preserves result navigation", () => {
+        const cancelReason = "ขอยกเลิกเนื่องจากวัสดุไม่พร้อมจัดส่งและได้ประสานรายการทดแทนแล้ว ".repeat(6);
+        const items = Array.from({ length: 4 }, (_, index) => ({
+            name: `วัสดุสำนักงาน ${index + 1}`,
+            quantity: index + 1,
+            unit: "ชิ้น",
+        }));
+        const actionUrl = "https://liff.line.me/nhfapp-liff-id/stock?requestId=456";
+        const message = generateStockRequestResultFlexMessage({
+            schemaVersion: 1,
+            requestId: 456,
+            status: "CANCELLED",
+            projectCode: "PRJ-2569/01",
+            recipient: { userId: 3, name: "ผู้ขอวัสดุ", email: "private@example.com" },
+            items,
+            cancelReason,
+            actedAt: "2026-11-03T03:00:00.000Z",
+            retryKey: "stock:request:456:line",
+        }, actionUrl);
+        const body = message.contents.body?.contents;
+
+        expect(validateNotificationFlexMessage(message)).toEqual([]);
+        expect(cancelReason.length).toBeLessThanOrEqual(500);
+        expect(body?.[5]).toMatchObject({
+            type: "text",
+            text: "สถานะ: ยกเลิกแล้ว",
+            color: NOTIFICATION_STATUS_COLORS.danger,
+            scaling: true,
+        });
+        expect(body?.[6]).toMatchObject({
+            type: "box",
+            layout: "vertical",
+            contents: [
+                { text: "เหตุผล:", scaling: true, wrap: true },
+                { text: cancelReason, scaling: true, wrap: true },
+            ],
+        });
+        expect(JSON.stringify(body?.[9])).toContain("และอีก 1 รายการ");
+        expect(message.contents.footer?.contents[0]).toMatchObject({ action: { uri: actionUrl } });
     });
 });

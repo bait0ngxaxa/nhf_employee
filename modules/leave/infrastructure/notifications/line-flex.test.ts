@@ -19,6 +19,7 @@ import type {
     LeaveResultPayload,
 } from "../../application/notifications/notification-payloads";
 import { NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
+import { validateNotificationFlexMessage } from "@/__tests__/lib/notification-flex-contract";
 
 const employee = {
     employeeId: 10,
@@ -40,6 +41,13 @@ const leaveDetails = {
     period: "FULL_DAY" as const,
     durationDays: 2,
 };
+const actionUrls = {
+    history: "https://liff.line.me/nhfapp-liff-id/leave/history",
+    review: "https://liff.line.me/nhfapp-liff-id/leave/review",
+    result: "https://liff.line.me/nhfapp-liff-id/leave/history?result=1",
+    cancelled: "https://liff.line.me/nhfapp-liff-id/leave/history?cancelled=1",
+    notTaken: "https://liff.line.me/nhfapp-liff-id/leave/history?notTaken=1",
+} as const;
 
 function buildActionPayload(): LeaveActionPayload {
     return {
@@ -128,7 +136,7 @@ describe("Leave LINE Flex messages", () => {
                 status: "REJECTED",
                 reason: "ติดภารกิจ",
             },
-            "history-url",
+            actionUrls.history,
         );
 
         expect(JSON.stringify(message)).toContain("คำขอลาไม่ได้รับการอนุมัติ");
@@ -136,42 +144,45 @@ describe("Leave LINE Flex messages", () => {
     });
 
     it.each([
-        [generateLeaveActionFlexMessage(buildActionPayload(), "url"), "มีคำขอลาใหม่รออนุมัติ", "ตรวจสอบคำขอ"],
-        [generateLeaveResultFlexMessage(buildResultPayload(), "url"), "คำขอลาได้รับการอนุมัติ", "เปิดรายละเอียด"],
-        [generateLeaveResultFlexMessage({ ...buildResultPayload(), status: "REJECTED" }, "url"), "คำขอลาไม่ได้รับการอนุมัติ", "เปิดรายละเอียด"],
-        [generateLeaveCancelledFlexMessage(buildCancelledPayload(), "url"), "คำขอลาถูกยกเลิก", "เปิดรายละเอียด"],
-        [generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), "url"), "มีคำขอยกเลิกวันลารอยืนยัน", "ตรวจสอบคำขอ"],
-        [generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), "url"), "ยืนยันการยกเลิกวันลาแล้ว", "เปิดรายละเอียด"],
-        [generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), "url"), "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน", "ตรวจสอบคำขอ"],
-        [generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), "url"), "ยืนยันไม่ได้ใช้วันลาแล้ว", "เปิดรายละเอียด"],
+        [generateLeaveActionFlexMessage(buildActionPayload(), actionUrls.review), "มีคำขอลาใหม่รออนุมัติ", "ตรวจสอบคำขอ"],
+        [generateLeaveResultFlexMessage(buildResultPayload(), actionUrls.history), "คำขอลาได้รับการอนุมัติ", "เปิดรายละเอียด"],
+        [generateLeaveResultFlexMessage({ ...buildResultPayload(), status: "REJECTED" }, actionUrls.history), "คำขอลาไม่ได้รับการอนุมัติ", "เปิดรายละเอียด"],
+        [generateLeaveCancelledFlexMessage(buildCancelledPayload(), actionUrls.history), "คำขอลาถูกยกเลิก", "เปิดรายละเอียด"],
+        [generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), actionUrls.review), "มีคำขอยกเลิกวันลารอยืนยัน", "ตรวจสอบคำขอ"],
+        [generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), actionUrls.history), "ยืนยันการยกเลิกวันลาแล้ว", "เปิดรายละเอียด"],
+        [generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), actionUrls.review), "มีรายการแจ้งไม่ได้ใช้วันลารอยืนยัน", "ตรวจสอบคำขอ"],
+        [generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), actionUrls.history), "ยืนยันไม่ได้ใช้วันลาแล้ว", "เปิดรายละเอียด"],
     ] as const)("uses the canonical event title, privacy-safe preview and CTA", (message, title, action) => {
+        expect(validateNotificationFlexMessage(message)).toEqual([]);
         expect(message.altText).toBe(`วันลา: ${title}`);
         expect(message.contents.header?.contents[0]).toMatchObject({ text: "NHFapp | วันลา · คำขอลา" });
         expect(message.contents.body?.contents[0]).toMatchObject({ text: title });
-        expect(message.contents.footer?.contents[0]).toMatchObject({ action: { label: action, uri: "url" } });
+        expect(message.contents.footer?.contents[0]).toMatchObject({ action: { label: action } });
+        const button = message.contents.footer?.contents[0];
+        expect(button).toMatchObject({ action: { uri: expect.stringMatching(/^https:\/\//) } });
         expect(message.altText).not.toContain(employee.name);
     });
 
     it.each([
-        ["result", generateLeaveResultFlexMessage(buildResultPayload(), "result-url"), "result-url"],
-        ["cancelled", generateLeaveCancelledFlexMessage(buildCancelledPayload(), "cancel-url"), "cancel-url"],
-        ["cancellation request", generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), "review-url"), "review-url"],
-        ["cancelled after approval", generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), "history-url"), "history-url"],
-        ["not-taken request", generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), "not-taken-url"), "not-taken-url"],
-        ["not-taken confirmation", generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), "history-url"), "history-url"],
+        ["result", generateLeaveResultFlexMessage(buildResultPayload(), actionUrls.result), actionUrls.result],
+        ["cancelled", generateLeaveCancelledFlexMessage(buildCancelledPayload(), actionUrls.cancelled), actionUrls.cancelled],
+        ["cancellation request", generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), actionUrls.review), actionUrls.review],
+        ["cancelled after approval", generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), actionUrls.history), actionUrls.history],
+        ["not-taken request", generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), actionUrls.notTaken), actionUrls.notTaken],
+        ["not-taken confirmation", generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), actionUrls.history), actionUrls.history],
     ])("keeps the CTA supplied by the Leave LIFF flow for %s", (_label, message, expectedUrl) => {
         expect(getButtonUri(message)).toBe(expectedUrl);
     });
 
     it.each([
-        ["approval requested", generateLeaveActionFlexMessage(buildActionPayload(), "url"), "warning"],
-        ["approved", generateLeaveResultFlexMessage(buildResultPayload(), "url"), "success"],
-        ["rejected", generateLeaveResultFlexMessage({ ...buildResultPayload(), status: "REJECTED" }, "url"), "danger"],
-        ["cancelled", generateLeaveCancelledFlexMessage(buildCancelledPayload(), "url"), "neutral"],
-        ["cancellation requested", generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), "url"), "warning"],
-        ["cancelled after approval", generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), "url"), "neutral"],
-        ["not-taken requested", generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), "url"), "warning"],
-        ["not-taken confirmed", generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), "url"), "neutral"],
+        ["approval requested", generateLeaveActionFlexMessage(buildActionPayload(), actionUrls.review), "warning"],
+        ["approved", generateLeaveResultFlexMessage(buildResultPayload(), actionUrls.history), "success"],
+        ["rejected", generateLeaveResultFlexMessage({ ...buildResultPayload(), status: "REJECTED" }, actionUrls.history), "danger"],
+        ["cancelled", generateLeaveCancelledFlexMessage(buildCancelledPayload(), actionUrls.history), "neutral"],
+        ["cancellation requested", generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), actionUrls.review), "warning"],
+        ["cancelled after approval", generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), actionUrls.history), "neutral"],
+        ["not-taken requested", generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), actionUrls.notTaken), "warning"],
+        ["not-taken confirmed", generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), actionUrls.history), "neutral"],
     ] as const)("uses the typed semantic color for %s", (_label, message, status) => {
         expect(message.contents.body?.contents[0]).toMatchObject({
             color: NOTIFICATION_STATUS_COLORS[status],

@@ -416,6 +416,30 @@ versions, fonts and device widths. The official [Flex Message Simulator](https:/
 can preview JSON without sending a message; simulator preview does not replace
 acceptance on supported LINE devices.
 
+#### LINE Flex constraints and accessibility
+
+The shared renderer uses URI buttons. LINE limits a Flex button action label to
+40 characters and its URI to 1,000 characters; accepted URI schemes are `http`,
+`https`, `line` and `tel`. LINE deprecates the `line://` URI scheme and recommends
+HTTPS links for LINE and LIFF features. A Bubble's JSON definition is limited to
+30 KB, and Flex `altText` to 1,500 characters. The contract test measures Bubble
+size using UTF-8 bytes. The application keeps its shorter 400-character `altText`
+convention through `notificationAltText()`; 400 is an NHFapp limit, not the
+provider limit. See the [Messaging API reference](https://developers.line.biz/en/reference/messaging-api/nojs/)
+and [LINE URL scheme guidance](https://developers.line.biz/en/docs/messaging-api/using-line-url-scheme/).
+
+Shared Flex text and buttons set `scaling: true` so supported LINE clients can
+honor the user's font-size setting. Clients that ignore `scaling` still receive
+wrapped text and the normal Flex keyword sizes. Important content remains in
+separate text components; the templates do not combine scaling with
+`adjustMode: "shrink-to-fit"`.
+
+`notificationFlexDetail(label, value)` uses a compact, wrapping horizontal row
+for predictable fields such as dates, counts and request references. Pass
+`"stacked"` for variable or long text such as notes, reasons and task descriptions.
+Both layouts keep label and value in separate scalable text components. Text
+wrapping and flexible column proportions let rows grow naturally on narrow screens.
+
 ### Reusing the templates for a module
 
 1. Keep event titles, selected details, status mapping, action labels and URL
@@ -425,7 +449,8 @@ acceptance on supported LINE devices.
 3. Reuse `NOTIFICATION_COLORS`, `NOTIFICATION_STATUS_COLORS`,
    `notificationFlexText()`, `notificationFlexDetail()` and
    `notificationFlexStatus()` instead of adding local color values or layout
-   copies.
+   copies. Use the default compact detail row for predictable values and the
+   explicit `"stacked"` layout for long variable content.
 4. Set status only from an explicit typed event/state. Keep the current subject,
    `altText`, CTA label, destination and privacy field selection conventions.
 
@@ -436,9 +461,11 @@ acceptance on supported LINE devices.
 - **Gmail:** inspect web and mobile, including a narrow viewport. Check status
   text/color, long organization and task names, line breaks and CTA navigation.
 - **LINE:** load the deterministic JSON examples below in the Flex Message
-  Simulator. Check narrow-screen wrapping, module identity, status text, Stock
-  item preview/overflow and the primary URI action. Confirm on iOS and Android
-  LINE clients before release when device acceptance is required.
+  Simulator. Check narrow-screen wrapping, large LINE font settings, module
+  identity, status text, Stock item preview/overflow and the primary URI action.
+  Confirm on iOS and Android LINE clients before release when device acceptance
+  is required.
 
 Examples for independent inspection: [sample Email HTML](./examples/notification-email-sample.html)
-and [sample LINE Flex JSON](./examples/notification-line-flex-sample.json).
+and [Stock result LINE Flex JSON](./examples/notification-line-flex-sample.json),
+[Routine reminder LINE Flex JSON](./examples/notification-line-flex-routine-sample.json).

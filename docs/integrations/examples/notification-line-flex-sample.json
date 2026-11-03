@@ -15,7 +15,8 @@
           "color": "#FFFFFF",
           "size": "sm",
           "weight": "bold",
-          "wrap": true
+          "wrap": true,
+          "scaling": true
         }
       ]
     },
@@ -31,35 +32,92 @@
           "size": "lg",
           "weight": "bold",
           "color": "#047857",
-          "wrap": true
+          "wrap": true,
+          "scaling": true
         },
         {
-          "type": "text",
-          "text": "เลขที่คำขอ #123",
-          "size": "sm",
-          "color": "#374151",
-          "wrap": true
+          "type": "box",
+          "layout": "horizontal",
+          "spacing": "sm",
+          "contents": [
+            {
+              "size": "xs",
+              "color": "#6B7280",
+              "flex": 1,
+              "type": "text",
+              "text": "เลขที่คำขอ:",
+              "wrap": true,
+              "scaling": true
+            },
+            {
+              "flex": 2,
+              "type": "text",
+              "text": "#123",
+              "size": "sm",
+              "color": "#374151",
+              "wrap": true,
+              "scaling": true
+            }
+          ]
         },
         {
-          "type": "text",
-          "text": "ผู้รับตัวอย่าง",
           "weight": "bold",
           "size": "md",
-          "wrap": true
+          "type": "text",
+          "text": "ผู้รับตัวอย่าง",
+          "color": "#374151",
+          "wrap": true,
+          "scaling": true
         },
         {
-          "type": "text",
-          "text": "โครงการ: PRJ-2569/01",
-          "size": "sm",
-          "color": "#374151",
-          "wrap": true
+          "type": "box",
+          "layout": "horizontal",
+          "spacing": "sm",
+          "contents": [
+            {
+              "size": "xs",
+              "color": "#6B7280",
+              "flex": 1,
+              "type": "text",
+              "text": "โครงการ:",
+              "wrap": true,
+              "scaling": true
+            },
+            {
+              "flex": 2,
+              "type": "text",
+              "text": "PRJ-2569/01",
+              "size": "sm",
+              "color": "#374151",
+              "wrap": true,
+              "scaling": true
+            }
+          ]
         },
         {
-          "type": "text",
-          "text": "ดำเนินการเมื่อ: 5 ส.ค. 2569 15:00",
-          "size": "sm",
-          "color": "#374151",
-          "wrap": true
+          "type": "box",
+          "layout": "horizontal",
+          "spacing": "sm",
+          "contents": [
+            {
+              "size": "xs",
+              "color": "#6B7280",
+              "flex": 1,
+              "type": "text",
+              "text": "ดำเนินการเมื่อ:",
+              "wrap": true,
+              "scaling": true
+            },
+            {
+              "flex": 2,
+              "type": "text",
+              "text": "5 ส.ค. 2569 15:00",
+              "size": "sm",
+              "color": "#374151",
+              "wrap": true,
+              "scaling": true
+            }
+          ]
         },
         {
           "type": "text",
@@ -67,25 +125,30 @@
           "size": "sm",
           "weight": "bold",
           "color": "#047857",
-          "wrap": true
+          "wrap": true,
+          "scaling": true
         },
         {
           "type": "separator",
           "margin": "md"
         },
         {
+          "weight": "bold",
+          "margin": "md",
           "type": "text",
           "text": "รายการ",
-          "weight": "bold",
           "size": "sm",
-          "margin": "md"
+          "color": "#374151",
+          "wrap": true,
+          "scaling": true
         },
         {
           "type": "text",
           "text": "กระดาษ A4 (80 แกรม) x2 รีม\nปากกาสีน้ำเงิน x5 ด้าม\nแฟ้มเอกสาร x3 แฟ้ม\nและอีก 1 รายการ",
-          "color": "#374151",
           "size": "sm",
-          "wrap": true
+          "color": "#374151",
+          "wrap": true,
+          "scaling": true
         }
       ]
     },
@@ -104,7 +167,8 @@
             "type": "uri",
             "label": "เปิดรายละเอียด",
             "uri": "https://liff.line.me/nhfapp-liff-id/stock?requestId=123"
-          }
+          },
+          "scaling": true
         }
       ]
     }

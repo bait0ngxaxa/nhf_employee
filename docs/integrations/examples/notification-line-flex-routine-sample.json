@@ -1,0 +1,162 @@
+{
+  "type": "flex",
+  "altText": "Routine: งานใกล้ถึงกำหนด: ตรวจสอบระบบสำรองข้อมูลและอุปกรณ์ประจำเดือน",
+  "contents": {
+    "type": "bubble",
+    "header": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "16px",
+      "backgroundColor": "#174A63",
+      "contents": [
+        {
+          "type": "text",
+          "text": "NHFapp | Routine · งานตามกำหนด",
+          "color": "#FFFFFF",
+          "size": "sm",
+          "weight": "bold",
+          "wrap": true,
+          "scaling": true
+        }
+      ]
+    },
+    "body": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "16px",
+      "spacing": "md",
+      "contents": [
+        {
+          "type": "text",
+          "text": "งานใกล้ถึงกำหนด",
+          "size": "lg",
+          "weight": "bold",
+          "color": "#B45309",
+          "wrap": true,
+          "scaling": true
+        },
+        {
+          "weight": "bold",
+          "size": "md",
+          "type": "text",
+          "text": "ตรวจสอบระบบสำรองข้อมูลและอุปกรณ์ประจำเดือน",
+          "color": "#374151",
+          "wrap": true,
+          "scaling": true
+        },
+        {
+          "type": "box",
+          "layout": "vertical",
+          "margin": "md",
+          "spacing": "sm",
+          "contents": [
+            {
+              "type": "box",
+              "layout": "horizontal",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "size": "xs",
+                  "color": "#6B7280",
+                  "flex": 1,
+                  "type": "text",
+                  "text": "หน่วยงาน:",
+                  "wrap": true,
+                  "scaling": true
+                },
+                {
+                  "flex": 2,
+                  "type": "text",
+                  "text": "ฝ่ายเทคโนโลยีสารสนเทศ",
+                  "size": "sm",
+                  "color": "#374151",
+                  "wrap": true,
+                  "scaling": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "horizontal",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "size": "xs",
+                  "color": "#6B7280",
+                  "flex": 1,
+                  "type": "text",
+                  "text": "หมวดหมู่:",
+                  "wrap": true,
+                  "scaling": true
+                },
+                {
+                  "flex": 2,
+                  "type": "text",
+                  "text": "ระบบสารสนเทศ",
+                  "size": "sm",
+                  "color": "#374151",
+                  "wrap": true,
+                  "scaling": true
+                }
+              ]
+            },
+            {
+              "type": "box",
+              "layout": "horizontal",
+              "spacing": "sm",
+              "contents": [
+                {
+                  "size": "xs",
+                  "color": "#6B7280",
+                  "flex": 1,
+                  "type": "text",
+                  "text": "ครบกำหนด:",
+                  "wrap": true,
+                  "scaling": true
+                },
+                {
+                  "flex": 2,
+                  "type": "text",
+                  "text": "10 พ.ย. 2569",
+                  "size": "sm",
+                  "color": "#374151",
+                  "wrap": true,
+                  "scaling": true
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "ครบกำหนดใน 2 วัน",
+              "size": "sm",
+              "weight": "bold",
+              "color": "#B45309",
+              "wrap": true,
+              "scaling": true
+            }
+          ]
+        }
+      ]
+    },
+    "footer": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "12px",
+      "spacing": "sm",
+      "contents": [
+        {
+          "type": "button",
+          "style": "primary",
+          "height": "sm",
+          "color": "#176B87",
+          "action": {
+            "type": "uri",
+            "label": "เปิดดูงาน",
+            "uri": "https://liff.line.me/nhfapp-liff-id/routine?taskId=71&occurrenceId=91"
+          },
+          "scaling": true
+        }
+      ]
+    }
+  }
+}
