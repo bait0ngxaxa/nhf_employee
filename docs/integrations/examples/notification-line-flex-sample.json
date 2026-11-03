@@ -1,0 +1,112 @@
+{
+  "type": "flex",
+  "altText": "Stock: คำขอเบิกวัสดุ #123 ถูกจ่ายแล้ว",
+  "contents": {
+    "type": "bubble",
+    "header": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "16px",
+      "backgroundColor": "#174A63",
+      "contents": [
+        {
+          "type": "text",
+          "text": "NHFapp | Stock · คำขอเบิกวัสดุ",
+          "color": "#FFFFFF",
+          "size": "sm",
+          "weight": "bold",
+          "wrap": true
+        }
+      ]
+    },
+    "body": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "16px",
+      "spacing": "md",
+      "contents": [
+        {
+          "type": "text",
+          "text": "คำขอเบิกวัสดุถูกจ่ายแล้ว",
+          "size": "lg",
+          "weight": "bold",
+          "color": "#047857",
+          "wrap": true
+        },
+        {
+          "type": "text",
+          "text": "เลขที่คำขอ #123",
+          "size": "sm",
+          "color": "#374151",
+          "wrap": true
+        },
+        {
+          "type": "text",
+          "text": "ผู้รับตัวอย่าง",
+          "weight": "bold",
+          "size": "md",
+          "wrap": true
+        },
+        {
+          "type": "text",
+          "text": "โครงการ: PRJ-2569/01",
+          "size": "sm",
+          "color": "#374151",
+          "wrap": true
+        },
+        {
+          "type": "text",
+          "text": "ดำเนินการเมื่อ: 5 ส.ค. 2569 15:00",
+          "size": "sm",
+          "color": "#374151",
+          "wrap": true
+        },
+        {
+          "type": "text",
+          "text": "สถานะ: จ่ายแล้ว",
+          "size": "sm",
+          "weight": "bold",
+          "color": "#047857",
+          "wrap": true
+        },
+        {
+          "type": "separator",
+          "margin": "md"
+        },
+        {
+          "type": "text",
+          "text": "รายการ",
+          "weight": "bold",
+          "size": "sm",
+          "margin": "md"
+        },
+        {
+          "type": "text",
+          "text": "กระดาษ A4 (80 แกรม) x2 รีม\nปากกาสีน้ำเงิน x5 ด้าม\nแฟ้มเอกสาร x3 แฟ้ม\nและอีก 1 รายการ",
+          "color": "#374151",
+          "size": "sm",
+          "wrap": true
+        }
+      ]
+    },
+    "footer": {
+      "type": "box",
+      "layout": "vertical",
+      "paddingAll": "12px",
+      "spacing": "sm",
+      "contents": [
+        {
+          "type": "button",
+          "style": "primary",
+          "height": "sm",
+          "color": "#176B87",
+          "action": {
+            "type": "uri",
+            "label": "เปิดรายละเอียด",
+            "uri": "https://liff.line.me/nhfapp-liff-id/stock?requestId=123"
+          }
+        }
+      ]
+    }
+  }
+}

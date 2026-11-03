@@ -18,6 +18,7 @@ import type {
     LeaveNotTakenRequestedPayload,
     LeaveResultPayload,
 } from "../../application/notifications/notification-payloads";
+import { NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
 
 const employee = {
     employeeId: 10,
@@ -160,5 +161,27 @@ describe("Leave LINE Flex messages", () => {
         ["not-taken confirmation", generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), "history-url"), "history-url"],
     ])("keeps the CTA supplied by the Leave LIFF flow for %s", (_label, message, expectedUrl) => {
         expect(getButtonUri(message)).toBe(expectedUrl);
+    });
+
+    it.each([
+        ["approval requested", generateLeaveActionFlexMessage(buildActionPayload(), "url"), "warning"],
+        ["approved", generateLeaveResultFlexMessage(buildResultPayload(), "url"), "success"],
+        ["rejected", generateLeaveResultFlexMessage({ ...buildResultPayload(), status: "REJECTED" }, "url"), "danger"],
+        ["cancelled", generateLeaveCancelledFlexMessage(buildCancelledPayload(), "url"), "neutral"],
+        ["cancellation requested", generateLeaveCancellationRequestedFlexMessage(buildCancellationRequestedPayload(), "url"), "warning"],
+        ["cancelled after approval", generateLeaveCancelledAfterApprovalFlexMessage(buildCancelledAfterApprovalPayload(), "url"), "neutral"],
+        ["not-taken requested", generateLeaveNotTakenRequestedFlexMessage(buildNotTakenRequestedPayload(), "url"), "warning"],
+        ["not-taken confirmed", generateLeaveNotTakenConfirmedFlexMessage(buildNotTakenConfirmedPayload(), "url"), "neutral"],
+    ] as const)("uses the typed semantic color for %s", (_label, message, status) => {
+        expect(message.contents.body?.contents[0]).toMatchObject({
+            color: NOTIFICATION_STATUS_COLORS[status],
+        });
+
+        const statusRow = message.contents.body?.contents.find(
+            (content) => content.type === "text" && content.text.startsWith("สถานะ:"),
+        );
+        if (statusRow) {
+            expect(statusRow).toMatchObject({ color: NOTIFICATION_STATUS_COLORS[status] });
+        }
     });
 });

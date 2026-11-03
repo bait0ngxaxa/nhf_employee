@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
 import { generateLeaveActionEmailHTML } from "./leave-action";
 import { generateLeaveEventEmailHTML } from "./leave-event";
 import { generateLeaveResultEmailHTML } from "./leave-result";
@@ -65,6 +66,34 @@ describe("Leave email template XSS escaping", () => {
         expect(actionHtml).toContain("เหตุผลในการลาย้อนหลัง");
         expectEscapedHtml(actionHtml);
         expectEscapedHtml(resultHtml);
+        expect(resultHtml).toContain(
+            `color:${NOTIFICATION_STATUS_COLORS.danger}; font-size:18px;`,
+        );
+    });
+
+    it("uses the success semantic color for approved leave results", () => {
+        const html = generateLeaveResultEmailHTML({
+            leaveId: "leave-approved",
+            employee: {
+                employeeId: 1,
+                userId: 1,
+                email: "user@example.com",
+                name: "User",
+            },
+            approverName: "Manager",
+            leaveType: "SICK",
+            startDate: "2026-05-28T00:00:00.000Z",
+            endDate: "2026-05-29T00:00:00.000Z",
+            period: "FULL_DAY",
+            durationDays: 2,
+            status: "APPROVED",
+            reason: null,
+        }, "https://example.com/dashboard/leave");
+
+        expect(html).toContain(
+            `color:${NOTIFICATION_STATUS_COLORS.success}; font-size:18px;`,
+        );
+        expect(html).toContain(`color:${NOTIFICATION_STATUS_COLORS.success}; font-size:14px;`);
     });
 
     it("escapes leave event email fields", () => {
@@ -79,6 +108,7 @@ describe("Leave email template XSS escaping", () => {
             durationDays: 2,
             dashboardLink: `https://example.com/dashboard?next=${XSS_PAYLOAD}`,
             ctaLabel: XSS_PAYLOAD,
+            status: "information",
             noteLabel: XSS_PAYLOAD,
             note: XSS_PAYLOAD,
         });

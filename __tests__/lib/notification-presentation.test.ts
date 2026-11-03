@@ -58,24 +58,44 @@ describe("NHFapp notification presentation contract", () => {
 
     it("uses email-safe Thai fallbacks, compact spacing, semantic colors and wrapping", () => {
         const longThaiValue = "ชื่องานภาษาไทย".repeat(30);
+        const longActionLabel = "เปิดดูงาน".repeat(8);
+        const longUrl = `https://app.example.com/task?name=${"งาน".repeat(80)}&view=details`;
         const html = generateNotificationEmailHTML({
             module: "Routine",
             categoryLabel: "งานตามกำหนด",
             title: "งานใกล้ถึงกำหนด",
             intro: "กรุณาตรวจสอบงาน",
-            details: [{ label: "สถานะ", value: longThaiValue, status: "warning" }],
-            actionLabel: "เปิดดูงาน",
-            actionUrl: "https://app.example.com/task?name=งาน&view=details",
+            details: [{ label: "ชื่อหน่วยงาน".repeat(8), value: longThaiValue, status: "warning" }],
+            actionLabel: longActionLabel,
+            actionUrl: longUrl,
             status: "warning",
         });
 
         expect(html).toContain("font-family:'Noto Sans Thai', Tahoma, Arial, sans-serif");
         expect(html).toContain("max-width:600px");
         expect(html).toContain("word-break:break-word");
+        expect(html).toContain("word-break:break-all");
         expect(html).toContain("color:#B45309");
+        expect(html).toContain("ชื่อหน่วยงาน".repeat(8));
         expect(html).toContain(longThaiValue);
-        expect(html).toContain("href=\"https://app.example.com/task?name=งาน&amp;view=details\"");
+        expect(html).toContain(`href="https://app.example.com/task?name=${"งาน".repeat(80)}&amp;view=details"`);
+        expect(html).toContain(longActionLabel);
         expect(html).not.toContain("<script");
+    });
+
+    it("omits the details table when no optional detail rows are present", () => {
+        const html = generateNotificationEmailHTML({
+            module: "IT",
+            categoryLabel: "Ticket IT",
+            title: "มี Ticket IT ใหม่",
+            intro: "รอรับเรื่องในคิว IT",
+            details: [],
+            actionLabel: "เปิด Ticket",
+            actionUrl: "https://app.example.com/dashboard/it/queue/123",
+        });
+
+        expect(html).toContain("รอรับเรื่องในคิว IT");
+        expect(html).not.toContain("border-collapse:collapse");
     });
 
     it.each(Object.keys(NOTIFICATION_MODULES) as NotificationModule[])("uses one subject convention and rejects CR/LF in %s content", (module) => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { sendStockRequestResultNotification } from "@/modules/stock";
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
+import { NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
 
 // Mock nodemailer with factory
 const sendMailMock = vi.fn();
@@ -76,6 +77,9 @@ describe("Stock email notifications", () => {
                     "ขนาด: A4",
                 ),
             }));
+            expect(sendMailMock.mock.calls.at(-1)?.[0].html).toContain(
+                `color:${NOTIFICATION_STATUS_COLORS.success}; font-size:18px;`,
+            );
         });
 
         it("sends a cancelled result with the cancellation reason", async () => {
@@ -89,6 +93,9 @@ describe("Stock email notifications", () => {
                 text: expect.stringContaining("เหตุผลยกเลิก: มีวัสดุทดแทนแล้ว"),
                 html: expect.stringContaining("มีวัสดุทดแทนแล้ว"),
             }));
+            expect(sendMailMock.mock.calls.at(-1)?.[0].html).toContain(
+                `color:${NOTIFICATION_STATUS_COLORS.danger}; font-size:18px;`,
+            );
         });
 
         it("uses a safe fallback when a cancelled result has no reason", async () => {

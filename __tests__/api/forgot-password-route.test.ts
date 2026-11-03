@@ -82,6 +82,7 @@ describe("forgot-password route", () => {
             subject: "[NHFapp][Account] คำขอรีเซ็ตรหัสผ่าน",
             fromName: "NHFapp | บัญชีผู้ใช้",
             html: expect.stringContaining("ตั้งรหัสผ่านใหม่"),
+            text: expect.stringContaining("ลิงก์จะหมดอายุภายใน 1 ชั่วโมง"),
         }));
     });
 

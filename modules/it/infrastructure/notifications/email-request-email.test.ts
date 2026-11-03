@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
 import { buildEmailRequestEmailData } from "./email-request-email";
 
 describe("Email Request Email content", () => {
@@ -25,6 +26,9 @@ describe("Email Request Email content", () => {
         expect(email.html).toContain("https://app.example.com/dashboard/email-request");
         expect(email.html).toContain("<table role=\"presentation\"");
         expect(email.html).toContain("มีคำขออีเมลพนักงานใหม่รอตรวจสอบ");
+        expect(email.html).toContain(
+            `color:${NOTIFICATION_STATUS_COLORS.warning}; font-size:18px;`,
+        );
         expect(email.text).toContain("รายการ: คำขออีเมลพนักงานใหม่ #77");
         expect(email.html).not.toContain("somchai@example.com");
         expect(email.html).not.toContain("replyEmail");

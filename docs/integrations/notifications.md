@@ -332,17 +332,18 @@ action. Shared code owns presentation only, never business audiences or workflow
   `คำขออีเมลพนักงานใหม่`), `วันลา` (category `คำขอลา`), `Routine`
   (category `งานตามกำหนด` or `สัญญา`), `Stock` (category `คำขอเบิกวัสดุ`
   or `คลังวัสดุ`), and `บัญชีผู้ใช้`.
-- **Email structure:** full-page pale background, centered table-based card,
+- **Email structure:** pale page background, centered table-based card,
   NHFapp/module header, hidden preheader, category, event heading, concise intro,
-  structured details, primary CTA, fallback URL and automated-message footer.
-  All templates, including password reset, use
-  `lib/email/templates/notification.ts`. Its inputs are plain text and are escaped
-  centrally; it accepts no raw HTML. Domains keep their existing field selection
-  and URL validation. Password reset tokens appear only in the existing action URL.
-- **LINE Flex:** NHFapp/module/category header, event title first in the body,
-  short context and structured details/status, then one small primary CTA in the
-  footer. Use `lib/line/notification-flex.ts`; domains supply their existing
-  details, destination and meaningful module/status colors.
+  structured details, primary CTA, fallback URL and compact automated-message
+  footer. All templates, including password reset, use
+  `lib/email/templates/notification.ts`. Inputs are plain text and escaped
+  centrally; the renderer accepts no raw HTML. Domains retain their existing field
+  selection and URL construction. Password reset tokens remain in the existing
+  action URL and are excluded from the subject and preheader.
+- **LINE Flex:** branded NHFapp/module/category header, event title first in the
+  body, wrapped context and structured details/status, then one primary CTA in the
+  footer. Use `lib/line/notification-flex.ts`; domains supply existing content,
+  typed semantic status, action label and destination.
 - **LINE altText:** `<canonical module label>: <event title>`, optionally followed
   by a short reference/task name. Keep within 400 characters; do not add employee
   contacts, private content or unnecessary actor names to the preview.
@@ -360,3 +361,84 @@ attachment, grant and contact details. Stock operational LINE remains a legacy
 broadcast channel; personal result LINE remains NHFapp. Existing notification
 rows are not rewritten. Channel coverage and implementation references are listed
 in [notification inventory](./notification-inventory.md).
+
+## Shared presentation design system
+
+Email and LINE use serializable channel-safe tokens from
+`shared/notifications/presentation.ts`. The brand colors stay fixed across modules;
+semantic status color is separate from brand and CTA color.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| Brand primary | `#174A63` | NHFapp header identity |
+| Brand action | `#176B87` | Primary CTA |
+| Heading | `#173B50` | Default event title |
+| Body | `#374151` | Main content |
+| Muted | `#6B7280` | Secondary details and labels |
+| Surface | `#FFFFFF` | Message card |
+| Subtle surface | `#F3F7F9` | Page and detail background |
+| Border | `#E5E7EB` | Detail rows and dividers |
+
+Semantic colors are defined once in `NOTIFICATION_STATUS_COLORS`:
+`information` (`#2563EB`), `success` (`#047857`), `warning` (`#B45309`),
+`danger` (`#B91C1C`) and `neutral` (the muted text color). Producers pass a status
+from typed event/state data. Presentation code never guesses status from a
+localized title. Success is reserved for a confirmed outcome, such as approved
+Leave, resolved IT Ticket or issued Stock. Warning marks work needing attention,
+including Routine reminders and requests awaiting review. Rejected Leave and
+cancelled Stock results use danger. Neutral identifies Leave cancellation and
+confirmation events whose meaning is factual rather than a failed outcome. A text
+title or status label always carries the meaning alongside its color.
+
+All active module Email producers delegate their HTML shell to
+`generateNotificationEmailHTML()`: IT and Email Request wrappers, Leave event
+templates, Routine reminders, Stock results and Account password reset. Active
+IT, Leave, Routine and Stock Flex producers call `buildNotificationFlex()`.
+Modules own canonical content and existing field selection; the shared renderers
+own brand layout, detail/status primitives and CTA presentation.
+
+Email uses inline styles and presentation tables without JavaScript, Tailwind,
+remote fonts or runtime CSS variables. The font stack is
+`'Noto Sans Thai', Tahoma, Arial, sans-serif`; email clients may not have Noto Sans
+Thai available, so Tahoma/Arial and the client's Thai-capable fallback remain
+important. Email-safe pixel sizes follow the app's label/body/title hierarchy:
+12px metadata, 14px dense body and CTA, 16px identity, and 18px event title.
+Outlook, Gmail and Apple Mail can differ in support for border radius, line breaking
+and width constraints. The content remains readable without images or custom fonts,
+with a text alternative provided by each sending workflow.
+
+Flex messages use only the typed Bubble, Box, Text, Separator and Button subset in
+`types/api.ts`. They do not use HTML, custom fonts, image assets or unsupported CSS
+properties. The supported structure follows LINE's [Flex Message elements](https://developers.line.biz/en/docs/messaging-api/flex-message-elements/)
+and [Flex Message layout](https://developers.line.biz/en/docs/messaging-api/flex-message-layout/)
+documentation. LINE may render the same JSON differently across OS versions, app
+versions, fonts and device widths. The official [Flex Message Simulator](https://developers.line.biz/flex-simulator/)
+can preview JSON without sending a message; simulator preview does not replace
+acceptance on supported LINE devices.
+
+### Reusing the templates for a module
+
+1. Keep event titles, selected details, status mapping, action labels and URL
+   construction in the owning module's current notification producer.
+2. Pass plain-text content to `generateNotificationEmailHTML()` or call
+   `buildNotificationFlex()` with the canonical module key and category label.
+3. Reuse `NOTIFICATION_COLORS`, `NOTIFICATION_STATUS_COLORS`,
+   `notificationFlexText()`, `notificationFlexDetail()` and
+   `notificationFlexStatus()` instead of adding local color values or layout
+   copies.
+4. Set status only from an explicit typed event/state. Keep the current subject,
+   `altText`, CTA label, destination and privacy field selection conventions.
+
+### Manual acceptance
+
+- **Outlook:** inspect desktop and mobile. Check Thai wrapping, long values, the
+  fallback URL, blocked images/fonts, card width and CTA readability.
+- **Gmail:** inspect web and mobile, including a narrow viewport. Check status
+  text/color, long organization and task names, line breaks and CTA navigation.
+- **LINE:** load the deterministic JSON examples below in the Flex Message
+  Simulator. Check narrow-screen wrapping, module identity, status text, Stock
+  item preview/overflow and the primary URI action. Confirm on iOS and Android
+  LINE clients before release when device acceptance is required.
+
+Examples for independent inspection: [sample Email HTML](./examples/notification-email-sample.html)
+and [sample LINE Flex JSON](./examples/notification-line-flex-sample.json).

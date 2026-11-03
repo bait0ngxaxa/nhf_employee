@@ -17,6 +17,7 @@ vi.mock("nodemailer", () => ({
 
 import { sendRoutineReminderNotification, sendRoutineContractExpiryNotification } from "./email";
 import { generateRoutineReminderEmailHTML } from "./routine-reminder-email";
+import { NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
 
 const XSS_PAYLOAD = `<script>alert("xss")</script><img src=x onerror="alert('x')">`;
 
@@ -75,6 +76,9 @@ describe("Routine email notifications", () => {
                 "เปิดดูงาน: http://localhost:3000/dashboard/routine?taskId=71&occurrenceId=91",
             ),
         }));
+        expect(sendMailMock.mock.calls[0]?.[0].html).toContain(
+            `color:${NOTIFICATION_STATUS_COLORS.warning}; font-size:18px;`,
+        );
         expect(sendMailMock.mock.calls[0]?.[0].messageId).toBe(
             sendMailMock.mock.calls[1]?.[0].messageId,
         );
@@ -113,8 +117,13 @@ describe("Routine email notifications", () => {
             unitName: XSS_PAYLOAD, categoryName: XSS_PAYLOAD, actionUrl: `https://app.example.com/?q=${XSS_PAYLOAD}` }));
         const line = generateRoutineContractExpiryFlexMessage({ taskTitle: "สัญญา", unitName: "หน่วยงาน", categoryName: "หมวดหมู่", contractEndDateLabel: "5 สิงหาคม 2569", actionUrl: "https://liff.line.me/app/routine?taskId=71" });
         expect(line.altText).toBe("Routine: สัญญาใกล้สิ้นสุด: สัญญา");
-        expect(line.contents.body?.contents[0]).toMatchObject({ text: "สัญญาใกล้สิ้นสุด" });
+        expect(line.contents.body?.contents[0]).toMatchObject({
+            text: "สัญญาใกล้สิ้นสุด", color: NOTIFICATION_STATUS_COLORS.warning,
+        });
         expect(line.contents.footer?.contents[0]).toMatchObject({ action: { label: "เปิดดูงาน", uri: "https://liff.line.me/app/routine?taskId=71" } });
+        expect(sendMailMock.mock.calls.at(-1)?.[0].html).toContain(
+            `color:${NOTIFICATION_STATUS_COLORS.warning}; font-size:18px;`,
+        );
     });
 
 });

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { parseITTicketNotificationPayload } from "../../domain/ticket-notification";
+import { NOTIFICATION_STATUS_COLORS } from "@/shared/notifications/presentation";
+import { getITTicketNotificationStatus } from "./notification-status";
 import { buildITTicketEmailData } from "./ticket-email";
 
 describe("IT Ticket Email composition", () => {
@@ -46,6 +48,9 @@ describe("IT Ticket Email composition", () => {
         expect(email.html).toContain("<table role=\"presentation\"");
         expect(email.html).toContain("NHFapp&nbsp; | &nbsp;IT");
         expect(email.html).toContain("<h1");
+        expect(email.html).toContain(
+            `color:${NOTIFICATION_STATUS_COLORS[getITTicketNotificationStatus(event)]}; font-size:18px;`,
+        );
         expect(email.text).toContain(`https://app.example.com${route}`);
         expect(email.text).toContain("เลขที่ Ticket: Ticket IT #123");
         expect(email.text).toContain("กรุณาอย่าตอบกลับ");
