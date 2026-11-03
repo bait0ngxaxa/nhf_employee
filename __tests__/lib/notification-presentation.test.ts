@@ -56,6 +56,28 @@ describe("NHFapp notification presentation contract", () => {
         expect(html).toContain("<br>อีกบรรทัด");
     });
 
+    it("uses email-safe Thai fallbacks, compact spacing, semantic colors and wrapping", () => {
+        const longThaiValue = "ชื่องานภาษาไทย".repeat(30);
+        const html = generateNotificationEmailHTML({
+            module: "Routine",
+            categoryLabel: "งานตามกำหนด",
+            title: "งานใกล้ถึงกำหนด",
+            intro: "กรุณาตรวจสอบงาน",
+            details: [{ label: "สถานะ", value: longThaiValue, status: "warning" }],
+            actionLabel: "เปิดดูงาน",
+            actionUrl: "https://app.example.com/task?name=งาน&view=details",
+            status: "warning",
+        });
+
+        expect(html).toContain("font-family:'Noto Sans Thai', Tahoma, Arial, sans-serif");
+        expect(html).toContain("max-width:600px");
+        expect(html).toContain("word-break:break-word");
+        expect(html).toContain("color:#B45309");
+        expect(html).toContain(longThaiValue);
+        expect(html).toContain("href=\"https://app.example.com/task?name=งาน&amp;view=details\"");
+        expect(html).not.toContain("<script");
+    });
+
     it.each(Object.keys(NOTIFICATION_MODULES) as NotificationModule[])("uses one subject convention and rejects CR/LF in %s content", (module) => {
         expect(notificationSubject(module, " งาน\r\nทดสอบ ")).toBe(`[NHFapp][${module}] งาน ทดสอบ`);
         expect(NOTIFICATION_MODULES[module].sender).toMatch(/^NHFapp \| /);

@@ -25,8 +25,8 @@ export function generateRoutineReminderEmailHTML(
         details: [
             { label: "ชื่องาน", value: data.taskTitle }, { label: "หน่วยงาน", value: data.unitName },
             { label: "หมวดหมู่", value: data.categoryName }, { label: "วันครบกำหนด", value: formatThaiDueDate(data.dueDate) },
-            { label: "สถานะกำหนด", value: getTimingText(data.daysBefore) },
-        ], actionLabel: NOTIFICATION_ACTIONS.task, actionUrl: data.actionUrl });
+            { label: "สถานะกำหนด", value: getTimingText(data.daysBefore), status: "warning" },
+        ], actionLabel: NOTIFICATION_ACTIONS.task, actionUrl: data.actionUrl, status: "warning" });
 }
 
 export function generateRoutineReminderEmailText(

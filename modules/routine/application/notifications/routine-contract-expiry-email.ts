@@ -19,7 +19,7 @@ export function generateRoutineContractExpiryEmailHTML(
         details: [
             { label: "ชื่องาน", value: data.taskTitle }, { label: "หน่วยงาน", value: data.unitName },
             { label: "หมวดหมู่", value: data.categoryName }, { label: "วันสิ้นสุดสัญญา", value: formatThaiContractEndDate(data.contractEndDate) },
-        ], actionLabel: NOTIFICATION_ACTIONS.task, actionUrl: data.actionUrl });
+        ], actionLabel: NOTIFICATION_ACTIONS.task, actionUrl: data.actionUrl, status: "warning" });
 }
 
 export function generateRoutineContractExpiryEmailText(

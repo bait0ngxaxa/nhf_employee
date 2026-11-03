@@ -7,6 +7,7 @@ import {
     type LeaveTypeValue,
 } from "@/modules/leave/application/notifications/notification-format";
 import { generateNotificationEmailHTML, type NotificationEmailDetail } from "@/lib/email/templates/notification";
+import type { NotificationStatus } from "@/shared/notifications/presentation";
 
 export type LeaveEventEmailData = LeaveSummaryInput & {
     title: string;
@@ -15,6 +16,7 @@ export type LeaveEventEmailData = LeaveSummaryInput & {
     leaveType: LeaveTypeValue;
     dashboardLink: string;
     ctaLabel: string;
+    status: NotificationStatus;
     actorLabel?: string;
     actorName?: string | null;
     noteLabel?: string;
@@ -31,5 +33,6 @@ export function generateLeaveEventEmailHTML(data: LeaveEventEmailData): string {
     if (data.actorLabel && data.actorName) details.push({ label: data.actorLabel, value: data.actorName });
     if (data.note) details.push({ label: data.noteLabel ?? "หมายเหตุ", value: data.note });
     return generateNotificationEmailHTML({ module: "Leave", categoryLabel: "คำขอลา", title: data.title,
-        intro: data.intro, details, actionLabel: data.ctaLabel, actionUrl: data.dashboardLink });
+        intro: data.intro, details, actionLabel: data.ctaLabel, actionUrl: data.dashboardLink,
+        status: data.status });
 }

@@ -17,6 +17,6 @@ export function generateLeaveActionEmailHTML(data: LeaveActionPayload, dashboard
     return generateNotificationEmailHTML({
         module: "Leave", categoryLabel: "คำขอลา", title: LEAVE_NOTIFICATION_TITLES.action,
         intro: `คำขอลาของ ${data.employee.name} รอการพิจารณาจากคุณ`,
-        details, actionLabel: NOTIFICATION_ACTIONS.review, actionUrl: dashboardLink,
+        details, actionLabel: NOTIFICATION_ACTIONS.review, actionUrl: dashboardLink, status: "warning",
     });
 }

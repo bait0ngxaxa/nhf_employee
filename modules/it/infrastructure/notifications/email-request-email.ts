@@ -35,6 +35,7 @@ export function buildEmailRequestEmailData(
             referenceValue: label,
             actionLabel: NOTIFICATION_ACTIONS.review,
             actionUrl,
+            status: "warning",
         }),
         text: [
             "NHFapp | IT",

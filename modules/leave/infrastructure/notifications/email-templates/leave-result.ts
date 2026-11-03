@@ -11,10 +11,15 @@ export function generateLeaveResultEmailHTML(data: LeaveResultPayload, dashboard
         { label: "ประเภทการลา", value: getLeaveTypeLabel(data.leaveType) },
         { label: "วันที่", value: formatLeaveDateRange(data.startDate, data.endDate) },
         { label: "จำนวนวัน", value: `${formatLeaveDurationDays(data.durationDays)} วัน (${getLeavePeriodLabel(data.period)})` },
-        { label: "สถานะ", value: data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ" },
+        {
+            label: "สถานะ",
+            value: data.status === "APPROVED" ? "อนุมัติ" : "ไม่อนุมัติ",
+            status: data.status === "APPROVED" ? "success" : "danger",
+        },
     ];
     if (data.reason) details.push({ label: "เหตุผลจากผู้อนุมัติ", value: data.reason });
     return generateNotificationEmailHTML({ module: "Leave", categoryLabel: "คำขอลา", title,
         intro: "ตรวจสอบผลการพิจารณาและรายละเอียดคำขอลาของคุณได้ด้านล่าง",
-        details, actionLabel: NOTIFICATION_ACTIONS.details, actionUrl: dashboardUrl });
+        details, actionLabel: NOTIFICATION_ACTIONS.details, actionUrl: dashboardUrl,
+        status: data.status === "APPROVED" ? "success" : "danger" });
 }

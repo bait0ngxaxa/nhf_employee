@@ -1,4 +1,5 @@
 import { generateNotificationEmailHTML } from "@/lib/email/templates/notification";
+import type { NotificationStatus } from "@/shared/notifications/presentation";
 
 export interface ITNotificationEmailTemplateData {
     readonly categoryLabel: string;
@@ -8,6 +9,7 @@ export interface ITNotificationEmailTemplateData {
     readonly referenceValue: string;
     readonly actionLabel: string;
     readonly actionUrl: string;
+    readonly status?: NotificationStatus;
 }
 
 export function generateITNotificationEmailHTML(data: ITNotificationEmailTemplateData): string {
@@ -20,5 +22,6 @@ export function generateITNotificationEmailHTML(data: ITNotificationEmailTemplat
         details: [{ label: data.referenceLabel, value: data.referenceValue }],
         actionLabel: data.actionLabel,
         actionUrl: data.actionUrl,
+        status: data.status,
     });
 }

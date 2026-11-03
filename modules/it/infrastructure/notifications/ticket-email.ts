@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/email";
 import { getPublicOrigin } from "@/lib/network/public-url";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { generateITNotificationEmailHTML } from "./email-template";
+import { getITTicketNotificationStatus } from "./notification-status";
 
 import type { ITTicketNotificationPayloadV1 } from "../../domain/ticket-notification";
 
@@ -41,6 +42,7 @@ export function buildITTicketEmailData(
             referenceValue: ticketLabel,
             actionLabel: NOTIFICATION_ACTIONS.ticket,
             actionUrl,
+            status: getITTicketNotificationStatus(payload.event),
         }),
         text: [
             "NHFapp | IT",

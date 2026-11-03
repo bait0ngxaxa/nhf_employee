@@ -30,7 +30,8 @@ export function generateStockRequestResultEmailHTML(
     details.push({ label: "รายการวัสดุ", value: data.items.map((item) => `${item.name}${getVariantLabel(item)}: ${item.quantity} ${item.unit}`).join("\n") });
     return generateNotificationEmailHTML({ module: "Stock", categoryLabel: "คำขอเบิกวัสดุ",
         title: getStatusText(data.status), intro: `เรียน ${data.recipient.name}\nตรวจสอบผลการดำเนินการคำขอเบิกวัสดุของคุณได้ด้านล่าง`,
-        details, actionLabel: NOTIFICATION_ACTIONS.details, actionUrl: dashboardUrl });
+        details, actionLabel: NOTIFICATION_ACTIONS.details, actionUrl: dashboardUrl,
+        status: data.status === "ISSUED" ? "success" : "danger" });
 }
 
 export function generateStockRequestResultEmailText(
