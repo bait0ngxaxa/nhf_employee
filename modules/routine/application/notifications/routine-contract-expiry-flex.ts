@@ -1,5 +1,9 @@
 import { buildNotificationFlex } from "@/lib/line/notification-flex";
-import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
+import {
+    NOTIFICATION_ACTIONS,
+    NOTIFICATION_COLORS,
+    NOTIFICATION_STATUS_COLORS,
+} from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 
 export interface RoutineContractExpiryFlexMessageData {
@@ -35,28 +39,28 @@ export function generateRoutineContractExpiryFlexMessage(
                     {
                         type: "text",
                         text: `หน่วยงาน: ${data.unitName}`,
-                        color: "#4B5563",
+                        color: NOTIFICATION_COLORS.muted,
                         size: "sm",
                         wrap: true,
                     },
                     {
                         type: "text",
                         text: `หมวดหมู่: ${data.categoryName}`,
-                        color: "#4B5563",
+                        color: NOTIFICATION_COLORS.muted,
                         size: "sm",
                         wrap: true,
                     },
                     {
                         type: "text",
                         text: `สิ้นสุดสัญญา: ${data.contractEndDateLabel}`,
-                        color: "#111827",
+                        color: NOTIFICATION_COLORS.heading,
                         size: "sm",
                         wrap: true,
                     },
                     {
                         type: "text",
                         text: "เหลือเวลาประมาณ 1 เดือน กรุณาตรวจสอบและดำเนินการที่เกี่ยวข้อง",
-                        color: "#9A3412",
+                        color: NOTIFICATION_STATUS_COLORS.warning,
                         size: "sm",
                         weight: "bold",
                         wrap: true,
@@ -66,6 +70,6 @@ export function generateRoutineContractExpiryFlexMessage(
         ],
         actionLabel: NOTIFICATION_ACTIONS.task,
         actionUrl: data.actionUrl,
-        accentColor: "#C2410C",
+        status: "warning",
     });
 }

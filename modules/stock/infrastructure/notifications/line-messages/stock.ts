@@ -1,5 +1,9 @@
-import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
-import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
+import {
+    buildNotificationFlex,
+    notificationFlexDetail,
+    notificationFlexText,
+} from "@/lib/line/notification-flex";
+import { NOTIFICATION_ACTIONS, NOTIFICATION_COLORS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 import type { StockRequestLineData } from "../../../contracts/notifications";
 import { formatDate } from "@/lib/line/helpers";
@@ -51,109 +55,11 @@ export function generateStockRequestFlexMessage(
                 margin: "md",
                 spacing: "sm",
                 contents: [
-                    {
-                        type: "box",
-                        layout: "baseline",
-                        contents: [
-                            {
-                                type: "text",
-                                text: "รหัสโครงการ:",
-                                color: "#4B5563",
-                                size: "sm",
-                                flex: 2,
-                            },
-                            {
-                                type: "text",
-                                text: data.projectCode,
-                                color: "#111827",
-                                size: "sm",
-                                wrap: true,
-                                flex: 3,
-                            },
-                        ],
-                    },
-                    {
-                        type: "box",
-                        layout: "baseline",
-                        contents: [
-                            {
-                                type: "text",
-                                text: "จำนวนรายการ:",
-                                color: "#4B5563",
-                                size: "sm",
-                                flex: 2,
-                            },
-                            {
-                                type: "text",
-                                text: `${data.itemCount} รายการ`,
-                                color: "#111827",
-                                size: "sm",
-                                flex: 3,
-                            },
-                        ],
-                    },
-                    {
-                        type: "box",
-                        layout: "baseline",
-                        contents: [
-                            {
-                                type: "text",
-                                text: "รวมจำนวนเบิก:",
-                                color: "#4B5563",
-                                size: "sm",
-                                flex: 2,
-                            },
-                            {
-                                type: "text",
-                                text: `${data.totalQuantity}`,
-                                color: "#111827",
-                                size: "sm",
-                                flex: 3,
-                            },
-                        ],
-                    },
-                    {
-                        type: "box",
-                        layout: "baseline",
-                        contents: [
-                            {
-                                type: "text",
-                                text: "วันที่ขอ:",
-                                color: "#4B5563",
-                                size: "sm",
-                                flex: 2,
-                            },
-                            {
-                                type: "text",
-                                text: formatDate(data.requestedAt),
-                                color: "#111827",
-                                size: "sm",
-                                wrap: true,
-                                flex: 3,
-                            },
-                        ],
-                    },
-                    {
-                        type: "box",
-                        layout: "baseline",
-                        contents: [
-                            {
-                                type: "text",
-                                text: "หมายเหตุ:",
-                                color: "#4B5563",
-                                size: "sm",
-                                flex: 2,
-                            },
-                            {
-                                type: "text",
-                                text: noteText,
-                                color: "#111827",
-                                size: "sm",
-                                wrap: true,
-                                flex: 3,
-                            },
-                        ],
-                    },
+                    notificationFlexDetail("รหัสโครงการ", data.projectCode),
+                    notificationFlexDetail("จำนวนรายการ", `${data.itemCount} รายการ`),
+                    notificationFlexDetail("รวมจำนวนเบิก", `${data.totalQuantity}`),
+                    notificationFlexDetail("วันที่ขอ", formatDate(data.requestedAt)),
+                    notificationFlexDetail("หมายเหตุ", noteText),
                 ],
             },
             {
@@ -171,13 +77,13 @@ export function generateStockRequestFlexMessage(
                 type: "text",
                 text: buildItemsPreview(data.items),
                 size: "sm",
-                color: "#374151",
+                color: NOTIFICATION_COLORS.body,
                 wrap: true,
                 margin: "sm",
             },
         ],
         actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.adminRequests)}`,
-        accentColor: "#047857",
+        status: "warning",
     });
 }

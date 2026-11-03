@@ -10,6 +10,6 @@ export function generateEmailRequestFlexMessage(emailRequestId: number | null, a
         module: "IT", categoryLabel: "คำขออีเมลพนักงานใหม่", title: copy.title,
         altText: `${copy.title}${emailRequestId === null ? "" : ` #${emailRequestId}`}`,
         contents: [notificationFlexText(label), notificationFlexText(copy.summary)],
-        actionLabel: NOTIFICATION_ACTIONS.review, actionUrl, accentColor: "#7C3AED",
+        actionLabel: NOTIFICATION_ACTIONS.review, actionUrl, status: "warning",
     });
 }

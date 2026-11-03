@@ -1,5 +1,9 @@
-import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
-import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
+import { buildNotificationFlex, notificationFlexStatus, notificationFlexText } from "@/lib/line/notification-flex";
+import {
+    NOTIFICATION_ACTIONS,
+    NOTIFICATION_COLORS,
+    type NotificationStatus,
+} from "@/shared/notifications/presentation";
 import { LEAVE_NOTIFICATION_TITLES } from "../../domain/notification-content";
 import type { LineFlexComponent, LineFlexMessage } from "@/types/api";
 
@@ -34,10 +38,9 @@ type LeaveFlexMessageData = {
     leaveSummary: string;
     details?: string;
     statusLabel?: string;
-    statusColor?: string;
     actionLabel: string;
     actionUrl: string;
-    accentColor: string;
+    status: NotificationStatus;
 };
 
 function buildLeaveFlexMessage(data: LeaveFlexMessageData): LineFlexMessage {
@@ -45,27 +48,20 @@ function buildLeaveFlexMessage(data: LeaveFlexMessageData): LineFlexMessage {
         {
             type: "text",
             text: "รายละเอียดคำขอ",
-            color: "#374151",
+            color: NOTIFICATION_COLORS.body,
             size: "sm",
             weight: "bold",
             wrap: true,
         },
     ];
     if (data.statusLabel) {
-        detailContents.push({
-            type: "text",
-            text: `สถานะ: ${data.statusLabel}`,
-            color: data.statusColor ?? "#111827",
-            size: "sm",
-            weight: "bold",
-            wrap: true,
-        });
+        detailContents.push(notificationFlexStatus(`สถานะ: ${data.statusLabel}`, data.status));
     }
     if (data.details) {
         detailContents.push({
             type: "text",
             text: data.details,
-            color: "#4B5563",
+            color: NOTIFICATION_COLORS.muted,
             size: "sm",
             wrap: true,
         });
@@ -74,7 +70,7 @@ function buildLeaveFlexMessage(data: LeaveFlexMessageData): LineFlexMessage {
     return buildNotificationFlex({
         module: "Leave", categoryLabel: "คำขอลา", title: data.title,
         contents: [notificationFlexText(data.employeeName), notificationFlexText(data.leaveSummary), ...detailContents],
-        actionLabel: data.actionLabel, actionUrl: data.actionUrl, accentColor: data.accentColor,
+        actionLabel: data.actionLabel, actionUrl: data.actionUrl, status: data.status,
     });
 }
 
@@ -94,7 +90,7 @@ export function generateLeaveActionFlexMessage(
         details: `รายละเอียดเพิ่มเติม${formatLeaveFlagSummary(payload)}`,
         actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl,
-        accentColor: "#2563EB",
+        status: "warning",
     });
 }
 
@@ -115,10 +111,9 @@ export function generateLeaveResultFlexMessage(
         leaveSummary: formatSummary(payload),
         details,
         statusLabel,
-        statusColor: isApproved ? "#047857" : "#B91C1C",
         actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
-        accentColor: isApproved ? "#047857" : "#DC2626",
+        status: isApproved ? "success" : "danger",
     });
 }
 
@@ -132,7 +127,7 @@ export function generateLeaveCancelledFlexMessage(
         leaveSummary: formatSummary(payload),
         actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
-        accentColor: "#6B7280",
+        status: "neutral",
     });
 }
 
@@ -147,7 +142,7 @@ export function generateLeaveCancellationRequestedFlexMessage(
         details: `หมายเหตุ: ${payload.note}`,
         actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl,
-        accentColor: "#B45309",
+        status: "warning",
     });
 }
 
@@ -161,10 +156,9 @@ export function generateLeaveCancelledAfterApprovalFlexMessage(
         leaveSummary: formatSummary(payload),
         details: `ผู้ยืนยัน: ${formatLeaveDecisionActor(payload)}`,
         statusLabel: "ยกเลิกแล้ว",
-        statusColor: "#6B7280",
         actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
-        accentColor: "#6B7280",
+        status: "neutral",
     });
 }
 
@@ -179,7 +173,7 @@ export function generateLeaveNotTakenRequestedFlexMessage(
         details: `หมายเหตุ: ${payload.note}`,
         actionLabel: NOTIFICATION_ACTIONS.review,
         actionUrl,
-        accentColor: "#B45309",
+        status: "warning",
     });
 }
 
@@ -193,9 +187,8 @@ export function generateLeaveNotTakenConfirmedFlexMessage(
         leaveSummary: formatSummary(payload),
         details: `ผู้ยืนยัน: ${formatLeaveDecisionActor(payload)}`,
         statusLabel: "ไม่ได้ใช้วันลา",
-        statusColor: "#6B7280",
         actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
-        accentColor: "#6B7280",
+        status: "neutral",
     });
 }

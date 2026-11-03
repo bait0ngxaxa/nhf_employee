@@ -1,5 +1,9 @@
-import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
-import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
+import {
+    buildNotificationFlex,
+    notificationFlexStatus,
+    notificationFlexText,
+} from "@/lib/line/notification-flex";
+import { NOTIFICATION_ACTIONS, NOTIFICATION_COLORS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 
 import type { StockRequestResultLinePayload } from "../notification-payloads";
@@ -24,15 +28,7 @@ export function generateStockRequestResultFlexMessage(
 ): LineFlexMessage {
     const isIssued = payload.status === "ISSUED";
     const statusLabel = isIssued ? "จ่ายแล้ว" : "ยกเลิกแล้ว";
-    const statusColor = isIssued ? "#047857" : "#B91C1C";
-    const detailLines = [
-        `โครงการ: ${payload.projectCode}`,
-        `ดำเนินการเมื่อ: ${formatDate(payload.actedAt)}`,
-        `สถานะ: ${statusLabel}`,
-    ];
-    if (!isIssued && payload.cancelReason) {
-        detailLines.push(`เหตุผล: ${payload.cancelReason}`);
-    }
+    const status = isIssued ? "success" : "danger";
 
     return buildNotificationFlex({
         module: "Stock",
@@ -48,13 +44,12 @@ export function generateStockRequestResultFlexMessage(
                 size: "md",
                 wrap: true,
             },
-            ...detailLines.map((text) => ({
-                type: "text" as const,
-                text,
-                color: text.startsWith("สถานะ") ? statusColor : "#374151",
-                size: "sm" as const,
-                wrap: true,
-            })),
+            notificationFlexText(`โครงการ: ${payload.projectCode}`),
+            notificationFlexText(`ดำเนินการเมื่อ: ${formatDate(payload.actedAt)}`),
+            notificationFlexStatus(`สถานะ: ${statusLabel}`, status),
+            ...(!isIssued && payload.cancelReason
+                ? [notificationFlexText(`เหตุผล: ${payload.cancelReason}`)]
+                : []),
             {
                 type: "separator",
                 margin: "md",
@@ -69,13 +64,13 @@ export function generateStockRequestResultFlexMessage(
             {
                 type: "text",
                 text: buildItemsPreview(payload.items),
-                color: "#374151",
+                color: NOTIFICATION_COLORS.body,
                 size: "sm",
                 wrap: true,
             },
         ],
         actionLabel: NOTIFICATION_ACTIONS.details,
         actionUrl,
-        accentColor: statusColor,
+        status,
     });
 }

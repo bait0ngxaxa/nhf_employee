@@ -1,5 +1,5 @@
 import { buildNotificationFlex, notificationFlexText } from "@/lib/line/notification-flex";
-import { NOTIFICATION_ACTIONS } from "@/shared/notifications/presentation";
+import { NOTIFICATION_ACTIONS, NOTIFICATION_COLORS } from "@/shared/notifications/presentation";
 import type { LineFlexMessage } from "@/types/api";
 import type { StockLowLineData } from "../../../contracts/notifications";
 import { formatDate } from "@/lib/line/helpers";
@@ -50,13 +50,13 @@ export function generateStockLowFlexMessage(
                 type: "text",
                 text: buildItemsPreview(data.items),
                 size: "sm",
-                color: "#374151",
+                color: NOTIFICATION_COLORS.body,
                 wrap: true,
                 margin: "md",
             },
         ],
         actionLabel: NOTIFICATION_ACTIONS.inventory,
         actionUrl: `${baseUrl}${toDashboardStockTabPath(STOCK_DASHBOARD_TABS.inventory)}`,
-        accentColor: "#C2410C",
+        status: "warning",
     });
 }
