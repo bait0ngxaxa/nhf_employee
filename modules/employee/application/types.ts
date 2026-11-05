@@ -30,6 +30,7 @@ export interface CreateEmployeeData {
     phone?: string | null;
     position: string;
     affiliation?: string | null;
+    hireDate?: Date | null;
     departmentId: number;
 }
 
@@ -59,7 +60,7 @@ export interface EmployeeRecord {
     phone: string | null;
     email: string;
     position: string;
-    hireDate: Date;
+    hireDate: Date | null;
     status: EmployeeStatusValue;
     deletedAt: Date | null;
     createdAt: Date;
@@ -182,6 +183,7 @@ export interface CsvImportEmployee {
     department: string;
     affiliation?: string;
     nickname?: string;
+    hireDate?: string | null;
     status?: string;
 }
 

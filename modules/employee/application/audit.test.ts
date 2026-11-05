@@ -24,6 +24,7 @@ describe("Employee Audit producers", () => {
     });
 
     it("preserves the Employee create payload and actor metadata", async () => {
+        const hireDate = new Date("2023-04-01T00:00:00.000Z");
         await appendEmployeeCreateAudit({
             id: 12,
             firstName: "สมชาย",
@@ -32,6 +33,7 @@ describe("Employee Audit producers", () => {
             email: "somchai@thainhf.org",
             position: "เจ้าหน้าที่",
             departmentId: 4,
+            hireDate,
         }, actor);
 
         expect(appendAuditBestEffort).toHaveBeenCalledWith({
@@ -50,10 +52,30 @@ describe("Employee Audit producers", () => {
                     email: "somchai@thainhf.org",
                     position: "เจ้าหน้าที่",
                     departmentId: 4,
+                    hireDate,
                 },
                 metadata: { employeeName: "สมชาย ใจดี (ชาย)" },
             },
         });
+    });
+
+    it("records a nullable hire date when a created Employee has no known date", async () => {
+        await appendEmployeeCreateAudit({
+            id: 13,
+            firstName: "สมหญิง",
+            lastName: "ใจดี",
+            nickname: null,
+            email: "somying@thainhf.org",
+            position: "เจ้าหน้าที่",
+            departmentId: 4,
+            hireDate: null,
+        }, actor);
+
+        expect(appendAuditBestEffort).toHaveBeenCalledWith(expect.objectContaining({
+            details: expect.objectContaining({
+                after: expect.objectContaining({ hireDate: null }),
+            }),
+        }));
     });
 
     it("keeps fallback update action selection and before/after payloads", async () => {

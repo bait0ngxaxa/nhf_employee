@@ -16,7 +16,40 @@ describe("Employee Validation", () => {
             };
             const result = createEmployeeSchema.safeParse(data);
             expect(result.success).toBe(true);
+            if (result.success) expect(result.data.hireDate).toBeNull();
         });
+
+        it("accepts a valid optional date-only hire date", () => {
+            const result = createEmployeeSchema.safeParse({
+                firstName: "John",
+                lastName: "Doe",
+                email: "john@test.com",
+                position: "Dev",
+                departmentId: 1,
+                hireDate: "2023-04-01",
+            });
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.hireDate).toEqual(new Date("2023-04-01T00:00:00.000Z"));
+            }
+        });
+
+        it.each(["2026-02-30", "01/02/2026", "2026-11-04T00:00:00.000Z"])(
+            "rejects non-canonical or invalid hire date %s",
+            (hireDate) => {
+                const result = createEmployeeSchema.safeParse({
+                    firstName: "John",
+                    lastName: "Doe",
+                    email: "john@test.com",
+                    position: "Dev",
+                    departmentId: 1,
+                    hireDate,
+                });
+
+                expect(result.success).toBe(false);
+            },
+        );
 
         it("should convert departmentId string to number", () => {
             const data = {
@@ -60,6 +93,22 @@ describe("Employee Validation", () => {
                 firstName: "New Name",
             });
             expect(result.success).toBe(true);
+            if (result.success) expect(result.data).not.toHaveProperty("hireDate");
+        });
+
+        it("distinguishes an omitted hire date from explicit null and a date value", () => {
+            const unchanged = updateEmployeeSchema.safeParse({ firstName: "New" });
+            const cleared = updateEmployeeSchema.safeParse({ hireDate: null });
+            const changed = updateEmployeeSchema.safeParse({ hireDate: "2023-04-01" });
+
+            expect(unchanged.success).toBe(true);
+            if (unchanged.success) expect(unchanged.data).not.toHaveProperty("hireDate");
+            expect(cleared.success).toBe(true);
+            if (cleared.success) expect(cleared.data.hireDate).toBeNull();
+            expect(changed.success).toBe(true);
+            if (changed.success) {
+                expect(changed.data.hireDate).toEqual(new Date("2023-04-01T00:00:00.000Z"));
+            }
         });
 
         it("should allow empty string for email if allowed by schema", () => {

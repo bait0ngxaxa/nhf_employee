@@ -20,6 +20,7 @@ export async function createImportedEmployee(data: {
     phone: string | null;
     position: string;
     affiliation: string | null;
+    hireDate: Date | null;
     departmentId: number;
     status: EmployeeStatusValue;
 }): Promise<{
@@ -30,6 +31,7 @@ export async function createImportedEmployee(data: {
     phone: string | null;
     position: string;
     affiliation: string | null;
+    hireDate: Date | null;
     dept: { name: string };
 }> {
     return prisma.employee.create({ data, include: { dept: true } });

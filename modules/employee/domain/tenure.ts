@@ -52,6 +52,14 @@ function parseDateOnlyString(value: string): CalendarDate | null {
     );
 }
 
+export function parseEmployeeHireDate(value: string): Date | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const date = parseDateOnlyString(value);
+    if (!date) return null;
+
+    return new Date(Date.UTC(date.year, date.month - 1, date.day));
+}
+
 function getThailandCalendarDate(value: Date | string): CalendarDate | null {
     const instant = value instanceof Date ? value : new Date(value);
     if (!Number.isFinite(instant.getTime())) return null;

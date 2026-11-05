@@ -17,6 +17,7 @@ export interface EmployeeAuditCreateEmployee extends EmployeeDisplayNameSource {
     email: string;
     position: string;
     departmentId: number;
+    hireDate?: Date | null;
 }
 
 export interface EmployeeAuditUpdateInput {
@@ -54,6 +55,7 @@ export async function appendEmployeeCreateAudit(
                 email: employee.email,
                 position: employee.position,
                 departmentId: employee.departmentId,
+                hireDate: employee.hireDate ?? null,
             },
             metadata: {
                 employeeName: getEmployeeDisplayName(employee),

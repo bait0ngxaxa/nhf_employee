@@ -96,6 +96,7 @@ function buildEmployee(overrides: Record<string, unknown> = {}): Record<string, 
         firstName: "Test",
         lastName: "Employee",
         email: "employee@thainhf.org",
+        hireDate: null,
         status: "ACTIVE",
         deletedAt: null,
         user: null,
@@ -209,6 +210,29 @@ describe("Employee Mutations", () => {
             expect(result.success).toBe(true);
             expect(result.employee).toBeDefined();
             expect(prismaMock.employee.create).toHaveBeenCalled();
+            expect(prismaMock.employee.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ hireDate: null }),
+                }),
+            );
+        });
+
+        it("persists a supplied hire date without substituting the creation time", async () => {
+            const hireDate = new Date("2023-04-01T00:00:00.000Z");
+            prismaMock.employee.create.mockResolvedValue({
+                id: 1,
+                ...mockData,
+                hireDate,
+            } as never);
+
+            const result = await createEmployee({ ...mockData, hireDate });
+
+            expect(result.success).toBe(true);
+            expect(prismaMock.employee.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ hireDate }),
+                }),
+            );
         });
     });
 
@@ -241,6 +265,47 @@ describe("Employee Mutations", () => {
                     data: expect.objectContaining({ firstName: "New" }),
                 }),
             );
+        });
+
+        it("adds a hire date to an employee whose date is unknown", async () => {
+            const employee = buildEmployee({ hireDate: null });
+            const hireDate = new Date("2023-04-01T00:00:00.000Z");
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue({ ...employee, hireDate } as never);
+
+            const result = await updateEmployee(1, { hireDate });
+
+            expect(result.success).toBe(true);
+            expect(result.beforeData?.hireDate).toBeNull();
+            expect(prismaMock.employee.update).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ hireDate }),
+            }));
+        });
+
+        it("explicitly clears a previously saved hire date", async () => {
+            const previousHireDate = new Date("2023-04-01T00:00:00.000Z");
+            const employee = buildEmployee({ hireDate: previousHireDate });
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue({ ...employee, hireDate: null } as never);
+
+            const result = await updateEmployee(1, { hireDate: null });
+
+            expect(result.success).toBe(true);
+            expect(result.beforeData?.hireDate).toEqual(previousHireDate);
+            expect(prismaMock.employee.update).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({ hireDate: null }),
+            }));
+        });
+
+        it("preserves hire date when the PATCH field is omitted", async () => {
+            const previousHireDate = new Date("2023-04-01T00:00:00.000Z");
+            const employee = buildEmployee({ hireDate: previousHireDate });
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+
+            await updateEmployee(1, { firstName: "Updated" });
+
+            const updateCall = prismaMock.employee.update.mock.calls[0]?.[0];
+            expect(updateCall?.data).not.toHaveProperty("hireDate");
         });
         it("keeps the existing behavior for an employee without a linked user", async () => {
             const employee = buildEmployee();
@@ -624,6 +689,35 @@ describe("Employee Mutations", () => {
             expect(prismaMock.user.update).toHaveBeenCalledWith(expect.objectContaining({
                 data: expect.objectContaining({ isActive: false }),
             }));
+        });
+
+        it("includes hire-date changes in the lifecycle audit transaction", async () => {
+            const previousHireDate = new Date("2023-04-01T00:00:00.000Z");
+            const nextHireDate = new Date("2024-05-02T00:00:00.000Z");
+            const employee = buildEmployee({ hireDate: previousHireDate });
+            prismaMock.employee.findUnique.mockResolvedValue(employee as never);
+            prismaMock.employee.update.mockResolvedValue({
+                ...employee,
+                hireDate: nextHireDate,
+                status: "INACTIVE",
+                deletedAt: new Date("2026-11-05T00:00:00.000Z"),
+            } as never);
+
+            const result = await updateEmployee(
+                1,
+                { status: "INACTIVE", hireDate: nextHireDate },
+                ACTOR,
+                NO_OFFBOARDING_DEPENDENCIES,
+            );
+
+            expect(result.auditRecorded).toBe(true);
+            const auditDetails = JSON.parse(
+                String(prismaMock.auditLog.create.mock.calls[0]?.[0].data.details),
+            ) as Record<string, Record<string, unknown>>;
+            expect(auditDetails).toMatchObject({
+                before: { hireDate: previousHireDate.toISOString() },
+                after: { hireDate: nextHireDate.toISOString() },
+            });
         });
 
         it.each(["INACTIVE", "SUSPENDED"] as const)(

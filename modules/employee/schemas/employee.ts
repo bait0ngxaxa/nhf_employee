@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseEmployeeHireDate } from "../domain/tenure";
 
 const PHONE_ERROR_MESSAGE =
     "กรุณาระบุเบอร์โทรศัพท์ให้ถูกต้อง (10 หลัก เช่น 0889999999 หรือ 088-9999999)";
@@ -19,6 +20,23 @@ const employeePhoneSchema = z.string().trim().max(20, PHONE_ERROR_MESSAGE)
 const emptyToUndefined = (value: unknown): unknown =>
     value === "" || value === null ? undefined : value;
 
+const hireDateStringSchema = z.string().transform((value, context) => {
+    const date = parseEmployeeHireDate(value);
+    if (!date) {
+        context.addIssue({
+            code: "custom",
+            message: "กรุณาระบุวันที่เริ่มงานเป็นรูปแบบ YYYY-MM-DD ที่ถูกต้อง",
+        });
+        return z.NEVER;
+    }
+    return date;
+});
+
+export const employeeHireDateSchema = z.preprocess(
+    (value: unknown) => value === "" ? null : value,
+    z.union([hireDateStringSchema, z.null()]),
+);
+
 export const createEmployeeSchema = z.object({
     firstName: z.string({ message: "กรุณากรอกชื่อ" }).min(1, "กรุณากรอกชื่อ").max(100, "ชื่อต้องไม่เกิน 100 ตัวอักษร").trim(),
     lastName: z.string({ message: "กรุณากรอกนามสกุล" }).min(1, "กรุณากรอกนามสกุล").max(100, "นามสกุลต้องไม่เกิน 100 ตัวอักษร").trim(),
@@ -27,6 +45,7 @@ export const createEmployeeSchema = z.object({
     phone: employeePhoneSchema,
     position: z.string({ message: "กรุณากรอกตำแหน่ง" }).min(1, "กรุณากรอกตำแหน่ง").max(200, "ตำแหน่งต้องไม่เกิน 200 ตัวอักษร").trim(),
     affiliation: z.string().max(200, "สังกัดต้องไม่เกิน 200 ตัวอักษร").trim().nullish().transform((value) => value || null),
+    hireDate: employeeHireDateSchema.optional().transform((value) => value ?? null),
     departmentId: z.union([z.string(), z.number()])
         .transform((value) => typeof value === "string" ? parseInt(value, 10) : value)
         .refine((value) => !Number.isNaN(value) && value > 0, { message: "กรุณาเลือกแผนก" }),
@@ -40,6 +59,7 @@ export const updateEmployeeSchema = z.object({
     phone: employeePhoneSchema,
     position: z.string().min(1, "กรุณากรอกตำแหน่ง").max(200, "ตำแหน่งต้องไม่เกิน 200 ตัวอักษร").trim().optional(),
     affiliation: z.string().max(200, "สังกัดต้องไม่เกิน 200 ตัวอักษร").trim().nullish().transform((value) => value || null),
+    hireDate: employeeHireDateSchema.optional(),
     departmentId: z.union([z.string(), z.number()])
         .transform((value) => typeof value === "string" ? parseInt(value, 10) : value)
         .refine((value) => !Number.isNaN(value) && value > 0, { message: "กรุณาเลือกแผนก" }).optional(),

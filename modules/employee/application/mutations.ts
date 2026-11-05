@@ -38,6 +38,7 @@ type LifecycleEmployee = {
     lastName: string;
     nickname: string | null;
     email: string;
+    hireDate: Date | null;
     status: EmployeeStatusValue;
     deletedAt: Date | null;
     user: EmployeeAccountLifecycleRecord | null;
@@ -79,6 +80,7 @@ const LIFECYCLE_EMPLOYEE_SELECT = {
     lastName: true,
     nickname: true,
     email: true,
+    hireDate: true,
     status: true,
     deletedAt: true,
     user: {
@@ -118,6 +120,7 @@ function buildBeforeData(
         lastName: employee.lastName,
         nickname: employee.nickname,
         email: employee.email,
+        hireDate: employee.hireDate,
         status: employee.status,
         deletedAt: employee.deletedAt,
         userId: account?.id ?? null,
@@ -222,6 +225,7 @@ function buildEmployeeUpdateData(data: UpdateEmployeeData): Prisma.EmployeeUnche
     if (data.phone !== undefined) result.phone = data.phone?.trim() || null;
     if (data.position) result.position = data.position.trim();
     if (data.affiliation !== undefined) result.affiliation = data.affiliation?.trim() || null;
+    if (data.hireDate !== undefined) result.hireDate = data.hireDate;
     if (data.departmentId) result.departmentId = data.departmentId;
     return result;
 }
@@ -278,6 +282,7 @@ async function writeLifecycleAudit(
     beforeData: Record<string, unknown>,
     status: EmployeeStatusValue,
     deletedAt: Date | null,
+    hireDate: Date | null,
 ): Promise<void> {
     await appendAuditInTransaction(tx, {
         action: operation === "OFFBOARD" ? "EMPLOYEE_DELETE" : "EMPLOYEE_STATUS_CHANGE",
@@ -290,6 +295,7 @@ async function writeLifecycleAudit(
             after: {
                 status,
                 deletedAt,
+                hireDate,
                 userId: account?.id ?? null,
                 userIsActive: isEmployeeDeactivation(operation) ? false : true,
             },
@@ -397,6 +403,7 @@ async function runEmployeeLifecycle(
                 beforeData,
                 employeeResult.status,
                 employeeResult.deletedAt,
+                employeeResult.hireDate,
             );
             return {
                 success: true,
@@ -490,6 +497,7 @@ export async function createEmployee(data: CreateEmployeeData): Promise<Employee
             phone: data.phone,
             position: data.position,
             affiliation: data.affiliation,
+            hireDate: data.hireDate ?? null,
             departmentId: data.departmentId,
         },
         include: EMPLOYEE_WITH_RELATIONS_INCLUDE,

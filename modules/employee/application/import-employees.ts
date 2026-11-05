@@ -1,6 +1,7 @@
 import { listDepartmentReferences } from "@/modules/department";
 
 import { getEmployeeDisplayName } from "../domain/identity";
+import { employeeHireDateSchema } from "../schemas/employee";
 import { parseEmployeeImportStatus } from "../domain/import-status";
 import {
     getEmployeeImportDepartmentCode,
@@ -46,6 +47,10 @@ export async function importEmployeesFromCsvRows(
         const rowNumber = employeeData.sourceRow ?? index + 1;
         try {
             assertRequiredFields(employeeData);
+            const hireDateResult = employeeHireDateSchema.safeParse(employeeData.hireDate ?? null);
+            if (!hireDateResult.success) {
+                throw new Error("วันที่เริ่มงานต้องเป็นรูปแบบ YYYY-MM-DD ที่ถูกต้อง หรือเว้นว่างได้");
+            }
             const normalizedEmail = normalizeEmployeeImportEmail(employeeData.email);
             if (normalizedEmail && existingEmails.has(normalizedEmail)) {
                 throw new Error("อีเมลนี้ถูกใช้งานแล้ว");
@@ -71,6 +76,7 @@ export async function importEmployeesFromCsvRows(
                 phone: employeeData.phone?.trim() || null,
                 position: employeeData.position.trim(),
                 affiliation: employeeData.affiliation?.trim() || null,
+                hireDate: hireDateResult.data,
                 departmentId,
                 status: parseEmployeeImportStatus(employeeData.status),
             });
@@ -85,6 +91,7 @@ export async function importEmployeesFromCsvRows(
                 department: created.dept.name,
                 affiliation: created.affiliation || undefined,
                 nickname: created.nickname || undefined,
+                hireDate: created.hireDate?.toISOString().slice(0, 10) ?? null,
             });
         } catch (error) {
             result.errors.push({

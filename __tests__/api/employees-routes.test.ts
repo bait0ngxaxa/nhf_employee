@@ -327,6 +327,38 @@ describe("Employee mutation routes", () => {
         });
     });
 
+    it("passes an explicit hire-date clear through PATCH and audit", async () => {
+        const previousHireDate = new Date("2023-04-01T00:00:00.000Z");
+        vi.mocked(updateEmployee).mockResolvedValue({
+            success: true,
+            employee: { id: 12, hireDate: null },
+            beforeData: { hireDate: previousHireDate },
+        } as never);
+
+        const response = await PATCH(new NextRequest(
+            "http://localhost/api/employees/12",
+            {
+                method: "PATCH",
+                body: JSON.stringify({ hireDate: null }),
+            },
+        ), employeeParams("12"));
+
+        expect(response.status).toBe(200);
+        expect(updateEmployee).toHaveBeenCalledWith(
+            12,
+            { hireDate: null },
+            expect.objectContaining({ userId: ADMIN.id }),
+            getEmployeeLeaveOffboardingBlockers,
+            employeeAccountLifecycle,
+        );
+        expect(appendEmployeeUpdateAudit).toHaveBeenCalledWith(expect.objectContaining({
+            employeeId: 12,
+            before: { hireDate: previousHireDate },
+            after: { hireDate: null },
+            statusChanged: false,
+        }));
+    });
+
     it("schedules Employee create Audit after the response path is established", async () => {
         vi.mocked(createEmployee).mockResolvedValue({
             success: true,

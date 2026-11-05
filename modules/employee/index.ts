@@ -1,6 +1,7 @@
 // Employee API route contracts.
 export {
     createEmployeeSchema,
+    employeeHireDateSchema,
     employeeFiltersSchema,
     updateEmployeeSchema,
 } from "./schemas/employee";
