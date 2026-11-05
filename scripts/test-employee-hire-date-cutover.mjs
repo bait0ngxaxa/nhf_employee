@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import mysql from "mysql2/promise";
+import { extractCutoverProcedure } from "./employee-hire-date-cli.mjs";
 
 // Deliberately separate from DATABASE_URL and the ordinary integration DB.
 const url = new URL(process.env.TEST_DATABASE_URL || "mysql://invalid/invalid");
@@ -16,17 +21,36 @@ const connection = await mysql.createConnection({
     multipleStatements: true,
     dateStrings: true,
 });
-const sql = await readFile("scripts/employee-hire-date-legacy-remediation.sql", "utf8");
-const procedure = sql.slice(sql.indexOf("CREATE PROCEDURE"), sql.indexOf("END$$") + 3);
+const sql = await readFile(new URL("employee-hire-date-legacy-remediation.sql", import.meta.url), "utf8");
+const procedure = extractCutoverProcedure(sql);
 const receiptSql = await readFile(
-    "prisma/migrations/20261105100000_employee_hire_date_cutover_receipt/migration.sql", "utf8",
+    new URL("../prisma/migrations/20261105100000_employee_hire_date_cutover_receipt/migration.sql", import.meta.url), "utf8",
 );
 const nullableSql = await readFile(
-    "prisma/migrations/20261105090000_employee_hire_date_nullable/migration.sql", "utf8",
+    new URL("../prisma/migrations/20261105090000_employee_hire_date_nullable/migration.sql", import.meta.url), "utf8",
 );
 const ownedTables = [];
 let ownsProcedure = false;
 let passed = 0;
+const execFileAsync = promisify(execFile);
+const target = `${url.hostname}:${url.port || 3306}/${decodeURIComponent(url.pathname.slice(1))}`;
+const applyArgs = ["cutover", "--apply", "--operator=cli-test@example.org", "--backup-ref=cli-verified-backup",
+    "--confirm-writers-paused", `--confirm-target=${target}`];
+
+async function cli(args) {
+    try {
+        const result = await execFileAsync(process.execPath,
+            [fileURLToPath(new URL("employee-hire-date-cli.mjs", import.meta.url)), ...args], {
+                // Exercise path independence and prevent loading a normal developer DB.
+                cwd: tmpdir(),
+                env: { ...process.env, DATABASE_URL: url.href, EMPLOYEE_HIRE_DATE_DATABASE_URL: url.href },
+            });
+        return { code: 0, output: result.stdout + result.stderr };
+    } catch (error) {
+        if (typeof error.code !== "number") throw error;
+        return { code: error.code, output: error.stdout + error.stderr };
+    }
+}
 
 async function rows(statement) {
     return (await connection.query(statement))[0];
@@ -74,6 +98,9 @@ try {
     assert.equal(existing.length, 0, "Refusing existing fixture tables");
     assert.equal((await rows(`SELECT routine_name FROM information_schema.routines
         WHERE routine_schema = DATABASE() AND routine_name = 'clear_legacy_employee_hire_dates'`)).length, 0);
+    assert.equal((await rows(`SELECT table_name FROM information_schema.tables
+        WHERE table_schema = DATABASE() AND table_name = '_prisma_migrations'`)).length, 0,
+    "Use an empty test DB; never overwrite Prisma migration history");
     await connection.query(`CREATE TABLE employees (
         id INT PRIMARY KEY, firstName VARCHAR(191), lastName VARCHAR(191),
         hireDate DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -208,6 +235,129 @@ try {
         await connection.query("DELETE FROM employees; SET @expected_employee_count = 0; SET @expected_clear_count = 0");
         await connection.query("CALL clear_legacy_employee_hire_dates()");
         assert.equal((await rows("SELECT employeeCount FROM employee_hire_date_cutover"))[0].employeeCount, 0);
+    });
+    await connection.query("DROP PROCEDURE clear_legacy_employee_hire_dates");
+    ownsProcedure = false;
+    // Minimal isolated migration-history fixture for CLI preflight; never a live Prisma history.
+    await connection.query(`CREATE TABLE _prisma_migrations (
+        migration_name VARCHAR(255), finished_at DATETIME(3), rolled_back_at DATETIME(3)
+    ) ENGINE=InnoDB`);
+    ownedTables.push("_prisma_migrations");
+    await connection.query(`INSERT INTO _prisma_migrations VALUES
+        ('20261105090000_employee_hire_date_nullable', NOW(3), NULL),
+        ('20261105100000_employee_hire_date_cutover_receipt', NOW(3), NULL)`);
+
+    await test("CLI assess and default cutover are read-only across working directories", async () => {
+        for (const command of ["assess", "cutover"]) {
+            const result = await cli([command]);
+            assert.equal(result.code, 0, result.output);
+            assert.match(result.output, /Total employees: 3/);
+            assert.match(result.output, /Non-null hire dates: 2/);
+            await unchangedAfterFailure();
+        }
+        const result = await cli(["verify"]);
+        assert.equal(result.code, 1);
+        assert.match(result.output, /CUTOVER_NOT_COMPLETED/);
+    });
+    await test("CLI refuses missing migration and target mismatch without changes", async () => {
+        await connection.query("DELETE FROM _prisma_migrations WHERE migration_name = '20261105090000_employee_hire_date_nullable'");
+        const missing = await cli(["assess"]);
+        assert.equal(missing.code, 1);
+        assert.match(missing.output, /migrations are missing/);
+        await connection.query("INSERT INTO _prisma_migrations VALUES ('20261105090000_employee_hire_date_nullable', NOW(3), NULL)");
+        const mismatch = await cli([...applyArgs.slice(0, -1), "--confirm-target=wrong:3306/wrong"]);
+        assert.equal(mismatch.code, 1);
+        await unchangedAfterFailure();
+    });
+    await test("CLI refuses an existing routine and never drops another owner's routine", async () => {
+        await connection.query(procedure);
+        try {
+            const result = await cli(applyArgs);
+            assert.equal(result.code, 1);
+            assert.match(result.output, /routine already exists/);
+            assert.equal((await rows(`SELECT routine_name FROM information_schema.routines
+                WHERE routine_schema = DATABASE() AND routine_name = 'clear_legacy_employee_hire_dates'`)).length, 1);
+            await unchangedAfterFailure();
+        } finally {
+            await connection.query("DROP PROCEDURE clear_legacy_employee_hire_dates");
+        }
+    });
+    await test("CLI refuses concurrent setup lock without installing a routine", async () => {
+        const { createHash } = await import("node:crypto");
+        const lockName = `nhf_hire_date_${createHash("sha256").update(decodeURIComponent(url.pathname.slice(1))).digest("hex").slice(0, 40)}`;
+        await connection.query("SELECT GET_LOCK(?, 0)", [lockName]);
+        try {
+            const result = await cli(applyArgs);
+            assert.equal(result.code, 1);
+            assert.match(result.output, /setup lock/);
+            await unchangedAfterFailure();
+        } finally {
+            await connection.query("SELECT RELEASE_LOCK(?)", [lockName]);
+        }
+    });
+    await test("CLI procedure failure returns nonzero, rolls back and removes only its own routine", async () => {
+        await connection.query(`CREATE TRIGGER cutover_test_fail BEFORE UPDATE ON employees
+            FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced CLI rollback'`);
+        try {
+            const result = await cli(applyArgs);
+            assert.equal(result.code, 1);
+            assert.match(result.output, /No automatic retry/);
+            await unchangedAfterFailure();
+            assert.equal((await rows(`SELECT routine_name FROM information_schema.routines
+                WHERE routine_schema = DATABASE() AND routine_name = 'clear_legacy_employee_hire_dates'`)).length, 0);
+        } finally {
+            await connection.query("DROP TRIGGER cutover_test_fail");
+        }
+    });
+    await test("CLI count mismatch inside the authoritative transaction rolls everything back", async () => {
+        // Simulate a cohort change after CLI counts, before the locked SQL snapshot.
+        await connection.query(`CREATE TRIGGER cutover_test_fail BEFORE INSERT ON employee_hire_date_cutover
+            FOR EACH ROW UPDATE employees SET hireDate = NULL WHERE id = 12`);
+        try {
+            const result = await cli(applyArgs);
+            assert.equal(result.code, 1);
+            await unchangedAfterFailure();
+        } finally {
+            await connection.query("DROP TRIGGER cutover_test_fail");
+        }
+    });
+    await test("CLI apply obtains fresh counts rather than trusting an earlier dry run", async () => {
+        const dry = await cli(["cutover"]);
+        assert.equal(dry.code, 0);
+        assert.match(dry.output, /Non-null hire dates: 2/);
+        await connection.query("UPDATE employees SET hireDate = NULL WHERE id = 12");
+        const result = await cli(applyArgs);
+        assert.equal(result.code, 0, result.output);
+        assert.equal((await rows("SELECT clearedCount FROM employee_hire_date_cutover"))[0].clearedCount, 1);
+    });
+    await test("CLI apply, verify, new dates and rerun protection use the actual SQL", async () => {
+        const applied = await cli(applyArgs);
+        assert.equal(applied.code, 0, applied.output);
+        assert.match(applied.output, /CUTOVER_VERIFIED/);
+        assert.equal((await rows("SELECT COUNT(*) AS n FROM employee_hire_date_cutover"))[0].n, 1);
+        const verified = await cli(["verify"]);
+        assert.equal(verified.code, 0, verified.output);
+        await connection.query(`UPDATE employees SET hireDate = '2026-11-05' WHERE id = 7;
+            INSERT INTO employees VALUES (30, 'new', 'employee', '2026-11-06', NOW(), NOW())`);
+        const withNew = await cli(["verify"]);
+        assert.equal(withNew.code, 0, withNew.output);
+        assert.match(withNew.output, /CUTOVER_VERIFIED_WITH_NEW_DATES/);
+        const repeated = await cli(applyArgs);
+        assert.equal(repeated.code, 1);
+        assert.match(repeated.output, /already completed/);
+        assert.equal((await rows("SELECT COUNT(hireDate) AS n FROM employees"))[0].n, 2);
+        const assess = await cli(["assess"]);
+        assert.equal(assess.code, 0);
+        assert.match(assess.output, /Cleanup must NOT be repeated/);
+    });
+    await test("CLI verification rejects corrupted durable receipt", async () => {
+        const applied = await cli(applyArgs);
+        assert.equal(applied.code, 0, applied.output);
+        await connection.query("UPDATE employee_hire_date_cutover SET clearedCount = employeeCount + 1");
+        const result = await cli(["verify"]);
+        assert.equal(result.code, 1);
+        assert.match(result.output, /VERIFICATION_FAILED/);
+        assert.equal((await rows("SELECT COUNT(*) AS n FROM employee_hire_date_cutover"))[0].n, 1);
     });
     process.stdout.write(`${passed} MySQL cutover scenarios passed\n`);
 } finally {

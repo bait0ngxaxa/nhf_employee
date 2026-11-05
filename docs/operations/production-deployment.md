@@ -530,6 +530,36 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 
 การ deploy application และ Rich Menu activation เป็นคนละ control. ถ้า status ไม่สามารถระบุ previous default menu/rollback target ได้ ให้หยุดก่อน `--apply`. Rollback application ต้องใช้ artifact ที่เข้ากันได้กับ forward-only schema; การคืน default Rich Menu ใช้ขั้นตอนในหัวข้อ 10
 
+### Employee hire-date cutover — ทำครั้งเดียวก่อนเปิด feature
+
+ใช้ขั้นตอนนี้เฉพาะ release ที่เริ่มใช้ nullable hire date ครั้งแรก โดยแทรกช่วงหยุด writes ก่อน start application รุ่นใหม่ ห้ามเพิ่ม cleanup เป็นงานที่รันทุก deployment และไม่ต้องให้ HR ตรวจหรืออนุมัติวันที่รายคน:
+
+1. เตรียมและตรวจ release artifact รวม Node.js dependencies, CLI และ SQL ของ revision ที่ review แล้ว
+2. สำรองฐานข้อมูลและทดสอบว่า restore ได้จริง เก็บ backup reference
+3. หยุด application instances, imports, scheduler jobs และ integrations ทุกตัวที่เขียน employee พร้อมรอ requests เดิมจบ
+4. ใช้ `npx prisma migrate deploy` เพื่อ apply nullable DATE และ durable receipt migrations
+5. รัน `npm run employee:hire-date:assess` แบบ read-only
+6. ตรวจจำนวนพนักงาน/วันที่และเป้าหมาย `host:port/database` ที่แสดง
+7. รันคำสั่ง cutover ด้านล่างด้วย operator, verified backup reference และ target จริง
+8. รัน `npm run employee:hire-date:verify` ต้องได้ `CUTOVER_VERIFIED` และไม่มี hire date ค้างอยู่ ณ ขอบเขตก่อนเปิด writes
+9. Deploy/start application รุ่นใหม่
+10. Smoke test employee create/edit/clear date, tenure และ CSV flows ด้วยบัญชีที่มีสิทธิ์
+11. เปิดการใช้งานและ employee writers ตามปกติ
+
+```sh
+npm run employee:hire-date:cutover -- --apply --operator="operator@example.org" --backup-ref="verified-backup-reference" --confirm-writers-paused --confirm-target="127.0.0.1:3308/employee_nhf"
+```
+
+`cutover` ที่ไม่มี `--apply` เป็น dry run และไม่เขียนข้อมูล ไม่ต้องใช้ MySQL interactive client หรือกรอก expected counts เอง CLI อ่าน counts ใหม่ใน maintenance window และ SQL ตรวจ snapshot/จำนวนแถวอีกครั้งใน transaction หากไม่ตรงจะ rollback ทั้งหมด
+
+ใช้ `DATABASE_URL` ตาม environment เดิม หรือกำหนด `EMPLOYEE_HIRE_DATE_DATABASE_URL` อย่างชัดเจนสำหรับบัญชี cutover ที่มีสิทธิ์เพิ่ม หากกำหนดค่าเฉพาะแล้วผิด/ว่าง CLI จะไม่ fallback ไปอีกฐาน ยืนยัน target ตามที่ assess แสดงจริง ภายใน Docker hostname/port อาจต่างจาก host CLI โหลด `.env*` จาก root ของ repository โดยไม่ขึ้นกับ working directory และไม่แสดง credentials
+
+`--confirm-writers-paused` เป็นคำยืนยันของ operator ไม่ใช่หลักฐานว่า processes หยุดจริง เมื่อทำสำเร็จ receipt ป้องกันการรันซ้ำถาวร หลังกลับมาใช้งาน วันที่จริงที่กรอกใหม่เป็นข้อมูลที่ถูกต้อง และ verify อาจรายงาน `CUTOVER_VERIFIED_WITH_NEW_DATES` ได้ ห้ามล้างซ้ำเพื่อให้ count กลับเป็นศูนย์
+
+หาก CALL ขาดการเชื่อมต่อ ผลอาจ commit แล้ว CLI ไม่ retry อัตโนมัติ ให้คง maintenance, รัน verify ใหม่ และให้ DBA ตรวจ routine ที่อาจค้างอยู่ CLI ไม่ overwrite routine เดิม การ verify ต้องมี audit evidence ครบ หาก audit หมดอายุตาม retention ให้ตรวจ archive/receipt แทนการ cleanup อีกครั้ง
+
+รายละเอียดสิทธิ์ฐานข้อมูล, TLS, lifecycle, SQL สำหรับ troubleshooting และ rollback อยู่ใน [Employee hire date cutover](../architecture/employee-hire-date-migration.md)
+
 ## 10. Rich Menu rollback
 
 ### 10.1 Evidence ที่ต้อง capture ก่อน launch
