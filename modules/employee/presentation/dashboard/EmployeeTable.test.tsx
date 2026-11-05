@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EmployeeTable } from "./EmployeeTable";
 import type { Employee } from "./types";
@@ -22,6 +22,7 @@ const employee: Employee = {
 describe("EmployeeTable", () => {
     afterEach(() => {
         vi.useRealTimers();
+        vi.restoreAllMocks();
     });
 
     it("keeps full names and email addresses on one line without truncation", () => {
@@ -96,6 +97,59 @@ describe("EmployeeTable", () => {
         expect(within(table).getByText("ยังไม่ทราบ")).toBeInTheDocument();
         expect(within(card).getByText("ไม่ระบุ")).toBeInTheDocument();
         expect(within(card).getByText("ยังไม่ทราบ")).toBeInTheDocument();
+        expect(screen.queryByText(/0 ปี/)).not.toBeInTheDocument();
+    });
+
+    it("updates desktop and mobile at Thailand midnight with a single timer", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-11-04T16:59:59.500Z"));
+        const { unmount } = render(
+            <EmployeeTable employees={[{ ...employee, hireDate: "2023-04-01" }]} canUpdateEmployees={false} />,
+        );
+        expect(screen.getAllByText("3 ปี 7 เดือน 3 วัน")).toHaveLength(2);
+        expect(vi.getTimerCount()).toBe(1);
+        act(() => vi.advanceTimersByTime(500));
+        expect(screen.getAllByText("3 ปี 7 เดือน 4 วัน")).toHaveLength(2);
+        expect(vi.getTimerCount()).toBe(1);
+        unmount();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("catches up after a hidden tab returns without polling while hidden", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-11-04T05:00:00Z"));
+        const visibility = vi.spyOn(document, "visibilityState", "get");
+        render(<EmployeeTable employees={[{ ...employee, hireDate: "2023-04-01" }]} canUpdateEmployees={false} />);
+        visibility.mockReturnValue("hidden");
+        fireEvent(document, new Event("visibilitychange"));
+        expect(vi.getTimerCount()).toBe(0);
+        vi.setSystemTime(new Date("2026-11-06T05:00:00Z"));
+        visibility.mockReturnValue("visible");
+        fireEvent(document, new Event("visibilitychange"));
+        expect(screen.getAllByText("3 ปี 7 เดือน 5 วัน")).toHaveLength(2);
+        expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it.each(["focus", "pageshow"])("refreshes on %s after a suspended timer", (event) => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-11-04T05:00:00Z"));
+        render(<EmployeeTable employees={[{ ...employee, hireDate: "2023-04-01" }]} canUpdateEmployees={false} />);
+        vi.setSystemTime(new Date("2026-11-05T05:00:00Z"));
+        fireEvent(window, new Event(event));
+        expect(screen.getAllByText("3 ปี 7 เดือน 4 วัน")).toHaveLength(2);
+    });
+
+    it("recalculates both layouts after adding, changing and clearing a date", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-11-04T05:00:00Z"));
+        const { rerender } = render(<EmployeeTable employees={[{ ...employee, hireDate: null }]} canUpdateEmployees={false} />);
+        expect(screen.getAllByText("ยังไม่ทราบ")).toHaveLength(2);
+        rerender(<EmployeeTable employees={[{ ...employee, hireDate: "2023-04-01" }]} canUpdateEmployees={false} />);
+        expect(screen.getAllByText("3 ปี 7 เดือน 3 วัน")).toHaveLength(2);
+        rerender(<EmployeeTable employees={[{ ...employee, hireDate: "2026-11-04" }]} canUpdateEmployees={false} />);
+        expect(screen.getAllByText("0 ปี 0 เดือน 0 วัน")).toHaveLength(2);
+        rerender(<EmployeeTable employees={[{ ...employee, hireDate: null }]} canUpdateEmployees={false} />);
+        expect(screen.getAllByText("ยังไม่ทราบ")).toHaveLength(2);
         expect(screen.queryByText(/0 ปี/)).not.toBeInTheDocument();
     });
 });

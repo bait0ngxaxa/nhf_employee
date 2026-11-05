@@ -4,6 +4,7 @@ import {
     calculateEmploymentTenure,
     formatEmploymentHireDate,
     formatEmploymentTenure,
+    getThailandDateOnly,
 } from "./tenure";
 
 describe("calculateEmploymentTenure", () => {
@@ -83,6 +84,9 @@ describe("calculateEmploymentTenure", () => {
             months: 7,
             days: 4,
         });
+        expect(getThailandDateOnly(new Date("2026-11-04T16:59:59.999Z"))).toBe("2026-11-04");
+        expect(getThailandDateOnly(new Date("2026-11-04T17:00:00.000Z"))).toBe("2026-11-05");
+        expect(getThailandDateOnly(new Date("2026-12-31T17:00:00.000Z"))).toBe("2027-01-01");
     });
 
     it("returns zero instead of negative tenure for future hire dates", () => {

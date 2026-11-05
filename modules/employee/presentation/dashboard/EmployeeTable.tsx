@@ -1,3 +1,5 @@
+"use client";
+
 import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { Employee } from "./types";
@@ -9,6 +11,7 @@ import {
     formatEmployeePhone,
 } from "./formatters";
 import { EmployeeMobileCard } from "./EmployeeMobileCard";
+import { useEmploymentAsOfDate } from "./useEmploymentAsOfDate";
 import {
     calculateEmploymentTenure,
     formatEmploymentHireDate,
@@ -31,12 +34,12 @@ export const EmployeeTable = memo(function EmployeeTable({
     canUpdateEmployees,
     onEditEmployee,
 }: EmployeeTableProps) {
+    const asOfDate = useEmploymentAsOfDate();
     if (employees.length === 0) {
         return null;
     }
 
     const canEdit = canUpdateEmployees && Boolean(onEditEmployee);
-    const asOfDate = new Date();
 
     return (
         <div className="space-y-3">

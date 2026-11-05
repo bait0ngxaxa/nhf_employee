@@ -60,9 +60,12 @@ describe("Employee CSV export", () => {
         }));
     });
 
-    it("exports a known hire date and tenure using the shared calendar calculation", async () => {
+    it.each([
+        ["2026-11-04T16:59:59.999Z", "3 ปี 7 เดือน 3 วัน"],
+        ["2026-11-04T17:00:00.000Z", "3 ปี 7 เดือน 4 วัน"],
+    ])("exports tenure on the Thailand calendar at %s", async (instant, tenure) => {
         vi.useFakeTimers();
-        vi.setSystemTime(new Date("2026-11-04T05:00:00.000Z"));
+        vi.setSystemTime(new Date(instant));
         prismaMock.employee.count.mockResolvedValue(1);
         prismaMock.employee.findMany.mockResolvedValueOnce([{
             firstName: "สมชาย",
@@ -82,6 +85,6 @@ describe("Employee CSV export", () => {
         if (result.status !== "ready") return;
 
         const csv = await result.response.text();
-        expect(csv).toContain("1,สมชาย,ใจดี,-,เจ้าหน้าที่,-,บริหาร,somchai@thainhf.org,-,ทำงานอยู่,01/04/2566,3 ปี 7 เดือน 3 วัน");
+        expect(csv).toContain(`1,สมชาย,ใจดี,-,เจ้าหน้าที่,-,บริหาร,somchai@thainhf.org,-,ทำงานอยู่,01/04/2566,${tenure}`);
     });
 });

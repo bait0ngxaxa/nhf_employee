@@ -78,6 +78,13 @@ function getThailandCalendarDate(value: Date | string): CalendarDate | null {
     return makeCalendarDate(year, month, day);
 }
 
+/** Current Thailand day, as a Gregorian ISO date for presentation clocks. */
+export function getThailandDateOnly(instant: Date): string {
+    const date = getThailandCalendarDate(instant);
+    if (!date) throw new RangeError("Invalid Thailand calendar date");
+    return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+}
+
 function toHireCalendarDate(value: Date | string): CalendarDate | null {
     if (typeof value === "string") return parseDateOnlyString(value);
     if (!Number.isFinite(value.getTime())) return null;

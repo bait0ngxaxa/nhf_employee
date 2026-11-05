@@ -31,14 +31,14 @@ import {
 interface EmployeeMobileCardProps {
     employee: Employee;
     canUpdateEmployees: boolean;
-    asOfDate?: Date;
+    asOfDate: string;
     onEditEmployee?: (employee: Employee) => void;
 }
 
 export function EmployeeMobileCard({
     employee,
     canUpdateEmployees,
-    asOfDate = new Date(),
+    asOfDate,
     onEditEmployee,
 }: EmployeeMobileCardProps) {
     return (
