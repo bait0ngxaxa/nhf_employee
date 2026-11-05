@@ -16,6 +16,7 @@ const INITIAL_FORM_DATA: EmployeeFormData = {
     phone: "",
     position: "",
     affiliation: "",
+    hireDate: "",
     departmentId: "",
 };
 
@@ -128,7 +129,10 @@ export function useAddEmployee({
         setIsLoading(true);
 
         try {
-            const apiResult = await apiPost(API_ROUTES.employees.list, result.data);
+            const apiResult = await apiPost(API_ROUTES.employees.list, {
+                ...result.data,
+                hireDate: formData.hireDate || null,
+            });
 
             if (apiResult.success) {
                 toast.success("เพิ่มพนักงานสำเร็จ", {

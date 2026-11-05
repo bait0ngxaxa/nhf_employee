@@ -2,6 +2,8 @@ import { Badge } from "@/components/ui/badge";
 import {
     AtSign,
     BriefcaseBusiness,
+    CalendarDays,
+    Clock3,
     Phone,
     ShieldCheck,
     UserRound,
@@ -17,6 +19,11 @@ import {
     isTemporaryEmail,
 } from "./formatters";
 import {
+    calculateEmploymentTenure,
+    formatEmploymentHireDate,
+    formatEmploymentTenure,
+} from "../../domain/tenure";
+import {
     EmployeeAvatar,
     EditEmployeeButton,
 } from "./EmployeeTablePrimitives";
@@ -24,12 +31,14 @@ import {
 interface EmployeeMobileCardProps {
     employee: Employee;
     canUpdateEmployees: boolean;
+    asOfDate?: Date;
     onEditEmployee?: (employee: Employee) => void;
 }
 
 export function EmployeeMobileCard({
     employee,
     canUpdateEmployees,
+    asOfDate = new Date(),
     onEditEmployee,
 }: EmployeeMobileCardProps) {
     return (
@@ -76,6 +85,18 @@ export function EmployeeMobileCard({
                     icon={Phone}
                     label="เบอร์โทร"
                     value={formatEmployeePhone(employee.phone)}
+                />
+                <MobileDetail
+                    icon={CalendarDays}
+                    label="วันที่เริ่มงาน"
+                    value={formatEmploymentHireDate(employee.hireDate)}
+                />
+                <MobileDetail
+                    icon={Clock3}
+                    label="อายุงาน"
+                    value={formatEmploymentTenure(
+                        calculateEmploymentTenure(employee.hireDate, asOfDate),
+                    )}
                 />
             </dl>
 

@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EmployeeTable } from "./EmployeeTable";
 import type { Employee } from "./types";
 
@@ -20,6 +20,10 @@ const employee: Employee = {
 };
 
 describe("EmployeeTable", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it("keeps full names and email addresses on one line without truncation", () => {
         render(
             <EmployeeTable
@@ -57,5 +61,41 @@ describe("EmployeeTable", () => {
         expect(screen.queryByRole("button", {
             name: `แก้ไขข้อมูล ${fullName}`,
         })).not.toBeInTheDocument();
+    });
+
+    it("shows the same known hire date and calculated tenure on desktop and mobile", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-11-04T05:00:00.000Z"));
+
+        render(
+            <EmployeeTable
+                employees={[{ ...employee, hireDate: "2023-04-01" }]}
+                canUpdateEmployees={false}
+            />,
+        );
+
+        const table = screen.getByRole("table");
+        const card = screen.getByRole("article");
+        expect(within(table).getByText("01/04/2566")).toBeInTheDocument();
+        expect(within(table).getByText("3 ปี 7 เดือน 3 วัน")).toBeInTheDocument();
+        expect(within(card).getByText("01/04/2566")).toBeInTheDocument();
+        expect(within(card).getByText("3 ปี 7 เดือน 3 วัน")).toBeInTheDocument();
+    });
+
+    it("shows unknown hire date and tenure instead of zero for null dates", () => {
+        render(
+            <EmployeeTable
+                employees={[{ ...employee, hireDate: null }]}
+                canUpdateEmployees={false}
+            />,
+        );
+
+        const table = screen.getByRole("table");
+        const card = screen.getByRole("article");
+        expect(within(table).getByText("ไม่ระบุ")).toBeInTheDocument();
+        expect(within(table).getByText("ยังไม่ทราบ")).toBeInTheDocument();
+        expect(within(card).getByText("ไม่ระบุ")).toBeInTheDocument();
+        expect(within(card).getByText("ยังไม่ทราบ")).toBeInTheDocument();
+        expect(screen.queryByText(/0 ปี/)).not.toBeInTheDocument();
     });
 });

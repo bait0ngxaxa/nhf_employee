@@ -23,9 +23,9 @@ function buildInitialFormData(employee: Employee | null): EmployeeFormData {
         phone: employee?.phone || "",
         position: employee?.position || "",
         affiliation: employee?.affiliation || "",
+        hireDate: employee?.hireDate?.slice(0, 10) || "",
         departmentId: employee?.dept?.id?.toString() || "",
         status: employee?.status || "ACTIVE",
-        hireDate: "",
     };
 }
 
@@ -139,7 +139,10 @@ export function useEditEmployee({
 
         setIsLoading(true);
 
-        const apiResult = await apiPatch(API_ROUTES.employees.byId(employee.id), formData);
+        const apiResult = await apiPatch(API_ROUTES.employees.byId(employee.id), {
+            ...formData,
+            hireDate: formData.hireDate || null,
+        });
 
         if (apiResult.success) {
             onSuccess?.();

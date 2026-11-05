@@ -10,6 +10,11 @@ import {
 } from "./formatters";
 import { EmployeeMobileCard } from "./EmployeeMobileCard";
 import {
+    calculateEmploymentTenure,
+    formatEmploymentHireDate,
+    formatEmploymentTenure,
+} from "../../domain/tenure";
+import {
     EditEmployeeButton,
     EmployeeAvatar,
     isTemporaryEmail,
@@ -31,6 +36,7 @@ export const EmployeeTable = memo(function EmployeeTable({
     }
 
     const canEdit = canUpdateEmployees && Boolean(onEditEmployee);
+    const asOfDate = new Date();
 
     return (
         <div className="space-y-3">
@@ -40,6 +46,7 @@ export const EmployeeTable = memo(function EmployeeTable({
                         key={employee.id}
                         employee={employee}
                         canUpdateEmployees={canEdit}
+                        asOfDate={asOfDate}
                         onEditEmployee={onEditEmployee}
                     />
                 ))}
@@ -77,6 +84,12 @@ export const EmployeeTable = memo(function EmployeeTable({
                             เบอร์โทร
                         </th>
                         <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
+                            วันที่เริ่มงาน
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
+                            อายุงาน
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
                             สถานะ
                         </th>
                         {canEdit ? (
@@ -87,78 +100,94 @@ export const EmployeeTable = memo(function EmployeeTable({
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border-muted">
-                    {employees.map((employee) => (
-                        <tr
-                            key={employee.id}
-                            className="group border-b border-border-muted transition-colors hover:bg-brand-surface/40 last:border-0"
-                        >
-                            <td className="px-5 py-4">
-                                <div className="flex items-center gap-3">
-                                    <EmployeeAvatar employee={employee} />
-                                    <div>
-                                        <div className="whitespace-nowrap text-sm font-semibold text-content-heading">
-                                            {getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}
+                    {employees.map((employee) => {
+                        const tenure = formatEmploymentTenure(
+                            calculateEmploymentTenure(employee.hireDate, asOfDate),
+                        );
+
+                        return (
+                            <tr
+                                key={employee.id}
+                                className="group border-b border-border-muted transition-colors hover:bg-brand-surface/40 last:border-0"
+                            >
+                                <td className="px-5 py-4">
+                                    <div className="flex items-center gap-3">
+                                        <EmployeeAvatar employee={employee} />
+                                        <div>
+                                            <div className="whitespace-nowrap text-sm font-semibold text-content-heading">
+                                                {getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </td>
-                            <td className="px-4 py-4">
-                                <NicknameBadge nickname={employee.nickname} />
-                            </td>
-                            <td className="px-4 py-4">
-                                <div
-                                    className="line-clamp-2 text-sm leading-6 text-content-strong [overflow-wrap:anywhere]"
-                                    title={employee.position}
-                                >
-                                    {employee.position}
-                                </div>
-                            </td>
-                            <td className="px-4 py-4">
-                                <div
-                                    className="line-clamp-2 text-sm leading-6 text-content-body [overflow-wrap:anywhere]"
-                                    title={employee.affiliation || undefined}
-                                >
-                                    {employee.affiliation || "-"}
-                                </div>
-                            </td>
-                            <td className="px-4 py-4">
-                                <Badge
-                                    variant="outline"
-                                    className={`${getEmployeeDepartmentBadgeClass(employee.dept.name)} max-w-full px-2.5 font-medium`}
-                                    title={employee.dept.name}
-                                >
-                                    <span className="truncate">
-                                        {employee.dept.name}
-                                    </span>
-                                </Badge>
-                            </td>
-                            <td className="px-4 py-4">
-                                <EmailValue email={employee.email} />
-                            </td>
-                            <td className="tabular-nums px-4 py-4">
-                                <div className="whitespace-nowrap text-sm text-content-strong">
-                                    {formatEmployeePhone(employee.phone)}
-                                </div>
-                            </td>
-                            <td className="px-4 py-4">
-                                <Badge
-                                    className={getEmployeeStatusBadge(
-                                        employee.status,
-                                    )}
-                                >
-                                    {getEmployeeStatusLabel(employee.status)}
-                                </Badge>
-                            </td>
-                            {canEdit && onEditEmployee ? (
-                                <td className="sticky right-0 bg-surface-raised px-4 py-4 employee-table-sticky-shadow group-hover:bg-brand-surface">
-                                    <EditEmployeeButton
-                                        employee={employee}
-                                        onEditEmployee={onEditEmployee}
-                                    />
                                 </td>
-                            ) : null}
-                        </tr>
-                    ))}
+                                <td className="px-4 py-4">
+                                    <NicknameBadge nickname={employee.nickname} />
+                                </td>
+                                <td className="px-4 py-4">
+                                    <div
+                                        className="line-clamp-2 text-sm leading-6 text-content-strong [overflow-wrap:anywhere]"
+                                        title={employee.position}
+                                    >
+                                        {employee.position}
+                                    </div>
+                                </td>
+                                <td className="px-4 py-4">
+                                    <div
+                                        className="line-clamp-2 text-sm leading-6 text-content-body [overflow-wrap:anywhere]"
+                                        title={employee.affiliation || undefined}
+                                    >
+                                        {employee.affiliation || "-"}
+                                    </div>
+                                </td>
+                                <td className="px-4 py-4">
+                                    <Badge
+                                        variant="outline"
+                                        className={`${getEmployeeDepartmentBadgeClass(employee.dept.name)} max-w-full px-2.5 font-medium`}
+                                        title={employee.dept.name}
+                                    >
+                                        <span className="truncate">
+                                            {employee.dept.name}
+                                        </span>
+                                    </Badge>
+                                </td>
+                                <td className="px-4 py-4">
+                                    <EmailValue email={employee.email} />
+                                </td>
+                                <td className="tabular-nums px-4 py-4">
+                                    <div className="whitespace-nowrap text-sm text-content-strong">
+                                        {formatEmployeePhone(employee.phone)}
+                                    </div>
+                                </td>
+                                <td className="tabular-nums px-4 py-4">
+                                    <div className="whitespace-nowrap text-sm text-content-strong">
+                                        {formatEmploymentHireDate(employee.hireDate)}
+                                    </div>
+                                </td>
+                                <td className="tabular-nums px-4 py-4">
+                                    <div className="whitespace-nowrap text-sm text-content-strong">
+                                        {tenure}
+                                    </div>
+                                </td>
+                                <td className="px-4 py-4">
+                                    <Badge
+                                        className={getEmployeeStatusBadge(
+                                            employee.status,
+                                        )}
+                                    >
+                                        {getEmployeeStatusLabel(employee.status)}
+                                    </Badge>
+                                </td>
+                                {canEdit && onEditEmployee ? (
+                                    <td className="sticky right-0 bg-surface-raised px-4 py-4 employee-table-sticky-shadow group-hover:bg-brand-surface">
+                                        <EditEmployeeButton
+                                            employee={employee}
+                                            onEditEmployee={onEditEmployee}
+                                        />
+                                    </td>
+                                ) : null}
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>

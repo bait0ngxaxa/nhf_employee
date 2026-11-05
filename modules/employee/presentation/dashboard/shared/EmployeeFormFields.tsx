@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -154,6 +155,51 @@ export function EmployeeFormFields({
                 maxLength={120}
                 onChange={(v) => onFieldChange("position", v)}
             />
+
+            <div className="grid min-w-0 gap-3">
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                    <Label
+                        htmlFor="hireDate"
+                        className={fieldErrors.hireDate
+                            ? "text-status-error-foreground [overflow-wrap:anywhere]"
+                            : "[overflow-wrap:anywhere]"}
+                    >
+                        วันที่เริ่มงาน (ไม่บังคับ)
+                    </Label>
+                    {formData.hireDate ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="min-h-11 shrink-0 px-3 text-content-secondary"
+                            onClick={() => onFieldChange("hireDate", "")}
+                            aria-label="ล้างวันที่เริ่มงาน"
+                        >
+                            ล้างวันที่
+                        </Button>
+                    ) : null}
+                </div>
+                <Input
+                    id="hireDate"
+                    type="date"
+                    value={formData.hireDate}
+                    aria-invalid={Boolean(fieldErrors.hireDate)}
+                    aria-describedby={fieldErrors.hireDate
+                        ? "hireDate-help hireDate-error"
+                        : "hireDate-help"}
+                    onChange={(event) => onFieldChange("hireDate", event.target.value)}
+                    className={fieldErrors.hireDate
+                        ? "border-status-error-focus focus-visible:ring-status-error-focus"
+                        : ""}
+                />
+                <p id="hireDate-help" className="text-xs leading-5 text-content-secondary [overflow-wrap:anywhere]">
+                    เว้นว่างได้ และเพิ่มหรือแก้ไขภายหลังได้
+                </p>
+                {fieldErrors.hireDate ? (
+                    <p id="hireDate-error" className="text-xs leading-5 text-status-error-foreground [overflow-wrap:anywhere]">
+                        {fieldErrors.hireDate}
+                    </p>
+                ) : null}
+            </div>
 
             {/* Affiliation */}
             <FormField

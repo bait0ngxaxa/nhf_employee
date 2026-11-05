@@ -25,7 +25,7 @@ export interface Employee {
     email: string;
     position: string;
     affiliation?: string | null;
-    hireDate: string;
+    hireDate: string | null;
     status: EmployeeStatusValue;
     dept: Department;
     user?: User | null;
@@ -43,7 +43,7 @@ export interface EmployeeFormData {
     affiliation?: string;
     departmentId: string | number;
     status?: EmployeeStatusValue;
-    hireDate?: string;
+    hireDate: string;
 }
 
 export interface EmployeeListProps {
