@@ -9,12 +9,13 @@ import type { EmployeeListProps } from "./types";
 import { AlertCircle, SearchX, Sparkles, UsersRound } from "lucide-react";
 
 import { getEmployeeStatusLabel } from "./formatters";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 import { useEmployeeDataContext, useEmployeeUIContext } from "./context/EmployeeContext";
 import { EmployeeListSkeleton } from "./EmployeeSkeletons";
 import type { Employee } from "./types";
 
 export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
+    const directoryRef = useRef<HTMLDivElement>(null);
     const {
         employees,
         currentEmployees,
@@ -58,10 +59,6 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
         await handleExportCSV();
     };
 
-    if (isInitialLoading) {
-        return <EmployeeListSkeleton />;
-    }
-
     // Calculate display range
     const hasActiveFilters =
         debouncedSearchTerm.trim().length > 0 || statusFilter !== "all";
@@ -83,7 +80,16 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
           : "เมื่อเพิ่มพนักงานแล้ว รายชื่อและข้อมูลติดต่อจะแสดงที่นี่";
 
     return (
-        <div className="space-y-6">
+        <div
+            ref={directoryRef}
+            role="region"
+            aria-label="รายชื่อพนักงาน"
+            tabIndex={-1}
+            className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+            {isInitialLoading ? <EmployeeListSkeleton /> : null}
+            {/* Keep the edit session mounted even when the directory shows its loading shell. */}
+            <div className={isInitialLoading ? "hidden" : "space-y-6"}>
             {/* Search, Filter and Export Controls */}
             <EmployeeSearchControls
                 canExportEmployees={employeeCapabilities?.canExportEmployees === true}
@@ -135,20 +141,21 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
                     }
                     onRetry={error ? triggerRefresh : undefined}
                 />
-            ) : (
-                canUpdateEmployees ? (
+            ) : null}
+            {canUpdateEmployees ? (
                     <EmployeeEditCapabilitySession
-                        key={JSON.stringify([debouncedSearchTerm, statusFilter, currentPage, itemsPerPage])}
+                        tableKey={JSON.stringify([debouncedSearchTerm, statusFilter, currentPage, itemsPerPage])}
                         employees={currentEmployees}
+                        detailsFocusFallbackRef={directoryRef}
                     />
                 ) : (
                     <EmployeeTable
                         key={JSON.stringify([debouncedSearchTerm, statusFilter, currentPage, itemsPerPage])}
                         employees={currentEmployees}
+                        detailsFocusFallbackRef={directoryRef}
                         canUpdateEmployees={false}
                     />
-                )
-            )}
+                )}
 
             {/* Pagination Controls */}
             <Pagination
@@ -159,15 +166,19 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
                 onPreviousPage={handlePreviousPage}
                 onNextPage={handleNextPage}
             />
-
+            </div>
         </div>
     );
 }
 
 function EmployeeEditCapabilitySession({
     employees,
+    tableKey,
+    detailsFocusFallbackRef,
 }: {
     employees: Employee[];
+    tableKey: string;
+    detailsFocusFallbackRef: RefObject<HTMLDivElement | null>;
 }) {
     const { handleEmployeeUpdate } = useEmployeeUIContext();
     const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
@@ -190,7 +201,9 @@ function EmployeeEditCapabilitySession({
     return (
         <>
             <EmployeeTable
+                key={tableKey}
                 employees={employees}
+                detailsFocusFallbackRef={detailsFocusFallbackRef}
                 canUpdateEmployees
                 onEditEmployee={handleEditEmployee}
             />

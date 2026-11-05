@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useRef, useState, type ReactElement } from "react";
+import { memo, useRef, useState, type ReactElement, type RefObject } from "react";
 import { Badge } from "@/components/ui/badge";
 import { getEmployeeFullName } from "../../domain/identity";
 import type { Employee } from "./types";
@@ -13,15 +13,18 @@ interface EmployeeTableProps {
     employees: Employee[];
     canUpdateEmployees: boolean;
     onEditEmployee?: (employee: Employee) => void;
+    detailsFocusFallbackRef?: RefObject<HTMLDivElement | null>;
 }
 
 export const EmployeeTable = memo(function EmployeeTable({
     employees,
     canUpdateEmployees,
     onEditEmployee,
+    detailsFocusFallbackRef,
 }: EmployeeTableProps): ReactElement | null {
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
     const detailsTrigger = useRef<HTMLButtonElement | null>(null);
+    const tableRef = useRef<HTMLDivElement>(null);
     const selectedEmployee = employees.find((employee) => employee.id === selectedEmployeeId);
 
     // Forget removed selections so they cannot reopen when an ID returns later.
@@ -42,7 +45,7 @@ export const EmployeeTable = memo(function EmployeeTable({
     };
 
     return (
-        <div className="min-w-0 space-y-3">
+        <div ref={tableRef} tabIndex={-1} className="min-w-0 space-y-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
             <div className="grid gap-3 xl:hidden">
                 {employees.map((employee) => (
                     <EmployeeMobileCard
@@ -98,7 +101,10 @@ export const EmployeeTable = memo(function EmployeeTable({
                     onClose={() => setSelectedEmployeeId(null)}
                     onCloseAutoFocus={(event) => {
                         event.preventDefault();
-                        if (detailsTrigger.current?.isConnected) detailsTrigger.current.focus();
+                        const target = detailsTrigger.current?.isConnected
+                            ? detailsTrigger.current
+                            : detailsFocusFallbackRef?.current ?? tableRef.current;
+                        target?.focus();
                     }}
                 />
             ) : null}
