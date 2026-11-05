@@ -70,6 +70,7 @@ describe("edit employee hire date PATCH contract", () => {
         await act(() => result.current.handleSubmit(event));
         const payload = vi.mocked(apiPatch).mock.calls[0][1];
         expect(payload).not.toHaveProperty("hireDate");
+        if (typeof payload !== "object" || payload === null) throw new Error("Expected PATCH object");
         const latestDatabaseEmployee = { ...employee, hireDate: "2025-07-01" };
         expect({ ...latestDatabaseEmployee, ...payload }).toHaveProperty("hireDate", "2025-07-01");
     });

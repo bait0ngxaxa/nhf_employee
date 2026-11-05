@@ -142,6 +142,26 @@ try {
             await connection.query("DROP TRIGGER cutover_test_fail");
         }
     });
+    await test("silently corrupted audit details fail actual audit-count validation", async () => {
+        await connection.query(`CREATE TRIGGER cutover_test_fail BEFORE INSERT ON audit_logs
+            FOR EACH ROW SET NEW.details = JSON_OBJECT('unexpected', true)`);
+        try {
+            await assert.rejects(connection.query("CALL clear_legacy_employee_hire_dates()"), /validation failed/);
+            await unchangedAfterFailure();
+        } finally {
+            await connection.query("DROP TRIGGER cutover_test_fail");
+        }
+    });
+    await test("receipt failure rolls back employee changes and audits", async () => {
+        await connection.query(`CREATE TRIGGER cutover_test_fail BEFORE UPDATE ON employee_hire_date_cutover
+            FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced receipt failure'`);
+        try {
+            await assert.rejects(connection.query("CALL clear_legacy_employee_hire_dates()"), /forced receipt failure/);
+            await unchangedAfterFailure();
+        } finally {
+            await connection.query("DROP TRIGGER cutover_test_fail");
+        }
+    });
     await test("silent update mismatch rolls back audits and employee changes", async () => {
         await connection.query(`CREATE TRIGGER cutover_test_fail BEFORE UPDATE ON employees
             FOR EACH ROW SET NEW.hireDate = OLD.hireDate`);
