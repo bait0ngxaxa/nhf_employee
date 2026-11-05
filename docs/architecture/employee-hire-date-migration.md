@@ -1,104 +1,147 @@
-# Employee Hire Date Migration Assessment
+# Employee hire date cutover
 
-## Decision
+## Business decision and schema
 
-The schema migration is prepared, but production cutover is **not ready** until an
-authorized HR operator reviews every populated legacy hire date against a
-trusted employment record and approves the resulting keep or clear decisions.
-The application has no verification flag, so any non-null value exposed by the
-new UI is treated as a known hire date.
+All employees present at the initial production cutover are legacy employees.
+All their historical hire dates are untrusted and approved for clearing to NULL.
+No individual HR review, evidence matching or keep/clear decisions are required.
+Never classify the cohort using hireDate/createdAt equality. createdAt is never
+an employment start date.
 
-No production database was inspected or changed for this implementation.
+`Employee.hireDate` remains `DateTime? @db.Date`, without a default or persisted
+tenure. The existing nullable migration preserves stored calendar dates while
+discarding DATETIME time components. Its published migration file is unchanged.
+The additional receipt migration creates only `employee_hire_date_cutover`.
+Use normal `npx prisma migrate deploy`, never db push.
 
-## Evidence found
+## Required release sequence
 
-- The Employee model has used hireDate DateTime @default(now()) since the
-  initial Employee schema migration. The database migration created it as
-  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3).
-- Before this feature, manual creation and CSV import persistence omitted
-  hireDate. MySQL therefore filled it from the database default.
-- Historical application revisions contain the same database default and use
-  hireDate for display/export, but no historical Employee create or import
-  path was found that explicitly supplied a genuine employment date.
-- The edit form contained an empty hireDate value, but its API mutation did not
-  persist it. Existing Employee create/update audit producers also omitted
-  hireDate.
-- Consequently, application history and current audit records cannot establish
-  which populated values are genuine. Matching hireDate to createdAt is a
-  useful candidate signal, not proof; differing values are not proof of
-  verification either.
+1. Create a production backup and verify it can be restored to an isolated DB.
+   Retain its identifier and verification results in the release record.
+2. Enter a controlled maintenance window. Stop all app instances, imports,
+   integrations and other employee writers; drain in-flight requests. Restrict
+   database write access to the cutover operator until step 8. A session variable
+   acknowledging this pause does not enforce it; operators must actually stop
+   the writers. No new real hire dates may be entered before cleanup finishes.
+3. Apply Prisma migrations, including the nullable DATE and receipt migrations.
+4. Execute the one-time cleanup described below, while writes remain paused.
+5. Verify all legacy hire dates are NULL, counts agree, IDs/profiles/relationships
+   match the backup, and the durable receipt and per-employee audits exist.
+6. Deploy the new application version before exposing it to normal users.
+7. Smoke test omitted/null/date creation, unrelated edits, setting/changing/
+   clearing dates, tenure, and CSV import/export with an authorized test account.
+   Do not rerun cleanup after entering a smoke-test hire date.
+8. Resume normal operations and restore application DB access.
 
-## Migration behavior
+No production operation is performed by the coding session. Operators execute
+this procedure with a verified backup and maintenance boundary.
 
-The migration changes only employees.hireDate from DATETIME to nullable DATE.
-It removes the implicit creation-time default and preserves each existing
-calendar date as stored, while discarding its time component. It does not clear
-or rewrite employee rows. New application create and import paths explicitly
-write NULL when no date is supplied.
+## Dry run and execution
 
-Apply the migration through the normal Prisma migration workflow. Do not use
-db push. The schema remains compatible with the prior application for the
-short cutover window: old creates omit the field, and a nullable column with no
-default receives NULL.
+Run `scripts/employee-hire-date-legacy-assessment.sql` after migrations in the
+paused window. It is read-only: save the employee IDs/dates and the two counts.
+A populated receipt means cleanup already completed; stop, even if new dates
+now exist. This is expected after cutover.
 
-## Application contract
+Use a dedicated MySQL 8.0+ client session with autocommit enabled and no open
+transaction. Do not use `mysql --force`. Set these inputs, replacing example
+values with the dry-run counts, operator and verified backup reference:
 
-- `POST /api/employees` accepts `hireDate` as an optional `YYYY-MM-DD` string
-  or `null`. Omitting it stores `NULL`; the server never substitutes
-  `createdAt` or the current date.
-- `PATCH /api/employees/:id` treats an omitted field as unchanged, `null` as an
-  explicit clear, and a valid `YYYY-MM-DD` string as a set or replacement.
-- Invalid calendar dates and non-ISO date strings are rejected by the shared
-  validation schema. CSV import accepts `วันที่เริ่มงาน`, `hireDate`, and
-  `hire_date`; its sample leaves dates blank, and the upload guidance documents
-  `YYYY-MM-DD` as the sole accepted format.
-- Tenure is calculated when presented from the date-only hire date to the
-  current Thailand calendar date. It is not stored. Unknown dates display as
-  unknown; future dates display zero elapsed tenure until their calendar date.
-  Employee status does not imply an employment end date.
-- Dashboard and CSV export share the same tenure calculation. Displayed dates
-  use the Thai calendar; CSV import remains Gregorian ISO date-only.
+```sql
+SET time_zone = '+00:00';
+SET @operator_email = 'deployment-operator@example.org';
+SET @verified_backup_reference = 'release-record/verified-backup-id';
+SET @expected_employee_count = 123;
+SET @expected_clear_count = 120;
+SET @cutover_deadline_utc = UTC_TIMESTAMP(3) + INTERVAL 30 MINUTE;
+SET @employee_writes_paused = 1;
+SET @apply_employee_hire_date_remediation = 1;
+SOURCE scripts/employee-hire-date-legacy-remediation.sql;
+```
 
-## Required operator procedure
+The script defaults both gates to 0 when unspecified and fails closed on missing
+inputs, an expired deadline, wrong schema/engine, unexpected counts, SQL errors,
+warnings or a completed receipt. On success it prints `COMPLETED`, employee,
+cleared and audit counts and the UTC completion timestamp. On failure it raises
+a SQL error and automatically rolls back the data transaction; there is no manual
+COMMIT decision. If a failed CALL leaves the helper procedure installed, rerunning
+the script replaces that helper; the durable receipt is never removed.
 
-1. Take and verify a restorable database backup. Freeze changes to employee hire
-   dates for the review window.
-2. Run the read-only report in
-   scripts/employee-hire-date-legacy-assessment.sql against the target database.
-   Retain its output in the approved change record. Restrict access because it
-   contains employee names and dates.
-3. Have an authorized HR reviewer compare every non-null date with an
-   authoritative employment record. Record employee ID, current date, evidence
-   reference, reviewer, and the approved decision. Preserve only dates supported
-   by that evidence. Approve clearing uncertain or system-generated values to
-   NULL. Do not classify records solely by whether hireDate equals createdAt.
-4. Apply the Prisma migration. Review the affected column definition and verify
-   the migration did not alter employee IDs or relationships.
-5. Before deploying the new UI, apply only the individually approved clear
-   decisions in one transaction using
-   scripts/employee-hire-date-legacy-remediation.sql. Populate its temporary
-   table from the approved review record, set the acting operator, and inspect
-   the preview while leaving the apply gate disabled. For execution, enable the
-   gate in the same database session, start the transaction, and lock the
-   reviewed rows. The script inserts one existing EMPLOYEE_UPDATE audit row per
-   approved clear with before.hireDate, after.hireDate = null, the acting
-   operator, and the approval reference. It updates only rows whose current
-   date still equals the staged expected date. Compare staged, audited, and
-   affected row counts; commit only when all counts match, otherwise roll back.
-   Never run a table-wide clear.
-6. Confirm all remaining non-null values have approved evidence, then deploy
-   the application. At that point the UI may treat non-null values as known.
-   New manual and CSV imports without a date will persist NULL.
+```sql
+SELECT COUNT(*) AS employees, COUNT(hireDate) AS remaining_hire_dates
+FROM employees;
+SELECT id, completedAt, operatorEmail, backupReference, employeeCount, clearedCount
+FROM employee_hire_date_cutover;
+SELECT entityId, userEmail, createdAt, details
+FROM audit_logs
+WHERE entityType = 'Employee'
+  AND JSON_UNQUOTE(JSON_EXTRACT(details, '$.metadata.reason')) = 'legacy_hire_date_cutover';
+```
 
-If complete review is not possible, keep the feature cutover blocked. The final
-schema cannot distinguish verified from unverified values after deployment.
+## Atomicity, audit and protection of new dates
+
+The SERIALIZABLE transaction reserves receipt ID 1, captures all employee IDs,
+original hire dates and updatedAt values, and locks the complete employee cohort
+and key gaps. It clears only non-null dates from that snapshot and sets updatedAt
+explicitly to one UTC timestamp. Already-null employees are untouched. No profile,
+ID, createdAt or relationship is changed. Expected snapshot counts, inserted audit
+counts, actual audit counts, update counts, remaining dates and total employees
+are validated before COMMIT. Any validation/audit/update failure rolls back the
+receipt, employee changes and audit rows together.
+
+Each changed employee receives an existing EMPLOYEE_UPDATE audit with original
+date, null result, employee identity, operator email, database actor, timestamp
+and backup reference. The receipt durably retains the complete original snapshot
+and operator/backup/count metadata. This small one-row record is necessary because
+normal audit logs expire after 90 days. It has no application workflow. Restrict
+access to its personal data and keep the backup under the normal retention policy.
+
+Receipt ID 1 is a database primary key and singleton CHECK. Concurrent/repeated
+cleanup attempts fail before modifying employees. The receipt survives audit
+retention, application deployments and reinstalls of the helper procedure.
+Never delete/truncate the receipt or bypass it. A retry after a genuine rollback
+is safe only before normal writes resume, after another dry run.
+
+Post-cutover dates are protected by completing cleanup before the new app accepts
+dates, keeping writes paused through deployment, and permanently refusing a
+second cleanup. This is a controlled release boundary, not a timestamp heuristic
+or UI flag. The script cannot prove an external backup was restored or writers
+were stopped; those are required operator checks.
 
 ## Rollback and recovery
 
-The migration is backward compatible with the prior application, but data
-clears cannot be reconstructed from the new schema. Preserve the backup and
-approved review record until the cutover is accepted. Prefer rolling back the
-application while leaving the nullable DATE column in place. Reverting to
-NOT NULL would fail after NULL values exist and restoring the prior timestamp
-precision would require the backup; never manufacture dates to make a schema
-rollback succeed.
+Schema DDL is separate from the cleanup transaction. Prefer application rollback
+with the nullable DATE column and receipt retained. Never populate dates to force
+a NOT NULL rollback. The old DATETIME precision is recoverable only from backup.
+If cleanup fails, verify the SQL error and unchanged rows/absence of a receipt;
+resolve the failure before retrying inside maintenance.
+
+After successful cleanup, do not rerun it or automatically restore historical
+untrusted dates. For operational recovery, use the verified backup or receipt
+snapshot in an isolated database first. Any approved production restoration must
+preserve dates entered after cutover and must be separately audited; do not apply
+a blanket restore over a running application. Retain receipt ID 1 even after an
+application rollback.
+
+## Application contract and verification
+
+POST accepts optional `hireDate: YYYY-MM-DD | null`; omitted stores null. PATCH
+omitted leaves unchanged, null clears, a valid date sets/replaces. Unchanged edit
+dates are omitted. Invalid/ambiguous dates are rejected. CSV aliases are
+`วันที่เริ่มงาน`, `hireDate`, `hire_date`; blank/missing dates store null.
+Unknown dates display `ไม่ระบุ` / `ยังไม่ทราบ`. Calendar tenure is derived on the
+Thailand date; future dates show zero elapsed tenure. Status implies no end date.
+Desktop/mobile and exports use the shared calculation.
+
+For executable cleanup regression coverage, create an empty isolated MySQL DB
+whose name ends in `_hire_date_cutover_test` and run:
+
+```powershell
+$env:TEST_DATABASE_URL = 'mysql://test-user:test-password@127.0.0.1:3310/employee_hire_date_cutover_test'
+node scripts/test-employee-hire-date-cutover.mjs
+```
+
+The test refuses other database names and existing fixture tables. It applies
+the actual schema SQL and cleanup procedure to isolated fixtures, exercises
+failure/rollback, counts, audit, identity preservation and rerun protection, then
+removes only its fixture objects. It never uses the production DATABASE_URL.

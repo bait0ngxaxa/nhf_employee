@@ -456,6 +456,19 @@ enum NotificationOutboxStatus {
   SUPERSEDED
 }
 
+// One-time operational receipt; no application workflow or employee relationship.
+model EmployeeHireDateCutover {
+  id              Int      @id
+  completedAt     DateTime @db.DateTime(3)
+  operatorEmail   String   @db.VarChar(191)
+  backupReference String   @db.VarChar(255)
+  employeeCount   Int
+  clearedCount    Int
+  originalValues  Json
+
+  @@map("employee_hire_date_cutover")
+}
+
 // Audit Log for tracking critical actions per agent.md security standards
 model AuditLog {
   id         Int         @id @default(autoincrement())

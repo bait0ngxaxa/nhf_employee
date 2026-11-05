@@ -28,11 +28,14 @@ describe("Employee hire date migration contract", () => {
         expect(migration).not.toMatch(/\b(?:UPDATE|DELETE|TRUNCATE)\s+(?:FROM\s+)?employees\b/i);
     });
 
-    it("gates remediation and restricts clears to explicitly reviewed, unchanged rows", () => {
-        expect(remediation).toMatch(/SET @apply_employee_hire_date_remediation = 0/);
-        expect(remediation).toMatch(/CREATE TEMPORARY TABLE approved_employee_hire_date_clears/);
-        expect(remediation).toMatch(/r\.expected_hire_date = e\.hireDate/);
+    it("fails closed and records the whole cutover without individual review", () => {
+        expect(remediation).toMatch(/COALESCE\(@apply_employee_hire_date_remediation, 0\)/);
+        expect(remediation).toMatch(/INSERT INTO employee_hire_date_cutover/);
+        expect(remediation).toMatch(/FOR UPDATE/);
         expect(remediation).toMatch(/INSERT INTO audit_logs/);
-        expect(remediation).toMatch(/SET e\.hireDate = NULL/);
+        expect(remediation).toMatch(/SET e\.hireDate = NULL, e\.updatedAt = changed_at/);
+        expect(remediation).toMatch(/ROLLBACK;[\s\S]*RESIGNAL SQLSTATE '45000';/);
+        expect(remediation).toMatch(/audit_count <> clear_count OR update_count <> clear_count/);
+        expect(remediation).not.toMatch(/hireDate\s*=\s*createdAt|approved_employee/);
     });
 });
