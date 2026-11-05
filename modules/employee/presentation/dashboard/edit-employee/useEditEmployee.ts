@@ -63,6 +63,8 @@ export function useEditEmployee({
     const [formData, setFormData] = useState<EmployeeFormData>(() =>
         buildInitialFormData(employee),
     );
+    // Compare with the editing snapshot, not props that may refresh mid-edit.
+    const [initialHireDate] = useState(formData.hireDate);
 
     const { data: departmentData } = useSWR<{ departments: Department[] }>(
         isOpen && canReadDepartments ? API_ROUTES.employees.departments : null,
@@ -139,9 +141,10 @@ export function useEditEmployee({
 
         setIsLoading(true);
 
+        const { hireDate, ...profileData } = formData;
         const apiResult = await apiPatch(API_ROUTES.employees.byId(employee.id), {
-            ...formData,
-            hireDate: formData.hireDate || null,
+            ...profileData,
+            ...(hireDate !== initialHireDate ? { hireDate: hireDate || null } : {}),
         });
 
         if (apiResult.success) {
