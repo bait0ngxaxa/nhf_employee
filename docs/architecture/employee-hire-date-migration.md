@@ -15,8 +15,8 @@ No production database was inspected or changed for this implementation.
 - The Employee model has used hireDate DateTime @default(now()) since the
   initial Employee schema migration. The database migration created it as
   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3).
-- Current manual creation and CSV import persistence omit hireDate. MySQL
-  therefore fills it from the database default.
+- Before this feature, manual creation and CSV import persistence omitted
+  hireDate. MySQL therefore filled it from the database default.
 - Historical application revisions contain the same database default and use
   hireDate for display/export, but no historical Employee create or import
   path was found that explicitly supplied a genuine employment date.
@@ -40,6 +40,24 @@ Apply the migration through the normal Prisma migration workflow. Do not use
 db push. The schema remains compatible with the prior application for the
 short cutover window: old creates omit the field, and a nullable column with no
 default receives NULL.
+
+## Application contract
+
+- `POST /api/employees` accepts `hireDate` as an optional `YYYY-MM-DD` string
+  or `null`. Omitting it stores `NULL`; the server never substitutes
+  `createdAt` or the current date.
+- `PATCH /api/employees/:id` treats an omitted field as unchanged, `null` as an
+  explicit clear, and a valid `YYYY-MM-DD` string as a set or replacement.
+- Invalid calendar dates and non-ISO date strings are rejected by the shared
+  validation schema. CSV import accepts `วันที่เริ่มงาน`, `hireDate`, and
+  `hire_date`; its sample leaves dates blank, and the upload guidance documents
+  `YYYY-MM-DD` as the sole accepted format.
+- Tenure is calculated when presented from the date-only hire date to the
+  current Thailand calendar date. It is not stored. Unknown dates display as
+  unknown; future dates display zero elapsed tenure until their calendar date.
+  Employee status does not imply an employment end date.
+- Dashboard and CSV export share the same tenure calculation. Displayed dates
+  use the Thai calendar; CSV import remains Gregorian ISO date-only.
 
 ## Required operator procedure
 
