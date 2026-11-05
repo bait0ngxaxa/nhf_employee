@@ -3,6 +3,11 @@ import { generateFilename } from "@/lib/helpers/date-helpers";
 import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
 import { getEmployeeEmailStatus, getEmployeeStatusLabel } from "../../domain/identity";
 import {
+    calculateEmploymentTenure,
+    formatEmploymentHireDate,
+    formatEmploymentTenure,
+} from "../../domain/tenure";
+import {
     EMPLOYEE_EXPORT_BATCH_SIZE,
     EMPLOYEE_EXPORT_MAX_ROWS,
 } from "../../application/constants";
@@ -44,9 +49,10 @@ export async function createEmployeeExport(
     const response = createCsvDownloadResponse(
         buildEmployeeExportFilename(filters),
         async (controller) => {
+            const asOfDate = new Date();
             controller.enqueue(encodeCsvRow([
                 "ลำดับ", "ชื่อ", "นามสกุล", "ชื่อเล่น", "ตำแหน่ง",
-                "สังกัด", "แผนก", "อีเมล", "เบอร์โทร", "สถานะ",
+                "สังกัด", "แผนก", "อีเมล", "เบอร์โทร", "สถานะ", "วันที่เริ่มงาน", "อายุงาน",
             ]));
             for (let offset = 0; offset < recordCount; offset += EMPLOYEE_EXPORT_BATCH_SIZE) {
                 const employees = await prisma.employee.findMany({
@@ -59,6 +65,7 @@ export async function createEmployeeExport(
                         affiliation: true,
                         email: true,
                         phone: true,
+                        hireDate: true,
                         status: true,
                         dept: { select: { name: true } },
                     },
@@ -78,6 +85,10 @@ export async function createEmployeeExport(
                         getEmployeeEmailStatus(employee.email) === "temp" ? "-" : employee.email,
                         employee.phone || "-",
                         getEmployeeStatusLabel(employee.status),
+                        formatEmploymentHireDate(employee.hireDate),
+                        formatEmploymentTenure(
+                            calculateEmploymentTenure(employee.hireDate, asOfDate),
+                        ),
                     ]));
                 }
             }

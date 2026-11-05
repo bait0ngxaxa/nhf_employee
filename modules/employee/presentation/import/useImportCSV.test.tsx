@@ -45,12 +45,13 @@ function createTextFile(content: string): File {
     return file;
 }
 
-function createEmployeeCSV(rows: string[]): string {
+function createEmployeeCSV(rows: string[], includeHireDate = false): string {
+    const headers = "ชื่อ,นามสกุล,ตำแหน่ง,แผนก,อีเมล,เบอร์โทร,สังกัด,ชื่อเล่น,สถานะ";
     return [
-        "ชื่อ,นามสกุล,ตำแหน่ง,แผนก,อีเมล,เบอร์โทร,สังกัด,ชื่อเล่น,สถานะ",
+        includeHireDate ? `${headers},hireDate` : headers,
         ...rows.map((row) => {
             const fieldCount = row.split(",").length;
-            return row + ",".repeat(Math.max(0, 9 - fieldCount));
+            return row + ",".repeat(Math.max(0, (includeHireDate ? 10 : 9) - fieldCount));
         }),
     ].join("\n");
 }
@@ -112,6 +113,50 @@ describe("Employee CSV import limits", () => {
 });
 
 describe("Employee CSV import workflow", () => {
+    it("previews, edits, validates, and submits an ISO hire date", async () => {
+        apiPostMock.mockResolvedValue(createSuccessfulResult());
+        render(<ImportEmployeeCSV />);
+        selectFile(createTextFile(createEmployeeCSV([
+            "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,somchai@thainhf.org,,,,active,2023-04-01",
+        ], true)));
+
+        await screen.findByText("ตรวจสอบข้อมูลก่อนนำเข้า");
+        expect(screen.getAllByText("2023-04-01")).toHaveLength(2);
+        const editButton = screen.getAllByRole("button", {
+            name: "แก้ไขข้อมูลแถว CSV ที่ 2",
+        }).at(0);
+        if (!editButton) throw new Error("ไม่พบปุ่มแก้ไขแถว CSV");
+        fireEvent.click(editButton);
+
+        const hireDateInput = screen.getByLabelText("วันที่เริ่มงาน");
+        expect(hireDateInput).toHaveValue("2023-04-01");
+        fireEvent.change(hireDateInput, { target: { value: "2024-02-29" } });
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกการแก้ไข" }));
+        expect(screen.getAllByText("2024-02-29")).toHaveLength(2);
+
+        fireEvent.click(screen.getByRole("button", { name: "นำเข้าข้อมูล 1 แถว" }));
+        await waitFor(() => {
+            expect(apiPostMock).toHaveBeenCalledWith(
+                API_ROUTES.employees.import,
+                {
+                    employees: [expect.objectContaining({ hireDate: "2024-02-29" })],
+                },
+            );
+        });
+    });
+
+    it("blocks an ambiguous hire date with a row-level correction error", async () => {
+        render(<ImportEmployeeCSV />);
+        selectFile(createTextFile(createEmployeeCSV([
+            "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,,,,,active,01/02/2026",
+        ], true)));
+
+        await screen.findByText("แก้ไขแถวที่มีข้อความแจ้งก่อนนำเข้า");
+        expect(screen.getAllByText(/YYYY-MM-DD/).length).toBeGreaterThan(0);
+        expect(screen.getByRole("button", { name: "แก้ไข 1 แถวก่อนนำเข้า" })).toBeDisabled();
+        expect(apiPostMock).not.toHaveBeenCalled();
+    });
+
     it("submits corrected fields and preserves the original CSV row number", async () => {
         apiPostMock.mockResolvedValue(createSuccessfulResult());
         render(<ImportEmployeeCSV />);
@@ -195,6 +240,7 @@ describe("Employee CSV import workflow", () => {
             position: "เจ้าหน้าที่",
             department: "ADMIN",
             email: "duplicate@thainhf.org",
+            hireDate: "2020-03-05",
         };
         apiPostMock
             .mockResolvedValueOnce({
@@ -219,9 +265,9 @@ describe("Employee CSV import workflow", () => {
             .mockResolvedValueOnce(createSuccessfulResult([failedEmployee]));
         render(<ImportEmployeeCSV />);
         selectFile(createTextFile(createEmployeeCSV([
-            "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,somchai@thainhf.org",
-            "สมหญิง,ใจดี,เจ้าหน้าที่,ADMIN,duplicate@thainhf.org",
-        ])));
+            "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,somchai@thainhf.org,,,,active,2020-01-10",
+            "สมหญิง,ใจดี,เจ้าหน้าที่,ADMIN,duplicate@thainhf.org,,,,active,2020-03-05",
+        ], true)));
 
         await screen.findByText("ตรวจสอบข้อมูลก่อนนำเข้า");
         fireEvent.click(screen.getByRole("button", { name: "นำเข้าข้อมูล 2 แถว" }));
@@ -248,7 +294,10 @@ describe("Employee CSV import workflow", () => {
         expect(apiPostMock).toHaveBeenNthCalledWith(
             1,
             API_ROUTES.employees.import,
-            { employees: expect.arrayContaining([expect.objectContaining({ firstName: "สมชาย" }), expect.objectContaining({ firstName: "สมหญิง" })]) },
+            { employees: expect.arrayContaining([
+                expect.objectContaining({ firstName: "สมชาย", hireDate: "2020-01-10" }),
+                expect.objectContaining({ firstName: "สมหญิง", hireDate: "2020-03-05" }),
+            ]) },
         );
         expect(apiPostMock).toHaveBeenNthCalledWith(
             2,
@@ -259,6 +308,7 @@ describe("Employee CSV import workflow", () => {
                         sourceRow: 3,
                         firstName: "สมหญิง",
                         email: "duplicate@thainhf.org",
+                        hireDate: "2020-03-05",
                     }),
                 ],
             },

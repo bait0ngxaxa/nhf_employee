@@ -1,4 +1,5 @@
 import { parseEmployeeImportStatus } from "../../domain/import-status";
+import { parseEmployeeHireDate } from "../../domain/tenure";
 import {
     getEmployeeImportDepartmentCode,
     normalizeEmployeeImportEmail,
@@ -37,6 +38,9 @@ export const CSV_HEADER_MAPPINGS: Record<string, CSVEmployeeField> = {
     ชื่อเล่น: "nickname",
     nickname: "nickname",
     nick: "nickname",
+    วันที่เริ่มงาน: "hireDate",
+    hiredate: "hireDate",
+    hire_date: "hireDate",
     สถานะ: "status",
     status: "status",
 };
@@ -305,6 +309,14 @@ export function validateEmployeeImportRows(
             );
         }
 
+        if (employee.hireDate && !parseEmployeeHireDate(employee.hireDate)) {
+            addIssue(
+                index,
+                "hireDate",
+                "วันที่เริ่มงานต้องเป็นรูปแบบ YYYY-MM-DD ที่ถูกต้อง หรือเว้นว่างได้",
+            );
+        }
+
         if (employee.firstName.trim() !== "" && employee.lastName.trim() !== "") {
             const name = normalizeEmployeeImportName(employee.firstName, employee.lastName);
             const rows = nameRows.get(name) ?? [];
@@ -342,7 +354,7 @@ function quoteCSVCell(value: string): string {
 
 export function generateFailedRowsCSV(errors: readonly ImportError[]): string {
     const rows = [
-        ["แถวต้นฉบับ CSV", "ชื่อ", "นามสกุล", "อีเมล", "เบอร์โทร", "ตำแหน่ง", "แผนก", "สังกัด", "ชื่อเล่น", "สถานะ", "เหตุผล"],
+        ["แถวต้นฉบับ CSV", "ชื่อ", "นามสกุล", "อีเมล", "เบอร์โทร", "ตำแหน่ง", "แผนก", "สังกัด", "ชื่อเล่น", "วันที่เริ่มงาน", "สถานะ", "เหตุผล"],
         ...errors.map((error) => [
             String(error.row),
             error.data.firstName ?? "",
@@ -353,6 +365,7 @@ export function generateFailedRowsCSV(errors: readonly ImportError[]): string {
             error.data.department ?? "",
             error.data.affiliation ?? "",
             error.data.nickname ?? "",
+            error.data.hireDate ?? "",
             error.data.status ?? "",
             error.error,
         ]),
@@ -376,10 +389,10 @@ export function downloadFailedRowsCSV(errors: readonly ImportError[]): void {
 }
 
 export function generateSampleCSV(): string {
-    const sampleData = `ลำดับ,ชื่อ,นามสกุล,ชื่อเล่น,ตำแหน่ง,สังกัด,แผนก,อีเมล,เบอร์โทร,สถานะ
-1,สมชาย,ใจดี,ชาย,ผู้จัดการ,สำนักงานใหญ่,บริหาร,somchai@thainhf.org,081-234-5678,ปกติ
-2,สมหญิง,รักงาน,หญิง,อาจารย์,คณะวิทยาศาสตร์,วิชาการ,,082-345-6789,ปกติ
-3,เจษฎา,รักเรียน,เจ,ครู,โรงเรียนประถม,ADMIN,,081-111-2222,ปกติ`;
+    const sampleData = `ลำดับ,ชื่อ,นามสกุล,ชื่อเล่น,ตำแหน่ง,สังกัด,แผนก,อีเมล,เบอร์โทร,สถานะ,วันที่เริ่มงาน
+1,สมชาย,ใจดี,ชาย,ผู้จัดการ,สำนักงานใหญ่,บริหาร,somchai@thainhf.org,081-234-5678,ปกติ,
+2,สมหญิง,รักงาน,หญิง,อาจารย์,คณะวิทยาศาสตร์,วิชาการ,,082-345-6789,ปกติ,
+3,เจษฎา,รักเรียน,เจ,ครู,โรงเรียนประถม,ADMIN,,081-111-2222,ปกติ,`;
 
     return "\uFEFF" + sampleData;
 }

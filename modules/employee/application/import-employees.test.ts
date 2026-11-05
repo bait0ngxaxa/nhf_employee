@@ -54,8 +54,62 @@ describe("Employee Import", () => {
         // Assert
         expect(result.success).toHaveLength(1);
         expect(result.errors).toHaveLength(0);
-        expect(prismaMock.employee.create).toHaveBeenCalled();
+        expect(prismaMock.employee.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ hireDate: null }),
+            }),
+        );
         expect(listDepartmentReferences).toHaveBeenCalledTimes(1);
+    });
+
+    it("persists a valid ISO hire date as a date-only value", async () => {
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
+            { id: 1, code: "ADMIN", name: "Administration" },
+        ] as never);
+        prismaMock.employee.findMany.mockResolvedValue([]);
+        prismaMock.employee.create.mockImplementation((args) =>
+            Promise.resolve({
+                ...args.data,
+                dept: { name: "ADMIN" },
+            }) as never);
+
+        const result = await importEmployeesFromCsvRows([{
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            position: "เจ้าหน้าที่",
+            department: "ADMIN",
+            hireDate: "2024-02-29",
+        }]);
+
+        expect(result.errors).toHaveLength(0);
+        expect(result.success[0]?.hireDate).toBe("2024-02-29");
+        expect(prismaMock.employee.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    hireDate: new Date("2024-02-29T00:00:00.000Z"),
+                }),
+            }),
+        );
+    });
+
+    it("rejects invalid or ambiguous hire dates as row-level import errors", async () => {
+        vi.mocked(listDepartmentReferences).mockResolvedValue([
+            { id: 1, code: "ADMIN", name: "Administration" },
+        ] as never);
+        prismaMock.employee.findMany.mockResolvedValue([]);
+
+        const result = await importEmployeesFromCsvRows([{
+            firstName: "สมชาย",
+            lastName: "ใจดี",
+            position: "เจ้าหน้าที่",
+            department: "ADMIN",
+            hireDate: "01/02/2026",
+        }]);
+
+        expect(result.success).toHaveLength(0);
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0]?.error).toContain("YYYY-MM-DD");
+        expect(prismaMock.employee.create).not.toHaveBeenCalled();
     });
 
     it("should report errors for missing fields", async () => {

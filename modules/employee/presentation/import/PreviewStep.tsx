@@ -45,6 +45,7 @@ const EDITABLE_FIELDS = [
     { key: "phone", label: "เบอร์โทรศัพท์", type: "tel" },
     { key: "position", label: "ตำแหน่ง", type: "text" },
     { key: "department", label: "แผนก", type: "text" },
+    { key: "hireDate", label: "วันที่เริ่มงาน", type: "date" },
     { key: "affiliation", label: "สังกัด", type: "text" },
     { key: "nickname", label: "ชื่อเล่น", type: "text" },
     { key: "status", label: "สถานะ", type: "text" },
@@ -90,6 +91,7 @@ function getEmployeeSummary(employee: CSVEmployee): Array<[string, string]> {
         ["อีเมล", employee.email?.trim() ?? ""],
         ["ตำแหน่ง", employee.position.trim()],
         ["แผนก", employee.department.trim()],
+        ["วันที่เริ่มงาน", employee.hireDate?.trim() || "ไม่ระบุ"],
         ["สังกัด", employee.affiliation?.trim() ?? ""],
         ["เบอร์โทร", employee.phone?.trim() ?? ""],
         ["ชื่อเล่น", employee.nickname?.trim() ?? ""],
@@ -197,6 +199,7 @@ export function PreviewStep({
                                     "ตำแหน่ง",
                                     "แผนก",
                                     "เบอร์โทร",
+                                    "วันที่เริ่มงาน",
                                     "ชื่อเล่น",
                                     "การตรวจสอบ",
                                     "การทำงาน",
@@ -249,6 +252,9 @@ export function PreviewStep({
                                         </td>
                                         <td className="tabular-nums max-w-36 px-3 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                             {formatEmployeePhone(employee.phone)}
+                                        </td>
+                                        <td className="tabular-nums whitespace-nowrap px-3 py-4 text-sm text-content-neutral-secondary">
+                                            {employee.hireDate || "ไม่ระบุ"}
                                         </td>
                                         <td className="max-w-36 px-3 py-4 text-sm text-content-neutral-secondary [overflow-wrap:anywhere]">
                                             {employee.nickname || "-"}

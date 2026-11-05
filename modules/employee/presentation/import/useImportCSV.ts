@@ -164,6 +164,7 @@ export function useImportCSV({
             department: data.department ?? "",
             affiliation: data.affiliation,
             nickname: data.nickname,
+            hireDate: data.hireDate ?? undefined,
             status: data.status,
         })));
         setImportResult(null);

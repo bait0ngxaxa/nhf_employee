@@ -56,6 +56,51 @@ describe("Employee CSV helpers", () => {
         }]);
     });
 
+    it.each(["วันที่เริ่มงาน", "hireDate", "hire_date"])(
+        "maps the optional hire date header %s",
+        (header) => {
+            const parsed = parseCSV([
+                `ชื่อ,นามสกุล,ตำแหน่ง,แผนก,${header}`,
+                "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,2023-04-01",
+            ].join("\n"));
+
+            expect(parsed[0]?.hireDate).toBe("2023-04-01");
+        },
+    );
+
+    it("accepts an empty optional hire date and rejects duplicate aliases", () => {
+        const parsed = parseCSV([
+            "ชื่อ,นามสกุล,ตำแหน่ง,แผนก,hire_date",
+            "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,",
+        ].join("\n"));
+        expect(parsed[0]?.hireDate).toBeUndefined();
+
+        expect(() => parseCSV([
+            "ชื่อ,นามสกุล,ตำแหน่ง,แผนก,hireDate,วันที่เริ่มงาน",
+            "สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,2023-04-01,2023-04-01",
+        ].join("\n"))).toThrow('หัวตาราง CSV มีคอลัมน์ "วันที่เริ่มงาน" ซ้ำกัน');
+    });
+
+    it.each(["01/02/2026", "2023-02-29"])(
+        "reports an invalid hire date %s as a row-level validation issue",
+        (hireDate) => {
+            const parsed = parseCSV([
+                "ชื่อ,นามสกุล,ตำแหน่ง,แผนก,วันที่เริ่มงาน",
+                `สมชาย,ใจดี,เจ้าหน้าที่,ADMIN,${hireDate}`,
+            ].join("\n"));
+
+            expect(validateEmployeeImportRows(parsed)).toEqual([
+                expect.objectContaining({
+                    sourceRow: 2,
+                    issues: [expect.objectContaining({
+                        field: "hireDate",
+                        message: expect.stringContaining("YYYY-MM-DD"),
+                    })],
+                }),
+            ]);
+        },
+    );
+
     it("parses escaped quotes, embedded newlines, CRLF, and original physical row numbers", () => {
         const parsed = parseCSV([
             "\uFEFFชื่อ,นามสกุล,ตำแหน่ง,แผนก,สังกัด,ชื่อเล่น",
@@ -128,10 +173,10 @@ describe("Employee CSV helpers", () => {
         const sample = generateSampleCSV();
 
         expect(sample).toBe([
-            "\uFEFFลำดับ,ชื่อ,นามสกุล,ชื่อเล่น,ตำแหน่ง,สังกัด,แผนก,อีเมล,เบอร์โทร,สถานะ",
-            "1,สมชาย,ใจดี,ชาย,ผู้จัดการ,สำนักงานใหญ่,บริหาร,somchai@thainhf.org,081-234-5678,ปกติ",
-            "2,สมหญิง,รักงาน,หญิง,อาจารย์,คณะวิทยาศาสตร์,วิชาการ,,082-345-6789,ปกติ",
-            "3,เจษฎา,รักเรียน,เจ,ครู,โรงเรียนประถม,ADMIN,,081-111-2222,ปกติ",
+            "\uFEFFลำดับ,ชื่อ,นามสกุล,ชื่อเล่น,ตำแหน่ง,สังกัด,แผนก,อีเมล,เบอร์โทร,สถานะ,วันที่เริ่มงาน",
+            "1,สมชาย,ใจดี,ชาย,ผู้จัดการ,สำนักงานใหญ่,บริหาร,somchai@thainhf.org,081-234-5678,ปกติ,",
+            "2,สมหญิง,รักงาน,หญิง,อาจารย์,คณะวิทยาศาสตร์,วิชาการ,,082-345-6789,ปกติ,",
+            "3,เจษฎา,รักเรียน,เจ,ครู,โรงเรียนประถม,ADMIN,,081-111-2222,ปกติ,",
         ].join("\n"));
         expect(sample).not.toContain("@company.com");
     });
@@ -211,6 +256,7 @@ describe("Employee CSV helpers", () => {
                 lastName: "นามสกุล",
                 position: "ตำแหน่ง",
                 department: "ADMIN",
+                hireDate: index === 50 ? "2023-04-01" : undefined,
             },
             error: "ตรวจสอบไม่ผ่าน",
         }));
@@ -219,6 +265,8 @@ describe("Employee CSV helpers", () => {
 
         expect(csv).toContain("\uFEFF\"แถวต้นฉบับ CSV\"");
         expect(csv).toContain("\"52\",\"'=HYPERLINK(\"\"https://example.com\"\")\"");
+        expect(csv).toContain("\"วันที่เริ่มงาน\"");
+        expect(csv).toContain("\"2023-04-01\"");
         expect(csv.match(/ตรวจสอบไม่ผ่าน/g)).toHaveLength(51);
     });
 

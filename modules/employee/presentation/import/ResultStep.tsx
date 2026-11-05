@@ -26,6 +26,7 @@ function getRejectedValues(error: ImportError): Array<[string, string]> {
         ["เบอร์โทร", error.data.phone ?? ""],
         ["ตำแหน่ง", error.data.position ?? ""],
         ["แผนก", error.data.department ?? ""],
+        ["วันที่เริ่มงาน", error.data.hireDate ?? ""],
         ["สังกัด", error.data.affiliation ?? ""],
         ["ชื่อเล่น", error.data.nickname ?? ""],
         ["สถานะ", error.data.status ?? ""],
