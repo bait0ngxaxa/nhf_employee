@@ -1,8 +1,27 @@
 import { Button } from "@/components/ui/button";
 import { Edit } from "lucide-react";
+import type { ReactElement } from "react";
 
 import type { Employee } from "./types";
 import { getEmployeeDisplayName } from "./formatters";
+
+export function DetailsEmployeeButton({ employee, onViewEmployee }: {
+    employee: Employee;
+    onViewEmployee: (employee: Employee, trigger: HTMLButtonElement) => void;
+}): ReactElement {
+    return (
+        <Button
+            type="button"
+            variant="outline"
+            className="h-11 px-3"
+            aria-label={`ดูรายละเอียด ${getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}`}
+            aria-haspopup="dialog"
+            onClick={(event) => onViewEmployee(employee, event.currentTarget)}
+        >
+            ดูรายละเอียด
+        </Button>
+    );
+}
 
 export function getEmployeeAvatarLetter(employee: Employee): string {
     const firstName = employee.firstName.trim();

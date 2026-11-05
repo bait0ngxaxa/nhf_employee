@@ -1,27 +1,13 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useRef, useState, type ReactElement } from "react";
 import { Badge } from "@/components/ui/badge";
+import { getEmployeeFullName } from "../../domain/identity";
 import type { Employee } from "./types";
-import {
-    getEmployeeDepartmentBadgeClass,
-    getEmployeeDisplayName,
-    getEmployeeStatusLabel,
-    getEmployeeStatusBadge,
-    formatEmployeePhone,
-} from "./formatters";
+import { getEmployeeStatusLabel, getEmployeeStatusBadge, isTemporaryEmail } from "./formatters";
 import { EmployeeMobileCard } from "./EmployeeMobileCard";
-import { useEmploymentAsOfDate } from "./useEmploymentAsOfDate";
-import {
-    calculateEmploymentTenure,
-    formatEmploymentHireDate,
-    formatEmploymentTenure,
-} from "../../domain/tenure";
-import {
-    EditEmployeeButton,
-    EmployeeAvatar,
-    isTemporaryEmail,
-} from "./EmployeeTablePrimitives";
+import { EmployeeDetailsDialog } from "./EmployeeDetailsDialog";
+import { DetailsEmployeeButton, EditEmployeeButton, EmployeeAvatar } from "./EmployeeTablePrimitives";
 
 interface EmployeeTableProps {
     employees: Employee[];
@@ -33,196 +19,89 @@ export const EmployeeTable = memo(function EmployeeTable({
     employees,
     canUpdateEmployees,
     onEditEmployee,
-}: EmployeeTableProps) {
-    const asOfDate = useEmploymentAsOfDate();
-    if (employees.length === 0) {
-        return null;
+}: EmployeeTableProps): ReactElement | null {
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
+    const detailsTrigger = useRef<HTMLButtonElement | null>(null);
+    const selectedEmployee = employees.find((employee) => employee.id === selectedEmployeeId);
+
+    // Forget removed selections so they cannot reopen when an ID returns later.
+    if (selectedEmployeeId !== null && !selectedEmployee) {
+        setSelectedEmployeeId(null);
     }
+    if (employees.length === 0) return null;
 
     const canEdit = canUpdateEmployees && Boolean(onEditEmployee);
+    const openDetails = (employee: Employee, trigger: HTMLButtonElement): void => {
+        detailsTrigger.current = trigger;
+        setSelectedEmployeeId(employee.id);
+    };
+    const editEmployee = (employee: Employee): void => {
+        if (!canEdit) return;
+        setSelectedEmployeeId(null);
+        onEditEmployee?.(employee);
+    };
 
     return (
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
             <div className="grid gap-3 xl:hidden">
                 {employees.map((employee) => (
                     <EmployeeMobileCard
                         key={employee.id}
                         employee={employee}
                         canUpdateEmployees={canEdit}
-                        asOfDate={asOfDate}
-                        onEditEmployee={onEditEmployee}
+                        onViewEmployee={openDetails}
+                        onEditEmployee={editEmployee}
                     />
                 ))}
             </div>
-
-            <div
-                className="hidden max-h-[70vh] overflow-auto rounded-xl border border-border-subtle bg-surface-raised xl:block"
-                style={{
-                    contentVisibility: "auto",
-                    containIntrinsicSize: "0 500px",
-                }}
-            >
-                <table className="w-max min-w-[1360px] text-left text-sm">
+            <div className="hidden max-h-[70vh] overflow-auto rounded-xl border border-border-subtle bg-surface-raised xl:block">
+                <table className="w-full table-fixed text-left text-sm">
                     <thead className="sticky top-0 z-10 border-b border-border-subtle bg-surface-subtle">
-                    <tr>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-content-secondary">
-                            ชื่อ-นามสกุล
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            ชื่อเล่น
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            ตำแหน่ง
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            สังกัด
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            แผนก
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            อีเมล
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            เบอร์โทร
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            วันที่เริ่มงาน
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            อายุงาน
-                        </th>
-                        <th className="px-4 py-4 text-left text-xs font-semibold text-content-secondary">
-                            สถานะ
-                        </th>
-                        {canEdit ? (
-                        <th className="sticky right-0 bg-surface-subtle px-4 py-4 text-left text-xs font-semibold text-content-secondary employee-table-sticky-shadow">
-                                การจัดการ
-                            </th>
-                        ) : null}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border-muted">
-                    {employees.map((employee) => {
-                        const tenure = formatEmploymentTenure(
-                            calculateEmploymentTenure(employee.hireDate, asOfDate),
-                        );
-
-                        return (
-                            <tr
-                                key={employee.id}
-                                className="group border-b border-border-muted transition-colors hover:bg-brand-surface/40 last:border-0"
-                            >
-                                <td className="px-5 py-4">
-                                    <div className="flex items-center gap-3">
+                        <tr>
+                            <th scope="col" className="w-[27%] px-4 py-4 text-xs font-semibold text-content-secondary">ชื่อ-นามสกุล</th>
+                            <th scope="col" className="w-[13%] px-3 py-4 text-xs font-semibold text-content-secondary">ชื่อเล่น</th>
+                            <th scope="col" className="w-[26%] px-3 py-4 text-xs font-semibold text-content-secondary">อีเมล</th>
+                            <th scope="col" className="w-[14%] px-3 py-4 text-xs font-semibold text-content-secondary">สถานะ</th>
+                            <th scope="col" className="w-[20%] px-3 py-4 text-xs font-semibold text-content-secondary">การจัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-muted">
+                        {employees.map((employee) => (
+                            <tr key={employee.id} className="group transition-colors hover:bg-brand-surface/40">
+                                <td className="px-4 py-3">
+                                    <div className="flex min-w-0 items-center gap-3">
                                         <EmployeeAvatar employee={employee} />
-                                        <div>
-                                            <div className="whitespace-nowrap text-sm font-semibold text-content-heading">
-                                                {getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <NicknameBadge nickname={employee.nickname} />
-                                </td>
-                                <td className="px-4 py-4">
-                                    <div
-                                        className="line-clamp-2 text-sm leading-6 text-content-strong [overflow-wrap:anywhere]"
-                                        title={employee.position}
-                                    >
-                                        {employee.position}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <div
-                                        className="line-clamp-2 text-sm leading-6 text-content-body [overflow-wrap:anywhere]"
-                                        title={employee.affiliation || undefined}
-                                    >
-                                        {employee.affiliation || "-"}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <Badge
-                                        variant="outline"
-                                        className={`${getEmployeeDepartmentBadgeClass(employee.dept.name)} max-w-full px-2.5 font-medium`}
-                                        title={employee.dept.name}
-                                    >
-                                        <span className="truncate">
-                                            {employee.dept.name}
+                                        <span className="min-w-0 font-semibold leading-6 text-content-heading [overflow-wrap:anywhere]">
+                                            {getEmployeeFullName(employee.firstName, employee.lastName) || "ไม่ระบุชื่อ"}
                                         </span>
-                                    </Badge>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <EmailValue email={employee.email} />
-                                </td>
-                                <td className="tabular-nums px-4 py-4">
-                                    <div className="whitespace-nowrap text-sm text-content-strong">
-                                        {formatEmployeePhone(employee.phone)}
                                     </div>
                                 </td>
-                                <td className="tabular-nums px-4 py-4">
-                                    <div className="whitespace-nowrap text-sm text-content-strong">
-                                        {formatEmploymentHireDate(employee.hireDate)}
+                                <td className="px-3 py-3 text-content-body [overflow-wrap:anywhere]">{employee.nickname?.trim() || "-"}</td>
+                                <td className="px-3 py-3 text-content-strong [overflow-wrap:anywhere]">{isTemporaryEmail(employee.email) ? "-" : employee.email}</td>
+                                <td className="px-3 py-3">
+                                    <Badge className={getEmployeeStatusBadge(employee.status)}>{getEmployeeStatusLabel(employee.status)}</Badge>
+                                </td>
+                                <td className="px-3 py-3">
+                                    <div className="flex flex-wrap gap-2">
+                                        <DetailsEmployeeButton employee={employee} onViewEmployee={openDetails} />
+                                        {canEdit ? <EditEmployeeButton employee={employee} onEditEmployee={editEmployee} /> : null}
                                     </div>
                                 </td>
-                                <td className="tabular-nums px-4 py-4">
-                                    <div className="whitespace-nowrap text-sm text-content-strong">
-                                        {tenure}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <Badge
-                                        className={getEmployeeStatusBadge(
-                                            employee.status,
-                                        )}
-                                    >
-                                        {getEmployeeStatusLabel(employee.status)}
-                                    </Badge>
-                                </td>
-                                {canEdit && onEditEmployee ? (
-                                    <td className="sticky right-0 bg-surface-raised px-4 py-4 employee-table-sticky-shadow group-hover:bg-brand-surface">
-                                        <EditEmployeeButton
-                                            employee={employee}
-                                            onEditEmployee={onEditEmployee}
-                                        />
-                                    </td>
-                                ) : null}
                             </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {selectedEmployee ? (
+                <EmployeeDetailsDialog
+                    employee={selectedEmployee}
+                    onClose={() => setSelectedEmployeeId(null)}
+                    onCloseAutoFocus={(event) => {
+                        event.preventDefault();
+                        if (detailsTrigger.current?.isConnected) detailsTrigger.current.focus();
+                    }}
+                />
+            ) : null}
         </div>
     );
 });
-
-function NicknameBadge({ nickname }: { nickname?: string | null }) {
-    const normalizedNickname = nickname?.trim();
-    if (!normalizedNickname) {
-        return <span className="text-sm text-content-subtle">-</span>;
-    }
-
-    return (
-        <Badge
-            variant="secondary"
-            className="max-w-full border border-employee-nickname-border/70 bg-employee-nickname-surface px-2.5 font-medium text-employee-nickname-foreground hover:bg-employee-nickname-surface"
-            title={normalizedNickname}
-        >
-            <span className="truncate">{normalizedNickname}</span>
-        </Badge>
-    );
-}
-
-function EmailValue({ email }: { email: string }) {
-    if (isTemporaryEmail(email)) {
-        return <span className="text-sm text-content-subtle">-</span>;
-    }
-
-    return (
-        <div className="whitespace-nowrap text-sm text-content-strong">
-            {email}
-        </div>
-    );
-}

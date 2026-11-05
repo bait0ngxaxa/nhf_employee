@@ -137,9 +137,13 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
                 />
             ) : (
                 canUpdateEmployees ? (
-                    <EmployeeEditCapabilitySession employees={currentEmployees} />
+                    <EmployeeEditCapabilitySession
+                        key={JSON.stringify([debouncedSearchTerm, statusFilter, currentPage, itemsPerPage])}
+                        employees={currentEmployees}
+                    />
                 ) : (
                     <EmployeeTable
+                        key={JSON.stringify([debouncedSearchTerm, statusFilter, currentPage, itemsPerPage])}
                         employees={currentEmployees}
                         canUpdateEmployees={false}
                     />

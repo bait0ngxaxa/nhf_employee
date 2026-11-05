@@ -1,133 +1,43 @@
+import type { ReactElement } from "react";
 import { Badge } from "@/components/ui/badge";
-import {
-    AtSign,
-    BriefcaseBusiness,
-    CalendarDays,
-    Clock3,
-    Phone,
-    ShieldCheck,
-    UserRound,
-    type LucideIcon,
-} from "lucide-react";
-
+import { getEmployeeFullName } from "../../domain/identity";
 import type { Employee } from "./types";
-import {
-    formatEmployeePhone,
-    getEmployeeDisplayName,
-    getEmployeeStatusBadge,
-    getEmployeeStatusLabel,
-    isTemporaryEmail,
-} from "./formatters";
-import {
-    calculateEmploymentTenure,
-    formatEmploymentHireDate,
-    formatEmploymentTenure,
-} from "../../domain/tenure";
-import {
-    EmployeeAvatar,
-    EditEmployeeButton,
-} from "./EmployeeTablePrimitives";
+import { getEmployeeStatusBadge, getEmployeeStatusLabel, isTemporaryEmail } from "./formatters";
+import { EmployeeAvatar, DetailsEmployeeButton, EditEmployeeButton } from "./EmployeeTablePrimitives";
 
 interface EmployeeMobileCardProps {
     employee: Employee;
     canUpdateEmployees: boolean;
-    asOfDate: string;
+    onViewEmployee: (employee: Employee, trigger: HTMLButtonElement) => void;
     onEditEmployee?: (employee: Employee) => void;
 }
 
-export function EmployeeMobileCard({
-    employee,
-    canUpdateEmployees,
-    asOfDate,
-    onEditEmployee,
-}: EmployeeMobileCardProps) {
+export function EmployeeMobileCard({ employee, canUpdateEmployees, onViewEmployee, onEditEmployee }: EmployeeMobileCardProps): ReactElement {
     return (
-        <article className="rounded-xl border border-border-subtle bg-surface-raised p-4">
+        <article className="min-w-0 rounded-xl border border-border-subtle bg-surface-raised p-4">
             <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                     <EmployeeAvatar employee={employee} />
-                    <div className="min-w-0">
-                        <h3 className="text-sm font-semibold leading-6 text-content-heading [overflow-wrap:anywhere]">
-                            {getEmployeeDisplayName(employee) || "ไม่ระบุชื่อ"}
-                        </h3>
-                        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-content-secondary [overflow-wrap:anywhere]">
-                            {employee.position}
-                        </p>
-                    </div>
+                    <h3 className="min-w-0 text-sm font-semibold leading-6 text-content-heading [overflow-wrap:anywhere]">
+                        {getEmployeeFullName(employee.firstName, employee.lastName) || "ไม่ระบุชื่อ"}
+                    </h3>
                 </div>
-                <Badge className={getEmployeeStatusBadge(employee.status)}>
-                    {getEmployeeStatusLabel(employee.status)}
-                </Badge>
+                <Badge className={getEmployeeStatusBadge(employee.status)}>{getEmployeeStatusLabel(employee.status)}</Badge>
             </div>
-
-            <dl className="mt-4 grid gap-3 text-sm">
-                <MobileDetail
-                    icon={UserRound}
-                    label="ชื่อเล่น"
-                    value={employee.nickname?.trim() || "-"}
-                />
-                <MobileDetail
-                    icon={ShieldCheck}
-                    label="แผนก"
-                    value={employee.dept.name}
-                />
-                <MobileDetail
-                    icon={BriefcaseBusiness}
-                    label="สังกัด"
-                    value={employee.affiliation || "-"}
-                />
-                <MobileDetail
-                    icon={AtSign}
-                    label="อีเมล"
-                    value={isTemporaryEmail(employee.email) ? "-" : employee.email}
-                />
-                <MobileDetail
-                    icon={Phone}
-                    label="เบอร์โทร"
-                    value={formatEmployeePhone(employee.phone)}
-                />
-                <MobileDetail
-                    icon={CalendarDays}
-                    label="วันที่เริ่มงาน"
-                    value={formatEmploymentHireDate(employee.hireDate)}
-                />
-                <MobileDetail
-                    icon={Clock3}
-                    label="อายุงาน"
-                    value={formatEmploymentTenure(
-                        calculateEmploymentTenure(employee.hireDate, asOfDate),
-                    )}
-                />
-            </dl>
-
-            {canUpdateEmployees && onEditEmployee ? (
-                <div className="mt-4 flex justify-end border-t border-border-muted pt-3">
-                    <EditEmployeeButton
-                        employee={employee}
-                        onEditEmployee={onEditEmployee}
-                    />
+            <dl className="mt-3 grid gap-2 text-sm">
+                <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-3">
+                    <dt className="text-content-muted">ชื่อเล่น</dt>
+                    <dd className="text-content-strong [overflow-wrap:anywhere]">{employee.nickname?.trim() || "-"}</dd>
                 </div>
-            ) : null}
+                <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-3">
+                    <dt className="text-content-muted">อีเมล</dt>
+                    <dd className="text-content-strong [overflow-wrap:anywhere]">{isTemporaryEmail(employee.email) ? "-" : employee.email}</dd>
+                </div>
+            </dl>
+            <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border-muted pt-3">
+                <DetailsEmployeeButton employee={employee} onViewEmployee={onViewEmployee} />
+                {canUpdateEmployees && onEditEmployee ? <EditEmployeeButton employee={employee} onEditEmployee={onEditEmployee} /> : null}
+            </div>
         </article>
-    );
-}
-
-function MobileDetail({
-    icon: Icon,
-    label,
-    value,
-}: {
-    icon: LucideIcon;
-    label: string;
-    value: string;
-}) {
-    return (
-        <div className="grid grid-cols-[1rem_minmax(5rem,7rem)_minmax(0,1fr)] items-start gap-2">
-            <Icon className="mt-0.5 h-4 w-4 text-content-subtle" aria-hidden="true" />
-            <dt className="text-xs font-medium text-content-muted">{label}</dt>
-            <dd className="min-w-0 text-right text-xs font-medium leading-5 text-content-strong [overflow-wrap:anywhere]">
-                {value}
-            </dd>
-        </div>
     );
 }
