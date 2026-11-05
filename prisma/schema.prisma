@@ -179,7 +179,7 @@ model Employee {
   phone         String?
   email         String         @unique
   position      String
-  hireDate      DateTime       @default(now())
+  hireDate      DateTime?      @db.Date
   status        EmployeeStatus @default(ACTIVE)
   deletedAt     DateTime?
   createdAt     DateTime       @default(now())
