@@ -198,6 +198,24 @@ describe("EmployeeProvider capability-aware presentation", () => {
         await act(async () => { finish?.(new Response(null, { status: 403 })); });
     });
 
+    it("releases loading on timeout and permits a new export", async () => {
+        vi.useFakeTimers();
+        mocks.fetchWithRefresh.mockReturnValueOnce(new Promise<Response>(() => undefined));
+        renderProvider(exportListCapabilities);
+        const button = screen.getByRole("button", { name: "export" });
+        fireEvent.click(button);
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("true");
+        await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("false");
+        expect(mocks.toastError).toHaveBeenCalledWith("เกิดข้อผิดพลาดในการดาวน์โหลด", {
+            description: "การดาวน์โหลดใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง",
+        });
+        await act(async () => { fireEvent.click(button); });
+        expect(mocks.fetchWithRefresh).toHaveBeenCalledTimes(2);
+        expect(mocks.triggerDownload).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("false");
+    });
+
     it("reports a forbidden response without downloading the error body", async () => {
         mocks.fetchWithRefresh.mockResolvedValue(Response.json({ error: "คุณไม่มีสิทธิ์ดำเนินการ" }, { status: 403 }));
         renderProvider(exportListCapabilities);
@@ -347,7 +365,7 @@ describe("EmployeeProvider capability-aware presentation", () => {
         });
         expect(mocks.toastSuccess).not.toHaveBeenCalled();
         expect(mocks.toastInfo).toHaveBeenCalledWith("เริ่มดาวน์โหลดไฟล์ Excel แล้ว", expect.any(Object));
-        expect(mocks.fetchWithRefresh).toHaveBeenCalledWith(API_ROUTES.employees.export, { cache: "no-store", credentials: "include" });
+        expect(mocks.fetchWithRefresh).toHaveBeenCalledWith(API_ROUTES.employees.export, { cache: "no-store", credentials: "include", signal: expect.any(AbortSignal) });
         await waitFor(() => expect(screen.getByTestId("is-exporting")).toHaveTextContent("false"));
     });
 

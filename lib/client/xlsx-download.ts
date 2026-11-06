@@ -5,6 +5,8 @@ import { triggerDownload } from "@/lib/helpers/download";
 
 const XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const DEFAULT_ERROR = "ไม่สามารถดาวน์โหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง";
+const DOWNLOAD_TIMEOUT_MS = 120_000;
+const TIMEOUT_ERROR = "การดาวน์โหลดใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง";
 const pendingDownloads = new Map<string, Promise<void>>();
 
 class XlsxDownloadError extends Error {}
@@ -41,14 +43,16 @@ async function responseError(response: Response): Promise<string> {
     return DEFAULT_ERROR;
 }
 
-async function performDownload(url: string, fallbackFilename: string): Promise<void> {
+async function performDownload(url: string, fallbackFilename: string, signal: AbortSignal): Promise<void> {
     try {
-        const response = await fetchWithRefresh(url, { credentials: "include", cache: "no-store" });
+        const response = await fetchWithRefresh(url, { credentials: "include", cache: "no-store", signal });
+        if (signal.aborted) throw new XlsxDownloadError(TIMEOUT_ERROR);
         if (!response.ok) throw new XlsxDownloadError(await responseError(response));
         if (response.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !== XLSX_CONTENT_TYPE) {
             throw new XlsxDownloadError(DEFAULT_ERROR);
         }
         const blob = await response.blob();
+        if (signal.aborted) throw new XlsxDownloadError(TIMEOUT_ERROR);
         const objectUrl = URL.createObjectURL(blob);
         try {
             triggerDownload(objectUrl, resolveFilename(response, fallbackFilename));
@@ -68,7 +72,22 @@ async function performDownload(url: string, fallbackFilename: string): Promise<v
 export function downloadXlsx(url: string, fallbackFilename = "export.xlsx"): Promise<void> {
     const pending = pendingDownloads.get(url);
     if (pending) return pending;
-    const download = performDownload(url, fallbackFilename).finally(() => pendingDownloads.delete(url));
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+            reject(new XlsxDownloadError(TIMEOUT_ERROR));
+            controller.abort();
+        }, DOWNLOAD_TIMEOUT_MS);
+    });
+    // Refresh waits or transports that ignore abort must not retain the shared lock.
+    const download = Promise.race([
+        performDownload(url, fallbackFilename, controller.signal),
+        deadline,
+    ]).finally(() => {
+        clearTimeout(timeout);
+        pendingDownloads.delete(url);
+    });
     pendingDownloads.set(url, download);
     return download;
 }

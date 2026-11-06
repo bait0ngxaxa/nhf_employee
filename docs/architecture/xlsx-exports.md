@@ -24,4 +24,6 @@ Missing, malformed, unsafe or unexpected-extension filenames use a validated `.x
 
 Concurrent calls for the same URL share one pending promise. Module locks also cover metadata preflight and prevent repeated clicks. Stock request and balance controls remain independent. Loading ends when the browser download starts; it cannot confirm that a user saved the file to disk. Object URLs are released immediately on initiation failure or after a short grace period on success, independent of loading state.
 
+Each download has a two-minute deadline covering the HTTP request, auth-refresh wait and response body (including JSON errors). On timeout the downloader aborts its request and rejects with a Thai retry message, releasing the shared lock and caller loading state. A promise deadline also handles transport waits that ignore cancellation. Late responses cannot initiate a download or remove a replacement request's lock. The existing shared auth-refresh operation is not cancelled or changed by this downloader.
+
 Existing limits: Employee 2,000 employees, Leave 3,000 requests, Stock 5,000 rows and Routine 2,000 tasks. CSV import is unchanged. The yearly export panel is used exclusively by XLSX controls and defaults to the Excel label while preserving explicit caller labels.

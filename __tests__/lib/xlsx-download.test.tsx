@@ -40,10 +40,11 @@ describe("XLSX download", () => {
         const filename = "รายงาน_ค้นหา-สมชาย.xlsx";
         vi.mocked(fetchWithRefresh).mockResolvedValue(response(encodeURIComponent(filename)));
         await downloadXlsx("/api/export");
-        expect(fetchWithRefresh).toHaveBeenCalledWith("/api/export", { credentials: "include", cache: "no-store" });
+        expect(fetchWithRefresh).toHaveBeenCalledWith("/api/export", { credentials: "include", cache: "no-store", signal: expect.any(AbortSignal) });
         expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
         expect(triggerDownload).toHaveBeenCalledWith("blob:xlsx", filename);
         expect(revokeObjectURL).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(1); // URL cleanup only; request deadline is cleared.
         await vi.advanceTimersByTimeAsync(60_000);
         expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith("blob:xlsx");
     });
@@ -109,5 +110,77 @@ describe("XLSX download", () => {
         await downloadXlsx("/api/export");
         expect(fetchWithRefresh).toHaveBeenCalledTimes(2);
         expect(triggerDownload).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(["fetch", "body", "error body"])("times out a stalled %s and permits retry without a late download", async (stage) => {
+        const url = `/api/export?stage=${stage}`;
+        let finishFetch: ((value: Response) => void) | undefined;
+        let finishBody: ((value: Blob) => void) | undefined;
+        let finishError: ((value: unknown) => void) | undefined;
+        if (stage === "fetch") {
+            vi.mocked(fetchWithRefresh).mockReturnValueOnce(new Promise<Response>((resolve) => { finishFetch = resolve; }));
+        } else {
+            const result = stage === "body" ? response() : Response.json({ error: "failed" }, { status: 500 });
+            if (stage === "body") {
+                vi.spyOn(result, "blob").mockReturnValue(new Promise<Blob>((resolve) => { finishBody = resolve; }));
+            } else {
+                vi.spyOn(result, "json").mockReturnValue(new Promise<unknown>((resolve) => { finishError = resolve; }));
+            }
+            vi.mocked(fetchWithRefresh).mockResolvedValueOnce(result);
+        }
+        const first = downloadXlsx(url);
+        expect(downloadXlsx(url)).toBe(first);
+        let failure: unknown;
+        const settled = first.catch((error: unknown) => { failure = error; });
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(failure).toBeInstanceOf(Error);
+        expect(failure).toMatchObject({ message: "การดาวน์โหลดใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง" });
+        await settled;
+        const signal = vi.mocked(fetchWithRefresh).mock.calls[0]?.[1]?.signal;
+        expect(signal?.aborted).toBe(true);
+        expect(triggerDownload).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+
+        // Start a replacement while the old transport still ignores cancellation.
+        let finishRetry: ((value: Response) => void) | undefined;
+        vi.mocked(fetchWithRefresh).mockReturnValueOnce(new Promise<Response>((resolve) => { finishRetry = resolve; }));
+        const retry = downloadXlsx(url);
+        expect(retry).not.toBe(first);
+        finishFetch?.(response());
+        finishBody?.(new Blob(["late workbook"]));
+        finishError?.({ error: "late error" });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(triggerDownload).not.toHaveBeenCalled();
+        expect(createObjectURL).not.toHaveBeenCalled();
+        expect(downloadXlsx(url)).toBe(retry);
+        finishRetry?.(response());
+        await retry;
+        expect(fetchWithRefresh).toHaveBeenCalledTimes(2);
+        expect(triggerDownload).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses one deadline for the request and body rather than resetting after headers", async () => {
+        let finishFetch: ((value: Response) => void) | undefined;
+        vi.mocked(fetchWithRefresh).mockReturnValueOnce(new Promise<Response>((resolve) => { finishFetch = resolve; }));
+        const result = response();
+        vi.spyOn(result, "blob").mockReturnValue(new Promise<Blob>(() => undefined));
+        const download = downloadXlsx("/api/export");
+        const rejected = expect(download).rejects.toThrow("การดาวน์โหลดใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง");
+        await vi.advanceTimersByTimeAsync(100_000);
+        finishFetch?.(result);
+        await vi.advanceTimersByTimeAsync(20_000);
+        await rejected;
+        expect(triggerDownload).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("aborts a signal-aware transport while keeping the timeout message", async () => {
+        vi.mocked(fetchWithRefresh).mockImplementationOnce((_url, init) => new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+        }));
+        const rejected = expect(downloadXlsx("/api/export")).rejects.toThrow("การดาวน์โหลดใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง");
+        await vi.advanceTimersByTimeAsync(120_000);
+        await rejected;
+        expect(vi.getTimerCount()).toBe(0);
     });
 });
