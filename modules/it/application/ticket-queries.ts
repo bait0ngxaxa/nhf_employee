@@ -10,7 +10,11 @@ import {
     resolveITCapabilityInTransaction,
     type ITAuthorizationContext,
 } from "./authorization";
-import { ITTicketInputValidationError, ITTicketNotFoundError } from "./ticket-errors";
+import {
+    ITTicketInputValidationError,
+    ITTicketNotFoundError,
+    ITTicketQueueCursorStaleError,
+} from "./ticket-errors";
 import { assertITActorCurrentWorkforce } from "./workforce";
 import { findITOperatorAudience } from "./operator-audience";
 import {
@@ -23,6 +27,7 @@ import {
     countRequesterITTickets,
     findActiveITTicketCategories,
     findOperatorITTicketDetailById,
+    findOperatorITTicketQueueAnchor,
     findOperatorITTickets,
     findRequesterITTicketDetailById,
     findRequesterITTickets,
@@ -295,7 +300,31 @@ export async function getITRequesterTicket(
     });
 }
 
-/** Lists a bounded organization-wide queue using stable descending keyset pagination. */
+/**
+ * Priority is a mutable sort key. A cursor is only continued while its anchor
+ * Ticket still has the priority and creation time it was issued with; otherwise
+ * the keyset boundary no longer describes the client's loaded rows.
+ */
+async function assertITOperatorQueueCursorAnchorIsCurrent(
+    tx: Parameters<typeof findOperatorITTicketQueueAnchor>[0],
+    cursor: ParsedITOperatorQueueCursor,
+): Promise<void> {
+    const anchor = await findOperatorITTicketQueueAnchor(tx, cursor.id);
+    if (
+        anchor === null
+        || anchor.priority !== cursor.priority
+        || anchor.createdAt.getTime() !== cursor.createdAt.getTime()
+    ) {
+        throw new ITTicketQueueCursorStaleError();
+    }
+}
+
+/**
+ * Lists a bounded organization-wide queue with priority/createdAt/id keyset
+ * pagination. Each page is consistent; across pages a moved anchor is rejected
+ * as stale, but other concurrent changes can still move unseen rows across the
+ * boundary until the client reloads from the first page.
+ */
 export async function listITOperatorTickets(
     context: ITAuthorizationContext,
     input: unknown,
@@ -317,6 +346,9 @@ export async function listITOperatorTickets(
             tx,
         );
         assertOperatorReadScope(authorization.scopes);
+        if (cursor !== null) {
+            await assertITOperatorQueueCursorAnchorIsCurrent(tx, cursor);
+        }
 
         const records = await findOperatorITTickets(
             tx,

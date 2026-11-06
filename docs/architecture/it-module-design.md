@@ -109,7 +109,7 @@ Ordinary comments are permitted only in `OPEN`, `IN_PROGRESS`, and `WAITING_REQU
 
 Creation policy is server-owned: `INCIDENT → P2`; `SERVICE_REQUEST → P3`; `SUGGESTION → P3`. The Prisma column is non-null with a `P2` database fallback, while the creation command explicitly applies the type mapping. New Tickets have `triagedAt = NULL` and `triagedByUserId = NULL`; this is the authoritative untriaged state. An operator may confirm the current default without changing the priority. That first confirmation records the actor and time; later adjustments preserve the original triage fields and append their own Activity/Audit facts. Repeating an already-confirmed identical priority is a no-op. Actual priority changes require a meaningful reason (maximum 500 characters). Every state change uses the existing expected-version Serializable transaction and atomically persists the Ticket update, Activity event, and Audit record. `CLOSED` and `CANCELLED` Tickets cannot be triaged or reprioritized; priority never changes status, assignment, or category. There is no requester urgency input, impact/urgency matrix, priority automation, historical priority backfill, or formal SLA policy/engine. Category may be null until classified; operator manages classification, while category reference maintenance can initially be deployment/configuration managed without a new capability.
 
-The Dashboard operator detail exposes the current badge, triage state and actor, a P0–P3 selector, and a reason field only for actual changes. The operator queue defaults to `OPEN`, `IN_PROGRESS`, and `WAITING_REQUESTER`; `ALL` and exact-status filters retain access to resolved and terminal history. Queue filtering is performed in SQL. Its deterministic order is priority `P0 → P1 → P2 → P3`, then oldest `createdAt`, then ascending Ticket ID. The keyset cursor carries the last priority/date/ID and a hash of normalized filters, so malformed cursors and cursors reused with changed filters are rejected. Unresolved Ticket age is informational and measured from `createdAt`; it is not an SLA or deadline.
+The Dashboard operator detail exposes the current badge, triage state and actor, a P0–P3 selector, and a reason field only for actual changes. The operator queue defaults to `OPEN`, `IN_PROGRESS`, and `WAITING_REQUESTER`; `ALL` and exact-status filters retain access to resolved and terminal history. Queue filtering is performed in SQL. Its deterministic order is priority `P0 → P1 → P2 → P3`, then oldest `createdAt`, then ascending Ticket ID. The keyset cursor carries the last priority/date/ID and a hash of normalized filters, so malformed cursors and cursors reused with changed filters are rejected. Because priority is mutable, a continuation also revalidates its anchor Ticket's current priority and creation time; a moved or missing anchor returns `409 QUEUE_CURSOR_STALE` (see Section 34). Unresolved Ticket age is informational and measured from `createdAt`; it is not an SLA or deadline.
 
 ## 6. Conversation, Activity, and Audit
 
@@ -861,3 +861,31 @@ provider call, so a priority, status, or grant change committed in that short
 gap can still be followed by one send. The design preserves at-least-once
 retry semantics and existing SMTP Message-ID / LINE retry keys; it does not
 claim exactly-once or zero-staleness external delivery.
+
+## 34. Operator queue pagination consistency (review 1206e61)
+
+The queue order (`priority`, `createdAt`, `id`) and SQL filtering are
+unchanged; for a static result set the keyset is deterministic and gap-free.
+Priority is a mutable sort key, so the implementation adopts a bounded
+reconcile-on-change approach rather than snapshot pagination:
+
+- **Server:** `listITOperatorTickets` still rejects malformed cursors and
+  cursors reused with different filters (`400`). After the read ALL check it
+  re-reads only the cursor anchor's `priority` and `createdAt`; if the anchor
+  no longer holds the sort position the cursor encoded, or no longer exists,
+  it returns `409` with `code: "QUEUE_CURSOR_STALE"` instead of continuing.
+- **Client:** a stale outcome reloads the queue from the first page and shows
+  an info notice. Appended pages are merged by Ticket ID: a Ticket that moved
+  behind the cursor and reappears replaces its earlier copy (newer server data,
+  new position), never duplicating a row, and a warning notice offers
+  `โหลดคิวใหม่`. Filter changes and manual reloads reset pagination; a
+  load-more response that resolves after a reload or filter change, or for a
+  superseded cursor, is discarded.
+
+**Remaining semantics (honest limitation).** This is not snapshot
+consistency. A non-anchor row that changes after its page loaded, a row
+escalated ahead of an unchanged anchor, a newly created Ticket, or a Ticket
+re-entering the filtered status set can be missed by a continuation until the
+operator reloads; a row moving behind the cursor is shown once at its newer
+position. No queue-wide revision, Redis, or unbounded query is introduced.
+Requester Ticket pagination is unchanged.

@@ -17,7 +17,9 @@ import {
     ITTicketIdempotencyConflictError,
     ITTicketInvalidTransitionError,
     ITTicketMutationConflictError,
+    ITTicketInputValidationError,
     ITTicketPriorityTerminalError,
+    ITTicketQueueCursorStaleError,
     ITTicketStatus,
     assignITTicket,
     buildITAuthorizationContext,
@@ -905,6 +907,91 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
             status: "ALL",
         })).tickets.map(({ id }) => id);
         expect(historicalIds).toContain(cancelled.ticket.id);
+    });
+
+    it("keeps keyset pages stable for static data and rejects a cursor whose anchor moved", async () => {
+        const fixture = await createFixture("queue-concurrency");
+        await grant(fixture.operator.userId, "it.ticket.read");
+        const tickets = [];
+        for (const label of ["a", "b", "c", "d", "e"]) {
+            tickets.push(await createTicket(fixture.requester, nextFixtureKey(`queue-concurrency-${label}`)));
+        }
+        const [a, b, c, d, e] = tickets.map(({ ticket }) => ticket.id);
+        if (a === undefined || b === undefined || c === undefined || d === undefined || e === undefined) {
+            throw new Error("Expected five queue fixtures");
+        }
+        // b and c share createdAt so the ID tie-breaker decides their order.
+        const createdAtById = new Map([
+            [a, "2026-06-01T00:00:00.000Z"],
+            [b, "2026-06-02T00:00:00.000Z"],
+            [c, "2026-06-02T00:00:00.000Z"],
+            [d, "2026-06-03T00:00:00.000Z"],
+            [e, "2026-06-04T00:00:00.000Z"],
+        ]);
+        for (const [ticketId, createdAt] of createdAtById) {
+            await prisma.iTTicket.update({ where: { id: ticketId }, data: { createdAt: new Date(createdAt) } });
+        }
+        const operator = fixture.operator.context;
+        const page = (cursor?: string) => listITOperatorTickets(operator, {
+            limit: 2,
+            ...(cursor === undefined ? {} : { cursor }),
+        });
+        const changePriority = async (ticketId: number, priority: "P1" | "P3") => {
+            const current = await prisma.iTTicket.findUniqueOrThrow({ where: { id: ticketId } });
+            await setITTicketPriority(operator, {
+                ticketId,
+                priority,
+                reason: "ปรับลำดับระหว่างทดสอบคิว",
+                expectedVersion: current.version,
+            });
+        };
+
+        // Static result set: multiple pages within one priority, oldest first, ID tie-break.
+        const staticIds: number[] = [];
+        let cursor: string | undefined;
+        do {
+            const result = await page(cursor);
+            staticIds.push(...result.tickets.map(({ id }) => id));
+            cursor = result.nextCursor ?? undefined;
+        } while (cursor !== undefined);
+        expect(staticIds).toEqual([a, b, c, d, e]);
+
+        // The anchor (b) moves P2 -> P3 after page 1: the continuation is stale.
+        const first = await page();
+        expect(first.tickets.map(({ id }) => id)).toEqual([a, b]);
+        await changePriority(b, "P3");
+        await expect(page(first.nextCursor ?? undefined))
+            .rejects.toBeInstanceOf(ITTicketQueueCursorStaleError);
+
+        // Reload: b now sorts last. A previously loaded non-anchor row (a) then
+        // moves behind the cursor and is returned again on a later page.
+        const reloaded = await page();
+        expect(reloaded.tickets.map(({ id }) => id)).toEqual([a, c]);
+        await changePriority(a, "P3");
+        const continued: number[] = [];
+        cursor = reloaded.nextCursor ?? undefined;
+        while (cursor !== undefined) {
+            const result = await page(cursor);
+            continued.push(...result.tickets.map(({ id }) => id));
+            cursor = result.nextCursor ?? undefined;
+        }
+        expect(continued).toEqual([d, e, a, b]);
+
+        // An unseen row (e) moving ahead of an unchanged anchor is not detected
+        // by the continuation; only a reload from the first page shows it.
+        const beforeEscalation = await page();
+        expect(beforeEscalation.tickets.map(({ id }) => id)).toEqual([c, d]);
+        await changePriority(e, "P1");
+        const afterEscalation = await page(beforeEscalation.nextCursor ?? undefined);
+        expect(afterEscalation.tickets.map(({ id }) => id)).toEqual([a, b]);
+        expect((await page()).tickets.map(({ id }) => id)).toEqual([e, c]);
+
+        // Cursors stay bound to their filters.
+        await expect(listITOperatorTickets(operator, {
+            limit: 2,
+            priority: "P2",
+            cursor: beforeEscalation.nextCursor ?? undefined,
+        })).rejects.toBeInstanceOf(ITTicketInputValidationError);
     });
 
     it("rolls back Ticket and idempotency writes when event persistence fails", async () => {

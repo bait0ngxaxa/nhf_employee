@@ -9,7 +9,8 @@ export type ITTicketErrorCode =
     | "CATEGORY_NOT_FOUND"
     | "CATEGORY_INACTIVE"
     | "PRIORITY_TERMINAL"
-    | "TICKET_NOT_COMMENTABLE";
+    | "TICKET_NOT_COMMENTABLE"
+    | "QUEUE_CURSOR_STALE";
 
 export class ITTicketError extends Error {
     readonly code: ITTicketErrorCode;
@@ -93,6 +94,17 @@ export class ITTicketPriorityTerminalError extends ITTicketError {
     constructor() {
         super("PRIORITY_TERMINAL", "ไม่สามารถประเมินหรือเปลี่ยน Priority ของ Ticket ที่สิ้นสุดแล้วได้");
         this.name = "ITTicketPriorityTerminalError";
+    }
+}
+
+/**
+ * The operator queue cursor's anchor Ticket no longer holds the sort position
+ * it had when the page was issued, so continuing could duplicate or skip rows.
+ */
+export class ITTicketQueueCursorStaleError extends ITTicketError {
+    constructor() {
+        super("QUEUE_CURSOR_STALE", "ลำดับคิวมีการเปลี่ยนแปลงระหว่างโหลด กรุณาโหลดคิวใหม่");
+        this.name = "ITTicketQueueCursorStaleError";
     }
 }
 

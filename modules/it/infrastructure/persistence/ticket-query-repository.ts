@@ -1,4 +1,4 @@
-import type { ITTicketStatus, ITTicketType, Prisma } from "@prisma/client";
+import type { ITTicketPriority, ITTicketStatus, ITTicketType, Prisma } from "@prisma/client";
 
 export type ITTicketReadPersistenceContext = Pick<
     Prisma.TransactionClient,
@@ -180,6 +180,17 @@ export async function findOperatorITTickets(
         select: IT_OPERATOR_TICKET_SELECT,
         orderBy: [{ priority: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         take,
+    });
+}
+
+/** Reads only the immutable/mutable sort keys of a queue cursor anchor. */
+export async function findOperatorITTicketQueueAnchor(
+    tx: ITTicketReadPersistenceContext,
+    ticketId: number,
+): Promise<{ readonly priority: ITTicketPriority; readonly createdAt: Date } | null> {
+    return tx.iTTicket.findUnique({
+        where: { id: ticketId },
+        select: { priority: true, createdAt: true },
     });
 }
 

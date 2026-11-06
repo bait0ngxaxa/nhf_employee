@@ -47,7 +47,9 @@ import {
     ITTicketCategoryNotFoundError,
     ITTicketInvalidTransitionError,
     ITTicketMutationConflictError,
+    ITTicketInputValidationError,
     ITTicketNotFoundError,
+    ITTicketQueueCursorStaleError,
     ITWorkforceDeniedError,
 } from "@/modules/it";
 
@@ -180,6 +182,25 @@ describe("IT operator API adapters", () => {
         );
 
         expect(response.status).toBe(403);
+    });
+
+    it("maps a stale queue cursor to an explicit 409 outcome and a malformed cursor to 400", async () => {
+        mocks.listTickets.mockRejectedValueOnce(new ITTicketQueueCursorStaleError());
+        const stale = await getOperatorQueue(new NextRequest(
+            "http://localhost/api/it/operator/tickets?status=ACTIVE&cursor=abc",
+        ));
+        expect(stale.status).toBe(409);
+        expect(await stale.json()).toEqual({
+            success: false,
+            error: "ลำดับคิวมีการเปลี่ยนแปลงระหว่างโหลด กรุณาโหลดคิวใหม่",
+            code: "QUEUE_CURSOR_STALE",
+        });
+
+        mocks.listTickets.mockRejectedValueOnce(new ITTicketInputValidationError());
+        const malformed = await getOperatorQueue(new NextRequest(
+            "http://localhost/api/it/operator/tickets?cursor=not-valid",
+        ));
+        expect(malformed.status).toBe(400);
     });
 
     it("returns a generic 500 without exposing unexpected error details", async () => {

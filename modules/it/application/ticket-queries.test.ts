@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
     findMany: vi.fn(),
     findCategories: vi.fn(),
     findFirst: vi.fn(),
+    findUnique: vi.fn(),
     authorize: vi.fn(),
     assertWorkforce: vi.fn(),
     findConfiguredRecipients: vi.fn(),
@@ -47,7 +48,11 @@ import {
     listITOperatorTickets,
     listITRequesterTickets,
 } from "./ticket-queries";
-import { ITTicketInputValidationError, ITTicketNotFoundError } from "./ticket-errors";
+import {
+    ITTicketInputValidationError,
+    ITTicketNotFoundError,
+    ITTicketQueueCursorStaleError,
+} from "./ticket-errors";
 import { buildITAuthorizationContext } from "./authorization";
 
 const tx = {
@@ -55,6 +60,7 @@ const tx = {
         count: mocks.count,
         findMany: mocks.findMany,
         findFirst: mocks.findFirst,
+        findUnique: mocks.findUnique,
     },
     iTTicketCategory: { findMany: mocks.findCategories },
 };
@@ -101,6 +107,7 @@ describe("IT requester Ticket queries", () => {
         mocks.count.mockResolvedValue(11);
         mocks.findMany.mockResolvedValue([ticket]);
         mocks.findFirst.mockResolvedValue({ ...ticket, attachments: [] });
+        mocks.findUnique.mockResolvedValue(null);
         mocks.findCategories.mockResolvedValue([]);
         mocks.findConfiguredRecipients.mockImplementation(async ({ capability }: { capability: string }) =>
             capability === "it.ticket.read" ? [51, 52]
@@ -303,6 +310,7 @@ describe("IT requester Ticket queries", () => {
         mocks.findMany
             .mockResolvedValueOnce([first, nextPriority])
             .mockResolvedValueOnce([nextPriority]);
+        mocks.findUnique.mockResolvedValue({ priority: "P0", createdAt });
 
         const firstPage = await listITOperatorTickets(actorContext, { limit: 1 });
         await listITOperatorTickets(actorContext, {
@@ -330,6 +338,48 @@ describe("IT requester Ticket queries", () => {
             priority: "P0",
             cursor: firstPage.nextCursor ?? undefined,
         })).rejects.toBeInstanceOf(ITTicketInputValidationError);
+    });
+
+    it("revalidates the cursor anchor and rejects a moved or missing anchor as stale", async () => {
+        mocks.authorize.mockResolvedValue({ scopes: ["ALL"] });
+        const anchor = { ...ticket, id: 18, priority: "P1" as const };
+        mocks.findMany.mockResolvedValueOnce([anchor, { ...ticket, id: 19 }]);
+        const firstPage = await listITOperatorTickets(actorContext, { limit: 1 });
+        const cursor = firstPage.nextCursor ?? undefined;
+        expect(cursor).toBeDefined();
+        mocks.findMany.mockClear();
+
+        // Ticket #18 was downgraded P1 -> P3 after page 1 loaded.
+        mocks.findUnique.mockResolvedValueOnce({ priority: "P3", createdAt });
+        await expect(listITOperatorTickets(actorContext, { limit: 1, cursor }))
+            .rejects.toBeInstanceOf(ITTicketQueueCursorStaleError);
+        expect(mocks.findUnique).toHaveBeenLastCalledWith({
+            where: { id: 18 },
+            select: { priority: true, createdAt: true },
+        });
+
+        mocks.findUnique.mockResolvedValueOnce(null);
+        await expect(listITOperatorTickets(actorContext, { limit: 1, cursor }))
+            .rejects.toBeInstanceOf(ITTicketQueueCursorStaleError);
+        expect(mocks.findMany).not.toHaveBeenCalled();
+
+        mocks.findUnique.mockResolvedValueOnce({ priority: "P1", createdAt });
+        mocks.findMany.mockResolvedValueOnce([]);
+        await expect(listITOperatorTickets(actorContext, { limit: 1, cursor }))
+            .resolves.toMatchObject({ tickets: [], nextCursor: null });
+    });
+
+    it("checks read ALL before revealing whether a cursor anchor is stale", async () => {
+        mocks.authorize.mockResolvedValueOnce({ scopes: ["ALL"] });
+        mocks.findMany.mockResolvedValueOnce([ticket, { ...ticket, id: 20 }]);
+        const firstPage = await listITOperatorTickets(actorContext, { limit: 1 });
+
+        mocks.authorize.mockResolvedValueOnce({ scopes: ["OWN"] });
+        await expect(listITOperatorTickets(actorContext, {
+            limit: 1,
+            cursor: firstPage.nextCursor ?? undefined,
+        })).rejects.not.toBeInstanceOf(ITTicketQueueCursorStaleError);
+        expect(mocks.findUnique).not.toHaveBeenCalled();
     });
 
     it("applies status, type, category, assignee, priority, and triage filters in SQL", async () => {

@@ -258,6 +258,115 @@ describe("IT operator queue presentation", () => {
         expect(filteredRequest).toContain("status=ACTIVE");
         expect(filteredRequest).not.toContain("cursor=");
     });
+
+    function queueTicket(id: number, priority: ITOperatorTicket["priority"]): ITOperatorTicket {
+        return { ...ticket, id, priority, title: `งานคิวหมายเลข ${id}` };
+    }
+
+    function linksFor(id: number): HTMLElement[] {
+        return screen.queryAllByRole("link", { name: new RegExp(`งานคิวหมายเลข ${id}(?!\\d)`) });
+    }
+
+    function firstPageRequests(): string[] {
+        return fetchMock.mock.calls
+            .map(([input]) => String(input))
+            .filter((url) => url.includes("/api/it/operator/tickets")
+                && !url.includes("/reference")
+                && !url.includes("cursor="));
+    }
+
+    it("does not duplicate a Ticket that moved behind the cursor and offers a reload", async () => {
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("cursor=")) {
+                // #101 was downgraded P1 -> P3 after page 1 loaded.
+                return queueResponse([queueTicket(103, "P2"), queueTicket(101, "P3")]);
+            }
+            return queueResponse([queueTicket(101, "P1"), queueTicket(102, "P2")], "cursor-1");
+        });
+
+        render(<ITTicketOperatorQueue />);
+        expect(await screen.findAllByRole("link", { name: /งานคิวหมายเลข 101(?!\d)/ })).toHaveLength(2);
+        fireEvent.click(screen.getByRole("button", { name: "โหลดรายการถัดไป" }));
+
+        await waitFor(() => expect(linksFor(103)).toHaveLength(2));
+        expect(linksFor(101)).toHaveLength(2);
+        expect(screen.getByText("แสดง 3 รายการ")).toBeInTheDocument();
+        expect(screen.getByText(/มี Ticket เปลี่ยนลำดับระหว่างโหลด/)).toBeInTheDocument();
+
+        const requestsBefore = firstPageRequests().length;
+        fireEvent.click(screen.getByRole("button", { name: "โหลดคิวใหม่" }));
+        await waitFor(() => expect(firstPageRequests().length).toBe(requestsBefore + 1));
+        await waitFor(() => expect(screen.queryByText(/มี Ticket เปลี่ยนลำดับระหว่างโหลด/))
+            .not.toBeInTheDocument());
+        expect(linksFor(103)).toHaveLength(0);
+    });
+
+    it("reloads from the first page when the server reports a stale cursor", async () => {
+        let firstPageCalls = 0;
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("cursor=")) {
+                return apiResponse({
+                    success: false,
+                    error: "ลำดับคิวมีการเปลี่ยนแปลงระหว่างโหลด กรุณาโหลดคิวใหม่",
+                    code: "QUEUE_CURSOR_STALE",
+                }, 409);
+            }
+            firstPageCalls += 1;
+            return firstPageCalls === 1
+                ? queueResponse([queueTicket(201, "P1")], "cursor-stale")
+                // An unseen Ticket moved ahead of the old cursor; the reload shows it.
+                : queueResponse([queueTicket(205, "P0"), queueTicket(201, "P1")]);
+        });
+
+        render(<ITTicketOperatorQueue />);
+        expect(await screen.findAllByRole("link", { name: /งานคิวหมายเลข 201(?!\d)/ })).toHaveLength(2);
+        fireEvent.click(screen.getByRole("button", { name: "โหลดรายการถัดไป" }));
+
+        await waitFor(() => expect(linksFor(205)).toHaveLength(2));
+        expect(linksFor(201)).toHaveLength(2);
+        expect(screen.getByText(/ระบบจึงโหลดคิวใหม่ตั้งแต่รายการแรก/)).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "โหลดรายการถัดไป" })).not.toBeInTheDocument();
+        expect(screen.queryByText("ลำดับคิวมีการเปลี่ยนแปลงระหว่างโหลด กรุณาโหลดคิวใหม่"))
+            .not.toBeInTheDocument();
+    });
+
+    it("drops a load-more response that resolves after a refresh or filter change", async () => {
+        let resolveLoadMore: ((response: Response) => void) | null = null;
+        let generation = 0;
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("cursor=")) {
+                return new Promise<Response>((resolve) => {
+                    resolveLoadMore = resolve;
+                });
+            }
+            generation += 1;
+            return generation === 1
+                ? queueResponse([queueTicket(301, "P1")], "cursor-slow")
+                : queueResponse([queueTicket(302, "P1")], "cursor-fresh");
+        });
+
+        render(<ITTicketOperatorQueue />);
+        expect(await screen.findAllByRole("link", { name: /งานคิวหมายเลข 301(?!\d)/ })).toHaveLength(2);
+        fireEvent.click(screen.getByRole("button", { name: "โหลดรายการถัดไป" }));
+        await waitFor(() => expect(resolveLoadMore).not.toBeNull());
+
+        fireEvent.click(screen.getByRole("button", { name: "โหลดข้อมูลใหม่" }));
+        await waitFor(() => expect(linksFor(302)).toHaveLength(2));
+
+        await act(async () => {
+            resolveLoadMore?.(queueResponse([queueTicket(399, "P3")]));
+        });
+        expect(linksFor(399)).toHaveLength(0);
+        expect(linksFor(301)).toHaveLength(0);
+        expect(screen.getByText("แสดง 1 รายการ")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "โหลดรายการถัดไป" })).toBeEnabled();
+    });
 });
 
 describe("IT operator Ticket detail presentation", () => {

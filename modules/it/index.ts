@@ -130,6 +130,7 @@ export {
     ITTicketCategoryInactiveError,
     ITTicketCategoryNotFoundError,
     ITTicketPriorityTerminalError,
+    ITTicketQueueCursorStaleError,
     ITTicketError,
     ITTicketIdempotencyConflictError,
     ITTicketInputValidationError,

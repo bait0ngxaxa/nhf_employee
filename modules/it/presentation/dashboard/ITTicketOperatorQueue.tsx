@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactElement } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactElement } from "react";
 import Link from "next/link";
 import { ArrowDown, CircleAlert, RefreshCw, TicketCheck } from "lucide-react";
 
@@ -31,6 +31,10 @@ import {
     parseITOperatorTicketList,
     readITOperatorError,
 } from "./ticket-presentation";
+import {
+    isITOperatorQueueCursorStale,
+    mergeITOperatorQueuePage,
+} from "./operator-queue-pagination";
 
 interface QueueFilters {
     readonly status: "ACTIVE" | "ALL" | ITTicketStatus;
@@ -49,6 +53,8 @@ type QueueState =
         readonly list: ITOperatorTicketList;
         readonly loadingMore: boolean;
         readonly loadMoreError: string | null;
+        /** A later page repositioned an already visible Ticket. */
+        readonly reordered: boolean;
     }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
 
@@ -313,7 +319,9 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
     const [refreshKey, setRefreshKey] = useState(0);
     const [queueState, setQueueState] = useState<QueueState | null>(null);
     const [referenceState, setReferenceState] = useState<ReferenceState | null>(null);
+    const [staleCursorReloaded, setStaleCursorReloaded] = useState(false);
     const requestKey = `${JSON.stringify(filters)}:${refreshKey}`;
+    const activeRequestKeyRef = useRef(requestKey);
     const currentQueueState = queueState?.key === requestKey ? queueState : null;
     const list = currentQueueState?.kind === "loaded" ? currentQueueState.list : null;
     const queueError = currentQueueState?.kind === "error" ? currentQueueState.message : null;
@@ -350,6 +358,7 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                     list: parsed,
                     loadingMore: false,
                     loadMoreError: null,
+                    reordered: false,
                 });
             })
             .catch((cause: unknown) => {
@@ -387,8 +396,13 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
         return () => controller.abort();
     }, [refreshKey]);
 
+    useEffect(() => {
+        activeRequestKeyRef.current = requestKey;
+    }, [requestKey]);
+
     const handleFilterSubmit = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
+        setStaleCursorReloaded(false);
         setFilters(draft);
     };
 
@@ -408,21 +422,38 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
         try {
             const response = await fetch(`${API_ROUTES.itOperatorTickets.list}?${query}`);
             const payload: unknown = await response.json().catch(() => null);
+            if (response.status === 409 && isITOperatorQueueCursorStale(payload)) {
+                // The cursor anchor moved; reload from the first page instead of
+                // presenting an inconsistent continuation. Ignore it if the
+                // filters or a refresh already replaced this queue.
+                if (activeRequestKeyRef.current === requestKey) {
+                    setStaleCursorReloaded(true);
+                    setRefreshKey((current) => current + 1);
+                }
+                return;
+            }
             if (!response.ok) throw new Error(readITOperatorError(payload, response.status));
             const nextPage = parseITOperatorTicketList(payload);
             if (nextPage === null) throw new Error("ข้อมูลคิว IT Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
-            setQueueState((current) => current?.key !== requestKey || current.kind !== "loaded"
-                ? current
-                : {
+            setQueueState((current) => {
+                if (
+                    current?.key !== requestKey
+                    || current.kind !== "loaded"
+                    || current.list.nextCursor !== cursor
+                ) return current;
+                const merged = mergeITOperatorQueuePage(current.list.tickets, nextPage.tickets);
+                return {
                     ...current,
                     list: {
-                        tickets: [...current.list.tickets, ...nextPage.tickets],
+                        tickets: [...merged.tickets],
                         nextCursor: nextPage.nextCursor,
                         limit: nextPage.limit,
                     },
                     loadingMore: false,
                     loadMoreError: null,
-                });
+                    reordered: current.reordered || merged.repositionedTicketIds.length > 0,
+                };
+            });
         } catch (cause: unknown) {
             setQueueState((current) => current?.key !== requestKey || current.kind !== "loaded"
                 ? current
@@ -436,7 +467,11 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
         }
     };
 
-    const retry = (): void => setRefreshKey((current) => current + 1);
+    const retry = (): void => {
+        setStaleCursorReloaded(false);
+        setRefreshKey((current) => current + 1);
+    };
+    const reordered = currentQueueState?.kind === "loaded" && currentQueueState.reordered;
 
     return (
         <section className={embedded ? "" : "min-h-[calc(100dvh-6rem)]"}>
@@ -479,6 +514,21 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                             </p>
                         ) : null}
                     </div>
+                    {staleCursorReloaded && !queueError ? (
+                        <div role="status" className="mb-3 flex gap-3 rounded-lg border border-status-info-border bg-status-info-surface px-4 py-3 text-sm leading-6 text-status-info-strong">
+                            <RefreshCw aria-hidden="true" className="mt-1 size-4 shrink-0" />
+                            <p>ลำดับคิวมีการเปลี่ยนแปลงระหว่างโหลดรายการถัดไป ระบบจึงโหลดคิวใหม่ตั้งแต่รายการแรก</p>
+                        </div>
+                    ) : null}
+                    {reordered ? (
+                        <div role="status" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-warning-border bg-status-warning-surface px-4 py-3 text-sm leading-6 text-status-warning-strong">
+                            <div className="flex min-w-0 gap-3">
+                                <CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />
+                                <p>มี Ticket เปลี่ยนลำดับระหว่างโหลด รายการที่แสดงอาจไม่ครบหรือไม่เป็นลำดับล่าสุด</p>
+                            </div>
+                            <Button type="button" size="sm" variant="outline" onClick={retry}>โหลดคิวใหม่</Button>
+                        </div>
+                    ) : null}
                     {loading ? (
                         <Card><QueueSkeleton /></Card>
                     ) : null}
