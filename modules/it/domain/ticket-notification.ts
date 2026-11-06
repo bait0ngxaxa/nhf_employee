@@ -22,7 +22,9 @@ const itTicketNotificationPayloadBaseSchema = z.object({
         "REQUESTER_COMMENTED",
         "WAITING_REQUESTER",
         "RESOLVED",
+        "PRIORITY_ESCALATED",
     ]),
+    priority: z.enum(["P0", "P1", "P2", "P3"]).optional(),
     ticketId: positiveDatabaseIdSchema,
     recipientUserId: positiveDatabaseIdSchema,
     audience: z.enum(["REQUESTER", "ASSIGNEE", "OPERATOR_QUEUE"]),
@@ -34,7 +36,8 @@ export const itTicketNotificationPayloadSchema =
         const eventUsesEventSource = payload.event === "CREATED"
             || payload.event === "ASSIGNED"
             || payload.event === "WAITING_REQUESTER"
-            || payload.event === "RESOLVED";
+            || payload.event === "RESOLVED"
+            || payload.event === "PRIORITY_ESCALATED";
         const audienceIsValid = payload.event === "CREATED"
             ? payload.audience === "OPERATOR_QUEUE"
             : payload.event === "ASSIGNED"
@@ -43,8 +46,16 @@ export const itTicketNotificationPayloadSchema =
                     || payload.event === "WAITING_REQUESTER"
                     || payload.event === "RESOLVED"
                     ? payload.audience === "REQUESTER"
+                    : payload.event === "PRIORITY_ESCALATED"
+                        ? payload.audience === "ASSIGNEE"
+                            || payload.audience === "OPERATOR_QUEUE"
                     : payload.audience === "ASSIGNEE"
                         || payload.audience === "OPERATOR_QUEUE";
+        const priorityAudienceIsValid = payload.event !== "PRIORITY_ESCALATED"
+            || (payload.priority === "P0" && payload.audience === "OPERATOR_QUEUE")
+            || (payload.priority === "P1"
+                && (payload.audience === "ASSIGNEE"
+                    || payload.audience === "OPERATOR_QUEUE"));
 
         if ((payload.source.kind === "EVENT") !== eventUsesEventSource) {
             context.addIssue({
@@ -53,11 +64,18 @@ export const itTicketNotificationPayloadSchema =
                 message: "IT Ticket notification source does not match event",
             });
         }
-        if (!audienceIsValid) {
+        if (!audienceIsValid || !priorityAudienceIsValid) {
             context.addIssue({
                 code: "custom",
                 path: ["audience"],
                 message: "IT Ticket notification audience does not match event",
+            });
+        }
+        if ((payload.event === "PRIORITY_ESCALATED") !== (payload.priority !== undefined)) {
+            context.addIssue({
+                code: "custom",
+                path: ["priority"],
+                message: "Priority is required only for priority escalation events",
             });
         }
     });
@@ -73,7 +91,8 @@ export type ITTicketLineNotificationPayload = ITTicketNotificationPayloadV1 & {
         | "OPERATOR_COMMENTED"
         | "REQUESTER_COMMENTED"
         | "WAITING_REQUESTER"
-        | "RESOLVED";
+        | "RESOLVED"
+        | "PRIORITY_ESCALATED";
 };
 
 /** Explicit channel policy. Keep this aligned with the approved IT event matrix. */
@@ -89,6 +108,9 @@ export function isITTicketLineNotification(
         case "WAITING_REQUESTER":
         case "RESOLVED":
             return payload.audience === "REQUESTER";
+        case "PRIORITY_ESCALATED":
+            return payload.audience === "ASSIGNEE"
+                || payload.audience === "OPERATOR_QUEUE";
         case "REQUESTER_COMMENTED":
             return payload.audience === "ASSIGNEE"
                 || payload.audience === "OPERATOR_QUEUE";

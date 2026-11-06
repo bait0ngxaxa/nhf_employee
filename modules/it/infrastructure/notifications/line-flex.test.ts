@@ -72,6 +72,16 @@ describe("IT Ticket personal LINE Flex message", () => {
             destination: "https://liff.line.me/nhfapp-liff-id/it/123",
         },
         {
+            event: "PRIORITY_ESCALATED",
+            statusColor: NOTIFICATION_STATUS_COLORS.warning,
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 455 },
+            title: "Ticket IT ถูกยกระดับความสำคัญ",
+            body: "Priority เพิ่มขึ้น: P0",
+            action: "เปิด Ticket",
+            destination: "https://app.example.com/dashboard/it/queue/123",
+        },
+        {
             event: "REQUESTER_COMMENTED",
             statusColor: NOTIFICATION_STATUS_COLORS.information,
             audience: "OPERATOR_QUEUE",
@@ -88,6 +98,7 @@ describe("IT Ticket personal LINE Flex message", () => {
         const payload = parseITTicketNotificationPayload({
             version: 1,
             event: input.event,
+            ...(input.event === "PRIORITY_ESCALATED" ? { priority: "P0" } : {}),
             ticketId: 123,
             recipientUserId: 42,
             audience: input.audience,

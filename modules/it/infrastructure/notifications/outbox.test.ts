@@ -74,6 +74,15 @@ describe("IT Ticket outbox adapter", () => {
                 audience: "OPERATOR_QUEUE",
                 source: { kind: "COMMENT", id: "cmr-comment-2" },
             },
+            {
+                version: 1,
+                event: "PRIORITY_ESCALATED",
+                priority: "P0",
+                ticketId: 123,
+                recipientUserId: 46,
+                audience: "OPERATOR_QUEUE",
+                source: { kind: "EVENT", id: 461 },
+            },
         ] as const;
 
         await enqueueITTicketNotificationIntents(
@@ -84,29 +93,9 @@ describe("IT Ticket outbox adapter", () => {
         expect(createMany).toHaveBeenCalledOnce();
         const call = createMany.mock.calls[0]?.[0];
         expect(call?.skipDuplicates).toBe(true);
-        expect(call?.data.map(({ type }) => type)).toEqual([
-            "IT_TICKET_IN_APP",
-            "IT_TICKET_EMAIL",
-            "IT_TICKET_LINE",
-            "IT_TICKET_IN_APP",
-            "IT_TICKET_EMAIL",
-            "IT_TICKET_LINE",
-            "IT_TICKET_IN_APP",
-            "IT_TICKET_EMAIL",
-            "IT_TICKET_LINE",
-            "IT_TICKET_IN_APP",
-            "IT_TICKET_EMAIL",
-            "IT_TICKET_LINE",
-            "IT_TICKET_IN_APP",
-            "IT_TICKET_EMAIL",
-            "IT_TICKET_LINE",
-            "IT_TICKET_IN_APP",
-            "IT_TICKET_EMAIL",
-            "IT_TICKET_LINE",
-            "IT_TICKET_IN_APP",
-            "IT_TICKET_EMAIL",
-            "IT_TICKET_LINE",
-        ]);
+        expect(call?.data.map(({ type }) => type)).toEqual(
+            payloads.flatMap(() => ["IT_TICKET_IN_APP", "IT_TICKET_EMAIL", "IT_TICKET_LINE"]),
+        );
 
         const lineRows = call?.data.filter(({ type }) => type === "IT_TICKET_LINE");
         expect(lineRows).toHaveLength(payloads.length);

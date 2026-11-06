@@ -58,6 +58,51 @@ describe("IT Ticket notification payload", () => {
         })).toThrow("Invalid IT Ticket notification payload");
     });
 
+    it("requires target priority and an operator audience for escalation notifications", () => {
+        const payload = parseITTicketNotificationPayload({
+            version: 1,
+            event: "PRIORITY_ESCALATED",
+            priority: "P0",
+            ticketId: 123,
+            recipientUserId: 42,
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 457 },
+        });
+
+        expect(payload.priority).toBe("P0");
+        expect(isITTicketLineNotification(payload)).toBe(true);
+        expect(() => parseITTicketNotificationPayload({
+            ...payload,
+            priority: undefined,
+        })).toThrow("Invalid IT Ticket notification payload");
+        expect(() => parseITTicketNotificationPayload({
+            ...payload,
+            audience: "REQUESTER",
+        })).toThrow("Invalid IT Ticket notification payload");
+        expect(() => parseITTicketNotificationPayload({
+            ...payload,
+            audience: "ASSIGNEE",
+        })).toThrow("Invalid IT Ticket notification payload");
+        expect(() => parseITTicketNotificationPayload({
+            ...payload,
+            priority: "P2",
+        })).toThrow("Invalid IT Ticket notification payload");
+        expect(parseITTicketNotificationPayload({
+            ...payload,
+            priority: "P1",
+            audience: "OPERATOR_QUEUE",
+        }).priority).toBe("P1");
+        expect(() => parseITTicketNotificationPayload({
+            version: 1,
+            event: "CREATED",
+            priority: "P0",
+            ticketId: 123,
+            recipientUserId: 42,
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 458 },
+        })).toThrow("Invalid IT Ticket notification payload");
+    });
+
     it("allows LINE only for the explicitly approved event and audience matrix", () => {
         const allowed = [
             ["CREATED", "OPERATOR_QUEUE", { kind: "EVENT", id: 1 }],

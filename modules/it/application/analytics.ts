@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import {
     IT_ANALYTICS_PERIODS,
     IT_ANALYTICS_TIME_ZONE,
+    IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_OPTIONS,
     IT_TICKET_TYPE_OPTIONS,
     type ITAnalyticsDashboard,
@@ -239,6 +240,20 @@ export async function getITAnalyticsDashboard(
             type: value,
             count: typeCountMap.get(value) ?? 0,
         }));
+        const priorityCountMap = new Map(
+            persistence.priorities.map((row) => [row.priority, row.count]),
+        );
+        const backlogPriorityCountMap = new Map(
+            persistence.backlogPriorities.map((row) => [row.priority, row.count]),
+        );
+        const priorityDistribution = IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => ({
+            priority: value,
+            count: priorityCountMap.get(value) ?? 0,
+        }));
+        const priorityBacklog = IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => ({
+            priority: value,
+            count: backlogPriorityCountMap.get(value) ?? 0,
+        }));
 
         const trendCounts = new Map(bounds.dates.map((date) => [
             date,
@@ -256,25 +271,43 @@ export async function getITAnalyticsDashboard(
             if (bucket) bucket.resolved += 1;
         }
 
-        const resolvedAtByTicketId = new Map(
-            persistence.resolvedEvents.flatMap((event) =>
-                event.occurredAt === null ? [] : [[event.ticketId, event.occurredAt] as const],
-            ),
+        const firstResponseDurationsByPriority = new Map(
+            IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => [value, [] as number[]]),
         );
-        const createdAtByTicketId = new Map(
-            persistence.resolvedTickets.map((ticket) => [ticket.id, ticket.createdAt]),
+        for (const sample of persistence.firstResponses) {
+            firstResponseDurationsByPriority.get(sample.priority)?.push(
+                sample.firstRespondedAt.getTime() - sample.createdAt.getTime(),
+            );
+        }
+        const resolvedTicketById = new Map(
+            persistence.resolvedTickets.map((ticket) => [ticket.id, ticket]),
         );
-        const resolutionDurations = [...resolvedAtByTicketId.entries()].flatMap(
-            ([ticketId, resolvedAt]) => {
-                const createdAt = createdAtByTicketId.get(ticketId);
-                return createdAt === undefined
-                    ? []
-                    : [resolvedAt.getTime() - createdAt.getTime()];
-            },
+        const resolutionDurationsByPriority = new Map(
+            IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => [value, [] as number[]]),
         );
+        const resolutionDurations: number[] = [];
+        for (const event of persistence.resolvedEvents) {
+            if (event.occurredAt === null) continue;
+            const ticket = resolvedTicketById.get(event.ticketId);
+            if (!ticket) continue;
+            const duration = event.occurredAt.getTime() - ticket.createdAt.getTime();
+            resolutionDurations.push(duration);
+            resolutionDurationsByPriority.get(ticket.priority)?.push(duration);
+        }
         const firstResponseDurations = persistence.firstResponses.map((sample) =>
             sample.firstRespondedAt.getTime() - sample.createdAt.getTime(),
         );
+        const responseResolutionByPriority = IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => {
+            const firstResponseDurations = firstResponseDurationsByPriority.get(value) ?? [];
+            const priorityResolutionDurations = resolutionDurationsByPriority.get(value) ?? [];
+            return {
+                priority: value,
+                firstRespondedTickets: firstResponseDurations.length,
+                averageFirstResponseMinutes: averageMinutes(firstResponseDurations),
+                resolvedTickets: priorityResolutionDurations.length,
+                averageResolutionMinutes: averageMinutes(priorityResolutionDurations),
+            };
+        });
         const backlogByStatus = new Map(
             persistence.statuses.map((row) => [row.status, row.count]),
         );
@@ -298,6 +331,7 @@ export async function getITAnalyticsDashboard(
                 currentBacklog,
                 waitingRequester: backlogByStatus.get(ITTicketStatus.WAITING_REQUESTER) ?? 0,
                 unassignedBacklog,
+                untriagedBacklog: persistence.untriagedBacklogCount,
                 oldestUnresolvedAgeMinutes: persistence.backlogOldestCreatedAt === null
                     ? null
                     : Math.max(
@@ -316,6 +350,9 @@ export async function getITAnalyticsDashboard(
             })),
             statusDistribution,
             typeDistribution,
+            priorityDistribution,
+            priorityBacklog,
+            responseResolutionByPriority,
             categoryBacklog: sortedDimensionRows(categoryRows),
             assigneeBacklog: sortedDimensionRows(assigneeRows),
             departmentCreated: sortedLabels(departmentCounts),

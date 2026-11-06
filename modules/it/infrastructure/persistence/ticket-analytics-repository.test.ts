@@ -14,12 +14,18 @@ describe("IT Ticket analytics persistence", () => {
         const statusGroupBy = vi.fn().mockResolvedValue([
             { status: "OPEN", _count: { _all: 2 } },
         ]);
+        const priorityGroupBy = vi.fn().mockResolvedValue([
+            { priority: "P0", _count: { _all: 1 } },
+        ]);
         const categoryGroupBy = vi.fn().mockResolvedValue([
             { categoryId: 19, _count: { _all: 2 } },
             { categoryId: null, _count: { _all: 1 } },
         ]);
         const assigneeGroupBy = vi.fn().mockResolvedValue([
             { assignedToUserId: null, _count: { _all: 1 } },
+        ]);
+        const backlogPriorityGroupBy = vi.fn().mockResolvedValue([
+            { priority: "P0", _count: { _all: 1 } },
         ]);
         const typeGroupBy = vi.fn().mockResolvedValue([
             { type: "INCIDENT", _count: { _all: 1 } },
@@ -36,6 +42,7 @@ describe("IT Ticket analytics persistence", () => {
         const count = vi.fn().mockResolvedValue(1);
         const findMany = vi.fn()
             .mockResolvedValueOnce([{
+                priority: "P0",
                 createdAt: new Date("2026-09-02T00:00:00.000Z"),
                 firstRespondedAt: new Date("2026-09-02T00:20:00.000Z"),
             }])
@@ -43,6 +50,7 @@ describe("IT Ticket analytics persistence", () => {
             .mockResolvedValueOnce([{
                 id: 41,
                 createdAt: new Date("2026-09-01T12:00:00.000Z"),
+                priority: "P0",
             }]);
         const findCategories = vi.fn().mockResolvedValue([
             { id: 19, name: "หมวดประวัติ", key: "ARCHIVED" },
@@ -51,8 +59,10 @@ describe("IT Ticket analytics persistence", () => {
             iTTicket: {
                 groupBy: vi.fn()
                     .mockImplementationOnce(statusGroupBy)
+                    .mockImplementationOnce(priorityGroupBy)
                     .mockImplementationOnce(categoryGroupBy)
                     .mockImplementationOnce(assigneeGroupBy)
+                    .mockImplementationOnce(backlogPriorityGroupBy)
                     .mockImplementationOnce(typeGroupBy)
                     .mockImplementationOnce(departmentGroupBy),
                 aggregate,
@@ -79,6 +89,10 @@ describe("IT Ticket analytics persistence", () => {
             by: ["status"],
             _count: { _all: true },
         });
+        expect(priorityGroupBy).toHaveBeenCalledWith({
+            by: ["priority"],
+            _count: { _all: true },
+        });
         expect(categoryGroupBy).toHaveBeenCalledWith({
             by: ["categoryId"],
             where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] } },
@@ -88,6 +102,17 @@ describe("IT Ticket analytics persistence", () => {
             by: ["requesterDepartmentNameSnapshot"],
             where: { createdAt: { gte: startAt, lt: endAt } },
             _count: { _all: true },
+        });
+        expect(backlogPriorityGroupBy).toHaveBeenCalledWith({
+            by: ["priority"],
+            where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] } },
+            _count: { _all: true },
+        });
+        expect(count).toHaveBeenCalledWith({
+            where: {
+                status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] },
+                triagedAt: null,
+            },
         });
         expect(eventGroupBy).toHaveBeenCalledWith({
             by: ["ticketId"],
@@ -107,9 +132,14 @@ describe("IT Ticket analytics persistence", () => {
                 createdAt: { gte: startAt, lt: endAt },
                 firstRespondedAt: { not: null },
             },
-            select: { createdAt: true, firstRespondedAt: true },
+            select: { priority: true, createdAt: true, firstRespondedAt: true },
         }));
         expect(result.resolvedEvents).toHaveLength(1);
+        expect(result.priorities).toEqual([{ priority: "P0", count: 1 }]);
+        expect(result.backlogPriorities).toEqual([{ priority: "P0", count: 1 }]);
+        expect(result.untriagedBacklogCount).toBe(1);
+        expect(result.firstResponses[0]).toMatchObject({ priority: "P0" });
+        expect(result.resolvedTickets[0]).toMatchObject({ priority: "P0" });
         expect(result.categories).toEqual([{
             id: 19,
             name: "หมวดประวัติ",

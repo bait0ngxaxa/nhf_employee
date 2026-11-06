@@ -16,6 +16,7 @@ import {
     dispatchITTicketNotificationOutbox,
     postITOperatorTicketComment,
     postITRequesterTicketComment,
+    setITTicketPriority,
     transitionITTicketStatus,
     type ITAuthorizationContext,
 } from "@/modules/it";
@@ -594,6 +595,119 @@ describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
         expect(lineTransport.send).not.toHaveBeenCalled();
     });
 
+    it("notifies only eligible operators for actual P1/P0 escalations and deduplicates delivery", async () => {
+        const fixture = await createTicketFixture("priority-escalations");
+        const actor = await createOperator(fixture, "priority-actor");
+        const assignee = await createOperator(fixture, "priority-assignee");
+        const peer = await createOperator(fixture, "priority-peer");
+        const outsider = await createWorkforceUser("priority-outsider", fixture.departmentId);
+        const created = await createTicket(fixture.requester, "priority-escalations");
+        const assigned = await assignITTicket(actor.context, {
+            ticketId: created.ticket.id,
+            expectedVersion: created.ticket.version,
+            assigneeUserId: assignee.userId,
+        });
+        const triaged = await setITTicketPriority(actor.context, {
+            ticketId: created.ticket.id,
+            priority: "P2",
+            expectedVersion: assigned.ticket.version,
+        });
+        expect(triaged.changed).toBe(true);
+        expect(await getOutboxRows(created.ticket.id).then((rows) =>
+            rows.filter(({ payload }) => payload.event === "PRIORITY_ESCALATED"),
+        )).toHaveLength(0);
+
+        const p1 = await setITTicketPriority(actor.context, {
+            ticketId: created.ticket.id,
+            priority: "P1",
+            reason: "กระทบบริการสำคัญหลายคน",
+            expectedVersion: triaged.ticket.version,
+        });
+        const p1Rows = (await getOutboxRows(created.ticket.id)).filter(
+            ({ payload }) => payload.event === "PRIORITY_ESCALATED" && payload.priority === "P1",
+        );
+        expect(p1Rows.map(({ payload }) => payload.recipientUserId)).toEqual([assignee.userId]);
+        expect(p1Rows[0]?.payload.audience).toBe("ASSIGNEE");
+
+        const p0 = await setITTicketPriority(actor.context, {
+            ticketId: created.ticket.id,
+            priority: "P0",
+            reason: "เกิดเหตุขัดข้องระดับองค์กร",
+            expectedVersion: p1.ticket.version,
+        });
+        const p0Rows = (await getOutboxRows(created.ticket.id)).filter(
+            ({ payload }) => payload.event === "PRIORITY_ESCALATED" && payload.priority === "P0",
+        );
+        expect(p0Rows.map(({ payload }) => payload.recipientUserId).sort())
+            .toEqual([assignee.userId, peer.userId].sort());
+        expect(p0Rows.every(({ payload }) => payload.audience === "OPERATOR_QUEUE"))
+            .toBe(true);
+        expect(p0Rows.some(({ payload }) => payload.recipientUserId === actor.userId
+            || payload.recipientUserId === outsider.userId)).toBe(false);
+
+        const noOpP0 = await setITTicketPriority(actor.context, {
+            ticketId: created.ticket.id,
+            priority: "P0",
+            expectedVersion: p0.ticket.version,
+        });
+        const downgrade = await setITTicketPriority(actor.context, {
+            ticketId: created.ticket.id,
+            priority: "P1",
+            reason: "ลด Priority หลังสถานการณ์คลี่คลาย",
+            expectedVersion: noOpP0.ticket.version,
+        });
+        const noOpP1 = await setITTicketPriority(actor.context, {
+            ticketId: created.ticket.id,
+            priority: "P1",
+            expectedVersion: downgrade.ticket.version,
+        });
+        expect(noOpP0.changed).toBe(false);
+        expect(downgrade.changed).toBe(true);
+        expect(noOpP1.changed).toBe(false);
+
+        const allEscalations = (await getOutboxRows(created.ticket.id)).filter(
+            ({ payload }) => payload.event === "PRIORITY_ESCALATED",
+        );
+        expect(allEscalations).toHaveLength(3);
+        const p1InApp = p1Rows[0];
+        if (!p1InApp) throw new Error("Expected P1 escalation Inbox intent");
+        await expect(dispatchITTicketNotificationOutbox(p1InApp.row)).resolves.toBe("SENT");
+        await expect(dispatchITTicketNotificationOutbox(p1InApp.row)).resolves.toBe("SENT");
+        expect(await prisma.notification.count({
+            where: { userId: assignee.userId, dedupeKey: p1InApp.row.eventKey },
+        })).toBe(1);
+
+        const channelRows = await getTicketChannelOutboxIdentity(created.ticket.id);
+        const sourceIds = new Set(allEscalations.map(({ payload }) =>
+            payload.source.kind === "EVENT" ? payload.source.id : -1,
+        ));
+        const escalationChannelRows = channelRows.filter(({ eventKey }) =>
+            eventKey !== null
+                && [...sourceIds].some((sourceId) => eventKey.includes(`:event:${sourceId}:`)),
+        );
+        expect(escalationChannelRows).toHaveLength(9);
+        expect(new Set(escalationChannelRows.map(({ eventKey }) => eventKey)).size)
+            .toBe(escalationChannelRows.length);
+
+        const unassignedTicket = await createTicket(
+            fixture.requester,
+            "priority-p1-unassigned",
+        );
+        await setITTicketPriority(actor.context, {
+            ticketId: unassignedTicket.ticket.id,
+            priority: "P1",
+            reason: "มีผลกระทบหลายผู้ใช้และยังไม่มีผู้รับผิดชอบ",
+            expectedVersion: unassignedTicket.ticket.version,
+        });
+        const unassignedP1Rows = (await getOutboxRows(unassignedTicket.ticket.id)).filter(
+            ({ payload }) => payload.event === "PRIORITY_ESCALATED",
+        );
+        expect(unassignedP1Rows.map(({ payload }) => payload.recipientUserId).sort())
+            .toEqual([assignee.userId, peer.userId].sort());
+        expect(unassignedP1Rows.every(({ payload }) => payload.audience === "OPERATOR_QUEUE"))
+            .toBe(true);
+    });
+
     it("only notifies on waiting/resolved, supersedes stale waiting, and routes requester Inbox actions", async () => {
         const fixture = await createTicketFixture("status-events");
         const operator = await createOperator(fixture, "status-operator");
@@ -998,6 +1112,33 @@ describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
             where: { authorUserId: operator.userId, idempotencyKey: commentKey },
         })).toBe(0);
         expect((await latestTicket(created.ticket.id)).firstRespondedAt).toBeNull();
+
+        await createOutboxFailureTrigger();
+        try {
+            await expect(setITTicketPriority(operator.context, {
+                ticketId: created.ticket.id,
+                priority: "P1",
+                reason: "ต้อง rollback เมื่อ outbox เขียนไม่ได้",
+                expectedVersion: started.ticket.version,
+            })).rejects.toThrow();
+        } finally {
+            await dropOutboxFailureTrigger();
+        }
+        expect(await latestTicket(created.ticket.id)).toMatchObject({
+            priority: "P2",
+            triagedAt: null,
+            version: started.ticket.version,
+        });
+        expect(await prisma.iTTicketEvent.count({
+            where: { ticketId: created.ticket.id, kind: "PRIORITY_CHANGED" },
+        })).toBe(0);
+        expect(await prisma.auditLog.count({
+            where: {
+                entityType: "ITTicket",
+                entityId: created.ticket.id,
+                action: "TICKET_UPDATE",
+            },
+        })).toBe(0);
         expect(await getTicketChannelOutboxIdentity(created.ticket.id))
             .toEqual(initialChannelRows);
     });

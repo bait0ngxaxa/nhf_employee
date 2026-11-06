@@ -89,6 +89,8 @@ describe("IT Ticket Email outbox dispatch", () => {
             ticketId: 123,
             actorUserId: 7,
             kind: "ASSIGNED",
+            fromPriority: null,
+            toPriority: null,
             toStatus: null,
             toAssigneeUserId: 42,
         });
@@ -155,6 +157,84 @@ describe("IT Ticket Email outbox dispatch", () => {
         await expect(dispatchITTicketNotificationOutbox(buildEmailOutbox(payload)))
             .resolves.toBe("SUPERSEDED");
 
+        expect(mocks.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it("revalidates the assigned recipient and immutable P1 escalation source", async () => {
+        const payload: ITTicketNotificationPayloadV1 = {
+            version: 1,
+            event: "PRIORITY_ESCALATED",
+            priority: "P1",
+            ticketId: 123,
+            recipientUserId: 42,
+            audience: "ASSIGNEE",
+            source: { kind: "EVENT", id: 456 },
+        };
+        mocks.eventSource.mockResolvedValue({
+            id: 456,
+            ticketId: 123,
+            actorUserId: 7,
+            kind: "PRIORITY_CHANGED",
+            fromPriority: "P2",
+            toPriority: "P1",
+            toStatus: null,
+            toAssigneeUserId: null,
+        });
+        mocks.ticketResource.mockResolvedValueOnce({
+            id: 123,
+            requesterUserId: 99,
+            assignedToUserId: 43,
+            status: "OPEN",
+        });
+
+        await expect(dispatchITTicketNotificationOutbox(buildEmailOutbox(payload)))
+            .resolves.toBe("SUPERSEDED");
+        expect(mocks.sendEmail).not.toHaveBeenCalled();
+
+        mocks.ticketResource.mockResolvedValueOnce({
+            id: 123,
+            requesterUserId: 99,
+            assignedToUserId: 42,
+            status: "OPEN",
+        });
+        await expect(dispatchITTicketNotificationOutbox(buildEmailOutbox(payload)))
+            .resolves.toBe("SENT");
+        expect(mocks.sendEmail).toHaveBeenCalledWith(
+            payload,
+            "operator@example.com",
+            buildITTicketEmailEventKey(payload),
+        );
+    });
+
+    it("supersedes an unassigned P1 queue notification after assignment", async () => {
+        const payload: ITTicketNotificationPayloadV1 = {
+            version: 1,
+            event: "PRIORITY_ESCALATED",
+            priority: "P1",
+            ticketId: 123,
+            recipientUserId: 42,
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 456 },
+        };
+        mocks.eventSource.mockResolvedValue({
+            id: 456,
+            ticketId: 123,
+            actorUserId: 7,
+            kind: "PRIORITY_CHANGED",
+            fromPriority: "P2",
+            toPriority: "P1",
+            toStatus: null,
+            toAssigneeUserId: null,
+        });
+        mocks.ticketResource.mockResolvedValueOnce({
+            id: 123,
+            requesterUserId: 99,
+            assignedToUserId: 43,
+            status: "OPEN",
+        });
+
+        await expect(dispatchITTicketNotificationOutbox(buildEmailOutbox(payload)))
+            .resolves.toBe("SUPERSEDED");
         expect(mocks.sendEmail).not.toHaveBeenCalled();
     });
 

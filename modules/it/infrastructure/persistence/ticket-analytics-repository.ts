@@ -1,5 +1,6 @@
 import type {
     ITTicketEventKind,
+    ITTicketPriority,
     ITTicketStatus,
     Prisma,
 } from "@prisma/client";
@@ -43,6 +44,7 @@ export interface ITAnalyticsDepartmentCount {
 }
 
 export interface ITAnalyticsFirstResponseSample {
+    readonly priority: ITTicketPriority;
     readonly createdAt: Date;
     readonly firstRespondedAt: Date;
 }
@@ -55,6 +57,7 @@ export interface ITAnalyticsResolvedEvent {
 export interface ITAnalyticsResolvedTicket {
     readonly id: number;
     readonly createdAt: Date;
+    readonly priority: ITTicketPriority;
 }
 
 export interface ITAnalyticsCategoryName {
@@ -66,6 +69,9 @@ export interface ITAnalyticsCategoryName {
 export interface ITAnalyticsPersistenceSnapshot {
     readonly statuses: readonly ITAnalyticsStatusCount[];
     readonly types: readonly ITAnalyticsTypeCount[];
+    readonly priorities: readonly { readonly priority: ITTicketPriority; readonly count: number }[];
+    readonly backlogPriorities: readonly { readonly priority: ITTicketPriority; readonly count: number }[];
+    readonly untriagedBacklogCount: number;
     readonly backlogCategories: readonly ITAnalyticsCategoryCount[];
     readonly backlogAssignees: readonly ITAnalyticsAssigneeCount[];
     readonly backlogOldestCreatedAt: Date | null;
@@ -99,6 +105,10 @@ export async function readITAnalyticsPersistenceSnapshot(
         by: ["status"],
         _count: { _all: true },
     });
+    const priorityGroups = await tx.iTTicket.groupBy({
+        by: ["priority"],
+        _count: { _all: true },
+    });
     const categoryGroups = await tx.iTTicket.groupBy({
         by: ["categoryId"],
         where: backlogWhere,
@@ -108,6 +118,14 @@ export async function readITAnalyticsPersistenceSnapshot(
         by: ["assignedToUserId"],
         where: backlogWhere,
         _count: { _all: true },
+    });
+    const backlogPriorityGroups = await tx.iTTicket.groupBy({
+        by: ["priority"],
+        where: backlogWhere,
+        _count: { _all: true },
+    });
+    const untriagedBacklogCount = await tx.iTTicket.count({
+        where: { ...backlogWhere, triagedAt: null },
     });
     const oldestBacklog = await tx.iTTicket.aggregate({
         where: backlogWhere,
@@ -129,7 +147,7 @@ export async function readITAnalyticsPersistenceSnapshot(
             ...periodWhere,
             firstRespondedAt: { not: null },
         },
-        select: { createdAt: true, firstRespondedAt: true },
+        select: { priority: true, createdAt: true, firstRespondedAt: true },
     });
     const createdRows = await tx.iTTicket.findMany({
         where: periodWhere,
@@ -150,7 +168,7 @@ export async function readITAnalyticsPersistenceSnapshot(
         ? []
         : await tx.iTTicket.findMany({
             where: { id: { in: resolvedIds } },
-            select: { id: true, createdAt: true },
+            select: { id: true, createdAt: true, priority: true },
         });
     const categoryIds = categoryGroups.flatMap((group) =>
         group.categoryId === null ? [] : [group.categoryId],
@@ -167,6 +185,15 @@ export async function readITAnalyticsPersistenceSnapshot(
             status: group.status,
             count: countOf(group),
         })),
+        priorities: priorityGroups.map((group) => ({
+            priority: group.priority,
+            count: countOf(group),
+        })),
+        backlogPriorities: backlogPriorityGroups.map((group) => ({
+            priority: group.priority,
+            count: countOf(group),
+        })),
+        untriagedBacklogCount,
         types: typeGroups.map((group) => ({
             type: group.type,
             count: countOf(group),
@@ -188,7 +215,11 @@ export async function readITAnalyticsPersistenceSnapshot(
         firstResponses: firstResponseRows.flatMap((row) =>
             row.firstRespondedAt === null
                 ? []
-                : [{ createdAt: row.createdAt, firstRespondedAt: row.firstRespondedAt }],
+                : [{
+                    priority: row.priority,
+                    createdAt: row.createdAt,
+                    firstRespondedAt: row.firstRespondedAt,
+                }],
         ),
         createdAtValues: createdRows.map((row) => row.createdAt),
         resolvedEvents: resolutionGroups.map((group) => ({
@@ -198,6 +229,7 @@ export async function readITAnalyticsPersistenceSnapshot(
         resolvedTickets: resolvedTickets.map((ticket) => ({
             id: ticket.id,
             createdAt: ticket.createdAt,
+            priority: ticket.priority,
         })),
         categories,
     };

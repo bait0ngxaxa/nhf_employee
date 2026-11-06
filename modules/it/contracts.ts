@@ -73,6 +73,7 @@ export interface ITAnalyticsDashboard {
         readonly currentBacklog: number;
         readonly waitingRequester: number;
         readonly unassignedBacklog: number;
+        readonly untriagedBacklog: number;
         readonly oldestUnresolvedAgeMinutes: number | null;
         readonly newTickets: number;
         readonly resolvedTickets: number;
@@ -92,6 +93,21 @@ export interface ITAnalyticsDashboard {
     readonly typeDistribution: readonly {
         readonly type: ITTicketType;
         readonly count: number;
+    }[];
+    readonly priorityDistribution: readonly {
+        readonly priority: ITTicketPriority;
+        readonly count: number;
+    }[];
+    readonly priorityBacklog: readonly {
+        readonly priority: ITTicketPriority;
+        readonly count: number;
+    }[];
+    readonly responseResolutionByPriority: readonly {
+        readonly priority: ITTicketPriority;
+        readonly firstRespondedTickets: number;
+        readonly averageFirstResponseMinutes: number | null;
+        readonly resolvedTickets: number;
+        readonly averageResolutionMinutes: number | null;
     }[];
     readonly categoryBacklog: readonly {
         readonly label: string;

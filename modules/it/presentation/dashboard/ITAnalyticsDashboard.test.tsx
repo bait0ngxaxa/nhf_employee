@@ -41,6 +41,7 @@ function dashboardPayload(period: string, backlog: number): unknown {
                 currentBacklog: backlog,
                 waitingRequester: 1,
                 unassignedBacklog: 1,
+                untriagedBacklog: 1,
                 oldestUnresolvedAgeMinutes: 138,
                 newTickets: backlog + 1,
                 resolvedTickets: 2,
@@ -64,6 +65,24 @@ function dashboardPayload(period: string, backlog: number): unknown {
                 { type: "INCIDENT", count: 1 },
                 { type: "SERVICE_REQUEST", count: 0 },
                 { type: "SUGGESTION", count: 0 },
+            ],
+            priorityDistribution: [
+                { priority: "P0", count: 1 },
+                { priority: "P1", count: 2 },
+                { priority: "P2", count: backlog },
+                { priority: "P3", count: 0 },
+            ],
+            priorityBacklog: [
+                { priority: "P0", count: 1 },
+                { priority: "P1", count: 1 },
+                { priority: "P2", count: backlog },
+                { priority: "P3", count: 0 },
+            ],
+            responseResolutionByPriority: [
+                { priority: "P0", firstRespondedTickets: 1, averageFirstResponseMinutes: 20, resolvedTickets: 0, averageResolutionMinutes: null },
+                { priority: "P1", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 1, averageResolutionMinutes: 35 },
+                { priority: "P2", firstRespondedTickets: 2, averageFirstResponseMinutes: 60, resolvedTickets: 1, averageResolutionMinutes: 75 },
+                { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
             ],
             categoryBacklog: [{ label: "ยังไม่จัดหมวดหมู่", count: backlog }],
             assigneeBacklog: [{ label: "ยังไม่มีผู้รับผิดชอบ", count: 1 }],
@@ -120,14 +139,15 @@ describe("IT analytics Dashboard presentation", () => {
         expect(within(overview).getByText("5", { selector: "dd" })).toBeInTheDocument();
         expect(within(overview).getByText("รอข้อมูลจากผู้แจ้ง")).toBeInTheDocument();
         expect(within(overview).getByText("ยังไม่มีผู้รับผิดชอบ")).toBeInTheDocument();
-        expect(within(overview).getAllByText("1", { selector: "dd" })).toHaveLength(2);
+        expect(within(overview).getAllByText("1", { selector: "dd" })).toHaveLength(3);
         expect(within(overview).getByText("Ticket ใหม่")).toBeInTheDocument();
         expect(within(overview).getByText("6", { selector: "dd" })).toBeInTheDocument();
         expect(within(overview).getByText("แก้ไขแล้ว")).toBeInTheDocument();
         expect(within(overview).getByText("2", { selector: "dd" })).toBeInTheDocument();
-        expect(within(overview).queryByText("เวลาตอบกลับครั้งแรกเฉลี่ย")).not.toBeInTheDocument();
-        expect(within(overview).queryByText("เวลาแก้ไขเฉลี่ย")).not.toBeInTheDocument();
-        expect(within(overview).queryByText("ยังไม่มีข้อมูล")).not.toBeInTheDocument();
+        expect(within(overview).getByText("ยังไม่ประเมินในงานค้าง")).toBeInTheDocument();
+        expect(within(overview).getByText("ตอบกลับครั้งแรกเฉลี่ย")).toBeInTheDocument();
+        expect(within(overview).getByText("2 ชม. 18 นาที")).toBeInTheDocument();
+        expect(within(overview).getByText("เวลาแก้ไขเฉลี่ย")).toBeInTheDocument();
         expect(within(overview).getByText("งานที่ค้างนานที่สุด 2 ชม. 18 นาที")).toBeInTheDocument();
         expect(screen.queryByRole("region", { name: "งานค้างปัจจุบัน" })).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "รายงาน IT" })).toBeInTheDocument();
@@ -149,7 +169,7 @@ describe("IT analytics Dashboard presentation", () => {
         );
     });
 
-    it("shows one breakdown by default and makes all five datasets selectable", async () => {
+    it("shows one breakdown by default and makes all report datasets selectable", async () => {
         fetchMock.mockResolvedValue(response(dashboardPayload("30D", 5)));
 
         render(<ITAnalyticsDashboard />);
@@ -172,6 +192,17 @@ describe("IT analytics Dashboard presentation", () => {
         expect(within(typeBreakdown).getByText(IT_TICKET_TYPE_LABELS.INCIDENT)).toBeInTheDocument();
         expect(within(typeBreakdown).queryByText(IT_TICKET_STATUS_LABELS.OPEN)).not.toBeInTheDocument();
 
+        await chooseBreakdown("Priority");
+        const priorityBreakdown = screen.getByRole("region", {
+            name: "Ticket ปัจจุบันแยกตาม Priority",
+        });
+        expect(within(priorityBreakdown).getByText("P0 — วิกฤต")).toBeInTheDocument();
+        expect(within(priorityBreakdown).getByText("P1 — สูง")).toBeInTheDocument();
+
+        await chooseBreakdown("งานค้างตาม Priority");
+        expect(screen.getByRole("region", { name: "งานค้างแยกตาม Priority" }))
+            .toHaveTextContent("P2 — ปกติ");
+
         await chooseBreakdown("หมวดหมู่");
         expect(within(screen.getByRole("region", { name: "งานค้างแยกตามหมวดหมู่" }))
             .getByText("ยังไม่จัดหมวดหมู่")).toBeInTheDocument();
@@ -183,6 +214,14 @@ describe("IT analytics Dashboard presentation", () => {
         await chooseBreakdown("หน่วยงาน");
         expect(within(screen.getByRole("region", { name: "Ticket ใหม่แยกตามหน่วยงาน" }))
             .getByText("ไม่ระบุหน่วยงาน")).toBeInTheDocument();
+
+        await chooseBreakdown("เวลาตาม Priority");
+        const priorityTiming = screen.getByRole("region", {
+            name: "เวลาตอบกลับและแก้ไขแยกตาม Priority ปัจจุบัน",
+        });
+        expect(within(priorityTiming).getByText("กลุ่มตาม Priority ปัจจุบัน การจัดประเภทใหม่อาจเปลี่ยนกลุ่มของข้อมูลย้อนหลัง"))
+            .toBeInTheDocument();
+        expect(within(priorityTiming).getByText("1 ชม.")).toBeInTheDocument();
     });
 
     it("shows zero data as a valid empty dashboard without rendering average metrics", async () => {
@@ -194,6 +233,7 @@ describe("IT analytics Dashboard presentation", () => {
                 currentBacklog: 0,
                 waitingRequester: 0,
                 unassignedBacklog: 0,
+                untriagedBacklog: 0,
                 oldestUnresolvedAgeMinutes: null,
                 newTickets: 0,
                 resolvedTickets: 0,
@@ -219,6 +259,24 @@ describe("IT analytics Dashboard presentation", () => {
                 { type: "SERVICE_REQUEST", count: 0 },
                 { type: "SUGGESTION", count: 0 },
             ],
+            priorityDistribution: [
+                { priority: "P0", count: 0 },
+                { priority: "P1", count: 0 },
+                { priority: "P2", count: 0 },
+                { priority: "P3", count: 0 },
+            ],
+            priorityBacklog: [
+                { priority: "P0", count: 0 },
+                { priority: "P1", count: 0 },
+                { priority: "P2", count: 0 },
+                { priority: "P3", count: 0 },
+            ],
+            responseResolutionByPriority: [
+                { priority: "P0", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
+                { priority: "P1", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
+                { priority: "P2", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
+                { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
+            ],
             categoryBacklog: [],
             assigneeBacklog: [],
             departmentCreated: [],
@@ -228,7 +286,7 @@ describe("IT analytics Dashboard presentation", () => {
         render(<ITAnalyticsDashboard />);
 
         expect(await screen.findByText("ยังไม่มีข้อมูลในช่วงเวลานี้")).toBeInTheDocument();
-        expect(screen.queryByText("ยังไม่มีข้อมูล")).not.toBeInTheDocument();
+        expect(screen.getAllByText("ยังไม่มีข้อมูล")).toHaveLength(2);
         expect(screen.getAllByText("0").length).toBeGreaterThan(0);
         expect(screen.queryByText("0 นาที")).not.toBeInTheDocument();
 

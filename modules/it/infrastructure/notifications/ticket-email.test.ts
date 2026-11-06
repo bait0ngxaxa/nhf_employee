@@ -63,4 +63,28 @@ describe("IT Ticket Email composition", () => {
         expect(email.html).not.toContain("storageKey");
         expect(email.html).not.toContain("capability");
     });
+
+    it("includes the escalated priority in operator email without exposing the reason", () => {
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://app.example.com");
+        const payload = parseITTicketNotificationPayload({
+            version: 1,
+            event: "PRIORITY_ESCALATED",
+            priority: "P0",
+            ticketId: 123,
+            recipientUserId: 42,
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 8 },
+        });
+        const email = buildITTicketEmailData(
+            payload,
+            "operator@example.com",
+            "it:ticket:123:event:8:user:42:email",
+        );
+
+        expect(email.subject).toContain("ถูกยกระดับความสำคัญ");
+        expect(email.text).toContain("Priority เพิ่มขึ้น: P0");
+        expect(email.html).toContain("Priority เพิ่มขึ้น: P0");
+        expect(email.html).toContain("https://app.example.com/dashboard/it/queue/123");
+        expect(email.html).not.toContain("เหตุผล");
+    });
 });

@@ -1,11 +1,12 @@
 import {
     IT_ANALYTICS_PERIODS,
     IT_ANALYTICS_TIME_ZONE,
+    IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_OPTIONS,
     IT_TICKET_TYPE_OPTIONS,
     type ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
 } from "../../contracts";
-import type { ITTicketStatus, ITTicketType } from "@prisma/client";
+import type { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
 
 type RecordValue = Record<string, unknown>;
 
@@ -45,6 +46,11 @@ function isTicketType(value: unknown): value is ITTicketType {
         && IT_TICKET_TYPE_OPTIONS.some((option) => option.value === value);
 }
 
+function isPriority(value: unknown): value is ITTicketPriority {
+    return typeof value === "string"
+        && IT_TICKET_PRIORITY_OPTIONS.some((option) => option.value === value);
+}
+
 function parseLabelCounts(
     value: unknown,
 ): readonly { readonly label: string; readonly count: number }[] | null {
@@ -58,6 +64,57 @@ function parseLabelCounts(
             return null;
         }
         rows.push({ label: item.label, count: item.count });
+    }
+    return rows;
+}
+
+function parsePriorityCounts(
+    value: unknown,
+): ITAnalyticsDashboardDTO["priorityDistribution"] | null {
+    if (!Array.isArray(value)) return null;
+    const rows: ITAnalyticsDashboardDTO["priorityDistribution"][number][] = [];
+    for (const item of value) {
+        if (!isRecord(item)
+            || !hasExactKeys(item, ["priority", "count"])
+            || !isPriority(item.priority)
+            || !isNonNegativeInteger(item.count)) {
+            return null;
+        }
+        rows.push({ priority: item.priority, count: item.count });
+    }
+    return rows;
+}
+
+function parseResponseResolutionByPriority(
+    value: unknown,
+): ITAnalyticsDashboardDTO["responseResolutionByPriority"] | null {
+    if (!Array.isArray(value)) return null;
+    const rows: ITAnalyticsDashboardDTO["responseResolutionByPriority"][number][] = [];
+    for (const item of value) {
+        if (!isRecord(item)
+            || !hasExactKeys(item, [
+                "priority",
+                "firstRespondedTickets",
+                "averageFirstResponseMinutes",
+                "resolvedTickets",
+                "averageResolutionMinutes",
+            ])
+            || !isPriority(item.priority)
+            || !isNonNegativeInteger(item.firstRespondedTickets)
+            || !isNonNegativeInteger(item.resolvedTickets)
+            || (item.averageFirstResponseMinutes !== null
+                && !isNonNegativeNumber(item.averageFirstResponseMinutes))
+            || (item.averageResolutionMinutes !== null
+                && !isNonNegativeNumber(item.averageResolutionMinutes))) {
+            return null;
+        }
+        rows.push({
+            priority: item.priority,
+            firstRespondedTickets: item.firstRespondedTickets,
+            averageFirstResponseMinutes: item.averageFirstResponseMinutes,
+            resolvedTickets: item.resolvedTickets,
+            averageResolutionMinutes: item.averageResolutionMinutes,
+        });
     }
     return rows;
 }
@@ -80,6 +137,9 @@ export function parseITAnalyticsDashboardResponse(
         "trend",
         "statusDistribution",
         "typeDistribution",
+        "priorityDistribution",
+        "priorityBacklog",
+        "responseResolutionByPriority",
         "categoryBacklog",
         "assigneeBacklog",
         "departmentCreated",
@@ -96,6 +156,7 @@ export function parseITAnalyticsDashboardResponse(
             "currentBacklog",
             "waitingRequester",
             "unassignedBacklog",
+            "untriagedBacklog",
             "oldestUnresolvedAgeMinutes",
             "newTickets",
             "resolvedTickets",
@@ -111,6 +172,7 @@ export function parseITAnalyticsDashboardResponse(
         "currentBacklog",
         "waitingRequester",
         "unassignedBacklog",
+        "untriagedBacklog",
         "newTickets",
         "resolvedTickets",
         "firstRespondedTickets",
@@ -161,7 +223,14 @@ export function parseITAnalyticsDashboardResponse(
     const categoryBacklog = parseLabelCounts(dashboard.categoryBacklog);
     const assigneeBacklog = parseLabelCounts(dashboard.assigneeBacklog);
     const departmentCreated = parseLabelCounts(dashboard.departmentCreated);
-    if (categoryBacklog === null || assigneeBacklog === null || departmentCreated === null) {
+    const priorityDistribution = parsePriorityCounts(dashboard.priorityDistribution);
+    const priorityBacklog = parsePriorityCounts(dashboard.priorityBacklog);
+    const responseResolutionByPriority = parseResponseResolutionByPriority(
+        dashboard.responseResolutionByPriority,
+    );
+    if (categoryBacklog === null || assigneeBacklog === null || departmentCreated === null
+        || priorityDistribution === null || priorityBacklog === null
+        || responseResolutionByPriority === null) {
         return null;
     }
 
@@ -177,6 +246,7 @@ export function parseITAnalyticsDashboardResponse(
             currentBacklog: summary.currentBacklog as number,
             waitingRequester: summary.waitingRequester as number,
             unassignedBacklog: summary.unassignedBacklog as number,
+            untriagedBacklog: summary.untriagedBacklog as number,
             oldestUnresolvedAgeMinutes: summary.oldestUnresolvedAgeMinutes as number | null,
             newTickets: summary.newTickets as number,
             resolvedTickets: summary.resolvedTickets as number,
@@ -187,6 +257,9 @@ export function parseITAnalyticsDashboardResponse(
         trend,
         statusDistribution,
         typeDistribution,
+        priorityDistribution,
+        priorityBacklog,
+        responseResolutionByPriority,
         categoryBacklog,
         assigneeBacklog,
         departmentCreated,

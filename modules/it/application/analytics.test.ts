@@ -59,6 +59,17 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
         { type: "INCIDENT", count: 1 },
         { type: "SUGGESTION", count: 1 },
     ],
+    priorities: [
+        { priority: "P0", count: 1 },
+        { priority: "P1", count: 2 },
+        { priority: "P3", count: 1 },
+    ],
+    backlogPriorities: [
+        { priority: "P0", count: 1 },
+        { priority: "P1", count: 1 },
+        { priority: "P2", count: 1 },
+    ],
+    untriagedBacklogCount: 2,
     backlogCategories: [
         { categoryId: 19, count: 2 },
         { categoryId: null, count: 1 },
@@ -76,10 +87,12 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
     newTicketCount: 2,
     firstResponses: [
         {
+            priority: "P0",
             createdAt: new Date("2026-09-25T15:00:00.000Z"),
             firstRespondedAt: new Date("2026-09-25T15:45:00.000Z"),
         },
         {
+            priority: "P1",
             createdAt: new Date("2026-09-25T16:00:00.000Z"),
             firstRespondedAt: new Date("2026-09-25T16:20:00.000Z"),
         },
@@ -93,8 +106,8 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
         { ticketId: 92, occurredAt: new Date("2026-09-25T17:00:00.000Z") },
     ],
     resolvedTickets: [
-        { id: 91, createdAt: new Date("2026-09-25T15:59:59.000Z") },
-        { id: 92, createdAt: new Date("2026-09-25T15:30:00.000Z") },
+        { id: 91, createdAt: new Date("2026-09-25T15:59:59.000Z"), priority: "P1" },
+        { id: 92, createdAt: new Date("2026-09-25T15:30:00.000Z"), priority: "P3" },
     ],
     categories: [{ id: 19, name: "หมวดประวัติที่ปิดแล้ว", key: "ARCHIVED" }],
 };
@@ -150,6 +163,7 @@ describe("IT analytics application query", () => {
                 currentBacklog: 3,
                 waitingRequester: 1,
                 unassignedBacklog: 1,
+                untriagedBacklog: 2,
                 oldestUnresolvedAgeMinutes: 8225,
                 newTickets: 2,
                 resolvedTickets: 2,
@@ -161,6 +175,48 @@ describe("IT analytics application query", () => {
                 { type: "INCIDENT", count: 1 },
                 { type: "SERVICE_REQUEST", count: 0 },
                 { type: "SUGGESTION", count: 1 },
+            ],
+            priorityDistribution: [
+                { priority: "P0", count: 1 },
+                { priority: "P1", count: 2 },
+                { priority: "P2", count: 0 },
+                { priority: "P3", count: 1 },
+            ],
+            priorityBacklog: [
+                { priority: "P0", count: 1 },
+                { priority: "P1", count: 1 },
+                { priority: "P2", count: 1 },
+                { priority: "P3", count: 0 },
+            ],
+            responseResolutionByPriority: [
+                {
+                    priority: "P0",
+                    firstRespondedTickets: 1,
+                    averageFirstResponseMinutes: 45,
+                    resolvedTickets: 0,
+                    averageResolutionMinutes: null,
+                },
+                {
+                    priority: "P1",
+                    firstRespondedTickets: 1,
+                    averageFirstResponseMinutes: 20,
+                    resolvedTickets: 1,
+                    averageResolutionMinutes: 60,
+                },
+                {
+                    priority: "P2",
+                    firstRespondedTickets: 0,
+                    averageFirstResponseMinutes: null,
+                    resolvedTickets: 0,
+                    averageResolutionMinutes: null,
+                },
+                {
+                    priority: "P3",
+                    firstRespondedTickets: 0,
+                    averageFirstResponseMinutes: null,
+                    resolvedTickets: 1,
+                    averageResolutionMinutes: 90,
+                },
             ],
             categoryBacklog: [
                 { label: "หมวดประวัติที่ปิดแล้ว", count: 2 },
@@ -346,6 +402,9 @@ describe("IT analytics application query", () => {
             backlogCategories: [],
             backlogAssignees: [],
             backlogOldestCreatedAt: null,
+            priorities: [],
+            backlogPriorities: [],
+            untriagedBacklogCount: 0,
             departmentSnapshots: [],
             newTicketCount: 0,
             firstResponses: [],
@@ -361,6 +420,7 @@ describe("IT analytics application query", () => {
             currentBacklog: 0,
             waitingRequester: 0,
             unassignedBacklog: 0,
+            untriagedBacklog: 0,
             oldestUnresolvedAgeMinutes: null,
             newTickets: 0,
             resolvedTickets: 0,
@@ -372,6 +432,19 @@ describe("IT analytics application query", () => {
         expect(result.trend.every((day) => day.created === 0 && day.resolved === 0)).toBe(true);
         expect(result.statusDistribution.every((row) => row.count === 0)).toBe(true);
         expect(result.typeDistribution.every((row) => row.count === 0)).toBe(true);
+        expect(result.priorityDistribution).toEqual([
+            { priority: "P0", count: 0 },
+            { priority: "P1", count: 0 },
+            { priority: "P2", count: 0 },
+            { priority: "P3", count: 0 },
+        ]);
+        expect(result.priorityBacklog).toEqual([
+            { priority: "P0", count: 0 },
+            { priority: "P1", count: 0 },
+            { priority: "P2", count: 0 },
+            { priority: "P3", count: 0 },
+        ]);
+        expect(result.responseResolutionByPriority).toHaveLength(4);
         expect(result.categoryBacklog).toEqual([]);
         expect(result.assigneeBacklog).toEqual([]);
         expect(result.departmentCreated).toEqual([]);

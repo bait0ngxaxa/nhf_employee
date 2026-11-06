@@ -1,4 +1,4 @@
-import { Role } from "@prisma/client";
+import { Role, type ITTicketPriority } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -30,6 +30,9 @@ interface TicketInput {
     readonly requester: WorkforceUser;
     readonly type: "INCIDENT" | "SERVICE_REQUEST" | "SUGGESTION";
     readonly status: "OPEN" | "IN_PROGRESS" | "WAITING_REQUESTER" | "RESOLVED" | "CLOSED" | "CANCELLED";
+    readonly priority?: ITTicketPriority;
+    readonly triagedAt?: Date | null;
+    readonly triagedByUserId?: number | null;
     readonly createdAt: Date;
     readonly firstRespondedAt?: Date | null;
     readonly assignedToUserId?: number | null;
@@ -194,6 +197,9 @@ async function createTicket(input: TicketInput): Promise<number> {
     const ticket = await prisma.iTTicket.create({
         data: {
             type: input.type,
+            priority: input.priority ?? "P2",
+            triagedAt: input.triagedAt ?? null,
+            triagedByUserId: input.triagedByUserId ?? null,
             title: "ข้อมูลทดสอบที่ต้องไม่ปรากฏในรายงาน",
             description: "รายละเอียดทดสอบส่วนบุคคล",
             status: input.status,
@@ -246,7 +252,11 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         const inactiveAssignee = await createWorkforceUser("อดีตผู้รับผิดชอบ", oldDepartmentId);
         const activeAssignee = await createWorkforceUser("ผู้รับผิดชอบ", oldDepartmentId);
         const analyticsOnly = await createWorkforceUser("ผู้ดูรายงาน", oldDepartmentId);
+        const priorityOperator = await createWorkforceUser("ผู้ประเมิน Priority", oldDepartmentId);
         await grant(analyticsOnly.userId, "it.analytics.read");
+        await grant(priorityOperator.userId, "it.ticket.read");
+        await grant(priorityOperator.userId, "it.ticket.comment");
+        await grant(priorityOperator.userId, "it.ticket.manage");
 
         const category = await prisma.iTTicketCategory.create({
             data: {
@@ -263,6 +273,9 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             requester,
             type: "INCIDENT",
             status: "OPEN",
+            priority: "P0",
+            triagedAt: new Date("2026-09-20T00:00:00.000Z"),
+            triagedByUserId: priorityOperator.userId,
             createdAt: periodStart,
             assignedToUserId: null,
             categoryId: category.id,
@@ -274,6 +287,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             requester,
             type: "SERVICE_REQUEST",
             status: "WAITING_REQUESTER",
+            priority: "P1",
             createdAt: new Date("2026-09-25T16:59:59.000Z"),
             assignedToUserId: inactiveAssignee.userId,
             categoryId: category.id,
@@ -285,6 +299,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             requester,
             type: "SUGGESTION",
             status: "IN_PROGRESS",
+            priority: "P2",
             createdAt: new Date("2026-09-25T17:00:01.000Z"),
             assignedToUserId: activeAssignee.userId,
             requesterDepartmentId: oldDepartmentId,
@@ -294,6 +309,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             requester,
             type: "INCIDENT",
             status: "RESOLVED",
+            priority: "P3",
             createdAt: new Date("2026-09-25T16:00:00.000Z"),
             requesterDepartmentNameSnapshot: "ฝ่ายเดิม ณ วันสร้าง",
             updatedAt: new Date("2026-09-30T00:00:00.000Z"),
@@ -302,6 +318,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             requester,
             type: "SERVICE_REQUEST",
             status: "CLOSED",
+            priority: "P1",
             createdAt: new Date("2026-09-25T16:02:00.000Z"),
             requesterDepartmentNameSnapshot: "ฝ่ายเดิม ณ วันสร้าง",
             updatedAt: new Date("2026-09-30T00:00:00.000Z"),
@@ -310,6 +327,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             requester,
             type: "SUGGESTION",
             status: "CANCELLED",
+            priority: "P0",
             createdAt: new Date("2026-09-25T16:04:00.000Z"),
             requesterDepartmentNameSnapshot: null,
         });
@@ -317,12 +335,14 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             requester,
             type: "INCIDENT",
             status: "OPEN",
+            priority: "P3",
             createdAt: NOW,
         });
         const oldestBacklogTicket = await createTicket({
             requester,
             type: "INCIDENT",
             status: "OPEN",
+            priority: "P2",
             createdAt: new Date("2026-08-01T00:00:00.000Z"),
             assignedToUserId: activeAssignee.userId,
             categoryId: category.id,
@@ -390,6 +410,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             currentBacklog: 5,
             waitingRequester: 1,
             unassignedBacklog: 2,
+            untriagedBacklog: 4,
             oldestUnresolvedAgeMinutes: Math.floor(
                 (NOW.getTime() - new Date("2026-08-01T00:00:00.000Z").getTime()) / 60_000,
             ),
@@ -417,6 +438,48 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             { type: "INCIDENT", count: 2 },
             { type: "SERVICE_REQUEST", count: 2 },
             { type: "SUGGESTION", count: 2 },
+        ]);
+        expect(dashboard.priorityDistribution).toEqual([
+            { priority: "P0", count: 2 },
+            { priority: "P1", count: 2 },
+            { priority: "P2", count: 2 },
+            { priority: "P3", count: 2 },
+        ]);
+        expect(dashboard.priorityBacklog).toEqual([
+            { priority: "P0", count: 1 },
+            { priority: "P1", count: 1 },
+            { priority: "P2", count: 2 },
+            { priority: "P3", count: 1 },
+        ]);
+        expect(dashboard.responseResolutionByPriority).toEqual([
+            {
+                priority: "P0",
+                firstRespondedTickets: 1,
+                averageFirstResponseMinutes: 42,
+                resolvedTickets: 0,
+                averageResolutionMinutes: null,
+            },
+            {
+                priority: "P1",
+                firstRespondedTickets: 1,
+                averageFirstResponseMinutes: 2,
+                resolvedTickets: 1,
+                averageResolutionMinutes: 60,
+            },
+            {
+                priority: "P2",
+                firstRespondedTickets: 0,
+                averageFirstResponseMinutes: null,
+                resolvedTickets: 0,
+                averageResolutionMinutes: null,
+            },
+            {
+                priority: "P3",
+                firstRespondedTickets: 0,
+                averageFirstResponseMinutes: null,
+                resolvedTickets: 1,
+                averageResolutionMinutes: 61,
+            },
         ]);
         expect(dashboard.categoryBacklog).toContainEqual({
             label: "หมวดหมู่ที่ปิดใช้งานแล้ว",

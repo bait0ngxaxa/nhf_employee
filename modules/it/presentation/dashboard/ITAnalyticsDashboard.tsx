@@ -10,6 +10,7 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 
 import {
     IT_ANALYTICS_PERIODS,
+    IT_TICKET_PRIORITY_LABELS,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
     type ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
@@ -39,9 +40,12 @@ const PERIOD_LABELS: Readonly<Record<ITAnalyticsPeriod, string>> = {
 const BREAKDOWN_OPTIONS = [
     { value: "status", label: "สถานะ" },
     { value: "type", label: "ประเภท" },
+    { value: "priority", label: "Priority" },
+    { value: "priorityBacklog", label: "งานค้างตาม Priority" },
     { value: "category", label: "หมวดหมู่" },
     { value: "assignee", label: "ผู้รับผิดชอบ" },
     { value: "department", label: "หน่วยงาน" },
+    { value: "priorityTiming", label: "เวลาตาม Priority" },
 ] as const;
 
 type BreakdownDimension = typeof BREAKDOWN_OPTIONS[number]["value"];
@@ -117,7 +121,7 @@ function SummaryOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
             <h2 id="it-analytics-overview-title" className="text-lg font-semibold text-content-heading">
                 ภาพรวม
             </h2>
-            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-3">
+            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4">
                 <div className="col-span-2 min-w-0 border-b border-border-neutral pb-4 sm:col-span-1 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-5">
                     <OverviewMetric
                         label="งานค้าง"
@@ -130,10 +134,21 @@ function SummaryOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
                 </div>
                 <OverviewMetric label="รอข้อมูลจากผู้แจ้ง" value={countText(summary.waitingRequester)} />
                 <OverviewMetric label="ยังไม่มีผู้รับผิดชอบ" value={countText(summary.unassignedBacklog)} />
+                <OverviewMetric label="ยังไม่ประเมินในงานค้าง" value={countText(summary.untriagedBacklog)} />
             </dl>
-            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-5 border-t border-border-neutral pt-5 sm:grid-cols-2">
+            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-5 border-t border-border-neutral pt-5 sm:grid-cols-4">
                 <OverviewMetric label="Ticket ใหม่" value={countText(summary.newTickets)} />
                 <OverviewMetric label="แก้ไขแล้ว" value={countText(summary.resolvedTickets)} />
+                <OverviewMetric
+                    label="ตอบกลับครั้งแรกเฉลี่ย"
+                    value={formatITAnalyticsDuration(summary.averageFirstResponseMinutes)}
+                    detail={`จาก ${countText(summary.firstRespondedTickets)} Ticket ที่ตอบแล้วในช่วงรายงาน`}
+                />
+                <OverviewMetric
+                    label="เวลาแก้ไขเฉลี่ย"
+                    value={formatITAnalyticsDuration(summary.averageResolutionMinutes)}
+                    detail={`จาก ${countText(summary.resolvedTickets)} Ticket ที่แก้ไขในช่วงรายงาน`}
+                />
             </dl>
         </section>
     );
@@ -192,6 +207,52 @@ function DistributionPanel({
     );
 }
 
+function PriorityTimingPanel({
+    title,
+    description,
+    rows,
+}: {
+    readonly title: string;
+    readonly description?: string;
+    readonly rows: ITAnalyticsDashboardDTO["responseResolutionByPriority"];
+}): ReactElement {
+    return (
+        <section aria-labelledby="it-analytics-breakdown-title" className="mt-5 min-w-0">
+            <div className="min-w-0">
+                <h3 id="it-analytics-breakdown-title" className="text-base font-semibold text-content-heading">{title}</h3>
+                {description ? <p className="mt-1 text-sm leading-6 text-content-secondary">{description}</p> : null}
+            </div>
+            <div className="mt-4 overflow-x-auto rounded-lg border border-border-neutral">
+                <table className="w-full min-w-[660px] border-collapse text-left text-sm">
+                    <caption className="sr-only">เวลาตอบกลับและแก้ไขตาม Priority ปัจจุบัน</caption>
+                    <thead className="bg-surface-subtle text-xs font-semibold text-content-secondary">
+                        <tr>
+                            <th scope="col" className="px-3 py-3">Priority</th>
+                            <th scope="col" className="px-3 py-3">จำนวนที่ตอบแล้ว</th>
+                            <th scope="col" className="px-3 py-3">ตอบกลับครั้งแรกเฉลี่ย</th>
+                            <th scope="col" className="px-3 py-3">จำนวนที่แก้ไขแล้ว</th>
+                            <th scope="col" className="px-3 py-3">เวลาแก้ไขเฉลี่ย</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-neutral">
+                        {rows.map((row) => (
+                            <tr key={row.priority}>
+                                <th scope="row" className="px-3 py-3 font-semibold text-content-heading">
+                                    {IT_TICKET_PRIORITY_LABELS[row.priority]}
+                                </th>
+                                <td className="px-3 py-3 tabular-nums">{countText(row.firstRespondedTickets)}</td>
+                                <td className="px-3 py-3">{formatITAnalyticsDuration(row.averageFirstResponseMinutes)}</td>
+                                <td className="px-3 py-3 tabular-nums">{countText(row.resolvedTickets)}</td>
+                                <td className="px-3 py-3">{formatITAnalyticsDuration(row.averageResolutionMinutes)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    );
+}
+
 function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
     const [selectedBreakdown, setSelectedBreakdown] = useState<BreakdownDimension>("status");
     const statusRows = dashboard.statusDistribution.map((row) => ({
@@ -200,6 +261,14 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
     }));
     const typeRows = dashboard.typeDistribution.map((row) => ({
         label: IT_TICKET_TYPE_LABELS[row.type],
+        count: row.count,
+    }));
+    const priorityRows = dashboard.priorityDistribution.map((row) => ({
+        label: IT_TICKET_PRIORITY_LABELS[row.priority],
+        count: row.count,
+    }));
+    const priorityBacklogRows = dashboard.priorityBacklog.map((row) => ({
+        label: IT_TICKET_PRIORITY_LABELS[row.priority],
         count: row.count,
     }));
     const breakdowns: Readonly<Record<BreakdownDimension, {
@@ -216,6 +285,16 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
             description: "นับ Ticket ที่สร้างในช่วงรายงาน",
             rows: typeRows,
         },
+        priority: {
+            title: "Ticket ปัจจุบันแยกตาม Priority",
+            description: "รวมทุกสถานะและจัดกลุ่มตาม Priority ปัจจุบัน",
+            rows: priorityRows,
+        },
+        priorityBacklog: {
+            title: "งานค้างแยกตาม Priority",
+            description: "รวม OPEN, IN_PROGRESS และ WAITING_REQUESTER เท่านั้น",
+            rows: priorityBacklogRows,
+        },
         category: {
             title: "งานค้างแยกตามหมวดหมู่",
             description: "รวมเฉพาะ Ticket ที่ยังไม่ปิดงาน",
@@ -230,6 +309,11 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
             title: "Ticket ใหม่แยกตามหน่วยงาน",
             description: "ใช้ชื่อหน่วยงานที่บันทึกไว้เมื่อสร้าง Ticket",
             rows: dashboard.departmentCreated,
+        },
+        priorityTiming: {
+            title: "เวลาตอบกลับและแก้ไขแยกตาม Priority ปัจจุบัน",
+            description: "กลุ่มตาม Priority ปัจจุบัน การจัดประเภทใหม่อาจเปลี่ยนกลุ่มของข้อมูลย้อนหลัง",
+            rows: [],
         },
     };
     const breakdown = breakdowns[selectedBreakdown];
@@ -264,11 +348,19 @@ function DashboardReport({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
                         </Select>
                     </label>
                 </div>
-                <DistributionPanel
-                    title={breakdown.title}
-                    description={breakdown.description}
-                    rows={breakdown.rows}
-                />
+                {selectedBreakdown === "priorityTiming" ? (
+                    <PriorityTimingPanel
+                        title={breakdown.title}
+                        description={breakdown.description}
+                        rows={dashboard.responseResolutionByPriority}
+                    />
+                ) : (
+                    <DistributionPanel
+                        title={breakdown.title}
+                        description={breakdown.description}
+                        rows={breakdown.rows}
+                    />
+                )}
             </section>
         </div>
     );

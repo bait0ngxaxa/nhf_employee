@@ -1,4 +1,9 @@
-import type { ITTicketEventKind, ITTicketStatus, Prisma } from "@prisma/client";
+import type {
+    ITTicketEventKind,
+    ITTicketPriority,
+    ITTicketStatus,
+    Prisma,
+} from "@prisma/client";
 
 type ITTicketNotificationReadContext = Pick<
     Prisma.TransactionClient,
@@ -10,6 +15,8 @@ export interface ITTicketNotificationEventSource {
     readonly ticketId: number;
     readonly actorUserId: number;
     readonly kind: ITTicketEventKind;
+    readonly fromPriority: ITTicketPriority | null;
+    readonly toPriority: ITTicketPriority | null;
     readonly toStatus: ITTicketStatus | null;
     readonly toAssigneeUserId: number | null;
 }
@@ -39,6 +46,8 @@ export function findITTicketNotificationEventSource(
             ticketId: true,
             actorUserId: true,
             kind: true,
+            fromPriority: true,
+            toPriority: true,
             toStatus: true,
             toAssigneeUserId: true,
         },

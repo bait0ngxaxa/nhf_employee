@@ -43,7 +43,10 @@ import {
 } from "./ticket-audit";
 import { createITTicketRequestHash } from "../domain/ticket-idempotency";
 import { isAllowedITTicketTransition, isTerminalITTicketStatus } from "../domain/ticket-workflow";
-import { getInitialITTicketPriority } from "../domain/ticket-priority";
+import {
+    getInitialITTicketPriority,
+    isITTicketPriorityEscalation,
+} from "../domain/ticket-priority";
 import {
     deleteITTicketAttachmentFiles,
     writeITTicketAttachments,
@@ -663,6 +666,8 @@ export async function setITTicketPriority(
 
         const occurredAt = new Date();
         const actorUserId = context.authorizationActor.userId;
+        const shouldNotifyPriorityEscalation = changedPriority
+            && isITTicketPriorityEscalation(ticket.priority, command.priority);
         const result = await saveMutationAndEvent(
             tx,
             ticket,
@@ -681,6 +686,33 @@ export async function setITTicketPriority(
                 toPriority: command.priority,
                 priorityReason: changeReason ?? null,
             },
+            shouldNotifyPriorityEscalation
+                ? async (eventId) => {
+                    const operatorAudience = await findITOperatorAudience(tx);
+                    const assignedRecipientUserId = command.priority === "P1"
+                        ? ticket.assignedToUserId
+                        : null;
+                    const recipients = assignedRecipientUserId === null
+                        ? operatorAudience
+                        : operatorAudience.filter((operator) =>
+                            operator.userId === assignedRecipientUserId,
+                        );
+                    const notifications: ITTicketNotificationPayloadV1[] = recipients
+                        .filter((operator) => operator.userId !== actorUserId)
+                        .map((operator) => ({
+                            version: 1,
+                            event: "PRIORITY_ESCALATED",
+                            priority: command.priority,
+                            ticketId: ticket.id,
+                            recipientUserId: operator.userId,
+                            audience: assignedRecipientUserId === null
+                                ? "OPERATOR_QUEUE"
+                                : "ASSIGNEE",
+                            source: { kind: "EVENT", id: eventId },
+                        }));
+                    await enqueueITTicketNotificationIntents(tx, notifications);
+                }
+                : undefined,
         );
         await createITTicketPriorityAudit(
             tx,

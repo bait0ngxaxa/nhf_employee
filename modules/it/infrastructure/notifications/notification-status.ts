@@ -8,6 +8,7 @@ const IT_TICKET_NOTIFICATION_STATUS = {
     REQUESTER_COMMENTED: "information",
     WAITING_REQUESTER: "warning",
     RESOLVED: "success",
+    PRIORITY_ESCALATED: "warning",
 } satisfies Record<ITTicketNotificationPayloadV1["event"], NotificationStatus>;
 
 export function getITTicketNotificationStatus(

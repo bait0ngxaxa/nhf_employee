@@ -1,4 +1,5 @@
 import { getITTicketNotificationContent } from "../../domain/ticket-notification-content";
+import { isITTicketPriorityEscalation } from "../../domain/ticket-priority";
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 
 import { getCurrentWorkforceDepartmentSnapshotInTransaction } from "@/modules/employee";
@@ -126,6 +127,15 @@ function assertSourceMatchesPayload(
                     : payload.event === "RESOLVED"
                         ? fact.kind === "STATUS_CHANGED"
                             && fact.toStatus === "RESOLVED"
+                            : payload.event === "PRIORITY_ESCALATED"
+                                ? fact.kind === "PRIORITY_CHANGED"
+                                    && fact.fromPriority !== null
+                                    && fact.toPriority === payload.priority
+                                    && payload.priority !== undefined
+                                    && isITTicketPriorityEscalation(
+                                        fact.fromPriority,
+                                        fact.toPriority,
+                                    )
                         : false;
         if (!matches) {
             throw new ITTicketNotificationSourceMismatchError(
@@ -185,6 +195,12 @@ async function isCurrentlyApplicable(
             await findLatestITTicketAssignmentGeneration(tx, payload.ticketId);
         return ticket.assignedToUserId === payload.recipientUserId
             && latestAssignmentGeneration?.id === payload.source.id;
+    }
+    if (payload.event === "PRIORITY_ESCALATED") {
+        if (payload.audience === "ASSIGNEE") {
+            return ticket.assignedToUserId === payload.recipientUserId;
+        }
+        return payload.priority === "P0" || ticket.assignedToUserId === null;
     }
     if (payload.event === "REQUESTER_COMMENTED") {
         return payload.audience === "ASSIGNEE"
