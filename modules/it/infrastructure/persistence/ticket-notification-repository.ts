@@ -33,6 +33,7 @@ export interface ITTicketNotificationResourceState {
     readonly requesterUserId: number;
     readonly assignedToUserId: number | null;
     readonly status: ITTicketStatus;
+    readonly priority: ITTicketPriority;
 }
 
 export function findITTicketNotificationEventSource(
@@ -79,6 +80,24 @@ export function findLatestITTicketStatusGeneration(
     });
 }
 
+/**
+ * The latest durable priority fact for a Ticket. Its event ID is the priority
+ * generation: any later triage or change supersedes earlier escalation alerts.
+ */
+export function findLatestITTicketPriorityGeneration(
+    tx: ITTicketNotificationReadContext,
+    ticketId: number,
+): Promise<{ readonly id: number } | null> {
+    return tx.iTTicketEvent.findFirst({
+        where: {
+            ticketId,
+            kind: { in: ["PRIORITY_TRIAGED", "PRIORITY_CHANGED"] },
+        },
+        orderBy: { id: "desc" },
+        select: { id: true },
+    });
+}
+
 export function findITTicketNotificationCommentSource(
     tx: ITTicketNotificationReadContext,
     commentId: string,
@@ -105,6 +124,7 @@ export function findITTicketNotificationResource(
             requesterUserId: true,
             assignedToUserId: true,
             status: true,
+            priority: true,
         },
     });
 }

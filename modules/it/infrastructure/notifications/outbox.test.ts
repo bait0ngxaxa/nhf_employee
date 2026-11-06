@@ -126,8 +126,25 @@ describe("IT Ticket outbox adapter", () => {
             notificationOutbox: { createMany },
         } as unknown as Pick<Prisma.TransactionClient, "notificationOutbox">;
 
-        await enqueueITTicketNotificationIntents(tx, []);
+        await expect(enqueueITTicketNotificationIntents(tx, [])).resolves.toBe(0);
 
         expect(createMany).not.toHaveBeenCalled();
+    });
+
+    it("reports the inserted row count so callers can wake the outbox only for new intents", async () => {
+        const createMany = vi.fn(async () => ({ count: 3 }));
+        const tx = {
+            notificationOutbox: { createMany },
+        } as unknown as Pick<Prisma.TransactionClient, "notificationOutbox">;
+
+        await expect(enqueueITTicketNotificationIntents(tx, [{
+            version: 1,
+            event: "PRIORITY_ESCALATED",
+            priority: "P0",
+            ticketId: 19,
+            recipientUserId: 52,
+            audience: "OPERATOR_QUEUE",
+            source: { kind: "EVENT", id: 461 },
+        }])).resolves.toBe(3);
     });
 });

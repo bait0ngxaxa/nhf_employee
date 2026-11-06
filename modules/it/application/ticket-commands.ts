@@ -46,6 +46,8 @@ import { isAllowedITTicketTransition, isTerminalITTicketStatus } from "../domain
 import {
     getInitialITTicketPriority,
     isITTicketPriorityEscalation,
+    isITTicketPriorityEscalationAlertableStatus,
+    selectITTicketPriorityEscalationRecipients,
 } from "../domain/ticket-priority";
 import {
     deleteITTicketAttachmentFiles,
@@ -424,7 +426,7 @@ async function saveMutationAndEvent(
         Prisma.ITTicketEventUncheckedCreateInput,
         "ticketId" | "actorUserId"
     >,
-    afterEvent?: (eventId: number) => Promise<void>,
+    afterEvent?: (eventId: number) => Promise<unknown>,
 ): Promise<ITTicketMutationResult> {
     const updated = await updateITTicketIfVersionMatches(
         tx,
@@ -666,8 +668,15 @@ export async function setITTicketPriority(
 
         const occurredAt = new Date();
         const actorUserId = context.authorizationActor.userId;
+        const escalationPriority = command.priority === "P0" || command.priority === "P1"
+            ? command.priority
+            : null;
         const shouldNotifyPriorityEscalation = changedPriority
-            && isITTicketPriorityEscalation(ticket.priority, command.priority);
+            && escalationPriority !== null
+            && isITTicketPriorityEscalation(ticket.priority, command.priority)
+            && isITTicketPriorityEscalationAlertableStatus(ticket.status);
+        // Reset per transaction attempt: the serializable helper may retry this callback.
+        let enqueuedIntentCount = 0;
         const result = await saveMutationAndEvent(
             tx,
             ticket,
@@ -686,31 +695,40 @@ export async function setITTicketPriority(
                 toPriority: command.priority,
                 priorityReason: changeReason ?? null,
             },
-            shouldNotifyPriorityEscalation
+            shouldNotifyPriorityEscalation && escalationPriority !== null
                 ? async (eventId) => {
                     const operatorAudience = await findITOperatorAudience(tx);
-                    const assignedRecipientUserId = command.priority === "P1"
-                        ? ticket.assignedToUserId
-                        : null;
-                    const recipients = assignedRecipientUserId === null
-                        ? operatorAudience
-                        : operatorAudience.filter((operator) =>
-                            operator.userId === assignedRecipientUserId,
-                        );
-                    const notifications: ITTicketNotificationPayloadV1[] = recipients
-                        .filter((operator) => operator.userId !== actorUserId)
-                        .map((operator) => ({
+                    const selection = selectITTicketPriorityEscalationRecipients({
+                        priority: escalationPriority,
+                        assignedToUserId: ticket.assignedToUserId,
+                        actorUserId,
+                        eligibleOperatorUserIds: operatorAudience.map(
+                            (operator) => operator.userId,
+                        ),
+                    });
+                    if (selection.recipientUserIds.length === 0) {
+                        // Valid outcome; the Ticket change still commits. Identifiers only.
+                        console.warn("IT Ticket priority escalation has no eligible recipient", {
+                            ticketId: ticket.id,
+                            priority: escalationPriority,
+                            audience: selection.audience,
+                        });
+                        return;
+                    }
+                    const notifications: ITTicketNotificationPayloadV1[] =
+                        selection.recipientUserIds.map((recipientUserId) => ({
                             version: 1,
                             event: "PRIORITY_ESCALATED",
-                            priority: command.priority,
+                            priority: escalationPriority,
                             ticketId: ticket.id,
-                            recipientUserId: operator.userId,
-                            audience: assignedRecipientUserId === null
-                                ? "OPERATOR_QUEUE"
-                                : "ASSIGNEE",
+                            recipientUserId,
+                            audience: selection.audience,
                             source: { kind: "EVENT", id: eventId },
                         }));
-                    await enqueueITTicketNotificationIntents(tx, notifications);
+                    enqueuedIntentCount = await enqueueITTicketNotificationIntents(
+                        tx,
+                        notifications,
+                    );
                 }
                 : undefined,
         );
@@ -722,6 +740,6 @@ export async function setITTicketPriority(
             result.ticket,
             changeReason,
         );
-        return result;
+        return { ...result, notificationIntentsEnqueued: enqueuedIntentCount > 0 };
     });
 }

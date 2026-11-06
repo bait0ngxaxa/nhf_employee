@@ -26,6 +26,12 @@ export interface ITTicketRecord {
 export interface ITTicketMutationResult {
     readonly ticket: ITTicketRecord;
     readonly changed: boolean;
+    /**
+     * True only when the committed mutation persisted at least one new
+     * notification outbox intent. Delivery adapters use it to wake the
+     * existing outbox processor after commit.
+     */
+    readonly notificationIntentsEnqueued?: boolean;
 }
 
 /** Trusted request metadata supplied separately from the authorization contract. */

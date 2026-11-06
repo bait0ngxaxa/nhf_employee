@@ -628,6 +628,15 @@ describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
         );
         expect(p1Rows.map(({ payload }) => payload.recipientUserId)).toEqual([assignee.userId]);
         expect(p1Rows[0]?.payload.audience).toBe("ASSIGNEE");
+        expect(p1.notificationIntentsEnqueued).toBe(true);
+        const p1InApp = p1Rows[0];
+        if (!p1InApp) throw new Error("Expected P1 escalation Inbox intent");
+        // Deduplicated delivery while the P1 alert is still the current generation.
+        await expect(dispatchITTicketNotificationOutbox(p1InApp.row)).resolves.toBe("SENT");
+        await expect(dispatchITTicketNotificationOutbox(p1InApp.row)).resolves.toBe("SENT");
+        expect(await prisma.notification.count({
+            where: { userId: assignee.userId, dedupeKey: p1InApp.row.eventKey },
+        })).toBe(1);
 
         const p0 = await setITTicketPriority(actor.context, {
             ticketId: created.ticket.id,
@@ -664,18 +673,19 @@ describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
         expect(noOpP0.changed).toBe(false);
         expect(downgrade.changed).toBe(true);
         expect(noOpP1.changed).toBe(false);
+        expect(noOpP0.notificationIntentsEnqueued).toBeUndefined();
+        expect(downgrade.notificationIntentsEnqueued).toBe(false);
 
         const allEscalations = (await getOutboxRows(created.ticket.id)).filter(
             ({ payload }) => payload.event === "PRIORITY_ESCALATED",
         );
         expect(allEscalations).toHaveLength(3);
-        const p1InApp = p1Rows[0];
-        if (!p1InApp) throw new Error("Expected P1 escalation Inbox intent");
-        await expect(dispatchITTicketNotificationOutbox(p1InApp.row)).resolves.toBe("SENT");
-        await expect(dispatchITTicketNotificationOutbox(p1InApp.row)).resolves.toBe("SENT");
-        expect(await prisma.notification.count({
-            where: { userId: assignee.userId, dedupeKey: p1InApp.row.eventKey },
-        })).toBe(1);
+        // P1 -> P0 -> P1 created newer priority generations, so neither earlier
+        // alert is current any more; a retry cannot resend them.
+        await expect(dispatchITTicketNotificationOutbox(p1InApp.row)).resolves.toBe("SUPERSEDED");
+        for (const { row } of p0Rows) {
+            await expect(dispatchITTicketNotificationOutbox(row)).resolves.toBe("SUPERSEDED");
+        }
 
         const channelRows = await getTicketChannelOutboxIdentity(created.ticket.id);
         const sourceIds = new Set(allEscalations.map(({ payload }) =>
@@ -1141,6 +1151,220 @@ describe.sequential("IT6/IT9D Ticket notifications with real MySQL", () => {
         })).toBe(0);
         expect(await getTicketChannelOutboxIdentity(created.ticket.id))
             .toEqual(initialChannelRows);
+    });
+
+    it("falls back to the eligible queue when a P1 assignee is inactive or loses operator grants", async () => {
+        const fixture = await createTicketFixture("priority-fallback");
+        const actor = await createOperator(fixture, "fallback-actor");
+        const inactiveAssignee = await createOperator(fixture, "fallback-inactive");
+        const revokedAssignee = await createOperator(fixture, "fallback-revoked");
+        const peer = await createOperator(fixture, "fallback-peer");
+
+        const inactiveTicket = await createTicket(fixture.requester, "fallback-inactive");
+        const assignedInactive = await assignITTicket(actor.context, {
+            ticketId: inactiveTicket.ticket.id,
+            expectedVersion: inactiveTicket.ticket.version,
+            assigneeUserId: inactiveAssignee.userId,
+        });
+        const revokedTicket = await createTicket(fixture.requester, "fallback-revoked");
+        const assignedRevoked = await assignITTicket(actor.context, {
+            ticketId: revokedTicket.ticket.id,
+            expectedVersion: revokedTicket.ticket.version,
+            assigneeUserId: revokedAssignee.userId,
+        });
+        await prisma.user.update({
+            where: { id: inactiveAssignee.userId },
+            data: { isActive: false },
+        });
+        await prisma.userCapabilityGrant.deleteMany({
+            where: { userId: revokedAssignee.userId, capabilityKey: "it.ticket.manage" },
+        });
+
+        const cases = [
+            { created: inactiveTicket, version: assignedInactive.ticket.version, assignee: inactiveAssignee.userId },
+            { created: revokedTicket, version: assignedRevoked.ticket.version, assignee: revokedAssignee.userId },
+        ];
+        for (const { created, version, assignee } of cases) {
+            const escalated = await setITTicketPriority(actor.context, {
+                ticketId: created.ticket.id,
+                priority: "P1",
+                reason: "ผู้รับผิดชอบเดิมไม่สามารถรับงานได้",
+                expectedVersion: version,
+            });
+            expect(escalated.notificationIntentsEnqueued).toBe(true);
+            expect(escalated.ticket.assignedToUserId).toBe(assignee);
+            const rows = (await getOutboxRows(created.ticket.id)).filter(
+                ({ payload }) => payload.event === "PRIORITY_ESCALATED",
+            );
+            expect(rows.map(({ payload }) => payload.recipientUserId)).toEqual([peer.userId]);
+            expect(rows.every(({ payload }) => payload.audience === "OPERATOR_QUEUE")).toBe(true);
+            const queueRow = rows[0] ?? failMissingOutboxRow();
+            await expect(dispatchITTicketNotificationOutbox(queueRow.row)).resolves.toBe("SENT");
+        }
+    });
+
+    it("commits an escalation without intents when no eligible recipient remains", async () => {
+        const fixture = await createTicketFixture("priority-no-recipient");
+        const actor = await createOperator(fixture, "no-recipient-actor");
+        const created = await createTicket(fixture.requester, "priority-no-recipient");
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        try {
+            const escalated = await setITTicketPriority(actor.context, {
+                ticketId: created.ticket.id,
+                priority: "P0",
+                reason: "ระบบหลักล่ม",
+                expectedVersion: created.ticket.version,
+            });
+            expect(escalated.changed).toBe(true);
+            expect(escalated.notificationIntentsEnqueued).toBe(false);
+            expect(warn).toHaveBeenCalledWith(
+                "IT Ticket priority escalation has no eligible recipient",
+                { ticketId: created.ticket.id, priority: "P0", audience: "OPERATOR_QUEUE" },
+            );
+        } finally {
+            warn.mockRestore();
+        }
+        expect((await latestTicket(created.ticket.id)).priority).toBe("P0");
+        expect(await prisma.iTTicketEvent.count({
+            where: { ticketId: created.ticket.id, kind: "PRIORITY_CHANGED" },
+        })).toBe(1);
+        expect(await prisma.auditLog.count({
+            where: { entityType: "ITTicket", entityId: created.ticket.id, action: "TICKET_UPDATE" },
+        })).toBe(1);
+        expect((await getOutboxRows(created.ticket.id)).filter(
+            ({ payload }) => payload.event === "PRIORITY_ESCALATED",
+        )).toHaveLength(0);
+    });
+
+    it("supersedes escalation alerts that are stale by priority generation, lifecycle, or recipient", async () => {
+        const fixture = await createTicketFixture("priority-stale");
+        const actor = await createOperator(fixture, "stale-actor");
+        const peer = await createOperator(fixture, "stale-peer");
+        const reason = "ปรับระดับตามสถานการณ์";
+
+        const escalationRowsFor = (ticketId: number, sourceEventId: number) =>
+            prisma.notificationOutbox.findMany({
+                where: {
+                    type: { in: ["IT_TICKET_IN_APP", "IT_TICKET_EMAIL", "IT_TICKET_LINE"] },
+                    eventKey: { startsWith: `it:ticket:${ticketId}:event:${sourceEventId}:` },
+                },
+                orderBy: { id: "asc" },
+            });
+        const latestPriorityEventId = async (ticketId: number): Promise<number> =>
+            (await prisma.iTTicketEvent.findFirstOrThrow({
+                where: { ticketId, kind: "PRIORITY_CHANGED" },
+                orderBy: { id: "desc" },
+                select: { id: true },
+            })).id;
+        const changePriority = async (
+            ticketId: number,
+            version: number,
+            priority: "P0" | "P1" | "P2" | "P3",
+        ): Promise<{ readonly version: number; readonly eventId: number }> => {
+            const result = await setITTicketPriority(actor.context, {
+                ticketId, priority, reason, expectedVersion: version,
+            });
+            return { version: result.ticket.version, eventId: await latestPriorityEventId(ticketId) };
+        };
+        const expectRows = async (
+            ticketId: number,
+            eventId: number,
+            outcome: "SENT" | "SUPERSEDED",
+        ): Promise<void> => {
+            const rows = await escalationRowsFor(ticketId, eventId);
+            expect(rows.map(({ type }) => type).sort())
+                .toEqual(["IT_TICKET_EMAIL", "IT_TICKET_IN_APP", "IT_TICKET_LINE"]);
+            for (const row of rows) {
+                // A valid Email row would use real SMTP; it shares the validation
+                // path exercised here by Inbox and LINE.
+                if (outcome === "SENT" && row.type === "IT_TICKET_EMAIL") continue;
+                await expect(dispatchITTicketNotificationOutbox(row), row.type).resolves.toBe(outcome);
+            }
+        };
+
+        // P2 -> P0 -> P2
+        const a = await createTicket(fixture.requester, "stale-p0-p2");
+        const a1 = await changePriority(a.ticket.id, a.ticket.version, "P0");
+        await changePriority(a.ticket.id, a1.version, "P2");
+        await expectRows(a.ticket.id, a1.eventId, "SUPERSEDED");
+
+        // P2 -> P1 -> P3
+        const b = await createTicket(fixture.requester, "stale-p1-p3");
+        const b1 = await changePriority(b.ticket.id, b.ticket.version, "P1");
+        await changePriority(b.ticket.id, b1.version, "P3");
+        await expectRows(b.ticket.id, b1.eventId, "SUPERSEDED");
+
+        // P2 -> P1 -> P0
+        const c = await createTicket(fixture.requester, "stale-p1-p0");
+        const c1 = await changePriority(c.ticket.id, c.ticket.version, "P1");
+        const c2 = await changePriority(c.ticket.id, c1.version, "P0");
+        await expectRows(c.ticket.id, c1.eventId, "SUPERSEDED");
+        await expectRows(c.ticket.id, c2.eventId, "SENT");
+
+        // P2 -> P0 -> P1: the downgrade creates no alert and supersedes P0.
+        const d = await createTicket(fixture.requester, "stale-p0-p1");
+        const d1 = await changePriority(d.ticket.id, d.ticket.version, "P0");
+        const d2 = await changePriority(d.ticket.id, d1.version, "P1");
+        expect(await escalationRowsFor(d.ticket.id, d2.eventId)).toHaveLength(0);
+        await expectRows(d.ticket.id, d1.eventId, "SUPERSEDED");
+
+        // P2 -> P1 -> P2 -> P1: same priority value, newer durable generation.
+        const e = await createTicket(fixture.requester, "stale-p1-repeat");
+        const e1 = await changePriority(e.ticket.id, e.ticket.version, "P1");
+        const e2 = await changePriority(e.ticket.id, e1.version, "P2");
+        const e3 = await changePriority(e.ticket.id, e2.version, "P1");
+        await expectRows(e.ticket.id, e1.eventId, "SUPERSEDED");
+        await expectRows(e.ticket.id, e3.eventId, "SENT");
+        expect(await prisma.iTTicketEvent.findMany({
+            where: { ticketId: e.ticket.id, kind: "PRIORITY_CHANGED" },
+            orderBy: { id: "asc" },
+            select: { fromPriority: true, toPriority: true },
+        })).toEqual([
+            { fromPriority: "P2", toPriority: "P1" },
+            { fromPriority: "P1", toPriority: "P2" },
+            { fromPriority: "P2", toPriority: "P1" },
+        ]);
+
+        // P0 escalation followed by closure.
+        const f = await createTicket(fixture.requester, "stale-closed");
+        const f1 = await changePriority(f.ticket.id, f.ticket.version, "P0");
+        let fVersion = f1.version;
+        for (const targetStatus of ["IN_PROGRESS", "RESOLVED", "CLOSED"] as const) {
+            fVersion = (await transitionITTicketStatus(actor.context, {
+                ticketId: f.ticket.id, expectedVersion: fVersion, targetStatus,
+            })).ticket.version;
+        }
+        await expectRows(f.ticket.id, f1.eventId, "SUPERSEDED");
+        expect(await getTicketInbox(f.ticket.id, peer.userId)).toHaveLength(0);
+
+        // Escalating a RESOLVED Ticket is not active work and enqueues nothing.
+        const g = await createTicket(fixture.requester, "resolved-escalation");
+        let gVersion = g.ticket.version;
+        for (const targetStatus of ["IN_PROGRESS", "RESOLVED"] as const) {
+            gVersion = (await transitionITTicketStatus(actor.context, {
+                ticketId: g.ticket.id, expectedVersion: gVersion, targetStatus,
+            })).ticket.version;
+        }
+        const resolvedEscalation = await setITTicketPriority(actor.context, {
+            ticketId: g.ticket.id, priority: "P0", reason, expectedVersion: gVersion,
+        });
+        expect(resolvedEscalation.changed).toBe(true);
+        expect(resolvedEscalation.notificationIntentsEnqueued).toBe(false);
+        expect(await escalationRowsFor(g.ticket.id, await latestPriorityEventId(g.ticket.id)))
+            .toHaveLength(0);
+
+        // A valid unchanged alert whose recipient loses authority before dispatch.
+        const h = await createTicket(fixture.requester, "stale-recipient");
+        const h1 = await changePriority(h.ticket.id, h.ticket.version, "P0");
+        await prisma.userCapabilityGrant.deleteMany({
+            where: { userId: peer.userId, capabilityKey: "it.ticket.read" },
+        });
+        await expectRows(h.ticket.id, h1.eventId, "SUPERSEDED");
+
+        // Only the two still-current alerts (c2, e3) reached the LINE transport.
+        expect(lineTransport.send).toHaveBeenCalledTimes(2);
+        expect(await getTicketInbox(c.ticket.id, peer.userId)).toHaveLength(1);
+        expect(await getTicketInbox(e.ticket.id, peer.userId)).toHaveLength(1);
     });
 });
 

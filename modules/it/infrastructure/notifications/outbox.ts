@@ -13,11 +13,12 @@ type ITTicketNotificationOutboxContext = Pick<
     "notificationOutbox"
 >;
 
+/** Persists channel intents in the caller's transaction; returns the inserted row count. */
 export async function enqueueITTicketNotificationIntents(
     tx: ITTicketNotificationOutboxContext,
     payloads: readonly ITTicketNotificationPayloadV1[],
-): Promise<void> {
-    if (payloads.length === 0) return;
+): Promise<number> {
+    if (payloads.length === 0) return 0;
 
     const data = payloads.flatMap((payload) => {
         const serializedPayload = JSON.stringify(payload);
@@ -44,8 +45,9 @@ export async function enqueueITTicketNotificationIntents(
         return intents;
     });
 
-    await tx.notificationOutbox.createMany({
+    const result = await tx.notificationOutbox.createMany({
         data,
         skipDuplicates: true,
     });
+    return result.count;
 }

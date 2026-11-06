@@ -1,5 +1,9 @@
 import { getITTicketNotificationContent } from "../../domain/ticket-notification-content";
-import { isITTicketPriorityEscalation } from "../../domain/ticket-priority";
+import {
+    isITTicketPriorityEscalation,
+    isITTicketPriorityEscalationAlertableStatus,
+    resolveITTicketPriorityEscalationAudience,
+} from "../../domain/ticket-priority";
 import type { NotificationOutbox, Prisma } from "@prisma/client";
 
 import { getCurrentWorkforceDepartmentSnapshotInTransaction } from "@/modules/employee";
@@ -36,9 +40,11 @@ import {
     findITTicketNotificationRecipientEmail,
     findITTicketNotificationResource,
     findLatestITTicketAssignmentGeneration,
+    findLatestITTicketPriorityGeneration,
     findLatestITTicketStatusGeneration,
     type ITTicketNotificationCommentSource,
     type ITTicketNotificationEventSource,
+    type ITTicketNotificationResourceState,
 } from "../../infrastructure/persistence/ticket-notification-repository";
 
 export type ITTicketNotificationDispatchOutcome =
@@ -158,6 +164,38 @@ function assertSourceMatchesPayload(
     return source.fact.authorUserId;
 }
 
+/**
+ * An escalation alert is deliverable only while its source event is still the
+ * Ticket's latest priority generation, the current priority still equals the
+ * alerted priority, the Ticket is active work, and the recipient still belongs
+ * to the audience the current assignment would select.
+ */
+async function isPriorityEscalationStillCurrent(
+    tx: Prisma.TransactionClient,
+    payload: ITTicketNotificationPayloadV1,
+    ticket: ITTicketNotificationResourceState,
+    eligibleOperatorUserIds: ReadonlySet<number>,
+): Promise<boolean> {
+    const priority = payload.priority;
+    if (priority !== "P0" && priority !== "P1") return false;
+    if (payload.source.kind !== "EVENT") return false;
+    if (ticket.priority !== priority) return false;
+    if (!isITTicketPriorityEscalationAlertableStatus(ticket.status)) return false;
+
+    const latestPriorityGeneration =
+        await findLatestITTicketPriorityGeneration(tx, payload.ticketId);
+    if (latestPriorityGeneration?.id !== payload.source.id) return false;
+
+    const currentAudience = resolveITTicketPriorityEscalationAudience({
+        priority,
+        assignedToUserId: ticket.assignedToUserId,
+        eligibleOperatorUserIds,
+    });
+    if (currentAudience !== payload.audience) return false;
+    return currentAudience === "OPERATOR_QUEUE"
+        || ticket.assignedToUserId === payload.recipientUserId;
+}
+
 async function isCurrentlyApplicable(
     tx: Prisma.TransactionClient,
     payload: ITTicketNotificationPayloadV1,
@@ -184,10 +222,12 @@ async function isCurrentlyApplicable(
         )) !== null;
     }
 
-    const operatorIsEligible = (await findITOperatorAudience(tx)).some(
-        (operator) => operator.userId === payload.recipientUserId,
+    const eligibleOperatorUserIds = new Set(
+        (await findITOperatorAudience(tx)).map((operator) => operator.userId),
     );
-    if (!operatorIsEligible) return false;
+    // A recipient who lost eligibility after enqueue is superseded; dispatch
+    // never re-routes the alert to a different recipient.
+    if (!eligibleOperatorUserIds.has(payload.recipientUserId)) return false;
 
     if (payload.event === "ASSIGNED") {
         if (payload.source.kind !== "EVENT") return false;
@@ -197,10 +237,12 @@ async function isCurrentlyApplicable(
             && latestAssignmentGeneration?.id === payload.source.id;
     }
     if (payload.event === "PRIORITY_ESCALATED") {
-        if (payload.audience === "ASSIGNEE") {
-            return ticket.assignedToUserId === payload.recipientUserId;
-        }
-        return payload.priority === "P0" || ticket.assignedToUserId === null;
+        return isPriorityEscalationStillCurrent(
+            tx,
+            payload,
+            ticket,
+            eligibleOperatorUserIds,
+        );
     }
     if (payload.event === "REQUESTER_COMMENTED") {
         return payload.audience === "ASSIGNEE"

@@ -29,6 +29,20 @@ export function getAllowedITTicketTransitions(
     return ALLOWED_TRANSITIONS[from];
 }
 
+/**
+ * Statuses that represent work IT is still actively carrying. `RESOLVED`
+ * awaits explicit operator closure but is not active work.
+ */
+export const IT_TICKET_ACTIVE_WORK_STATUSES = Object.freeze([
+    "OPEN",
+    "IN_PROGRESS",
+    "WAITING_REQUESTER",
+] as const satisfies readonly ITTicketStatus[]);
+
+export function isActiveWorkITTicketStatus(status: ITTicketStatus): boolean {
+    return (IT_TICKET_ACTIVE_WORK_STATUSES as readonly ITTicketStatus[]).includes(status);
+}
+
 /** A Ticket is terminal when the approved workflow has no outgoing transition. */
 export function isTerminalITTicketStatus(status: ITTicketStatus): boolean {
     return ALLOWED_TRANSITIONS[status].length === 0;

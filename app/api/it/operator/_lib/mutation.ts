@@ -66,12 +66,15 @@ export async function patchITOperatorTicket<TBody extends object>(
             { ...parsed.data, ticketId },
             createITCommandRequestMetadata(auth.user, request.headers),
         );
+        // `mutate` resolves only after its transaction commits; a rejected or
+        // rolled-back mutation throws before this point and never wakes the outbox.
         if (
             result.changed
-            && options.shouldWakeOutbox?.(
-                parsed.data,
-                context.authorizationActor.userId,
-            )
+            && (result.notificationIntentsEnqueued === true
+                || options.shouldWakeOutbox?.(
+                    parsed.data,
+                    context.authorizationActor.userId,
+                ) === true)
         ) {
             scheduleITTicketOutboxWakeup();
         }

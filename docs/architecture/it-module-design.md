@@ -770,9 +770,9 @@ requester LIFF behavior, authorization, replay handling, and workflow.
 | `REQUESTER_COMMENTED` | Current assignee, or operator queue while unassigned | Yes | Yes | Yes |
 | `WAITING_REQUESTER` | Requester | Yes | Yes | Yes |
 | `RESOLVED` | Requester | Yes | Yes | Yes |
-| `PRIORITY_ESCALATED` | Assigned eligible operator for P1; eligible operator queue for P0 or unassigned P1 | Yes | Yes | Yes |
+| `PRIORITY_ESCALATED` | Currently eligible P1 assignee; otherwise (P0, unassigned P1, or ineligible P1 assignee) the eligible operator queue | Yes | Yes | Yes |
 
-Operator start/resume, cancellation, reopening, and closure do not create new notification intents. Requester-facing status notifications remain limited to the existing `WAITING_REQUESTER` and `RESOLVED` events; a pending waiting notification is revalidated against its source status generation before delivery. `PRIORITY_ESCALATED` is produced only for actual `P2/P3 → P1` or `P1/P2/P3 → P0` changes. Initial defaults, first confirmation, repeated values, and downgrades produce no escalation alert. P0 notifies the eligible operator queue; P1 notifies the assigned eligible operator, or the eligible queue when unassigned. The actor is excluded, and recipients are revalidated at dispatch. The payload contains the target priority and source event identity, never the change reason.
+Operator start/resume, cancellation, reopening, and closure do not create new notification intents. Requester-facing status notifications remain limited to the existing `WAITING_REQUESTER` and `RESOLVED` events; a pending waiting notification is revalidated against its source status generation before delivery. `PRIORITY_ESCALATED` is produced only for actual `P2/P3 → P1` or `P1/P2/P3 → P0` changes. Initial defaults, first confirmation, repeated values, and downgrades produce no escalation alert. P0 notifies the eligible operator queue; P1 notifies the assigned eligible operator, or the eligible queue when unassigned. The actor is excluded, and recipients are revalidated at dispatch. The payload contains the target priority and source event identity, never the change reason. See Section 33 for the remediated recipient, wakeup, and staleness contract.
 
 The Ticket mutation transaction persists `IT_TICKET_IN_APP`,
 `IT_TICKET_EMAIL`, and approved `IT_TICKET_LINE` intents with the source fact.
@@ -814,3 +814,50 @@ The forward-only migration adds `IT_TICKET_EMAIL`, `EMAIL_REQUEST_EMAIL`, and
 `EMAIL_REQUEST_LINE` while preserving all historical outbox enum values.
 Email Request and Ticket delivery failures happen after business commit; they do
 not roll back Ticket state or duplicate Audit, Inbox, or another channel.
+
+## 33. Priority escalation notification remediation (review 1206e61)
+
+**Recipient policy.** Eligibility always means the existing IT operator
+contract (`findITOperatorAudience`: active workforce plus configured
+`it.ticket.read`, `it.ticket.comment`, and `it.ticket.manage` ALL). A non-null
+`assignedToUserId` is never proof of current authority. P0 notifies every
+eligible operator. P1 notifies the assignee only while that assignee is
+eligible; when the Ticket is unassigned or its assignee is inactive, deleted,
+or no longer holds the operator grants, it falls back to the eligible queue
+(`OPERATOR_QUEUE`). The actor is always excluded and recipients are unique.
+When the actor is the eligible P1 assignee, nobody else is alerted. If no
+recipient remains, the priority change, Activity, and Audit still commit, no
+recipient is manufactured, and the server logs
+`IT Ticket priority escalation has no eligible recipient` with only Ticket ID,
+priority, and audience. Escalations are enqueued only while the Ticket is active
+work (`OPEN`, `IN_PROGRESS`, `WAITING_REQUESTER`).
+
+**Wakeup.** `setITTicketPriority` reports `notificationIntentsEnqueued` from the
+transactional outbox insert count. The shared operator mutation adapter wakes
+the existing processor through `after()` only when the committed result reports
+new intents (or the existing status/assignment predicates match). Rejected,
+failed, or rolled-back commands throw before the wakeup point. No-op
+confirmations, first triage, downgrades, escalations of non-active Tickets,
+and escalations with no recipient do not wake the outbox. No worker is added;
+the scheduled processor remains the fallback.
+
+**Dispatch staleness.** Before Inbox, Email, or LINE delivery the shared
+applicability path requires, inside one Serializable read transaction: the
+source event belongs to the payload Ticket, is a `PRIORITY_CHANGED`
+escalation whose target equals the payload priority, is still the latest
+`PRIORITY_TRIAGED`/`PRIORITY_CHANGED` event ID for the Ticket (durable
+generation, not a value comparison), the current priority still equals the
+alerted priority, the Ticket is still active work, the recipient is still an
+eligible operator other than the actor, and the current assignment would
+select the same audience (and, for `ASSIGNEE`, the same user). Any failure is
+`SUPERSEDED`; Ticket events, Audit rows, and historical priority values are
+never modified. `RESOLVED`, `CLOSED`, and `CANCELLED` suppress pending
+escalation alerts. A recipient who loses eligibility before dispatch is
+superseded and the alert is not re-routed to another recipient.
+
+**Residual race.** Inbox creation runs inside the validating transaction.
+Email and LINE are validated in a transaction that commits before the external
+provider call, so a priority, status, or grant change committed in that short
+gap can still be followed by one send. The design preserves at-least-once
+retry semantics and existing SMTP Message-ID / LINE retry keys; it does not
+claim exactly-once or zero-staleness external delivery.

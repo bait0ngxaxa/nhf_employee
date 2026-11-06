@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     ticketResource: vi.fn(),
     latestAssignment: vi.fn(),
     latestStatus: vi.fn(),
+    latestPriority: vi.fn(),
     recipientEmail: vi.fn(),
     operatorAudience: vi.fn(),
 }));
@@ -44,6 +45,7 @@ vi.mock("../../infrastructure/persistence/ticket-notification-repository", () =>
     findITTicketNotificationRecipientEmail: mocks.recipientEmail,
     findITTicketNotificationResource: mocks.ticketResource,
     findLatestITTicketAssignmentGeneration: mocks.latestAssignment,
+    findLatestITTicketPriorityGeneration: mocks.latestPriority,
     findLatestITTicketStatusGeneration: mocks.latestStatus,
 }));
 
@@ -108,6 +110,7 @@ describe("IT Ticket Email outbox dispatch", () => {
         });
         mocks.latestAssignment.mockResolvedValue({ id: 456 });
         mocks.latestStatus.mockResolvedValue({ id: 456 });
+        mocks.latestPriority.mockResolvedValue({ id: 456 });
         mocks.currentWorkforce.mockResolvedValue({ userId: 99 });
         mocks.recipientEmail.mockResolvedValue(" Operator@Example.com ");
         mocks.operatorAudience.mockResolvedValue([{ userId: 42 }]);
@@ -180,11 +183,13 @@ describe("IT Ticket Email outbox dispatch", () => {
             toStatus: null,
             toAssigneeUserId: null,
         });
+        mocks.operatorAudience.mockResolvedValue([{ userId: 42 }, { userId: 43 }]);
         mocks.ticketResource.mockResolvedValueOnce({
             id: 123,
             requesterUserId: 99,
             assignedToUserId: 43,
             status: "OPEN",
+            priority: "P1",
         });
 
         await expect(dispatchITTicketNotificationOutbox(buildEmailOutbox(payload)))
@@ -196,6 +201,7 @@ describe("IT Ticket Email outbox dispatch", () => {
             requesterUserId: 99,
             assignedToUserId: 42,
             status: "OPEN",
+            priority: "P1",
         });
         await expect(dispatchITTicketNotificationOutbox(buildEmailOutbox(payload)))
             .resolves.toBe("SENT");
@@ -206,7 +212,7 @@ describe("IT Ticket Email outbox dispatch", () => {
         );
     });
 
-    it("supersedes an unassigned P1 queue notification after assignment", async () => {
+    it("supersedes an unassigned P1 queue notification after assignment to an eligible operator", async () => {
         const payload: ITTicketNotificationPayloadV1 = {
             version: 1,
             event: "PRIORITY_ESCALATED",
@@ -226,11 +232,13 @@ describe("IT Ticket Email outbox dispatch", () => {
             toStatus: null,
             toAssigneeUserId: null,
         });
+        mocks.operatorAudience.mockResolvedValue([{ userId: 42 }, { userId: 43 }]);
         mocks.ticketResource.mockResolvedValueOnce({
             id: 123,
             requesterUserId: 99,
             assignedToUserId: 43,
             status: "OPEN",
+            priority: "P1",
         });
 
         await expect(dispatchITTicketNotificationOutbox(buildEmailOutbox(payload)))
