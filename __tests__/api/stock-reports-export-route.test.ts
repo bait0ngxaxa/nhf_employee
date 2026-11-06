@@ -46,6 +46,14 @@ vi.mock("@/modules/stock", async () => {
 });
 
 describe("GET /api/stock/reports/export", () => {
+    it.each(["raw-issued", "raw-inventory"])("rejects removed mode %s including metadata", async (mode) => {
+        for (const suffix of ["", "&metaOnly=1"]) {
+            const response = await stockReportsExportRoute(new NextRequest(`http://localhost/api/stock/reports/export?reportType=${mode}${suffix}`));
+            expect(response.status).toBe(400);
+        }
+        expect(createStockRequestReportXlsxResponse).not.toHaveBeenCalled();
+        expect(createStockBalanceReportXlsxResponse).not.toHaveBeenCalled();
+    });
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(getApiAuthSession).mockResolvedValue({

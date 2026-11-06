@@ -174,7 +174,8 @@ export function canAccessStockDashboard(
     return capabilities?.canReadCatalog === true
         || capabilities?.canReadOwnRequests === true
         || capabilities?.canReadAllRequests === true
-        || capabilities?.canExportReports === true;
+        || capabilities?.canExportReports === true
+        || capabilities?.canReadReports === true;
 }
 
 export function canAccessEmployeeDashboard(

@@ -8,6 +8,8 @@ import {
     issueRequest,
     cancelRequest,
 } from "./application/mutations";
+export { getStockAnalytics } from "./application/queries/analytics";
+export { stockAnalyticsQuerySchema } from "./schemas/analytics";
 import {
     getCategories,
     getItems,

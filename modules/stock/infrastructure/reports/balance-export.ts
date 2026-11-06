@@ -116,9 +116,11 @@ export async function getStockBalanceReportMeta(): Promise<{
     count: number;
     maxRows: number;
 }> {
-    const count = await prisma.stockItem.count({
-        where: { isActive: true },
-    });
+    const [variantCount, fallbackCount] = await Promise.all([
+        prisma.stockItemVariant.count({ where: { isActive: true, stockItem: { isActive: true } } }),
+        prisma.stockItem.count({ where: { isActive: true, variants: { none: { isActive: true } } } }),
+    ]);
+    const count = variantCount + fallbackCount;
 
     return {
         count,
@@ -136,6 +138,10 @@ export async function createStockBalanceReportXlsxResponse(
     }
 
     const items = await loadActiveStockItems();
+    const outputRows = items.reduce((sum, item) => sum + Math.max(1, item.variants.length), 0);
+    if (outputRows > EXPORT_LIMITS.stock.maxRows) {
+        throw new Error(`ส่งออกยอดคงเหลือสต๊อกได้ไม่เกิน ${EXPORT_LIMITS.stock.maxRows} รายการต่อครั้ง`);
+    }
     const workbook = createStockBalanceReportWorkbook(items);
     const filename = generateFilename("ยอดคงเหลือสต๊อกปัจจุบัน", "xlsx");
 

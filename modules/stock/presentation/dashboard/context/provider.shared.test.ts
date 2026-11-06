@@ -24,6 +24,7 @@ const noCapabilities: StockPresentationCapabilities = {
     canCancelAnyRequests: false,
     canProcessRequests: false,
     canManageInventory: false,
+    canReadReports: false,
     canExportReports: false,
 };
 
@@ -94,11 +95,14 @@ describe("stock provider shared pagination helpers", () => {
     });
 
     it("derives Stock tabs from granular capabilities in deterministic order", () => {
+        expect(getVisibleStockTabs({ ...noCapabilities, canReadReports: true })).toEqual(["reports"]);
+        expect(normalizeStockTab("reports", { ...noCapabilities, canReadReports: true })).toBe("reports");
         expect(getVisibleStockTabs({
             ...noCapabilities,
             canReadOwnRequests: true,
             canReadAllRequests: true,
             canProcessRequests: true,
+            canReadReports: false,
             canExportReports: true,
         })).toEqual(["my-requests", "admin-requests", "reports"]);
         expect(normalizeStockTab("inventory", {

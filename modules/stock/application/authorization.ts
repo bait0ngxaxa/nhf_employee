@@ -25,6 +25,7 @@ export const STOCK_CAPABILITIES = [
     "stock.request.cancel",
     "stock.request.process",
     "stock.report.export",
+    "stock.report.read",
 ] as const;
 
 export type StockCapability = (typeof STOCK_CAPABILITIES)[number];
@@ -120,6 +121,7 @@ export function defaultStockScopes(
         case "stock.inventory.manage":
         case "stock.request.process":
         case "stock.report.export":
+        case "stock.report.read":
             return [];
     }
 }
@@ -256,6 +258,7 @@ export async function getStockPresentationCapabilities(
             project("stock.report.export"),
             "ALL",
         ),
+        canReadReports: hasStockScope(project("stock.report.read"), "ALL"),
     });
 }
 

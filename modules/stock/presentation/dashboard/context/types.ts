@@ -117,6 +117,7 @@ export interface StockDataContextValue {
 export interface StockUIContextValue {
     activeTab: string;
     setActiveTab: (tab: string) => void;
+    navigateToInventory: (sku: string) => void;
     itemsPage: number;
     setItemsPage: (page: number) => void;
     requestsPage: number;

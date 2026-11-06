@@ -87,6 +87,7 @@ const STOCK_CAPABILITIES = {
     canCancelAnyRequests: false,
     canProcessRequests: false,
     canManageInventory: false,
+    canReadReports: false,
     canExportReports: false,
 };
 

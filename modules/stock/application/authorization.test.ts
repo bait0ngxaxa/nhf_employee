@@ -174,6 +174,7 @@ describe("Stock authorization adapter", () => {
         ["stock.inventory.manage", []],
         ["stock.request.process", []],
         ["stock.report.export", []],
+        ["stock.report.read", []],
     ] as const)(
         "applies the same role-neutral default policy for %s",
         async (capability, expectedScopes) => {

@@ -31,6 +31,7 @@ const stockUser = {
         canCancelAnyRequests: false,
         canProcessRequests: false,
         canManageInventory: false,
+        canReadReports: false,
         canExportReports: false,
     },
 };
@@ -82,6 +83,7 @@ describe("Stock Dashboard route access", () => {
                 canReadOwnRequests: false,
                 canCreateRequests: false,
                 canCancelOwnRequests: false,
+                canReadReports: false,
                 canExportReports: true,
             },
         });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     canAccessLeaveDashboard,
     canAccessEmployeeDashboard,
+    canAccessStockDashboard,
     canAccessITTicketQueue,
     canAccessITAnalytics,
     DASHBOARD_MENU_GROUPS,
@@ -53,6 +54,7 @@ const stockCapabilities = {
     canCancelAnyRequests: false,
     canProcessRequests: false,
     canManageInventory: false,
+    canReadReports: false,
     canExportReports: false,
 } satisfies StockPresentationCapabilities;
 
@@ -160,6 +162,10 @@ afterEach(() => {
 });
 
 describe("dashboard menu", () => {
+    it("allows Stock entry for analytics read independently of export and catalog", () => {
+        expect(canAccessStockDashboard({ ...stockCapabilities, canReadCatalog: false, canReadOwnRequests: false, canReadReports: true })).toBe(true);
+        expect(canAccessStockDashboard({ ...stockCapabilities, canReadCatalog: false, canReadOwnRequests: false })).toBe(false);
+    });
     it("shows announcement management only to system administrators", () => {
         expect(getMenuIds(true)).toContain("announcements");
         expect(getMenuIds(false)).not.toContain("announcements");
@@ -502,6 +508,7 @@ describe("dashboard menu", () => {
                 ...stockCapabilities,
                 canReadCatalog: false,
                 canReadOwnRequests: false,
+                canReadReports: false,
                 canExportReports: true,
             })
                 .flatMap((group) => group.items.map((item) => item.id)),

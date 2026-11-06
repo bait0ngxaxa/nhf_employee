@@ -117,6 +117,7 @@ function setContexts(requests: StockRequest[] = [REQUEST]): void {
             canCancelAnyRequests: true,
             canProcessRequests: true,
             canManageInventory: true,
+            canReadReports: false,
             canExportReports: true,
         },
         refreshItems,
@@ -136,6 +137,7 @@ function setContexts(requests: StockRequest[] = [REQUEST]): void {
         setSearchQuery: vi.fn(),
         selectedCategoryId: undefined,
         setSelectedCategoryId: vi.fn(),
+        navigateToInventory: vi.fn(),
         statusFilter: undefined,
         setStatusFilter: vi.fn(),
     };

@@ -107,6 +107,7 @@ describe("Stock presentation capability projection", () => {
             canCancelAnyRequests: false,
             canProcessRequests: false,
             canManageInventory: false,
+            canReadReports: false,
             canExportReports: false,
         });
 
@@ -131,6 +132,7 @@ describe("Stock presentation capability projection", () => {
             canCancelAnyRequests: false,
             canProcessRequests: false,
             canManageInventory: false,
+            canReadReports: false,
             canExportReports: false,
         });
     });
@@ -149,6 +151,7 @@ describe("Stock presentation capability projection", () => {
             canCancelAnyRequests: false,
             canProcessRequests: false,
             canManageInventory: false,
+            canReadReports: false,
             canExportReports: false,
         });
     });
@@ -167,6 +170,7 @@ describe("Stock presentation capability projection", () => {
             canCancelAnyRequests: false,
             canProcessRequests: false,
             canManageInventory: false,
+            canReadReports: false,
             canExportReports: false,
         });
     });
@@ -211,6 +215,7 @@ describe("Stock presentation capability projection", () => {
             canProcessRequests: false,
             canCancelAnyRequests: true,
             canManageInventory: true,
+            canReadReports: false,
             canExportReports: true,
         });
     });
@@ -244,6 +249,8 @@ describe("Stock presentation capability projection", () => {
     it.each([
         ["stock.inventory.manage", "canManageInventory", "canExportReports"],
         ["stock.report.export", "canExportReports", "canManageInventory"],
+        ["stock.report.read", "canReadReports", "canExportReports"],
+        ["stock.report.export", "canExportReports", "canReadReports"],
     ] as const)(
         "keeps %s independent from the other administrative Stock surface",
         async (grantedCapability, grantedProjection, deniedProjection) => {
@@ -280,6 +287,7 @@ describe("Stock presentation capability projection", () => {
 
         await expect(getStockPresentationCapabilities(liffUser)).resolves.toMatchObject({
             canManageInventory: false,
+            canReadReports: false,
             canExportReports: false,
         });
     });

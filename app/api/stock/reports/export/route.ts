@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { getBangkokYear } from "@/lib/helpers/bangkok-time";
 import {
     assertStockCapability,
     buildStockAuthorizationContext,
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         }
 
         const { year, yearsOnly, metaOnly, reportType } = parsedQuery.data;
-        const resolvedYear = year ?? new Date().getFullYear();
+        const resolvedYear = year ?? getBangkokYear(new Date());
 
         if (reportType === "balances") {
             if (yearsOnly) {

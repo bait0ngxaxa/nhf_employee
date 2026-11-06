@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "constants/dashboard.ts"
+        ],
+        "createdAt": "2026-11-06T08:37:55.504Z",
+        "reason": "Agent: all five flagged menu palette definitions are unchanged from base 7e78a240; DESIGN.md Quiet Canvas permits gradients at module entry points, and the Stock task explicitly requires preserving existing design and avoiding unrelated UI changes."
+      }
+    ]
+  }
+}

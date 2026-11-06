@@ -55,6 +55,7 @@ const EMPTY_STOCK_CAPABILITIES: StockPresentationCapabilities = Object.freeze({
     canCancelAnyRequests: false,
     canProcessRequests: false,
     canManageInventory: false,
+    canReadReports: false,
     canExportReports: false,
 });
 
@@ -200,6 +201,22 @@ export function StockProvider({ children }: StockProviderProps) {
         [pathname, router, searchParams, stockCapabilities],
     );
 
+    const navigateToInventory = useCallback((sku: string): void => {
+        if (!isStockDashboardRoute(pathname)
+            || !stockCapabilities.canReadCatalog
+            || !stockCapabilities.canManageInventory) return;
+
+        // Cancel a pending search draft before changing the canonical URL.
+        setSearchDraft({ canonicalValue: canonicalSearchQuery, value: canonicalSearchQuery, urlSyncRevision: 0 });
+        router.push(createStockDashboardUrl(searchParams, {
+            [STOCK_TAB_QUERY_KEY]: "inventory",
+            [STOCK_ITEMS_SEARCH_QUERY_KEY]: sku.trim() || null,
+            [STOCK_ITEMS_CATEGORY_QUERY_KEY]: null,
+            [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
+            [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: "1",
+        }), { scroll: false });
+    }, [canonicalSearchQuery, pathname, router, searchParams, stockCapabilities]);
+
     const setRequestsPage = useCallback(
         (page: number) => {
             const nextPage = normalizePositivePage(page);
@@ -260,7 +277,9 @@ export function StockProvider({ children }: StockProviderProps) {
     );
 
     useEffect(() => {
-        if (debouncedSearchUrlSyncRevision === 0) {
+        if (debouncedSearchUrlSyncRevision === 0
+            || debouncedSearchUrlSyncRevision !== searchUrlSyncRevision
+            || debouncedSearchQueryForUrl !== searchQuery) {
             return;
         }
 
@@ -299,6 +318,8 @@ export function StockProvider({ children }: StockProviderProps) {
     }, [
         debouncedSearchQueryForUrl,
         debouncedSearchUrlSyncRevision,
+        searchUrlSyncRevision,
+        searchQuery,
         pathname,
         router,
     ]);
@@ -492,6 +513,7 @@ export function StockProvider({ children }: StockProviderProps) {
         () => ({
             activeTab,
             setActiveTab,
+            navigateToInventory,
             itemsPage,
             setItemsPage,
             requestsPage,
@@ -508,6 +530,7 @@ export function StockProvider({ children }: StockProviderProps) {
         [
             activeTab,
             setActiveTab,
+            navigateToInventory,
             itemsPage,
             requestsPage,
             searchQuery,

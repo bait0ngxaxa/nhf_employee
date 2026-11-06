@@ -1,4 +1,5 @@
 "use client";
+import type { ReactElement } from "react";
 
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -16,17 +17,18 @@ import { StockAdminReports } from "./components/StockAdminReports";
 
 function StockContent() {
     const { stockCapabilities } = useStockDataContext();
-    const { activeTab, setActiveTab } = useStockUIContext();
+    const { activeTab, setActiveTab, navigateToInventory } = useStockUIContext();
 
     const canReadCatalog = stockCapabilities.canReadCatalog;
     const canReadOwnRequests = stockCapabilities.canReadOwnRequests;
     const canReadAllRequests = stockCapabilities.canReadAllRequests;
     const canManageInventory = stockCapabilities.canManageInventory;
     const canExportReports = stockCapabilities.canExportReports;
+    const canReadReports = stockCapabilities.canReadReports;
     const hasUsableTab = canReadCatalog
         || canReadOwnRequests
         || canReadAllRequests
-        || canExportReports;
+        || canExportReports || canReadReports;
 
     const tabs: SectionTabItem[] = [
         {
@@ -62,8 +64,8 @@ function StockContent() {
             value: "reports",
             label: "รายงาน",
             group: "admin",
-            content: <StockAdminReports canExportReports={canExportReports} />,
-            visible: canExportReports,
+            content: <StockAdminReports canExportReports={canExportReports} canReadReports={canReadReports} onInventory={canReadCatalog && canManageInventory ? navigateToInventory : undefined} />,
+            visible: canExportReports || canReadReports,
         },
     ];
 
@@ -92,7 +94,7 @@ function StockContent() {
     );
 }
 
-export function StockSection() {
+export function StockSection(): ReactElement {
     return (
         <StockProvider>
             <StockContent />
