@@ -24,6 +24,7 @@ const noCapabilities: StockPresentationCapabilities = {
     canCancelAnyRequests: false,
     canProcessRequests: false,
     canManageInventory: false,
+    canReadReports: false,
     canExportReports: false,
 };
 
@@ -99,6 +100,7 @@ describe("stock provider shared pagination helpers", () => {
             canReadOwnRequests: true,
             canReadAllRequests: true,
             canProcessRequests: true,
+            canReadReports: false,
             canExportReports: true,
         })).toEqual(["my-requests", "admin-requests", "reports"]);
         expect(normalizeStockTab("inventory", {

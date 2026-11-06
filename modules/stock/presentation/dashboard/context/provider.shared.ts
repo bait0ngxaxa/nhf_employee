@@ -54,7 +54,7 @@ export function getVisibleStockTabs(
             case "admin-requests":
                 return capabilities.canReadAllRequests;
             case "reports":
-                return capabilities.canExportReports;
+                return capabilities.canExportReports || capabilities.canReadReports;
         }
     });
 }

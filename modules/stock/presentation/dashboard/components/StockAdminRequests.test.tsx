@@ -117,6 +117,7 @@ function setContexts(requests: StockRequest[] = [REQUEST]): void {
             canCancelAnyRequests: true,
             canProcessRequests: true,
             canManageInventory: true,
+            canReadReports: false,
             canExportReports: true,
         },
         refreshItems,

@@ -11,4 +11,5 @@ export interface StockPresentationCapabilities {
 
     readonly canManageInventory: boolean;
     readonly canExportReports: boolean;
+    readonly canReadReports: boolean;
 }

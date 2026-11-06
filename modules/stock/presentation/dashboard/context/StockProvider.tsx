@@ -55,6 +55,7 @@ const EMPTY_STOCK_CAPABILITIES: StockPresentationCapabilities = Object.freeze({
     canCancelAnyRequests: false,
     canProcessRequests: false,
     canManageInventory: false,
+    canReadReports: false,
     canExportReports: false,
 });
 

@@ -53,6 +53,7 @@ const stockCapabilities = {
     canCancelAnyRequests: false,
     canProcessRequests: false,
     canManageInventory: false,
+    canReadReports: false,
     canExportReports: false,
 } satisfies StockPresentationCapabilities;
 
@@ -502,6 +503,7 @@ describe("dashboard menu", () => {
                 ...stockCapabilities,
                 canReadCatalog: false,
                 canReadOwnRequests: false,
+                canReadReports: false,
                 canExportReports: true,
             })
                 .flatMap((group) => group.items.map((item) => item.id)),

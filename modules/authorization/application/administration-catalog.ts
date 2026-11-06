@@ -76,6 +76,7 @@ const CAPABILITY_ADMINISTRATION_METADATA: Readonly<
     "stock.request.cancel": CENTRAL_WITH_DEFAULT_POLICY,
     "stock.request.process": CENTRAL_ONLY,
     "stock.report.export": CENTRAL_ONLY,
+    "stock.report.read": CENTRAL_ONLY,
 
     "leave.request.read": CENTRAL_WITH_DEFAULT_POLICY,
     "leave.approval.read": CENTRAL_WITH_DEFAULT_POLICY,

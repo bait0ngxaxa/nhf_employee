@@ -157,6 +157,7 @@ const stockCapabilities = {
     canCancelAnyRequests: true,
     canProcessRequests: true,
     canManageInventory: true,
+    canReadReports: false,
     canExportReports: true,
 };
 
@@ -612,6 +613,7 @@ describe("StockProvider live search", () => {
                     canCancelAnyRequests: false,
                     canProcessRequests: false,
                     canManageInventory: false,
+                    canReadReports: false,
                     canExportReports: false,
                 },
             },
@@ -654,6 +656,7 @@ describe("StockProvider live search", () => {
                     canCancelAnyRequests: false,
                     canProcessRequests: false,
                     canManageInventory: false,
+                    canReadReports: false,
                     canExportReports: true,
                 },
             },

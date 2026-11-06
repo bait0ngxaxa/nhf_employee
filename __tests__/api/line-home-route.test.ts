@@ -48,6 +48,7 @@ const CAPABILITIES = {
         canCancelAnyRequests: false,
         canProcessRequests: false,
         canManageInventory: false,
+        canReadReports: false,
         canExportReports: false,
     },
     canRequestStock: true,

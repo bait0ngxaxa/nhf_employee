@@ -425,6 +425,7 @@ describe("Authorization Administration capability catalog", () => {
             "stock.inventory.manage",
             "stock.request.process",
             "stock.report.export",
+            "stock.report.read",
         ]) {
             expect(first.find((capability) => capability.key === key)).toMatchObject({
                 runtimeAuthorizationMode: "CENTRAL_ONLY",
@@ -487,6 +488,7 @@ describe("Authorization Administration capability catalog", () => {
             "stock.inventory.manage",
             "stock.request.process",
             "stock.report.export",
+            "stock.report.read",
             "leave.approver.manage",
             "leave.recovery.manage",
             "audit.read",
@@ -531,10 +533,10 @@ describe("Authorization Administration capability catalog", () => {
             "it.ticket.create",
             "it.ticket.comment",
         ]);
-        expect(first).toHaveLength(46);
+        expect(first).toHaveLength(47);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_ONLY",
-        )).toHaveLength(19);
+        )).toHaveLength(20);
         expect(first.filter(({ runtimeAuthorizationMode }) =>
             runtimeAuthorizationMode === "CENTRAL_WITH_DEFAULT_POLICY",
         )).toHaveLength(27);

@@ -72,6 +72,7 @@ const LIMITATIONS: Readonly<
             label: "report ยังตรวจช่วงข้อมูลและเงื่อนไขของ Stock แยกต่างหาก",
         }),
     ]),
+    "stock.report.read": Object.freeze([]),
 });
 
 function asStockActor(actor: AuthorizationActor): StockAuthorizationActor {

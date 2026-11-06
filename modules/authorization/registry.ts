@@ -206,6 +206,13 @@ export const CAPABILITY_DEFINITIONS = Object.freeze([
         scopes: ["ALL"] as const,
         channels: ["DASHBOARD"] as const,
     }),
+    defineCapability({
+        key: "stock.report.read",
+        domain: "stock",
+        description: "Read aggregated Stock analytics within an authorized resource scope.",
+        scopes: ["ALL"] as const,
+        channels: ["DASHBOARD"] as const,
+    }),
 
     defineCapability({
         key: "leave.request.read",

@@ -23,10 +23,11 @@ function StockContent() {
     const canReadAllRequests = stockCapabilities.canReadAllRequests;
     const canManageInventory = stockCapabilities.canManageInventory;
     const canExportReports = stockCapabilities.canExportReports;
+    const canReadReports = stockCapabilities.canReadReports;
     const hasUsableTab = canReadCatalog
         || canReadOwnRequests
         || canReadAllRequests
-        || canExportReports;
+        || canExportReports || canReadReports;
 
     const tabs: SectionTabItem[] = [
         {
@@ -63,7 +64,7 @@ function StockContent() {
             label: "รายงาน",
             group: "admin",
             content: <StockAdminReports canExportReports={canExportReports} />,
-            visible: canExportReports,
+            visible: canExportReports || canReadReports,
         },
     ];
 

@@ -11,6 +11,7 @@ const capabilities = vi.hoisted(() => ({
     canCancelAnyRequests: true,
     canProcessRequests: true,
     canManageInventory: true,
+    canReadReports: false,
     canExportReports: true,
 }));
 
