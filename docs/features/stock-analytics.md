@@ -65,6 +65,21 @@ the total count is shown. Detail reads are bounded and avoid per-variant queries
 Refresh recomputes the report; no cache infrastructure or schema/index changes
 were introduced without production query-plan evidence.
 
+## Dashboard interactions
+
+The Top 10 chart reads the canonical material ID from Recharts 3.8.0's
+`BarRectangleItem.payload`; text controls offer the same drill-down by keyboard.
+The selected reporting filters are retained and focus moves to the detail heading.
+The installed implementation also spreads datum fields onto the rectangle, so
+the original direct-ID handler passed the real-bar baseline check; payload access
+uses the explicitly declared event contract rather than that implementation detail.
+
+Low-stock actions use one provider operation and one `router.push` through the
+existing Stock URL helper. The destination sets the Inventory tab and SKU search,
+clears category, resets both item-page keys to 1, and preserves unrelated query
+parameters. A pending debounced search draft cannot overwrite this destination.
+Back/forward derive tab, search and category from the canonical URL.
+
 ## Export compatibility and limits
 
 Annual sheets **สรุปการใช้วัสดุ** / **รายละเอียดที่ใช้คำนวณ** and balance
@@ -88,8 +103,9 @@ refresh, empty/error/loading states and explicit downloads.
 `node scripts/check-stock-analytics.mjs` renders the real Reports components and
 project CSS using isolated, clearly labeled synthetic transport data. It does
 not replace a deployed end-to-end test. It checks 320/390/768/1280px in light/dark,
-page overflow/runtime errors, two rendered donuts, keyboard tooltip, focused
-drill-down, inventory navigation and explicit legacy Excel downloads. It uses the same
+page overflow/runtime errors, two rendered donuts, real SVG bar clicks with
+canonical ID/filter assertions, keyboard tooltip and focused drill-down, inventory
+action and explicit legacy Excel downloads. It uses the same
 optional browser tooling pattern as the IT chart check. When Puppeteer is not
 installed, set `STOCK_BROWSER_DRIVER` to the file URL of an external
 `puppeteer-core` entry and `CHART_BROWSER_PATH` to a Chrome/Edge executable.
@@ -99,9 +115,14 @@ After `npm run build`, the optional live check is
 `node modules/stock/__tests__/integration/stock-analytics.browser.mjs` with the
 same browser variables and `TEST_DATABASE_URL` (or `integration.env`). It refuses
 databases without `_test` / `_integration` suffixes, creates isolated test records,
-starts/stops the production server, uses real login cookies and real APIs, checks
-Dashboard rendering and original Excel workbook reconciliation, then revokes the test user's
-read/export grants to verify separate 403 responses. It never changes production
+starts/stops the production server with explicit production mode and an isolated
+`stock-browser.localhost` browser origin, uses real login cookies and real APIs, checks
+real chart clicks, keyboard drill-down, filtered Inventory navigation and browser
+back/forward. It downloads both original Excel reports through the original UI,
+checks Chrome-saved files, filenames, worksheets, issuance totals and
+physical/reserved/available quantities,
+rejects retired modes, then revokes read/export grants to verify separate views
+and 403 responses. It never changes production
 data or authorization configuration. Test records remain in the dedicated DB.
 
 Deferred operational work: profile query plans against production-sized data

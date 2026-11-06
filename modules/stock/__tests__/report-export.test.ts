@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import { prisma } from "@/lib/db/prisma";
-import { createStockBalanceReportXlsxResponse } from "../infrastructure/reports/balance-export";
+import { createStockBalanceReportXlsxResponse, getStockBalanceReportMeta } from "../infrastructure/reports/balance-export";
 import { createStockRequestReportXlsxResponse } from "../infrastructure/reports/report-export";
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -66,6 +66,39 @@ function bangkokExcelDate(isoDate: string): Date {
 describe("Stock report export services", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+    });
+
+    it("counts expanded active variant rows and fallback rows for the balance ceiling", async () => {
+        prismaMock.stockItemVariant.count.mockResolvedValue(4999);
+        prismaMock.stockItem.count.mockResolvedValue(1);
+        expect(await getStockBalanceReportMeta()).toEqual({ count: 5000, maxRows: 5000 });
+        expect(prismaMock.stockItemVariant.count).toHaveBeenCalledWith({ where: { isActive: true, stockItem: { isActive: true } } });
+        expect(prismaMock.stockItem.count).toHaveBeenCalledWith({ where: { isActive: true, variants: { none: { isActive: true } } } });
+    });
+
+    it("rejects too many expanded inventory rows before loading the catalog", async () => {
+        prismaMock.stockItemVariant.count.mockResolvedValue(5001);
+        prismaMock.stockItem.count.mockResolvedValue(0);
+        await expect(createStockBalanceReportXlsxResponse()).rejects.toThrow("5000");
+        expect(prismaMock.stockItem.findMany).not.toHaveBeenCalled();
+    });
+
+    it("rechecks actual balance rows when the catalog grows after metadata was counted", async () => {
+        prismaMock.stockItemVariant.count.mockResolvedValue(1);
+        prismaMock.stockItem.count.mockResolvedValue(0);
+        prismaMock.stockItem.findMany.mockResolvedValue(asNever([{
+            id: 1, name: "วัสดุ", sku: "ITEM", unit: "ชิ้น", defaultVariantId: 1,
+            quantity: 0, minStock: 0, category: { name: "สำนักงาน" }, isActive: true,
+            variants: Array.from({ length: 5001 }, (_, index) => ({ id: index + 1, isActive: true, unit: "ชิ้น", quantity: 0, minStock: 0 })),
+        }]));
+        prismaMock.stockRequestItem.findMany.mockResolvedValue([]);
+        await expect(createStockBalanceReportXlsxResponse()).rejects.toThrow("5000");
+    });
+
+    it("preserves the annual issued-line export ceiling", async () => {
+        prismaMock.stockRequestItem.count.mockResolvedValue(5001);
+        await expect(createStockRequestReportXlsxResponse(2024)).rejects.toThrow("5000");
+        expect(prismaMock.stockRequest.findMany).not.toHaveBeenCalled();
     });
 
     it("should export stock request xlsx with summary and detail sheets", async () => {

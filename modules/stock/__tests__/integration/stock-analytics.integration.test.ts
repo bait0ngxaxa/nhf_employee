@@ -2,6 +2,9 @@ import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { StockRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getStockAnalytics } from "../../application/queries/analytics";
+import ExcelJS from "exceljs";
+import { createStockRequestReportXlsxResponse } from "../../infrastructure/reports/report-export";
+import { createStockBalanceReportXlsxResponse } from "../../infrastructure/reports/balance-export";
 import { createStockFixture } from "./stock-fixtures";
 
 describe("Stock analytics MySQL aggregation", () => {
@@ -46,6 +49,30 @@ describe("Stock analytics MySQL aggregation", () => {
         expect(empty.kpis.issuedLines).toBe(0);
         expect(empty.kpis.pendingRequests).toBeGreaterThanOrEqual(1);
         expect(empty.stockHealth).toEqual(quantity.stockHealth);
+    });
+    it("reconciles the original annual and balance Excel contracts with analytics", async () => {
+        const analytics = await getStockAnalytics({ year: 2024, projectCode: fixture.request.projectCode });
+        const annualResponse = await createStockRequestReportXlsxResponse(2024);
+        const annual = new ExcelJS.Workbook();
+        await annual.xlsx.load(await annualResponse.arrayBuffer());
+        expect(annual.worksheets.map((sheet) => sheet.name)).toEqual(["สรุปการใช้วัสดุ", "รายละเอียดที่ใช้คำนวณ"]);
+        const requestRows: ExcelJS.Row[] = [];
+        annual.worksheets[1].eachRow((row, index) => { if (index > 1 && row.getCell(4).value === fixture.request.projectCode) requestRows.push(row); });
+        expect(requestRows).toHaveLength(analytics.kpis.issuedRequests);
+        expect(requestRows.reduce((total, row) => total + Number(row.getCell(9).value), 0)).toBe(analytics.kpis.issuedLines);
+        const summary: { unit: string; quantity: number }[] = [];
+        annual.worksheets[0].eachRow((row, index) => { if (index > 1 && row.getCell(2).value === fixture.item.name) summary.push({ unit: String(row.getCell(4).value), quantity: Number(row.getCell(6).value) }); });
+        expect(summary).toEqual(expect.arrayContaining(analytics.topMaterials[0].quantities));
+        const balanceResponse = await createStockBalanceReportXlsxResponse();
+        const balance = new ExcelJS.Workbook();
+        await balance.xlsx.load(await balanceResponse.arrayBuffer());
+        expect(balance.worksheets.map((sheet) => sheet.name)).toEqual(["ยอดคงเหลือจริง"]);
+        const variantRows: ExcelJS.Row[] = [];
+        balance.worksheets[0].eachRow((row, index) => { if (index > 1 && row.getCell(2).value === fixture.item.name) variantRows.push(row); });
+        expect(variantRows).toHaveLength(2);
+        const pieces = variantRows.find((row) => row.getCell(4).value === "ชิ้น");
+        expect([5, 6, 7, 8].map((col) => pieces?.getCell(col).value)).toEqual([10, 3, 7, 2]);
+        expect(analytics.topMaterials[0].available).toContainEqual({ unit: "ชิ้น", quantity: Number(pieces?.getCell(7).value) });
     });
     it("keeps canonical identities, category line shares and all-unit frequency under quantity ranking", async () => {
         const category = await prisma.stockCategory.create({ data: { name: `Analytics alternate ${fixture.item.id}` } });
