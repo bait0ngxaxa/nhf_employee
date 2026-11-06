@@ -33,22 +33,24 @@ export function StockPopularityChart({ data, onSelect }: { data: StockAnalyticsR
 
 export function StockDistributionChart({ title, description, rows }: { title: string; description: string; rows: { name: string; value: number; color?: string }[] }): ReactElement {
     const total = rows.reduce((sum, row) => sum + row.value, 0);
+    const chartRows: typeof rows = rows.length > 5 ? [...rows.slice(0, 4), { name: "หมวดอื่น ๆ", value: rows.slice(4).reduce((sum, row) => sum + row.value, 0) }] : rows;
     return <section className="min-w-0 rounded-2xl border border-border-subtle bg-surface-raised p-5">
         <h3 className="text-lg font-bold text-content-strong">{title}</h3>
         <p className="mt-1 text-sm leading-6 text-content-muted">{description}</p>
         {total === 0 ? <p className="py-12 text-center text-sm text-content-muted">ไม่มีข้อมูลสำหรับแสดงสัดส่วน</p> : <div className="h-56" aria-label={`${title}: ${total.toLocaleString("th-TH")} รายการ`}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}><PieChart accessibilityLayer>
-                <Pie data={rows} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="80%" isAnimationActive={false}>
-                    {rows.map((row, index) => <Cell key={row.name} fill={row.color ?? categoryColors[index % categoryColors.length]} stroke="var(--surface-raised)" />)}
+                <Pie data={chartRows} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="80%" isAnimationActive={false}>
+                    {chartRows.map((row, index) => <Cell key={row.name} fill={row.color ?? categoryColors[index]} stroke="var(--surface-raised)" />)}
                 </Pie><Tooltip contentStyle={tooltipStyle} />
             </PieChart></ResponsiveContainer>
         </div>}
         <ul className="space-y-2 text-sm" aria-label={`${title} ค่าข้อมูล`}>
-            {rows.map((row, index) => <li key={row.name} className="flex items-start gap-2">
+            {chartRows.map((row, index) => <li key={row.name} className="flex items-start gap-2">
                 <span className="mt-1 size-3 shrink-0 rounded-sm" style={{ background: row.color ?? categoryColors[index % categoryColors.length] }} aria-hidden="true" />
                 <span className="min-w-0 flex-1 break-words text-content-secondary">{row.name}</span>
                 <span className="shrink-0 tabular-nums text-content-strong">{row.value.toLocaleString("th-TH")} · {total ? (row.value / total * 100).toFixed(1) : "0.0"}%</span>
             </li>)}
         </ul>
+        {rows.length > 5 ? <details className="mt-4 text-sm text-content-secondary"><summary className="min-h-11 cursor-pointer py-3 font-medium">ดูรายละเอียดทุกหมวด</summary><ul className="space-y-2">{rows.map((row) => <li key={row.name} className="flex justify-between gap-3"><span>{row.name}</span><span className="shrink-0 tabular-nums">{row.value.toLocaleString("th-TH")} · {total ? (row.value / total * 100).toFixed(1) : "0.0"}%</span></li>)}</ul></details> : null}
     </section>;
 }

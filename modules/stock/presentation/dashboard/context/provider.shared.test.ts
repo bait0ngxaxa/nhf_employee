@@ -95,6 +95,8 @@ describe("stock provider shared pagination helpers", () => {
     });
 
     it("derives Stock tabs from granular capabilities in deterministic order", () => {
+        expect(getVisibleStockTabs({ ...noCapabilities, canReadReports: true })).toEqual(["reports"]);
+        expect(normalizeStockTab("reports", { ...noCapabilities, canReadReports: true })).toBe("reports");
         expect(getVisibleStockTabs({
             ...noCapabilities,
             canReadOwnRequests: true,

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { getBangkokYear, createBangkokYearRange } from "@/lib/helpers/bangkok-time";
 
 export const stockAnalyticsQuerySchema = z.object({
-    year: z.coerce.number().int().min(2000).max(9998).default(() => getBangkokYear(new Date())),
+    year: z.coerce.number().int().min(2000).max(2100).default(() => getBangkokYear(new Date())),
     fromMonth: z.coerce.number().int().min(1).max(12).default(1),
     toMonth: z.coerce.number().int().min(1).max(12).default(12),
     categoryId: z.coerce.number().int().positive().optional(),

@@ -34,6 +34,13 @@ export async function readStockAnalytics(query: StockAnalyticsQuery): Promise<St
             ${joins} WHERE ${where} ${unitFilter}
             GROUP BY i.id, i.name, i.sku, c.name ORDER BY ${ranking} DESC, i.id ASC LIMIT 10`);
         const ids = top.map((row) => row.id);
+        // Unit filters choose the ranking, not the material's all-unit request frequency.
+        const counts = query.metric === "quantity" && ids.length
+            ? await tx.$queryRaw<{ id: number; requests: Count; lineCount: Count }[]>(Prisma.sql`
+                SELECT i.id, COUNT(DISTINCT r.id) AS requests, COUNT(ri.id) AS lineCount ${joins}
+                WHERE ${where} AND i.id IN (${Prisma.join(ids)}) GROUP BY i.id`)
+            : top;
+        const countsById = new Map(counts.map((row) => [row.id, row]));
         const quantities = ids.length ? await tx.$queryRaw<{ id: number; unit: string; quantity: Count }[]>(Prisma.sql`
             SELECT i.id, COALESCE(v.unit, i.unit) AS unit, SUM(ri.quantity) AS quantity ${joins}
             WHERE ${where} AND i.id IN (${Prisma.join(ids)})
@@ -41,7 +48,7 @@ export async function readStockAnalytics(query: StockAnalyticsQuery): Promise<St
             ORDER BY i.id, BINARY COALESCE(v.unit, i.unit)`) : [];
         const materials: AnalyticsMaterial[] = top.map((row) => ({
             id: row.id, name: row.name, sku: row.sku, category: row.category,
-            requestCount: number(row.requests), lineCount: number(row.lineCount),
+            requestCount: number(countsById.get(row.id)?.requests ?? 0), lineCount: number(countsById.get(row.id)?.lineCount ?? 0),
             quantities: quantities.filter((q) => q.id === row.id).map((q) => ({ unit: q.unit, quantity: number(q.quantity) })),
             available: [], health: { healthy: 0, low: 0, out: 0 },
         }));

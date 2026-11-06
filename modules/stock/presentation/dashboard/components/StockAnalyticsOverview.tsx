@@ -36,7 +36,7 @@ export function StockAnalyticsOverview({ onInventory }: { onInventory?: (sku: st
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-content-strong">ภาพรวมการใช้วัสดุ</h2><p className="mt-1 text-sm text-content-muted">วัสดุยอดนิยมจากการจ่ายจริง และสถานะคลังพร้อมดำเนินการ</p></div><Button variant="outline" disabled={isValidating} aria-busy={isValidating} onClick={() => void mutate()}><RefreshCw className="mr-2 size-4" aria-hidden="true" />รีเฟรชข้อมูล</Button></div>
         <form key={formVersion} onSubmit={applyFilters} className="rounded-2xl border border-border-subtle bg-surface-raised p-5" aria-label="ตัวกรองการจ่ายวัสดุย้อนหลัง">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                <label className="space-y-2 text-sm text-content-secondary"><span>ปี ค.ศ. (ปฏิทินไทย)</span><Input name="year" type="number" min={2000} max={9998} defaultValue={getBangkokYear(new Date())} required className="h-11" /></label>
+                <label className="space-y-2 text-sm text-content-secondary"><span>ปี ค.ศ. (ปฏิทินไทย)</span><Input name="year" type="number" min={2000} max={2100} defaultValue={getBangkokYear(new Date())} required className="h-11" /></label>
                 <label className="space-y-2 text-sm text-content-secondary"><span>เดือนเริ่มต้น</span><select name="fromMonth" defaultValue="1" className={selectClass}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></label>
                 <label className="space-y-2 text-sm text-content-secondary"><span>เดือนสิ้นสุด</span><select name="toMonth" defaultValue="12" className={selectClass}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></label>
                 <label className="space-y-2 text-sm text-content-secondary"><span>หมวดวัสดุ</span><select name="categoryId" defaultValue="" className={selectClass}><option value="">ทุกหมวด</option>{data?.options.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
@@ -54,7 +54,7 @@ export function StockAnalyticsOverview({ onInventory }: { onInventory?: (sku: st
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {[
                     ["จำนวนคำขอที่จ่ายแล้ว", data.kpis.issuedRequests, "คำขอไม่ซ้ำที่จ่ายแล้วและมีรายการตรงตัวกรอง"],
-                    ["จำนวนรายการที่จ่าย", data.kpis.issuedLines, "จำนวนบรรทัด StockRequestItem ไม่ใช่ปริมาณหรือจำนวนชนิด"],
+                    ["จำนวนรายการที่จ่าย", data.kpis.issuedLines, "จำนวนบรรทัดวัสดุในคำขอที่จ่ายแล้ว ไม่ใช่ปริมาณหรือจำนวนชนิด"],
                     ["คำขอรอจ่าย · ปัจจุบัน", data.kpis.pendingRequests, "ทุกคำขอสถานะรอจ่าย ไม่ใช้ตัวกรองย้อนหลัง"],
                     ["วัสดุที่ต้องเติม · ปัจจุบัน", data.kpis.attentionVariants, "variant ที่ใช้งานอยู่ของวัสดุที่ใช้งานและพร้อมใช้ ≤ จุดสั่งซื้อ หรือหมด"],
                 ].map(([label, value, description]) => <div key={label} className="rounded-2xl border border-border-subtle bg-surface-raised p-4"><dt className="text-sm font-medium text-content-secondary">{label}</dt><dd className="mt-2 text-2xl font-bold tabular-nums text-content-strong">{Number(value).toLocaleString("th-TH")}</dd><dd className="mt-2 text-xs leading-5 text-content-muted">{description}</dd></div>)}

@@ -70,4 +70,26 @@ describe("Stock analytics MySQL aggregation", () => {
         expect(values[0].getCell(11).value).toBe(7);
         expect(inventorySheet.actualRowCount - 1).toBe(Object.values(analytics.stockHealth).reduce((sum, count) => sum + count, 0));
     });
+    it("keeps canonical identities, category line shares and all-unit frequency under quantity ranking", async () => {
+        const category = await prisma.stockCategory.create({ data: { name: `Analytics alternate ${fixture.item.id}` } });
+        const item = await prisma.stockItem.create({ data: { name: fixture.item.name, sku: `${fixture.item.sku}-duplicate-name`, unit: "กล่อง", categoryId: category.id, isActive: false } });
+        const variant = await prisma.stockItemVariant.create({ data: { stockItemId: item.id, sku: `${item.sku}-v`, unit: "กล่อง", isActive: false } });
+        const project = `${fixture.request.projectCode}-TIE`;
+        for (const [key, lines] of [["a", [
+            { itemId: fixture.item.id, variantId: fixture.variant.id, quantity: 1 },
+            { itemId: fixture.item.id, variantId: secondVariantId, quantity: 2 },
+            { itemId: item.id, variantId: variant.id, quantity: 2 },
+        ]], ["b", [{ itemId: fixture.item.id, variantId: fixture.variant.id, quantity: 1 }]]] as const) {
+            await prisma.stockRequest.create({ data: { requestedBy: fixture.requester.id, idempotencyKey: `tie-${key}`, requestHash: "0".repeat(64), projectCode: project, status: StockRequestStatus.ISSUED, issuedAt: new Date("2024-02-10T00:00:00Z"), items: { create: [...lines] } } });
+        }
+        const result = await getStockAnalytics({ year: 2024, projectCode: project, metric: "quantity", unit: "กล่อง" });
+        expect(result.topMaterials.map((m) => m.id)).toEqual([fixture.item.id, item.id]);
+        expect(result.topMaterials[0]).toMatchObject({ requestCount: 2, lineCount: 3 });
+        expect(result.topMaterials[1].health).toEqual({ healthy: 0, low: 0, out: 0 });
+        expect(result.categories.map((c) => c.percentage)).toEqual([75, 25]);
+        const filtered = await getStockAnalytics({ year: 2024, projectCode: project, categoryId: category.id });
+        expect(filtered.kpis.issuedRequests).toBe(1);
+        expect(filtered.kpis.issuedLines).toBe(1);
+        expect(filtered.stockHealth).toEqual(result.stockHealth);
+    });
 });

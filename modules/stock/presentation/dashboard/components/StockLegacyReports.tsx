@@ -1,12 +1,13 @@
 "use client";
 
 import { FileSpreadsheet, Loader2 } from "lucide-react";
+import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
 import { StockReportsSkeleton } from "./StockSkeletons";
 import { useStockAdminReports } from "./useStockAdminReports";
 
-export function StockLegacyReports({ canExportReports }: { canExportReports: boolean }) {
+export function StockLegacyReports({ canExportReports }: { canExportReports: boolean }): ReactElement {
     const reports = useStockAdminReports(canExportReports);
 
     if (reports.isPageLoading) {

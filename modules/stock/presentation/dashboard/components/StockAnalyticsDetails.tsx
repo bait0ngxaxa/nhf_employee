@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactElement } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import type { StockAnalyticsResponse, UnitQuantity } from "../../../domain/analytics";
 
@@ -13,9 +13,16 @@ function quantities(values: UnitQuantity[]): string {
 }
 
 export function StockAnalyticsDetails({ data, onSelect, onInventory, detailName, onClose, onPage }: { data: StockAnalyticsResponse; onSelect: (id: number) => void; onInventory?: (sku: string) => void; detailName?: string; onClose: () => void; onPage: (page: number) => void }): ReactElement {
+    const detailHeading = useRef<HTMLHeadingElement>(null);
+    const detailPage = data.detail?.page;
+    useEffect(() => {
+        if (detailPage === undefined) return;
+        detailHeading.current?.focus({ preventScroll: true });
+        detailHeading.current?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    }, [detailPage, detailName]);
     return <div className="space-y-5">
         {data.detail ? <section className="rounded-2xl border border-module-stock-badge-border bg-surface-raised p-5" aria-label="รายละเอียดวัสดุ">
-            <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-bold text-content-strong">รายการย่อย: {detailName ?? "วัสดุที่เลือก"}</h3><Button variant="outline" onClick={onClose}>ปิดรายละเอียด</Button></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><h3 ref={detailHeading} tabIndex={-1} className="scroll-mt-24 text-lg font-bold text-content-strong focus-visible:outline-2 focus-visible:outline-ring">รายการย่อย: {detailName ?? "วัสดุที่เลือก"}</h3><Button variant="outline" onClick={onClose}>ปิดรายละเอียด</Button></div>
             <p className="mt-2 text-sm text-content-muted">จำนวนคำขอและปริมาณแยกตาม variant ในช่วงที่เลือก รวม variant ที่ปิดใช้งานแล้ว</p>
             <div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><caption className="sr-only">การใช้รายการย่อย หน้า {data.detail.page}</caption><thead><tr><th className={th}>SKU / คุณลักษณะ</th><th className={th}>คำขอ</th><th className={th}>ปริมาณที่จ่าย</th></tr></thead><tbody>
                 {data.detail.rows.map((r) => <tr key={r.variantId ?? "legacy"} className="border-t border-border-subtle"><td className={td}>{r.sku}<span className="block text-content-muted">{r.attributes || "รายการมาตรฐาน"}</span></td><td className={td}>{r.requests}</td><td className={td}>{r.quantity} {r.unit}</td></tr>)}

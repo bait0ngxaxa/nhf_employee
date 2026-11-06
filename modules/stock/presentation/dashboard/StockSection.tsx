@@ -1,4 +1,5 @@
 "use client";
+import type { ReactElement } from "react";
 
 import { SectionShell } from "@/components/ui/section-shell";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -93,7 +94,7 @@ function StockContent() {
     );
 }
 
-export function StockSection() {
+export function StockSection(): ReactElement {
     return (
         <StockProvider>
             <StockContent />

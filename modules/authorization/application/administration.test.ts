@@ -548,7 +548,7 @@ describe("Authorization Administration capability catalog", () => {
         )).toHaveLength(0);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "GRANTABLE",
-        )).toHaveLength(46);
+        )).toHaveLength(47);
         expect(first.filter(({ administrativeStatus }) =>
             administrativeStatus === "POLICY_ACTIVATION_REQUIRED",
         )).toHaveLength(0);

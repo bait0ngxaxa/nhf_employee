@@ -17,5 +17,6 @@ describe("Stock analytics definitions", () => {
         expect(stockAnalyticsQuerySchema.safeParse({ metric: "quantity" }).success).toBe(false);
         expect(stockAnalyticsQuerySchema.safeParse({ metric: "quantity", unit: "ชิ้น" }).success).toBe(true);
         expect(stockAnalyticsQuerySchema.safeParse({ year: "bad" }).success).toBe(false);
+        expect(stockAnalyticsQuerySchema.safeParse({ year: 2101 }).success).toBe(false);
     });
 });
