@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { styleWorksheet } from "@/lib/server/xlsx-style";
 
 import { buildLeaveReportRows } from "@/modules/leave/infrastructure/reports/report-model";
 import type {
@@ -50,26 +51,8 @@ function addDetailSheet(workbook: ExcelJS.Workbook, rows: LeaveDetailRow[]): voi
 }
 
 function finishWorksheet(sheet: ExcelJS.Worksheet, freezeColumnCount: number): void {
-    sheet.views = [{ state: "frozen", xSplit: freezeColumnCount, ySplit: 1 }];
-    sheet.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: sheet.columnCount },
-    };
-    sheet.eachRow((row) => {
-        row.font = { name: "Arial" };
-    });
-    styleHeaderRow(sheet.getRow(1));
+    styleWorksheet(sheet, { freezeColumns: freezeColumnCount });
     applyNumberFormat(sheet);
-}
-
-function styleHeaderRow(row: ExcelJS.Row): void {
-    row.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" } };
-    row.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF1F2937" },
-    };
-    row.alignment = { vertical: "middle", horizontal: "center" };
 }
 
 function styleTotalRow(sheet: ExcelJS.Worksheet): void {

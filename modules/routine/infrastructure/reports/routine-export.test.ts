@@ -130,6 +130,28 @@ describe("Routine task Excel export", () => {
         expect(sheet.getRow(2).getCell(11).value).toBe("พนักงาน 42");
     });
 
+    it.each(["=1+1", "+SUM(A1:A2)", "-1+2", "@SUM(A1:A2)", "https://example.com", "ภาษาไทย\nบรรทัดใหม่"])("serializes literal titles %s with standard presentation", async (text) => {
+        mocks.getRoutineTaskExportData.mockResolvedValue({ status: "ready", recordCount: 1, tasks: [task(1, text, 21)] });
+        const result = await prepareRoutineTaskExport(queryActor);
+        expect(result.status).toBe("ready");
+        if (result.status !== "ready") throw new Error("Expected workbook");
+        const loaded = new ExcelJS.Workbook();
+        await loaded.xlsx.load(await result.response.arrayBuffer());
+        const sheet = loaded.worksheets[0];
+        expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 1, xSplit: 2 });
+        expect(sheet.autoFilter).toBe("A1:Q1");
+        expect(sheet.getRow(1).height).toBe(30);
+        sheet.getRow(1).eachCell((cell) => {
+            expect(cell.font).toMatchObject({ name: "Arial", size: 11, bold: true });
+            expect(cell.fill).toMatchObject({ fgColor: { argb: "FF1F2937" } });
+            expect(cell.border.right?.style).toBe("thin");
+        });
+        expect(sheet.getCell("B2").value).toBe(text);
+        expect(sheet.getCell("B2").type).toBe(ExcelJS.ValueType.String);
+        expect(sheet.getCell("I2").value).toBe("2026-08-10");
+        expect(sheet.getCell("I2").type).toBe(ExcelJS.ValueType.String);
+    });
+
     it("enforces the server-side task row limit", async () => {
         mocks.getRoutineTaskExportData.mockResolvedValue({
             status: "limit-exceeded",

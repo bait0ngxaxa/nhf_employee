@@ -20,6 +20,16 @@ async function loadWorkbook(response: Response): Promise<ExcelJS.Workbook> {
     const workbook = new ExcelJS.Workbook();
     const buffer = await response.arrayBuffer();
     await workbook.xlsx.load(buffer);
+    for (const sheet of workbook.worksheets) {
+        expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 1, xSplit: sheet.name === "ยอดคงเหลือจริง" ? 3 : 4 });
+        expect(sheet.autoFilter).toBe(`A1:${sheet.getColumn(sheet.columnCount).letter}1`);
+        expect(sheet.getRow(1).height).toBe(30);
+        sheet.getRow(1).eachCell((cell) => {
+            expect(cell.font).toMatchObject({ name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } });
+            expect(cell.fill).toMatchObject({ fgColor: { argb: "FF1F2937" } });
+            expect(cell.border.bottom?.style).toBe("thin");
+        });
+    }
     return workbook;
 }
 

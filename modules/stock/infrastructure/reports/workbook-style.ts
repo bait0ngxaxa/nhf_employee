@@ -1,6 +1,6 @@
 import type ExcelJS from "exceljs";
+import { styleWorksheet } from "@/lib/server/xlsx-style";
 
-const HEADER_FILL = "FF1F2937";
 const TOTAL_FILL = "FFE0F2FE";
 const NUMBER_FORMAT = "0";
 const DATE_TIME_FORMAT = "dd/mm/yyyy hh:mm";
@@ -10,15 +10,7 @@ export function finishStockWorksheet(
     freezeColumnCount: number,
     dateTimeKeys: ReadonlySet<string> = new Set(),
 ): void {
-    sheet.views = [{ state: "frozen", xSplit: freezeColumnCount, ySplit: 1 }];
-    sheet.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: sheet.columnCount },
-    };
-    sheet.eachRow((row) => {
-        row.font = { name: "Arial" };
-    });
-    styleHeaderRow(sheet.getRow(1));
+    styleWorksheet(sheet, { freezeColumns: freezeColumnCount });
     applyColumnFormats(sheet, dateTimeKeys);
 }
 
@@ -30,16 +22,6 @@ export function styleTotalRow(sheet: ExcelJS.Worksheet): void {
         pattern: "solid",
         fgColor: { argb: TOTAL_FILL },
     };
-}
-
-function styleHeaderRow(row: ExcelJS.Row): void {
-    row.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" } };
-    row.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: HEADER_FILL },
-    };
-    row.alignment = { vertical: "middle", horizontal: "center" };
 }
 
 function applyColumnFormats(

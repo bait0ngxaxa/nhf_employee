@@ -12,6 +12,19 @@ describe("leave report workbook", () => {
 
         await loaded.xlsx.load(buffer);
 
+        for (const [index, sheet] of loaded.worksheets.entries()) {
+            expect(sheet.views[0]).toMatchObject({ state: "frozen", ySplit: 1, xSplit: index === 0 ? 3 : 5 });
+            expect(sheet.autoFilter).toBe(index === 0 ? "A1:U1" : "A1:R1");
+            expect(sheet.getRow(1).height).toBe(30);
+            sheet.getRow(1).eachCell((cell) => {
+                expect(cell.font).toMatchObject({ name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } });
+                expect(cell.fill).toMatchObject({ fgColor: { argb: "FF1F2937" } });
+                expect(cell.border.bottom).toMatchObject({ style: "thin", color: { argb: "FF64748B" } });
+            });
+        }
+        expect(loaded.worksheets[0].getCell("A3").fill).toMatchObject({ fgColor: { argb: "FFE0F2FE" } });
+        expect(loaded.worksheets[1].getCell("F2").type).toBe(ExcelJS.ValueType.Date);
+        expect(loaded.worksheets[1].getCell("F2").numFmt).toBe("dd/mm/yyyy");
         expect(loaded.worksheets.map((sheet) => sheet.name)).toEqual([
             "สรุปรายคน",
             "รายละเอียดคำขอลา",
@@ -30,6 +43,19 @@ describe("leave report workbook", () => {
         expect(loaded.getWorksheet("รายละเอียดคำขอลา")?.getCell("N1").value).toBe(
             "เหตุผลในการลาย้อนหลัง",
         );
+    });
+
+    it.each(["=1+1", "+SUM(A1:A2)", "-1+2", "@SUM(A1:A2)", "https://example.com", "ภาษาไทย\nบรรทัดใหม่"])("preserves literal free text %s and half days", async (text) => {
+        const employee = createEmployee();
+        employee.leaveRequests[0].reason = text;
+        employee.leaveRequests[0].durationDays = 0.5;
+        const loaded = new ExcelJS.Workbook();
+        await loaded.xlsx.load(await createLeaveReportWorkbook([employee]).xlsx.writeBuffer());
+        const cell = loaded.worksheets[1].getCell("M2");
+        expect(cell.value).toBe(text);
+        expect(cell.type).toBe(ExcelJS.ValueType.String);
+        expect(loaded.worksheets[1].getCell("J2").value).toBe(0.5);
+        expect(loaded.worksheets[1].getCell("J2").numFmt).toBe("0.#");
     });
 
     it("creates a detail-only workbook without quota summary headers", async () => {

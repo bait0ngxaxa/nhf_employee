@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { styleWorksheet } from "@/lib/server/xlsx-style";
 
 import {
     formatRoutineScheduleSummary,
@@ -21,7 +22,7 @@ export function createRoutineTaskExportWorkbook(
     const sheet = workbook.addWorksheet(ROUTINE_SHEET_NAME);
     sheet.columns = getRoutineColumns();
     sheet.addRows(tasks.map(toRoutineWorksheetRow));
-    finishRoutineWorksheet(sheet);
+    styleWorksheet(sheet, { freezeColumns: 2 });
 
     return workbook;
 }
@@ -74,25 +75,6 @@ function formatAssignees(
 
 function textOrEmpty(value: string | null): string {
     return value?.trim() || EMPTY_VALUE;
-}
-
-function finishRoutineWorksheet(sheet: ExcelJS.Worksheet): void {
-    sheet.views = [{ state: "frozen", xSplit: 2, ySplit: 1 }];
-    sheet.autoFilter = {
-        from: { row: 1, column: 1 },
-        to: { row: 1, column: sheet.columnCount },
-    };
-    sheet.eachRow((row) => {
-        row.font = { name: "Arial" };
-    });
-    const header = sheet.getRow(1);
-    header.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" } };
-    header.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF1F2937" },
-    };
-    header.alignment = { vertical: "middle", horizontal: "center" };
 }
 
 function getRoutineColumns(): Partial<ExcelJS.Column>[] {

@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { styleWorksheet } from "@/lib/server/xlsx-style";
 
 export type EmployeeExportRow = [
     number, string, string, string, string, string,
@@ -27,24 +28,13 @@ export function createEmployeeExportWorkbook(
     ];
     // Plain string values remain literal text, including formula-like input.
     sheet.addRows([...rows]);
-    sheet.autoFilter = "A1:L1";
-    sheet.views = [{ state: "frozen", ySplit: 1 }];
     sheet.eachRow((row, rowNumber) => {
-        row.font = { name: "Arial", size: 11 };
-        row.alignment = { vertical: "middle", wrapText: true };
         if (rowNumber > 1) {
             row.eachCell((cell, column) => {
                 cell.numFmt = column === 1 ? "0" : "@";
             });
         }
     });
-    const header = sheet.getRow(1);
-    header.height = 30;
-    header.font = { name: "Arial", size: 11, bold: true, color: { argb: "FFFFFFFF" } };
-    header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    header.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    header.eachCell((cell) => {
-        cell.border = { right: { style: "thin", color: { argb: "FF64748B" } } };
-    });
+    styleWorksheet(sheet);
     return workbook;
 }
