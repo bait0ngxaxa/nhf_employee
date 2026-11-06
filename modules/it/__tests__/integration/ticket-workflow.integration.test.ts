@@ -24,6 +24,7 @@ import {
     createITTicket,
     getITOperatorTicketActivity,
     getITOperatorReferenceData,
+    listITOperatorTickets,
     getITRequesterTicketActivity,
     setITTicketCategory,
     setITTicketPriority,
@@ -787,6 +788,123 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
                 action: "TICKET_UPDATE",
             },
         })).toBe(1);
+    });
+
+    it("sorts and paginates the operator queue across priorities and composes filters in SQL", async () => {
+        const fixture = await createFixture("priority-queue");
+        await grant(fixture.operator.userId, "it.ticket.read");
+        const p0Old = await createTicket(fixture.requester, nextFixtureKey("queue-p0-old"));
+        const p0New = await createTicket(fixture.requester, nextFixtureKey("queue-p0-new"));
+        const p1 = await createTicket(fixture.requester, nextFixtureKey("queue-p1"));
+        const p2Untriaged = await createTicket(fixture.requester, nextFixtureKey("queue-p2"));
+        const p3 = await createTicket(fixture.requester, nextFixtureKey("queue-p3"), {
+            type: "SERVICE_REQUEST",
+            title: "คำขอ priority P3",
+            description: "งานบริการความสำคัญต่ำ",
+        });
+        const cancelled = await createTicket(
+            fixture.requester,
+            nextFixtureKey("queue-cancelled"),
+        );
+
+        await setITTicketPriority(fixture.operator.context, {
+            ticketId: p0Old.ticket.id,
+            priority: "P0",
+            reason: "เหตุ outage ระดับองค์กร",
+            expectedVersion: 1,
+        });
+        await setITTicketPriority(fixture.operator.context, {
+            ticketId: p0New.ticket.id,
+            priority: "P0",
+            reason: "เหตุ outage ระดับองค์กร",
+            expectedVersion: 1,
+        });
+        await setITTicketPriority(fixture.operator.context, {
+            ticketId: p1.ticket.id,
+            priority: "P1",
+            reason: "กระทบผู้ใช้หลายคน",
+            expectedVersion: 1,
+        });
+        await setITTicketPriority(fixture.operator.context, {
+            ticketId: p3.ticket.id,
+            priority: "P3",
+            expectedVersion: 1,
+        });
+        await transitionITTicketStatus(fixture.operator.context, {
+            ticketId: cancelled.ticket.id,
+            targetStatus: ITTicketStatus.CANCELLED,
+            expectedVersion: 1,
+        });
+
+        const category = await prisma.iTTicketCategory.create({
+            data: {
+                key: nextFixtureKey("queue-filter-category"),
+                name: "หมวดหมู่ทดสอบคิว",
+            },
+            select: { id: true },
+        });
+        await prisma.iTTicket.update({
+            where: { id: p1.ticket.id },
+            data: {
+                categoryId: category.id,
+                assignedToUserId: fixture.operator.userId,
+            },
+        });
+        const creationOrder = [
+            [p0Old.ticket.id, "2026-01-01T00:00:00.000Z"],
+            [p0New.ticket.id, "2026-02-01T00:00:00.000Z"],
+            [p1.ticket.id, "2026-03-01T00:00:00.000Z"],
+            [p2Untriaged.ticket.id, "2026-04-01T00:00:00.000Z"],
+            [p3.ticket.id, "2026-05-01T00:00:00.000Z"],
+        ] as const;
+        for (const [ticketId, createdAt] of creationOrder) {
+            await prisma.iTTicket.update({
+                where: { id: ticketId },
+                data: { createdAt: new Date(createdAt) },
+            });
+        }
+
+        const pagedIds: number[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await listITOperatorTickets(fixture.operator.context, {
+                limit: 2,
+                ...(cursor === undefined ? {} : { cursor }),
+            });
+            pagedIds.push(...page.tickets.map(({ id }) => id));
+            cursor = page.nextCursor ?? undefined;
+        } while (cursor !== undefined);
+        expect(pagedIds).toEqual([
+            p0Old.ticket.id,
+            p0New.ticket.id,
+            p1.ticket.id,
+            p2Untriaged.ticket.id,
+            p3.ticket.id,
+        ]);
+        expect(new Set(pagedIds).size).toBe(pagedIds.length);
+
+        const filtered = await listITOperatorTickets(fixture.operator.context, {
+            status: "OPEN",
+            type: "INCIDENT",
+            categoryId: category.id,
+            assignmentState: "ASSIGNED",
+            assigneeUserId: fixture.operator.userId,
+            priority: "P1",
+            triageState: "TRIAGED",
+        });
+        expect(filtered.tickets.map(({ id }) => id)).toEqual([p1.ticket.id]);
+        const untriaged = await listITOperatorTickets(fixture.operator.context, {
+            triageState: "UNTRIAGED",
+        });
+        expect(untriaged.tickets.map(({ id }) => id)).toContain(p2Untriaged.ticket.id);
+        expect(untriaged.tickets.map(({ id }) => id)).not.toContain(p3.ticket.id);
+        const activeIds = (await listITOperatorTickets(fixture.operator.context, {}))
+            .tickets.map(({ id }) => id);
+        expect(activeIds).not.toContain(cancelled.ticket.id);
+        const historicalIds = (await listITOperatorTickets(fixture.operator.context, {
+            status: "ALL",
+        })).tickets.map(({ id }) => id);
+        expect(historicalIds).toContain(cancelled.ticket.id);
     });
 
     it("rolls back Ticket and idempotency writes when event persistence fails", async () => {

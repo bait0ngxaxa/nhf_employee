@@ -178,7 +178,7 @@ export async function findOperatorITTickets(
     return tx.iTTicket.findMany({
         where,
         select: IT_OPERATOR_TICKET_SELECT,
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        orderBy: [{ priority: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         take,
     });
 }

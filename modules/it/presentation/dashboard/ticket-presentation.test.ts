@@ -20,6 +20,7 @@ import {
     parseITTicketConversationPage,
     parseITRequesterTicket,
     parseITRequesterTicketDetail,
+    formatITTicketAge,
 } from "./ticket-presentation";
 
 const operatorTicket = {
@@ -47,6 +48,13 @@ const operatorTicket = {
 };
 
 describe("IT operator presentation contracts", () => {
+    it("formats informational Ticket age from creation time without a countdown", () => {
+        const now = Date.parse("2026-02-03T00:00:00.000Z");
+        expect(formatITTicketAge("2026-02-01T00:00:00.000Z", now)).toBe("ค้าง 2 วัน");
+        expect(formatITTicketAge("2026-02-02T12:00:00.000Z", now)).toBe("ค้างไม่ถึง 1 วัน");
+        expect(formatITTicketAge("invalid", now)).toBe("ไม่ระบุ");
+    });
+
     it("preserves the requester response shape without exposing priority fields", () => {
         const requesterTicket = {
             id: 19,

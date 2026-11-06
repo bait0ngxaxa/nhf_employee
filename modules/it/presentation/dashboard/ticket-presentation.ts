@@ -30,6 +30,13 @@ export const IT_TICKET_STATUS_STYLES: Readonly<Record<ITTicketStatus, string>> =
     CANCELLED: "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200",
 };
 
+export const IT_TICKET_PRIORITY_STYLES: Readonly<Record<ITTicketPriority, string>> = {
+    P0: "bg-rose-100 text-rose-900 ring-1 ring-inset ring-rose-300 dark:bg-rose-950/60 dark:text-rose-100 dark:ring-rose-800",
+    P1: "bg-orange-100 text-orange-900 ring-1 ring-inset ring-orange-300 dark:bg-orange-950/60 dark:text-orange-100 dark:ring-orange-800",
+    P2: "bg-sky-100 text-sky-900 ring-1 ring-inset ring-sky-300 dark:bg-sky-950/60 dark:text-sky-100 dark:ring-sky-800",
+    P3: "bg-slate-100 text-slate-800 ring-1 ring-inset ring-slate-300 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600",
+};
+
 const IT_TICKET_ACTIVITY_DATE_FORMATTER = new Intl.DateTimeFormat("th-TH", {
     dateStyle: "medium",
     timeZone: "Asia/Bangkok",
@@ -411,6 +418,14 @@ export function formatITTicketDate(value: string): string {
         dateStyle: "medium",
         timeStyle: "short",
     }).format(date);
+}
+
+/** Shows elapsed age from creation; this is informational, not an SLA measure. */
+export function formatITTicketAge(createdAt: string, nowMs: number = Date.now()): string {
+    const createdAtMs = Date.parse(createdAt);
+    if (Number.isNaN(createdAtMs)) return "ไม่ระบุ";
+    const elapsedDays = Math.floor(Math.max(0, nowMs - createdAtMs) / 86_400_000);
+    return elapsedDays === 0 ? "ค้างไม่ถึง 1 วัน" : `ค้าง ${elapsedDays} วัน`;
 }
 
 export function formatITTicketActivityTime(value: string): string {

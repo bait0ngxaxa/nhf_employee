@@ -10,16 +10,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
 
 import {
+    IT_TICKET_PRIORITY_LABELS,
+    IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
     type ITOperatorReferenceData,
     type ITOperatorTicket,
     type ITOperatorTicketList,
 } from "../../contracts";
-import type { ITTicketStatus, ITTicketType } from "@prisma/client";
+import type { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
 import {
+    formatITTicketAge,
     formatITTicketDate,
+    IT_TICKET_PRIORITY_STYLES,
     IT_TICKET_STATUS_STYLES,
+    isITTicketPriority,
     isITTicketStatus,
     isITTicketType,
     parseITOperatorReferenceData,
@@ -28,8 +33,10 @@ import {
 } from "./ticket-presentation";
 
 interface QueueFilters {
-    readonly status?: ITTicketStatus;
+    readonly status: "ACTIVE" | "ALL" | ITTicketStatus;
     readonly type?: ITTicketType;
+    readonly priority?: ITTicketPriority;
+    readonly triageState?: "TRIAGED" | "UNTRIAGED";
     readonly categoryId?: number | "uncategorized";
     readonly assignmentState?: "ASSIGNED" | "UNASSIGNED";
     readonly assigneeUserId?: number;
@@ -53,6 +60,36 @@ function TicketStatus({ status }: { readonly status: ITTicketStatus }): ReactEle
     return (
         <span className={`inline-flex min-h-7 items-center rounded-full px-3 py-1 text-xs font-semibold ${IT_TICKET_STATUS_STYLES[status]}`}>
             {IT_TICKET_STATUS_LABELS[status]}
+        </span>
+    );
+}
+
+function TicketPriority({ priority }: { readonly priority: ITTicketPriority }): ReactElement {
+    return (
+        <span className={`inline-flex min-h-7 w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${IT_TICKET_PRIORITY_STYLES[priority]}`}>
+            {IT_TICKET_PRIORITY_LABELS[priority]}
+        </span>
+    );
+}
+
+function TicketTriage({ triaged }: { readonly triaged: boolean }): ReactElement {
+    return triaged
+        ? <span className="text-xs font-medium text-emerald-800 dark:text-emerald-200">ประเมินแล้ว</span>
+        : <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">ยังไม่ประเมิน</span>;
+}
+
+function TicketAge({ ticket }: { readonly ticket: ITOperatorTicket }): ReactElement {
+    if (ticket.status === "RESOLVED" || ticket.status === "CLOSED" || ticket.status === "CANCELLED") {
+        return <span className="text-xs text-content-muted">—</span>;
+    }
+    const age = formatITTicketAge(ticket.createdAt);
+    return (
+        <span
+            className="whitespace-nowrap text-xs text-content-secondary"
+            title="อายุคำนวณจากวันที่สร้าง ใช้เพื่อประกอบการจัดคิวเท่านั้น"
+            aria-label={`อายุคำขอ ${age}`}
+        >
+            {age}
         </span>
     );
 }
@@ -110,22 +147,69 @@ function QueueFiltersForm({
                 <h2 id="it-ticket-queue-filters-heading" className="text-base font-semibold text-content-heading">ตัวกรองคิว Ticket</h2>
                 <p className="text-sm leading-6 text-content-secondary">เลือกเงื่อนไขแล้วกดใช้ตัวกรองเพื่อค้นหารายการ</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <label className="min-w-0 text-sm font-medium text-content-secondary">
                     สถานะ
                     <select
                         aria-label="กรองตามสถานะ"
                         className={fieldClassName}
-                        value={draft.status ?? ""}
+                        value={draft.status}
                         onChange={(event) => {
                             const status = event.target.value;
-                            setDraft({ ...draft, status: isITTicketStatus(status) ? status : undefined });
+                            setDraft({
+                                ...draft,
+                                status: status === "ACTIVE" || status === "ALL"
+                                    ? status
+                                    : isITTicketStatus(status) ? status : "ACTIVE",
+                            });
                         }}
                     >
-                        <option value="">ทุกสถานะ</option>
+                        <option value="ACTIVE">งานที่ยังไม่สิ้นสุด</option>
+                        <option value="ALL">ทุกสถานะ</option>
                         {Object.entries(IT_TICKET_STATUS_LABELS).map(([status, label]) => (
                             <option key={status} value={status}>{label}</option>
                         ))}
+                    </select>
+                </label>
+                <label className="min-w-0 text-sm font-medium text-content-secondary">
+                    Priority
+                    <select
+                        aria-label="กรองตาม Priority"
+                        className={fieldClassName}
+                        value={draft.priority ?? ""}
+                        onChange={(event) => {
+                            const priority = event.target.value;
+                            setDraft({
+                                ...draft,
+                                priority: isITTicketPriority(priority) ? priority : undefined,
+                            });
+                        }}
+                    >
+                        <option value="">ทุกระดับ</option>
+                        {IT_TICKET_PRIORITY_OPTIONS.map(({ value, label }) => (
+                            <option key={value} value={value}>{label}</option>
+                        ))}
+                    </select>
+                </label>
+                <label className="min-w-0 text-sm font-medium text-content-secondary">
+                    การประเมิน
+                    <select
+                        aria-label="กรองตามการประเมิน Priority"
+                        className={fieldClassName}
+                        value={draft.triageState ?? ""}
+                        onChange={(event) => {
+                            const value = event.target.value;
+                            setDraft({
+                                ...draft,
+                                triageState: value === "TRIAGED" || value === "UNTRIAGED"
+                                    ? value
+                                    : undefined,
+                            });
+                        }}
+                    >
+                        <option value="">ประเมินทุกสถานะ</option>
+                        <option value="UNTRIAGED">ยังไม่ประเมิน</option>
+                        <option value="TRIAGED">ประเมินแล้ว</option>
                     </select>
                 </label>
                 <label className="min-w-0 text-sm font-medium text-content-secondary">
@@ -217,15 +301,15 @@ function QueueFiltersForm({
             </div>
             <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit">ใช้ตัวกรอง</Button>
-                <span className="text-xs leading-5 text-content-muted">ผลลัพธ์โหลดจากระบบตามลำดับรายการล่าสุด</span>
+                <span className="text-xs leading-5 text-content-muted">ระบบเรียงตาม Priority และแสดง Ticket เก่าก่อนในระดับเดียวกัน</span>
             </div>
         </form>
     );
 }
 
 export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?: boolean } = {}): ReactElement {
-    const [filters, setFilters] = useState<QueueFilters>({});
-    const [draft, setDraft] = useState<QueueFilters>({});
+    const [filters, setFilters] = useState<QueueFilters>({ status: "ACTIVE" });
+    const [draft, setDraft] = useState<QueueFilters>({ status: "ACTIVE" });
     const [refreshKey, setRefreshKey] = useState(0);
     const [queueState, setQueueState] = useState<QueueState | null>(null);
     const [referenceState, setReferenceState] = useState<ReferenceState | null>(null);
@@ -241,8 +325,10 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
     useEffect(() => {
         const controller = new AbortController();
         const query = new URLSearchParams();
-        if (filters.status) query.set("status", filters.status);
+        query.set("status", filters.status);
         if (filters.type) query.set("type", filters.type);
+        if (filters.priority) query.set("priority", filters.priority);
+        if (filters.triageState) query.set("triageState", filters.triageState);
         if (filters.categoryId !== undefined) query.set("categoryId", String(filters.categoryId));
         if (filters.assignmentState) query.set("assignmentState", filters.assignmentState);
         if (filters.assigneeUserId !== undefined) query.set("assigneeUserId", String(filters.assigneeUserId));
@@ -311,8 +397,10 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
         const cursor = list.nextCursor;
         setQueueState({ ...currentQueueState, loadingMore: true, loadMoreError: null });
         const query = new URLSearchParams({ cursor });
-        if (filters.status) query.set("status", filters.status);
+        query.set("status", filters.status);
         if (filters.type) query.set("type", filters.type);
+        if (filters.priority) query.set("priority", filters.priority);
+        if (filters.triageState) query.set("triageState", filters.triageState);
         if (filters.categoryId !== undefined) query.set("categoryId", String(filters.categoryId));
         if (filters.assignmentState) query.set("assignmentState", filters.assignmentState);
         if (filters.assigneeUserId !== undefined) query.set("assigneeUserId", String(filters.assigneeUserId));
@@ -359,7 +447,7 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                             คิว IT Ticket
                         </h1>
                         <p className="max-w-[70ch] text-sm leading-6 text-content-secondary">
-                            ตรวจสอบผู้แจ้ง สถานะ ผู้รับผิดชอบ และหมวดหมู่ แล้วเปิดรายการเพื่อดำเนินการ
+                            คิวเริ่มจากงานที่ยังไม่สิ้นสุด เรียง P0 ถึง P3 และแสดง Ticket เก่าก่อนในระดับเดียวกัน
                         </p>
                     </div> : null}
                     <Button type="button" variant="outline" onClick={retry}>
@@ -416,14 +504,17 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                         <>
                             <Card className="hidden overflow-hidden py-0 2xl:block">
                                 <CardContent className="overflow-x-auto px-0 py-0">
-                                    <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+                                    <table className="w-full min-w-[1420px] border-collapse text-left text-sm">
                                         <thead className="bg-surface-subtle text-xs font-semibold text-content-secondary">
                                             <tr>
                                                 <th scope="col" className="px-4 py-3">Ticket</th>
                                                 <th scope="col" className="px-4 py-3">ผู้แจ้ง</th>
+                                                <th scope="col" className="px-4 py-3">Priority</th>
+                                                <th scope="col" className="px-4 py-3">ประเมิน</th>
                                                 <th scope="col" className="px-4 py-3">สถานะ</th>
                                                 <th scope="col" className="px-4 py-3">ผู้รับผิดชอบ</th>
                                                 <th scope="col" className="px-4 py-3">หมวดหมู่</th>
+                                                <th scope="col" className="px-4 py-3">อายุคำขอ</th>
                                                 <th scope="col" className="px-4 py-3">สร้างเมื่อ</th>
                                                 <th scope="col" className="px-4 py-3">อัปเดตล่าสุด</th>
                                             </tr>
@@ -446,9 +537,12 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                                                             {ticket.requester.departmentNameSnapshot ?? "ไม่ระบุแผนก"}
                                                         </p>
                                                     </td>
+                                                    <td className="px-4 py-4"><TicketPriority priority={ticket.priority} /></td>
+                                                    <td className="px-4 py-4"><TicketTriage triaged={ticket.isTriaged} /></td>
                                                     <td className="px-4 py-4"><TicketStatus status={ticket.status} /></td>
                                                     <td className="max-w-48 px-4 py-4 [overflow-wrap:anywhere]"><TicketAssignment ticket={ticket} /></td>
                                                     <td className="max-w-40 px-4 py-4 [overflow-wrap:anywhere]"><TicketCategory ticket={ticket} /></td>
+                                                    <td className="whitespace-nowrap px-4 py-4"><TicketAge ticket={ticket} /></td>
                                                     <td className="whitespace-nowrap px-4 py-4 text-xs text-content-secondary">{formatITTicketDate(ticket.createdAt)}</td>
                                                     <td className="whitespace-nowrap px-4 py-4 text-xs text-content-secondary">{formatITTicketDate(ticket.updatedAt)}</td>
                                                 </tr>
@@ -468,9 +562,16 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                                                 <span className="min-w-0 font-semibold text-content-heading [overflow-wrap:anywhere]">
                                                     #{ticket.id} · {ticket.title}
                                                 </span>
-                                                <TicketStatus status={ticket.status} />
+                                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                                    <TicketPriority priority={ticket.priority} />
+                                                    <TicketStatus status={ticket.status} />
+                                                </div>
                                             </div>
                                             <p className="mt-1 text-sm text-content-secondary">{IT_TICKET_TYPE_LABELS[ticket.type]}</p>
+                                            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                                                <TicketTriage triaged={ticket.isTriaged} />
+                                                <TicketAge ticket={ticket} />
+                                            </div>
                                             <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-border-neutral pt-3 text-sm">
                                                 <div className="min-w-0">
                                                     <dt className="text-xs text-content-muted">ผู้แจ้ง</dt>

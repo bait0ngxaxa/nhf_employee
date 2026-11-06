@@ -23,16 +23,19 @@ import { ITTicketConversation } from "./ITTicketConversation";
 import { ITTicketActivity } from "../ITTicketActivity";
 
 import {
+    IT_TICKET_PRIORITY_LABELS,
+    IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
     type ITOperatorReferenceData,
     type ITOperatorTicketDetail,
     type ITPresentationCapabilities,
 } from "../../contracts";
-import type { ITTicketStatus } from "@prisma/client";
+import type { ITTicketPriority, ITTicketStatus } from "@prisma/client";
 import { getAllowedITTicketTransitions } from "../../domain/ticket-workflow";
 import {
     formatITTicketDate,
+    IT_TICKET_PRIORITY_STYLES,
     IT_TICKET_STATUS_STYLES,
     isITOperatorMutationVersionConflict,
     isITTicketResponseRecord,
@@ -86,6 +89,14 @@ function TicketStatus({ status }: { readonly status: ITTicketStatus }): ReactEle
     );
 }
 
+function TicketPriority({ priority }: { readonly priority: ITTicketPriority }): ReactElement {
+    return (
+        <span className={`inline-flex min-h-7 w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${IT_TICKET_PRIORITY_STYLES[priority]}`}>
+            {IT_TICKET_PRIORITY_LABELS[priority]}
+        </span>
+    );
+}
+
 export function ITTicketOperatorDetail({
     ticketId,
     capabilities,
@@ -102,6 +113,14 @@ export function ITTicketOperatorDetail({
     const [mutationAccessDenied, setMutationAccessDenied] = useState(false);
     const [pendingTerminalTransition, setPendingTerminalTransition] =
         useState<PendingTerminalTransition | null>(null);
+    const [priorityDraft, setPriorityDraft] = useState<{
+        readonly key: string;
+        readonly value: ITTicketPriority;
+    } | null>(null);
+    const [priorityReasonDraft, setPriorityReasonDraft] = useState<{
+        readonly key: string;
+        readonly value: string;
+    } | null>(null);
     const inFlightRef = useRef(false);
     const requiredVersionRef = useRef(0);
     const terminalTransitionTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -280,8 +299,20 @@ export function ITTicketOperatorDetail({
         : savedCategoryValue;
     const assignmentChanged = assignmentValue !== savedAssignmentValue;
     const categoryChanged = categoryValue !== savedCategoryValue;
+    const priorityValue = priorityDraft?.key === assignmentDraftKey
+        ? priorityDraft.value
+        : ticket?.priority ?? "P2";
+    const priorityReason = priorityReasonDraft?.key === assignmentDraftKey
+        ? priorityReasonDraft.value
+        : "";
+    const priorityChanged = ticket !== null && priorityValue !== ticket.priority;
+    const priorityTerminal = ticket?.status === "CLOSED" || ticket?.status === "CANCELLED";
     const canManage = capabilities.canManageTickets && !mutationAccessDenied;
     const actionsDisabled = busy || loading || mutationReviewReason !== null || !ticket;
+    const prioritySaveDisabled = actionsDisabled
+        || priorityTerminal
+        || (!priorityChanged && ticket?.isTriaged === true)
+        || (priorityChanged && priorityReason.trim().length === 0);
     const allowedTransitions = ticket
         ? getAllowedITTicketTransitions(ticket.status)
         : [];
@@ -311,6 +342,19 @@ export function ITTicketOperatorDetail({
             API_ROUTES.itOperatorTickets.categoryById(ticket.id),
             { categoryId },
             "บันทึกหมวดหมู่แล้ว",
+        );
+    };
+
+    const handlePriority = (): void => {
+        if (!ticket || priorityTerminal || (!priorityChanged && ticket.isTriaged)) return;
+        if (priorityChanged && priorityReason.trim().length === 0) return;
+        void runMutation(
+            API_ROUTES.itOperatorTickets.priorityById(ticket.id),
+            {
+                priority: priorityValue,
+                ...(priorityChanged ? { reason: priorityReason.trim() } : {}),
+            },
+            priorityChanged ? "บันทึก Priority แล้ว" : "ยืนยัน Priority แล้ว",
         );
     };
 
@@ -508,6 +552,90 @@ export function ITTicketOperatorDetail({
                                 </dl>
                             </CardContent>
                         </Card>
+
+                        <section aria-labelledby="it-ticket-priority-heading" className="space-y-4 rounded-xl border border-border-neutral bg-surface-subtle p-4 md:p-5">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                    <h2 id="it-ticket-priority-heading" className="text-lg font-semibold text-content-heading">Priority</h2>
+                                    <p className="text-sm leading-6 text-content-secondary">
+                                        ใช้จัดลำดับการทำงานตามผลกระทบและความเร่งด่วน
+                                    </p>
+                                </div>
+                                <TicketPriority priority={ticket.priority} />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                                <span className="font-medium text-content-secondary">สถานะการประเมิน</span>
+                                {ticket.isTriaged ? (
+                                    <span className="text-emerald-800 dark:text-emerald-200">
+                                        ประเมินแล้ว
+                                        {ticket.triagedBy ? ` · ${ticket.triagedBy.displayName}` : ""}
+                                        {ticket.triagedAt ? ` · ${formatITTicketDate(ticket.triagedAt)}` : ""}
+                                    </span>
+                                ) : (
+                                    <span className="font-semibold text-amber-800 dark:text-amber-200">ยังไม่ประเมิน</span>
+                                )}
+                            </div>
+                            {canManage ? (
+                                <div className="grid gap-3 border-t border-border-neutral pt-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                    <div className="space-y-3">
+                                        <label className="block text-sm font-medium text-content-secondary">
+                                            ระดับความสำคัญ
+                                            <select
+                                                aria-label="ระดับความสำคัญ"
+                                                className={fieldClassName}
+                                                value={priorityValue}
+                                                disabled={actionsDisabled || priorityTerminal}
+                                                onChange={(event) => {
+                                                    const value = event.target.value;
+                                                    if (value === "P0" || value === "P1" || value === "P2" || value === "P3") {
+                                                        setPriorityDraft({ key: assignmentDraftKey, value });
+                                                        setPriorityReasonDraft({ key: assignmentDraftKey, value: "" });
+                                                    }
+                                                }}
+                                            >
+                                                {IT_TICKET_PRIORITY_OPTIONS.map(({ value, label }) => (
+                                                    <option key={value} value={value}>{label}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        {priorityChanged ? (
+                                            <label className="block text-sm font-medium text-content-secondary">
+                                                เหตุผลการเปลี่ยน Priority
+                                                <textarea
+                                                    aria-label="เหตุผลการเปลี่ยน Priority"
+                                                    aria-describedby="it-ticket-priority-reason-help"
+                                                    aria-invalid={priorityReason.trim().length === 0}
+                                                    className={`${fieldClassName} min-h-20 resize-y py-2`}
+                                                    maxLength={500}
+                                                    value={priorityReason}
+                                                    disabled={actionsDisabled || priorityTerminal}
+                                                    onChange={(event) => setPriorityReasonDraft({
+                                                        key: assignmentDraftKey,
+                                                        value: event.target.value,
+                                                    })}
+                                                />
+                                                <span id="it-ticket-priority-reason-help" className="mt-1 block text-xs leading-5 text-content-muted">
+                                                    {priorityReason.trim().length === 0
+                                                        ? "กรุณาระบุเหตุผลก่อนบันทึก (ไม่เกิน 500 ตัวอักษร)"
+                                                        : `${priorityReason.length}/500 ตัวอักษร`}
+                                                </span>
+                                            </label>
+                                        ) : null}
+                                        {priorityTerminal ? (
+                                            <p className="text-sm text-content-muted">Ticket สิ้นสุดแล้ว จึงไม่สามารถประเมินหรือเปลี่ยน Priority ได้</p>
+                                        ) : null}
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={prioritySaveDisabled}
+                                        onClick={handlePriority}
+                                    >
+                                        {priorityChanged ? "บันทึก Priority" : "ยืนยัน Priority"}
+                                    </Button>
+                                </div>
+                            ) : null}
+                        </section>
 
                         <ITTicketConversation
                             ticketId={ticket.id}

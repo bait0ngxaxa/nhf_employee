@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
@@ -81,8 +81,11 @@ function apiResponse(body: unknown, status = 200): Response {
     });
 }
 
-function queueResponse(tickets: readonly ITOperatorTicket[] = []): Response {
-    return apiResponse({ success: true, tickets, nextCursor: null, limit: 25 });
+function queueResponse(
+    tickets: readonly ITOperatorTicket[] = [],
+    nextCursor: string | null = null,
+): Response {
+    return apiResponse({ success: true, tickets, nextCursor, limit: 25 });
 }
 
 function detailResponse(
@@ -201,18 +204,59 @@ describe("IT operator queue presentation", () => {
         expect(screen.getAllByText("อารี ใจเย็น")).toHaveLength(2);
         expect(screen.getAllByText("ยังไม่มีผู้รับผิดชอบ").length).toBeGreaterThan(1);
         expect(screen.getAllByText("ยังไม่จัดหมวดหมู่").length).toBeGreaterThan(0);
+        expect(screen.getAllByText("P2 — ปกติ", { selector: "span" })).toHaveLength(2);
+        expect(screen.getAllByText("ยังไม่ประเมิน", { selector: "span" })).toHaveLength(2);
+        expect(screen.getAllByText(/^ค้าง \d+ วัน$/)).toHaveLength(2);
 
         fireEvent.change(screen.getByLabelText("กรองตามสถานะ"), {
             target: { value: "IN_PROGRESS" },
+        });
+        fireEvent.change(screen.getByLabelText("กรองตาม Priority"), {
+            target: { value: "P1" },
+        });
+        fireEvent.change(screen.getByLabelText("กรองตามการประเมิน Priority"), {
+            target: { value: "UNTRIAGED" },
         });
         fireEvent.click(screen.getByRole("button", { name: "ใช้ตัวกรอง" }));
 
         await waitFor(() => {
             expect(fetchMock.mock.calls.some(([input]) =>
-                String(input).includes("status=IN_PROGRESS"),
+                String(input).includes("status=IN_PROGRESS")
+                    && String(input).includes("priority=P1")
+                    && String(input).includes("triageState=UNTRIAGED"),
             )).toBe(true);
         });
         expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
+    });
+
+    it("loads subsequent priority pages and resets pagination when a filter changes", async () => {
+        const secondTicket = { ...ticket, id: 20, priority: "P0" as const };
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("cursor=")) return queueResponse([secondTicket]);
+            if (url.includes("priority=P0")) return queueResponse([]);
+            return queueResponse([ticket], "cursor-token");
+        });
+
+        render(<ITTicketOperatorQueue />);
+        expect(await screen.findAllByRole("link", { name: /เข้าใช้งานระบบไม่ได้/ }))
+            .toHaveLength(2);
+        fireEvent.click(screen.getByRole("button", { name: "โหลดรายการถัดไป" }));
+        await waitFor(() => expect(screen.getAllByRole("link", {
+            name: /เข้าใช้งานระบบไม่ได้/,
+        })).toHaveLength(4));
+
+        fireEvent.change(screen.getByLabelText("กรองตาม Priority"), {
+            target: { value: "P0" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "ใช้ตัวกรอง" }));
+        expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
+        const filteredRequest = fetchMock.mock.calls
+            .map(([input]) => String(input))
+            .find((url) => url.includes("priority=P0"));
+        expect(filteredRequest).toContain("status=ACTIVE");
+        expect(filteredRequest).not.toContain("cursor=");
     });
 });
 
@@ -253,9 +297,123 @@ describe("IT operator Ticket detail presentation", () => {
                     expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
                 }
             }
+            if (status === "CLOSED" || status === "CANCELLED") {
+                expect(screen.getByLabelText("ระดับความสำคัญ")).toBeDisabled();
+                expect(screen.getByRole("button", { name: "ยืนยัน Priority" })).toBeDisabled();
+            } else {
+                expect(screen.getByLabelText("ระดับความสำคัญ")).toBeEnabled();
+            }
             expect(screen.queryByRole("combobox", { name: "สถานะ" })).not.toBeInTheDocument();
         },
     );
+
+    it("confirms the default priority, prevents duplicates, and requires a reason for changes", async () => {
+        const triageTime = "2026-10-01T03:40:00.000Z";
+        const triagedTicket: ITOperatorTicket = {
+            ...ticket,
+            triagedAt: triageTime,
+            isTriaged: true,
+            triagedBy: { userId: 51, displayName: "สมชาย ใจดี" },
+            version: 5,
+        };
+        const changedTicket: ITOperatorTicket = {
+            ...triagedTicket,
+            priority: "P1",
+            version: 6,
+        };
+        const patchBodies: unknown[] = [];
+        let detailReads = 0;
+        let patchCount = 0;
+        const firstPatchControl: { resolve?: (response: Response) => void } = {};
+        const firstPatch = new Promise<Response>((resolve) => {
+            firstPatchControl.resolve = resolve;
+        });
+        mockApiImplementation(async (input, init) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("/activity")) return activityResponse();
+            if (init?.method === "PATCH") {
+                patchBodies.push(JSON.parse(String(init.body)) as unknown);
+                patchCount += 1;
+                if (patchCount === 1) return firstPatch;
+                return apiResponse({
+                    success: true,
+                    changed: true,
+                    ticket: {
+                        id: 19,
+                        version: 6,
+                        status: "OPEN",
+                        priority: "P1",
+                        triagedAt: triageTime,
+                        triagedByUserId: 51,
+                        isTriaged: true,
+                        assignedToUserId: null,
+                        categoryId: null,
+                        updatedAt: "2026-10-01T04:00:00.000Z",
+                    },
+                });
+            }
+            detailReads += 1;
+            return detailResponse(
+                detailReads === 1 ? ticket : detailReads === 2 ? triagedTicket : changedTicket,
+            );
+        });
+
+        render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
+        expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
+        expect(screen.getAllByText("P2 — ปกติ", { selector: "span" })).toHaveLength(1);
+        expect(screen.getByText("ยังไม่ประเมิน")).toBeInTheDocument();
+        expect(screen.queryByLabelText("เหตุผลการเปลี่ยน Priority")).not.toBeInTheDocument();
+
+        const confirmButton = screen.getByRole("button", { name: "ยืนยัน Priority" });
+        fireEvent.click(confirmButton);
+        await waitFor(() => expect(patchBodies).toHaveLength(1));
+        expect(confirmButton).toBeDisabled();
+        fireEvent.click(confirmButton);
+        expect(patchBodies).toHaveLength(1);
+        expect(patchBodies[0]).toEqual({ priority: "P2", expectedVersion: 4 });
+        await act(async () => {
+            firstPatchControl.resolve?.(apiResponse({
+                success: true,
+                changed: true,
+                ticket: {
+                    id: 19,
+                    version: 5,
+                    status: "OPEN",
+                    priority: "P2",
+                    triagedAt: triageTime,
+                    triagedByUserId: 51,
+                    isTriaged: true,
+                    assignedToUserId: null,
+                    categoryId: null,
+                    updatedAt: triageTime,
+                },
+            }));
+        });
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("ยืนยัน Priority แล้ว"));
+        expect(await screen.findByText(/ประเมินแล้ว · สมชาย ใจดี/)).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText("ระดับความสำคัญ"), {
+            target: { value: "P1" },
+        });
+        const reasonInput = screen.getByLabelText("เหตุผลการเปลี่ยน Priority");
+        expect(screen.getByText("กรุณาระบุเหตุผลก่อนบันทึก (ไม่เกิน 500 ตัวอักษร)"))
+            .toBeInTheDocument();
+        const saveButton = screen.getByRole("button", { name: "บันทึก Priority" });
+        expect(saveButton).toBeDisabled();
+        fireEvent.change(reasonInput, { target: { value: "กระทบผู้ใช้หลายคน" } });
+        expect(saveButton).toBeEnabled();
+        fireEvent.click(saveButton);
+        await waitFor(() => expect(patchBodies).toHaveLength(2));
+        expect(patchBodies[1]).toEqual({
+            priority: "P1",
+            reason: "กระทบผู้ใช้หลายคน",
+            expectedVersion: 5,
+        });
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("บันทึก Priority แล้ว"));
+        expect(await screen.findByText("P1 — สูง", { selector: "span" })).toBeInTheDocument();
+        expect(toast.success).toHaveBeenCalledTimes(2);
+    });
 
     it.each([
         ["OPEN", true],
@@ -279,6 +437,8 @@ describe("IT operator Ticket detail presentation", () => {
         render(<ITTicketOperatorDetail ticketId={19} capabilities={capabilities} />);
 
         expect(await screen.findByRole("heading", { name: ticket.title })).toBeInTheDocument();
+        expect(screen.getByText("P2 — ปกติ")).toBeInTheDocument();
+        expect(screen.queryByLabelText("ระดับความสำคัญ")).not.toBeInTheDocument();
         if (commentable) {
             expect(await screen.findByLabelText("ตอบกลับ")).toBeInTheDocument();
         } else {

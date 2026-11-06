@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
-import { ITTicketStatus, ITTicketType } from "@prisma/client";
+import { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
@@ -65,9 +66,17 @@ const positiveQueryInteger = z.union([
     z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(positiveSafeInteger),
 ]);
 
+const operatorQueueStatusSchema = z.union([
+    z.literal("ACTIVE"),
+    z.literal("ALL"),
+    z.nativeEnum(ITTicketStatus),
+]);
+
 const operatorQueueInputSchema = z.object({
-    status: z.nativeEnum(ITTicketStatus).optional(),
+    status: operatorQueueStatusSchema.default("ACTIVE"),
     type: z.nativeEnum(ITTicketType).optional(),
+    priority: z.nativeEnum(ITTicketPriority).optional(),
+    triageState: z.enum(["TRIAGED", "UNTRIAGED"]).optional(),
     categoryId: z.union([
         z.literal("uncategorized"),
         positiveQueryInteger,
@@ -89,16 +98,53 @@ const operatorQueueInputSchema = z.object({
 });
 
 const ticketQueueCursorSchema = z.object({
+    priority: z.nativeEnum(ITTicketPriority),
     createdAt: z.string().datetime({ offset: true }),
     id: positiveSafeInteger,
+    filtersKey: z.string().regex(/^[a-f0-9]{64}$/),
 }).strict();
 
 interface ParsedITOperatorQueueCursor {
+    readonly priority: ITTicketPriority;
     readonly createdAt: Date;
     readonly id: number;
 }
 
-function decodeITOperatorQueueCursor(value: string): ParsedITOperatorQueueCursor | null {
+const IT_TICKET_PRIORITY_ORDER = ["P0", "P1", "P2", "P3"] as const satisfies
+    readonly ITTicketPriority[];
+const DEFAULT_OPERATOR_QUEUE_STATUSES = [
+    ITTicketStatus.OPEN,
+    ITTicketStatus.IN_PROGRESS,
+    ITTicketStatus.WAITING_REQUESTER,
+] as const;
+
+function getQueueCursorFilters(
+    input: z.output<typeof operatorQueueInputSchema>,
+) {
+    return {
+        status: input.status,
+        type: input.type ?? null,
+        priority: input.priority ?? null,
+        triageState: input.triageState ?? null,
+        categoryId: input.categoryId ?? null,
+        assignmentState: input.assignmentState ?? null,
+        assigneeUserId: input.assigneeUserId ?? null,
+        limit: input.limit,
+    };
+}
+
+function getQueueCursorFiltersKey(
+    input: z.output<typeof operatorQueueInputSchema>,
+): string {
+    return createHash("sha256")
+        .update(JSON.stringify(getQueueCursorFilters(input)))
+        .digest("hex");
+}
+
+function decodeITOperatorQueueCursor(
+    value: string,
+    input: z.output<typeof operatorQueueInputSchema>,
+): ParsedITOperatorQueueCursor | null {
     if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
 
     try {
@@ -107,19 +153,31 @@ function decodeITOperatorQueueCursor(value: string): ParsedITOperatorQueueCursor
         const parsedPayload: unknown = JSON.parse(json);
         const parsed = ticketQueueCursorSchema.safeParse(parsedPayload);
         if (!parsed.success) return null;
+        if (parsed.data.filtersKey !== getQueueCursorFiltersKey(input)) {
+            return null;
+        }
 
         const createdAt = new Date(parsed.data.createdAt);
         if (createdAt.toISOString() !== parsed.data.createdAt) return null;
-        return { createdAt, id: parsed.data.id };
+        return {
+            priority: parsed.data.priority,
+            createdAt,
+            id: parsed.data.id,
+        };
     } catch {
         return null;
     }
 }
 
-function encodeITOperatorQueueCursor(ticket: Pick<ITOperatorTicket, "id" | "createdAt">): string {
+function encodeITOperatorQueueCursor(
+    ticket: Pick<ITOperatorTicket, "id" | "priority" | "createdAt">,
+    input: z.output<typeof operatorQueueInputSchema>,
+): string {
     return Buffer.from(JSON.stringify({
+        priority: ticket.priority,
         createdAt: ticket.createdAt,
         id: ticket.id,
+        filtersKey: getQueueCursorFiltersKey(input),
     }), "utf8").toString("base64url");
 }
 
@@ -134,8 +192,15 @@ function createOperatorTicketWhere(
     cursor: ParsedITOperatorQueueCursor | null,
 ): Prisma.ITTicketWhereInput {
     const where: Prisma.ITTicketWhereInput = {};
-    if (input.status !== undefined) where.status = input.status;
+    if (input.status === "ACTIVE") {
+        where.status = { in: [...DEFAULT_OPERATOR_QUEUE_STATUSES] };
+    } else if (input.status !== "ALL") {
+        where.status = input.status;
+    }
     if (input.type !== undefined) where.type = input.type;
+    if (input.priority !== undefined) where.priority = input.priority;
+    if (input.triageState === "UNTRIAGED") where.triagedAt = null;
+    if (input.triageState === "TRIAGED") where.triagedAt = { not: null };
     if (input.categoryId !== undefined) {
         where.categoryId = input.categoryId === "uncategorized" ? null : input.categoryId;
     }
@@ -147,10 +212,16 @@ function createOperatorTicketWhere(
         where.assignedToUserId = { not: null };
     }
     if (cursor !== null) {
-        where.OR = [
-            { createdAt: { lt: cursor.createdAt } },
-            { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+        const cursorPriorityIndex = IT_TICKET_PRIORITY_ORDER.indexOf(cursor.priority);
+        const lowerPriorities = IT_TICKET_PRIORITY_ORDER.slice(cursorPriorityIndex + 1);
+        const cursorBoundary: Prisma.ITTicketWhereInput[] = [
+            ...(lowerPriorities.length === 0
+                ? []
+                : [{ priority: { in: [...lowerPriorities] } }]),
+            { priority: cursor.priority, createdAt: { gt: cursor.createdAt } },
+            { priority: cursor.priority, createdAt: cursor.createdAt, id: { gt: cursor.id } },
         ];
+        return { AND: [where, { OR: cursorBoundary }] };
     }
     return where;
 }
@@ -233,7 +304,7 @@ export async function listITOperatorTickets(
     if (!parsed.success) throw new ITTicketInputValidationError();
     const cursor = parsed.data.cursor === undefined
         ? null
-        : decodeITOperatorQueueCursor(parsed.data.cursor);
+        : decodeITOperatorQueueCursor(parsed.data.cursor, parsed.data);
     if (parsed.data.cursor !== undefined && cursor === null) {
         throw new ITTicketInputValidationError();
     }
@@ -260,7 +331,7 @@ export async function listITOperatorTickets(
         return {
             tickets,
             nextCursor: hasMore && lastTicket
-                ? encodeITOperatorQueueCursor(lastTicket)
+                ? encodeITOperatorQueueCursor(lastTicket, parsed.data)
                 : null,
             limit: parsed.data.limit,
         };

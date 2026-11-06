@@ -455,6 +455,8 @@ export const API_ROUTES = {
             `/api/it/operator/tickets/${id}/assignee`,
         categoryById: (id: number | string): string =>
             `/api/it/operator/tickets/${id}/category`,
+        priorityById: (id: number | string): string =>
+            `/api/it/operator/tickets/${id}/priority`,
         statusById: (id: number | string): string =>
             `/api/it/operator/tickets/${id}/status`,
     },

@@ -256,15 +256,21 @@ describe("IT requester Ticket queries", () => {
         });
     });
 
-    it("returns a bounded explicit operator DTO and stable newest-first queue", async () => {
+    it("returns a bounded explicit operator DTO in active priority and age order", async () => {
         mocks.authorize.mockResolvedValueOnce({ scopes: ["ALL"] });
         mocks.findMany.mockResolvedValueOnce([ticket, { ...ticket, id: 18 }]);
 
         const result = await listITOperatorTickets(actorContext, { limit: 1 });
 
         expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
-            where: {},
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            where: {
+                status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] },
+            },
+            orderBy: [
+                { priority: "asc" },
+                { createdAt: "asc" },
+                { id: "asc" },
+            ],
             take: 2,
         }));
         expect(result.tickets).toHaveLength(1);
@@ -290,13 +296,13 @@ describe("IT requester Ticket queries", () => {
         expect(result.tickets[0]).not.toHaveProperty("events");
     });
 
-    it("uses both createdAt and id for equal-timestamp cursor boundaries", async () => {
+    it("uses priority, createdAt, and id for stable keyset pagination and binds cursors to filters", async () => {
         mocks.authorize.mockResolvedValue({ scopes: ["ALL"] });
-        const newest = { ...ticket, id: 20 };
-        const sameTimeOlder = { ...ticket, id: 19 };
+        const first = { ...ticket, id: 18, priority: "P0" as const };
+        const nextPriority = { ...ticket, id: 19, priority: "P1" as const };
         mocks.findMany
-            .mockResolvedValueOnce([newest, sameTimeOlder])
-            .mockResolvedValueOnce([sameTimeOlder]);
+            .mockResolvedValueOnce([first, nextPriority])
+            .mockResolvedValueOnce([nextPriority]);
 
         const firstPage = await listITOperatorTickets(actorContext, { limit: 1 });
         await listITOperatorTickets(actorContext, {
@@ -306,21 +312,35 @@ describe("IT requester Ticket queries", () => {
 
         expect(mocks.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
             where: {
-                OR: [
-                    { createdAt: { lt: createdAt } },
-                    { createdAt, id: { lt: 20 } },
+                AND: [
+                    { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] } },
+                    {
+                        OR: [
+                            { priority: { in: ["P1", "P2", "P3"] } },
+                            { priority: "P0", createdAt: { gt: createdAt } },
+                            { priority: "P0", createdAt, id: { gt: 18 } },
+                        ],
+                    },
                 ],
             },
         }));
+
+        await expect(listITOperatorTickets(actorContext, {
+            limit: 1,
+            priority: "P0",
+            cursor: firstPage.nextCursor ?? undefined,
+        })).rejects.toBeInstanceOf(ITTicketInputValidationError);
     });
 
-    it("applies status, type, category, and assignment filters in the database query", async () => {
+    it("applies status, type, category, assignee, priority, and triage filters in SQL", async () => {
         mocks.authorize.mockResolvedValueOnce({ scopes: ["ALL"] });
         mocks.findMany.mockResolvedValueOnce([]);
 
         await listITOperatorTickets(actorContext, {
             status: "IN_PROGRESS",
             type: "INCIDENT",
+            priority: "P1",
+            triageState: "UNTRIAGED",
             categoryId: "uncategorized",
             assignmentState: "UNASSIGNED",
             limit: 12,
@@ -330,10 +350,23 @@ describe("IT requester Ticket queries", () => {
             where: {
                 status: "IN_PROGRESS",
                 type: "INCIDENT",
+                priority: "P1",
+                triagedAt: null,
                 categoryId: null,
                 assignedToUserId: null,
             },
             take: 13,
+        }));
+    });
+
+    it("uses an explicit all-status filter to keep terminal history discoverable", async () => {
+        mocks.authorize.mockResolvedValueOnce({ scopes: ["ALL"] });
+        mocks.findMany.mockResolvedValueOnce([]);
+
+        await listITOperatorTickets(actorContext, { status: "ALL" });
+
+        expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: {},
         }));
     });
 
@@ -347,7 +380,10 @@ describe("IT requester Ticket queries", () => {
         });
 
         expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
-            where: { assignedToUserId: 51 },
+            where: {
+                status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] },
+                assignedToUserId: 51,
+            },
         }));
     });
 
