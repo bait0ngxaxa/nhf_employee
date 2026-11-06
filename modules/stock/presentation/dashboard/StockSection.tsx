@@ -17,7 +17,7 @@ import { StockAdminReports } from "./components/StockAdminReports";
 
 function StockContent() {
     const { stockCapabilities } = useStockDataContext();
-    const { activeTab, setActiveTab, setSearchQuery, setSelectedCategoryId } = useStockUIContext();
+    const { activeTab, setActiveTab, navigateToInventory } = useStockUIContext();
 
     const canReadCatalog = stockCapabilities.canReadCatalog;
     const canReadOwnRequests = stockCapabilities.canReadOwnRequests;
@@ -64,7 +64,7 @@ function StockContent() {
             value: "reports",
             label: "รายงาน",
             group: "admin",
-            content: <StockAdminReports canExportReports={canExportReports} canReadReports={canReadReports} onInventory={canReadCatalog && canManageInventory ? (sku) => { setSearchQuery(sku); setSelectedCategoryId(undefined); setActiveTab("inventory"); } : undefined} />,
+            content: <StockAdminReports canExportReports={canExportReports} canReadReports={canReadReports} onInventory={canReadCatalog && canManageInventory ? navigateToInventory : undefined} />,
             visible: canExportReports || canReadReports,
         },
     ];

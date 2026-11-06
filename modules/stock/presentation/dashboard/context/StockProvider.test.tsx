@@ -93,6 +93,7 @@ function StockSearchProbe() {
         setSearchQuery,
         activeTab,
         setActiveTab,
+        navigateToInventory,
         itemsPage,
         requestsPage,
         selectedCategoryId,
@@ -115,6 +116,7 @@ function StockSearchProbe() {
             <output data-testid="requests-page">{requestsPage}</output>
             <output data-testid="active-tab">{activeTab}</output>
             <output data-testid="category-id">{selectedCategoryId ?? "none"}</output>
+            <button type="button" onClick={() => navigateToInventory("PAPER-A4")}>low stock inventory</button>
             <button type="button" onClick={() => setActiveTab("browse")}>browse tab</button>
             <button type="button" onClick={() => setActiveTab("inventory")}>inventory tab</button>
             <button type="button" onClick={() => setSelectedCategoryId(3)}>category three</button>
@@ -195,6 +197,62 @@ describe("StockProvider live search", () => {
 
     afterEach(() => {
         vi.useRealTimers();
+    });
+
+    it.each([
+        "stockTab=reports",
+        "stockTab=reports&stockCategoryId=99&stockSearch=old&source=alert",
+        "stockTab=reports&stockCategoryId=99&stockInventoryPage=7&stockItemsPage=4&stockRequestsPage=3",
+    ])("navigates from low stock with one canonical URL: %s", (initial) => {
+        navigationMocks.searchParams = new URLSearchParams(initial);
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        fireEvent.click(screen.getByRole("button", { name: "low stock inventory" }));
+        expect(navigationMocks.router.push).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
+        expect(screen.getByRole("textbox", { name: "item search" })).toHaveValue("PAPER-A4");
+        expect(screen.getByTestId("category-id")).toHaveTextContent("none");
+        expect(screen.getByTestId("items-page")).toHaveTextContent("1");
+        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS * 2));
+        expect(navigationMocks.searchParams.get("stockSearch")).toBe("PAPER-A4");
+        expect(navigationMocks.searchParams.has("stockCategoryId")).toBe(false);
+        expect(navigationMocks.searchParams.get("source")).toBe(new URLSearchParams(initial).get("source"));
+        const query = new URL(latestCapturedQuery(vi.mocked(useStockItemsQuery)), "http://localhost");
+        expect(query.searchParams.get("search")).toBe("PAPER-A4");
+        expect(query.searchParams.get("page")).toBe("1");
+        expect(query.searchParams.has("categoryId")).toBe(false);
+        const destination = navigationMocks.searchParams.toString();
+        // External URL changes model the browser's back/forward notifications.
+        act(() => navigationMocks.setExternalSearchParams(initial));
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("reports");
+        act(() => navigationMocks.setExternalSearchParams(destination));
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
+        expect(screen.getByRole("textbox", { name: "item search" })).toHaveValue("PAPER-A4");
+        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS * 2));
+        expect(navigationMocks.router.push).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+    });
+
+    it("does not replay a debounced search draft over the inventory destination", () => {
+        navigationMocks.searchParams = new URLSearchParams("stockTab=reports&stockSearch=old&stockCategoryId=8&stockInventoryPage=6");
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        fireEvent.change(screen.getByRole("textbox", { name: "item search" }), { target: { value: "stale draft" } });
+        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS - 1));
+        fireEvent.click(screen.getByRole("button", { name: "low stock inventory" }));
+        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS * 3));
+        expect(navigationMocks.searchParams.get("stockSearch")).toBe("PAPER-A4");
+        expect(navigationMocks.searchParams.get("stockInventoryPage")).toBe("1");
+        expect(navigationMocks.router.push).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+    });
+
+    it("does not navigate to inventory without both inventory capabilities", () => {
+        navigationMocks.searchParams = new URLSearchParams("stockTab=reports");
+        vi.mocked(useAuth).mockReturnValue({ user: { stockCapabilities: { ...stockCapabilities, canManageInventory: false } } } as never);
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        fireEvent.click(screen.getByRole("button", { name: "low stock inventory" }));
+        expect(navigationMocks.router.push).not.toHaveBeenCalled();
+        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
     });
 
     it("updates item input immediately but debounces the API query and URL", () => {

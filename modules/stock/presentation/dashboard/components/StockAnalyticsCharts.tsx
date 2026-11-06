@@ -16,7 +16,10 @@ export function StockPopularityChart({ data, onSelect }: { data: StockAnalyticsR
                     <XAxis type="number" allowDecimals={false} tick={{ fill: "var(--content-muted)", fontSize: 12 }} />
                     <YAxis dataKey="rank" type="category" width={135} tick={{ fill: "var(--content-strong)", fontSize: 12 }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={tooltipStyle} labelFormatter={(_label, payload) => payload[0]?.payload?.name ?? ""} formatter={(value) => [value, data.filters.metric === "frequency" ? "คำขอที่จ่ายแล้ว" : `ปริมาณ (${data.filters.unit})`]} />
-                    <Bar dataKey="value" fill="var(--module-stock-solid)" isAnimationActive={false} radius={[0, 4, 4, 0]} onClick={(row) => { if (typeof row.id === "number") onSelect(row.id); }} />
+                    <Bar dataKey="value" fill="var(--module-stock-solid)" isAnimationActive={false} radius={[0, 4, 4, 0]} onClick={(rectangle) => {
+                        const material: unknown = rectangle.payload;
+                        if (typeof material === "object" && material !== null && "id" in material && typeof material.id === "number") onSelect(material.id);
+                    }} />
                 </BarChart>
             </ResponsiveContainer>
         </div>

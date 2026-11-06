@@ -69,22 +69,37 @@ try {
             await page.$eval('[role="application"]', (element) => element.focus());
             await page.keyboard.press("ArrowDown");
             await page.waitForSelector(".recharts-tooltip-wrapper", { visible: true });
-            await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent.includes("ดูรายการย่อย")).click());
+            await page.$eval('input[name="projectCode"]', (input) => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; setter.call(input, 'BAR-CHECK'); input.dispatchEvent(new Event('input', { bubbles: true })); });
+            await page.$eval('form[aria-label="ตัวกรองการจ่ายวัสดุย้อนหลัง"]', (form) => form.requestSubmit());
+            await page.waitForFunction(() => window.lastRequest.includes('projectCode=BAR-CHECK'));
+            const bars = await page.$$('.recharts-bar-rectangle path');
+            await bars[1].click();
+            await page.waitForFunction(() => new URL(window.lastRequest, location.href).searchParams.get('itemId') === '2');
+            assert.equal(new URL(await page.evaluate(() => window.lastRequest), 'http://localhost').searchParams.get('projectCode'), 'BAR-CHECK');
+            await page.waitForFunction(() => document.activeElement?.textContent === 'รายการย่อย: หมึกพิมพ์เลเซอร์');
+            await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent.includes("ปิดรายละเอียด")).click());
+            // The textual alternative must remain reachable and activate with the keyboard.
+            await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent.includes("ดูรายการย่อย")).focus());
+            await page.keyboard.press('Enter');
+            await page.waitForFunction(() => new URL(window.lastRequest, location.href).searchParams.get('itemId') === '1');
             await page.waitForFunction(() => document.body.textContent.includes("ปิดรายละเอียด"));
             await page.waitForFunction(() => document.activeElement?.textContent.startsWith("รายการย่อย:"));
             await page.screenshot({ path: join(output, "detail.png"), fullPage: true });
             await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent === "จัดการสต็อก").click());
             assert.equal(await page.evaluate(() => window.inventorySku), "PAPER-A4");
             await page.click('[role="tab"][data-state="inactive"]');
-            await page.waitForSelector('form[aria-label="ส่งออกข้อมูลดิบการจ่ายวัสดุ"]');
-            await page.$eval('form[aria-label="ส่งออกข้อมูลดิบการจ่ายวัสดุ"]', (form) => form.requestSubmit());
+            await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent === 'ดาวน์โหลด Excel' && !b.disabled));
+            await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent === 'ดาวน์โหลด Excel').click());
             await page.waitForFunction(() => Boolean(window.downloadUrl));
-            assert.ok((await page.evaluate(() => window.downloadUrl)).includes("reportType=raw-issued"));
+            assert.equal(await page.evaluate(() => window.downloadUrl), '/api/stock/reports/export?format=xlsx&year=2026');
+            await page.evaluate(() => { window.downloadUrl = null; [...document.querySelectorAll('button')].find((b) => b.textContent === 'ดาวน์โหลด Excel สต๊อกคงเหลือ').click(); });
+            await page.waitForFunction(() => Boolean(window.downloadUrl));
+            assert.equal(await page.evaluate(() => window.downloadUrl), '/api/stock/reports/export?format=xlsx&reportType=balances');
             await page.screenshot({ path: join(output, "export.png"), fullPage: true });
         }
         assert.deepEqual(errors, [], `${width}px runtime errors`);
         cases++;
         await page.close();
     }
-    process.stdout.write(`Stock analytics browser: ${cases} responsive/theme cases passed; charts, keyboard tooltip, drill-down, inventory action and explicit raw download passed. Captures: ${output}\n`);
+    process.stdout.write(`Stock analytics browser: ${cases} responsive/theme cases passed; charts, keyboard tooltip, drill-down, inventory action and explicit legacy Excel downloads passed. Captures: ${output}\n`);
 } finally { await browser.close(); }

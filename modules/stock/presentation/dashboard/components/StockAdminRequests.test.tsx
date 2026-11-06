@@ -137,6 +137,7 @@ function setContexts(requests: StockRequest[] = [REQUEST]): void {
         setSearchQuery: vi.fn(),
         selectedCategoryId: undefined,
         setSelectedCategoryId: vi.fn(),
+        navigateToInventory: vi.fn(),
         statusFilter: undefined,
         setStatusFilter: vi.fn(),
     };
