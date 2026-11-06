@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import type { Employee } from "../types";
 import { PAGINATION_DEFAULTS } from "@/constants/ui";
 import { triggerDownload } from "@/lib/helpers/download";
+import { fetchWithRefresh } from "@/modules/auth/client";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { EmployeeDataContext, EmployeeUIContext } from "./EmployeeContext";
 import { EXPORT_LIMITS } from "@/lib/ssot/exports";
@@ -62,6 +63,18 @@ interface EmployeeListResponse {
     pagination: Pagination;
 }
 
+function getExportFilename(response: Response): string {
+    const fallback = "รายชื่อพนักงาน.xlsx";
+    const encoded = response.headers.get("Content-Disposition")
+        ?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    if (!encoded) return fallback;
+    try {
+        return decodeURIComponent(encoded) || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 export function EmployeeProvider({
     children,
     employeeCapabilities,
@@ -90,6 +103,7 @@ export function EmployeeProvider({
 
     // UI states
     const [isExporting, setIsExporting] = useState(false);
+    const exportInFlightRef = useRef(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const debouncedSearchTerm = useDebouncedValue(searchTerm);
@@ -177,11 +191,13 @@ export function EmployeeProvider({
     }, [pagination.totalPages]);
 
     const handleExportXlsx = useCallback(async (): Promise<void> => {
-        if (!canExportEmployees) {
+        if (!canExportEmployees || exportInFlightRef.current) {
             return;
         }
 
+        exportInFlightRef.current = true;
         setIsExporting(true);
+        let errorDescription = "ไม่สามารถดาวน์โหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง";
         try {
             if (pagination.total === 0) {
                 toast.error("ไม่มีข้อมูลสำหรับดาวน์โหลด");
@@ -208,19 +224,42 @@ export function EmployeeProvider({
                 ? `${API_ROUTES.employees.export}?${queryString}`
                 : API_ROUTES.employees.export;
 
-            triggerDownload(exportUrl);
+            const response = await fetchWithRefresh(exportUrl, {
+                cache: "no-store",
+                credentials: "include",
+            });
+            if (!response.ok) {
+                const body: unknown = await response.json().catch(() => null);
+                if (body && typeof body === "object" && "error" in body
+                    && typeof body.error === "string" && body.error.trim()) {
+                    errorDescription = body.error;
+                }
+                throw new Error(`Employee export failed: HTTP ${response.status}`);
+            }
+            if (response.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase()
+                !== "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+                throw new Error("Unexpected employee export content type");
+            }
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            try {
+                triggerDownload(objectUrl, getExportFilename(response));
+            } finally {
+                // Allow the browser to consume the Blob before releasing its URL.
+                setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+            }
 
-            toast.info("ส่งคำขอดาวน์โหลดแล้ว", {
-                description: `กำลังส่งออกข้อมูลพนักงาน ${pagination.total} รายการ`,
+            toast.info("เริ่มดาวน์โหลดไฟล์ Excel แล้ว", {
+                description: `เตรียมข้อมูลพนักงาน ${pagination.total} รายการเรียบร้อยแล้ว`,
             });
         } catch (err) {
             console.error("Error preparing employee export:", err);
             toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด", {
-                description:
-                    "ไม่สามารถเริ่มการดาวน์โหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง",
+                description: errorDescription,
             });
         } finally {
-            setTimeout(() => setIsExporting(false), 500);
+            exportInFlightRef.current = false;
+            setIsExporting(false);
         }
     }, [canExportEmployees, debouncedSearchTerm, pagination.total, statusFilter]);
 

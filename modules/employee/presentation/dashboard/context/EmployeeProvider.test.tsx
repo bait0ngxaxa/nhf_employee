@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { EmployeePresentationCapabilities } from "../../../application/types";
@@ -13,6 +13,9 @@ import {
 const mocks = vi.hoisted(() => ({
     useSWR: vi.fn(),
     triggerDownload: vi.fn(),
+    fetchWithRefresh: vi.fn(),
+    createObjectURL: vi.fn(() => "blob:employee-export"),
+    revokeObjectURL: vi.fn(),
     toastError: vi.fn(),
     toastSuccess: vi.fn(),
     toastInfo: vi.fn(),
@@ -23,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("swr", () => ({
     default: mocks.useSWR,
 }));
+vi.mock("@/modules/auth/client", () => ({ fetchWithRefresh: mocks.fetchWithRefresh }));
 vi.mock("@/lib/helpers/download", () => ({
     triggerDownload: mocks.triggerDownload,
 }));
@@ -158,9 +162,134 @@ function renderProvider(
 describe("EmployeeProvider capability-aware presentation", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubGlobal("URL", class extends URL {
+            static createObjectURL = mocks.createObjectURL;
+            static revokeObjectURL = mocks.revokeObjectURL;
+        });
+        mocks.fetchWithRefresh.mockResolvedValue(new Response("workbook", {
+            headers: {
+                "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Content-Disposition": `attachment; filename="export.xlsx"; filename*=UTF-8''${encodeURIComponent("รายชื่อพนักงาน_ค้นหา-สมชาย.xlsx")}`,
+            },
+        }));
         mocks.listMutates.length = 0;
         mocks.statsMutates.length = 0;
         setupSWR();
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it("keeps loading and prevents duplicate requests while waiting for the server", async () => {
+        vi.useFakeTimers();
+        mocks.fetchWithRefresh.mockReturnValue(new Promise<Response>(() => undefined));
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("true");
+        expect(mocks.fetchWithRefresh).toHaveBeenCalledTimes(1);
+        expect(mocks.triggerDownload).not.toHaveBeenCalled();
+    });
+
+    it("reports a forbidden response without downloading the error body", async () => {
+        mocks.fetchWithRefresh.mockResolvedValue(Response.json({ error: "คุณไม่มีสิทธิ์ดำเนินการ" }, { status: 403 }));
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(
+            "เกิดข้อผิดพลาดในการดาวน์โหลด", { description: "คุณไม่มีสิทธิ์ดำเนินการ" },
+        ));
+        expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        expect(mocks.createObjectURL).not.toHaveBeenCalled();
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("false");
+    });
+
+    it("waits for the entire body before downloading and releases the Blob URL later", async () => {
+        let finishBody: ((blob: Blob) => void) | undefined;
+        const body = new Promise<Blob>((resolve) => { finishBody = resolve; });
+        const response = new Response(null, {
+            headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+        });
+        vi.spyOn(response, "blob").mockReturnValue(body);
+        mocks.fetchWithRefresh.mockResolvedValue(response);
+        renderProvider(exportListCapabilities);
+        const button = screen.getByRole("button", { name: "export" });
+        act(() => {
+            fireEvent.click(button);
+            // A second call in the same render must also be blocked.
+            fireEvent.click(button);
+        });
+        await waitFor(() => expect(response.blob).toHaveBeenCalled());
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("true");
+        expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        expect(mocks.fetchWithRefresh).toHaveBeenCalledTimes(1);
+        expect(mocks.toastInfo).not.toHaveBeenCalled();
+        vi.useFakeTimers();
+        const blob = new Blob(["complete workbook"]);
+        if (!finishBody) throw new Error("Body resolver missing");
+        await act(async () => { finishBody?.(blob); });
+        expect(mocks.createObjectURL).toHaveBeenCalledWith(blob);
+        expect(mocks.triggerDownload).toHaveBeenCalledWith("blob:employee-export", "รายชื่อพนักงาน.xlsx");
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("false");
+        expect(mocks.revokeObjectURL).not.toHaveBeenCalled();
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(mocks.revokeObjectURL).toHaveBeenCalledWith("blob:employee-export");
+    });
+
+    it.each([400, 401, 500])("reports HTTP %i errors and allows another attempt", async (status) => {
+        mocks.fetchWithRefresh.mockResolvedValueOnce(Response.json({ error: "ส่งออกข้อมูลไม่สำเร็จ" }, { status }));
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(
+            "เกิดข้อผิดพลาดในการดาวน์โหลด", { description: "ส่งออกข้อมูลไม่สำเร็จ" },
+        ));
+        expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("false");
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        await waitFor(() => expect(mocks.triggerDownload).toHaveBeenCalledTimes(1));
+    });
+
+    it.each(["non-JSON error", "HTML success", "invalid error payload", "network", "body read"])(
+        "handles %s without downloading an invalid file", async (failure) => {
+            if (failure === "network") {
+                mocks.fetchWithRefresh.mockRejectedValueOnce(new Error("Network failure"));
+            } else {
+                const response = failure === "invalid error payload"
+                    ? Response.json({ error: { internal: "details" } }, { status: 500 })
+                    : new Response("<html>Error</html>", {
+                        status: failure === "non-JSON error" ? 500 : 200,
+                        headers: { "Content-Type": failure === "body read"
+                            ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/html" },
+                    });
+                if (failure === "body read") vi.spyOn(response, "blob").mockRejectedValue(new Error("Truncated body"));
+                mocks.fetchWithRefresh.mockResolvedValueOnce(response);
+            }
+            renderProvider(exportListCapabilities);
+            fireEvent.click(screen.getByRole("button", { name: "export" }));
+            await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(
+                "เกิดข้อผิดพลาดในการดาวน์โหลด", { description: "ไม่สามารถดาวน์โหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง" },
+            ));
+            expect(mocks.triggerDownload).not.toHaveBeenCalled();
+            expect(mocks.createObjectURL).not.toHaveBeenCalled();
+            expect(mocks.toastInfo).not.toHaveBeenCalled();
+            expect(screen.getByTestId("is-exporting")).toHaveTextContent("false");
+        },
+    );
+
+    it("falls back to an XLSX filename when the encoded header is malformed", async () => {
+        mocks.fetchWithRefresh.mockResolvedValueOnce(new Response("workbook", {
+            headers: {
+                "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Content-Disposition": "attachment; filename*=UTF-8''%INVALID",
+            },
+        }));
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        await waitFor(() => expect(mocks.triggerDownload).toHaveBeenCalledWith("blob:employee-export", "รายชื่อพนักงาน.xlsx"));
     });
 
     it("disables both SWR resources and data surfaces without read capabilities", () => {
@@ -201,6 +330,7 @@ describe("EmployeeProvider capability-aware presentation", () => {
         fireEvent.click(screen.getByRole("button", { name: "export" }));
 
         expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        expect(mocks.fetchWithRefresh).not.toHaveBeenCalled();
     });
 
     it("initiates export when the independent export capability is available", async () => {
@@ -210,12 +340,12 @@ describe("EmployeeProvider capability-aware presentation", () => {
 
         await waitFor(() => {
             expect(mocks.triggerDownload).toHaveBeenCalledWith(
-                API_ROUTES.employees.export,
+                "blob:employee-export", "รายชื่อพนักงาน_ค้นหา-สมชาย.xlsx",
             );
         });
         expect(mocks.toastSuccess).not.toHaveBeenCalled();
-        expect(mocks.toastInfo).toHaveBeenCalledWith("ส่งคำขอดาวน์โหลดแล้ว", expect.any(Object));
-        expect(screen.getByTestId("is-exporting")).toHaveTextContent("true");
+        expect(mocks.toastInfo).toHaveBeenCalledWith("เริ่มดาวน์โหลดไฟล์ Excel แล้ว", expect.any(Object));
+        expect(mocks.fetchWithRefresh).toHaveBeenCalledWith(API_ROUTES.employees.export, { cache: "no-store", credentials: "include" });
         await waitFor(() => expect(screen.getByTestId("is-exporting")).toHaveTextContent("false"));
     });
 
@@ -225,8 +355,9 @@ describe("EmployeeProvider capability-aware presentation", () => {
         fireEvent.click(screen.getByRole("button", { name: "status" }));
         await waitFor(() => expect(mocks.useSWR.mock.calls.at(-2)?.[0]).toContain(encodeURIComponent("สมชาย")));
         fireEvent.click(screen.getByRole("button", { name: "export" }));
-        const url = new URL(mocks.triggerDownload.mock.calls[0][0], "http://localhost");
+        const url = new URL(mocks.fetchWithRefresh.mock.calls[0][0], "http://localhost");
         expect([...url.searchParams]).toEqual([["search", "สมชาย"], ["status", "ACTIVE"]]);
+        await waitFor(() => expect(mocks.triggerDownload).toHaveBeenCalledTimes(1));
     });
 
     it.each([0, 2001])("rejects export for %i matching employees", (total) => {
@@ -234,22 +365,24 @@ describe("EmployeeProvider capability-aware presentation", () => {
         renderProvider(exportListCapabilities);
         fireEvent.click(screen.getByRole("button", { name: "export" }));
         expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        expect(mocks.fetchWithRefresh).not.toHaveBeenCalled();
         expect(mocks.toastError).toHaveBeenCalled();
     });
 
-    it("allows exactly 2000 matching employees", () => {
+    it("allows exactly 2000 matching employees", async () => {
         setupSWR(2000);
         renderProvider(exportListCapabilities);
         fireEvent.click(screen.getByRole("button", { name: "export" }));
-        expect(mocks.triggerDownload).toHaveBeenCalledWith(API_ROUTES.employees.export);
+        expect(mocks.fetchWithRefresh).toHaveBeenCalledWith(API_ROUTES.employees.export, expect.any(Object));
+        await waitFor(() => expect(mocks.triggerDownload).toHaveBeenCalledTimes(1));
     });
 
-    it("reports an error if initiating the download fails", () => {
+    it("reports an error if initiating the download fails", async () => {
         mocks.triggerDownload.mockImplementationOnce(() => { throw new Error("Download failed"); });
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
         renderProvider(exportListCapabilities);
         fireEvent.click(screen.getByRole("button", { name: "export" }));
-        expect(mocks.toastError).toHaveBeenCalledWith("เกิดข้อผิดพลาดในการดาวน์โหลด", expect.any(Object));
+        await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("เกิดข้อผิดพลาดในการดาวน์โหลด", expect.any(Object)));
         consoleError.mockRestore();
     });
 
