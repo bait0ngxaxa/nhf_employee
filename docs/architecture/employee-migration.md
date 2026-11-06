@@ -1,5 +1,15 @@
 # Employee migration
 
+Current export format: `GET /api/employees/export` now returns a buffered XLSX
+workbook through `createXlsxDownloadResponse()`. Employee owns the formatting in
+`infrastructure/export/employee-workbook.ts`: worksheet `รายชื่อพนักงาน`, the same
+12 export columns (including hire date and tenure), styled headers, AutoFilter
+`A1:L1`, and a frozen first row. Phone numbers and Buddhist Era hire dates remain
+text. Dashboard uses `handleExportXlsx` and `ดาวน์โหลด Excel`; filters, the
+2,000-row limit, 250-row batches, authorization, and audit contracts are preserved.
+CSV import is unchanged. CSV export references below describe the earlier
+migration baseline rather than the current download format.
+
 Status: Phase F3 CLOSED — Employee migration complete; Phase G1 Department
 server/persistence ownership complete; Phase G2 Department server-only
 presentation boundary confirmed; Phase G3 Department migration complete.

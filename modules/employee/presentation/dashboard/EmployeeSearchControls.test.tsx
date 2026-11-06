@@ -25,7 +25,7 @@ const employee: Employee = {
     updatedAt: "2020-01-01T00:00:00.000Z",
 };
 
-function renderControls(canExportEmployees: boolean) {
+function renderControls(canExportEmployees: boolean, isExporting = false) {
     const onExportClick = vi.fn();
     const dataValue: EmployeeDataContextValue = {
         employees: [employee],
@@ -50,8 +50,8 @@ function renderControls(canExportEmployees: boolean) {
         handlePageChange: vi.fn(),
         handlePreviousPage: vi.fn(),
         handleNextPage: vi.fn(),
-        isExporting: false,
-        handleExportCSV: async () => undefined,
+        isExporting,
+        handleExportXlsx: async () => undefined,
         handleEmployeeUpdate: vi.fn(),
     };
 
@@ -73,18 +73,27 @@ describe("EmployeeSearchControls presentation", () => {
     it("does not render or initiate export without export capability", () => {
         renderControls(false);
 
-        expect(screen.queryByRole("button", { name: /ดาวน์โหลดข้อมูล CSV/ }))
+        expect(screen.queryByRole("button", { name: /ดาวน์โหลด Excel/ }))
             .not.toBeInTheDocument();
     });
 
     it("renders and delegates export only with export capability", () => {
         const onExportClick = renderControls(true);
         const exportButton = screen.getByRole("button", {
-            name: /ดาวน์โหลดข้อมูล CSV/,
+            name: /ดาวน์โหลด Excel/,
         });
 
         fireEvent.click(exportButton);
 
+        expect(exportButton).toHaveTextContent("ดาวน์โหลด Excel (1 คน)");
         expect(onExportClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("disables the export button while preparing the download", () => {
+        const onExportClick = renderControls(true, true);
+        const button = screen.getByRole("button", { name: "กำลังเตรียม…" });
+        expect(button).toBeDisabled();
+        fireEvent.click(button);
+        expect(onExportClick).not.toHaveBeenCalled();
     });
 });

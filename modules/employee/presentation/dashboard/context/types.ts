@@ -42,7 +42,7 @@ export interface EmployeeUIContextValue {
 
     // Export State & Actions
     isExporting: boolean;
-    handleExportCSV: () => Promise<void>;
+    handleExportXlsx: () => Promise<void>;
 
     // Edit mutation action. The edit session itself is owned by the
     // capability-scoped editor surface.

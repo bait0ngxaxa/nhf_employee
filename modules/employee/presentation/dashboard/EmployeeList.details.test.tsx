@@ -45,7 +45,7 @@ const ui: EmployeeUIContextValue = {
     searchTerm: "", debouncedSearchTerm: "", setSearchTerm: vi.fn(),
     statusFilter: "all", setStatusFilter: vi.fn(), currentPage: 1, itemsPerPage: 20,
     handlePageChange: vi.fn(), handlePreviousPage: vi.fn(), handleNextPage: vi.fn(),
-    isExporting: false, handleExportCSV: vi.fn(async () => undefined), handleEmployeeUpdate: vi.fn(),
+    isExporting: false, handleExportXlsx: vi.fn(async () => undefined), handleEmployeeUpdate: vi.fn(),
 };
 function directory(overrides: Partial<EmployeeUIContextValue> = {}, canReadEmployees = true, canUpdateEmployees = true, dataOverrides: Partial<EmployeeDataContextValue> = {}) {
     return (

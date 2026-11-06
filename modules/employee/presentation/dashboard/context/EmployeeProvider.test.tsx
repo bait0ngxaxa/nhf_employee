@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     triggerDownload: vi.fn(),
     toastError: vi.fn(),
     toastSuccess: vi.fn(),
+    toastInfo: vi.fn(),
     listMutates: [] as Array<ReturnType<typeof vi.fn>>,
     statsMutates: [] as Array<ReturnType<typeof vi.fn>>,
 }));
@@ -29,6 +30,7 @@ vi.mock("sonner", () => ({
     toast: {
         error: mocks.toastError,
         success: mocks.toastSuccess,
+        info: mocks.toastInfo,
     },
 }));
 
@@ -80,7 +82,7 @@ const updateListCapabilities: EmployeePresentationCapabilities = {
     canUpdateEmployees: true,
 };
 
-function setupSWR(): void {
+function setupSWR(total = 1): void {
     mocks.useSWR.mockImplementation((key: string | null) => {
         const mutate = vi.fn(async () => undefined);
         if (key === API_ROUTES.employees.stats) {
@@ -101,7 +103,7 @@ function setupSWR(): void {
                     pagination: {
                         page: 1,
                         limit: 20,
-                        total: 1,
+                        total,
                         totalPages: 1,
                     },
                 },
@@ -127,7 +129,10 @@ function ProviderProbe(): ReactElement {
             <output data-testid="employee-count">{data.employees.length}</output>
             <output data-testid="stats-total">{data.employeeStats.total}</output>
             <output data-testid="is-loading">{String(data.isLoading)}</output>
-            <button type="button" onClick={() => void ui.handleExportCSV()}>
+            <output data-testid="is-exporting">{String(ui.isExporting)}</output>
+            <button type="button" onClick={() => ui.setSearchTerm("สมชาย")}>search</button>
+            <button type="button" onClick={() => ui.setStatusFilter("ACTIVE")}>status</button>
+            <button type="button" onClick={() => void ui.handleExportXlsx()}>
                 export
             </button>
             <button type="button" onClick={() => ui.handleEmployeeUpdate(employee)}>
@@ -208,6 +213,44 @@ describe("EmployeeProvider capability-aware presentation", () => {
                 API_ROUTES.employees.export,
             );
         });
+        expect(mocks.toastSuccess).not.toHaveBeenCalled();
+        expect(mocks.toastInfo).toHaveBeenCalledWith("ส่งคำขอดาวน์โหลดแล้ว", expect.any(Object));
+        expect(screen.getByTestId("is-exporting")).toHaveTextContent("true");
+        await waitFor(() => expect(screen.getByTestId("is-exporting")).toHaveTextContent("false"));
+    });
+
+    it("forwards search and status without UI pagination parameters", async () => {
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "search" }));
+        fireEvent.click(screen.getByRole("button", { name: "status" }));
+        await waitFor(() => expect(mocks.useSWR.mock.calls.at(-2)?.[0]).toContain(encodeURIComponent("สมชาย")));
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        const url = new URL(mocks.triggerDownload.mock.calls[0][0], "http://localhost");
+        expect([...url.searchParams]).toEqual([["search", "สมชาย"], ["status", "ACTIVE"]]);
+    });
+
+    it.each([0, 2001])("rejects export for %i matching employees", (total) => {
+        setupSWR(total);
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        expect(mocks.toastError).toHaveBeenCalled();
+    });
+
+    it("allows exactly 2000 matching employees", () => {
+        setupSWR(2000);
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        expect(mocks.triggerDownload).toHaveBeenCalledWith(API_ROUTES.employees.export);
+    });
+
+    it("reports an error if initiating the download fails", () => {
+        mocks.triggerDownload.mockImplementationOnce(() => { throw new Error("Download failed"); });
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        renderProvider(exportListCapabilities);
+        fireEvent.click(screen.getByRole("button", { name: "export" }));
+        expect(mocks.toastError).toHaveBeenCalledWith("เกิดข้อผิดพลาดในการดาวน์โหลด", expect.any(Object));
+        consoleError.mockRestore();
     });
 
     it("does not refresh after an update without update capability", () => {

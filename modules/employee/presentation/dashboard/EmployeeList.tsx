@@ -36,7 +36,7 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
         handlePageChange,
         handlePreviousPage,
         handleNextPage,
-        handleExportCSV,
+        handleExportXlsx,
     } = useEmployeeUIContext();
     const canReadEmployees = employeeCapabilities?.canReadEmployees === true;
     const canUpdateEmployees = employeeCapabilities?.canUpdateEmployees === true;
@@ -54,9 +54,9 @@ export function EmployeeList({ employeeCapabilities }: EmployeeListProps) {
         && debouncedSearchTerm.trim().length === 0
         && statusFilter === "all";
 
-    // Handle export button click - fetch data then trigger CSV download
+    // Request an XLSX export using the current filters.
     const onExportClick = async (): Promise<void> => {
-        await handleExportCSV();
+        await handleExportXlsx();
     };
 
     // Calculate display range

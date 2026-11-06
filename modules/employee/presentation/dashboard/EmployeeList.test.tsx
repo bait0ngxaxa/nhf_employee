@@ -88,7 +88,7 @@ function renderEmployeeList(canUpdateEmployees: boolean) {
         handlePreviousPage: vi.fn(),
         handleNextPage: vi.fn(),
         isExporting: false,
-        handleExportCSV: async () => undefined,
+        handleExportXlsx: async () => undefined,
         handleEmployeeUpdate: mocks.handleEmployeeUpdate,
     };
 
@@ -141,7 +141,7 @@ describe("EmployeeList capability-owned edit session", () => {
                         handlePreviousPage: vi.fn(),
                         handleNextPage: vi.fn(),
                         isExporting: false,
-                        handleExportCSV: async () => undefined,
+                        handleExportXlsx: async () => undefined,
                         handleEmployeeUpdate: mocks.handleEmployeeUpdate,
                     }}
                 >
@@ -185,7 +185,7 @@ describe("EmployeeList capability-owned edit session", () => {
                         handlePreviousPage: vi.fn(),
                         handleNextPage: vi.fn(),
                         isExporting: false,
-                        handleExportCSV: async () => undefined,
+                        handleExportXlsx: async () => undefined,
                         handleEmployeeUpdate: mocks.handleEmployeeUpdate,
                     }}
                 >

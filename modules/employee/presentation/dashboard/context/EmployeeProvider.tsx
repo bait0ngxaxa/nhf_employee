@@ -176,7 +176,7 @@ export function EmployeeProvider({
         });
     }, [pagination.totalPages]);
 
-    const handleExportCSV = useCallback(async (): Promise<void> => {
+    const handleExportXlsx = useCallback(async (): Promise<void> => {
         if (!canExportEmployees) {
             return;
         }
@@ -210,7 +210,7 @@ export function EmployeeProvider({
 
             triggerDownload(exportUrl);
 
-            toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
+            toast.info("ส่งคำขอดาวน์โหลดแล้ว", {
                 description: `กำลังส่งออกข้อมูลพนักงาน ${pagination.total} รายการ`,
             });
         } catch (err) {
@@ -288,7 +288,7 @@ export function EmployeeProvider({
             handlePageChange,
             handlePreviousPage,
             handleNextPage,
-            handleExportCSV,
+            handleExportXlsx,
             handleEmployeeUpdate,
         }),
         [
@@ -297,7 +297,7 @@ export function EmployeeProvider({
             handlePageChange,
             handlePreviousPage,
             handleNextPage,
-            handleExportCSV,
+            handleExportXlsx,
             handleEmployeeUpdate,
         ],
     );
@@ -315,7 +315,7 @@ export function EmployeeProvider({
             handlePreviousPage: uiHandlers.handlePreviousPage,
             handleNextPage: uiHandlers.handleNextPage,
             isExporting,
-            handleExportCSV: uiHandlers.handleExportCSV,
+            handleExportXlsx: uiHandlers.handleExportXlsx,
             handleEmployeeUpdate: uiHandlers.handleEmployeeUpdate,
         }),
         [
