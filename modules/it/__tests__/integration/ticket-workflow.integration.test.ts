@@ -17,12 +17,16 @@ import {
     ITTicketIdempotencyConflictError,
     ITTicketInvalidTransitionError,
     ITTicketMutationConflictError,
+    ITTicketPriorityTerminalError,
     ITTicketStatus,
     assignITTicket,
     buildITAuthorizationContext,
     createITTicket,
+    getITOperatorTicketActivity,
     getITOperatorReferenceData,
+    getITRequesterTicketActivity,
     setITTicketCategory,
+    setITTicketPriority,
     transitionITTicketStatus,
 } from "@/modules/it";
 import type { ITAuthorizationContext } from "@/modules/it";
@@ -419,6 +423,8 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
             after: {
                 type: "SERVICE_REQUEST",
                 status: "OPEN",
+                priority: "P3",
+                isTriaged: false,
                 requesterUserId: fixture.requester.userId,
                 assignedToUserId: null,
                 categoryId: null,
@@ -513,6 +519,273 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         })).toBe(1);
         expect(await prisma.auditLog.count({
             where: { userId: fixture.requester.userId, action: "TICKET_CREATE" },
+        })).toBe(1);
+    });
+
+    it("assigns the approved initial priority by Ticket type and rejects requester priority input", async () => {
+        const fixture = await createFixture("initial-priority");
+        const cases = [
+            { type: "INCIDENT", priority: "P2" },
+            { type: "SERVICE_REQUEST", priority: "P3" },
+            { type: "SUGGESTION", priority: "P3" },
+        ] as const;
+
+        for (const { type, priority } of cases) {
+            const result = await createTicket(fixture.requester, nextFixtureKey(type), {
+                type,
+                title: "ทดสอบค่าเริ่มต้น",
+                description: "ระบบกำหนด Priority จากประเภท Ticket",
+            });
+            expect(result.ticket).toMatchObject({
+                type,
+                priority,
+                triagedAt: null,
+                triagedByUserId: null,
+            });
+            expect(await prisma.iTTicketEvent.count({
+                where: { ticketId: result.ticket.id },
+            })).toBe(1);
+        }
+
+        await expect(createTicket(fixture.requester, nextFixtureKey("client-priority"), {
+            type: "INCIDENT",
+            title: "Priority จาก requester",
+            description: "ต้องถูกปฏิเสธ",
+            priority: "P0",
+        })).rejects.toMatchObject({ name: "ITTicketInputValidationError" });
+        expect(await prisma.iTTicket.count({
+            where: { requesterUserId: fixture.requester.userId },
+        })).toBe(3);
+    });
+
+    it("confirms the default priority, hides operator Activity from requesters, and audits changes once", async () => {
+        const fixture = await createFixture("priority-triage");
+        await grant(fixture.operator.userId, "it.ticket.read");
+        const created = await createTicket(fixture.requester);
+
+        const confirmed = await setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P2",
+            expectedVersion: 1,
+        });
+        expect(confirmed).toMatchObject({
+            changed: true,
+            ticket: {
+                priority: "P2",
+                version: 2,
+                status: "OPEN",
+                triagedByUserId: fixture.operator.userId,
+            },
+        });
+        expect(confirmed.ticket.triagedAt).toBeInstanceOf(Date);
+        const firstTriageAt = confirmed.ticket.triagedAt;
+        expect((await eventsFor(created.ticket.id))[1]).toMatchObject({
+            kind: "PRIORITY_TRIAGED",
+            actorUserId: fixture.operator.userId,
+            fromPriority: "P2",
+            toPriority: "P2",
+            priorityReason: null,
+        });
+
+        const requesterActivity = await getITRequesterTicketActivity(
+            fixture.requester.context,
+            created.ticket.id,
+        );
+        const operatorActivity = await getITOperatorTicketActivity(
+            fixture.operator.context,
+            created.ticket.id,
+        );
+        expect(requesterActivity.items.map((item) => item.type)).toEqual(["CREATED"]);
+        expect(operatorActivity.items.map((item) => item.type)).toEqual([
+            "CREATED",
+            "PRIORITY_TRIAGED",
+        ]);
+
+        const duplicate = await setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P2",
+            expectedVersion: 2,
+        });
+        expect(duplicate).toMatchObject({ changed: false, ticket: { version: 2 } });
+        expect(await prisma.iTTicketEvent.count({ where: { ticketId: created.ticket.id } })).toBe(2);
+        expect(await prisma.auditLog.count({
+            where: {
+                entityType: "ITTicket",
+                entityId: created.ticket.id,
+                action: "TICKET_UPDATE",
+            },
+        })).toBe(1);
+
+        const changed = await setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P1",
+            reason: "ระบบสำคัญขัดข้องหลายหน่วยงาน",
+            expectedVersion: 2,
+        });
+        expect(changed).toMatchObject({
+            changed: true,
+            ticket: {
+                priority: "P1",
+                version: 3,
+                status: "OPEN",
+                triagedByUserId: fixture.operator.userId,
+            },
+        });
+        expect(changed.ticket.triagedAt).toEqual(firstTriageAt);
+        expect((await eventsFor(created.ticket.id))[2]).toMatchObject({
+            kind: "PRIORITY_CHANGED",
+            fromPriority: "P2",
+            toPriority: "P1",
+            priorityReason: "ระบบสำคัญขัดข้องหลายหน่วยงาน",
+        });
+        const audits = await prisma.auditLog.findMany({
+            where: {
+                entityType: "ITTicket",
+                entityId: created.ticket.id,
+                action: "TICKET_UPDATE",
+            },
+            orderBy: { id: "asc" },
+            select: { userId: true, details: true },
+        });
+        expect(audits).toHaveLength(2);
+        expect(JSON.parse(audits[0]?.details ?? "null")).toEqual({
+            before: { priority: "P2", isTriaged: false },
+            after: { priority: "P2", isTriaged: true },
+            metadata: { change: "PRIORITY_TRIAGE", channel: "DASHBOARD" },
+        });
+        expect(audits[1]?.userId).toBe(fixture.operator.userId);
+        expect(JSON.parse(audits[1]?.details ?? "null")).toEqual({
+            before: { priority: "P2", isTriaged: true },
+            after: { priority: "P1", isTriaged: true },
+            metadata: {
+                change: "PRIORITY",
+                reason: "ระบบสำคัญขัดข้องหลายหน่วยงาน",
+                channel: "DASHBOARD",
+            },
+        });
+    });
+
+    it("rejects unauthorized, invalid, reasonless, stale, and terminal priority mutations", async () => {
+        const fixture = await createFixture("priority-rejections");
+        const created = await createTicket(fixture.requester);
+
+        await expect(setITTicketPriority(fixture.requester.context, {
+            ticketId: created.ticket.id,
+            priority: "P1",
+            reason: "เหตุผลทดสอบ",
+            expectedVersion: 1,
+        })).rejects.toMatchObject({ name: "ITCapabilityDeniedError" });
+        await expect(setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P4",
+            expectedVersion: 1,
+        })).rejects.toMatchObject({ name: "ITTicketInputValidationError" });
+        await expect(setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P1",
+            expectedVersion: 1,
+        })).rejects.toMatchObject({ name: "ITTicketInputValidationError" });
+
+        await setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P2",
+            expectedVersion: 1,
+        });
+        await expect(setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P0",
+            reason: "เหตุผลทดสอบ",
+            expectedVersion: 1,
+        })).rejects.toBeInstanceOf(ITTicketMutationConflictError);
+
+        await transitionITTicketStatus(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            targetStatus: ITTicketStatus.IN_PROGRESS,
+            expectedVersion: 2,
+        });
+        await transitionITTicketStatus(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            targetStatus: ITTicketStatus.CANCELLED,
+            expectedVersion: 3,
+        });
+        await expect(setITTicketPriority(fixture.operator.context, {
+            ticketId: created.ticket.id,
+            priority: "P0",
+            reason: "เหตุผลทดสอบ",
+            expectedVersion: 4,
+        })).rejects.toBeInstanceOf(ITTicketPriorityTerminalError);
+        const current = await prisma.iTTicket.findUniqueOrThrow({
+            where: { id: created.ticket.id },
+        });
+        expect(current).toMatchObject({ status: "CANCELLED", priority: "P2", version: 4 });
+        expect(await prisma.iTTicketEvent.count({ where: { ticketId: created.ticket.id } })).toBe(4);
+        expect(await prisma.auditLog.count({
+            where: {
+                entityType: "ITTicket",
+                entityId: created.ticket.id,
+                action: "TICKET_UPDATE",
+            },
+        })).toBe(1);
+    });
+
+    it("serializes priority races and rolls back the Ticket and Activity if Audit fails", async () => {
+        const fixture = await createFixture("priority-race");
+        const created = await createTicket(fixture.requester);
+        const results = await Promise.allSettled([
+            setITTicketPriority(fixture.operator.context, {
+                ticketId: created.ticket.id,
+                priority: "P1",
+                reason: "การเปลี่ยนแปลง A",
+                expectedVersion: 1,
+            }),
+            setITTicketPriority(fixture.operator.context, {
+                ticketId: created.ticket.id,
+                priority: "P0",
+                reason: "การเปลี่ยนแปลง B",
+                expectedVersion: 1,
+            }),
+        ]);
+        expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+        const rejected = results.find((result) => result.status === "rejected");
+        expect(rejected?.status).toBe("rejected");
+        if (rejected?.status === "rejected") {
+            expect(rejected.reason).toBeInstanceOf(ITTicketMutationConflictError);
+        }
+        expect(await prisma.iTTicketEvent.count({ where: { ticketId: created.ticket.id } })).toBe(2);
+        expect(await prisma.auditLog.count({
+            where: {
+                entityType: "ITTicket",
+                entityId: created.ticket.id,
+                action: "TICKET_UPDATE",
+            },
+        })).toBe(1);
+
+        const version = (await prisma.iTTicket.findUniqueOrThrow({
+            where: { id: created.ticket.id },
+            select: { version: true },
+        })).version;
+        await createAuditFailureTrigger();
+        try {
+            await expect(setITTicketPriority(fixture.operator.context, {
+                ticketId: created.ticket.id,
+                priority: "P3",
+                reason: "ทดสอบ rollback audit",
+                expectedVersion: version,
+            })).rejects.toThrow();
+        } finally {
+            await dropAuditFailureTrigger();
+        }
+        const afterRollback = await prisma.iTTicket.findUniqueOrThrow({
+            where: { id: created.ticket.id },
+        });
+        expect(afterRollback.version).toBe(version);
+        expect(await prisma.iTTicketEvent.count({ where: { ticketId: created.ticket.id } })).toBe(2);
+        expect(await prisma.auditLog.count({
+            where: {
+                entityType: "ITTicket",
+                entityId: created.ticket.id,
+                action: "TICKET_UPDATE",
+            },
         })).toBe(1);
     });
 

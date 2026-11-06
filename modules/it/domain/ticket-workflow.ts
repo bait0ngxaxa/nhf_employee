@@ -28,3 +28,8 @@ export function getAllowedITTicketTransitions(
 ): readonly ITTicketStatus[] {
     return ALLOWED_TRANSITIONS[from];
 }
+
+/** A Ticket is terminal when the approved workflow has no outgoing transition. */
+export function isTerminalITTicketStatus(status: ITTicketStatus): boolean {
+    return ALLOWED_TRANSITIONS[status].length === 0;
+}

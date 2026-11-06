@@ -1,11 +1,14 @@
 import type { AuthorizationScope } from "@/modules/authorization";
-import type { ITTicketStatus, ITTicketType } from "@prisma/client";
+import type { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
 
 export type { ITPresentationCapabilities } from "../contracts";
 
 export interface ITTicketRecord {
     readonly id: number;
     readonly type: ITTicketType;
+    readonly priority: ITTicketPriority;
+    readonly triagedAt: Date | null;
+    readonly triagedByUserId: number | null;
     readonly title: string;
     readonly description: string;
     readonly status: ITTicketStatus;

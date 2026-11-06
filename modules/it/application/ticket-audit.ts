@@ -51,6 +51,8 @@ export function createITTicketCreationAudit(
         after: {
             type: ticket.type,
             status: ticket.status,
+            priority: ticket.priority,
+            isTriaged: ticket.triagedAt !== null,
             requesterUserId: ticket.requesterUserId,
             assignedToUserId: ticket.assignedToUserId,
             categoryId: ticket.categoryId,
@@ -105,6 +107,30 @@ export function createITTicketCategoryAudit(
         before: { categoryId: beforeCategoryId },
         after: { categoryId: afterCategoryId },
         metadata: { change: "CATEGORY" },
+    });
+}
+
+export function createITTicketPriorityAudit(
+    tx: Prisma.TransactionClient,
+    context: ITAuthorizationContext,
+    requestMetadata: ITCommandRequestMetadata | undefined,
+    before: Pick<ITTicketRecord, "id" | "priority" | "triagedAt">,
+    after: Pick<ITTicketRecord, "priority" | "triagedAt">,
+    reason: string | undefined,
+): Promise<void> {
+    return appendITTicketAudit(tx, "TICKET_UPDATE", before.id, context, requestMetadata, {
+        before: {
+            priority: before.priority,
+            isTriaged: before.triagedAt !== null,
+        },
+        after: {
+            priority: after.priority,
+            isTriaged: after.triagedAt !== null,
+        },
+        metadata: {
+            change: reason === undefined ? "PRIORITY_TRIAGE" : "PRIORITY",
+            ...(reason === undefined ? {} : { reason }),
+        },
     });
 }
 

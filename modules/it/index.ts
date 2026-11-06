@@ -25,12 +25,14 @@ export {
     assignITTicketBodySchema,
     createITTicketInputSchema,
     setITTicketCategoryBodySchema,
+    setITTicketPriorityBodySchema,
     transitionITTicketStatusBodySchema,
 } from "./application/ticket-schemas";
 export {
     assignITTicket,
     createITTicket,
     setITTicketCategory,
+    setITTicketPriority,
     transitionITTicketStatus,
 } from "./application/ticket-commands";
 export {
@@ -127,6 +129,7 @@ export {
     ITTicketAssigneeNotEligibleError,
     ITTicketCategoryInactiveError,
     ITTicketCategoryNotFoundError,
+    ITTicketPriorityTerminalError,
     ITTicketError,
     ITTicketIdempotencyConflictError,
     ITTicketInputValidationError,
@@ -136,8 +139,12 @@ export {
     ITTicketNotFoundError,
     ITWorkforceDeniedError,
 } from "./application/ticket-errors";
-export { isAllowedITTicketTransition } from "./domain/ticket-workflow";
+export { isAllowedITTicketTransition, isTerminalITTicketStatus } from "./domain/ticket-workflow";
 export { getAllowedITTicketTransitions } from "./domain/ticket-workflow";
+export {
+    getInitialITTicketPriority,
+    isITTicketPriorityEscalation,
+} from "./domain/ticket-priority";
 export {
     createITTicketCommentRequestHash,
     isITTicketCommentableStatus,
@@ -145,6 +152,7 @@ export {
 export {
     ITTicketCommentKind,
     ITTicketEventKind,
+    ITTicketPriority,
     ITTicketStatus,
     ITTicketType,
 } from "@prisma/client";
@@ -173,6 +181,7 @@ export type {
     AssignITTicketInput,
     CreateITTicketInput,
     SetITTicketCategoryInput,
+    SetITTicketPriorityInput,
     TransitionITTicketStatusInput,
 } from "./application/ticket-schemas";
 export type {

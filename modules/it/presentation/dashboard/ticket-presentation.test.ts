@@ -18,6 +18,7 @@ import {
     parseITTicketActivityPage,
     parseITTicketConversationItem,
     parseITTicketConversationPage,
+    parseITRequesterTicket,
     parseITRequesterTicketDetail,
 } from "./ticket-presentation";
 
@@ -27,6 +28,9 @@ const operatorTicket = {
     title: "เข้าใช้งานระบบไม่ได้",
     description: "หน้าเข้าสู่ระบบแสดงข้อผิดพลาด",
     status: "IN_PROGRESS",
+    priority: "P2",
+    triagedAt: null,
+    isTriaged: false,
     requester: {
         userId: 41,
         displayName: "สมชาย ใจดี (ชาย)",
@@ -34,6 +38,7 @@ const operatorTicket = {
         departmentNameSnapshot: "แผนกตัวอย่าง",
     },
     assignee: { userId: 51, displayName: "อารี ใจเย็น" },
+    triagedBy: null,
     category: { id: 7, key: "NETWORK", name: "เครือข่าย", isActive: false },
     version: 4,
     createdAt: "2026-09-01T01:00:00.000Z",
@@ -42,6 +47,22 @@ const operatorTicket = {
 };
 
 describe("IT operator presentation contracts", () => {
+    it("preserves the requester response shape without exposing priority fields", () => {
+        const requesterTicket = {
+            id: 19,
+            type: "INCIDENT",
+            title: "เข้าใช้งานระบบไม่ได้",
+            description: "หน้าเข้าสู่ระบบแสดงข้อผิดพลาด",
+            status: "OPEN",
+            createdAt: "2026-09-01T01:00:00.000Z",
+            updatedAt: "2026-09-01T01:00:00.000Z",
+            resolvedAt: null,
+        };
+
+        expect(parseITRequesterTicket(requesterTicket)).toEqual(requesterTicket);
+        expect(parseITRequesterTicket(requesterTicket)).not.toHaveProperty("priority");
+    });
+
     it("formats compact Activity times in Bangkok time", () => {
         expect(formatITTicketActivityTime("2026-09-01T07:03:00.000Z")).toBe("14:03");
         expect(formatITTicketActivityTimestamp(
@@ -152,6 +173,10 @@ describe("IT operator presentation contracts", () => {
                 id: 19,
                 version: 5,
                 status: "IN_PROGRESS",
+                priority: "P1",
+                triagedAt: "2026-09-02T03:00:00.000Z",
+                triagedByUserId: 51,
+                isTriaged: true,
                 assignedToUserId: 51,
                 categoryId: 7,
                 updatedAt: "2026-09-02T03:00:00.000Z",
@@ -215,6 +240,24 @@ describe("IT Ticket conversation and activity presentation contracts", () => {
             hasMore: true,
         });
         expect(parseITTicketActivityItem(comment)).toBeNull();
+    });
+
+    it("parses operator priority Activity with its reason", () => {
+        const priorityChanged = {
+            type: "PRIORITY_CHANGED",
+            id: 12,
+            occurredAt: "2026-09-01T02:03:00.000Z",
+            actorDisplayName: "อารี ใจเย็น",
+            fromPriority: "P2",
+            toPriority: "P1",
+            reason: "ระบบสำคัญขัดข้องหลายหน่วยงาน",
+        } as const;
+
+        expect(parseITTicketActivityItem(priorityChanged)).toEqual(priorityChanged);
+        expect(describeITTicketActivityItem(priorityChanged, "DASHBOARD"))
+            .toContain("เหตุผล: ระบบสำคัญขัดข้องหลายหน่วยงาน");
+        expect(parseITTicketActivityItem({ ...priorityChanged, toPriority: "P4" })).toBeNull();
+        expect(parseITTicketActivityItem({ ...priorityChanged, reason: undefined })).toBeNull();
     });
 
     it("merges pages independently with stable ID ordering for equal timestamps", () => {

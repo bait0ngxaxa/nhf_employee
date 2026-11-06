@@ -46,6 +46,9 @@ export const IT_TICKET_ACTIVITY_EVENT_SELECT = {
     kind: true,
     fromStatus: true,
     toStatus: true,
+    fromPriority: true,
+    toPriority: true,
+    priorityReason: true,
     occurredAt: true,
     actor: {
         select: {

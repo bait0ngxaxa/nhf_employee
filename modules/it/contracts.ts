@@ -1,5 +1,6 @@
 import type {
     ITTicketCommentKind,
+    ITTicketPriority,
     ITTicketStatus,
     ITTicketType,
 } from "@prisma/client";
@@ -145,6 +146,10 @@ export interface ITOperatorTicket {
     readonly title: string;
     readonly description: string;
     readonly status: ITTicketStatus;
+    readonly priority: ITTicketPriority;
+    readonly triagedAt: string | null;
+    readonly isTriaged: boolean;
+    readonly triagedBy: ITTicketOperatorIdentity | null;
     readonly requester: ITTicketOperatorIdentity & {
         readonly departmentId: number | null;
         readonly departmentNameSnapshot: string | null;
@@ -176,6 +181,10 @@ export interface ITOperatorTicketMutationSnapshot {
     readonly id: number;
     readonly version: number;
     readonly status: ITTicketStatus;
+    readonly priority: ITTicketPriority;
+    readonly triagedAt: string | null;
+    readonly triagedByUserId: number | null;
+    readonly isTriaged: boolean;
     readonly assignedToUserId: number | null;
     readonly categoryId: number | null;
     readonly updatedAt: string;
@@ -230,6 +239,15 @@ export type ITTicketActivityItem =
         readonly actorDisplayName: string;
         readonly fromCategoryName: string | null;
         readonly toCategoryName: string | null;
+    }
+    | {
+        readonly type: "PRIORITY_TRIAGED" | "PRIORITY_CHANGED";
+        readonly id: number;
+        readonly occurredAt: string;
+        readonly actorDisplayName: string;
+        readonly fromPriority: ITTicketPriority;
+        readonly toPriority: ITTicketPriority;
+        readonly reason: string | null;
     };
 
 export interface ITTicketConversationPage {
@@ -285,6 +303,20 @@ export const IT_TICKET_TYPE_LABELS: Readonly<Record<ITTicketType, string>> = {
     INCIDENT: "ปัญหาที่พบ",
     SERVICE_REQUEST: "ขอรับบริการ",
     SUGGESTION: "ข้อเสนอแนะ",
+};
+
+export const IT_TICKET_PRIORITY_OPTIONS = [
+    { value: "P0", label: "P0 — วิกฤต" },
+    { value: "P1", label: "P1 — สูง" },
+    { value: "P2", label: "P2 — ปกติ" },
+    { value: "P3", label: "P3 — ต่ำ" },
+] as const satisfies readonly { value: ITTicketPriority; label: string }[];
+
+export const IT_TICKET_PRIORITY_LABELS: Readonly<Record<ITTicketPriority, string>> = {
+    P0: "P0 — วิกฤต",
+    P1: "P1 — สูง",
+    P2: "P2 — ปกติ",
+    P3: "P3 — ต่ำ",
 };
 
 export const IT_TICKET_STATUS_LABELS: Readonly<Record<ITTicketStatus, string>> = {

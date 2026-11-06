@@ -13,6 +13,7 @@ import {
     ITTicketMutationConflictError,
     ITTicketNotCommentableError,
     ITTicketNotFoundError,
+    ITTicketPriorityTerminalError,
     ITTicketAttachmentValidationError,
     ITWorkforceDeniedError,
 } from "@/modules/it";
@@ -52,6 +53,7 @@ export function mapITOperatorRouteError(error: unknown): NextResponse | null {
         error instanceof ITTicketAssigneeNotEligibleError
         || error instanceof ITTicketCategoryInactiveError
         || error instanceof ITTicketInvalidTransitionError
+        || error instanceof ITTicketPriorityTerminalError
         || error instanceof ITTicketNotCommentableError
     ) {
         return jsonError(error.message, 409, { success: false, code: error.code });

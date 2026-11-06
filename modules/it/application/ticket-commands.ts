@@ -18,11 +18,13 @@ import {
     ITTicketInvalidTransitionError,
     ITTicketMutationConflictError,
     ITTicketNotFoundError,
+    ITTicketPriorityTerminalError,
 } from "./ticket-errors";
 import {
     assignITTicketInputSchema,
     createITTicketInputSchema,
     setITTicketCategoryInputSchema,
+    setITTicketPriorityInputSchema,
     transitionITTicketStatusInputSchema,
     type CreateITTicketInput,
 } from "./ticket-schemas";
@@ -36,10 +38,12 @@ import {
     createITTicketAssignmentAudit,
     createITTicketCategoryAudit,
     createITTicketCreationAudit,
+    createITTicketPriorityAudit,
     createITTicketStatusAudit,
 } from "./ticket-audit";
 import { createITTicketRequestHash } from "../domain/ticket-idempotency";
-import { isAllowedITTicketTransition } from "../domain/ticket-workflow";
+import { isAllowedITTicketTransition, isTerminalITTicketStatus } from "../domain/ticket-workflow";
+import { getInitialITTicketPriority } from "../domain/ticket-priority";
 import {
     deleteITTicketAttachmentFiles,
     writeITTicketAttachments,
@@ -73,6 +77,9 @@ function toITTicketRecord(ticket: PrismaITTicket): ITTicketRecord {
     return Object.freeze({
         id: ticket.id,
         type: ticket.type,
+        priority: ticket.priority,
+        triagedAt: ticket.triagedAt,
+        triagedByUserId: ticket.triagedByUserId,
         title: ticket.title,
         description: ticket.description,
         status: ticket.status,
@@ -209,6 +216,9 @@ export async function createITTicket(
         const occurredAt = new Date();
         const ticket = await createITTicketRecord(tx, {
             type: canonicalInput.type,
+            priority: getInitialITTicketPriority(canonicalInput.type),
+            triagedAt: null,
+            triagedByUserId: null,
             title: canonicalInput.title,
             description: canonicalInput.description,
             status: "OPEN",
@@ -618,6 +628,67 @@ export async function setITTicketCategory(
             ticket.id,
             ticket.categoryId,
             result.ticket.categoryId,
+        );
+        return result;
+    });
+}
+
+/** Reviews or changes priority with the existing operator transaction and Audit guarantees. */
+export async function setITTicketPriority(
+    context: ITAuthorizationContext,
+    input: unknown,
+    requestMetadata?: ITCommandRequestMetadata,
+): Promise<ITTicketMutationResult> {
+    const command = parseInput(setITTicketPriorityInputSchema, input);
+    return runOperatorMutation(async (tx) => {
+        await assertOperatorAuthority(tx, context);
+        const ticket = await loadTicketAtVersion(
+            tx,
+            command.ticketId,
+            command.expectedVersion,
+        );
+        const isUnchanged = ticket.priority === command.priority;
+        if (isUnchanged && ticket.triagedAt !== null) {
+            return { ticket: toITTicketRecord(ticket), changed: false };
+        }
+        if (isTerminalITTicketStatus(ticket.status)) {
+            throw new ITTicketPriorityTerminalError();
+        }
+
+        const changedPriority = !isUnchanged;
+        const changeReason = changedPriority ? command.reason : undefined;
+        if (changedPriority && changeReason === undefined) {
+            throw new ITTicketInputValidationError();
+        }
+
+        const occurredAt = new Date();
+        const actorUserId = context.authorizationActor.userId;
+        const result = await saveMutationAndEvent(
+            tx,
+            ticket,
+            command.expectedVersion,
+            actorUserId,
+            occurredAt,
+            {
+                priority: command.priority,
+                ...(ticket.triagedAt === null
+                    ? { triagedAt: occurredAt, triagedByUserId: actorUserId }
+                    : {}),
+            },
+            {
+                kind: changedPriority ? "PRIORITY_CHANGED" : "PRIORITY_TRIAGED",
+                fromPriority: ticket.priority,
+                toPriority: command.priority,
+                priorityReason: changeReason ?? null,
+            },
+        );
+        await createITTicketPriorityAudit(
+            tx,
+            context,
+            requestMetadata,
+            ticket,
+            result.ticket,
+            changeReason,
         );
         return result;
     });

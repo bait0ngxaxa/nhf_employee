@@ -1,6 +1,7 @@
 import {
     IT_OPERATOR_QUEUE_MAX_LIMIT,
     IT_TICKET_STATUS_LABELS,
+    IT_TICKET_PRIORITY_LABELS,
     IT_TICKET_TYPE_LABELS,
     type ITTicketCommentSubmission,
     type ITTicketAttachmentSummary,
@@ -18,7 +19,7 @@ import {
     type ITRequesterTicketList,
     type ITOperatorTicketDetail,
 } from "../../contracts";
-import type { ITTicketStatus, ITTicketType } from "@prisma/client";
+import type { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
 
 export const IT_TICKET_STATUS_STYLES: Readonly<Record<ITTicketStatus, string>> = {
     OPEN: "bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-200",
@@ -46,6 +47,11 @@ export function isITTicketType(value: unknown): value is ITTicketType {
 export function isITTicketStatus(value: unknown): value is ITTicketStatus {
     return typeof value === "string"
         && Object.prototype.hasOwnProperty.call(IT_TICKET_STATUS_LABELS, value);
+}
+
+export function isITTicketPriority(value: unknown): value is ITTicketPriority {
+    return typeof value === "string"
+        && Object.prototype.hasOwnProperty.call(IT_TICKET_PRIORITY_LABELS, value);
 }
 
 export function parseITRequesterTicket(value: unknown): ITRequesterTicket | null {
@@ -124,6 +130,10 @@ export function parseITOperatorTicket(value: unknown): ITOperatorTicket | null {
         || typeof value.title !== "string"
         || typeof value.description !== "string"
         || !isITTicketStatus(value.status)
+        || !isITTicketPriority(value.priority)
+        || !isNullableString(value.triagedAt)
+        || typeof value.isTriaged !== "boolean"
+        || value.isTriaged !== (value.triagedAt !== null)
         || !isPositiveSafeInteger(value.version)
         || typeof value.createdAt !== "string"
         || typeof value.updatedAt !== "string"
@@ -142,6 +152,16 @@ export function parseITOperatorTicket(value: unknown): ITOperatorTicket | null {
         const parsedAssignee = parseOperatorIdentity(value.assignee);
         if (parsedAssignee === null) return null;
         assignee = parsedAssignee;
+    }
+
+    let triagedBy: ITOperatorTicket["triagedBy"] = null;
+    if (value.triagedBy !== null) {
+        const parsedTriagedBy = parseOperatorIdentity(value.triagedBy);
+        if (parsedTriagedBy === null) return null;
+        triagedBy = parsedTriagedBy;
+    }
+    if ((value.isTriaged && triagedBy === null) || (!value.isTriaged && triagedBy !== null)) {
+        return null;
     }
 
     let category: ITOperatorTicket["category"] = null;
@@ -167,6 +187,10 @@ export function parseITOperatorTicket(value: unknown): ITOperatorTicket | null {
         title: value.title,
         description: value.description,
         status: value.status,
+        priority: value.priority,
+        triagedAt: value.triagedAt,
+        isTriaged: value.isTriaged,
+        triagedBy,
         requester: {
             ...requesterIdentity,
             departmentId: value.requester.departmentId,
@@ -277,6 +301,13 @@ export function parseITOperatorTicketMutationSnapshot(value: unknown): {
         || !isPositiveSafeInteger(value.ticket.id)
         || !isPositiveSafeInteger(value.ticket.version)
         || !isITTicketStatus(value.ticket.status)
+        || !isITTicketPriority(value.ticket.priority)
+        || !isNullableString(value.ticket.triagedAt)
+        || typeof value.ticket.isTriaged !== "boolean"
+        || value.ticket.isTriaged !== (value.ticket.triagedAt !== null)
+        || !isNullablePositiveSafeInteger(value.ticket.triagedByUserId)
+        || ((value.ticket.isTriaged as boolean)
+            !== (value.ticket.triagedByUserId !== null))
         || !isNullablePositiveSafeInteger(value.ticket.assignedToUserId)
         || !isNullablePositiveSafeInteger(value.ticket.categoryId)
         || typeof value.ticket.updatedAt !== "string") {
@@ -288,6 +319,10 @@ export function parseITOperatorTicketMutationSnapshot(value: unknown): {
             id: value.ticket.id,
             version: value.ticket.version,
             status: value.ticket.status,
+            priority: value.ticket.priority,
+            triagedAt: value.ticket.triagedAt,
+            triagedByUserId: value.ticket.triagedByUserId,
+            isTriaged: value.ticket.isTriaged,
             assignedToUserId: value.ticket.assignedToUserId,
             categoryId: value.ticket.categoryId,
             updatedAt: value.ticket.updatedAt,
@@ -493,6 +528,21 @@ export function parseITTicketActivityItem(value: unknown): ITTicketActivityItem 
             toCategoryName: value.toCategoryName,
         };
     }
+    if (value.type === "PRIORITY_TRIAGED" || value.type === "PRIORITY_CHANGED") {
+        if (!isITTicketPriority(value.fromPriority)
+            || !isITTicketPriority(value.toPriority)
+            || (value.reason !== null
+                && (typeof value.reason !== "string" || value.reason.length > 500))) {
+            return null;
+        }
+        return {
+            type: value.type,
+            ...base,
+            fromPriority: value.fromPriority,
+            toPriority: value.toPriority,
+            reason: value.reason,
+        };
+    }
     return null;
 }
 
@@ -546,6 +596,12 @@ export function describeITTicketActivityItem(
             description = audience === "LIFF"
                 ? "ปรับข้อมูลการจัดหมวดหมู่"
                 : `เปลี่ยนหมวดหมู่จาก ${item.fromCategoryName ?? "ไม่จัดหมวดหมู่"} เป็น ${item.toCategoryName ?? "ไม่จัดหมวดหมู่"}`;
+            break;
+        case "PRIORITY_TRIAGED":
+            description = `ยืนยันระดับความสำคัญ ${IT_TICKET_PRIORITY_LABELS[item.toPriority]}`;
+            break;
+        case "PRIORITY_CHANGED":
+            description = `เปลี่ยนระดับความสำคัญจาก ${IT_TICKET_PRIORITY_LABELS[item.fromPriority]} เป็น ${IT_TICKET_PRIORITY_LABELS[item.toPriority]}${item.reason === null ? "" : ` เหตุผล: ${item.reason}`}`;
             break;
     }
     return description;

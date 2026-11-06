@@ -39,6 +39,7 @@ model User {
   teamMemberships             TeamMembership[]
   userCapabilityGrants        UserCapabilityGrant[]
   requestedITTickets          ITTicket[]                   @relation("ITTicketRequester")
+  triagedITTickets            ITTicket[]                   @relation("ITTicketTriagedBy")
   assignedITTickets           ITTicket[]                   @relation("ITTicketAssignee")
   authoredITTicketEvents      ITTicketEvent[]               @relation("ITTicketEventActor")
   fromITTicketAssigneeEvents  ITTicketEvent[]               @relation("ITTicketEventFromAssignee")
@@ -228,6 +229,13 @@ enum ITTicketType {
   SUGGESTION
 }
 
+enum ITTicketPriority {
+  P0
+  P1
+  P2
+  P3
+}
+
 enum ITTicketStatus {
   OPEN
   IN_PROGRESS
@@ -243,6 +251,8 @@ enum ITTicketEventKind {
   ASSIGNED
   UNASSIGNED
   CATEGORY_CHANGED
+  PRIORITY_TRIAGED
+  PRIORITY_CHANGED
 }
 
 enum ITTicketCommentKind {
@@ -253,6 +263,9 @@ enum ITTicketCommentKind {
 model ITTicket {
   id                              Int            @id @default(autoincrement())
   type                            ITTicketType
+  priority                        ITTicketPriority @default(P2)
+  triagedAt                       DateTime?
+  triagedByUserId                 Int?
   title                           String         @db.VarChar(200)
   description                     String         @db.Text
   status                          ITTicketStatus @default(OPEN)
@@ -269,6 +282,7 @@ model ITTicket {
 
   requester         User               @relation("ITTicketRequester", fields: [requesterUserId], references: [id], onDelete: Restrict)
   assignedTo        User?              @relation("ITTicketAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
+  triagedBy         User?              @relation("ITTicketTriagedBy", fields: [triagedByUserId], references: [id], onDelete: Restrict)
   requesterDepartment Department?       @relation(fields: [requesterDepartmentId], references: [id], onDelete: SetNull)
   category          ITTicketCategory?  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   events            ITTicketEvent[]
@@ -279,10 +293,13 @@ model ITTicket {
   @@index([requesterUserId, createdAt, id])
   @@index([createdAt, id])
   @@index([status, createdAt, id])
+  @@index([status, priority, createdAt, id])
+  @@index([status, triagedAt, priority, createdAt, id])
   @@index([assignedToUserId, status, createdAt])
   @@index([assignedToUserId, createdAt, id])
   @@index([type, createdAt])
   @@index([categoryId, createdAt])
+  @@index([triagedByUserId])
   @@index([requesterDepartmentId])
   @@map("it_tickets")
 }
@@ -312,6 +329,9 @@ model ITTicketEvent {
   toAssigneeUserId     Int?
   fromCategoryId       Int?
   toCategoryId         Int?
+  fromPriority         ITTicketPriority?
+  toPriority           ITTicketPriority?
+  priorityReason       String?           @db.VarChar(500)
   occurredAt           DateTime          @default(now())
 
   ticket       ITTicket         @relation(fields: [ticketId], references: [id], onDelete: Restrict)

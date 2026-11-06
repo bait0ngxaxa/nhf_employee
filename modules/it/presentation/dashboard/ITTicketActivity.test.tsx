@@ -138,6 +138,53 @@ describe("IT Ticket Activity", () => {
         expect(screen.getByLabelText("ตอบกลับ")).toBeInTheDocument();
     });
 
+    it("keeps operator-only priority Activity hidden from requester surfaces", async () => {
+        const priorityEvent = {
+            type: "PRIORITY_CHANGED" as const,
+            id: 12,
+            occurredAt: "2026-09-01T02:03:00.000Z",
+            actorDisplayName: "เจ้าหน้าที่ IT",
+            fromPriority: "P2" as const,
+            toPriority: "P1" as const,
+            reason: "ระบบสำคัญขัดข้องหลายหน่วยงาน",
+        };
+        const pageLoader = async () => ({
+            items: [priorityEvent],
+            olderCursor: null,
+            hasMore: false,
+        });
+
+        const { unmount } = render(
+            <ITTicketActivity
+                ticketId={ticketId}
+                ticketCreatedAt={ticketCreatedAt}
+                audience="REQUESTER"
+                surface="LIFF"
+                pageLoader={pageLoader}
+            />,
+        );
+
+        await waitFor(() => expect(screen.queryByRole("list", {
+            name: `ประวัติการดำเนินการ Ticket #${ticketId}`,
+        })).not.toBeInTheDocument());
+        expect(screen.getByText("ยังไม่มีประวัติการดำเนินการ")).toBeInTheDocument();
+
+        unmount();
+        render(
+            <ITTicketActivity
+                ticketId={ticketId}
+                ticketCreatedAt={ticketCreatedAt}
+                audience="OPERATOR"
+                pageLoader={pageLoader}
+            />,
+        );
+        const operatorActivity = await screen.findByRole("list", {
+            name: `ประวัติการดำเนินการ Ticket #${ticketId}`,
+        });
+        expect(within(operatorActivity).getByText(/เปลี่ยนระดับความสำคัญจาก P2/)).toBeInTheDocument();
+        expect(within(operatorActivity).getByText(/เหตุผล: ระบบสำคัญขัดข้องหลายหน่วยงาน/)).toBeInTheDocument();
+    });
+
     it("keeps LIFF activity compact and omits requester-hidden assignment and category details", async () => {
         render(
             <ITTicketActivity

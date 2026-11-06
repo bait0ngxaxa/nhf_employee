@@ -59,7 +59,7 @@ Dashboard shell / App Router pages / app/api adapters
 
 | Concept | Minimum durable data / invariant |
 | --- | --- |
-| `ITTicket` | id, type, title, description, status, requesterUserId, nullable assignedToUserId, nullable categoryId, createdAt, updatedAt; optional priority and response/resolution/closure timestamps as decided below. Requester/type/creation time immutable. |
+| `ITTicket` | id, type, priority, nullable `triagedAt`/`triagedByUserId`, title, description, status, requesterUserId, nullable assignedToUserId, nullable categoryId, createdAt, updatedAt, and response/resolution timestamps. Requester/type/creation time immutable. |
 | `ITTicketCategory` | id, stable unique key, name, isActive. Category is reference data, not a hardcoded operational enum. Inactive categories remain readable on historical tickets. No initial category administration capability is justified. |
 | `ITTicketComment` | id, ticketId, authorUserId, server-derived kind (`REQUESTER` or `OPERATOR`), body, createdAt; requester and operator messages visible to both sides. Immutable after posting. No private/internal note flag. |
 | `ITTicketCommentIdempotency` | authorUserId, idempotencyKey, server-computed canonical request hash, commentId; unique actor/key and comment linkage. Comment and idempotency row commit atomically. |
@@ -98,13 +98,24 @@ Assignment starts null (`UNASSIGNED`); `ASSIGNED` means a non-null User referenc
 
 Ordinary comments are permitted only in `OPEN`, `IN_PROGRESS`, and `WAITING_REQUESTER`; `RESOLVED`, `CLOSED`, and `CANCELLED` are non-commentable. IT5B attachments follow this same conversation lifecycle. A requester endpoint always scopes by both Ticket ID and authenticated requester ID, even for an actor with comment ALL. Operator reads require read ALL; operator replies with optional images independently require read ALL and comment ALL, not manage ALL. Requester messages never set `firstRespondedAt`; the first accepted operator comment atomically sets it once, and images do not set it independently. Assignment, status, category, retries, and later replies do not change it. Internal IT-only notes require a distinct visibility/authorization model and remain deferred.
 
-Priority candidates are `LOW`, `NORMAL`, `HIGH`, `URGENT`. If included in MVP, default authoritative priority to `NORMAL`, and allow only manage ALL to change it. Requester urgency may be collected as separate input only after a product decision; never treat it as operational priority. Record priority changes in Activity. A formal impact×urgency matrix and SLA engine are outside scope. Category may be null until classified; operator manages classification, while category reference maintenance can initially be deployment/configuration managed without a new capability.
+**LOCKED — approved P0–P3 priority contract.** Priority is independent of Ticket type, category, and status. Only `it.ticket.manage / ALL` can confirm or change it through the Dashboard operator API; requester Dashboard and LIFF contracts do not accept or expose priority.
+
+| Priority | Meaning |
+| --- | --- |
+| `P0` — Critical | Organization-wide critical outage or severe active security incident. |
+| `P1` — High | Important service disruption or significant multi-user impact. |
+| `P2` — Normal | Ordinary IT incident with limited impact. |
+| `P3` — Low | Low-impact service request, suggestion, or non-urgent work. |
+
+Creation policy is server-owned: `INCIDENT → P2`; `SERVICE_REQUEST → P3`; `SUGGESTION → P3`. The Prisma column is non-null with a `P2` database fallback, while the creation command explicitly applies the type mapping. New Tickets have `triagedAt = NULL` and `triagedByUserId = NULL`; this is the authoritative untriaged state. An operator may confirm the current default without changing the priority. That first confirmation records the actor and time; later adjustments preserve the original triage fields and append their own Activity/Audit facts. Repeating an already-confirmed identical priority is a no-op. Actual priority changes require a meaningful reason (maximum 500 characters). Every state change uses the existing expected-version Serializable transaction and atomically persists the Ticket update, Activity event, and Audit record. `CLOSED` and `CANCELLED` Tickets cannot be triaged or reprioritized; priority never changes status, assignment, or category. There is no requester urgency input, impact/urgency matrix, priority automation, historical priority backfill, or formal SLA policy/engine. Category may be null until classified; operator manages classification, while category reference maintenance can initially be deployment/configuration managed without a new capability.
 
 ## 6. Conversation, Activity, and Audit
 
 **LOCKED; operational history is implemented in IT5A, accountability integration in IT11.** Ticket history has three separate concerns: `ITTicketComment` is the human Conversation, `ITTicketEvent` is the authoritative operational Activity, and `AuditLog` is security/accountability history. Conversation queries and presentation read comments only. Activity queries and presentation read structured events only. Each event is appended in the same transaction as its mutation; comments do not create duplicate Ticket events. The original IT5A implementation merged comments and events into one timeline for presentation; that historical presentation was superseded by independent source-specific reads and cursors. `resolvedAt` is set when entering `RESOLVED`, cleared on `RESOLVED → IN_PROGRESS`, and preserved on `RESOLVED → CLOSED`; cancellation does not set it. `STATUS_CHANGED` events and corresponding Audit facts remain atomic with each status mutation and record reopen, close, and cancellation occurrences. `firstRespondedAt` is set only by the first accepted operator comment. Do not infer first response or waiting duration from `updatedAt`.
 
 `ITTicketEvent` and `ITTicketComment` remain operational records and feed their established reporting needs. `AuditLog` follows [`modules/audit`](../../modules/audit) public commands. At the IT5A phase boundary, comment Audit was deferred pending a policy decision. IT11 resolves that decision: successful create, assignment, status, category, and requester/operator comment mutations are auditable in their existing transaction. A comment Audit record identifies the comment, author side, and attachment count; it never copies the body, file bytes, or private storage key. Replays, no-op assignment/category changes, and failed commands add no second state-change record. Never use Audit as the Ticket event store or expose Audit rows through requester Conversation or Activity.
+
+Priority events use `PRIORITY_TRIAGED` for first explicit operator confirmation and `PRIORITY_CHANGED` for actual changes. Both store old/new priority; actual changes also store the reason. Requester Activity queries omit these operator-only facts, preserving requester Activity and Conversation behavior. Audit records use the existing `TICKET_UPDATE` action and contain only priority/triage before/after values and the change reason.
 
 ## 7. Authorization and resource policy
 
@@ -202,6 +213,7 @@ The current channel boundary is:
 - **`DASHBOARD`:** requester self-service, operator queue/detail/workflow, analytics, and the Email Request Dashboard.
 - **`LIFF_SELF_SERVICE`:** requester self-service only. Effective `it.ticket.read`, `it.ticket.create`, and `it.ticket.comment` scopes are always `OWN`, including when configured authority resolves to `ALL`.
 - LIFF does not expose the operator queue, assignment, category/status mutation, `it.ticket.manage`, or `it.analytics.read`.
+- Operator priority review and changes are Dashboard-only. Requester Dashboard and LIFF creation and tracking flows remain unchanged and do not expose priority.
 
 IT9A owns the **CLOSED** requester-only authorization/API foundation, including:
 
@@ -336,9 +348,11 @@ Do not delete, rename, reinterpret, or reuse historical stored values in IT0. At
 
 **LOCKED implementation obligations.** IT2 implements server-derived requester identity, validated title/description/type, active workforce and current capability checks, atomic creation/idempotency/event persistence, and expected-version operator writes with transaction-time authorization and assignee revalidation. Same requester/key/canonical input replays; different input conflicts; a unique-key race reads back the committed result. Creation input excludes ownership, assignment, status, category, Department, version, resolution, and permission fields. Ticket writes have no NotificationOutbox intent. IT5A comment POST uses a required `Idempotency-Key`, a server-computed hash of Ticket/author-side/canonical trimmed body, actor-key persistence, and atomic comment plus idempotency commit. Comment body uses the existing 10,000-character Ticket description bound as a conservative technical safety limit pending an IT-specific product maximum; text is never silently truncated. The accepted requester/operator side is server-derived and stored on the immutable comment. Requester comment writes keep the OWN resource predicate and check current workforce, authority and lifecycle in the transaction. Operator replies require both read ALL and comment ALL there. First response is conditionally claimed once by an operator comment in that transaction. Comments do not mutate workflow status/version, add a duplicate event, or create Notification, outbox or Audit rows. A stale screen is never sufficient mutation authority. If a requester becomes inactive, history remains but access stops; if an assignee becomes inactive, retain evidence and surface reassignment. Deletion and retention policy must not silently cascade away Tickets, comments or events.
 
+Priority creation and operator mutation follow the same persistence and Audit invariants as the existing workflow: no requester-supplied priority is accepted, version checks happen before no-op/review decisions, stale writes return the established conflict, and failed Activity/Audit persistence rolls back the whole priority mutation. `CLOSED` and `CANCELLED` are the terminal statuses and reject triage/reprioritization. Priority does not mutate status, assignment, or category.
+
 ## 15. Explicit non-goals and open product requirements
 
-**Non-goals:** ITIL Problem/Change Management, CMDB/assets, SLA engine or breach automation, approvals, multi-tenant/external customers, email ingestion, chatbot/AI classification, knowledge base, automatic routing/escalation/on-call, nested IT teams, custom workflow/policy DSL, arbitrary custom fields, and automatic EmailRequest→Ticket conversion. LIFF operator, analytics, and administrative surfaces are out of scope. IT9A adds no LIFF UI, Home card, navigation item, Rich Menu change, or Ticket LINE notification.
+**Non-goals:** ITIL Problem/Change Management, CMDB/assets, SLA policies/deadlines/countdowns/breaches/compliance or automation, approvals, multi-tenant/external customers, email ingestion, chatbot/AI classification, knowledge base, automatic routing/escalation/on-call, nested IT teams, custom workflow/policy DSL, arbitrary custom fields, and automatic EmailRequest→Ticket conversion. LIFF operator, analytics, and administrative surfaces are out of scope. IT9A adds no LIFF UI, Home card, navigation item, Rich Menu change, or Ticket LINE notification.
 
 The cancellation, closure, reopening, commentability, and requester-reply decisions formerly tracked here are now locked in Section 5; the active backlog and resolution metric definitions are locked in Section 10. They are no longer open product questions.
 
@@ -346,7 +360,6 @@ The cancellation, closure, reopening, commentability, and requester-reply decisi
 
 1. Are internal IT-only notes required? This changes comment visibility, storage and API authorization.
 2. Is exactly one current assignee sufficient? If not, assignment cardinality and workload definitions change.
-3. Is priority part of MVP? Should requester provide a separate urgency signal? Who may set `URGENT`?
 4. Are categories centrally configured by deployment/operator data, or must IT administer them in the app?
 5. Are active application accounts without an Employee profile eligible? Current active workforce helper requires an Employee; product wording alone does not settle this exception.
 6. What retention/deletion policy applies to Ticket text, files, personal identity snapshots and operational history?
@@ -697,14 +710,17 @@ Status: **IT9E-UX-P0 — UAT candidate / awaiting UAT feedback; IT9E-UX-P1 — p
 IT11 explicitly approves accountability records for successful state-changing
 IT Ticket commands. `ITTicketEvent` and `ITTicketComment` remain the operational
 Conversation and Activity sources; `AuditLog` remains separate security and
-accountability evidence. No Prisma enum or persistence schema change is needed.
+accountability evidence. IT11 itself required no persistence change. The later
+priority contract adds typed Activity fields and continues using the existing
+`TICKET_UPDATE` Audit action.
 
 | Ticket command | Audit action | Entity | Recorded meaning |
 | --- | --- | --- | --- |
-| `createITTicket` | `TICKET_CREATE` | `ITTicket` | Persisted type, status, requester, assignee, category, requester Department, and attachment count. |
+| `createITTicket` | `TICKET_CREATE` | `ITTicket` | Persisted type, status, initial priority and untriaged state, requester, assignee, category, requester Department, and attachment count. |
 | `assignITTicket` | `TICKET_ASSIGN` | `ITTicket` | Persisted `assignedToUserId` before and after assignment, reassignment, or unassignment. |
 | `transitionITTicketStatus` | `TICKET_STATUS_CHANGE` | `ITTicket` | Persisted status and `resolvedAt` before and after transition. |
 | `setITTicketCategory` | `TICKET_UPDATE` | `ITTicket` | Persisted `categoryId` before and after, with `metadata.change = CATEGORY`. |
+| `setITTicketPriority` | `TICKET_UPDATE` | `ITTicket` | Priority and triage state before and after; actual priority changes include the operator reason. |
 | `postITRequesterTicketComment` | `TICKET_COMMENT` | `ITTicket` | Comment ID, `REQUESTER` author side, and attachment count. |
 | `postITOperatorTicketComment` | `TICKET_COMMENT` | `ITTicket` | Comment ID, `OPERATOR` author side, and attachment count. |
 
@@ -712,11 +728,12 @@ Each append uses `appendAuditInTransaction(...)` from `@/modules/audit` in
 the command's existing transaction. An Audit persistence failure rolls back
 the corresponding Ticket mutation. Create and comment idempotency replays do
 not append again; assignment/category no-ops preserve their existing response
-and do not append. Details omit Ticket descriptions, comment bodies, image
-bytes, and private storage keys. Trusted request metadata is provided by the
-IT server adapter separately from `ITAuthorizationContext`; actor user ID and
-channel continue to come from the authorization context, and client IP uses
-`getTrustedClientIp(...)`.
+and do not append. Repeated confirmed priority submissions also remain no-ops.
+Details omit Ticket descriptions, comment bodies, image bytes, and private
+storage keys; priority change reasons are retained for accountability. Trusted
+request metadata is provided by the IT server adapter separately from
+`ITAuthorizationContext`; actor user ID and channel continue to come from the
+authorization context, and client IP uses `getTrustedClientIp(...)`.
 
 The Audit Dashboard explicitly presents the five active Ticket actions and
 the `ITTicket` entity label. `TICKET_DELETE` retains its historical enum value

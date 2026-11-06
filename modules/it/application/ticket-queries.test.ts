@@ -68,6 +68,9 @@ const ticket = {
     title: "เข้าใช้งานระบบไม่ได้",
     description: "หน้าเข้าสู่ระบบแสดงข้อผิดพลาด",
     status: "IN_PROGRESS" as const,
+    priority: "P2" as const,
+    triagedAt: null,
+    triagedByUserId: null,
     createdAt,
     updatedAt,
     resolvedAt: null,
@@ -84,6 +87,7 @@ const ticket = {
         employee: { firstName: "สมชาย", lastName: "ใจดี", nickname: "ชาย" },
     },
     assignedTo: null,
+    triagedBy: null,
     category: null,
 };
 
@@ -148,6 +152,8 @@ describe("IT requester Ticket queries", () => {
         expect(result.tickets[0]).not.toHaveProperty("requesterUserId");
         expect(result.tickets[0]).not.toHaveProperty("assignedToUserId");
         expect(result.tickets[0]).not.toHaveProperty("version");
+        expect(result.tickets[0]).not.toHaveProperty("priority");
+        expect(result.tickets[0]).not.toHaveProperty("triagedAt");
     });
 
     it("treats an effective ALL grant as read access but keeps the SQL query requester-scoped", async () => {
@@ -265,6 +271,10 @@ describe("IT requester Ticket queries", () => {
         expect(result.nextCursor).not.toBeNull();
         expect(result.tickets[0]).toMatchObject({
             id: 19,
+            priority: "P2",
+            triagedAt: null,
+            isTriaged: false,
+            triagedBy: null,
             requester: {
                 userId: 41,
                 displayName: "สมชาย ใจดี (ชาย)",

@@ -84,6 +84,9 @@ export function toITOperatorTicket(
         title: ticket.title,
         description: ticket.description,
         status: ticket.status,
+        priority: ticket.priority,
+        triagedAt: ticket.triagedAt?.toISOString() ?? null,
+        isTriaged: ticket.triagedAt !== null,
         requester: Object.freeze({
             ...displayIdentity(ticket.requester),
             departmentId: ticket.requesterDepartmentId,
@@ -92,6 +95,9 @@ export function toITOperatorTicket(
         assignee: ticket.assignedTo === null
             ? null
             : Object.freeze(displayIdentity(ticket.assignedTo)),
+        triagedBy: ticket.triagedBy === null
+            ? null
+            : Object.freeze(displayIdentity(ticket.triagedBy)),
         category: ticket.category === null
             ? null
             : Object.freeze({

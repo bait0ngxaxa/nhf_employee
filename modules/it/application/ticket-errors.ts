@@ -8,6 +8,7 @@ export type ITTicketErrorCode =
     | "ASSIGNEE_NOT_ELIGIBLE"
     | "CATEGORY_NOT_FOUND"
     | "CATEGORY_INACTIVE"
+    | "PRIORITY_TERMINAL"
     | "TICKET_NOT_COMMENTABLE";
 
 export class ITTicketError extends Error {
@@ -85,6 +86,13 @@ export class ITTicketCategoryInactiveError extends ITTicketError {
     constructor() {
         super("CATEGORY_INACTIVE", "หมวดหมู่ Ticket นี้ปิดใช้งานแล้ว");
         this.name = "ITTicketCategoryInactiveError";
+    }
+}
+
+export class ITTicketPriorityTerminalError extends ITTicketError {
+    constructor() {
+        super("PRIORITY_TERMINAL", "ไม่สามารถประเมินหรือเปลี่ยน Priority ของ Ticket ที่สิ้นสุดแล้วได้");
+        this.name = "ITTicketPriorityTerminalError";
     }
 }
 

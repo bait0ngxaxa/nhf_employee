@@ -22,6 +22,9 @@ export const IT_OPERATOR_TICKET_SELECT = {
     title: true,
     description: true,
     status: true,
+    priority: true,
+    triagedAt: true,
+    triagedByUserId: true,
     requesterUserId: true,
     assignedToUserId: true,
     categoryId: true,
@@ -42,6 +45,16 @@ export const IT_OPERATOR_TICKET_SELECT = {
         },
     },
     assignedTo: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            employee: {
+                select: { firstName: true, lastName: true, nickname: true },
+            },
+        },
+    },
+    triagedBy: {
         select: {
             id: true,
             name: true,

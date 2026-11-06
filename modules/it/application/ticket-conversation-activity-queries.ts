@@ -152,6 +152,20 @@ function toActivityItem(event: ITTicketActivityEventRecord): ITTicketActivityIte
                 fromCategoryName: event.fromCategory?.name ?? null,
                 toCategoryName: event.toCategory?.name ?? null,
             };
+        case ITTicketEventKind.PRIORITY_TRIAGED:
+        case ITTicketEventKind.PRIORITY_CHANGED:
+            if (event.fromPriority === null || event.toPriority === null) {
+                throw new Error("Invalid IT Ticket priority activity event");
+            }
+            return {
+                type: event.kind,
+                id: event.id,
+                occurredAt,
+                actorDisplayName,
+                fromPriority: event.fromPriority,
+                toPriority: event.toPriority,
+                reason: event.priorityReason,
+            };
     }
 }
 
@@ -239,11 +253,18 @@ function createOlderConversationWhere(
 function createOlderActivityWhere(
     ticketId: number,
     cursor: ActivityCursor | null,
+    side: "REQUESTER" | "OPERATOR",
 ): Prisma.ITTicketEventWhereInput {
-    if (cursor === null) return { ticketId };
+    const where: Prisma.ITTicketEventWhereInput = {
+        ticketId,
+        ...(side === "REQUESTER"
+            ? { kind: { notIn: [ITTicketEventKind.PRIORITY_TRIAGED, ITTicketEventKind.PRIORITY_CHANGED] } }
+            : {}),
+    };
+    if (cursor === null) return where;
     const occurredAt = new Date(cursor.occurredAt);
     return {
-        ticketId,
+        ...where,
         OR: [
             { occurredAt: { lt: occurredAt } },
             { occurredAt, id: { lt: cursor.id } },
@@ -316,7 +337,7 @@ async function getITTicketActivity(
     return withAuthorizedTicketRead(context, ticketId, side, async (tx) => {
         const records = await findITTicketActivityEvents(
             tx,
-            createOlderActivityWhere(ticketId, cursor),
+            createOlderActivityWhere(ticketId, cursor, side),
             input.limit + 1,
         );
         const hasMore = records.length > input.limit;

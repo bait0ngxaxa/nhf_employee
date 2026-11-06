@@ -84,6 +84,10 @@ export function ITTicketActivity({
     const page = currentState?.kind === "loaded" ? currentState.page : null;
     const error = currentState?.kind === "error" ? currentState.message : null;
     const loading = currentState === null;
+    const visibleItems = page?.items.filter((item) =>
+        audience === "OPERATOR"
+        || (item.type !== "PRIORITY_TRIAGED" && item.type !== "PRIORITY_CHANGED"),
+    ) ?? [];
 
     const loadPage = useCallback((
         requestedTicketId: number,
@@ -172,7 +176,7 @@ export function ITTicketActivity({
                 </div>
             ) : null}
             {page ? (
-                page.items.length === 0 ? (
+                visibleItems.length === 0 ? (
                     <p className="py-3 text-sm text-content-secondary">ยังไม่มีประวัติการดำเนินการ</p>
                 ) : (
                     <>
@@ -186,7 +190,7 @@ export function ITTicketActivity({
                             </div>
                         ) : null}
                         <ol aria-label={`ประวัติการดำเนินการ Ticket #${ticketId}`} className="ml-4 border-l border-border-neutral pl-4">
-                            {page.items.map((item) => (
+                            {visibleItems.map((item) => (
                                 <li key={item.id} className="relative pb-5 last:pb-0">
                                     <span
                                         aria-hidden="true"

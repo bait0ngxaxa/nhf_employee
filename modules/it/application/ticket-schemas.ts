@@ -1,4 +1,4 @@
-import { ITTicketStatus, ITTicketType } from "@prisma/client";
+import { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
 import { z } from "zod";
 
 import {
@@ -45,10 +45,20 @@ export const setITTicketCategoryInputSchema = z.object({
     expectedVersion: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
 }).strict();
 
+export const setITTicketPriorityInputSchema = z.object({
+    ticketId: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
+    priority: z.nativeEnum(ITTicketPriority),
+    reason: z.string().trim().min(1).max(500).optional(),
+    expectedVersion: z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX),
+}).strict();
+
 export const transitionITTicketStatusBodySchema =
     transitionITTicketStatusInputSchema.omit({ ticketId: true });
 export const assignITTicketBodySchema = assignITTicketInputSchema.omit({ ticketId: true });
 export const setITTicketCategoryBodySchema = setITTicketCategoryInputSchema.omit({
+    ticketId: true,
+});
+export const setITTicketPriorityBodySchema = setITTicketPriorityInputSchema.omit({
     ticketId: true,
 });
 
@@ -71,4 +81,5 @@ export type TransitionITTicketStatusInput = z.infer<
 >;
 export type AssignITTicketInput = z.infer<typeof assignITTicketInputSchema>;
 export type SetITTicketCategoryInput = z.infer<typeof setITTicketCategoryInputSchema>;
+export type SetITTicketPriorityInput = z.infer<typeof setITTicketPriorityInputSchema>;
 export type CreateITTicketCommentInput = z.infer<typeof createITTicketCommentInputSchema>;
