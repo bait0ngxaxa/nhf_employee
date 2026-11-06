@@ -10,6 +10,7 @@ import {
 } from "./application/mutations";
 export { getStockAnalytics } from "./application/queries/analytics";
 export { stockAnalyticsQuerySchema } from "./schemas/analytics";
+export { createStockRawDataXlsxResponse, getStockRawExportCategories, StockRawExportLimitError } from "./infrastructure/reports/raw-export";
 import {
     getCategories,
     getItems,
