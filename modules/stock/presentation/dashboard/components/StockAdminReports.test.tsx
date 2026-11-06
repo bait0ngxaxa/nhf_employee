@@ -32,8 +32,8 @@ describe("StockAdminReports", () => {
         let finish: (() => void) | undefined;
         vi.mocked(downloadXlsx).mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
         render(<StockAdminReports canExportReports />);
-        const label = report === "requests" ? "ดาวน์โหลด Excel" : "ดาวน์โหลดสต๊อกคงเหลือ";
-        const otherLabel = report === "requests" ? "ดาวน์โหลดสต๊อกคงเหลือ" : "ดาวน์โหลด Excel";
+        const label = report === "requests" ? "ดาวน์โหลด Excel" : "ดาวน์โหลด Excel สต๊อกคงเหลือ";
+        const otherLabel = report === "requests" ? "ดาวน์โหลด Excel สต๊อกคงเหลือ" : "ดาวน์โหลด Excel";
         await waitFor(() => expect(screen.getByRole("button", { name: label })).toBeEnabled());
         const button = screen.getByRole("button", { name: label });
         fireEvent.click(button);
@@ -50,7 +50,7 @@ describe("StockAdminReports", () => {
         mockReportApis();
         vi.mocked(downloadXlsx).mockRejectedValueOnce(new Error("ไม่มีสิทธิ์ดาวน์โหลด"));
         render(<StockAdminReports canExportReports />);
-        const label = report === "requests" ? "ดาวน์โหลด Excel" : "ดาวน์โหลดสต๊อกคงเหลือ";
+        const label = report === "requests" ? "ดาวน์โหลด Excel" : "ดาวน์โหลด Excel สต๊อกคงเหลือ";
         await waitFor(() => expect(screen.getByRole("button", { name: label })).toBeEnabled());
         fireEvent.click(screen.getByRole("button", { name: label }));
         await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.any(String), { description: "ไม่มีสิทธิ์ดาวน์โหลด" }));
@@ -143,7 +143,7 @@ describe("StockAdminReports", () => {
         );
 
         fireEvent.click(
-            screen.getByRole("button", { name: "ดาวน์โหลดสต๊อกคงเหลือ" }),
+            screen.getByRole("button", { name: "ดาวน์โหลด Excel สต๊อกคงเหลือ" }),
         );
 
         await waitFor(() => {
@@ -216,12 +216,12 @@ describe("StockAdminReports", () => {
 
         await waitFor(() => {
             expect(
-                screen.getByRole("button", { name: "ดาวน์โหลดสต๊อกคงเหลือ" }),
+                screen.getByRole("button", { name: "ดาวน์โหลด Excel สต๊อกคงเหลือ" }),
             ).toBeEnabled();
         });
 
         fireEvent.click(
-            screen.getByRole("button", { name: "ดาวน์โหลดสต๊อกคงเหลือ" }),
+            screen.getByRole("button", { name: "ดาวน์โหลด Excel สต๊อกคงเหลือ" }),
         );
 
         expect(

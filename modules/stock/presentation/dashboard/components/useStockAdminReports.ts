@@ -101,7 +101,7 @@ export function useStockAdminReports(canExportReports: boolean) {
         reportExportLabel: isExportingReport ? "กำลังเตรียมไฟล์" : "ดาวน์โหลด Excel",
         balanceExportLabel: isExportingBalance
             ? "กำลังเตรียมไฟล์"
-            : "ดาวน์โหลดสต๊อกคงเหลือ",
+            : "ดาวน์โหลด Excel สต๊อกคงเหลือ",
         reportExportState: resolveExportState(meta, isLoadingMeta, isExportingReport),
         balanceExportState: resolveExportState(
             balanceMeta,

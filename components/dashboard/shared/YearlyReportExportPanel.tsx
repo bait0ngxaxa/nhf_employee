@@ -40,7 +40,7 @@ export function YearlyReportExportPanel({
     onExport,
     isExporting,
     disabled = false,
-    exportLabel = "ดาวน์โหลด CSV",
+    exportLabel = "ดาวน์โหลด Excel",
     selectAriaLabel = "เลือกปีรีพอร์ต",
     layout = "inline",
     title,
