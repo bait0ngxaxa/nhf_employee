@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { generateFilename } from "@/lib/helpers/date-helpers";
-import { createCsvDownloadResponse, encodeCsvRow } from "@/lib/server/csv";
+import { createXlsxDownloadResponse } from "@/lib/server/xlsx";
+import { createEmployeeExportWorkbook, type EmployeeExportRow } from "./employee-workbook";
 import { getEmployeeEmailStatus, getEmployeeStatusLabel } from "../../domain/identity";
 import {
     calculateEmploymentTenure,
@@ -34,7 +35,7 @@ function buildEmployeeExportFilename(filters: EmployeeFilters): string {
     const statusSuffix = filters.status && filters.status !== "all"
         ? `_สถานะ-${sanitizeFilenamePart(getEmployeeStatusLabel(filters.status))}`
         : "";
-    return generateFilename(`รายชื่อพนักงาน${searchSuffix}${statusSuffix}`, "csv");
+    return generateFilename(`รายชื่อพนักงาน${searchSuffix}${statusSuffix}`, "xlsx");
 }
 
 export async function createEmployeeExport(
@@ -46,53 +47,49 @@ export async function createEmployeeExport(
         return { status: "limit-exceeded", recordCount, maxRows: EMPLOYEE_EXPORT_MAX_ROWS };
     }
 
-    const response = createCsvDownloadResponse(
+    const rows: EmployeeExportRow[] = [];
+    const asOfDate = new Date();
+    for (let offset = 0; offset < recordCount; offset += EMPLOYEE_EXPORT_BATCH_SIZE) {
+        const employees = await prisma.employee.findMany({
+            where,
+            select: {
+                firstName: true,
+                lastName: true,
+                nickname: true,
+                position: true,
+                affiliation: true,
+                email: true,
+                phone: true,
+                hireDate: true,
+                status: true,
+                dept: { select: { name: true } },
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            skip: offset,
+            take: EMPLOYEE_EXPORT_BATCH_SIZE,
+        });
+        for (const [index, employee] of employees.entries()) {
+            rows.push([
+                offset + index + 1,
+                employee.firstName,
+                employee.lastName,
+                employee.nickname || "-",
+                employee.position,
+                employee.affiliation || "-",
+                employee.dept?.name || "-",
+                getEmployeeEmailStatus(employee.email) === "temp" ? "-" : employee.email,
+                employee.phone || "-",
+                getEmployeeStatusLabel(employee.status),
+                formatEmploymentHireDate(employee.hireDate),
+                formatEmploymentTenure(
+                    calculateEmploymentTenure(employee.hireDate, asOfDate),
+                ),
+            ]);
+        }
+    }
+    const response = await createXlsxDownloadResponse(
         buildEmployeeExportFilename(filters),
-        async (controller) => {
-            const asOfDate = new Date();
-            controller.enqueue(encodeCsvRow([
-                "ลำดับ", "ชื่อ", "นามสกุล", "ชื่อเล่น", "ตำแหน่ง",
-                "สังกัด", "แผนก", "อีเมล", "เบอร์โทร", "สถานะ", "วันที่เริ่มงาน", "อายุงาน",
-            ]));
-            for (let offset = 0; offset < recordCount; offset += EMPLOYEE_EXPORT_BATCH_SIZE) {
-                const employees = await prisma.employee.findMany({
-                    where,
-                    select: {
-                        firstName: true,
-                        lastName: true,
-                        nickname: true,
-                        position: true,
-                        affiliation: true,
-                        email: true,
-                        phone: true,
-                        hireDate: true,
-                        status: true,
-                        dept: { select: { name: true } },
-                    },
-                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                    skip: offset,
-                    take: EMPLOYEE_EXPORT_BATCH_SIZE,
-                });
-                for (const [index, employee] of employees.entries()) {
-                    controller.enqueue(encodeCsvRow([
-                        offset + index + 1,
-                        employee.firstName,
-                        employee.lastName,
-                        employee.nickname || "-",
-                        employee.position,
-                        employee.affiliation || "-",
-                        employee.dept?.name || "-",
-                        getEmployeeEmailStatus(employee.email) === "temp" ? "-" : employee.email,
-                        employee.phone || "-",
-                        getEmployeeStatusLabel(employee.status),
-                        formatEmploymentHireDate(employee.hireDate),
-                        formatEmploymentTenure(
-                            calculateEmploymentTenure(employee.hireDate, asOfDate),
-                        ),
-                    ]));
-                }
-            }
-        },
+        createEmployeeExportWorkbook(rows),
     );
 
     return {
