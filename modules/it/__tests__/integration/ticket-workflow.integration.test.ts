@@ -994,6 +994,75 @@ describe.sequential("IT Ticket workflow with real MySQL", () => {
         })).rejects.toBeInstanceOf(ITTicketInputValidationError);
     });
 
+    it("separates active work, awaiting closure, and history while keeping reopen and close valid", async () => {
+        const fixture = await createFixture("queue-views");
+        await grant(fixture.operator.userId, "it.ticket.read");
+        const operator = fixture.operator.context;
+        const create = (label: string) => createTicket(fixture.requester, nextFixtureKey(`queue-views-${label}`));
+        const advance = async (
+            ticketId: number,
+            statuses: readonly ITTicketStatus[],
+        ): Promise<number> => {
+            let version = (await prisma.iTTicket.findUniqueOrThrow({ where: { id: ticketId } })).version;
+            for (const targetStatus of statuses) {
+                version = (await transitionITTicketStatus(operator, {
+                    ticketId, targetStatus, expectedVersion: version,
+                })).ticket.version;
+            }
+            return version;
+        };
+        const ids = async (input: Record<string, unknown>): Promise<number[]> => {
+            const collected: number[] = [];
+            let cursor: string | undefined;
+            do {
+                const page = await listITOperatorTickets(operator, {
+                    ...input,
+                    limit: 1,
+                    ...(cursor === undefined ? {} : { cursor }),
+                });
+                collected.push(...page.tickets.map(({ id }) => id));
+                cursor = page.nextCursor ?? undefined;
+            } while (cursor !== undefined);
+            return collected;
+        };
+
+        const active = (await create("active")).ticket.id;
+        const resolvedA = (await create("resolved-a")).ticket.id;
+        const resolvedB = (await create("resolved-b")).ticket.id;
+        const closed = (await create("closed")).ticket.id;
+        const cancelled = (await create("cancelled")).ticket.id;
+        await advance(resolvedA, [ITTicketStatus.IN_PROGRESS, ITTicketStatus.RESOLVED]);
+        await advance(resolvedB, [ITTicketStatus.IN_PROGRESS, ITTicketStatus.RESOLVED]);
+        await advance(closed, [ITTicketStatus.IN_PROGRESS, ITTicketStatus.RESOLVED, ITTicketStatus.CLOSED]);
+        await advance(cancelled, [ITTicketStatus.CANCELLED]);
+
+        expect(await ids({})).toEqual([active]);
+        expect(await ids({ status: "RESOLVED" })).toEqual([resolvedA, resolvedB]);
+        expect((await ids({ status: "HISTORY" })).sort()).toEqual([closed, cancelled].sort());
+        expect((await ids({ status: "ALL" })).sort())
+            .toEqual([active, resolvedA, resolvedB, closed, cancelled].sort());
+        expect(await ids({ status: "RESOLVED", type: "INCIDENT", assignmentState: "UNASSIGNED" }))
+            .toEqual([resolvedA, resolvedB]);
+        expect(await ids({ status: "RESOLVED", priority: "P0" })).toEqual([]);
+
+        const firstPage = await listITOperatorTickets(operator, { status: "ACTIVE" });
+        expect(firstPage.awaitingClosureCount).toBe(2);
+        expect(firstPage.awaitingClosureCount)
+            .toBe(await prisma.iTTicket.count({ where: { status: "RESOLVED" } }));
+
+        // RESOLVED -> IN_PROGRESS returns to active work; RESOLVED -> CLOSED moves to history.
+        await advance(resolvedA, [ITTicketStatus.IN_PROGRESS]);
+        await advance(resolvedB, [ITTicketStatus.CLOSED]);
+        expect(await ids({})).toEqual([active, resolvedA]);
+        expect(await ids({ status: "RESOLVED" })).toEqual([]);
+        expect(await ids({ status: "HISTORY" })).toContain(resolvedB);
+        expect((await listITOperatorTickets(operator, {})).awaitingClosureCount).toBe(0);
+
+        // The view is not authority: an OWN-only requester cannot read any view or count.
+        await expect(listITOperatorTickets(fixture.requester.context, { status: "RESOLVED" }))
+            .rejects.toMatchObject({ name: "ITCapabilityDeniedError" });
+    });
+
     it("rolls back Ticket and idempotency writes when event persistence fails", async () => {
         const fixture = await createFixture("create-rollback");
         await createEventFailureTrigger();

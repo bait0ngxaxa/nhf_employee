@@ -420,6 +420,37 @@ describe("IT requester Ticket queries", () => {
         }));
     });
 
+    it("separates active work, awaiting closure, and history views in SQL", async () => {
+        mocks.authorize.mockResolvedValue({ scopes: ["ALL"] });
+        mocks.findMany.mockResolvedValue([]);
+        mocks.count.mockResolvedValue(3);
+
+        const active = await listITOperatorTickets(actorContext, {});
+        expect(mocks.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+            where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] } },
+        }));
+        expect(active.awaitingClosureCount).toBe(3);
+        expect(mocks.count).toHaveBeenLastCalledWith({ where: { status: "RESOLVED" } });
+
+        await listITOperatorTickets(actorContext, { status: "RESOLVED", priority: "P1" });
+        expect(mocks.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+            where: { status: "RESOLVED", priority: "P1" },
+        }));
+
+        await listITOperatorTickets(actorContext, { status: "HISTORY" });
+        expect(mocks.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+            where: { status: { in: ["CLOSED", "CANCELLED"] } },
+        }));
+    });
+
+    it("counts awaiting closure only after read ALL is established", async () => {
+        mocks.authorize.mockResolvedValueOnce({ scopes: ["OWN"] });
+        await expect(listITOperatorTickets(actorContext, { status: "RESOLVED" }))
+            .rejects.toMatchObject({ name: "ITCapabilityDeniedError" });
+        expect(mocks.count).not.toHaveBeenCalled();
+        expect(mocks.findMany).not.toHaveBeenCalled();
+    });
+
     it("applies a selected assignee as a database predicate", async () => {
         mocks.authorize.mockResolvedValueOnce({ scopes: ["ALL"] });
         mocks.findMany.mockResolvedValueOnce([]);

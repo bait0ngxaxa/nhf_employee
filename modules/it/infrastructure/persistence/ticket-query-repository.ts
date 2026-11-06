@@ -183,6 +183,13 @@ export async function findOperatorITTickets(
     });
 }
 
+/** Counts the awaiting-closure (`RESOLVED`) view without other filters. */
+export async function countOperatorITTicketsAwaitingClosure(
+    tx: ITTicketReadPersistenceContext,
+): Promise<number> {
+    return tx.iTTicket.count({ where: { status: "RESOLVED" } });
+}
+
 /** Reads only the immutable/mutable sort keys of a queue cursor anchor. */
 export async function findOperatorITTicketQueueAnchor(
     tx: ITTicketReadPersistenceContext,

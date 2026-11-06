@@ -109,7 +109,7 @@ Ordinary comments are permitted only in `OPEN`, `IN_PROGRESS`, and `WAITING_REQU
 
 Creation policy is server-owned: `INCIDENT → P2`; `SERVICE_REQUEST → P3`; `SUGGESTION → P3`. The Prisma column is non-null with a `P2` database fallback, while the creation command explicitly applies the type mapping. New Tickets have `triagedAt = NULL` and `triagedByUserId = NULL`; this is the authoritative untriaged state. An operator may confirm the current default without changing the priority. That first confirmation records the actor and time; later adjustments preserve the original triage fields and append their own Activity/Audit facts. Repeating an already-confirmed identical priority is a no-op. Actual priority changes require a meaningful reason (maximum 500 characters). Every state change uses the existing expected-version Serializable transaction and atomically persists the Ticket update, Activity event, and Audit record. `CLOSED` and `CANCELLED` Tickets cannot be triaged or reprioritized; priority never changes status, assignment, or category. There is no requester urgency input, impact/urgency matrix, priority automation, historical priority backfill, or formal SLA policy/engine. Category may be null until classified; operator manages classification, while category reference maintenance can initially be deployment/configuration managed without a new capability.
 
-The Dashboard operator detail exposes the current badge, triage state and actor, a P0–P3 selector, and a reason field only for actual changes. The operator queue defaults to `OPEN`, `IN_PROGRESS`, and `WAITING_REQUESTER`; `ALL` and exact-status filters retain access to resolved and terminal history. Queue filtering is performed in SQL. Its deterministic order is priority `P0 → P1 → P2 → P3`, then oldest `createdAt`, then ascending Ticket ID. The keyset cursor carries the last priority/date/ID and a hash of normalized filters, so malformed cursors and cursors reused with changed filters are rejected. Because priority is mutable, a continuation also revalidates its anchor Ticket's current priority and creation time; a moved or missing anchor returns `409 QUEUE_CURSOR_STALE` (see Section 34). Unresolved Ticket age is informational and measured from `createdAt`; it is not an SLA or deadline.
+The Dashboard operator detail exposes the current badge, triage state and actor, a P0–P3 selector, and a reason field only for actual changes. The operator queue defaults to active work (`OPEN`, `IN_PROGRESS`, `WAITING_REQUESTER`); a separate `รอปิดงาน` view (`RESOLVED`), a `HISTORY` view (`CLOSED`, `CANCELLED`), `ALL`, and exact-status filters keep resolved and terminal Tickets discoverable (see Section 35). Queue filtering is performed in SQL. Its deterministic order is priority `P0 → P1 → P2 → P3`, then oldest `createdAt`, then ascending Ticket ID. The keyset cursor carries the last priority/date/ID and a hash of normalized filters, so malformed cursors and cursors reused with changed filters are rejected. Because priority is mutable, a continuation also revalidates its anchor Ticket's current priority and creation time; a moved or missing anchor returns `409 QUEUE_CURSOR_STALE` (see Section 34). Unresolved Ticket age is informational and measured from `createdAt`; it is not an SLA or deadline.
 
 ## 6. Conversation, Activity, and Audit
 
@@ -889,3 +889,32 @@ re-entering the filtered status set can be missed by a continuation until the
 operator reloads; a row moving behind the cursor is shown once at its newer
 position. No queue-wide revision, Redis, or unbounded query is introduced.
 Requester Ticket pagination is unchanged.
+
+## 35. Resolved Tickets awaiting closure (review 1206e61)
+
+`RESOLVED` still needs an explicit operator decision (`RESOLVED → CLOSED` or
+`RESOLVED → IN_PROGRESS`), so it must not disappear, yet it is not active work
+and must not compete with active P0/P1 items. The queue therefore offers four
+named views, defined once in `IT_OPERATOR_QUEUE_STATUS_GROUPS` (contracts) and
+the domain `IT_TICKET_ACTIVE_WORK_STATUSES`:
+
+| View | Status filter | Statuses |
+| --- | --- | --- |
+| งานที่กำลังดำเนินการ (default) | `ACTIVE` | `OPEN`, `IN_PROGRESS`, `WAITING_REQUESTER` |
+| รอปิดงาน | `RESOLVED` | `RESOLVED` |
+| ประวัติ | `HISTORY` | `CLOSED`, `CANCELLED` |
+| ทั้งหมด | `ALL` | every status |
+
+The view switcher is a toggle-button group above the existing filter form (the
+queue already lives inside the IT workspace tabs). Selecting a view keeps the
+other filters, resets pagination, and binds new cursors to the new filter set.
+Exact-status filters remain available. Rows link to the existing operator
+detail page, where the unchanged workflow offers `ปิดงาน` and
+`เปิดงานอีกครั้ง`. The state machine, priority ordering, automatic closure
+(none), requester UX, and LIFF are unchanged.
+
+Every queue response carries `awaitingClosureCount`: the count of all current
+`RESOLVED` Tickets, computed in the same read transaction after the read ALL
+check, deliberately independent of other filters. It equals the
+`รอปิดงาน` view with no additional filters; with extra filters the view can
+show fewer rows. The view selection is presentation only and grants nothing.

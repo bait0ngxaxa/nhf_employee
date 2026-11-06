@@ -5,6 +5,8 @@ import type {
     ITTicketType,
 } from "@prisma/client";
 
+import { IT_TICKET_ACTIVE_WORK_STATUSES } from "./domain/ticket-workflow";
+
 export const IT_TICKET_TITLE_MAX_LENGTH = 200;
 export const IT_TICKET_DESCRIPTION_MAX_LENGTH = 10_000;
 /** Technical safety bound pending an IT-specific product maximum. */
@@ -30,6 +32,18 @@ export function isValidITTicketId(value: number): boolean {
 }
 
 export const IT_OPERATOR_QUEUE_DEFAULT_LIMIT = 25;
+
+/**
+ * Named operator queue views. `ACTIVE` is the default work queue; `RESOLVED`
+ * (an exact status) is the awaiting-closure view; `HISTORY` holds the
+ * terminal outcomes. `ALL` removes the status predicate.
+ */
+export const IT_OPERATOR_QUEUE_STATUS_GROUPS = Object.freeze({
+    ACTIVE: IT_TICKET_ACTIVE_WORK_STATUSES,
+    HISTORY: Object.freeze(["CLOSED", "CANCELLED"] as const satisfies readonly ITTicketStatus[]),
+});
+export type ITOperatorQueueStatusGroup = keyof typeof IT_OPERATOR_QUEUE_STATUS_GROUPS;
+export type ITOperatorQueueStatusFilter = ITOperatorQueueStatusGroup | "ALL" | ITTicketStatus;
 export const IT_OPERATOR_QUEUE_MAX_LIMIT = 100;
 export const IT_TICKET_ATTACHMENT_MAX_FILES = 3;
 export const IT_TICKET_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
@@ -191,6 +205,8 @@ export interface ITOperatorTicketList {
     readonly tickets: readonly ITOperatorTicket[];
     readonly nextCursor: string | null;
     readonly limit: number;
+    /** All current `RESOLVED` Tickets, independent of the requested filters. */
+    readonly awaitingClosureCount: number;
 }
 
 export interface ITOperatorTicketMutationSnapshot {

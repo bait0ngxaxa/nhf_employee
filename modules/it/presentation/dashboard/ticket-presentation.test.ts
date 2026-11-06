@@ -140,7 +140,17 @@ describe("IT operator presentation contracts", () => {
             tickets: [operatorTicket],
             nextCursor: "eyJpZCI6MTl9",
             limit: 25,
-        })).toMatchObject({ nextCursor: "eyJpZCI6MTl9", limit: 25 });
+            awaitingClosureCount: 3,
+        })).toMatchObject({ nextCursor: "eyJpZCI6MTl9", limit: 25, awaitingClosureCount: 3 });
+        for (const awaitingClosureCount of [undefined, -1, 1.5, "3"]) {
+            expect(parseITOperatorTicketList({
+                success: true,
+                tickets: [operatorTicket],
+                nextCursor: null,
+                limit: 25,
+                awaitingClosureCount,
+            })).toBeNull();
+        }
         expect(parseITOperatorTicketList({
             success: true,
             tickets: [operatorTicket],

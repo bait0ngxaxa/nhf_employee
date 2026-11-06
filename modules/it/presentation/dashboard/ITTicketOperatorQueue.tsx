@@ -14,6 +14,7 @@ import {
     IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
+    type ITOperatorQueueStatusFilter,
     type ITOperatorReferenceData,
     type ITOperatorTicket,
     type ITOperatorTicketList,
@@ -37,7 +38,7 @@ import {
 } from "./operator-queue-pagination";
 
 interface QueueFilters {
-    readonly status: "ACTIVE" | "ALL" | ITTicketStatus;
+    readonly status: ITOperatorQueueStatusFilter;
     readonly type?: ITTicketType;
     readonly priority?: ITTicketPriority;
     readonly triageState?: "TRIAGED" | "UNTRIAGED";
@@ -57,6 +58,18 @@ type QueueState =
         readonly reordered: boolean;
     }
     | { readonly key: string; readonly kind: "error"; readonly message: string };
+
+const QUEUE_VIEWS = [
+    { status: "ACTIVE", label: "งานที่กำลังดำเนินการ" },
+    { status: "RESOLVED", label: "รอปิดงาน" },
+    { status: "HISTORY", label: "ประวัติ" },
+    { status: "ALL", label: "ทั้งหมด" },
+] as const satisfies readonly { readonly status: ITOperatorQueueStatusFilter; readonly label: string }[];
+
+function parseQueueStatusFilter(value: string): ITOperatorQueueStatusFilter {
+    if (value === "ACTIVE" || value === "HISTORY" || value === "ALL") return value;
+    return isITTicketStatus(value) ? value : "ACTIVE";
+}
 
 type ReferenceState =
     | { readonly key: number; readonly kind: "loaded"; readonly value: ITOperatorReferenceData }
@@ -134,6 +147,43 @@ function QueueSkeleton(): ReactElement {
     );
 }
 
+function QueueViewSwitcher({
+    status,
+    awaitingClosureCount,
+    onSelect,
+}: {
+    readonly status: ITOperatorQueueStatusFilter;
+    readonly awaitingClosureCount: number | null;
+    readonly onSelect: (status: ITOperatorQueueStatusFilter) => void;
+}): ReactElement {
+    return (
+        <div role="group" aria-label="มุมมองคิว Ticket" className="flex flex-wrap gap-2">
+            {QUEUE_VIEWS.map((view) => {
+                const selected = view.status === status;
+                const count = view.status === "RESOLVED" ? awaitingClosureCount : null;
+                return (
+                    <Button
+                        key={view.status}
+                        type="button"
+                        variant="outline"
+                        aria-pressed={selected}
+                        aria-label={count === null ? view.label : `${view.label} ทั้งหมด ${count} รายการ`}
+                        onClick={() => onSelect(view.status)}
+                        className={selected
+                            ? "border-brand-border-strong bg-brand-surface font-semibold text-brand-strong hover:bg-brand-surface"
+                            : "font-medium text-content-secondary"}
+                    >
+                        {view.label}
+                        {count !== null ? (
+                            <span aria-hidden="true" className="tabular-nums">{count.toLocaleString("th-TH")}</span>
+                        ) : null}
+                    </Button>
+                );
+            })}
+        </div>
+    );
+}
+
 function QueueFiltersForm({
     draft,
     setDraft,
@@ -161,16 +211,14 @@ function QueueFiltersForm({
                         className={fieldClassName}
                         value={draft.status}
                         onChange={(event) => {
-                            const status = event.target.value;
                             setDraft({
                                 ...draft,
-                                status: status === "ACTIVE" || status === "ALL"
-                                    ? status
-                                    : isITTicketStatus(status) ? status : "ACTIVE",
+                                status: parseQueueStatusFilter(event.target.value),
                             });
                         }}
                     >
-                        <option value="ACTIVE">งานที่ยังไม่สิ้นสุด</option>
+                        <option value="ACTIVE">งานที่กำลังดำเนินการ</option>
+                        <option value="HISTORY">ประวัติ (ปิดงานแล้วและยกเลิกแล้ว)</option>
                         <option value="ALL">ทุกสถานะ</option>
                         {Object.entries(IT_TICKET_STATUS_LABELS).map(([status, label]) => (
                             <option key={status} value={status}>{label}</option>
@@ -448,6 +496,7 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                         tickets: [...merged.tickets],
                         nextCursor: nextPage.nextCursor,
                         limit: nextPage.limit,
+                        awaitingClosureCount: nextPage.awaitingClosureCount,
                     },
                     loadingMore: false,
                     loadMoreError: null,
@@ -467,11 +516,21 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
         }
     };
 
+    const selectView = (status: ITOperatorQueueStatusFilter): void => {
+        setStaleCursorReloaded(false);
+        setDraft((current) => ({ ...current, status }));
+        setFilters((current) => ({ ...current, status }));
+    };
+
     const retry = (): void => {
         setStaleCursorReloaded(false);
         setRefreshKey((current) => current + 1);
     };
     const reordered = currentQueueState?.kind === "loaded" && currentQueueState.reordered;
+    // Keep the last known count visible while a different view is loading.
+    const lastAwaitingClosureCount = queueState?.kind === "loaded"
+        ? queueState.list.awaitingClosureCount
+        : null;
 
     return (
         <section className={embedded ? "" : "min-h-[calc(100dvh-6rem)]"}>
@@ -482,7 +541,7 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                             คิว IT Ticket
                         </h1>
                         <p className="max-w-[70ch] text-sm leading-6 text-content-secondary">
-                            คิวเริ่มจากงานที่ยังไม่สิ้นสุด เรียง P0 ถึง P3 และแสดง Ticket เก่าก่อนในระดับเดียวกัน
+                            คิวเริ่มจากงานที่กำลังดำเนินการ เรียง P0 ถึง P3 และแสดง Ticket เก่าก่อนในระดับเดียวกัน งานที่แก้ไขแล้วอยู่ในมุมมองรอปิดงาน
                         </p>
                     </div> : null}
                     <Button type="button" variant="outline" onClick={retry}>
@@ -497,6 +556,12 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                         <Button type="button" size="sm" variant="outline" onClick={retry}>โหลดตัวเลือกอีกครั้ง</Button>
                     </div>
                 ) : null}
+
+                <QueueViewSwitcher
+                    status={filters.status}
+                    awaitingClosureCount={lastAwaitingClosureCount}
+                    onSelect={selectView}
+                />
 
                 <QueueFiltersForm
                     draft={draft}
@@ -544,9 +609,13 @@ export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?
                     {!loading && !queueError && list?.tickets.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-border-neutral bg-surface-subtle px-5 py-10 text-center">
                             <TicketCheck aria-hidden="true" className="mx-auto size-8 text-content-muted" />
-                            <h2 className="mt-3 font-semibold text-content-heading">ไม่พบ Ticket ในตัวกรองนี้</h2>
+                            <h2 className="mt-3 font-semibold text-content-heading">
+                                {filters.status === "RESOLVED" ? "ไม่มี Ticket ที่รอปิดงานในตัวกรองนี้" : "ไม่พบ Ticket ในตัวกรองนี้"}
+                            </h2>
                             <p className="mx-auto mt-1 max-w-[56ch] text-sm leading-6 text-content-secondary">
-                                ปรับตัวกรองเพื่อดูรายการอื่น หรือกลับมาตรวจสอบคิวอีกครั้ง
+                                {filters.status === "RESOLVED"
+                                    ? "Ticket ที่แก้ไขแล้วจะแสดงที่นี่จนกว่าจะปิดงานหรือเปิดงานอีกครั้ง"
+                                    : "ปรับตัวกรองเพื่อดูรายการอื่น หรือกลับมาตรวจสอบคิวอีกครั้ง"}
                             </p>
                         </div>
                     ) : null}

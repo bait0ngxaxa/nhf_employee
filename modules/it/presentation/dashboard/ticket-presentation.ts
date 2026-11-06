@@ -233,7 +233,10 @@ export function parseITOperatorTicketList(value: unknown): ITOperatorTicketList 
         || value.success !== true
         || !Array.isArray(value.tickets)
         || (value.nextCursor !== null && typeof value.nextCursor !== "string")
-        || !isPositiveSafeInteger(value.limit)) {
+        || !isPositiveSafeInteger(value.limit)
+        || typeof value.awaitingClosureCount !== "number"
+        || !Number.isSafeInteger(value.awaitingClosureCount)
+        || value.awaitingClosureCount < 0) {
         return null;
     }
     if (value.limit > IT_OPERATOR_QUEUE_MAX_LIMIT || value.tickets.length > value.limit) {
@@ -247,6 +250,7 @@ export function parseITOperatorTicketList(value: unknown): ITOperatorTicketList 
         tickets: tickets.filter((ticket): ticket is ITOperatorTicket => ticket !== null),
         nextCursor: value.nextCursor,
         limit: value.limit,
+        awaitingClosureCount: value.awaitingClosureCount,
     };
 }
 

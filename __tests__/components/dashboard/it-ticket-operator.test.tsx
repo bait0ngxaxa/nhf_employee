@@ -84,8 +84,9 @@ function apiResponse(body: unknown, status = 200): Response {
 function queueResponse(
     tickets: readonly ITOperatorTicket[] = [],
     nextCursor: string | null = null,
+    awaitingClosureCount = 0,
 ): Response {
-    return apiResponse({ success: true, tickets, nextCursor, limit: 25 });
+    return apiResponse({ success: true, tickets, nextCursor, limit: 25, awaitingClosureCount });
 }
 
 function detailResponse(
@@ -366,6 +367,103 @@ describe("IT operator queue presentation", () => {
         expect(linksFor(301)).toHaveLength(0);
         expect(screen.getByText("แสดง 1 รายการ")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "โหลดรายการถัดไป" })).toBeEnabled();
+    });
+});
+
+describe("IT operator queue views", () => {
+    const resolvedTicket: ITOperatorTicket = {
+        ...ticket,
+        id: 77,
+        title: "แก้ไขเครื่องพิมพ์แล้ว",
+        status: "RESOLVED",
+        priority: "P1",
+        resolvedAt: "2026-09-03T01:00:00.000Z",
+    };
+
+    function queueRequests(): string[] {
+        return fetchMock.mock.calls
+            .map(([input]) => String(input))
+            .filter((url) => url.includes("/api/it/operator/tickets") && !url.includes("/reference"));
+    }
+
+    it("defaults to active work, excludes RESOLVED, and shows the awaiting-closure count", async () => {
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            return queueResponse([ticket], null, 4);
+        });
+
+        render(<ITTicketOperatorQueue />);
+        const view = await screen.findByRole("group", { name: "มุมมองคิว Ticket" });
+        expect(within(view).getByRole("button", { name: "งานที่กำลังดำเนินการ" }))
+            .toHaveAttribute("aria-pressed", "true");
+        expect(await within(view).findByRole("button", { name: "รอปิดงาน ทั้งหมด 4 รายการ" }))
+            .toHaveAttribute("aria-pressed", "false");
+        expect(queueRequests()[0]).toContain("status=ACTIVE");
+        expect(queueRequests()[0]).not.toContain("RESOLVED");
+    });
+
+    it("opens the awaiting-closure view with RESOLVED Tickets linked to their detail page", async () => {
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("status=RESOLVED") && url.includes("cursor=")) {
+                return queueResponse([{ ...resolvedTicket, id: 78, title: "รีเซ็ตรหัสผ่านแล้ว" }], null, 2);
+            }
+            if (url.includes("status=RESOLVED")) return queueResponse([resolvedTicket], "resolved-cursor", 2);
+            return queueResponse([ticket], null, 2);
+        });
+
+        render(<ITTicketOperatorQueue />);
+        fireEvent.click(await screen.findByRole("button", { name: "รอปิดงาน ทั้งหมด 2 รายการ" }));
+
+        const links = await screen.findAllByRole("link", { name: /แก้ไขเครื่องพิมพ์แล้ว/ });
+        expect(links).toHaveLength(2);
+        for (const link of links) expect(link).toHaveAttribute("href", "/dashboard/it/queue/77");
+        expect(screen.getAllByText("แก้ไขแล้ว", { selector: "span" })).toHaveLength(2);
+        expect(screen.getByLabelText("กรองตามสถานะ")).toHaveValue("RESOLVED");
+        expect(screen.getByRole("button", { name: "รอปิดงาน ทั้งหมด 2 รายการ" }))
+            .toHaveAttribute("aria-pressed", "true");
+
+        fireEvent.click(screen.getByRole("button", { name: "โหลดรายการถัดไป" }));
+        expect(await screen.findAllByRole("link", { name: /รีเซ็ตรหัสผ่านแล้ว/ })).toHaveLength(2);
+        const pageTwo = queueRequests().find((url) => url.includes("cursor="));
+        expect(pageTwo).toContain("status=RESOLVED");
+    });
+
+    it("keeps other filters when switching views and resets pagination", async () => {
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            if (url.includes("status=HISTORY")) return queueResponse([]);
+            return queueResponse([ticket], "active-cursor", 0);
+        });
+
+        render(<ITTicketOperatorQueue />);
+        await screen.findAllByRole("link", { name: /เข้าใช้งานระบบไม่ได้/ });
+        fireEvent.change(screen.getByLabelText("กรองตาม Priority"), { target: { value: "P1" } });
+        fireEvent.click(screen.getByRole("button", { name: "ใช้ตัวกรอง" }));
+        await waitFor(() => expect(queueRequests().some((url) => url.includes("priority=P1"))).toBe(true));
+
+        fireEvent.click(screen.getByRole("button", { name: "ประวัติ" }));
+        await waitFor(() => expect(queueRequests().some((url) => url.includes("status=HISTORY"))).toBe(true));
+        const historyRequest = queueRequests().find((url) => url.includes("status=HISTORY"));
+        expect(historyRequest).toContain("priority=P1");
+        expect(historyRequest).not.toContain("cursor=");
+        expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
+    });
+
+    it("explains an empty awaiting-closure view", async () => {
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            return queueResponse([], null, 0);
+        });
+
+        render(<ITTicketOperatorQueue />);
+        fireEvent.click(await screen.findByRole("button", { name: "รอปิดงาน ทั้งหมด 0 รายการ" }));
+        expect(await screen.findByText("ไม่มี Ticket ที่รอปิดงานในตัวกรองนี้")).toBeInTheDocument();
+        expect(screen.getByText(/จนกว่าจะปิดงานหรือเปิดงานอีกครั้ง/)).toBeInTheDocument();
     });
 });
 

@@ -24,6 +24,7 @@ import {
     toITRequesterTicketDetail,
 } from "./ticket-dto";
 import {
+    countOperatorITTicketsAwaitingClosure,
     countRequesterITTickets,
     findActiveITTicketCategories,
     findOperatorITTicketDetailById,
@@ -38,6 +39,7 @@ import {
     IT_TICKET_LIST_MAX_LIMIT,
     IT_OPERATOR_QUEUE_DEFAULT_LIMIT,
     IT_OPERATOR_QUEUE_MAX_LIMIT,
+    IT_OPERATOR_QUEUE_STATUS_GROUPS,
     IT_TICKET_DATABASE_INT_MAX,
     type ITAssignableOperator,
     type ITOperatorReferenceData,
@@ -73,6 +75,7 @@ const positiveQueryInteger = z.union([
 
 const operatorQueueStatusSchema = z.union([
     z.literal("ACTIVE"),
+    z.literal("HISTORY"),
     z.literal("ALL"),
     z.nativeEnum(ITTicketStatus),
 ]);
@@ -117,11 +120,6 @@ interface ParsedITOperatorQueueCursor {
 
 const IT_TICKET_PRIORITY_ORDER = ["P0", "P1", "P2", "P3"] as const satisfies
     readonly ITTicketPriority[];
-const DEFAULT_OPERATOR_QUEUE_STATUSES = [
-    ITTicketStatus.OPEN,
-    ITTicketStatus.IN_PROGRESS,
-    ITTicketStatus.WAITING_REQUESTER,
-] as const;
 
 function getQueueCursorFilters(
     input: z.output<typeof operatorQueueInputSchema>,
@@ -197,8 +195,8 @@ function createOperatorTicketWhere(
     cursor: ParsedITOperatorQueueCursor | null,
 ): Prisma.ITTicketWhereInput {
     const where: Prisma.ITTicketWhereInput = {};
-    if (input.status === "ACTIVE") {
-        where.status = { in: [...DEFAULT_OPERATOR_QUEUE_STATUSES] };
+    if (input.status === "ACTIVE" || input.status === "HISTORY") {
+        where.status = { in: [...IT_OPERATOR_QUEUE_STATUS_GROUPS[input.status]] };
     } else if (input.status !== "ALL") {
         where.status = input.status;
     }
@@ -359,6 +357,7 @@ export async function listITOperatorTickets(
         const pageRecords = records.slice(0, parsed.data.limit);
         const tickets = pageRecords.map(toITOperatorTicket);
         const lastTicket = tickets.at(-1);
+        const awaitingClosureCount = await countOperatorITTicketsAwaitingClosure(tx);
 
         return {
             tickets,
@@ -366,6 +365,7 @@ export async function listITOperatorTickets(
                 ? encodeITOperatorQueueCursor(lastTicket, parsed.data)
                 : null,
             limit: parsed.data.limit,
+            awaitingClosureCount,
         };
     });
 }
