@@ -22,18 +22,6 @@ vi.mock("sonner", () => ({
 }));
 
 describe("StockAdminReports", () => {
-    it("exports line-level raw data only after explicit submission", async () => {
-        mockReportApis();
-        render(<StockAdminReports canExportReports />);
-        expect(downloadXlsx).not.toHaveBeenCalled();
-        fireEvent.change(screen.getByLabelText("ปีข้อมูลดิบ ค.ศ."), { target: { value: "2024" } });
-        fireEvent.change(screen.getByLabelText("โครงการข้อมูลดิบ"), { target: { value: "PROJECT-RAW" } });
-        fireEvent.submit(screen.getByRole("form", { name: "ส่งออกข้อมูลดิบการจ่ายวัสดุ" }));
-        await waitFor(() => expect(downloadXlsx).toHaveBeenCalledWith(expect.stringContaining("reportType=raw-issued")));
-        const url = String(vi.mocked(downloadXlsx).mock.calls[0][0]);
-        expect(url).toContain("year=2024");
-        expect(url).toContain("projectCode=PROJECT-RAW");
-    });
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(downloadXlsx).mockResolvedValue(undefined);

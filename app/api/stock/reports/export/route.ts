@@ -2,7 +2,6 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { getBangkokYear } from "@/lib/helpers/bangkok-time";
-import { EXPORT_LIMITS } from "@/lib/ssot/exports";
 import {
     assertStockCapability,
     buildStockAuthorizationContext,
@@ -14,10 +13,6 @@ import {
     stockReportExportQuerySchema,
     StockInvariantViolationError,
     StockCapabilityDeniedError,
-    stockAnalyticsQuerySchema,
-    createStockRawDataXlsxResponse,
-    StockRawExportLimitError,
-    getStockRawExportCategories,
 } from "@/modules/stock";
 
 export async function GET(request: NextRequest): Promise<Response> {
@@ -50,21 +45,6 @@ export async function GET(request: NextRequest): Promise<Response> {
 
         const { year, yearsOnly, metaOnly, reportType } = parsedQuery.data;
         const resolvedYear = year ?? getBangkokYear(new Date());
-
-        if (reportType === "raw-issued" || reportType === "raw-inventory") {
-            if (yearsOnly) return jsonError("ข้อมูลดิบไม่รองรับตัวเลือกนี้", 400);
-            if (metaOnly && reportType === "raw-issued") return NextResponse.json({ categories: await getStockRawExportCategories(), maxRows: EXPORT_LIMITS.stock.maxRows }, { headers: { "Cache-Control": "private, no-store" } });
-            if (metaOnly) return jsonError("ข้อมูลดิบคลังไม่รองรับตัวเลือกนี้", 400);
-            const filters = stockAnalyticsQuerySchema.safeParse({
-                year: searchParams.get("year") ?? undefined,
-                fromMonth: searchParams.get("fromMonth") ?? undefined,
-                toMonth: searchParams.get("toMonth") ?? undefined,
-                categoryId: searchParams.get("categoryId") ?? undefined,
-                projectCode: searchParams.get("projectCode") ?? undefined,
-            });
-            if (!filters.success) return jsonError("ตัวกรองข้อมูลดิบไม่ถูกต้อง", 400);
-            return await createStockRawDataXlsxResponse(filters.data, reportType);
-        }
 
         if (reportType === "balances") {
             if (yearsOnly) {
@@ -118,9 +98,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         if (error instanceof StockCapabilityDeniedError) {
             return forbidden();
         }
-        if (error instanceof StockRawExportLimitError) return jsonError(error.message, 400);
         console.error("Stock export error:", error);
-        if (request.nextUrl.searchParams.get("reportType")?.startsWith("raw-")) return serverError();
 
         if (error instanceof StockInvariantViolationError) {
             return serverError();

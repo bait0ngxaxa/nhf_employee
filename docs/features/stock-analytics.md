@@ -1,11 +1,11 @@
-# Stock analytics and raw exports
+# Stock Analytics Dashboard and original Excel reports
 
 Stock Reports opens **ภาพรวม** when `stock.report.read / ALL / DASHBOARD`
 is effective. This capability is centrally grantable with no domain default;
 ADMIN, inventory management and export authority do not imply analytics read.
 Configure the new read grant through existing Authorization Administration.
 No grants or role mappings are changed automatically. Export-only users retain
-the Reports entry and the dedicated export view. Read-only users cannot export.
+the Reports entry and the **รายงาน Excel** view. Read-only users cannot export.
 
 ## HTTP contracts
 
@@ -13,16 +13,15 @@ the Reports entry and the dedicated export view. Read-only users cannot export.
   authorization and explicit effective `ALL` scope before any report query.
   Responses are private/no-store. Errors do not expose database details.
 - `GET /api/stock/reports/export`: existing export authorization and annual
-  `requests` / current `balances` contracts remain. New `reportType=raw-issued`
-  and `reportType=raw-inventory` produce dedicated workbooks. `raw-issued`
-  with `metaOnly=1` returns category options and the configured row ceiling.
+  `requests` / current `balances` contracts are the only supported reports.
+  Both original panels use `StockLegacyReports` and `useStockAdminReports`.
 
 Analytics filters: `year` (Gregorian Bangkok calendar year, current by default),
 `fromMonth=1`, `toMonth=12`, optional `categoryId`, exact `projectCode`,
 `metric=frequency|quantity`, and optional `unit`. Quantity ranking requires a
 unit. `itemId` and `page` add a material's variant usage detail, 50 rows per page.
-Raw issuance accepts the same period/category/project filters; the export
-view explicitly maintains its own filters. Inventory ignores historical filters.
+Analytics filters do not change Excel reporting. Annual Excel keeps its original
+year selection; the inventory balance report is a current snapshot.
 
 ## Metric definitions
 
@@ -69,28 +68,18 @@ were introduced without production query-plan evidence.
 ## Export compatibility and limits
 
 Annual sheets **สรุปการใช้วัสดุ** / **รายละเอียดที่ใช้คำนวณ** and balance
-sheet **ยอดคงเหลือจริง** remain unchanged. Raw workbooks are explicitly separate:
-
-- **ข้อมูลดิบการจ่าย**: one row per issued line; Bangkok issue time, request,
-  project, requester/issuer display names, line/material/variant IDs, category,
-  SKU, attributes, quantity and unit. No additional personal email fields.
-- **ข้อมูลดิบคลังปัจจุบัน**: one row per active inventory variant; both SKUs,
-  identifiers, category/name/attributes, unit, physical/reserved/available,
-  minimum and exclusive health classification.
-
-Raw exports read at most 5,001 rows in a RepeatableRead transaction and reject
-more than the configured 5,000-row ceiling before serialization. Legacy balance
-metadata counts expanded active variants plus existing fallback rows; actual
-workbook rows are checked again. Existing download deadlines, MIME validation,
-UTF-8 filenames and lock handling are retained. Cell text stays literal, never
-formula/hyperlink objects. Raw dates are native Excel dates with Bangkok display.
+sheet **ยอดคงเหลือจริง** remain unchanged, including filenames and download behavior.
+Balance metadata counts expanded active variants plus existing fallback rows;
+actual workbook rows are checked again against the existing 5,000-row ceiling.
+Existing download deadlines, MIME validation, UTF-8 filenames and locking remain.
+No additional worksheets, export filters or export formats are introduced.
 
 ## Verification
 
 Focused MySQL tests exercise the actual mapped SQL, distinct request counting,
 several variants, mixed units, canonical identities with identical names,
 category percentages, deactivated history, status exclusion, leap-February
-boundaries, empty periods, reservation availability and raw-workbook reconciliation.
+boundaries, empty periods, reservation availability and original Excel reconciliation.
 Stock concurrency integration tests cover existing issuance/inventory invariants.
 API tests cover active sessions, read/export independence, scope rejection,
 invalid queries and sanitized failures. Component tests cover filters, drill-down,
@@ -100,7 +89,7 @@ refresh, empty/error/loading states and explicit downloads.
 project CSS using isolated, clearly labeled synthetic transport data. It does
 not replace a deployed end-to-end test. It checks 320/390/768/1280px in light/dark,
 page overflow/runtime errors, two rendered donuts, keyboard tooltip, focused
-drill-down, inventory navigation and explicit raw download. It uses the same
+drill-down, inventory navigation and explicit legacy Excel downloads. It uses the same
 optional browser tooling pattern as the IT chart check. When Puppeteer is not
 installed, set `STOCK_BROWSER_DRIVER` to the file URL of an external
 `puppeteer-core` entry and `CHART_BROWSER_PATH` to a Chrome/Edge executable.
@@ -111,7 +100,7 @@ After `npm run build`, the optional live check is
 same browser variables and `TEST_DATABASE_URL` (or `integration.env`). It refuses
 databases without `_test` / `_integration` suffixes, creates isolated test records,
 starts/stops the production server, uses real login cookies and real APIs, checks
-Dashboard rendering and raw XLSX reconciliation, then revokes the test user's
+Dashboard rendering and original Excel workbook reconciliation, then revokes the test user's
 read/export grants to verify separate 403 responses. It never changes production
 data or authorization configuration. Test records remain in the dedicated DB.
 

@@ -3,8 +3,6 @@ import { StockRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getStockAnalytics } from "../../application/queries/analytics";
 import { createStockFixture } from "./stock-fixtures";
-import ExcelJS from "exceljs";
-import { createStockRawDataWorkbook } from "../../infrastructure/reports/raw-export";
 
 describe("Stock analytics MySQL aggregation", () => {
     let fixture: Awaited<ReturnType<typeof createStockFixture>>;
@@ -48,27 +46,6 @@ describe("Stock analytics MySQL aggregation", () => {
         expect(empty.kpis.issuedLines).toBe(0);
         expect(empty.kpis.pendingRequests).toBeGreaterThanOrEqual(1);
         expect(empty.stockHealth).toEqual(quantity.stockHealth);
-    });
-    it("reconciles raw issued lines and inventory reservations with analytics", async () => {
-        const filters = { year: 2024, fromMonth: 2, toMonth: 2, projectCode: fixture.request.projectCode };
-        const analytics = await getStockAnalytics(filters);
-        const workbook = await createStockRawDataWorkbook(filters, "raw-issued");
-        const loaded = new ExcelJS.Workbook();
-        await loaded.xlsx.load(await workbook.xlsx.writeBuffer());
-        const sheet = loaded.worksheets[0];
-        expect(sheet.actualRowCount - 1).toBe(analytics.kpis.issuedLines);
-        expect(sheet.getCell("A2").value).toEqual(new Date("2024-02-01T00:00:00Z"));
-        expect(sheet.getCell("G2").value).toBe(fixture.item.id);
-        expect(sheet.getCell("M2").value).toBe(3);
-        expect(sheet.getCell("N2").value).toBe("ชิ้น");
-        const inventory = await createStockRawDataWorkbook({}, "raw-inventory");
-        const inventorySheet = inventory.worksheets[0];
-        const values: ExcelJS.Row[] = [];
-        inventorySheet.eachRow((row, index) => { if (index > 1 && row.getCell(2).value === fixture.variant.id) values.push(row); });
-        expect(values).toHaveLength(1);
-        expect(values[0].getCell(10).value).toBe(3);
-        expect(values[0].getCell(11).value).toBe(7);
-        expect(inventorySheet.actualRowCount - 1).toBe(Object.values(analytics.stockHealth).reduce((sum, count) => sum + count, 0));
     });
     it("keeps canonical identities, category line shares and all-unit frequency under quantity ranking", async () => {
         const category = await prisma.stockCategory.create({ data: { name: `Analytics alternate ${fixture.item.id}` } });

@@ -12,8 +12,6 @@ import {
     getStockRequestReportMeta,
     getStockRequestReportYears,
     StockCapabilityDeniedError,
-    createStockRawDataXlsxResponse,
-    StockRawExportLimitError,
 } from "@/modules/stock";
 
 const stockAuthorizationMock = vi.hoisted(() => ({
@@ -44,23 +42,17 @@ vi.mock("@/modules/stock", async () => {
         getStockRequestReportYears: vi.fn(),
         getStockRequestReportMeta: vi.fn(),
         createStockRequestReportXlsxResponse: vi.fn(),
-        createStockRawDataXlsxResponse: vi.fn(),
     };
 });
 
 describe("GET /api/stock/reports/export", () => {
-    it("preserves export authority and passes validated raw filters", async () => {
-        vi.mocked(createStockRawDataXlsxResponse).mockResolvedValue(new Response("xlsx"));
-        const response = await stockReportsExportRoute(new NextRequest("http://localhost/api/stock/reports/export?reportType=raw-issued&year=2024&fromMonth=2&toMonth=2&projectCode=P"));
-        expect(response.status).toBe(200);
-        expect(stockAuthorizationMock.assert).toHaveBeenCalledWith(expect.anything(), "stock.report.export");
-        expect(createStockRawDataXlsxResponse).toHaveBeenCalledWith(expect.objectContaining({ year: 2024, fromMonth: 2, toMonth: 2, projectCode: "P" }), "raw-issued");
-    });
-    it("rejects invalid raw filters and returns safe limit errors", async () => {
-        expect((await stockReportsExportRoute(new NextRequest("http://localhost/api/stock/reports/export?reportType=raw-issued&fromMonth=12&toMonth=1"))).status).toBe(400);
-        expect(createStockRawDataXlsxResponse).not.toHaveBeenCalled();
-        vi.mocked(createStockRawDataXlsxResponse).mockRejectedValue(new StockRawExportLimitError());
-        expect((await stockReportsExportRoute(new NextRequest("http://localhost/api/stock/reports/export?reportType=raw-inventory"))).status).toBe(400);
+    it.each(["raw-issued", "raw-inventory"])("rejects removed mode %s including metadata", async (mode) => {
+        for (const suffix of ["", "&metaOnly=1"]) {
+            const response = await stockReportsExportRoute(new NextRequest(`http://localhost/api/stock/reports/export?reportType=${mode}${suffix}`));
+            expect(response.status).toBe(400);
+        }
+        expect(createStockRequestReportXlsxResponse).not.toHaveBeenCalled();
+        expect(createStockBalanceReportXlsxResponse).not.toHaveBeenCalled();
     });
     beforeEach(() => {
         vi.clearAllMocks();
