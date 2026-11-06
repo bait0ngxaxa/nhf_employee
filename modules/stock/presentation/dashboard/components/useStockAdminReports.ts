@@ -43,8 +43,8 @@ export function useStockAdminReports(canExportReports: boolean) {
                 return;
             }
 
-            downloadStockRequestReportFile(selectedYear);
-            toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
+            await downloadStockRequestReportFile(selectedYear);
+            toast.info("เริ่มดาวน์โหลดไฟล์ Excel แล้ว", {
                 description: `กำลังส่งออกรายงานวัสดุ ${exportMeta.count} รายการ (ปี ${selectedYear})`,
             });
         } catch (error) {
@@ -70,8 +70,8 @@ export function useStockAdminReports(canExportReports: boolean) {
                 return;
             }
 
-            downloadStockBalanceReportFile();
-            toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
+            await downloadStockBalanceReportFile();
+            toast.info("เริ่มดาวน์โหลดไฟล์ Excel แล้ว", {
                 description: `กำลังส่งออกยอดคงเหลือสต๊อก ${exportMeta.count} รายการ`,
             });
         } catch (error) {

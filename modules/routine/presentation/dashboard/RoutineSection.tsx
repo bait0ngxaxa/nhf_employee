@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
-import { triggerDownload } from "@/lib/helpers/download";
+import { downloadXlsx } from "@/lib/client/xlsx-download";
 import type { RoutineTaskStatusFilter } from "../../schemas/routine";
 
 import { RoutineKpiGrid } from "./RoutineKpiGrid";
@@ -669,6 +669,24 @@ export function RoutineSection() {
 }
 
 function RoutineSectionCapabilitySurface() {
+    const [isExporting, setIsExporting] = useState(false);
+    const exportLockRef = useRef(false);
+    async function handleExport(): Promise<void> {
+        if (!canExportTasks || exportLockRef.current) return;
+        exportLockRef.current = true;
+        setIsExporting(true);
+        try {
+            await downloadXlsx(`${API_ROUTES.routines.export}?format=xlsx`);
+        } catch (error) {
+            toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด", {
+                description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+            });
+        } finally {
+            exportLockRef.current = false;
+            setIsExporting(false);
+        }
+    }
+
     const { user } = useDashboardDataContext();
     const routineCapabilities = user?.routineCapabilities;
     const canReadTasks = routineCapabilities?.canReadTasks === true;
@@ -799,12 +817,14 @@ function RoutineSectionCapabilitySurface() {
                         type="button"
                         variant="outline"
                         className="border-brand-border text-brand-strong hover:bg-brand-surface-strong hover:text-brand-strong"
-                        onClick={() => triggerDownload(`${API_ROUTES.routines.export}?format=xlsx`)}
+                        onClick={() => void handleExport()}
+                        disabled={isExporting}
+                        aria-busy={isExporting}
                         aria-label="ส่งออก Excel รายการทั้งหมด"
                         title="ส่งออกรายการทั้งหมด"
                     >
                         <Download aria-hidden="true" />
-                        ส่งออก Excel
+                        {isExporting ? "กำลังเตรียมไฟล์" : "ส่งออก Excel"}
                         <span className="text-xs font-normal text-content-muted">รายการทั้งหมด</span>
                     </Button>
                 ) : null}

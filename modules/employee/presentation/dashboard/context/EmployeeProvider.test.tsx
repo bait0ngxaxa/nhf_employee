@@ -186,7 +186,8 @@ describe("EmployeeProvider capability-aware presentation", () => {
 
     it("keeps loading and prevents duplicate requests while waiting for the server", async () => {
         vi.useFakeTimers();
-        mocks.fetchWithRefresh.mockReturnValue(new Promise<Response>(() => undefined));
+        let finish: ((response: Response) => void) | undefined;
+        mocks.fetchWithRefresh.mockReturnValueOnce(new Promise<Response>((resolve) => { finish = resolve; }));
         renderProvider(exportListCapabilities);
         fireEvent.click(screen.getByRole("button", { name: "export" }));
         await act(async () => { await vi.advanceTimersByTimeAsync(600); });
@@ -194,6 +195,7 @@ describe("EmployeeProvider capability-aware presentation", () => {
         expect(screen.getByTestId("is-exporting")).toHaveTextContent("true");
         expect(mocks.fetchWithRefresh).toHaveBeenCalledTimes(1);
         expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        await act(async () => { finish?.(new Response(null, { status: 403 })); });
     });
 
     it("reports a forbidden response without downloading the error body", async () => {

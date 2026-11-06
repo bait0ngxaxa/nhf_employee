@@ -1,28 +1,67 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import { StockAdminReports } from "./StockAdminReports";
 import { apiGet } from "@/lib/client/api-client";
-import { triggerDownload } from "@/lib/helpers/download";
+import { downloadXlsx } from "@/lib/client/xlsx-download";
 
 vi.mock("@/lib/client/api-client", () => ({
     apiGet: vi.fn(),
 }));
 
-vi.mock("@/lib/helpers/download", () => ({
-    triggerDownload: vi.fn(),
+vi.mock("@/lib/client/xlsx-download", () => ({
+    downloadXlsx: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
     toast: {
         error: vi.fn(),
         success: vi.fn(),
+        info: vi.fn(),
     },
 }));
 
 describe("StockAdminReports", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.mocked(downloadXlsx).mockResolvedValue(undefined);
+    });
+
+    it.each(["requests", "balances"])("awaits %s download and preserves independent controls", async (report) => {
+        mockReportApis();
+        let finish: (() => void) | undefined;
+        vi.mocked(downloadXlsx).mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
+        render(<StockAdminReports canExportReports />);
+        const label = report === "requests" ? "ดาวน์โหลด Excel" : "ดาวน์โหลดสต๊อกคงเหลือ";
+        const otherLabel = report === "requests" ? "ดาวน์โหลดสต๊อกคงเหลือ" : "ดาวน์โหลด Excel";
+        await waitFor(() => expect(screen.getByRole("button", { name: label })).toBeEnabled());
+        const button = screen.getByRole("button", { name: label });
+        fireEvent.click(button);
+        fireEvent.click(button);
+        await waitFor(() => expect(downloadXlsx).toHaveBeenCalledTimes(1));
+        expect(button).toBeDisabled();
+        expect(screen.getByRole("button", { name: otherLabel })).toBeEnabled();
+        expect(toast.info).not.toHaveBeenCalled();
+        await act(async () => { finish?.(); });
+        expect(button).toBeEnabled();
+    });
+
+    it.each(["requests", "balances"])("reports %s download errors", async (report) => {
+        mockReportApis();
+        vi.mocked(downloadXlsx).mockRejectedValueOnce(new Error("ไม่มีสิทธิ์ดาวน์โหลด"));
+        render(<StockAdminReports canExportReports />);
+        const label = report === "requests" ? "ดาวน์โหลด Excel" : "ดาวน์โหลดสต๊อกคงเหลือ";
+        await waitFor(() => expect(screen.getByRole("button", { name: label })).toBeEnabled());
+        fireEvent.click(screen.getByRole("button", { name: label }));
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.any(String), { description: "ไม่มีสิทธิ์ดาวน์โหลด" }));
+        expect(screen.getByRole("button", { name: label })).toBeEnabled();
+        expect(toast.info).not.toHaveBeenCalled();
+    });
+
+    it("does not load or download without export capability", () => {
+        render(<StockAdminReports canExportReports={false} />);
+        expect(apiGet).not.toHaveBeenCalled();
+        expect(downloadXlsx).not.toHaveBeenCalled();
     });
 
     it("uses a newly returned year for meta and export", async () => {
@@ -92,12 +131,12 @@ describe("StockAdminReports", () => {
         );
 
         await waitFor(() => {
-            expect(triggerDownload).toHaveBeenCalledWith(
+            expect(downloadXlsx).toHaveBeenCalledWith(
                 "/api/stock/reports/export?format=xlsx&year=2031",
             );
         });
-        expect(toast.success).toHaveBeenCalledWith(
-            "เริ่มดาวน์โหลดไฟล์แล้ว",
+        expect(toast.info).toHaveBeenCalledWith(
+            "เริ่มดาวน์โหลดไฟล์ Excel แล้ว",
             expect.objectContaining({
                 description: "กำลังส่งออกรายงานวัสดุ 8 รายการ (ปี 2031)",
             }),
@@ -108,12 +147,12 @@ describe("StockAdminReports", () => {
         );
 
         await waitFor(() => {
-            expect(triggerDownload).toHaveBeenCalledWith(
+            expect(downloadXlsx).toHaveBeenCalledWith(
                 "/api/stock/reports/export?format=xlsx&reportType=balances",
             );
         });
-        expect(toast.success).toHaveBeenCalledWith(
-            "เริ่มดาวน์โหลดไฟล์แล้ว",
+        expect(toast.info).toHaveBeenCalledWith(
+            "เริ่มดาวน์โหลดไฟล์ Excel แล้ว",
             expect.objectContaining({
                 description: "กำลังส่งออกยอดคงเหลือสต๊อก 12 รายการ",
             }),
@@ -147,12 +186,12 @@ describe("StockAdminReports", () => {
             await screen.findByRole("button", { name: "กำลังเตรียมไฟล์" }),
         ).toBeDisabled();
         expect(screen.getByText("กำลังเริ่มดาวน์โหลด")).toBeInTheDocument();
-        expect(triggerDownload).not.toHaveBeenCalled();
+        expect(downloadXlsx).not.toHaveBeenCalled();
 
         exportMeta.resolve(createSuccess({ year: 2031, count: 8, maxRows: 5000 }));
 
         await waitFor(() => {
-            expect(triggerDownload).toHaveBeenCalledWith(
+            expect(downloadXlsx).toHaveBeenCalledWith(
                 "/api/stock/reports/export?format=xlsx&year=2031",
             );
         });
@@ -189,12 +228,12 @@ describe("StockAdminReports", () => {
             await screen.findByRole("button", { name: "กำลังเตรียมไฟล์" }),
         ).toBeDisabled();
         expect(screen.getByText("กำลังเริ่มดาวน์โหลด")).toBeInTheDocument();
-        expect(triggerDownload).not.toHaveBeenCalled();
+        expect(downloadXlsx).not.toHaveBeenCalled();
 
         exportMeta.resolve(createSuccess({ count: 12, maxRows: 5000 }));
 
         await waitFor(() => {
-            expect(triggerDownload).toHaveBeenCalledWith(
+            expect(downloadXlsx).toHaveBeenCalledWith(
                 "/api/stock/reports/export?format=xlsx&reportType=balances",
             );
         });

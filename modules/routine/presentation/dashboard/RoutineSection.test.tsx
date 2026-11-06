@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 
+import { toast } from "sonner";
 import { RoutineSection } from "./RoutineSection";
 import type { RoutinePresentationCapabilities } from "../../application/types";
 import type {
@@ -34,7 +35,7 @@ const mocks = vi.hoisted(() => ({
     useSearchParams: vi.fn(),
     mutateSummary: vi.fn(),
     mutateTasks: vi.fn(),
-    triggerDownload: vi.fn(),
+    downloadXlsx: vi.fn(),
     useSWR: vi.fn((_key: unknown) => ({
         data: undefined as unknown,
         error: undefined as Error | undefined,
@@ -186,8 +187,8 @@ vi.mock("next/navigation", () => ({
     useRouter: () => navigationMocks.router,
 }));
 
-vi.mock("@/lib/helpers/download", () => ({
-    triggerDownload: mocks.triggerDownload,
+vi.mock("@/lib/client/xlsx-download", () => ({
+    downloadXlsx: mocks.downloadXlsx,
 }));
 
 vi.mock("@/components/ui/section-tabs", async () => {
@@ -446,15 +447,43 @@ describe("RoutineSection tabs", () => {
         expect(screen.queryByTestId("routine-kpi-grid")).not.toBeInTheDocument();
     });
 
-    it("offers an all-task Excel export to every workforce user", () => {
+    it("keeps export busy and prevents overlapping downloads", async () => {
+        mockRoutineUser("USER");
+        let finish: (() => void) | undefined;
+        mocks.downloadXlsx.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve; }));
+        render(<RoutineSection />);
+        const button = screen.getByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" });
+        fireEvent.click(button);
+        fireEvent.click(button);
+        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute("aria-busy", "true");
+        expect(button).toHaveTextContent("กำลังเตรียมไฟล์");
+        expect(mocks.downloadXlsx).toHaveBeenCalledTimes(1);
+        await act(async () => { finish?.(); });
+        expect(button).toBeEnabled();
+    });
+
+    it("reports export errors and releases the download lock", async () => {
+        mockRoutineUser("USER");
+        const notify = vi.spyOn(toast, "error").mockImplementation(() => "toast");
+        mocks.downloadXlsx.mockRejectedValueOnce(new Error("ไม่มีสิทธิ์ดาวน์โหลด"));
+        render(<RoutineSection />);
+        const button = screen.getByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" });
+        fireEvent.click(button);
+        await waitFor(() => expect(notify).toHaveBeenCalledWith("เกิดข้อผิดพลาดในการดาวน์โหลด", { description: "ไม่มีสิทธิ์ดาวน์โหลด" }));
+        expect(button).toBeEnabled();
+        notify.mockRestore();
+    });
+
+    it("offers an all-task Excel export to every workforce user", async () => {
         mockRoutineUser("USER");
 
         render(<RoutineSection />);
         fireEvent.click(screen.getByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" }));
 
-        expect(mocks.triggerDownload).toHaveBeenCalledWith(
+        await waitFor(() => expect(mocks.downloadXlsx).toHaveBeenCalledWith(
             "/api/routines/export?format=xlsx",
-        );
+        ));
     });
 
     it("gates the export control by canExportTasks instead of task-read access", () => {
@@ -466,7 +495,7 @@ describe("RoutineSection tabs", () => {
         render(<RoutineSection />);
 
         expect(screen.queryByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" })).not.toBeInTheDocument();
-        expect(mocks.triggerDownload).not.toHaveBeenCalled();
+        expect(mocks.downloadXlsx).not.toHaveBeenCalled();
     });
 
     it("exposes broad task management from capability authority", () => {

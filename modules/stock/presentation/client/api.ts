@@ -1,5 +1,5 @@
 import { apiGet, type ApiResponse } from "@/lib/client/api-client";
-import { triggerDownload } from "@/lib/helpers/download";
+import { downloadXlsx } from "@/lib/client/xlsx-download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
 export interface StockReportYearsResponse {
@@ -49,10 +49,10 @@ export const fetchStockBalanceMeta = async (): Promise<StockBalanceMetaResponse>
     return ensureSuccess(response);
 };
 
-export const downloadStockRequestReportFile = (year: number): void => {
-    triggerDownload(`${API_ROUTES.stock.reportsExport}?format=xlsx&year=${year}`);
+export const downloadStockRequestReportFile = async (year: number): Promise<void> => {
+    await downloadXlsx(`${API_ROUTES.stock.reportsExport}?format=xlsx&year=${year}`);
 };
 
-export const downloadStockBalanceReportFile = (): void => {
-    triggerDownload(`${API_ROUTES.stock.reportsExport}?format=xlsx&reportType=balances`);
+export const downloadStockBalanceReportFile = async (): Promise<void> => {
+    await downloadXlsx(`${API_ROUTES.stock.reportsExport}?format=xlsx&reportType=balances`);
 };

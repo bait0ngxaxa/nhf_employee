@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { YearlyReportExportPanel } from "@/components/dashboard/shared/YearlyReportExportPanel";
 import {
@@ -28,6 +28,7 @@ export function LeaveReportsDashboard() {
     const [isLoadingYears, setIsLoadingYears] = useState(true);
     const [isLoadingMeta, setIsLoadingMeta] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
+    const exportLockRef = useRef(false);
     const [meta, setMeta] = useState<LeaveExportMetaResponse | null>(null);
 
     useEffect(() => {
@@ -102,6 +103,8 @@ export function LeaveReportsDashboard() {
         meta.requestCount > meta.maxRows;
 
     async function handleExport(): Promise<void> {
+        if (exportLockRef.current) return;
+        exportLockRef.current = true;
         setIsExporting(true);
         try {
             const exportMeta = await fetchLeaveExportMeta(selectedYear, scope);
@@ -118,14 +121,17 @@ export function LeaveReportsDashboard() {
                 return;
             }
 
-            downloadLeaveExportFile(selectedYear, scope);
-            toast.success("เริ่มดาวน์โหลดไฟล์แล้ว", {
+            await downloadLeaveExportFile(selectedYear, scope);
+            toast.info("เริ่มดาวน์โหลดไฟล์ Excel แล้ว", {
                 description: `กำลังส่งออกรายงานพนักงาน ${exportMeta.employeeCount} คน / คำขอ ${exportMeta.requestCount} รายการ (ปี ${selectedYear})`,
             });
-        } catch {
-            toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด");
+        } catch (error) {
+            toast.error("เกิดข้อผิดพลาดในการดาวน์โหลด", {
+                description: error instanceof Error ? error.message : "กรุณาลองใหม่อีกครั้ง",
+            });
         } finally {
-            window.setTimeout(() => setIsExporting(false), 500);
+            exportLockRef.current = false;
+            setIsExporting(false);
         }
     }
 

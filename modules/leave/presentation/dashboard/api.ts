@@ -1,7 +1,7 @@
 import { apiGet, apiPost, apiPut, type ApiResponse } from "@/lib/client/api-client";
 import { fetchWithRefresh } from "@/modules/auth/client";
 import { createIdempotencyKey } from "@/lib/client/idempotency-key";
-import { triggerDownload } from "@/lib/helpers/download";
+import { downloadXlsx } from "@/lib/client/xlsx-download";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { LeaveCancellationDecisionValues, LeaveRequestValues } from "../../schemas/leave";
 import { DEFAULT_LEAVE_REPORT_SCOPE, type LeaveReportScope } from "../../schemas/report";
@@ -94,11 +94,11 @@ export const fetchLeaveExportMeta = async (
     return ensureSuccess(response);
 };
 
-export const downloadLeaveExportFile = (
+export const downloadLeaveExportFile = async (
     year: number,
     scope: LeaveReportScope = DEFAULT_LEAVE_REPORT_SCOPE,
-): void => {
-    triggerDownload(`${API_ROUTES.leave.export}?year=${year}&format=xlsx&scope=${scope}`);
+): Promise<void> => {
+    await downloadXlsx(`${API_ROUTES.leave.export}?year=${year}&format=xlsx&scope=${scope}`);
 };
 
 export const saveApproverAssignments = async (
