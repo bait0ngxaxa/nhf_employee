@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
     search: "",
     push: vi.fn(),
     replace: vi.fn(),
+    queueProps: vi.fn(),
+    analyticsProps: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -16,10 +18,24 @@ vi.mock("./ITTicketSelfService", () => ({
     ITTicketSelfService: () => <div>เนื้อหา Ticket ของฉัน</div>,
 }));
 vi.mock("./ITTicketOperatorQueue", () => ({
-    ITTicketOperatorQueue: () => <div>เนื้อหาคิวงาน IT</div>,
+    ITTicketOperatorQueue: (props: Record<string, unknown>) => {
+        mocks.queueProps(props);
+        return <div>เนื้อหาคิวงาน IT</div>;
+    },
 }));
 vi.mock("./ITAnalyticsDashboard", () => ({
-    ITAnalyticsDashboard: () => <div>เนื้อหารายงาน</div>,
+    ITAnalyticsDashboard: (props: { onReportStateChange?: (state: unknown) => void }) => {
+        mocks.analyticsProps(props);
+        return (
+            <button type="button" onClick={() => props.onReportStateChange?.({
+                period: "7D",
+                type: "INCIDENT",
+                category: null,
+            })}>
+                เนื้อหารายงาน
+            </button>
+        );
+    },
 }));
 
 const originalMatchMedia = window.matchMedia;
@@ -43,6 +59,8 @@ beforeEach(() => {
     mocks.search = "";
     mocks.push.mockReset();
     mocks.replace.mockReset();
+    mocks.queueProps.mockReset();
+    mocks.analyticsProps.mockReset();
     Object.defineProperty(window, "matchMedia", {
         configurable: true,
         value: () => ({
@@ -133,5 +151,42 @@ describe("IT unified workspace presentation", () => {
             "/dashboard/it?itTab=queue",
             { scroll: false },
         );
+    });
+
+    it("passes validated report URL state and queue-link permission to analytics, and writes changes back", async () => {
+        mocks.search = "itTab=analytics&reportPeriod=90D&reportCategory=uncategorized&reportType=bogus";
+        render(<ITWorkspace capabilities={{ ...none, canReadAnalytics: true, canReadAllTickets: true }} />);
+
+        fireEvent.click(await screen.findByRole("button", { name: "เนื้อหารายงาน" }));
+        expect(mocks.analyticsProps).toHaveBeenLastCalledWith(expect.objectContaining({
+            embedded: true,
+            canOpenOperatorQueue: true,
+            reportState: { period: "90D", type: null, category: "uncategorized" },
+        }));
+        expect(mocks.replace).toHaveBeenCalledWith(
+            "/dashboard/it?itTab=analytics&reportPeriod=7D&reportType=INCIDENT",
+            { scroll: false },
+        );
+    });
+
+    it("does not offer queue links to analytics-only viewers", async () => {
+        mocks.search = "itTab=analytics";
+        render(<ITWorkspace capabilities={{ ...none, canReadAnalytics: true }} />);
+
+        await screen.findByRole("button", { name: "เนื้อหารายงาน" });
+        expect(mocks.analyticsProps).toHaveBeenLastCalledWith(expect.objectContaining({
+            canOpenOperatorQueue: false,
+        }));
+    });
+
+    it("opens the queue with filters from an analytics drill-down link", async () => {
+        mocks.search = "itTab=queue&queueStatus=ACTIVE&queuePriority=P0&queueType=INCIDENT&queueCategory=4";
+        render(<ITWorkspace capabilities={{ ...none, canReadAllTickets: true, canReadAnalytics: true }} />);
+
+        expect(await screen.findByText("เนื้อหาคิวงาน IT")).toBeInTheDocument();
+        expect(mocks.queueProps).toHaveBeenLastCalledWith(expect.objectContaining({
+            embedded: true,
+            initialFilters: { status: "ACTIVE", priority: "P0", type: "INCIDENT", categoryId: 4 },
+        }));
     });
 });

@@ -30,7 +30,7 @@ const bundle = await build({
     stdin: {
         contents: `import React from "react";
             import { createRoot } from "react-dom/client";
-            import { ITAnalyticsReport } from "./modules/it/presentation/dashboard/ITAnalyticsDashboard";
+            import { ITAnalyticsDashboard, ITAnalyticsReport } from "./modules/it/presentation/dashboard/ITAnalyticsDashboard";
             const params = new URLSearchParams(location.search);
             const empty = params.get("empty") === "1";
             const linked = params.get("linked") === "1";
@@ -87,8 +87,16 @@ const bundle = await build({
                 unassignedHref: "/dashboard/it?itTab=queue&queueAssignment=UNASSIGNED",
                 untriagedHref: "/dashboard/it?itTab=queue&queueTriage=UNTRIAGED",
             } : undefined;
+            if (params.get("full") === "1") {
+                // Real container with filters; the API is stubbed with the same aggregates.
+                window.fetch = async () => new Response(JSON.stringify({ success: true, dashboard }), {
+                    status: 200, headers: { "Content-Type": "application/json" },
+                });
+            }
             createRoot(document.getElementById("root")).render(
-                <main className="mx-auto max-w-7xl px-4 py-6"><ITAnalyticsReport dashboard={dashboard} navigation={navigation} /></main>
+                <main className="mx-auto max-w-7xl px-4 py-6">{params.get("full") === "1"
+                    ? <ITAnalyticsDashboard embedded canOpenOperatorQueue />
+                    : <ITAnalyticsReport dashboard={dashboard} navigation={navigation} />}</main>
             );`,
         resolveDir: process.cwd(), loader: "tsx",
     },
@@ -117,7 +125,7 @@ const widths = process.argv[2] ? [Number(process.argv[2])] : [320, 390, 768, 128
 assert.ok(widths.every((width) => [320, 390, 768, 1280].includes(width)), "Use a supported viewport width");
 try {
     for (const width of widths) {
-        for (const variant of ["data", "linked", "empty"]) {
+        for (const variant of ["data", "linked", "empty", "full"]) {
             for (const dark of [false, true]) {
                 const page = await browser.newPage();
                 page.setDefaultTimeout(5000);
@@ -126,7 +134,7 @@ try {
                 page.on("pageerror", (error) => errors.push(String(error)));
                 try {
                     await page.setViewport({ width, height: 900, hasTouch: width < 1024 });
-                    const query = variant === "empty" ? "?empty=1" : variant === "linked" ? "?linked=1" : "";
+                    const query = { empty: "?empty=1", linked: "?linked=1", full: "?full=1", data: "" }[variant];
                     await page.goto(`${pathToFileURL(join(output, "index.html"))}${query}`);
                     if (dark) await page.evaluate(() => document.documentElement.classList.add("dark"));
                     await page.waitForSelector(variant === "empty" ? '[role="status"]' : ".recharts-bar");
@@ -167,14 +175,22 @@ try {
                                 document.querySelector(".recharts-tooltip-wrapper")?.textContent?.includes("Ticket"));
                         }
                     }
-                    if (variant === "linked") {
+                    if (variant === "full") {
+                        const filterGroup = await page.$('[role="group"][aria-label="ตัวกรองรายงาน"]');
+                        assert.ok(filterGroup, "report filters must render");
+                        const comboboxes = await page.$$eval('[role="group"] [role="combobox"]', (items) =>
+                            items.map((item) => item.getBoundingClientRect().height));
+                        assert.equal(comboboxes.length, 3, "period, type and category filters must render");
+                        assert.ok(comboboxes.every((height) => height >= 44), "filter controls must stay touch-sized");
+                    }
+                    if (variant === "linked" || variant === "full") {
                         const hrefs = await page.$$eval("main a", (links) => links.map((link) => link.getAttribute("href")));
                         assert.ok(hrefs.some((href) => href?.includes("queueCategory=uncategorized")), "uncategorized drill-down must exist");
                         assert.ok(hrefs.some((href) => href?.includes("queuePriority=P0")), "P0 attention link must exist");
                     } else {
                         assert.equal(await page.$$eval("main a", (links) => links.length), 0, "analytics-only view must not link to Tickets");
                     }
-                    if (screenshotDirectory && (width === 390 || width === 1280) && variant !== "linked") {
+                    if (screenshotDirectory && (width === 390 || width === 1280) && variant !== "linked" && !(variant === "full" && dark)) {
                         const name = `it-analytics-${width}-${variant}-${dark ? "dark" : "light"}`;
                         const fullHeight = await page.evaluate(() => document.documentElement.scrollHeight);
                         const sliceHeight = width < 768 ? 1400 : fullHeight;

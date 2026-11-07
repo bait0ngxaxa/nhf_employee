@@ -164,7 +164,7 @@ export function ITAnalyticsTopCategoriesPanel({
                         <ChartContainer
                             config={categoryChartConfig}
                             className={"aspect-auto w-full " + AXIS_CLASS_NAME}
-                            style={{ height: `${Math.max(9, rows.length * 2.75 + 2)}rem` }}
+                            style={{ height: `${Math.max(9, rows.length * (getCategoryHref ? 3.3 : 2.75) + 2)}rem` }}
                         >
                             <BarChart
                                 accessibilityLayer
@@ -212,25 +212,31 @@ export function ITAnalyticsTopCategoriesPanel({
                     <div className="min-w-0">
                         <ol aria-label="อันดับหมวดปัญหาและจำนวน Ticket" className="divide-y divide-border-neutral">
                             {rows.map((row, index) => (
-                                <li key={row.categoryId ?? "uncategorized"} className="flex min-w-0 items-start gap-3 py-2.5">
+                                <li key={row.categoryId ?? "uncategorized"} className="flex min-w-0 items-start gap-3 py-2">
                                     <span className="w-6 shrink-0 pt-0.5 text-right text-sm tabular-nums text-content-muted">{index + 1}</span>
                                     <div className="min-w-0 flex-1">
                                         <p className="break-words text-sm font-medium leading-6 text-content-heading">{row.label}</p>
-                                        <p className="text-xs leading-5 text-content-secondary">
-                                            <span className="tabular-nums">{formatITAnalyticsCount(row.count)}</span> Ticket
-                                            {" · "}
-                                            <span className="tabular-nums">{formatITAnalyticsShare(row.count, total)}</span>
-                                        </p>
+                                        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3">
+                                            <p className="text-xs leading-5 text-content-secondary">
+                                                <span className="tabular-nums">{formatITAnalyticsCount(row.count)}</span> Ticket
+                                                {" · "}
+                                                <span className="tabular-nums">{formatITAnalyticsShare(row.count, total)}</span>
+                                            </p>
+                                            {getCategoryHref ? (
+                                                <Link
+                                                    href={getCategoryHref(row.categoryId)}
+                                                    aria-label={`ดูงานค้างของหมวด ${row.label} ในคิวงาน`}
+                                                    className={LINK_CLASS_NAME + " min-h-9 text-xs"}
+                                                >
+                                                    ดูงานค้างในคิว
+                                                    <ArrowUpRight aria-hidden="true" className="size-3.5" />
+                                                </Link>
+                                            ) : null}
+                                        </div>
                                         {/* Below `sm` the list is the bar chart; wider screens use the chart beside it. */}
                                         <div aria-hidden="true" className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-subtle sm:hidden">
                                             <div className="h-full rounded-full bg-module-it-solid" style={{ width: `${maximum === 0 ? 0 : (row.count / maximum) * 100}%` }} />
                                         </div>
-                                        {getCategoryHref ? (
-                                            <Link href={getCategoryHref(row.categoryId)} className={LINK_CLASS_NAME + " min-h-9 text-xs"}>
-                                                ดูงานค้างของหมวดนี้ในคิวงาน
-                                                <ArrowUpRight aria-hidden="true" className="size-3.5" />
-                                            </Link>
-                                        ) : null}
                                     </div>
                                 </li>
                             ))}

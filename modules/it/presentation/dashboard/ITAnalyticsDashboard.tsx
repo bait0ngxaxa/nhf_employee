@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, CircleAlert, Clock3, RotateCw, ShieldAlert, UserRoundX, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, BarChart3, CircleAlert, Clock3, RotateCcw, RotateCw, ShieldAlert, UserRoundX, type LucideIcon } from "lucide-react";
 import type { ITTicketPriority } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,12 @@ import { API_ROUTES } from "@/lib/ssot/routes";
 import {
     IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS,
     IT_ANALYTICS_PERIODS,
+    IT_ANALYTICS_UNCATEGORIZED_FILTER,
+    IT_ANALYTICS_UNCATEGORIZED_LABEL,
     IT_TICKET_PRIORITY_LABELS,
     IT_TICKET_STATUS_LABELS,
     IT_TICKET_TYPE_LABELS,
+    IT_TICKET_TYPE_OPTIONS,
     type ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
     type ITAnalyticsPeriod,
 } from "../../contracts";
@@ -25,6 +28,16 @@ import {
     parseITAnalyticsDashboardResponse,
     readITAnalyticsError,
 } from "./analytics-presentation";
+import {
+    buildITAnalyticsQueueDestinations,
+    getITAnalyticsReportStateKey,
+    IT_ANALYTICS_DEFAULT_REPORT_STATE,
+    isDefaultITAnalyticsReportState,
+    parseITAnalyticsCategoryFilter,
+    toITAnalyticsApiQuery,
+    type ITAnalyticsQueueDestinations,
+    type ITAnalyticsReportState,
+} from "./analytics-url-state";
 import { formatITAnalyticsCount } from "./analytics-view";
 import {
     ITAnalyticsBacklogAgingPanel,
@@ -49,12 +62,7 @@ class ITAnalyticsRequestError extends Error {}
  * Optional operator-queue destinations. Supplied only when the viewer also
  * holds operator Ticket read; analytics access alone never links to Tickets.
  */
-export interface ITAnalyticsNavigation {
-    readonly getCategoryHref: (categoryId: number | null) => string;
-    readonly getPriorityHref: (priority: ITTicketPriority) => string;
-    readonly unassignedHref: string;
-    readonly untriagedHref: string;
-}
+export type ITAnalyticsNavigation = ITAnalyticsQueueDestinations;
 
 const PERIOD_LABELS: Readonly<Record<ITAnalyticsPeriod, string>> = {
     "7D": "7 วัน",
@@ -565,24 +573,173 @@ function ReportingWindow({ dashboard }: { readonly dashboard: ITAnalyticsDashboa
     );
 }
 
+const ALL_FILTER_VALUE = "ALL";
+
+type CategoryOption = ITAnalyticsDashboardDTO["filterOptions"]["categories"][number];
+
+function categoryOptionLabel(option: CategoryOption, options: readonly CategoryOption[]): string {
+    const duplicateName = options.some((other) => other.id !== option.id && other.name === option.name);
+    const name = duplicateName ? `${option.name} (${option.key})` : option.name;
+    return option.isActive ? name : `${name} · ปิดใช้งาน`;
+}
+
+function ReportFilters({
+    state,
+    categoryOptions,
+    onChange,
+}: {
+    readonly state: ITAnalyticsReportState;
+    readonly categoryOptions: readonly CategoryOption[];
+    readonly onChange: (state: ITAnalyticsReportState) => void;
+}): ReactElement {
+    const fieldClassName = "flex min-w-0 flex-col gap-1.5 text-sm font-medium text-content-secondary";
+    const categoryValue = state.category === null ? ALL_FILTER_VALUE : String(state.category);
+    const selectedCategoryMissing = typeof state.category === "number"
+        && !categoryOptions.some((option) => option.id === state.category);
+    const filtered = !isDefaultITAnalyticsReportState(state);
+
+    return (
+        <div role="group" aria-label="ตัวกรองรายงาน" className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto] lg:items-end">
+            <label className={fieldClassName}>
+                ช่วงเวลารายงาน
+                <Select
+                    value={state.period}
+                    onValueChange={(value) => {
+                        if ((IT_ANALYTICS_PERIODS as readonly string[]).includes(value)) {
+                            onChange({ ...state, period: value as ITAnalyticsPeriod });
+                        }
+                    }}
+                >
+                    <SelectTrigger aria-label="เลือกช่วงเวลารายงาน" className="min-h-11 w-full">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {IT_ANALYTICS_PERIODS.map((value) => (
+                            <SelectItem key={value} value={value}>{PERIOD_LABELS[value]}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </label>
+            <label className={fieldClassName}>
+                ประเภท Ticket
+                <Select
+                    value={state.type ?? ALL_FILTER_VALUE}
+                    onValueChange={(value) => {
+                        const option = IT_TICKET_TYPE_OPTIONS.find((item) => item.value === value);
+                        onChange({ ...state, type: option?.value ?? null });
+                    }}
+                >
+                    <SelectTrigger aria-label="กรองตามประเภท Ticket" className="min-h-11 w-full">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL_FILTER_VALUE}>ทุกประเภท</SelectItem>
+                        {IT_TICKET_TYPE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {IT_TICKET_TYPE_LABELS[option.value]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </label>
+            <label className={fieldClassName}>
+                หมวดหมู่
+                <Select
+                    value={categoryValue}
+                    onValueChange={(value) => {
+                        onChange({
+                            ...state,
+                            category: value === ALL_FILTER_VALUE ? null : parseITAnalyticsCategoryFilter(value),
+                        });
+                    }}
+                >
+                    <SelectTrigger aria-label="กรองตามหมวดหมู่" className="min-h-11 w-full">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={ALL_FILTER_VALUE}>ทุกหมวดหมู่</SelectItem>
+                        <SelectItem value={IT_ANALYTICS_UNCATEGORIZED_FILTER}>{IT_ANALYTICS_UNCATEGORIZED_LABEL}</SelectItem>
+                        {categoryOptions.map((option) => (
+                            <SelectItem key={option.id} value={String(option.id)}>
+                                {categoryOptionLabel(option, categoryOptions)}
+                            </SelectItem>
+                        ))}
+                        {selectedCategoryMissing ? (
+                            <SelectItem value={categoryValue}>หมวดหมู่ที่เลือก (ไม่พบในรายการ)</SelectItem>
+                        ) : null}
+                    </SelectContent>
+                </Select>
+            </label>
+            <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 gap-2"
+                disabled={!filtered}
+                onClick={() => onChange(IT_ANALYTICS_DEFAULT_REPORT_STATE)}
+            >
+                <RotateCcw aria-hidden="true" className="size-4" />
+                ล้างตัวกรอง
+            </Button>
+        </div>
+    );
+}
+
+function ActiveFilterSummary({
+    state,
+    categoryOptions,
+}: {
+    readonly state: ITAnalyticsReportState;
+    readonly categoryOptions: readonly CategoryOption[];
+}): ReactElement | null {
+    if (state.type === null && state.category === null) return null;
+    const parts: string[] = [];
+    if (state.type !== null) parts.push(`ประเภท ${IT_TICKET_TYPE_LABELS[state.type]}`);
+    if (state.category === IT_ANALYTICS_UNCATEGORIZED_FILTER) {
+        parts.push(`หมวดหมู่ ${IT_ANALYTICS_UNCATEGORIZED_LABEL}`);
+    } else if (state.category !== null) {
+        const option = categoryOptions.find((item) => item.id === state.category);
+        parts.push(`หมวดหมู่ ${option ? categoryOptionLabel(option, categoryOptions) : "ที่เลือก"}`);
+    }
+    return (
+        <p role="note" className="rounded-lg border border-brand-border-strong/30 bg-brand-surface px-3 py-2 text-sm leading-6 text-brand-strong">
+            กำลังกรอง: {parts.join(" · ")} — ตัวกรองนี้มีผลกับทั้งข้อมูลตามช่วงรายงานและข้อมูล ณ ปัจจุบัน
+            โดยใช้ประเภทและหมวดหมู่ปัจจุบันของ Ticket
+        </p>
+    );
+}
+
+/**
+ * Report filters may be controlled by the workspace URL (`reportState` +
+ * `onReportStateChange`) or kept locally when rendered standalone.
+ * `canOpenOperatorQueue` reflects the server-derived Ticket read ALL
+ * projection; the queue API still authorizes every request itself.
+ */
 export function ITAnalyticsDashboard({
     embedded = false,
-    navigation,
+    canOpenOperatorQueue = false,
+    reportState: controlledState,
+    onReportStateChange,
 }: {
     readonly embedded?: boolean;
-    readonly navigation?: ITAnalyticsNavigation;
+    readonly canOpenOperatorQueue?: boolean;
+    readonly reportState?: ITAnalyticsReportState;
+    readonly onReportStateChange?: (state: ITAnalyticsReportState) => void;
 } = {}): ReactElement {
-    const [period, setPeriod] = useState<ITAnalyticsPeriod>("30D");
+    const [localState, setLocalState] = useState<ITAnalyticsReportState>(IT_ANALYTICS_DEFAULT_REPORT_STATE);
+    const state = controlledState ?? localState;
     const [retryCount, setRetryCount] = useState(0);
     const [requestState, setRequestState] = useState<RequestState | null>(null);
+    const [categoryOptions, setCategoryOptions] = useState<readonly CategoryOption[]>([]);
     const latestRequestId = useRef(0);
-    const requestKey = `${period}:${retryCount}`;
+    const stateKey = getITAnalyticsReportStateKey(state);
+    const requestKey = `${stateKey}:${retryCount}`;
     const visibleState = requestState?.key === requestKey ? requestState : null;
+    const apiQuery = toITAnalyticsApiQuery(state);
 
     useEffect(() => {
         const controller = new AbortController();
         const requestId = ++latestRequestId.current;
-        const url = `${API_ROUTES.itAnalytics.dashboard}?period=${encodeURIComponent(period)}`;
+        const url = `${API_ROUTES.itAnalytics.dashboard}?${apiQuery}`;
 
         void fetch(url, { signal: controller.signal })
             .then(async (response) => {
@@ -593,6 +750,7 @@ export function ITAnalyticsDashboard({
                     throw new ITAnalyticsRequestError("ข้อมูลรายงาน IT ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 }
                 if (!controller.signal.aborted && requestId === latestRequestId.current) {
+                    setCategoryOptions(parsed.filterOptions.categories);
                     setRequestState({ key: requestKey, kind: "loaded", data: parsed });
                 }
             })
@@ -608,45 +766,33 @@ export function ITAnalyticsDashboard({
             });
 
         return () => controller.abort();
-    }, [period, requestKey]);
+    }, [apiQuery, requestKey]);
 
-    const handlePeriodChange = (value: string): void => {
-        if ((IT_ANALYTICS_PERIODS as readonly string[]).includes(value)) {
-            setPeriod(value as ITAnalyticsPeriod);
-        }
+    const handleStateChange = (next: ITAnalyticsReportState): void => {
+        if (getITAnalyticsReportStateKey(next) === stateKey) return;
+        if (onReportStateChange) onReportStateChange(next);
+        else setLocalState(next);
     };
 
     const reportState = visibleState;
+    const navigation = canOpenOperatorQueue && reportState?.kind === "loaded"
+        ? buildITAnalyticsQueueDestinations(reportState.data.filters)
+        : undefined;
     return (
         <section className="mx-auto w-full max-w-7xl min-w-0 space-y-5">
-            <header className={`flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between ${embedded ? "" : "border-b border-border-neutral pb-5"}`}>
-                <div className="min-w-0 space-y-2">
-                    {!embedded ? <>
-                        <h1 data-page-heading tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
-                            <BarChart3 aria-hidden="true" className="size-7 shrink-0 text-sky-700" />
-                            รายงาน IT
-                        </h1>
-                        <p className="max-w-[70ch] text-sm leading-6 text-content-secondary">
-                            ภาพรวมงานค้างและผลการให้บริการ IT ตามช่วงเวลาที่เลือก
-                        </p>
-                    </> : null}
-                    {reportState?.kind === "loaded" ? <ReportingWindow dashboard={reportState.data} /> : null}
-                </div>
-                <label className="flex w-full min-w-0 flex-col gap-1.5 text-sm font-medium text-content-secondary sm:w-48">
-                    ช่วงเวลารายงาน
-                    <Select value={period} onValueChange={handlePeriodChange}>
-                        <SelectTrigger aria-label="เลือกช่วงเวลารายงาน" className="min-h-11 w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {IT_ANALYTICS_PERIODS.map((value) => (
-                                <SelectItem key={value} value={value}>
-                                    {PERIOD_LABELS[value]}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </label>
+            <header className={`min-w-0 space-y-4 ${embedded ? "" : "border-b border-border-neutral pb-5"}`}>
+                {!embedded ? <div className="min-w-0 space-y-2">
+                    <h1 data-page-heading tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
+                        <BarChart3 aria-hidden="true" className="size-7 shrink-0 text-sky-700" />
+                        รายงาน IT
+                    </h1>
+                    <p className="max-w-[70ch] text-sm leading-6 text-content-secondary">
+                        ภาพรวมงานค้างและผลการให้บริการ IT ตามช่วงเวลาที่เลือก
+                    </p>
+                </div> : null}
+                <ReportFilters state={state} categoryOptions={categoryOptions} onChange={handleStateChange} />
+                <ActiveFilterSummary state={state} categoryOptions={categoryOptions} />
+                {reportState?.kind === "loaded" ? <ReportingWindow dashboard={reportState.data} /> : null}
             </header>
 
             {reportState === null ? (

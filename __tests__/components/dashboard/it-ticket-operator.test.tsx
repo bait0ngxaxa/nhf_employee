@@ -190,6 +190,39 @@ describe("IT operator queue presentation", () => {
         expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
     });
 
+    it("starts from validated drill-down filters and keeps an inactive linked category selectable", async () => {
+        mockApiImplementation(async (input) => {
+            const url = String(input);
+            if (url.includes("/reference")) return referenceResponse();
+            return queueResponse([ticket]);
+        });
+
+        render(<ITTicketOperatorQueue initialFilters={{
+            status: "ACTIVE",
+            type: "INCIDENT",
+            priority: "P0",
+            categoryId: 999,
+            assignmentState: "UNASSIGNED",
+        }} />);
+
+        expect(await screen.findAllByRole("link", { name: /เข้าใช้งานระบบไม่ได้/ })).not.toHaveLength(0);
+        const queueRequest = new URL(String(fetchMock.mock.calls.find(([input]) =>
+            String(input).startsWith("/api/it/operator/tickets?"))?.[0]), "http://localhost");
+        expect(Object.fromEntries(queueRequest.searchParams)).toEqual({
+            status: "ACTIVE",
+            type: "INCIDENT",
+            priority: "P0",
+            categoryId: "999",
+            assignmentState: "UNASSIGNED",
+        });
+        expect(screen.getByRole("combobox", { name: "กรองตาม Priority" })).toHaveValue("P0");
+        expect(screen.getByRole("combobox", { name: "กรองตามการมอบหมาย" })).toHaveValue("UNASSIGNED");
+        const category = screen.getByRole("combobox", { name: "กรองตามหมวดหมู่" });
+        await waitFor(() => expect(within(category)
+            .getByRole("option", { name: "หมวดหมู่ที่ปิดใช้งานหรือไม่อยู่ในรายการ" })).toBeInTheDocument());
+        expect(category).toHaveValue("999");
+    });
+
     it("renders operational identity and submits filters to the server", async () => {
         mockApiImplementation(async (input) => {
             const url = String(input);

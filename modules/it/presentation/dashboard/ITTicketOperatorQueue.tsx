@@ -19,7 +19,7 @@ import {
     type ITOperatorTicket,
     type ITOperatorTicketList,
 } from "../../contracts";
-import type { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
+import type { ITTicketPriority, ITTicketStatus } from "@prisma/client";
 import {
     formatITTicketAge,
     formatITTicketDate,
@@ -33,19 +33,15 @@ import {
     readITOperatorError,
 } from "./ticket-presentation";
 import {
+    IT_OPERATOR_QUEUE_DEFAULT_FILTERS,
+    type ITOperatorQueueFilters,
+} from "./operator-queue-url";
+import {
     isITOperatorQueueCursorStale,
     mergeITOperatorQueuePage,
 } from "./operator-queue-pagination";
 
-interface QueueFilters {
-    readonly status: ITOperatorQueueStatusFilter;
-    readonly type?: ITTicketType;
-    readonly priority?: ITTicketPriority;
-    readonly triageState?: "TRIAGED" | "UNTRIAGED";
-    readonly categoryId?: number | "uncategorized";
-    readonly assignmentState?: "ASSIGNED" | "UNASSIGNED";
-    readonly assigneeUserId?: number;
-}
+type QueueFilters = ITOperatorQueueFilters;
 
 type QueueState =
     | {
@@ -306,6 +302,11 @@ function QueueFiltersForm({
                         {reference?.categories.map((category) => (
                             <option key={category.id} value={category.id}>{category.name}</option>
                         ))}
+                        {/* A linked filter may name an inactive category that is not a selector choice. */}
+                        {typeof draft.categoryId === "number"
+                            && !reference?.categories.some((category) => category.id === draft.categoryId) ? (
+                                <option value={draft.categoryId}>หมวดหมู่ที่ปิดใช้งานหรือไม่อยู่ในรายการ</option>
+                            ) : null}
                     </select>
                 </label>
                 <label className="min-w-0 text-sm font-medium text-content-secondary">
@@ -361,9 +362,16 @@ function QueueFiltersForm({
     );
 }
 
-export function ITTicketOperatorQueue({ embedded = false }: { readonly embedded?: boolean } = {}): ReactElement {
-    const [filters, setFilters] = useState<QueueFilters>({ status: "ACTIVE" });
-    const [draft, setDraft] = useState<QueueFilters>({ status: "ACTIVE" });
+export function ITTicketOperatorQueue({
+    embedded = false,
+    initialFilters = IT_OPERATOR_QUEUE_DEFAULT_FILTERS,
+}: {
+    readonly embedded?: boolean;
+    /** Validated URL filters; the queue API still validates and authorizes them. */
+    readonly initialFilters?: ITOperatorQueueFilters;
+} = {}): ReactElement {
+    const [filters, setFilters] = useState<QueueFilters>(initialFilters);
+    const [draft, setDraft] = useState<QueueFilters>(initialFilters);
     const [refreshKey, setRefreshKey] = useState(0);
     const [queueState, setQueueState] = useState<QueueState | null>(null);
     const [referenceState, setReferenceState] = useState<ReferenceState | null>(null);

@@ -336,6 +336,105 @@ describe("IT analytics Dashboard presentation", () => {
         expect(screen.getByText("ยังไม่มีข้อมูลในช่วงเวลานี้")).toBeInTheDocument();
     });
 
+    it("requests type and category filters, explains their scope, and resets to the default report", async () => {
+        fetchMock.mockImplementation(async (input: string | URL) => {
+            const query = new URL(String(input), "http://localhost").searchParams;
+            const payload = dashboardPayload(query.get("period") ?? "30D", 5) as { dashboard: Record<string, unknown> };
+            payload.dashboard.filters = {
+                type: query.get("type"),
+                category: query.get("category") === "uncategorized"
+                    ? "uncategorized"
+                    : query.get("category") === null ? null : Number(query.get("category")),
+            };
+            payload.dashboard.filterOptions = {
+                categories: [
+                    { id: 4, key: "HARDWARE", name: "อุปกรณ์คอมพิวเตอร์", isActive: true },
+                    { id: 9, key: "LEGACY", name: "หมวดเดิม", isActive: false },
+                ],
+            };
+            return response(payload);
+        });
+
+        render(<ITAnalyticsDashboard />);
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        expect(screen.getByRole("button", { name: "ล้างตัวกรอง" })).toBeDisabled();
+
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "กรองตามประเภท Ticket" }), { key: "Enter" });
+        fireEvent.click(await screen.findByRole("option", { name: IT_TICKET_TYPE_LABELS.INCIDENT }));
+        await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+            "/api/it/analytics?period=30D&type=INCIDENT",
+            expect.anything(),
+        ));
+
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "กรองตามหมวดหมู่" }), { key: "Enter" });
+        expect(await screen.findByRole("option", { name: "หมวดเดิม · ปิดใช้งาน" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("option", { name: "ยังไม่จัดหมวดหมู่" }));
+        await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+            "/api/it/analytics?period=30D&type=INCIDENT&category=uncategorized",
+            expect.anything(),
+        ));
+        expect(await screen.findByRole("note")).toHaveTextContent(
+            "กำลังกรอง: ประเภท ปัญหาที่พบ · หมวดหมู่ ยังไม่จัดหมวดหมู่",
+        );
+        expect(screen.getByRole("note")).toHaveTextContent("ทั้งข้อมูลตามช่วงรายงานและข้อมูล ณ ปัจจุบัน");
+
+        fireEvent.click(screen.getByRole("button", { name: "ล้างตัวกรอง" }));
+        await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+            "/api/it/analytics?period=30D",
+            expect.anything(),
+        ));
+        expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
+
+    it("delegates filter changes to a controlling URL owner instead of keeping local state", async () => {
+        fetchMock.mockResolvedValue(response(dashboardPayload("7D", 5)));
+        const onChange = vi.fn();
+
+        render(<ITAnalyticsDashboard
+            reportState={{ period: "7D", type: "SUGGESTION", category: 4 }}
+            onReportStateChange={onChange}
+        />);
+
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        expect(fetchMock).toHaveBeenCalledWith(
+            "/api/it/analytics?period=7D&type=SUGGESTION&category=4",
+            expect.anything(),
+        );
+        await choosePeriod("90 วัน");
+        expect(onChange).toHaveBeenCalledWith({ period: "90D", type: "SUGGESTION", category: 4 });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("links aggregate rows to the operator queue only for viewers who can open it", async () => {
+        const payload = dashboardPayload("30D", 5) as { dashboard: Record<string, unknown> };
+        payload.dashboard.filters = { type: "INCIDENT", category: null };
+        fetchMock.mockResolvedValue(response(payload));
+
+        render(<ITAnalyticsDashboard canOpenOperatorQueue />);
+
+        const categories = await screen.findByRole("region", { name: "หมวดปัญหาที่มีการแจ้งมากที่สุด" });
+        const categoryLinks = within(categories).getAllByRole("link", { name: /ดูงานค้างของหมวด .* ในคิวงาน/ });
+        expect(categoryLinks.map((link) => link.getAttribute("href"))).toEqual([
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueCategory=4",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueCategory=uncategorized",
+        ]);
+        const attention = screen.getByRole("region", { name: "สิ่งที่ต้องติดตาม" });
+        expect(within(attention).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queuePriority=P0",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queuePriority=P1",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueAssignment=UNASSIGNED",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueTriage=UNTRIAGED",
+        ]);
+        expect(within(attention).getByText("ค้างเกิน 7 วัน").closest("li")?.querySelector("a")).toBeNull();
+        expect(within(screen.getByRole("region", { name: "งานค้างตาม Priority" }))
+            .queryByRole("link", { name: "P3 — ต่ำ" })).not.toBeInTheDocument();
+        expect(within(screen.getByRole("region", { name: "งานค้างตามผู้รับผิดชอบ" }))
+            .getByRole("link", { name: "ยังไม่มีผู้รับผิดชอบ" })).toHaveAttribute(
+            "href",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueAssignment=UNASSIGNED",
+        );
+    });
+
     it("does not let an older period response overwrite the newest selection", async () => {
         fetchMock.mockResolvedValueOnce(response(dashboardPayload("30D", 30)));
         const pending: PendingRequest[] = [];
