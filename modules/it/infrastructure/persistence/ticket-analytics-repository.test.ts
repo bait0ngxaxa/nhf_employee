@@ -52,8 +52,11 @@ describe("IT Ticket analytics persistence", () => {
                 createdAt: new Date("2026-09-01T12:00:00.000Z"),
                 priority: "P0",
             }]);
+        const createdCategoryGroupBy = vi.fn().mockResolvedValue([
+            { categoryId: 19, _count: { _all: 1 } },
+        ]);
         const findCategories = vi.fn().mockResolvedValue([
-            { id: 19, name: "หมวดประวัติ", key: "ARCHIVED" },
+            { id: 19, name: "หมวดประวัติ", key: "ARCHIVED", isActive: false },
         ]);
         const tx = {
             iTTicket: {
@@ -64,7 +67,8 @@ describe("IT Ticket analytics persistence", () => {
                     .mockImplementationOnce(assigneeGroupBy)
                     .mockImplementationOnce(backlogPriorityGroupBy)
                     .mockImplementationOnce(typeGroupBy)
-                    .mockImplementationOnce(departmentGroupBy),
+                    .mockImplementationOnce(departmentGroupBy)
+                    .mockImplementationOnce(createdCategoryGroupBy),
                 aggregate,
                 count,
                 findMany,
@@ -123,10 +127,18 @@ describe("IT Ticket analytics persistence", () => {
             },
             _min: { occurredAt: true },
         });
-        expect(findCategories).toHaveBeenCalledWith({
-            where: { id: { in: [19] } },
-            select: { id: true, name: true, key: true },
+        expect(createdCategoryGroupBy).toHaveBeenCalledWith({
+            by: ["categoryId"],
+            where: { createdAt: { gte: startAt, lt: endAt } },
+            _count: { _all: true },
         });
+        expect(findCategories).toHaveBeenCalledWith({
+            where: { OR: [{ isActive: true }, { tickets: { some: {} } }] },
+            select: { id: true, name: true, key: true, isActive: true },
+            orderBy: { id: "asc" },
+        });
+        // No aging ranges requested: no extra unbounded counts.
+        expect(count).toHaveBeenCalledTimes(2);
         expect(findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
             where: {
                 createdAt: { gte: startAt, lt: endAt },
@@ -144,9 +156,86 @@ describe("IT Ticket analytics persistence", () => {
             id: 19,
             name: "หมวดประวัติ",
             key: "ARCHIVED",
+            isActive: false,
         }]);
+        expect(result.createdCategories).toEqual([{ categoryId: 19, count: 1 }]);
+        expect(result.backlogAges).toEqual([]);
         expect(result.departmentSnapshots).toEqual([
             { departmentNameSnapshot: null, count: 1 },
+        ]);
+    });
+    it("applies Ticket type/category scope to every Ticket aggregate and counts aging ranges on the backlog", async () => {
+        const startAt = new Date("2026-09-01T17:00:00.000Z");
+        const endAt = new Date("2026-09-25T17:00:00.000Z");
+        const groupBy = vi.fn().mockResolvedValue([]);
+        const count = vi.fn().mockResolvedValue(3);
+        const aggregate = vi.fn().mockResolvedValue({ _min: { createdAt: null } });
+        const findMany = vi.fn().mockResolvedValue([]);
+        const eventGroupBy = vi.fn().mockResolvedValue([]);
+        const findCategories = vi.fn().mockResolvedValue([]);
+        const tx = {
+            iTTicket: { groupBy, count, aggregate, findMany },
+            iTTicketEvent: { groupBy: eventGroupBy },
+            iTTicketCategory: { findMany: findCategories },
+        } as unknown as ITTicketAnalyticsPersistenceContext;
+        const lte = new Date("2026-09-17T17:00:00.000Z");
+        const gt = new Date("2026-09-10T17:00:00.000Z");
+
+        const result = await readITAnalyticsPersistenceSnapshot(tx, {
+            startAt,
+            endAt,
+            backlogStatuses: [ITTicketStatus.OPEN],
+            resolutionEventKind: ITTicketEventKind.STATUS_CHANGED,
+            resolutionStatus: ITTicketStatus.RESOLVED,
+            scope: { type: "INCIDENT", category: "uncategorized" },
+            backlogAgeRanges: [
+                { key: "0_1", createdAtLte: null, createdAtGt: gt },
+                { key: "8_14", createdAtLte: lte, createdAtGt: gt },
+                { key: "15_PLUS", createdAtLte: lte, createdAtGt: null },
+            ],
+        });
+
+        const scope = { type: "INCIDENT", categoryId: null };
+        for (const [call] of groupBy.mock.calls) {
+            expect(call.where).toMatchObject(scope);
+        }
+        expect(groupBy).toHaveBeenCalledTimes(8);
+        expect(groupBy.mock.calls[0]?.[0]).toEqual({
+            by: ["status"],
+            where: scope,
+            _count: { _all: true },
+        });
+        expect(aggregate).toHaveBeenCalledWith({
+            where: { ...scope, status: { in: ["OPEN"] } },
+            _min: { createdAt: true },
+        });
+        expect(eventGroupBy).toHaveBeenCalledWith({
+            by: ["ticketId"],
+            where: {
+                kind: "STATUS_CHANGED",
+                toStatus: "RESOLVED",
+                occurredAt: { gte: startAt, lt: endAt },
+                ticket: scope,
+            },
+            _min: { occurredAt: true },
+        });
+        expect(count).toHaveBeenCalledWith({
+            where: { ...scope, status: { in: ["OPEN"] }, createdAt: { gt } },
+        });
+        expect(count).toHaveBeenCalledWith({
+            where: { ...scope, status: { in: ["OPEN"] }, createdAt: { lte, gt } },
+        });
+        expect(count).toHaveBeenCalledWith({
+            where: { ...scope, status: { in: ["OPEN"] }, createdAt: { lte } },
+        });
+        // Filter options are reference data and stay unscoped.
+        expect(findCategories).toHaveBeenCalledWith(expect.objectContaining({
+            where: { OR: [{ isActive: true }, { tickets: { some: {} } }] },
+        }));
+        expect(result.backlogAges).toEqual([
+            { key: "0_1", count: 3 },
+            { key: "8_14", count: 3 },
+            { key: "15_PLUS", count: 3 },
         ]);
     });
 });

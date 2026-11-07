@@ -13,6 +13,7 @@ import {
 
 const TEST_PREFIX = "it7-ticket-analytics";
 const NOW = new Date("2026-09-25T17:05:00.000Z");
+const DAY_MS = 24 * 60 * 60 * 1000;
 let fixtureSequence = 0;
 const trackedTicketIds = new Set<number>();
 const trackedUserIds = new Set<number>();
@@ -126,6 +127,28 @@ async function cleanFixtures(): Promise<void> {
     trackedCategoryIds.clear();
 }
 
+async function explainBacklogAgingCount(): Promise<readonly Record<string, unknown>[]> {
+    return prisma.$queryRaw<readonly Record<string, unknown>[]>(Prisma.sql`
+        EXPLAIN FORMAT=JSON
+        SELECT COUNT(*)
+        FROM it_tickets
+        WHERE status IN (${"OPEN"}, ${"IN_PROGRESS"}, ${"WAITING_REQUESTER"})
+          AND createdAt <= ${new Date(NOW.getTime() - 8 * DAY_MS)}
+          AND createdAt > ${new Date(NOW.getTime() - 15 * DAY_MS)}
+    `);
+}
+
+async function explainCreatedCategoryAggregation(): Promise<readonly Record<string, unknown>[]> {
+    return prisma.$queryRaw<readonly Record<string, unknown>[]>(Prisma.sql`
+        EXPLAIN FORMAT=JSON
+        SELECT categoryId, COUNT(*)
+        FROM it_tickets
+        WHERE createdAt >= ${new Date("2026-09-19T17:00:00.000Z")}
+          AND createdAt < ${NOW}
+        GROUP BY categoryId
+    `);
+}
+
 async function explainResolvedEventAggregation(): Promise<readonly Record<string, unknown>[]> {
     return prisma.$queryRaw<readonly Record<string, unknown>[]>(Prisma.sql`
         EXPLAIN FORMAT=JSON
@@ -216,6 +239,19 @@ async function createTicket(input: TicketInput): Promise<number> {
     });
     trackedTicketIds.add(ticket.id);
     return ticket.id;
+}
+
+async function createStatusEvent(
+    ticketId: number,
+    actorUserId: number,
+    fromStatus: "IN_PROGRESS" | "RESOLVED",
+    toStatus: "IN_PROGRESS" | "RESOLVED",
+    occurredAt: Date,
+): Promise<void> {
+    await prisma.iTTicketEvent.create({
+        data: { ticketId, actorUserId, kind: "STATUS_CHANGED", fromStatus, toStatus, occurredAt },
+        select: { id: true },
+    });
 }
 
 async function createResolvedEvent(
@@ -411,6 +447,8 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             waitingRequester: 1,
             unassignedBacklog: 2,
             untriagedBacklog: 4,
+            highPriorityBacklog: 2,
+            agedBacklog: 1,
             oldestUnresolvedAgeMinutes: Math.floor(
                 (NOW.getTime() - new Date("2026-08-01T00:00:00.000Z").getTime()) / 60_000,
             ),
@@ -420,6 +458,24 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             averageFirstResponseMinutes: 22,
             averageResolutionMinutes: 60.5,
         });
+        expect(dashboard.backlogAging).toEqual([
+            { bucket: "0_1", count: 3 },
+            { bucket: "2_3", count: 0 },
+            { bucket: "4_7", count: 1 },
+            { bucket: "8_14", count: 0 },
+            { bucket: "15_PLUS", count: 1 },
+        ]);
+        expect(dashboard.topCategories.rows).toEqual([
+            { categoryId: null, label: "ยังไม่จัดหมวดหมู่", count: 4 },
+            { categoryId: category.id, label: "หมวดหมู่ที่ปิดใช้งานแล้ว", count: 2 },
+        ]);
+        expect(dashboard.filterOptions.categories).toContainEqual({
+            id: category.id,
+            key: expect.stringContaining("legacy-category"),
+            name: "หมวดหมู่ที่ปิดใช้งานแล้ว",
+            isActive: false,
+        });
+        expect(dashboard.filters).toEqual({ type: null, category: null });
         expect(dashboard.trend).toHaveLength(7);
         expect(dashboard.trend.filter((row) => row.created > 0)).toEqual([
             { date: "2026-09-20", created: 1, resolved: 0 },
@@ -616,6 +672,157 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             .toBe(dashboard.summary.currentBacklog);
         expect(dashboard.assigneeBacklog.reduce((sum, row) => sum + row.count, 0))
             .toBe(dashboard.summary.currentBacklog);
+    });
+
+    it("applies type/category filters consistently while keeping current backlog independent of the period", async () => {
+        const departmentId = await createDepartment("filters");
+        const requester = await createWorkforceUser("filter-requester", departmentId);
+        const operator = await createWorkforceUser("filter-operator", departmentId);
+        const analyticsOnly = await createWorkforceUser("filter-report-reader", departmentId);
+        await grant(analyticsOnly.userId, "it.analytics.read");
+
+        const createCategory = async (label: string, name: string, isActive = true): Promise<number> => {
+            const created = await prisma.iTTicketCategory.create({
+                data: { key: nextFixtureKey(label), name, isActive },
+                select: { id: true },
+            });
+            trackedCategoryIds.add(created.id);
+            return created.id;
+        };
+        const categoryA = await createCategory("filter-a", "หมวด ก");
+        const categoryB = await createCategory("filter-b", "หมวด ข");
+        const unreferencedInactive = await createCategory("filter-c", "หมวดไม่มีการใช้งาน", false);
+        const ago = (days: number, extraMs = 0): Date => new Date(NOW.getTime() - days * DAY_MS - extraMs);
+
+        // Created in period with category A, later reclassified to B.
+        const reclassified = await createTicket({
+            requester, type: "INCIDENT", status: "IN_PROGRESS", priority: "P2",
+            createdAt: ago(1), categoryId: categoryA,
+        });
+        await prisma.iTTicket.update({ where: { id: reclassified }, data: { categoryId: categoryB } });
+        // Resolved, reopened and resolved again inside the period.
+        const reopened = await createTicket({
+            requester, type: "SERVICE_REQUEST", status: "RESOLVED", priority: "P2",
+            createdAt: ago(2), categoryId: categoryA,
+        });
+        await createStatusEvent(reopened, operator.userId, "IN_PROGRESS", "RESOLVED", ago(1));
+        await createStatusEvent(reopened, operator.userId, "RESOLVED", "IN_PROGRESS", ago(0, 2 * 3_600_000));
+        await createStatusEvent(reopened, operator.userId, "IN_PROGRESS", "RESOLVED", ago(0, 3_600_000));
+        // Exactly eight completed days old; priority raised P3 -> P1 after creation.
+        const reprioritized = await createTicket({
+            requester, type: "INCIDENT", status: "OPEN", priority: "P3",
+            createdAt: ago(8), triagedAt: ago(7), triagedByUserId: operator.userId,
+        });
+        await prisma.iTTicket.update({ where: { id: reprioritized }, data: { priority: "P1" } });
+        // Exactly fifteen completed days old: outside 7D but still current backlog.
+        await createTicket({
+            requester, type: "INCIDENT", status: "WAITING_REQUESTER", priority: "P0",
+            createdAt: ago(15), categoryId: categoryA, assignedToUserId: operator.userId,
+            triagedAt: ago(14), triagedByUserId: operator.userId,
+        });
+        // Terminal Ticket is never backlog.
+        await createTicket({
+            requester, type: "INCIDENT", status: "CLOSED", priority: "P0",
+            createdAt: ago(3), categoryId: categoryA,
+        });
+        // Inconsistent future timestamp clamps into the youngest bucket.
+        await createTicket({
+            requester, type: "SUGGESTION", status: "OPEN", priority: "P1",
+            createdAt: new Date(NOW.getTime() + 3_600_000),
+        });
+        await prisma.iTTicketCategory.update({ where: { id: categoryA }, data: { isActive: false } });
+
+        const all = await getITAnalyticsDashboard(analyticsOnly.context, { period: "7D" }, NOW);
+        expect(all.summary).toMatchObject({
+            currentBacklog: 4,
+            highPriorityBacklog: 3,
+            agedBacklog: 2,
+            unassignedBacklog: 3,
+            untriagedBacklog: 2,
+            newTickets: 3,
+            resolvedTickets: 1,
+        });
+        expect(all.backlogAging.map((row) => row.count)).toEqual([2, 0, 0, 1, 1]);
+        expect(all.backlogAging.reduce((sum, row) => sum + row.count, 0))
+            .toBe(all.summary.currentBacklog);
+        expect(all.priorityBacklog).toEqual([
+            { priority: "P0", count: 1 },
+            { priority: "P1", count: 2 },
+            { priority: "P2", count: 1 },
+            { priority: "P3", count: 0 },
+        ]);
+        expect(all.topCategories.rows).toEqual([
+            { categoryId: categoryA, label: "หมวด ก", count: 2 },
+            { categoryId: categoryB, label: "หมวด ข", count: 1 },
+        ]);
+        const optionIds = all.filterOptions.categories.map((option) => option.id);
+        expect(optionIds).toEqual(expect.arrayContaining([categoryA, categoryB]));
+        expect(optionIds).not.toContain(unreferencedInactive);
+        expect(all.filterOptions.categories.find((option) => option.id === categoryA)?.isActive)
+            .toBe(false);
+
+        const incidents = await getITAnalyticsDashboard(
+            analyticsOnly.context, { period: "7D", type: "INCIDENT" }, NOW,
+        );
+        expect(incidents.filters).toEqual({ type: "INCIDENT", category: null });
+        expect(incidents.summary).toMatchObject({
+            currentBacklog: 3, highPriorityBacklog: 2, agedBacklog: 2, newTickets: 2, resolvedTickets: 0,
+        });
+        expect(incidents.backlogAging.map((row) => row.count)).toEqual([1, 0, 0, 1, 1]);
+        expect(incidents.topCategories.rows).toEqual([
+            { categoryId: categoryA, label: "หมวด ก", count: 1 },
+            { categoryId: categoryB, label: "หมวด ข", count: 1 },
+        ]);
+        expect(incidents.typeDistribution).toEqual([
+            { type: "INCIDENT", count: 2 },
+            { type: "SERVICE_REQUEST", count: 0 },
+            { type: "SUGGESTION", count: 0 },
+        ]);
+
+        const serviceRequests = await getITAnalyticsDashboard(
+            analyticsOnly.context, { period: "7D", type: "SERVICE_REQUEST" }, NOW,
+        );
+        expect(serviceRequests.summary).toMatchObject({
+            currentBacklog: 0, resolvedTickets: 1, newTickets: 1,
+        });
+        expect(serviceRequests.trend.reduce((sum, row) => sum + row.resolved, 0)).toBe(1);
+
+        const categoryAOnly = await getITAnalyticsDashboard(
+            analyticsOnly.context, { period: "7D", category: String(categoryA) }, NOW,
+        );
+        expect(categoryAOnly.filters).toEqual({ type: null, category: categoryA });
+        expect(categoryAOnly.summary).toMatchObject({
+            currentBacklog: 1, highPriorityBacklog: 1, agedBacklog: 1, newTickets: 2, resolvedTickets: 1,
+        });
+        expect(categoryAOnly.topCategories.rows).toEqual([
+            { categoryId: categoryA, label: "หมวด ก", count: 2 },
+        ]);
+        expect(categoryAOnly.backlogAging.map((row) => row.count)).toEqual([0, 0, 0, 0, 1]);
+
+        const uncategorized = await getITAnalyticsDashboard(
+            analyticsOnly.context, { period: "7D", category: "uncategorized" }, NOW,
+        );
+        expect(uncategorized.summary).toMatchObject({
+            currentBacklog: 2, highPriorityBacklog: 2, newTickets: 0,
+        });
+        expect(uncategorized.topCategories.rows).toEqual([]);
+        expect(uncategorized.categoryBacklog).toEqual([
+            { label: "ยังไม่จัดหมวดหมู่", count: 2 },
+        ]);
+
+        const none = await getITAnalyticsDashboard(
+            analyticsOnly.context, { period: "7D", category: String(categoryB), type: "SUGGESTION" }, NOW,
+        );
+        expect(none.summary).toMatchObject({ currentBacklog: 0, newTickets: 0, resolvedTickets: 0 });
+        expect(none.backlogAging.every((row) => row.count === 0)).toBe(true);
+        expect(none.summary.oldestUnresolvedAgeMinutes).toBeNull();
+
+        const agingPlan = await explainBacklogAgingCount();
+        const categoryPlan = await explainCreatedCategoryAggregation();
+        expect(agingPlan).toHaveLength(1);
+        expect(categoryPlan).toHaveLength(1);
+        console.warn("IT analytics backlog-aging EXPLAIN FORMAT=JSON:", JSON.stringify(agingPlan[0]));
+        console.warn("IT analytics created-category EXPLAIN FORMAT=JSON:", JSON.stringify(categoryPlan[0]));
     });
 
     it("allows analytics-only authority and denies defaults, ADMIN, ticket scopes, and inactive workforce", async () => {

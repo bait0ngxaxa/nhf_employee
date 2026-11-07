@@ -1,9 +1,13 @@
 import {
+    IT_ANALYTICS_BACKLOG_AGE_BUCKETS,
     IT_ANALYTICS_PERIODS,
     IT_ANALYTICS_TIME_ZONE,
+    IT_ANALYTICS_UNCATEGORIZED_FILTER,
+    IT_TICKET_DATABASE_INT_MAX,
     IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_OPTIONS,
     IT_TICKET_TYPE_OPTIONS,
+    type ITAnalyticsCategoryFilter,
     type ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
 } from "../../contracts";
 import type { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
@@ -85,6 +89,98 @@ function parsePriorityCounts(
     return rows;
 }
 
+function isEntityId(value: unknown): value is number {
+    return Number.isSafeInteger(value)
+        && (value as number) > 0
+        && (value as number) <= IT_TICKET_DATABASE_INT_MAX;
+}
+
+function isCategoryFilter(value: unknown): value is ITAnalyticsCategoryFilter {
+    return value === IT_ANALYTICS_UNCATEGORIZED_FILTER || isEntityId(value);
+}
+
+function parseFilters(value: unknown): ITAnalyticsDashboardDTO["filters"] | null {
+    if (!isRecord(value)
+        || !hasExactKeys(value, ["type", "category"])
+        || (value.type !== null && !isTicketType(value.type))
+        || (value.category !== null && !isCategoryFilter(value.category))) {
+        return null;
+    }
+    return { type: value.type, category: value.category };
+}
+
+function parseFilterOptions(value: unknown): ITAnalyticsDashboardDTO["filterOptions"] | null {
+    if (!isRecord(value)
+        || !hasExactKeys(value, ["categories"])
+        || !Array.isArray(value.categories)) {
+        return null;
+    }
+    const categories: ITAnalyticsDashboardDTO["filterOptions"]["categories"][number][] = [];
+    const seen = new Set<number>();
+    for (const item of value.categories) {
+        if (!isRecord(item)
+            || !hasExactKeys(item, ["id", "key", "name", "isActive"])
+            || !isEntityId(item.id)
+            || seen.has(item.id)
+            || typeof item.key !== "string"
+            || typeof item.name !== "string"
+            || typeof item.isActive !== "boolean") {
+            return null;
+        }
+        seen.add(item.id);
+        categories.push({ id: item.id, key: item.key, name: item.name, isActive: item.isActive });
+    }
+    return { categories };
+}
+
+function parseTopCategories(value: unknown): ITAnalyticsDashboardDTO["topCategories"] | null {
+    if (!isRecord(value)
+        || !hasExactKeys(value, ["limit", "rows", "otherCategoryCount", "otherTicketCount"])
+        || !isNonNegativeInteger(value.limit)
+        || !isNonNegativeInteger(value.otherCategoryCount)
+        || !isNonNegativeInteger(value.otherTicketCount)
+        || !Array.isArray(value.rows)
+        || value.rows.length > value.limit) {
+        return null;
+    }
+    const rows: ITAnalyticsDashboardDTO["topCategories"]["rows"][number][] = [];
+    for (const item of value.rows) {
+        if (!isRecord(item)
+            || !hasExactKeys(item, ["categoryId", "label", "count"])
+            || (item.categoryId !== null && !isEntityId(item.categoryId))
+            || typeof item.label !== "string"
+            || !isNonNegativeInteger(item.count)) {
+            return null;
+        }
+        rows.push({ categoryId: item.categoryId, label: item.label, count: item.count });
+    }
+    return {
+        limit: value.limit,
+        rows,
+        otherCategoryCount: value.otherCategoryCount,
+        otherTicketCount: value.otherTicketCount,
+    };
+}
+
+/** Requires every aging bucket exactly once, in canonical order. */
+function parseBacklogAging(value: unknown): ITAnalyticsDashboardDTO["backlogAging"] | null {
+    if (!Array.isArray(value) || value.length !== IT_ANALYTICS_BACKLOG_AGE_BUCKETS.length) {
+        return null;
+    }
+    const rows: ITAnalyticsDashboardDTO["backlogAging"][number][] = [];
+    for (const [index, definition] of IT_ANALYTICS_BACKLOG_AGE_BUCKETS.entries()) {
+        const item: unknown = value[index];
+        if (!isRecord(item)
+            || !hasExactKeys(item, ["bucket", "count"])
+            || item.bucket !== definition.key
+            || !isNonNegativeInteger(item.count)) {
+            return null;
+        }
+        rows.push({ bucket: definition.key, count: item.count });
+    }
+    return rows;
+}
+
 function parseResponseResolutionByPriority(
     value: unknown,
 ): ITAnalyticsDashboardDTO["responseResolutionByPriority"] | null {
@@ -133,6 +229,8 @@ export function parseITAnalyticsDashboardResponse(
         "generatedAt",
         "timeZone",
         "period",
+        "filters",
+        "filterOptions",
         "summary",
         "trend",
         "statusDistribution",
@@ -140,6 +238,8 @@ export function parseITAnalyticsDashboardResponse(
         "priorityDistribution",
         "priorityBacklog",
         "responseResolutionByPriority",
+        "topCategories",
+        "backlogAging",
         "categoryBacklog",
         "assigneeBacklog",
         "departmentCreated",
@@ -157,6 +257,8 @@ export function parseITAnalyticsDashboardResponse(
             "waitingRequester",
             "unassignedBacklog",
             "untriagedBacklog",
+            "highPriorityBacklog",
+            "agedBacklog",
             "oldestUnresolvedAgeMinutes",
             "newTickets",
             "resolvedTickets",
@@ -173,6 +275,8 @@ export function parseITAnalyticsDashboardResponse(
         "waitingRequester",
         "unassignedBacklog",
         "untriagedBacklog",
+        "highPriorityBacklog",
+        "agedBacklog",
         "newTickets",
         "resolvedTickets",
         "firstRespondedTickets",
@@ -228,9 +332,14 @@ export function parseITAnalyticsDashboardResponse(
     const responseResolutionByPriority = parseResponseResolutionByPriority(
         dashboard.responseResolutionByPriority,
     );
+    const filters = parseFilters(dashboard.filters);
+    const filterOptions = parseFilterOptions(dashboard.filterOptions);
+    const topCategories = parseTopCategories(dashboard.topCategories);
+    const backlogAging = parseBacklogAging(dashboard.backlogAging);
     if (categoryBacklog === null || assigneeBacklog === null || departmentCreated === null
         || priorityDistribution === null || priorityBacklog === null
-        || responseResolutionByPriority === null) {
+        || responseResolutionByPriority === null || filters === null
+        || filterOptions === null || topCategories === null || backlogAging === null) {
         return null;
     }
 
@@ -242,11 +351,15 @@ export function parseITAnalyticsDashboardResponse(
             startAt: dashboard.period.startAt,
             endAt: dashboard.period.endAt,
         },
+        filters,
+        filterOptions,
         summary: {
             currentBacklog: summary.currentBacklog as number,
             waitingRequester: summary.waitingRequester as number,
             unassignedBacklog: summary.unassignedBacklog as number,
             untriagedBacklog: summary.untriagedBacklog as number,
+            highPriorityBacklog: summary.highPriorityBacklog as number,
+            agedBacklog: summary.agedBacklog as number,
             oldestUnresolvedAgeMinutes: summary.oldestUnresolvedAgeMinutes as number | null,
             newTickets: summary.newTickets as number,
             resolvedTickets: summary.resolvedTickets as number,
@@ -260,6 +373,8 @@ export function parseITAnalyticsDashboardResponse(
         priorityDistribution,
         priorityBacklog,
         responseResolutionByPriority,
+        topCategories,
+        backlogAging,
         categoryBacklog,
         assigneeBacklog,
         departmentCreated,

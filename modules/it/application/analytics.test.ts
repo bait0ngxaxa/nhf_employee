@@ -109,7 +109,18 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
         { id: 91, createdAt: new Date("2026-09-25T15:59:59.000Z"), priority: "P1" },
         { id: 92, createdAt: new Date("2026-09-25T15:30:00.000Z"), priority: "P3" },
     ],
-    categories: [{ id: 19, name: "หมวดประวัติที่ปิดแล้ว", key: "ARCHIVED" }],
+    createdCategories: [
+        { categoryId: 19, count: 1 },
+        { categoryId: null, count: 1 },
+    ],
+    backlogAges: [
+        { key: "0_1", count: 1 },
+        { key: "2_3", count: 0 },
+        { key: "4_7", count: 1 },
+        { key: "8_14", count: 0 },
+        { key: "15_PLUS", count: 1 },
+    ],
+    categories: [{ id: 19, name: "หมวดประวัติที่ปิดแล้ว", key: "ARCHIVED", isActive: false }],
 };
 
 function useSnapshot(snapshot: ITAnalyticsPersistenceSnapshot): void {
@@ -164,6 +175,8 @@ describe("IT analytics application query", () => {
                 waitingRequester: 1,
                 unassignedBacklog: 1,
                 untriagedBacklog: 2,
+                highPriorityBacklog: 2,
+                agedBacklog: 1,
                 oldestUnresolvedAgeMinutes: 8225,
                 newTickets: 2,
                 resolvedTickets: 2,
@@ -269,8 +282,8 @@ describe("IT analytics application query", () => {
                 { departmentNameSnapshot: "ฝ่ายเดียวกัน", count: 3 },
             ],
             categories: [
-                { id: 19, name: "ระบบ", key: "NETWORK" },
-                { id: 20, name: "ระบบ", key: "SOFTWARE" },
+                { id: 19, name: "ระบบ", key: "NETWORK", isActive: true },
+                { id: 20, name: "ระบบ", key: "SOFTWARE", isActive: true },
             ],
         });
 
@@ -301,7 +314,7 @@ describe("IT analytics application query", () => {
                 { userId: 205, count: 3 },
                 { userId: 101, count: 2 },
             ],
-            categories: [{ id: 19, name: "หมวดทั่วไป", key: "GENERAL" }],
+            categories: [{ id: 19, name: "หมวดทั่วไป", key: "GENERAL", isActive: true }],
         });
         mocks.findCurrentEmployees.mockResolvedValue([
             {
@@ -411,6 +424,8 @@ describe("IT analytics application query", () => {
             createdAtValues: [],
             resolvedEvents: [],
             resolvedTickets: [],
+            createdCategories: [],
+            backlogAges: [],
             categories: [],
         });
 
@@ -421,6 +436,8 @@ describe("IT analytics application query", () => {
             waitingRequester: 0,
             unassignedBacklog: 0,
             untriagedBacklog: 0,
+            highPriorityBacklog: 0,
+            agedBacklog: 0,
             oldestUnresolvedAgeMinutes: null,
             newTickets: 0,
             resolvedTickets: 0,
@@ -448,6 +465,171 @@ describe("IT analytics application query", () => {
         expect(result.categoryBacklog).toEqual([]);
         expect(result.assigneeBacklog).toEqual([]);
         expect(result.departmentCreated).toEqual([]);
+        expect(result.topCategories).toEqual({
+            limit: 10,
+            rows: [],
+            otherCategoryCount: 0,
+            otherTicketCount: 0,
+        });
+        expect(result.backlogAging).toEqual([
+            { bucket: "0_1", count: 0 },
+            { bucket: "2_3", count: 0 },
+            { bucket: "4_7", count: 0 },
+            { bucket: "8_14", count: 0 },
+            { bucket: "15_PLUS", count: 0 },
+        ]);
+        expect(result.filterOptions.categories).toEqual([]);
+    });
+
+    it("passes validated Ticket filters and one shared aging clock to every persistence read", async () => {
+        const result = await getITAnalyticsDashboard(actor, {
+            period: "7D",
+            type: "INCIDENT",
+            category: "19",
+        }, now);
+
+        const window = mocks.readSnapshot.mock.calls[0]?.[1];
+        expect(window).toMatchObject({
+            startAt: new Date("2026-09-19T17:00:00.000Z"),
+            endAt: now,
+            scope: { type: "INCIDENT", category: 19 },
+        });
+        expect(window?.backlogAgeRanges).toHaveLength(5);
+        expect(window?.backlogAgeRanges[0]).toEqual({
+            key: "0_1",
+            createdAtLte: null,
+            createdAtGt: new Date(now.getTime() - 2 * 86_400_000),
+        });
+        expect(result.filters).toEqual({ type: "INCIDENT", category: 19 });
+
+        await getITAnalyticsDashboard(actor, { category: "uncategorized" }, now);
+        expect(mocks.readSnapshot.mock.calls[1]?.[1]).toMatchObject({
+            scope: { type: null, category: "uncategorized" },
+        });
+        await getITAnalyticsDashboard(actor, "30D", now);
+        expect(mocks.readSnapshot.mock.calls[2]?.[1]).toMatchObject({
+            scope: { type: null, category: null },
+        });
+    });
+
+    it.each([
+        { type: "incident" },
+        { type: "" },
+        { category: "0" },
+        { category: "-1" },
+        { category: "1.5" },
+        { category: "UNCATEGORIZED" },
+        { category: "2147483648" },
+        { category: "" },
+        { period: "1D" },
+    ])("rejects malformed filters %o before opening the transaction", async (query) => {
+        await expect(getITAnalyticsDashboard(actor, query, now))
+            .rejects.toBeInstanceOf(ITAnalyticsInputValidationError);
+        expect(mocks.transaction).not.toHaveBeenCalled();
+    });
+
+    it("ranks period categories by canonical identity with deterministic ties and a summarized remainder", async () => {
+        const categories = Array.from({ length: 12 }, (_, index) => ({
+            id: 100 + index,
+            name: `หมวด ${String.fromCharCode(65 + index)}`,
+            key: `K${index}`,
+            isActive: index !== 3,
+        }));
+        useSnapshot({
+            ...populatedSnapshot,
+            createdCategories: [
+                ...categories.map((category, index) => ({
+                    categoryId: category.id,
+                    count: index < 2 ? 5 : 12 - index,
+                })),
+                { categoryId: null, count: 5 },
+                { categoryId: 999, count: 0 },
+            ],
+            categories: [
+                ...categories,
+                { id: 200, name: "หมวด A", key: "DUPLICATE", isActive: true },
+            ],
+        });
+
+        const result = await getITAnalyticsDashboard(actor, "30D", now);
+
+        expect(result.topCategories.limit).toBe(10);
+        expect(result.topCategories.rows).toHaveLength(10);
+        expect(result.topCategories.rows.slice(0, 5)).toEqual([
+            { categoryId: 102, label: "หมวด C", count: 10 },
+            { categoryId: 103, label: "หมวด D", count: 9 },
+            { categoryId: 104, label: "หมวด E", count: 8 },
+            { categoryId: 105, label: "หมวด F", count: 7 },
+            { categoryId: 106, label: "หมวด G", count: 6 },
+        ]);
+        // Equal counts: label order, then explicit uncategorized identity.
+        expect(result.topCategories.rows.slice(5)).toEqual([
+            { categoryId: null, label: "ยังไม่จัดหมวดหมู่", count: 5 },
+            { categoryId: 100, label: "หมวด A", count: 5 },
+            { categoryId: 101, label: "หมวด B", count: 5 },
+            { categoryId: 107, label: "หมวด H", count: 5 },
+            { categoryId: 108, label: "หมวด I", count: 4 },
+        ]);
+        expect(result.topCategories.otherCategoryCount).toBe(3);
+        expect(result.topCategories.otherTicketCount).toBe(1 + 2 + 3);
+        const total = result.topCategories.rows.reduce((sum, row) => sum + row.count, 0)
+            + result.topCategories.otherTicketCount;
+        expect(total).toBe(5 + 5 + 10 + 9 + 8 + 7 + 6 + 5 + 4 + 3 + 2 + 1 + 5);
+        expect(result.topCategories.rows.some((row) => row.categoryId === 999)).toBe(false);
+    });
+
+    it("disambiguates duplicate category names without merging their counts", async () => {
+        useSnapshot({
+            ...populatedSnapshot,
+            createdCategories: [
+                { categoryId: 19, count: 4 },
+                { categoryId: 20, count: 4 },
+            ],
+            categories: [
+                { id: 19, name: "ระบบ", key: "NETWORK", isActive: false },
+                { id: 20, name: "ระบบ", key: "SOFTWARE", isActive: true },
+            ],
+        });
+
+        const result = await getITAnalyticsDashboard(actor, "30D", now);
+
+        expect(result.topCategories.rows).toEqual([
+            { categoryId: 19, label: "ระบบ (NETWORK)", count: 4 },
+            { categoryId: 20, label: "ระบบ (SOFTWARE)", count: 4 },
+        ]);
+        expect(result.filterOptions.categories).toEqual([
+            { id: 20, key: "SOFTWARE", name: "ระบบ", isActive: true },
+            { id: 19, key: "NETWORK", name: "ระบบ", isActive: false },
+        ]);
+    });
+
+    it("derives high-priority and aged attention counts from the same current backlog snapshot", async () => {
+        useSnapshot({
+            ...populatedSnapshot,
+            backlogPriorities: [
+                { priority: "P0", count: 2 },
+                { priority: "P1", count: 3 },
+                { priority: "P2", count: 7 },
+                { priority: "P3", count: 1 },
+            ],
+            backlogAges: [
+                { key: "15_PLUS", count: 4 },
+                { key: "0_1", count: 5 },
+                { key: "8_14", count: 2 },
+            ],
+        });
+
+        const result = await getITAnalyticsDashboard(actor, "7D", now);
+
+        expect(result.summary.highPriorityBacklog).toBe(5);
+        expect(result.summary.agedBacklog).toBe(6);
+        expect(result.backlogAging).toEqual([
+            { bucket: "0_1", count: 5 },
+            { bucket: "2_3", count: 0 },
+            { bucket: "4_7", count: 0 },
+            { bucket: "8_14", count: 2 },
+            { bucket: "15_PLUS", count: 4 },
+        ]);
     });
 
     it("returns aggregate labels and counts without Ticket or requester details", async () => {

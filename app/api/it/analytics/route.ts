@@ -10,6 +10,13 @@ import {
     ITWorkforceDeniedError,
 } from "@/modules/it";
 
+const ANALYTICS_QUERY_KEYS = ["period", "type", "category"] as const;
+type AnalyticsQueryKey = (typeof ANALYTICS_QUERY_KEYS)[number];
+
+function isAnalyticsQueryKey(key: string): key is AnalyticsQueryKey {
+    return (ANALYTICS_QUERY_KEYS as readonly string[]).includes(key);
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         const auth = await requireApiSession({
@@ -19,16 +26,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         if (!auth.ok) return auth.response;
 
         const searchParams = new URL(request.url).searchParams;
-        let period: string | undefined;
+        const query: Partial<Record<AnalyticsQueryKey, string>> = {};
         let invalidQuery = false;
-        let periodSeen = false;
         searchParams.forEach((value, key) => {
-            if (key !== "period" || periodSeen) {
+            if (!isAnalyticsQueryKey(key) || query[key] !== undefined) {
                 invalidQuery = true;
                 return;
             }
-            periodSeen = true;
-            period = value;
+            query[key] = value;
         });
         if (invalidQuery) {
             return jsonError("พารามิเตอร์รายงาน IT ไม่ถูกต้อง", 400, { success: false });
@@ -36,7 +41,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
         const dashboard = await getITAnalyticsDashboard(
             await buildCurrentITAuthorizationContext(auth.user),
-            period,
+            query,
         );
         return NextResponse.json({ success: true, dashboard });
     } catch (error) {
