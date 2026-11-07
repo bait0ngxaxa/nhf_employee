@@ -92,6 +92,10 @@ export const IT_ANALYTICS_BACKLOG_AGE_BUCKETS = Object.freeze([
 export type ITAnalyticsBacklogAgeBucketKey =
     (typeof IT_ANALYTICS_BACKLOG_AGE_BUCKETS)[number]["key"];
 
+/** Labels the aggregate DTO uses for null dimension identities. */
+export const IT_ANALYTICS_UNCATEGORIZED_LABEL = "ยังไม่จัดหมวดหมู่";
+export const IT_ANALYTICS_UNASSIGNED_LABEL = "ยังไม่มีผู้รับผิดชอบ";
+
 /** "Older than seven completed days" means at least eight completed days. */
 export const IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS = 8;
 

@@ -12,7 +12,9 @@ import {
     IT_ANALYTICS_PERIODS,
     IT_ANALYTICS_TIME_ZONE,
     IT_ANALYTICS_TOP_CATEGORY_LIMIT,
+    IT_ANALYTICS_UNASSIGNED_LABEL,
     IT_ANALYTICS_UNCATEGORIZED_FILTER,
+    IT_ANALYTICS_UNCATEGORIZED_LABEL,
     IT_TICKET_DATABASE_INT_MAX,
     IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_OPTIONS,
@@ -277,7 +279,7 @@ export async function getITAnalyticsDashboard(
                 return {
                     identity: row.categoryId,
                     label: row.categoryId === null
-                        ? "ยังไม่จัดหมวดหมู่"
+                        ? IT_ANALYTICS_UNCATEGORIZED_LABEL
                         : category?.name ?? "หมวดหมู่เดิม",
                     count: row.count,
                     qualifier: row.categoryId === null
@@ -298,7 +300,7 @@ export async function getITAnalyticsDashboard(
             persistence.backlogAssignees.map((row): IdentifiedDimensionRow => ({
                 identity: row.userId,
                 label: row.userId === null
-                    ? "ยังไม่มีผู้รับผิดชอบ"
+                    ? IT_ANALYTICS_UNASSIGNED_LABEL
                     : assigneeNames.get(row.userId) ?? "ผู้รับผิดชอบเดิม",
                 count: row.count,
             })),
