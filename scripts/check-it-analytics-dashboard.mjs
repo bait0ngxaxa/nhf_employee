@@ -43,6 +43,7 @@ const bundle = await build({
             import { createRoot } from "react-dom/client";
             import { ITAnalyticsReport } from "./modules/it/presentation/dashboard/ITAnalyticsDashboard";
             import { ITWorkspace } from "./modules/it/presentation/dashboard/ITWorkspace";
+            import { buildITAnalyticsQueueDestinations } from "./modules/it/presentation/dashboard/analytics-url-state";
             const params = new URLSearchParams(location.search);
             const empty = params.get("empty") === "1";
             const linked = params.get("linked") === "1";
@@ -93,11 +94,7 @@ const bundle = await build({
                 ],
                 departmentCreated: empty ? [] : [{ label: "ฝ่ายบริหาร", count: 120 }, { label: "ไม่ระบุหน่วยงาน", count: 4 }],
             };
-            const navigation = linked ? {
-                getPriorityHref: (priority) => "/dashboard/it?itTab=queue&queuePriority=" + priority,
-                unassignedHref: "/dashboard/it?itTab=queue&queueAssignment=UNASSIGNED",
-                untriagedHref: "/dashboard/it?itTab=queue&queueTriage=UNTRIAGED",
-            } : undefined;
+            const navigation = linked ? buildITAnalyticsQueueDestinations(dashboard.filters) : undefined;
             if (params.get("full") === "1") {
                 // Real container with filters; the API is stubbed with the same aggregates.
                 window.analyticsRequests = [];
@@ -149,7 +146,7 @@ const widths = process.argv[2] ? [Number(process.argv[2])] : [320, 390, 768, 128
 assert.ok(widths.every((width) => [320, 390, 768, 1280].includes(width)), "Use a supported viewport width");
 try {
     for (const width of widths) {
-        for (const variant of ["data", "linked", "empty", "full"]) {
+        for (const variant of ["data", "linked", "empty", "full", "full-operator", "loading", "error"]) {
             for (const dark of [false, true]) {
                 const page = await browser.newPage();
                 page.setDefaultTimeout(5000);
@@ -158,9 +155,23 @@ try {
                 page.on("pageerror", (error) => errors.push(String(error)));
                 try {
                     await page.setViewport({ width, height: 900, hasTouch: width < 1024 });
-                    const query = { empty: "?empty=1", linked: "?linked=1", full: "?full=1&itTab=analytics&reportPeriod=90D&reportType=INCIDENT", data: "" }[variant];
+                    const query = { empty: "?empty=1", linked: "?linked=1", full: "?full=1&itTab=analytics&reportPeriod=90D&reportType=INCIDENT", "full-operator": "?full=1&linked=1&itTab=analytics&reportPeriod=90D&reportType=INCIDENT", loading: "?full=1&loading=1&itTab=analytics", error: "?full=1&error=1&itTab=analytics", data: "" }[variant];
                     await page.goto(`${pathToFileURL(join(output, "index.html"))}${query}`);
                     if (dark) await page.evaluate(() => document.documentElement.classList.add("dark"));
+                    if (variant === "loading" || variant === "error") {
+                        const selector = variant === "loading" ? '[aria-label="กำลังโหลดรายงาน IT"]' : '[role="alert"]';
+                        await page.waitForSelector(selector);
+                        assert.equal(await page.$$eval('[aria-label="ตัวกรองรายงาน"] [role="combobox"]', (items) => items.length), 3);
+                        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+                        if (variant === "error") {
+                            const before = await page.evaluate(() => window.analyticsRequests.length);
+                            await page.evaluate(() => [...document.querySelectorAll("button")].find((button) => button.textContent.includes("ลองอีกครั้ง")).click());
+                            await page.waitForFunction((count) => window.analyticsRequests.length > count && document.querySelector('[role="alert"]'), {}, before);
+                        }
+                        assert.deepEqual(errors, [], "state must not throw");
+                        cases += 1;
+                        continue;
+                    }
                     await page.waitForSelector(variant === "empty" ? '[role="status"]' : ".recharts-bar");
                     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
                     const layout = await page.evaluate(() => ({
@@ -199,7 +210,7 @@ try {
                                 document.querySelector(".recharts-tooltip-wrapper")?.textContent?.includes("Ticket"));
                         }
                     }
-                    if (variant === "full") {
+                    if (variant === "full" || variant === "full-operator") {
                         const filterGroup = await page.$('[role="group"][aria-label="ตัวกรองรายงาน"]');
                         assert.ok(filterGroup, "report filters must render");
                         const comboboxes = await page.$$eval('[role="group"] [role="combobox"]', (items) =>
@@ -207,10 +218,11 @@ try {
                         assert.equal(comboboxes.length, 3, "period, type and category filters must render");
                         assert.ok(comboboxes.every((height) => height >= 44), "filter controls must stay touch-sized");
                     }
-                    if (variant === "linked") {
+                    if (variant === "linked" || variant === "full-operator") {
                         const hrefs = await page.$$eval("main a", (links) => links.map((link) => link.getAttribute("href")));
                         assert.ok(hrefs.every((href) => !href?.includes("queueCategory=uncategorized")), "historical category must not link to queue");
                         assert.ok(hrefs.some((href) => href?.includes("queuePriority=P0")), "P0 attention link must exist");
+                        assert.ok(hrefs.every((href) => href?.includes("itTab=queue") && href?.includes("queueStatus=ACTIVE")), "current backlog links must retain ACTIVE population");
                     } else {
                         assert.equal(await page.$$eval("main a", (links) => links.length), 0, "analytics-only view must not link to Tickets");
                     }
@@ -226,7 +238,7 @@ try {
                             });
                         }
                     }
-                    if (variant === "full") {
+                    if (variant === "full" || variant === "full-operator") {
                         const categoryButtons = '[aria-label="อันดับหมวดปัญหาและจำนวน Ticket"] button';
                         const waitCategory = async (value) => {
                             await page.waitForFunction((expected) => {
@@ -261,7 +273,13 @@ try {
                         await page.waitForSelector('[role="option"]');
                         await page.evaluate(() => [...document.querySelectorAll('[role="option"]')].find((option) => option.textContent === "ทุกหมวดหมู่").click());
                         await waitCategory(null);
-                        assert.equal(await page.$$eval("main a", (links) => links.length), 0, "analytics-only interaction must not expose queue links");
+                        if (variant === "full") assert.equal(await page.$$eval("main a", (links) => links.length), 0, "analytics-only interaction must not expose queue links");
+                        if (width < 640) {
+                            await page.tap('[aria-label="กรองรายงานตามหมวด อีเมลและบัญชีผู้ใช้"]');
+                            await waitCategory("3");
+                            await page.evaluate(() => history.back());
+                            await waitCategory(null);
+                        }
                         assert.ok((await page.evaluate(() => window.analyticsRequests)).every((url) => url.startsWith("/api/it/analytics?")), "only aggregate API may be requested");
                     }
                     assert.deepEqual(errors, [], "page must not throw");

@@ -961,35 +961,42 @@ workspace remounts the queue when those URL filters change. Filters applied
 inside the queue afterwards stay local, as before, and are not written back to
 the URL.
 
-**Drill-down authorization.** Links render only when the server-derived
-`canReadAllTickets` projection is true; `it.analytics.read` alone never renders a
-link, and the queue API independently enforces `it.ticket.read / ALL`. Category,
-P0, P1, unassigned and untriaged links open the `ACTIVE` queue (the same
-`OPEN`/`IN_PROGRESS`/`WAITING_REQUESTER` population as the backlog) and carry the
-report's type/category filters so counts correspond. P0 and P1 are separate
-links because the queue filters one priority at a time. Category links target
-current backlog for that category, not the period-created cohort the chart ranks;
-the link text says `ดูงานค้างในคิว`. Aged backlog has no link because the queue has
-no age filter; adding one was deferred to keep the queue contract unchanged.
+**Historical category drill-down.** Selecting a real category bar or its ranked-list
+button updates the Analytics category filter. Reporting period and Ticket type
+stay selected; null category identity maps to canonical `uncategorized`, while
+null filter still means all categories. The workspace pushes canonical report
+URL state, so browser back/forward restores the filters and reloads only the
+aggregate analytics endpoint. The existing category selector clears/changes the
+category; the existing reset clears all report filters. Keyboard buttons and
+mobile touch targets are available without Ticket read access.
 
-**Performance evidence (real MySQL fixture).** Backlog aging uses five `COUNT`
-queries, one per bucket, on the caller's `REPEATABLE READ` snapshot.
-`EXPLAIN FORMAT=JSON` for a bucket count chose `it_tickets_status_createdAt_id_idx`
-with `access_type = range`, a covering index read, examining 3 rows (cost 0.86).
-The period category grouping chose `it_tickets_categoryId_createdAt_idx` with
-`access_type = index` (a full covering index scan, 6 rows, cost 0.85) rather than
-the `createdAt` range. **Risk:** at production volume this grouping scans the
-whole category/createdAt index unless the optimizer switches to the
-`(createdAt, id)` range; the fixture cannot show which. Revisit with
-representative row counts before adding an index. Filter options use
-`isActive = true OR EXISTS(ticket)` over the small category table.
+**Current-backlog authorization.** P0, P1, current priority, unassigned and
+untriaged links render only when server-derived `canReadAllTickets` is true.
+They open the `ACTIVE` queue with current type/category scope. The queue API
+independently enforces `it.ticket.read / ALL`; Analytics permission implies no
+Ticket access. Aged backlog has no queue link because the queue has no age
+filter. No Ticket API contract, workflow or priority-management rule changed.
+
+**Measured query optimization.** Aging now uses one parameterized conditional
+aggregate in the existing RepeatableRead transaction, reusing the domain's
+captured-instant boundary ranges. It scans the status/createdAt covering index
+for the current backlog and returns at most five groups. Missing groups become
+zero; the youngest group includes future timestamps. No schema, index, isolation
+or timeout change was needed. At 10,000/50,000 synthetic Tickets (1% active),
+query count falls 31 → 27 (empty scope 28 → 24), and final report hashes equal
+the baseline for all sixteen dataset/filter combinations. Category grouping
+uses the existing createdAt range at these volumes, rather than the full index
+scan observed on the tiny review fixture. Event-history scanning and
+period-bounded timestamp projections remain growth risks. Local serial p50
+improves modestly; 90D p95 worsens, so this does not establish production
+capacity. See [methodology, metrics and EXPLAIN evidence](../verification/it-analytics-performance/README.md).
 
 **Known limitations.** Category and priority groupings use current values, so
 reclassification moves historical Tickets. Backlog age is time since creation,
 not time in any status, and not an SLA. Type/category filters use the Ticket's
 current type/category for resolution events as well.
 
-**Verification (2026-11-07).** `npm run typecheck`, `npm run lint:strict`, and
+**Prior verification at reviewed HEAD `2278be0c` (2026-11-07).** `npm run typecheck`, `npm run lint:strict`, and
 `npm run architecture:check` (1,460 source files) passed. Focused real-MySQL
 integration (`ticket-analytics` + `ticket-workflow`) passed 2 files / 27 tests.
 `modules/it` plus `__tests__/components/dashboard` passed 72 files / 698 tests
@@ -999,3 +1006,11 @@ a repository dependency) passed 32 cases at 320/390/768/1280px in light and dark
 themes. One `npm run test` full-suite run was stopped by the host for low memory
 before reporting results and was not rerun; `npm run build` was not run for the
 same reason. Both remain to be confirmed before merge.
+
+## 37. Analytics correction release verification (2026-11-07)
+
+The three correction commits preserve section 10 definitions, the existing
+dashboard design and the independent analytics/operator authorization boundary.
+The current verification record, commands, exit statuses, browser isolation
+limitations and merge recommendation are maintained in
+[analytics merge readiness](../verification/it-analytics-merge-readiness.md).

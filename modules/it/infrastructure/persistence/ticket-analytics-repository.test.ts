@@ -174,7 +174,7 @@ describe("IT Ticket analytics persistence", () => {
         const eventGroupBy = vi.fn().mockResolvedValue([]);
         const findCategories = vi.fn().mockResolvedValue([]);
         const queryRaw = vi.fn().mockResolvedValue([
-            { bucket: "0_1", count: 3n }, { bucket: "8_14", count: 3n }, { bucket: "15_PLUS", count: 3n },
+            { bucket: "0_1", count: BigInt(3) }, { bucket: "8_14", count: BigInt(3) }, { bucket: "15_PLUS", count: BigInt(3) },
         ]);
         const tx = {
             $queryRaw: queryRaw,
