@@ -66,6 +66,8 @@ function createITAttachmentStorageKey(ticketId: number): string {
 export function createITTicketAttachmentStorage(
     privateRoot: string = DEFAULT_PRIVATE_ROOT,
 ): ITTicketAttachmentStorage {
+    // Private uploads are runtime data, not deployment assets. These annotations
+    // skip build-time tracing while preserving runtime realpath containment checks.
     const write = async (
         ticketId: number,
         attachments: readonly PreparedITTicketAttachment[],
@@ -78,7 +80,7 @@ export function createITTicketAttachmentStorage(
                 const storageKey = createITAttachmentStorageKey(ticketId);
                 const targetPath = resolveITAttachmentPath(privateRoot, storageKey);
                 await mkdir(path.dirname(targetPath), { recursive: true, mode: 0o750 });
-                const rootRealPath = await realpath(privateRoot);
+                const rootRealPath = await realpath(/* turbopackIgnore: true */ privateRoot);
                 const directoryRealPath = await realpath(path.dirname(targetPath));
                 if (!directoryRealPath.startsWith(`${rootRealPath}${path.sep}`)) {
                     throw new Error("IT attachment directory escaped private root");
@@ -129,7 +131,7 @@ export function createITTicketAttachmentStorage(
         const file = await lstat(targetPath);
         if (!file.isFile() || file.isSymbolicLink()) throw new Error("Invalid IT attachment file");
         const [rootRealPath, targetRealPath] = await Promise.all([
-            realpath(privateRoot),
+            realpath(/* turbopackIgnore: true */ privateRoot),
             realpath(targetPath),
         ]);
         if (!targetRealPath.startsWith(`${rootRealPath}${path.sep}`)) {
@@ -147,7 +149,7 @@ export function createITTicketAttachmentStorage(
         if (file === null) return;
         if (!file.isFile() || file.isSymbolicLink()) throw new Error("Invalid IT attachment file");
         const [rootRealPath, targetRealPath] = await Promise.all([
-            realpath(privateRoot),
+            realpath(/* turbopackIgnore: true */ privateRoot),
             realpath(targetPath),
         ]);
         if (!targetRealPath.startsWith(`${rootRealPath}${path.sep}`)) {
@@ -170,7 +172,7 @@ export function createITTicketAttachmentStorage(
         ) return false;
 
         const [rootRealPath, targetRealPath] = await Promise.all([
-            realpath(privateRoot),
+            realpath(/* turbopackIgnore: true */ privateRoot),
             realpath(targetPath),
         ]);
         if (!targetRealPath.startsWith(`${rootRealPath}${path.sep}`)) {
@@ -186,7 +188,7 @@ export function createITTicketAttachmentStorage(
         let itDirectoryRealPath: string;
         try {
             const [rootRealPath, resolvedITDirectory] = await Promise.all([
-                realpath(privateRoot),
+                realpath(/* turbopackIgnore: true */ privateRoot),
                 realpath(itDirectory),
             ]);
             if (!resolvedITDirectory.startsWith(`${rootRealPath}${path.sep}`)) return [];
@@ -207,7 +209,7 @@ export function createITTicketAttachmentStorage(
             let directoryRealPath: string;
             try {
                 [rootRealPath, directoryRealPath] = await Promise.all([
-                    realpath(privateRoot),
+                    realpath(/* turbopackIgnore: true */ privateRoot),
                     realpath(directoryPath),
                 ]);
             } catch (error) {
@@ -233,7 +235,7 @@ export function createITTicketAttachmentStorage(
                 if (fileStat === null) continue;
                 if (!fileStat.isFile() || fileStat.isSymbolicLink()) continue;
                 const [rootRealPath, targetRealPath] = await Promise.all([
-                    realpath(privateRoot),
+                    realpath(/* turbopackIgnore: true */ privateRoot),
                     realpath(targetPath),
                 ]);
                 if (!targetRealPath.startsWith(`${rootRealPath}${path.sep}`)) continue;
