@@ -825,6 +825,40 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         console.warn("IT analytics created-category EXPLAIN FORMAT=JSON:", JSON.stringify(categoryPlan[0]));
     });
 
+    it("partitions every aging boundary exactly once under type/category filters", async () => {
+        const departmentId = await createDepartment("aging-boundaries");
+        const actor = await createWorkforceUser("aging-boundaries", departmentId);
+        await grant(actor.userId, "it.analytics.read");
+        const category = await prisma.iTTicketCategory.create({ data: { key: nextFixtureKey("aging"), name: "อายุงาน" } });
+        trackedCategoryIds.add(category.id);
+        const ages = [-DAY_MS, 0, 2 * DAY_MS - 1, 2 * DAY_MS, 4 * DAY_MS - 1, 4 * DAY_MS,
+            8 * DAY_MS - 1, 8 * DAY_MS, 15 * DAY_MS - 1, 15 * DAY_MS, 800 * DAY_MS];
+        for (const type of ["INCIDENT", "SERVICE_REQUEST"] as const) {
+            for (const categoryId of [category.id, null]) {
+                for (const [index, age] of ages.entries()) await createTicket({
+                    requester: actor, type, categoryId,
+                    status: (["OPEN", "IN_PROGRESS", "WAITING_REQUESTER"] as const)[index % 3] ?? "OPEN",
+                    createdAt: new Date(NOW.getTime() - age),
+                });
+                for (const status of ["RESOLVED", "CLOSED", "CANCELLED"] as const) await createTicket({
+                    requester: actor, type, categoryId, status, createdAt: NOW,
+                });
+            }
+        }
+        for (const type of [undefined, "INCIDENT"] as const) {
+            for (const categoryFilter of [undefined, String(category.id), "uncategorized"]) {
+                const report = await getITAnalyticsDashboard(actor.context, {
+                    period: "7D", ...(type ? { type } : {}), ...(categoryFilter ? { category: categoryFilter } : {}),
+                }, NOW);
+                const multiplier = (type ? 1 : 2) * (categoryFilter ? 1 : 2);
+                expect(report.backlogAging.map((row) => row.count)).toEqual([3, 2, 2, 2, 2].map((count) => count * multiplier));
+                expect(report.summary.currentBacklog).toBe(ages.length * multiplier);
+                expect(report.priorityBacklog.reduce((sum, row) => sum + row.count, 0)).toBe(report.summary.currentBacklog);
+                expect(report.backlogAging.reduce((sum, row) => sum + row.count, 0)).toBe(report.summary.currentBacklog);
+            }
+        }
+    });
+
     it("allows analytics-only authority and denies defaults, ADMIN, ticket scopes, and inactive workforce", async () => {
         const departmentId = await createDepartment("auth");
         const defaults = await createWorkforceUser("default", departmentId);

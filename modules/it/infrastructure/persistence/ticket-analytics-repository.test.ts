@@ -173,7 +173,11 @@ describe("IT Ticket analytics persistence", () => {
         const findMany = vi.fn().mockResolvedValue([]);
         const eventGroupBy = vi.fn().mockResolvedValue([]);
         const findCategories = vi.fn().mockResolvedValue([]);
+        const queryRaw = vi.fn().mockResolvedValue([
+            { bucket: "0_1", count: 3n }, { bucket: "8_14", count: 3n }, { bucket: "15_PLUS", count: 3n },
+        ]);
         const tx = {
+            $queryRaw: queryRaw,
             iTTicket: { groupBy, count, aggregate, findMany },
             iTTicketEvent: { groupBy: eventGroupBy },
             iTTicketCategory: { findMany: findCategories },
@@ -219,15 +223,14 @@ describe("IT Ticket analytics persistence", () => {
             },
             _min: { occurredAt: true },
         });
-        expect(count).toHaveBeenCalledWith({
-            where: { ...scope, status: { in: ["OPEN"] }, createdAt: { gt } },
-        });
-        expect(count).toHaveBeenCalledWith({
-            where: { ...scope, status: { in: ["OPEN"] }, createdAt: { lte, gt } },
-        });
-        expect(count).toHaveBeenCalledWith({
-            where: { ...scope, status: { in: ["OPEN"] }, createdAt: { lte } },
-        });
+        expect(count).toHaveBeenCalledTimes(2); // period and untriaged only
+        expect(queryRaw).toHaveBeenCalledTimes(1);
+        const statement = queryRaw.mock.calls[0]?.[0];
+        expect(statement.sql).toContain("categoryId IS NULL");
+        expect(statement.sql).toContain("GROUP BY bucket");
+        expect(statement.values).toEqual([
+            gt, "0_1", lte, gt, "8_14", lte, "15_PLUS", "OPEN", "INCIDENT",
+        ]);
         // Filter options are reference data and stay unscoped.
         expect(findCategories).toHaveBeenCalledWith(expect.objectContaining({
             where: { OR: [{ isActive: true }, { tickets: { some: {} } }] },
