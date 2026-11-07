@@ -201,8 +201,15 @@ Reporting uses the explicit `Asia/Bangkok` timezone and supports exactly `7D`, `
 | Current backlog by category | Current backlog grouped by current category. Null uses `ยังไม่จัดหมวดหมู่`; inactive referenced categories remain reportable. |
 | Current workload by assignee | Current backlog grouped by current assignee. Null uses `ยังไม่มีผู้รับผิดชอบ`; unresolved historical identities use a safe fallback and retain their count. |
 | Requests by requester Department | Period-created Ticket cohort grouped by immutable `requesterDepartmentNameSnapshot`. Null/blank uses `ไม่ระบุหน่วยงาน`; current Employee Department is never joined for history. |
+| Most reported categories (`topCategories`) | Period-created Ticket cohort grouped by each Ticket's **current** `categoryId` (canonical identity, not display name). Null is the explicit `ยังไม่จัดหมวดหมู่` group; inactive referenced categories remain. Ranked by count descending, then label, then identity; top `IT_ANALYTICS_TOP_CATEGORY_LIMIT` (10) rows plus the remaining category/Ticket counts. Reclassification moves a Ticket between groups; this is not category-at-creation. Duplicate names use the category key qualifier. |
+| High-priority backlog | Current backlog with current priority `P0` or `P1` (`IT_ANALYTICS_HIGH_PRIORITIES`). Equals the P0+P1 rows of Active backlog by priority. Not an SLA measure. |
+| Backlog aging | Current backlog grouped by completed elapsed 24-hour periods since `ITTicket.createdAt`, measured against the response's single captured `now`: `0_1`, `2_3`, `4_7`, `8_14`, `15_PLUS`. A future `createdAt` clamps to zero days. Each Ticket is in exactly one bucket; the buckets sum to current backlog. This is age since creation, not time spent in any status, and not an SLA breach. |
+| Aged backlog | Current backlog aged at least `IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS` (8) completed days, i.e. "older than seven completed days"; equals the `8_14` + `15_PLUS` buckets. |
+| Category filter options | Active categories plus inactive categories still referenced by at least one Ticket. Reference data only; never filtered by the selected scope. |
 
 The browser-safe DTO contains only period metadata, aggregate counts/durations, daily totals, current-priority distributions, and approved category/assignee/Department labels. It contains no Ticket identifiers, titles, descriptions, comment text, attachment metadata, requester identity, or raw event rows. The internal API is `GET /api/it/analytics?period=30D`; it accepts only `7D`, `30D`, or `90D`, defaults a missing parameter to `30D`, and rejects malformed, duplicate, or extra parameters safely.
+
+**Ticket filters (analytics dashboard enhancement).** The API additionally accepts optional `type` (`INCIDENT`, `SERVICE_REQUEST`, `SUGGESTION`) and `category` (a positive category ID or `uncategorized`), each at most once. Both filters narrow the Ticket population for **every** metric — period metrics and current-snapshot metrics alike, including resolution events through their Ticket's current type/category. The period narrows only period metrics; it never restricts current backlog, priority, aging, assignee or attention counts. The response echoes the applied `filters` and returns `filterOptions.categories`. Category filtering uses current category, so a reclassified Ticket follows its new category in both period and snapshot metrics.
 
 All persistence aggregates are read in one MySQL `REPEATABLE READ` transaction. InnoDB's consistent non-locking reads in this isolation share one transaction snapshot, so summary cards and distributions represent the same database moment. This is a read-only snapshot, not the Serializable mutation helper. Queries use database counts/grouping/minimums and only bounded timestamp projections for daily bucketing and average calculations. The requester Department name is stored at Ticket creation by the existing Employee public snapshot contract; IT never reads Employee persistence internals.
 
@@ -918,3 +925,92 @@ Every queue response carries `awaitingClosureCount`: the count of all current
 check, deliberately independent of other filters. It equals the
 `รอปิดงาน` view with no additional filters; with extra filters the view can
 show fewer rows. The view selection is presentation only and grants nothing.
+
+
+## 36. IT Ticket Analytics Dashboard enhancement
+
+Branch `feat/it-ticket-analytics-dashboard`. The `บริการ IT → รายงาน` tab keeps the
+existing `GET /api/it/analytics` endpoint and section 10 metric definitions; this
+enhancement adds the fields and filters recorded in section 10 and redesigns the
+presentation. No schema change, migration, index, export, scheduled job,
+materialized view, or new authorization capability was added.
+
+**Layout (desktop reading order).** Report filters → four KPI cards
+(`งานค้างปัจจุบัน`, `Ticket ใหม่`, `แก้ไขแล้ว`, `งานเร่งด่วน P0 / P1`) with
+compact first-response, resolution, unassigned and untriaged metrics →
+`หมวดปัญหาที่มีการแจ้งมากที่สุด` (primary ranked horizontal bar chart plus ranked
+list) → `งานค้างตาม Priority` donut beside `อายุงานค้าง` → `สิ่งที่ต้องติดตาม`
+beside `งานค้างตามผู้รับผิดชอบ` → `ประสิทธิภาพการให้บริการ` (by current priority)
+→ the existing created/resolved trend, retitled
+`แนวโน้ม Ticket ใหม่และแก้ไขแล้ว` and otherwise unchanged → a remaining
+breakdown selector (status, type, all-status priority, backlog category,
+Department). Every panel carries a text badge, `ตามช่วงรายงาน` or
+`ข้อมูล ณ ปัจจุบัน`, so period and current-snapshot data are distinguishable
+without color. Below `sm` the category chart is replaced by the ranked list with
+meter bars; workload shows the top eight people and summarizes the rest.
+Workload copy states that backlog volume is not a performance measure.
+
+**URL state.** The workspace owns report filters as `reportPeriod`,
+`reportType`, and `reportCategory` (defaults omitted; invalid values fall back to
+defaults) and passes them to the dashboard, which stays router-agnostic. The
+operator queue reads a namespaced, validated URL contract
+(`queueStatus`, `queueType`, `queuePriority`, `queueTriage`, `queueCategory`,
+`queueAssignment`, `queueAssignee`) that maps one-to-one onto the existing queue
+API filters, defined in `presentation/dashboard/operator-queue-url.ts`; the
+workspace remounts the queue when those URL filters change. Filters applied
+inside the queue afterwards stay local, as before, and are not written back to
+the URL.
+
+**Historical category drill-down.** Selecting a real category bar or its ranked-list
+button updates the Analytics category filter. Reporting period and Ticket type
+stay selected; null category identity maps to canonical `uncategorized`, while
+null filter still means all categories. The workspace pushes canonical report
+URL state, so browser back/forward restores the filters and reloads only the
+aggregate analytics endpoint. The existing category selector clears/changes the
+category; the existing reset clears all report filters. Keyboard buttons and
+mobile touch targets are available without Ticket read access.
+
+**Current-backlog authorization.** P0, P1, current priority, unassigned and
+untriaged links render only when server-derived `canReadAllTickets` is true.
+They open the `ACTIVE` queue with current type/category scope. The queue API
+independently enforces `it.ticket.read / ALL`; Analytics permission implies no
+Ticket access. Aged backlog has no queue link because the queue has no age
+filter. No Ticket API contract, workflow or priority-management rule changed.
+
+**Measured query optimization.** Aging now uses one parameterized conditional
+aggregate in the existing RepeatableRead transaction, reusing the domain's
+captured-instant boundary ranges. It scans the status/createdAt covering index
+for the current backlog and returns at most five groups. Missing groups become
+zero; the youngest group includes future timestamps. No schema, index, isolation
+or timeout change was needed. At 10,000/50,000 synthetic Tickets (1% active),
+query count falls 31 → 27 (empty scope 28 → 24), and final report hashes equal
+the baseline for all sixteen dataset/filter combinations. Category grouping
+uses the existing createdAt range at these volumes, rather than the full index
+scan observed on the tiny review fixture. Event-history scanning and
+period-bounded timestamp projections remain growth risks. Local serial p50
+improves modestly; 90D p95 worsens, so this does not establish production
+capacity. See [methodology, metrics and EXPLAIN evidence](../verification/it-analytics-performance/README.md).
+
+**Known limitations.** Category and priority groupings use current values, so
+reclassification moves historical Tickets. Backlog age is time since creation,
+not time in any status, and not an SLA. Type/category filters use the Ticket's
+current type/category for resolution events as well.
+
+**Prior verification at reviewed HEAD `2278be0c` (2026-11-07).** `npm run typecheck`, `npm run lint:strict`, and
+`npm run architecture:check` (1,460 source files) passed. Focused real-MySQL
+integration (`ticket-analytics` + `ticket-workflow`) passed 2 files / 27 tests.
+`modules/it` plus `__tests__/components/dashboard` passed 72 files / 698 tests
+(1 skipped). `npm run test:it-analytics-dashboard:browser` (real Chrome via
+`puppeteer-core`, supplied through `PUPPETEER_MODULE` because `puppeteer` is not
+a repository dependency) passed 32 cases at 320/390/768/1280px in light and dark
+themes. One `npm run test` full-suite run was stopped by the host for low memory
+before reporting results and was not rerun; `npm run build` was not run for the
+same reason. Both remain to be confirmed before merge.
+
+## 37. Analytics correction release verification (2026-11-07)
+
+The three correction commits preserve section 10 definitions, the existing
+dashboard design and the independent analytics/operator authorization boundary.
+The current verification record, commands, exit statuses, browser isolation
+limitations and merge recommendation are maintained in
+[analytics merge readiness](../verification/it-analytics-merge-readiness.md).

@@ -1,18 +1,29 @@
-import { Prisma, ITTicketEventKind, ITTicketStatus } from "@prisma/client";
+import { Prisma, ITTicketEventKind, ITTicketStatus, ITTicketType } from "@prisma/client";
+import { z } from "zod";
 
 import { getUserDisplayName } from "@/shared/identity/display";
 import { findCurrentEmployeeDisplayProjections } from "@/modules/employee";
 import { prisma } from "@/lib/db/prisma";
 
 import {
+    IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS,
+    IT_ANALYTICS_BACKLOG_AGE_BUCKETS,
+    IT_ANALYTICS_HIGH_PRIORITIES,
     IT_ANALYTICS_PERIODS,
     IT_ANALYTICS_TIME_ZONE,
+    IT_ANALYTICS_TOP_CATEGORY_LIMIT,
+    IT_ANALYTICS_UNASSIGNED_LABEL,
+    IT_ANALYTICS_UNCATEGORIZED_FILTER,
+    IT_ANALYTICS_UNCATEGORIZED_LABEL,
+    IT_TICKET_DATABASE_INT_MAX,
     IT_TICKET_PRIORITY_OPTIONS,
     IT_TICKET_STATUS_OPTIONS,
     IT_TICKET_TYPE_OPTIONS,
+    type ITAnalyticsCategoryFilter,
     type ITAnalyticsDashboard,
     type ITAnalyticsPeriod,
 } from "../contracts";
+import { getITBacklogAgeBucketBounds } from "../domain/analytics-backlog-aging";
 import { getITAnalyticsLocalDate, getITAnalyticsPeriodBounds } from "../domain/analytics-period";
 import {
     ITCapabilityDeniedError,
@@ -29,8 +40,8 @@ const CURRENT_BACKLOG_STATUSES = Object.freeze([
 ] as const);
 
 export class ITAnalyticsInputValidationError extends Error {
-    constructor() {
-        super("ช่วงเวลารายงานไม่ถูกต้อง");
+    constructor(message = "ช่วงเวลารายงานไม่ถูกต้อง") {
+        super(message);
         this.name = "ITAnalyticsInputValidationError";
     }
 }
@@ -41,6 +52,55 @@ export function parseITAnalyticsPeriod(value: string | undefined): ITAnalyticsPe
         return value as ITAnalyticsPeriod;
     }
     throw new ITAnalyticsInputValidationError();
+}
+
+const analyticsCategoryFilterSchema = z.union([
+    z.literal(IT_ANALYTICS_UNCATEGORIZED_FILTER),
+    z.string()
+        .regex(/^[1-9]\d{0,9}$/)
+        .transform(Number)
+        .pipe(z.number().int().positive().max(IT_TICKET_DATABASE_INT_MAX)),
+]);
+
+const analyticsFiltersSchema = z.object({
+    type: z.enum(ITTicketType).optional(),
+    category: analyticsCategoryFilterSchema.optional(),
+}).strict();
+
+export interface ITAnalyticsDashboardFilters {
+    readonly type: ITTicketType | null;
+    readonly category: ITAnalyticsCategoryFilter | null;
+}
+
+/** Raw query values; every key is optional and validated before any read. */
+export interface ITAnalyticsDashboardQueryInput {
+    readonly period?: string;
+    readonly type?: string;
+    readonly category?: string;
+}
+
+export function parseITAnalyticsFilters(input: unknown): ITAnalyticsDashboardFilters {
+    const parsed = analyticsFiltersSchema.safeParse(input ?? {});
+    if (!parsed.success) {
+        throw new ITAnalyticsInputValidationError("ตัวกรองรายงาน IT ไม่ถูกต้อง");
+    }
+    return {
+        type: parsed.data.type ?? null,
+        category: parsed.data.category ?? null,
+    };
+}
+
+function parseITAnalyticsDashboardQuery(
+    input: string | ITAnalyticsDashboardQueryInput | undefined,
+): { readonly period: ITAnalyticsPeriod; readonly filters: ITAnalyticsDashboardFilters } {
+    if (input === undefined || typeof input === "string") {
+        return { period: parseITAnalyticsPeriod(input), filters: { type: null, category: null } };
+    }
+    const { period, ...filters } = input;
+    return {
+        period: parseITAnalyticsPeriod(period),
+        filters: parseITAnalyticsFilters(filters),
+    };
 }
 
 function averageMinutes(durationsMs: readonly number[]): number | null {
@@ -130,23 +190,40 @@ function disambiguateDimensionLabels<T extends IdentifiedDimensionRow>(
     return rows.map((row) => ({ ...row, label: labelsByRow.get(row) ?? row.label }));
 }
 
+/** Count descending, then label, then identity (uncategorized/unassigned first). */
+function rankDimensionRows<T extends IdentifiedDimensionRow>(rows: readonly T[]): readonly T[] {
+    return [...rows].sort((left, right) => right.count - left.count
+        || (left.label < right.label ? -1 : left.label > right.label ? 1 : 0)
+        || compareDimensionIdentity(left.identity, right.identity));
+}
+
 function sortedDimensionRows(
     rows: readonly IdentifiedDimensionRow[],
 ): readonly { readonly label: string; readonly count: number }[] {
-    return [...rows]
-        .sort((left, right) => right.count - left.count
-            || (left.label < right.label ? -1 : left.label > right.label ? 1 : 0)
-            || compareDimensionIdentity(left.identity, right.identity))
-        .map(({ label, count }) => ({ label, count }));
+    return rankDimensionRows(rows).map(({ label, count }) => ({ label, count }));
 }
 
+function compareCategoryOptions(
+    left: { readonly isActive: boolean; readonly name: string; readonly id: number },
+    right: { readonly isActive: boolean; readonly name: string; readonly id: number },
+): number {
+    if (left.isActive !== right.isActive) return left.isActive ? -1 : 1;
+    return (left.name < right.name ? -1 : left.name > right.name ? 1 : 0) || left.id - right.id;
+}
+
+/**
+ * `query` accepts the legacy period string or raw period/type/category values.
+ * Type and category narrow the whole Ticket population (period and current
+ * snapshot alike); the period narrows only period metrics.
+ */
 export async function getITAnalyticsDashboard(
     context: ITAuthorizationContext,
-    periodInput?: string,
+    query?: string | ITAnalyticsDashboardQueryInput,
     now: Date = new Date(),
 ): Promise<ITAnalyticsDashboard> {
-    const period = parseITAnalyticsPeriod(periodInput);
+    const { period, filters } = parseITAnalyticsDashboardQuery(query);
     const bounds = getITAnalyticsPeriodBounds(period, now);
+    const backlogAgeRanges = getITBacklogAgeBucketBounds(now);
 
     return prisma.$transaction(async (tx) => {
         await assertITActorCurrentWorkforce(tx, context);
@@ -168,6 +245,8 @@ export async function getITAnalyticsDashboard(
             backlogStatuses: CURRENT_BACKLOG_STATUSES,
             resolutionEventKind: ITTicketEventKind.STATUS_CHANGED,
             resolutionStatus: ITTicketStatus.RESOLVED,
+            scope: filters,
+            backlogAgeRanges,
         });
 
         const activeAssignees = await findCurrentEmployeeDisplayProjections(
@@ -190,15 +269,17 @@ export async function getITAnalyticsDashboard(
         const categoriesById = new Map(
             persistence.categories.map((category) => [category.id, category]),
         );
-        const categoryRows = disambiguateDimensionLabels(
-            persistence.backlogCategories.map((row): QualifiedDimensionRow => {
+        const labelCategoryRows = (
+            rows: readonly { readonly categoryId: number | null; readonly count: number }[],
+        ): readonly QualifiedDimensionRow[] => disambiguateDimensionLabels(
+            rows.map((row): QualifiedDimensionRow => {
                 const category = row.categoryId === null
                     ? undefined
                     : categoriesById.get(row.categoryId);
                 return {
                     identity: row.categoryId,
                     label: row.categoryId === null
-                        ? "ยังไม่จัดหมวดหมู่"
+                        ? IT_ANALYTICS_UNCATEGORIZED_LABEL
                         : category?.name ?? "หมวดหมู่เดิม",
                     count: row.count,
                     qualifier: row.categoryId === null
@@ -208,12 +289,18 @@ export async function getITAnalyticsDashboard(
             }),
             (row, ordinal) => row.qualifier ?? `หมวดหมู่ ${ordinal}`,
         );
+        const categoryRows = labelCategoryRows(persistence.backlogCategories);
+        const rankedCreatedCategories = rankDimensionRows(
+            labelCategoryRows(persistence.createdCategories.filter((row) => row.count > 0)),
+        );
+        const topCategoryRows = rankedCreatedCategories.slice(0, IT_ANALYTICS_TOP_CATEGORY_LIMIT);
+        const otherCategoryRows = rankedCreatedCategories.slice(IT_ANALYTICS_TOP_CATEGORY_LIMIT);
 
         const assigneeRows = disambiguateDimensionLabels(
             persistence.backlogAssignees.map((row): IdentifiedDimensionRow => ({
                 identity: row.userId,
                 label: row.userId === null
-                    ? "ยังไม่มีผู้รับผิดชอบ"
+                    ? IT_ANALYTICS_UNASSIGNED_LABEL
                     : assigneeNames.get(row.userId) ?? "ผู้รับผิดชอบเดิม",
                 count: row.count,
             })),
@@ -318,6 +405,20 @@ export async function getITAnalyticsDashboard(
         const unassignedBacklog = persistence.backlogAssignees.find(
             (row) => row.userId === null,
         )?.count ?? 0;
+        const highPriorityBacklog = IT_ANALYTICS_HIGH_PRIORITIES.reduce(
+            (total, priority) => total + (backlogPriorityCountMap.get(priority) ?? 0),
+            0,
+        );
+        const backlogAgeCountMap = new Map(
+            persistence.backlogAges.map((row) => [row.key, row.count]),
+        );
+        const backlogAging = IT_ANALYTICS_BACKLOG_AGE_BUCKETS.map(({ key }) => ({
+            bucket: key,
+            count: backlogAgeCountMap.get(key) ?? 0,
+        }));
+        const agedBacklog = IT_ANALYTICS_BACKLOG_AGE_BUCKETS
+            .filter((bucket) => bucket.minDays >= IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS)
+            .reduce((total, bucket) => total + (backlogAgeCountMap.get(bucket.key) ?? 0), 0);
 
         return {
             generatedAt: now.toISOString(),
@@ -327,11 +428,19 @@ export async function getITAnalyticsDashboard(
                 startAt: bounds.startAt.toISOString(),
                 endAt: bounds.endAt.toISOString(),
             },
+            filters: { type: filters.type, category: filters.category },
+            filterOptions: {
+                categories: [...persistence.categories]
+                    .sort(compareCategoryOptions)
+                    .map(({ id, key, name, isActive }) => ({ id, key, name, isActive })),
+            },
             summary: {
                 currentBacklog,
                 waitingRequester: backlogByStatus.get(ITTicketStatus.WAITING_REQUESTER) ?? 0,
                 unassignedBacklog,
                 untriagedBacklog: persistence.untriagedBacklogCount,
+                highPriorityBacklog,
+                agedBacklog,
                 oldestUnresolvedAgeMinutes: persistence.backlogOldestCreatedAt === null
                     ? null
                     : Math.max(
@@ -353,6 +462,17 @@ export async function getITAnalyticsDashboard(
             priorityDistribution,
             priorityBacklog,
             responseResolutionByPriority,
+            topCategories: {
+                limit: IT_ANALYTICS_TOP_CATEGORY_LIMIT,
+                rows: topCategoryRows.map((row) => ({
+                    categoryId: row.identity,
+                    label: row.label,
+                    count: row.count,
+                })),
+                otherCategoryCount: otherCategoryRows.length,
+                otherTicketCount: otherCategoryRows.reduce((total, row) => total + row.count, 0),
+            },
+            backlogAging,
             categoryBacklog: sortedDimensionRows(categoryRows),
             assigneeBacklog: sortedDimensionRows(assigneeRows),
             departmentCreated: sortedLabels(departmentCounts),

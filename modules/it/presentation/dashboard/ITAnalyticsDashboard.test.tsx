@@ -37,11 +37,15 @@ function dashboardPayload(period: string, backlog: number): unknown {
                 startAt: "2026-09-19T17:00:00.000Z",
                 endAt: now,
             },
+            filters: { type: null, category: null },
+            filterOptions: { categories: [] },
             summary: {
                 currentBacklog: backlog,
                 waitingRequester: 1,
                 unassignedBacklog: 1,
                 untriagedBacklog: 1,
+                highPriorityBacklog: 2,
+                agedBacklog: 0,
                 oldestUnresolvedAgeMinutes: 138,
                 newTickets: backlog + 1,
                 resolvedTickets: 2,
@@ -83,6 +87,22 @@ function dashboardPayload(period: string, backlog: number): unknown {
                 { priority: "P1", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 1, averageResolutionMinutes: 35 },
                 { priority: "P2", firstRespondedTickets: 2, averageFirstResponseMinutes: 60, resolvedTickets: 1, averageResolutionMinutes: 75 },
                 { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
+            ],
+            topCategories: {
+                limit: 10,
+                rows: [
+                    { categoryId: 4, label: "อุปกรณ์คอมพิวเตอร์", count: 4 },
+                    { categoryId: null, label: "ยังไม่จัดหมวดหมู่", count: 1 },
+                ],
+                otherCategoryCount: 1,
+                otherTicketCount: 1,
+            },
+            backlogAging: [
+                { bucket: "0_1", count: backlog },
+                { bucket: "2_3", count: 0 },
+                { bucket: "4_7", count: 0 },
+                { bucket: "8_14", count: 0 },
+                { bucket: "15_PLUS", count: 0 },
             ],
             categoryBacklog: [{ label: "ยังไม่จัดหมวดหมู่", count: backlog }],
             assigneeBacklog: [{ label: "ยังไม่มีผู้รับผิดชอบ", count: 1 }],
@@ -129,102 +149,133 @@ describe("IT analytics Dashboard presentation", () => {
         vi.unstubAllGlobals();
     });
 
-    it("renders all summary values in a flat overview and the fixed Bangkok reporting window", async () => {
+    it("renders the four KPI cards, secondary metrics, and both data scopes for the Bangkok window", async () => {
         fetchMock.mockResolvedValue(response(dashboardPayload("30D", 5)));
 
         render(<ITAnalyticsDashboard />);
 
         const overview = await screen.findByRole("region", { name: "ภาพรวม" });
-        expect(within(overview).getByText("งานค้าง")).toBeInTheDocument();
-        expect(within(overview).getByText("5", { selector: "dd" })).toBeInTheDocument();
-        expect(within(overview).getByText("รอข้อมูลจากผู้แจ้ง")).toBeInTheDocument();
-        expect(within(overview).getByText("ยังไม่มีผู้รับผิดชอบ")).toBeInTheDocument();
-        expect(within(overview).getAllByText("1", { selector: "dd" })).toHaveLength(3);
-        expect(within(overview).getByText("Ticket ใหม่")).toBeInTheDocument();
-        expect(within(overview).getByText("6", { selector: "dd" })).toBeInTheDocument();
-        expect(within(overview).getByText("แก้ไขแล้ว")).toBeInTheDocument();
-        expect(within(overview).getByText("2", { selector: "dd" })).toBeInTheDocument();
-        expect(within(overview).getByText("ยังไม่ประเมินในงานค้าง")).toBeInTheDocument();
+        const card = (label: string): HTMLElement => {
+            const term = within(overview).getByText(label, { selector: "dt span" });
+            const container = term.closest("div");
+            if (!container) throw new Error(`missing KPI card ${label}`);
+            return container;
+        };
+        expect(card("งานค้างปัจจุบัน")).toHaveTextContent("5");
+        expect(card("งานค้างปัจจุบัน")).toHaveTextContent("งานที่ค้างนานที่สุด 2 ชม. 18 นาที");
+        expect(card("งานค้างปัจจุบัน")).toHaveTextContent("ข้อมูล ณ ปัจจุบัน");
+        expect(card("Ticket ใหม่")).toHaveTextContent("6");
+        expect(card("Ticket ใหม่")).toHaveTextContent("ตามช่วงรายงาน");
+        expect(card("แก้ไขแล้ว")).toHaveTextContent("2");
+        expect(card("งานเร่งด่วน")).toHaveTextContent("P0P1");
+        expect(card("งานเร่งด่วน")).toHaveTextContent("2");
+        expect(card("งานเร่งด่วน")).toHaveTextContent("P0 1 · P1 1 ที่ยังไม่แก้ไข");
         expect(within(overview).getByText("ตอบกลับครั้งแรกเฉลี่ย")).toBeInTheDocument();
         expect(within(overview).getByText("2 ชม. 18 นาที")).toBeInTheDocument();
-        expect(within(overview).getByText("เวลาแก้ไขเฉลี่ย")).toBeInTheDocument();
-        expect(within(overview).getByText("งานที่ค้างนานที่สุด 2 ชม. 18 นาที")).toBeInTheDocument();
-        expect(screen.queryByRole("region", { name: "งานค้างปัจจุบัน" })).not.toBeInTheDocument();
+        expect(within(overview).getByText("ยังไม่ประเมิน Priority")).toBeInTheDocument();
+        expect(within(overview).getByText("ยังไม่มีข้อมูล")).toBeInTheDocument();
+
         expect(screen.getByRole("heading", { name: "รายงาน IT" })).toBeInTheDocument();
         expect(screen.getByText(/เวลาเอเชีย\/กรุงเทพฯ/)).toBeInTheDocument();
-        const chartRegion = screen.getByRole("region", {
-            name: "กราฟ Ticket ใหม่และแก้ไขแล้ว เลื่อนแนวนอนเพื่อดูข้อมูลทั้งหมด",
-        });
-        expect(chartRegion).toHaveAttribute("tabindex", "0");
-        expect(within(chartRegion).getByRole("application", { name: /แนวโน้ม Ticket ใหม่และแก้ไขแล้วรายวัน/ }))
-            .toBeInTheDocument();
-        const legend = screen.getByRole("list", { name: "คำอธิบายกราฟ" });
-        expect(legend).toHaveTextContent("Ticket ใหม่ 6");
-        expect(legend).toHaveTextContent("แก้ไขแล้ว 2");
-        expect(chartRegion).toHaveAccessibleDescription(/รายละเอียดตัวเลขทุกวัน/);
-        expect(screen.getByText("ดูตัวเลขรายวัน")).toBeInTheDocument();
+        expect(screen.getByText(/สถานะล่าสุด ไม่ขึ้นกับช่วงเวลา/)).toBeInTheDocument();
         expect(fetchMock).toHaveBeenCalledWith(
             "/api/it/analytics?period=30D",
             expect.objectContaining({ signal: expect.any(AbortSignal) }),
         );
     });
 
-    it("shows one breakdown by default and makes all report datasets selectable", async () => {
+    it("orders the operational sections with the category ranking first and the trend as a supporting chart", async () => {
+        fetchMock.mockResolvedValue(response(dashboardPayload("30D", 5)));
+
+        render(<ITAnalyticsDashboard />);
+
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        const headings = screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
+        expect(headings).toEqual([
+            "ภาพรวม",
+            "หมวดปัญหาที่มีการแจ้งมากที่สุด",
+            "งานค้างตาม Priority",
+            "อายุงานค้าง",
+            "สิ่งที่ต้องติดตาม",
+            "งานค้างตามผู้รับผิดชอบ",
+            "ประสิทธิภาพการให้บริการ",
+            "แนวโน้ม Ticket ใหม่และแก้ไขแล้ว",
+            "สถานะ Ticket ปัจจุบัน",
+        ]);
+
+        const categories = screen.getByRole("region", { name: "หมวดปัญหาที่มีการแจ้งมากที่สุด" });
+        const ranked = within(categories).getByRole("list", { name: "อันดับหมวดปัญหาและจำนวน Ticket" });
+        expect(within(ranked).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+            expect.stringContaining("อุปกรณ์คอมพิวเตอร์"),
+            expect.stringContaining("ยังไม่จัดหมวดหมู่"),
+        ]);
+        expect(ranked).toHaveTextContent("4 Ticket · 66.7%");
+        expect(categories).toHaveTextContent("หมวดอื่นอีก 1 หมวด รวม 1 Ticket");
+
+        const priority = screen.getByRole("region", { name: "งานค้างตาม Priority" });
+        const priorityList = within(priority).getByRole("list", { name: "งานค้างแยกตาม Priority" });
+        expect(priorityList).toHaveTextContent("P2 — ปกติ5");
+        expect(priorityList).toHaveTextContent("71.4%");
+
+        const aging = screen.getByRole("region", { name: "อายุงานค้าง" });
+        expect(aging).toHaveTextContent("ไม่ใช่การวัด SLA");
+        expect(within(aging).getByRole("region", { name: "กราฟอายุงานค้าง" }))
+            .toHaveAccessibleDescription(/0–1 วัน 5 รายการ, 2–3 วัน 0 รายการ/);
+
+        const attention = screen.getByRole("region", { name: "สิ่งที่ต้องติดตาม" });
+        expect(within(attention).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+            expect.stringContaining("งานเร่งด่วน P0 / P1 ที่ยังไม่แก้ไข"),
+            expect.stringContaining("ยังไม่มีผู้รับผิดชอบ"),
+            expect.stringContaining("ยังไม่ประเมิน Priority"),
+            expect.stringContaining("ค้างเกิน 7 วัน"),
+        ]);
+
+        const workload = screen.getByRole("region", { name: "งานค้างตามผู้รับผิดชอบ" });
+        expect(workload).toHaveTextContent("ไม่ใช่ตัวชี้วัดผลการทำงาน");
+        expect(within(workload).getByRole("meter", { name: "ยังไม่มีผู้รับผิดชอบ 1 รายการ" })).toBeInTheDocument();
+
+        const performance = screen.getByRole("region", { name: "ประสิทธิภาพการให้บริการ" });
+        expect(within(performance).getByRole("table")).toHaveTextContent("1 ชม. 15 นาที");
+        expect(performance).toHaveTextContent("Priority ใหม่");
+    });
+
+    it("never renders Ticket links for analytics-only viewers", async () => {
+        fetchMock.mockResolvedValue(response(dashboardPayload("30D", 5)));
+
+        render(<ITAnalyticsDashboard />);
+
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        expect(screen.queryAllByRole("link")).toEqual([]);
+    });
+
+    it("keeps the remaining breakdowns selectable with their own data scope", async () => {
         fetchMock.mockResolvedValue(response(dashboardPayload("30D", 5)));
 
         render(<ITAnalyticsDashboard />);
 
         const breakdown = await screen.findByRole("region", { name: "สถานะ Ticket ปัจจุบัน" });
         expect(within(breakdown).getByText(IT_TICKET_STATUS_LABELS.OPEN)).toBeInTheDocument();
-        expect(screen.getByRole("combobox", { name: "เลือกมิติรายละเอียด" }))
-            .toHaveTextContent("สถานะ");
-        expect(screen.queryByRole("region", { name: "Ticket ใหม่แยกตามประเภท" }))
-            .not.toBeInTheDocument();
-        expect(screen.queryByRole("region", { name: "งานค้างแยกตามหมวดหมู่" }))
-            .not.toBeInTheDocument();
-        expect(screen.queryByRole("region", { name: "งานค้างแยกตามผู้รับผิดชอบ" }))
-            .not.toBeInTheDocument();
-        expect(screen.queryByRole("region", { name: "Ticket ใหม่แยกตามหน่วยงาน" }))
-            .not.toBeInTheDocument();
+        expect(breakdown).toHaveTextContent("ข้อมูล ณ ปัจจุบัน");
 
         await chooseBreakdown("ประเภท");
         const typeBreakdown = screen.getByRole("region", { name: "Ticket ใหม่แยกตามประเภท" });
         expect(within(typeBreakdown).getByText(IT_TICKET_TYPE_LABELS.INCIDENT)).toBeInTheDocument();
-        expect(within(typeBreakdown).queryByText(IT_TICKET_STATUS_LABELS.OPEN)).not.toBeInTheDocument();
+        expect(typeBreakdown).toHaveTextContent("ตามช่วงรายงาน");
 
         await chooseBreakdown("Priority");
-        const priorityBreakdown = screen.getByRole("region", {
-            name: "Ticket ปัจจุบันแยกตาม Priority",
-        });
-        expect(within(priorityBreakdown).getByText("P0 — วิกฤต")).toBeInTheDocument();
-        expect(within(priorityBreakdown).getByText("P1 — สูง")).toBeInTheDocument();
+        expect(screen.getByRole("region", { name: "Ticket ปัจจุบันแยกตาม Priority" }))
+            .toHaveTextContent("P0 — วิกฤต");
 
-        await chooseBreakdown("งานค้างตาม Priority");
-        expect(screen.getByRole("region", { name: "งานค้างแยกตาม Priority" }))
-            .toHaveTextContent("P2 — ปกติ");
-
-        await chooseBreakdown("หมวดหมู่");
+        await chooseBreakdown("หมวดหมู่งานค้าง");
         expect(within(screen.getByRole("region", { name: "งานค้างแยกตามหมวดหมู่" }))
             .getByText("ยังไม่จัดหมวดหมู่")).toBeInTheDocument();
-
-        await chooseBreakdown("ผู้รับผิดชอบ");
-        expect(within(screen.getByRole("region", { name: "งานค้างแยกตามผู้รับผิดชอบ" }))
-            .getByText("ยังไม่มีผู้รับผิดชอบ")).toBeInTheDocument();
 
         await chooseBreakdown("หน่วยงาน");
         expect(within(screen.getByRole("region", { name: "Ticket ใหม่แยกตามหน่วยงาน" }))
             .getByText("ไม่ระบุหน่วยงาน")).toBeInTheDocument();
-
-        await chooseBreakdown("เวลาตาม Priority");
-        const priorityTiming = screen.getByRole("region", {
-            name: "เวลาตอบกลับและแก้ไขแยกตาม Priority ปัจจุบัน",
-        });
-        expect(within(priorityTiming).getByText("กลุ่มตาม Priority ปัจจุบัน การจัดประเภทใหม่อาจเปลี่ยนกลุ่มของข้อมูลย้อนหลัง"))
-            .toBeInTheDocument();
-        expect(within(priorityTiming).getByText("1 ชม.")).toBeInTheDocument();
     });
 
-    it("shows zero data as a valid empty dashboard without rendering average metrics", async () => {
+    it("shows zero data as valid empty states without inventing averages", async () => {
         const empty = dashboardPayload("30D", 0) as {
             dashboard: Record<string, unknown>;
         };
@@ -234,6 +285,8 @@ describe("IT analytics Dashboard presentation", () => {
                 waitingRequester: 0,
                 unassignedBacklog: 0,
                 untriagedBacklog: 0,
+                highPriorityBacklog: 0,
+                agedBacklog: 0,
                 oldestUnresolvedAgeMinutes: null,
                 newTickets: 0,
                 resolvedTickets: 0,
@@ -246,25 +299,6 @@ describe("IT analytics Dashboard presentation", () => {
                 created: 0,
                 resolved: 0,
             })),
-            statusDistribution: [
-                { status: "OPEN", count: 0 },
-                { status: "IN_PROGRESS", count: 0 },
-                { status: "WAITING_REQUESTER", count: 0 },
-                { status: "RESOLVED", count: 0 },
-                { status: "CLOSED", count: 0 },
-                { status: "CANCELLED", count: 0 },
-            ],
-            typeDistribution: [
-                { type: "INCIDENT", count: 0 },
-                { type: "SERVICE_REQUEST", count: 0 },
-                { type: "SUGGESTION", count: 0 },
-            ],
-            priorityDistribution: [
-                { priority: "P0", count: 0 },
-                { priority: "P1", count: 0 },
-                { priority: "P2", count: 0 },
-                { priority: "P3", count: 0 },
-            ],
             priorityBacklog: [
                 { priority: "P0", count: 0 },
                 { priority: "P1", count: 0 },
@@ -277,6 +311,7 @@ describe("IT analytics Dashboard presentation", () => {
                 { priority: "P2", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
                 { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
             ],
+            topCategories: { limit: 10, rows: [], otherCategoryCount: 0, otherTicketCount: 0 },
             categoryBacklog: [],
             assigneeBacklog: [],
             departmentCreated: [],
@@ -285,15 +320,140 @@ describe("IT analytics Dashboard presentation", () => {
 
         render(<ITAnalyticsDashboard />);
 
-        expect(await screen.findByText("ยังไม่มีข้อมูลในช่วงเวลานี้")).toBeInTheDocument();
-        expect(screen.getAllByText("ยังไม่มีข้อมูล")).toHaveLength(2);
-        expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+        const overview = await screen.findByRole("region", { name: "ภาพรวม" });
+        expect(within(overview).getByText("ไม่มีงานค้าง")).toBeInTheDocument();
+        expect(within(overview).getAllByText("ยังไม่มีข้อมูล")).toHaveLength(2);
         expect(screen.queryByText("0 นาที")).not.toBeInTheDocument();
+        expect(within(screen.getByRole("region", { name: "หมวดปัญหาที่มีการแจ้งมากที่สุด" }))
+            .getByRole("status")).toHaveTextContent("ยังไม่มี Ticket ที่สร้างในช่วงเวลานี้");
+        expect(screen.queryByRole("list", { name: "อันดับหมวดปัญหาและจำนวน Ticket" })).not.toBeInTheDocument();
+        for (const name of ["งานค้างตาม Priority", "อายุงานค้าง", "งานค้างตามผู้รับผิดชอบ"]) {
+            expect(within(screen.getByRole("region", { name })).getByRole("status"))
+                .toHaveTextContent("ไม่มีงานค้างในขณะนี้");
+        }
+        expect(within(screen.getByRole("region", { name: "สิ่งที่ต้องติดตาม" })).getAllByText("ไม่มีรายการ"))
+            .toHaveLength(4);
+        expect(screen.getByText("ยังไม่มีข้อมูลในช่วงเวลานี้")).toBeInTheDocument();
+    });
 
-        await chooseBreakdown("หมวดหมู่");
-        const emptyBreakdown = screen.getByRole("region", { name: "งานค้างแยกตามหมวดหมู่" });
-        expect(within(emptyBreakdown).getByText("ยังไม่มีข้อมูลในช่วงเวลานี้")).toBeInTheDocument();
-        expect(within(emptyBreakdown).queryByRole("meter")).not.toBeInTheDocument();
+    it("requests type and category filters, explains their scope, and resets to the default report", async () => {
+        fetchMock.mockImplementation(async (input: string | URL) => {
+            const query = new URL(String(input), "http://localhost").searchParams;
+            const payload = dashboardPayload(query.get("period") ?? "30D", 5) as { dashboard: Record<string, unknown> };
+            payload.dashboard.filters = {
+                type: query.get("type"),
+                category: query.get("category") === "uncategorized"
+                    ? "uncategorized"
+                    : query.get("category") === null ? null : Number(query.get("category")),
+            };
+            payload.dashboard.filterOptions = {
+                categories: [
+                    { id: 4, key: "HARDWARE", name: "อุปกรณ์คอมพิวเตอร์", isActive: true },
+                    { id: 9, key: "LEGACY", name: "หมวดเดิม", isActive: false },
+                ],
+            };
+            return response(payload);
+        });
+
+        render(<ITAnalyticsDashboard />);
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        expect(screen.getByRole("button", { name: "ล้างตัวกรอง" })).toBeDisabled();
+
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "กรองตามประเภท Ticket" }), { key: "Enter" });
+        fireEvent.click(await screen.findByRole("option", { name: IT_TICKET_TYPE_LABELS.INCIDENT }));
+        await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+            "/api/it/analytics?period=30D&type=INCIDENT",
+            expect.anything(),
+        ));
+
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "กรองตามหมวดหมู่" }), { key: "Enter" });
+        expect(await screen.findByRole("option", { name: "หมวดเดิม · ปิดใช้งาน" })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("option", { name: "ยังไม่จัดหมวดหมู่" }));
+        await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+            "/api/it/analytics?period=30D&type=INCIDENT&category=uncategorized",
+            expect.anything(),
+        ));
+        expect(await screen.findByRole("note")).toHaveTextContent(
+            "กำลังกรอง: ประเภท ปัญหาที่พบ · หมวดหมู่ ยังไม่จัดหมวดหมู่",
+        );
+        expect(screen.getByRole("note")).toHaveTextContent("ทั้งข้อมูลตามช่วงรายงานและข้อมูล ณ ปัจจุบัน");
+
+        fireEvent.click(screen.getByRole("button", { name: "ล้างตัวกรอง" }));
+        await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+            "/api/it/analytics?period=30D",
+            expect.anything(),
+        ));
+        expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    });
+
+    it("filters historical categories for analytics-only viewers, preserving period/type and never requesting Tickets", async () => {
+        fetchMock.mockResolvedValue(response(dashboardPayload("90D", 5)));
+        const onChange = vi.fn();
+        const { rerender } = render(<ITAnalyticsDashboard
+            reportState={{ period: "90D", type: "INCIDENT", category: null }}
+            onReportStateChange={onChange}
+        />);
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        fireEvent.click(screen.getByRole("button", { name: "กรองรายงานตามหมวด อุปกรณ์คอมพิวเตอร์" }));
+        expect(onChange).toHaveBeenLastCalledWith({ period: "90D", type: "INCIDENT", category: 4 });
+        rerender(<ITAnalyticsDashboard reportState={{ period: "90D", type: "INCIDENT", category: 4 }} onReportStateChange={onChange} />);
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        fireEvent.click(screen.getByRole("button", { name: "กรองรายงานตามหมวด ยังไม่จัดหมวดหมู่" }));
+        expect(onChange).toHaveBeenLastCalledWith({ period: "90D", type: "INCIDENT", category: "uncategorized" });
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "กรองตามหมวดหมู่" }), { key: "Enter" });
+        fireEvent.click(await screen.findByRole("option", { name: "ทุกหมวดหมู่" }));
+        expect(onChange).toHaveBeenLastCalledWith({ period: "90D", type: "INCIDENT", category: null });
+        expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+            "/api/it/analytics?period=90D&type=INCIDENT",
+            "/api/it/analytics?period=90D&type=INCIDENT&category=4",
+        ]);
+        expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+
+    it("delegates filter changes to a controlling URL owner instead of keeping local state", async () => {
+        fetchMock.mockResolvedValue(response(dashboardPayload("7D", 5)));
+        const onChange = vi.fn();
+
+        render(<ITAnalyticsDashboard
+            reportState={{ period: "7D", type: "SUGGESTION", category: 4 }}
+            onReportStateChange={onChange}
+        />);
+
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        expect(fetchMock).toHaveBeenCalledWith(
+            "/api/it/analytics?period=7D&type=SUGGESTION&category=4",
+            expect.anything(),
+        );
+        await choosePeriod("90 วัน");
+        expect(onChange).toHaveBeenCalledWith({ period: "90D", type: "SUGGESTION", category: 4 });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("links aggregate rows to the operator queue only for viewers who can open it", async () => {
+        const payload = dashboardPayload("30D", 5) as { dashboard: Record<string, unknown> };
+        payload.dashboard.filters = { type: "INCIDENT", category: null };
+        fetchMock.mockResolvedValue(response(payload));
+
+        render(<ITAnalyticsDashboard canOpenOperatorQueue />);
+
+        const categories = await screen.findByRole("region", { name: "หมวดปัญหาที่มีการแจ้งมากที่สุด" });
+        expect(within(categories).queryByRole("link")).not.toBeInTheDocument();
+        expect(within(categories).getByRole("button", { name: "กรองรายงานตามหมวด อุปกรณ์คอมพิวเตอร์" })).toBeInTheDocument();
+        const attention = screen.getByRole("region", { name: "สิ่งที่ต้องติดตาม" });
+        expect(within(attention).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queuePriority=P0",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queuePriority=P1",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueAssignment=UNASSIGNED",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueTriage=UNTRIAGED",
+        ]);
+        expect(within(attention).getByText("ค้างเกิน 7 วัน").closest("li")?.querySelector("a")).toBeNull();
+        expect(within(screen.getByRole("region", { name: "งานค้างตาม Priority" }))
+            .queryByRole("link", { name: "P3 — ต่ำ" })).not.toBeInTheDocument();
+        expect(within(screen.getByRole("region", { name: "งานค้างตามผู้รับผิดชอบ" }))
+            .getByRole("link", { name: "ยังไม่มีผู้รับผิดชอบ" })).toHaveAttribute(
+            "href",
+            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueAssignment=UNASSIGNED",
+        );
     });
 
     it("does not let an older period response overwrite the newest selection", async () => {

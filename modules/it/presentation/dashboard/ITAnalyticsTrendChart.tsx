@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import type { ITAnalyticsDashboard, ITAnalyticsPeriod } from "../../contracts";
 import { buildITTrendBuckets, formatITTrendDate, formatITTrendRange } from "./analytics-trend";
+import { ITAnalyticsScopeBadge } from "./ITAnalyticsCharts";
 
 const chartConfig = {
     created: { label: "Ticket ใหม่", color: "var(--brand-foreground)" },
@@ -36,7 +37,10 @@ export function ITAnalyticsTrendChart({ trend, period }: {
         <figure className="min-w-0 rounded-xl border border-border-neutral bg-surface-raised p-4 sm:p-6">
             <figcaption className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                    <h2 className="text-lg font-semibold text-content-heading">Ticket ใหม่และแก้ไขแล้ว</h2>
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <h2 className="text-lg font-semibold text-content-heading">แนวโน้ม Ticket ใหม่และแก้ไขแล้ว</h2>
+                        <ITAnalyticsScopeBadge scope="period" />
+                    </div>
                     <p className="mt-1 text-sm leading-6 text-content-secondary">
                         {weekly ? "เปรียบเทียบรายสัปดาห์ เริ่มวันจันทร์ เวลา Asia/Bangkok" : "เปรียบเทียบตามวันปฏิทินเวลา Asia/Bangkok"}
                     </p>

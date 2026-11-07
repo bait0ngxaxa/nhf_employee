@@ -108,8 +108,49 @@ describe("IT analytics API adapter", () => {
 
         expect(defaultResponse.status).toBe(200);
         expect(selectedResponse.status).toBe(200);
-        expect(mocks.getDashboard).toHaveBeenNthCalledWith(1, actorContext, undefined);
-        expect(mocks.getDashboard).toHaveBeenNthCalledWith(2, actorContext, "7D");
+        expect(mocks.getDashboard).toHaveBeenNthCalledWith(1, actorContext, {});
+        expect(mocks.getDashboard).toHaveBeenNthCalledWith(2, actorContext, { period: "7D" });
+    });
+
+    it("forwards the supported type and category filters for application validation", async () => {
+        const response = await GET(request(
+            "http://localhost/api/it/analytics?period=90D&type=INCIDENT&category=uncategorized",
+        ));
+
+        expect(response.status).toBe(200);
+        expect(mocks.getDashboard).toHaveBeenCalledWith(actorContext, {
+            period: "90D",
+            type: "INCIDENT",
+            category: "uncategorized",
+        });
+    });
+
+    it.each([
+        "type=INCIDENT&type=SUGGESTION",
+        "category=4&category=5",
+        "categoryId=4",
+        "type=INCIDENT&status=OPEN",
+        "category=4&requesterUserId=41",
+    ])("rejects duplicate or unsupported analytics parameters: %s", async (query) => {
+        const response = await GET(request(`http://localhost/api/it/analytics?${query}`));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({
+            success: false,
+            error: "พารามิเตอร์รายงาน IT ไม่ถูกต้อง",
+        });
+        expect(mocks.getDashboard).not.toHaveBeenCalled();
+    });
+
+    it("maps application filter validation to a safe 400", async () => {
+        mocks.getDashboard.mockRejectedValue(
+            new ITAnalyticsInputValidationError("ตัวกรองรายงาน IT ไม่ถูกต้อง"),
+        );
+
+        const response = await GET(request("http://localhost/api/it/analytics?category=abc"));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ success: false });
     });
 
     it("returns 400 for unsupported periods, duplicate periods, or client-selected filters", async () => {
@@ -140,7 +181,7 @@ describe("IT analytics API adapter", () => {
 
         expect(response.status).toBe(200);
         expect(mocks.buildContext).toHaveBeenCalledWith(user);
-        expect(mocks.getDashboard).toHaveBeenCalledWith(actorContext, "30D");
+        expect(mocks.getDashboard).toHaveBeenCalledWith(actorContext, { period: "30D" });
         for (const forbidden of [
             "ticketId",
             "requesterUserId",

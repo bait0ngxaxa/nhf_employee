@@ -1,14 +1,32 @@
+import { Prisma } from "@prisma/client";
 import type {
     ITTicketEventKind,
     ITTicketPriority,
     ITTicketStatus,
-    Prisma,
+    ITTicketType,
 } from "@prisma/client";
+
+import type {
+    ITAnalyticsBacklogAgeBucketKey,
+    ITAnalyticsCategoryFilter,
+} from "../../contracts";
 
 export type ITTicketAnalyticsPersistenceContext = Pick<
     Prisma.TransactionClient,
-    "iTTicket" | "iTTicketCategory" | "iTTicketEvent"
+    "iTTicket" | "iTTicketCategory" | "iTTicketEvent" | "$queryRaw"
 >;
+
+/** Ticket-population filters applied to every Ticket-scoped aggregate. */
+export interface ITAnalyticsTicketScope {
+    readonly type: ITTicketType | null;
+    readonly category: ITAnalyticsCategoryFilter | null;
+}
+
+export interface ITAnalyticsBacklogAgeRange {
+    readonly key: ITAnalyticsBacklogAgeBucketKey;
+    readonly createdAtLte: Date | null;
+    readonly createdAtGt: Date | null;
+}
 
 export interface ITAnalyticsQueryWindow {
     readonly startAt: Date;
@@ -16,6 +34,10 @@ export interface ITAnalyticsQueryWindow {
     readonly backlogStatuses: readonly ITTicketStatus[];
     readonly resolutionEventKind: ITTicketEventKind;
     readonly resolutionStatus: ITTicketStatus;
+    /** Omitted scope means the full Ticket population. */
+    readonly scope?: ITAnalyticsTicketScope;
+    /** Omitted ranges skip the aging counts. */
+    readonly backlogAgeRanges?: readonly ITAnalyticsBacklogAgeRange[];
 }
 
 export interface ITAnalyticsStatusCount {
@@ -64,6 +86,12 @@ export interface ITAnalyticsCategoryName {
     readonly id: number;
     readonly name: string;
     readonly key: string;
+    readonly isActive: boolean;
+}
+
+export interface ITAnalyticsBacklogAgeCount {
+    readonly key: ITAnalyticsBacklogAgeBucketKey;
+    readonly count: number;
 }
 
 export interface ITAnalyticsPersistenceSnapshot {
@@ -81,6 +109,10 @@ export interface ITAnalyticsPersistenceSnapshot {
     readonly createdAtValues: readonly Date[];
     readonly resolvedEvents: readonly ITAnalyticsResolvedEvent[];
     readonly resolvedTickets: readonly ITAnalyticsResolvedTicket[];
+    /** Period-created Tickets grouped by current category identity. */
+    readonly createdCategories: readonly ITAnalyticsCategoryCount[];
+    readonly backlogAges: readonly ITAnalyticsBacklogAgeCount[];
+    /** Active categories plus every category still referenced by a Ticket. */
     readonly categories: readonly ITAnalyticsCategoryName[];
 }
 
@@ -88,25 +120,48 @@ function countOf(group: { readonly _count: { readonly _all: number } }): number 
     return group._count._all;
 }
 
+/** Empty scope yields `{}` so unfiltered predicates stay unchanged. */
+function toTicketScopeWhere(scope: ITAnalyticsTicketScope | undefined): Prisma.ITTicketWhereInput {
+    const where: Prisma.ITTicketWhereInput = {};
+    if (scope?.type) where.type = scope.type;
+    if (scope?.category !== undefined && scope.category !== null) {
+        where.categoryId = scope.category === "uncategorized" ? null : scope.category;
+    }
+    return where;
+}
+
+function toBacklogAgePredicate(range: ITAnalyticsBacklogAgeRange): Prisma.Sql {
+    const conditions: Prisma.Sql[] = [];
+    if (range.createdAtLte !== null) conditions.push(Prisma.sql`createdAt <= ${range.createdAtLte}`);
+    if (range.createdAtGt !== null) conditions.push(Prisma.sql`createdAt > ${range.createdAtGt}`);
+    return conditions.length === 0 ? Prisma.sql`TRUE` : Prisma.join(conditions, " AND ");
+}
+
 /** All queries are narrow, period-bounded or grouped and run on the caller's snapshot. */
 export async function readITAnalyticsPersistenceSnapshot(
     tx: ITTicketAnalyticsPersistenceContext,
     window: ITAnalyticsQueryWindow,
 ): Promise<ITAnalyticsPersistenceSnapshot> {
+    const scopeWhere = toTicketScopeWhere(window.scope);
+    const hasScope = Object.keys(scopeWhere).length > 0;
     const backlogStatusFilter = [...window.backlogStatuses];
     const backlogWhere: Prisma.ITTicketWhereInput = {
+        ...scopeWhere,
         status: { in: backlogStatusFilter },
     };
     const periodWhere: Prisma.ITTicketWhereInput = {
+        ...scopeWhere,
         createdAt: { gte: window.startAt, lt: window.endAt },
     };
 
     const statusGroups = await tx.iTTicket.groupBy({
         by: ["status"],
+        ...(hasScope ? { where: scopeWhere } : {}),
         _count: { _all: true },
     });
     const priorityGroups = await tx.iTTicket.groupBy({
         by: ["priority"],
+        ...(hasScope ? { where: scopeWhere } : {}),
         _count: { _all: true },
     });
     const categoryGroups = await tx.iTTicket.groupBy({
@@ -160,6 +215,7 @@ export async function readITAnalyticsPersistenceSnapshot(
             kind: window.resolutionEventKind,
             toStatus: window.resolutionStatus,
             occurredAt: { gte: window.startAt, lt: window.endAt },
+            ...(hasScope ? { ticket: scopeWhere } : {}),
         },
         _min: { occurredAt: true },
     });
@@ -170,15 +226,42 @@ export async function readITAnalyticsPersistenceSnapshot(
             where: { id: { in: resolvedIds } },
             select: { id: true, createdAt: true, priority: true },
         });
-    const categoryIds = categoryGroups.flatMap((group) =>
-        group.categoryId === null ? [] : [group.categoryId],
-    );
-    const categories = categoryIds.length === 0
-        ? []
-        : await tx.iTTicketCategory.findMany({
-            where: { id: { in: categoryIds } },
-            select: { id: true, name: true, key: true },
-        });
+    const createdCategoryGroups = await tx.iTTicket.groupBy({
+        by: ["categoryId"],
+        where: periodWhere,
+        _count: { _all: true },
+    });
+    // One indexed current-backlog scan; no Ticket rows leave the database.
+    // Domain ranges partition all timestamps, including future dates in 0_1.
+    const ranges = window.backlogAgeRanges ?? [];
+    const ageScope: Prisma.Sql[] = [backlogStatusFilter.length === 0
+        ? Prisma.sql`FALSE`
+        : Prisma.sql`status IN (${Prisma.join(backlogStatusFilter)})`];
+    if (window.scope?.type) ageScope.push(Prisma.sql`type = ${window.scope.type}`);
+    if (window.scope?.category !== undefined && window.scope.category !== null) {
+        ageScope.push(window.scope.category === "uncategorized"
+            ? Prisma.sql`categoryId IS NULL`
+            : Prisma.sql`categoryId = ${window.scope.category}`);
+    }
+    const ageRows = ranges.length === 0 ? [] : await tx.$queryRaw<{
+        readonly bucket: ITAnalyticsBacklogAgeBucketKey;
+        readonly count: bigint;
+    }[]>(Prisma.sql`
+        SELECT CASE ${Prisma.join(ranges.map((range) =>
+            Prisma.sql`WHEN ${toBacklogAgePredicate(range)} THEN ${range.key}`), " ")}
+        END AS bucket, COUNT(*) AS count
+        FROM it_tickets
+        WHERE ${Prisma.join(ageScope, " AND ")}
+        GROUP BY bucket
+    `);
+    const agesByKey = new Map(ageRows.map((row) => [row.bucket, Number(row.count)]));
+    const backlogAges = ranges.map((range) => ({ key: range.key, count: agesByKey.get(range.key) ?? 0 }));
+    // Reference data only; inactive rows stay reportable while still referenced.
+    const categories = await tx.iTTicketCategory.findMany({
+        where: { OR: [{ isActive: true }, { tickets: { some: {} } }] },
+        select: { id: true, name: true, key: true, isActive: true },
+        orderBy: { id: "asc" },
+    });
 
     return {
         statuses: statusGroups.map((group) => ({
@@ -231,6 +314,11 @@ export async function readITAnalyticsPersistenceSnapshot(
             createdAt: ticket.createdAt,
             priority: ticket.priority,
         })),
+        createdCategories: createdCategoryGroups.map((group) => ({
+            categoryId: group.categoryId,
+            count: countOf(group),
+        })),
+        backlogAges,
         categories,
     };
 }

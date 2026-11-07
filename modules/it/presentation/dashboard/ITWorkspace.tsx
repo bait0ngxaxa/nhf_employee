@@ -17,6 +17,12 @@ import type { ITPresentationCapabilities } from "../../contracts";
 import { ITAnalyticsDashboard } from "./ITAnalyticsDashboard";
 import { ITTicketOperatorQueue } from "./ITTicketOperatorQueue";
 import { ITTicketSelfService } from "./ITTicketSelfService";
+import {
+    parseITAnalyticsUrlState,
+    writeITAnalyticsUrlState,
+    type ITAnalyticsReportState,
+} from "./analytics-url-state";
+import { getITOperatorQueueFiltersKey, parseITOperatorQueueUrlFilters } from "./operator-queue-url";
 import { getVisibleITDashboardTabs, normalizeITDashboardTab } from "./workspace-projection";
 
 export function ITWorkspace({
@@ -45,6 +51,13 @@ export function ITWorkspace({
         router.replace(toTabUrl(activeTab), { scroll: false });
     }, [activeTab, router, searchParams, toTabUrl]);
 
+    const reportState = parseITAnalyticsUrlState(searchParams);
+    const queueFilters = parseITOperatorQueueUrlFilters(searchParams);
+    const handleReportStateChange = (next: ITAnalyticsReportState): void => {
+        const params = writeITAnalyticsUrlState(new URLSearchParams(searchParams.toString()), next);
+        router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    };
+
     const setActiveTab = (value: string): void => {
         const nextTab = normalizeITDashboardTab(value, capabilities);
         if (!nextTab || nextTab === searchParams.get(IT_DASHBOARD_TAB_QUERY_KEY)) return;
@@ -62,13 +75,27 @@ export function ITWorkspace({
             value: IT_DASHBOARD_TABS.queue,
             label: "คิวงาน IT",
             visible: visibleTabs.includes(IT_DASHBOARD_TABS.queue),
-            content: <ITTicketOperatorQueue embedded />,
+            // URL filter changes (e.g. an analytics drill-down) remount the queue with them.
+            content: (
+                <ITTicketOperatorQueue
+                    key={getITOperatorQueueFiltersKey(queueFilters)}
+                    embedded
+                    initialFilters={queueFilters}
+                />
+            ),
         },
         {
             value: IT_DASHBOARD_TABS.analytics,
             label: "รายงาน",
             visible: visibleTabs.includes(IT_DASHBOARD_TABS.analytics),
-            content: <ITAnalyticsDashboard embedded />,
+            content: (
+                <ITAnalyticsDashboard
+                    embedded
+                    canOpenOperatorQueue={capabilities.canReadAllTickets}
+                    reportState={reportState}
+                    onReportStateChange={handleReportStateChange}
+                />
+            ),
         },
     ];
 

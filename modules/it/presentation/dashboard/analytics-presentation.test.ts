@@ -17,11 +17,20 @@ const response = {
             startAt: "2026-08-27T17:00:00.000Z",
             endAt: "2026-09-25T17:05:00.000Z",
         },
+        filters: { type: null, category: null } as { type: string | null; category: number | string | null },
+        filterOptions: {
+            categories: [
+                { id: 4, key: "HARDWARE", name: "อุปกรณ์คอมพิวเตอร์", isActive: true },
+                { id: 9, key: "LEGACY", name: "หมวดเดิม", isActive: false },
+            ],
+        },
         summary: {
             currentBacklog: 1,
             waitingRequester: 0,
             unassignedBacklog: 1,
             untriagedBacklog: 1,
+            highPriorityBacklog: 0,
+            agedBacklog: 0,
             oldestUnresolvedAgeMinutes: 42,
             newTickets: 0,
             resolvedTickets: 0,
@@ -61,6 +70,22 @@ const response = {
             { priority: "P2", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
             { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
         ],
+        topCategories: {
+            limit: 10,
+            rows: [
+                { categoryId: 4, label: "อุปกรณ์คอมพิวเตอร์", count: 3 },
+                { categoryId: null, label: "ยังไม่จัดหมวดหมู่", count: 1 },
+            ] as { categoryId: number | null; label: string; count: number }[],
+            otherCategoryCount: 0,
+            otherTicketCount: 0,
+        },
+        backlogAging: [
+            { bucket: "0_1", count: 1 },
+            { bucket: "2_3", count: 0 },
+            { bucket: "4_7", count: 0 },
+            { bucket: "8_14", count: 0 },
+            { bucket: "15_PLUS", count: 0 },
+        ],
         categoryBacklog: [{ label: "ยังไม่จัดหมวดหมู่", count: 1 }],
         assigneeBacklog: [{ label: "ยังไม่มีผู้รับผิดชอบ", count: 1 }],
         departmentCreated: [],
@@ -75,6 +100,64 @@ describe("IT analytics presentation contract", () => {
             summary: { currentBacklog: 1, averageResolutionMinutes: null },
             trend: [{ date: "2026-09-26", created: 0, resolved: 0 }],
         });
+    });
+
+    it("parses filters, filter options, top categories, and every aging bucket", () => {
+        const filtered = structuredClone(response);
+        filtered.dashboard.filters = { type: "INCIDENT", category: "uncategorized" };
+
+        expect(parseITAnalyticsDashboardResponse(filtered)).toMatchObject({
+            filters: { type: "INCIDENT", category: "uncategorized" },
+            filterOptions: { categories: [{ id: 4 }, { id: 9, isActive: false }] },
+            topCategories: { limit: 10, rows: [{ categoryId: 4 }, { categoryId: null }] },
+            backlogAging: [
+                { bucket: "0_1", count: 1 },
+                { bucket: "2_3", count: 0 },
+                { bucket: "4_7", count: 0 },
+                { bucket: "8_14", count: 0 },
+                { bucket: "15_PLUS", count: 0 },
+            ],
+            summary: { highPriorityBacklog: 0, agedBacklog: 0 },
+        });
+    });
+
+    it.each([
+        ["an unknown filter category", (value: typeof response) => {
+            value.dashboard.filters = { type: null, category: "OTHER" };
+        }],
+        ["a non-canonical Ticket type filter", (value: typeof response) => {
+            value.dashboard.filters = { type: "incident", category: null };
+        }],
+        ["a missing aging bucket", (value: typeof response) => {
+            value.dashboard.backlogAging = value.dashboard.backlogAging.slice(0, 4);
+        }],
+        ["reordered aging buckets", (value: typeof response) => {
+            value.dashboard.backlogAging = [...value.dashboard.backlogAging].reverse();
+        }],
+        ["more ranked rows than the limit", (value: typeof response) => {
+            value.dashboard.topCategories.limit = 1;
+        }],
+        ["a non-integer category identity", (value: typeof response) => {
+            value.dashboard.topCategories.rows = [{ categoryId: 1.5, label: "x", count: 1 }];
+        }],
+        ["duplicate filter option identities", (value: typeof response) => {
+            value.dashboard.filterOptions.categories = [
+                { id: 4, key: "A", name: "A", isActive: true },
+                { id: 4, key: "B", name: "B", isActive: true },
+            ];
+        }],
+        ["a missing attention count", (value: typeof response) => {
+            const { agedBacklog: _removed, ...summary } = value.dashboard.summary;
+            Object.assign(value.dashboard, { summary });
+        }],
+        ["a negative high-priority count", (value: typeof response) => {
+            value.dashboard.summary.highPriorityBacklog = -1;
+        }],
+    ])("rejects %s", (_label, mutate) => {
+        const invalid = structuredClone(response);
+        mutate(invalid);
+
+        expect(parseITAnalyticsDashboardResponse(invalid)).toBeNull();
     });
 
     it("rejects extra Ticket or requester details instead of passing them to the page", () => {

@@ -65,6 +65,40 @@ export const IT_ANALYTICS_TIME_ZONE = "Asia/Bangkok" as const;
 
 export type ITAnalyticsPeriod = (typeof IT_ANALYTICS_PERIODS)[number];
 
+/** Canonical filter value for Tickets whose current category is null. */
+export const IT_ANALYTICS_UNCATEGORIZED_FILTER = "uncategorized" as const;
+export type ITAnalyticsCategoryFilter = number | typeof IT_ANALYTICS_UNCATEGORIZED_FILTER;
+
+/** Ranked category chart size; remaining groups are summarized, never dropped silently. */
+export const IT_ANALYTICS_TOP_CATEGORY_LIMIT = 10;
+
+/** Current priorities counted as the high-priority backlog. */
+export const IT_ANALYTICS_HIGH_PRIORITIES = Object.freeze([
+    "P0",
+    "P1",
+] as const satisfies readonly ITTicketPriority[]);
+
+/**
+ * Backlog age uses completed elapsed 24-hour periods since `ITTicket.createdAt`.
+ * Buckets are contiguous and exhaustive; `maxDays: null` is open-ended.
+ */
+export const IT_ANALYTICS_BACKLOG_AGE_BUCKETS = Object.freeze([
+    { key: "0_1", minDays: 0, maxDays: 1, label: "0–1 วัน" },
+    { key: "2_3", minDays: 2, maxDays: 3, label: "2–3 วัน" },
+    { key: "4_7", minDays: 4, maxDays: 7, label: "4–7 วัน" },
+    { key: "8_14", minDays: 8, maxDays: 14, label: "8–14 วัน" },
+    { key: "15_PLUS", minDays: 15, maxDays: null, label: "15 วันขึ้นไป" },
+] as const);
+export type ITAnalyticsBacklogAgeBucketKey =
+    (typeof IT_ANALYTICS_BACKLOG_AGE_BUCKETS)[number]["key"];
+
+/** Labels the aggregate DTO uses for null dimension identities. */
+export const IT_ANALYTICS_UNCATEGORIZED_LABEL = "ยังไม่จัดหมวดหมู่";
+export const IT_ANALYTICS_UNASSIGNED_LABEL = "ยังไม่มีผู้รับผิดชอบ";
+
+/** "Older than seven completed days" means at least eight completed days. */
+export const IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS = 8;
+
 export interface ITPresentationCapabilities {
     readonly canReadOwnTickets: boolean;
     readonly canReadAllTickets: boolean;
@@ -83,11 +117,29 @@ export interface ITAnalyticsDashboard {
         readonly startAt: string;
         readonly endAt: string;
     };
+    /** Applied Ticket filters; they narrow both period and current-snapshot metrics. */
+    readonly filters: {
+        readonly type: ITTicketType | null;
+        readonly category: ITAnalyticsCategoryFilter | null;
+    };
+    readonly filterOptions: {
+        /** Active categories plus inactive categories still referenced by a Ticket. */
+        readonly categories: readonly {
+            readonly id: number;
+            readonly key: string;
+            readonly name: string;
+            readonly isActive: boolean;
+        }[];
+    };
     readonly summary: {
         readonly currentBacklog: number;
         readonly waitingRequester: number;
         readonly unassignedBacklog: number;
         readonly untriagedBacklog: number;
+        /** Current backlog with a current priority in `IT_ANALYTICS_HIGH_PRIORITIES`. */
+        readonly highPriorityBacklog: number;
+        /** Current backlog aged at least `IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS` completed days. */
+        readonly agedBacklog: number;
         readonly oldestUnresolvedAgeMinutes: number | null;
         readonly newTickets: number;
         readonly resolvedTickets: number;
@@ -122,6 +174,26 @@ export interface ITAnalyticsDashboard {
         readonly averageFirstResponseMinutes: number | null;
         readonly resolvedTickets: number;
         readonly averageResolutionMinutes: number | null;
+    }[];
+    /**
+     * Period-created Tickets grouped by their *current* category identity.
+     * This is not category-at-creation; later reclassification moves a Ticket.
+     */
+    readonly topCategories: {
+        readonly limit: number;
+        readonly rows: readonly {
+            /** `null` is the explicit uncategorized group. */
+            readonly categoryId: number | null;
+            readonly label: string;
+            readonly count: number;
+        }[];
+        readonly otherCategoryCount: number;
+        readonly otherTicketCount: number;
+    };
+    /** Current backlog grouped by completed days since creation, in bucket order. */
+    readonly backlogAging: readonly {
+        readonly bucket: ITAnalyticsBacklogAgeBucketKey;
+        readonly count: number;
     }[];
     readonly categoryBacklog: readonly {
         readonly label: string;
