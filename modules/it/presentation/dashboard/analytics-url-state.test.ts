@@ -63,12 +63,8 @@ describe("IT analytics report URL state", () => {
             .toEqual({ status: "ACTIVE", type: "INCIDENT", categoryId: 9, assignmentState: "UNASSIGNED" });
         expect(queue(destinations.untriagedHref))
             .toEqual({ status: "ACTIVE", type: "INCIDENT", categoryId: 9, triageState: "UNTRIAGED" });
-        expect(queue(destinations.getCategoryHref(3)))
-            .toEqual({ status: "ACTIVE", type: "INCIDENT", categoryId: 3 });
 
         const unfiltered = buildITAnalyticsQueueDestinations({ type: null, category: null });
-        expect(queue(unfiltered.getCategoryHref(null)))
-            .toEqual({ status: "ACTIVE", categoryId: "uncategorized" });
         expect(unfiltered.getPriorityHref("P1")).toBe("/dashboard/it?itTab=queue&queueStatus=ACTIVE&queuePriority=P1");
     });
 });

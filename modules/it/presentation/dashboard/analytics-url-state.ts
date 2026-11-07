@@ -90,7 +90,6 @@ export function getITAnalyticsReportStateKey(state: ITAnalyticsReportState): str
 }
 
 export interface ITAnalyticsQueueDestinations {
-    readonly getCategoryHref: (categoryId: number | null) => string;
     readonly getPriorityHref: (priority: ITTicketPriority) => string;
     readonly unassignedHref: string;
     readonly untriagedHref: string;
@@ -111,10 +110,6 @@ export function buildITAnalyticsQueueDestinations(
         ...(filters.category !== null ? { categoryId: filters.category } : {}),
     };
     return {
-        getCategoryHref: (categoryId) => buildITOperatorQueueHref({
-            ...base,
-            categoryId: categoryId ?? IT_ANALYTICS_UNCATEGORIZED_FILTER,
-        }),
         getPriorityHref: (priority) => buildITOperatorQueueHref({ ...base, priority }),
         unassignedHref: buildITOperatorQueueHref({ ...base, assignmentState: "UNASSIGNED" }),
         untriagedHref: buildITOperatorQueueHref({ ...base, triageState: "UNTRIAGED" }),

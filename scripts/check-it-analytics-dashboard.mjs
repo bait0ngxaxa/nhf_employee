@@ -15,6 +15,17 @@ const output = await mkdtemp(join(tmpdir(), "nhf-it-analytics-smoke-"));
 const linkShim = {
     name: "next-link-shim",
     setup(context) {
+        context.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "navigation", namespace: "navigation-shim" }));
+        context.onLoad({ filter: /.*/, namespace: "navigation-shim" }, () => ({
+            contents: `import { useMemo, useSyncExternalStore } from "react";
+                const subscribe = (listener) => { window.addEventListener("popstate", listener); return () => window.removeEventListener("popstate", listener); };
+                const navigate = (method, url) => { history[method](null, "", url); window.dispatchEvent(new PopStateEvent("popstate")); };
+                const router = { push: (url) => navigate("pushState", url), replace: (url) => navigate("replaceState", url) };
+                export const useRouter = () => router;
+                export const usePathname = () => location.pathname;
+                export const useSearchParams = () => { const query = useSyncExternalStore(subscribe, () => location.search); return useMemo(() => new URLSearchParams(query), [query]); };`,
+            loader: "jsx", resolveDir: process.cwd(),
+        }));
         context.onResolve({ filter: /^next\/link$/ }, () => ({ path: "next-link", namespace: "shim" }));
         context.onLoad({ filter: /.*/, namespace: "shim" }, () => ({
             contents: `import React from "react";
@@ -30,7 +41,8 @@ const bundle = await build({
     stdin: {
         contents: `import React from "react";
             import { createRoot } from "react-dom/client";
-            import { ITAnalyticsDashboard, ITAnalyticsReport } from "./modules/it/presentation/dashboard/ITAnalyticsDashboard";
+            import { ITAnalyticsReport } from "./modules/it/presentation/dashboard/ITAnalyticsDashboard";
+            import { ITWorkspace } from "./modules/it/presentation/dashboard/ITWorkspace";
             const params = new URLSearchParams(location.search);
             const empty = params.get("empty") === "1";
             const linked = params.get("linked") === "1";
@@ -82,20 +94,32 @@ const bundle = await build({
                 departmentCreated: empty ? [] : [{ label: "ฝ่ายบริหาร", count: 120 }, { label: "ไม่ระบุหน่วยงาน", count: 4 }],
             };
             const navigation = linked ? {
-                getCategoryHref: (id) => "/dashboard/it?itTab=queue&queueCategory=" + (id ?? "uncategorized"),
                 getPriorityHref: (priority) => "/dashboard/it?itTab=queue&queuePriority=" + priority,
                 unassignedHref: "/dashboard/it?itTab=queue&queueAssignment=UNASSIGNED",
                 untriagedHref: "/dashboard/it?itTab=queue&queueTriage=UNTRIAGED",
             } : undefined;
             if (params.get("full") === "1") {
                 // Real container with filters; the API is stubbed with the same aggregates.
-                window.fetch = async () => new Response(JSON.stringify({ success: true, dashboard }), {
-                    status: 200, headers: { "Content-Type": "application/json" },
-                });
+                window.analyticsRequests = [];
+                window.fetch = async (input) => {
+                    window.analyticsRequests.push(String(input));
+                    if (!String(input).startsWith("/api/it/analytics?")) throw new Error("Unexpected Ticket API request");
+                    const query = new URL(String(input), location.href).searchParams;
+                    const category = query.get("category");
+                    const filters = { type: query.get("type"), category: category === "uncategorized" ? category : category === null ? null : Number(category) };
+                    const filteredRows = category === null ? rows.slice(0, 10) : rows.filter((row) => String(row.categoryId ?? "uncategorized") === category);
+                    if (params.get("loading") === "1") return new Promise(() => {});
+                    return new Response(JSON.stringify({ success: true, dashboard: { ...dashboard,
+                        filters, period: { ...dashboard.period, key: query.get("period") },
+                        topCategories: { ...dashboard.topCategories, rows: filteredRows, otherCategoryCount: category === null ? 1 : 0, otherTicketCount: category === null ? 6 : 0 },
+                    } }), { status: params.get("error") === "1" ? 503 : 200, headers: { "Content-Type": "application/json" } });
+                };
             }
             createRoot(document.getElementById("root")).render(
                 <main className="mx-auto max-w-7xl px-4 py-6">{params.get("full") === "1"
-                    ? <ITAnalyticsDashboard embedded canOpenOperatorQueue />
+                    ? <ITWorkspace capabilities={{ canReadAnalytics: true, canReadAllTickets: linked,
+                        canReadOwnTickets: false, canCreateOwnTickets: false, canCommentOwnTickets: false,
+                        canCommentAllTickets: false, canManageTickets: false }} />
                     : <ITAnalyticsReport dashboard={dashboard} navigation={navigation} />}</main>
             );`,
         resolveDir: process.cwd(), loader: "tsx",
@@ -134,7 +158,7 @@ try {
                 page.on("pageerror", (error) => errors.push(String(error)));
                 try {
                     await page.setViewport({ width, height: 900, hasTouch: width < 1024 });
-                    const query = { empty: "?empty=1", linked: "?linked=1", full: "?full=1", data: "" }[variant];
+                    const query = { empty: "?empty=1", linked: "?linked=1", full: "?full=1&itTab=analytics&reportPeriod=90D&reportType=INCIDENT", data: "" }[variant];
                     await page.goto(`${pathToFileURL(join(output, "index.html"))}${query}`);
                     if (dark) await page.evaluate(() => document.documentElement.classList.add("dark"));
                     await page.waitForSelector(variant === "empty" ? '[role="status"]' : ".recharts-bar");
@@ -183,9 +207,9 @@ try {
                         assert.equal(comboboxes.length, 3, "period, type and category filters must render");
                         assert.ok(comboboxes.every((height) => height >= 44), "filter controls must stay touch-sized");
                     }
-                    if (variant === "linked" || variant === "full") {
+                    if (variant === "linked") {
                         const hrefs = await page.$$eval("main a", (links) => links.map((link) => link.getAttribute("href")));
-                        assert.ok(hrefs.some((href) => href?.includes("queueCategory=uncategorized")), "uncategorized drill-down must exist");
+                        assert.ok(hrefs.every((href) => !href?.includes("queueCategory=uncategorized")), "historical category must not link to queue");
                         assert.ok(hrefs.some((href) => href?.includes("queuePriority=P0")), "P0 attention link must exist");
                     } else {
                         assert.equal(await page.$$eval("main a", (links) => links.length), 0, "analytics-only view must not link to Tickets");
@@ -201,6 +225,44 @@ try {
                                 clip: { x: 0, y: top, width, height: Math.min(sliceHeight, fullHeight - top) },
                             });
                         }
+                    }
+                    if (variant === "full") {
+                        const categoryButtons = '[aria-label="อันดับหมวดปัญหาและจำนวน Ticket"] button';
+                        const waitCategory = async (value) => {
+                            await page.waitForFunction((expected) => {
+                                const params = new URLSearchParams(location.search);
+                                return params.get("reportCategory") === expected
+                                    && !document.querySelector('[aria-label="กำลังโหลดรายงาน IT"]')
+                                    && window.analyticsRequests.at(-1).includes("period=90D&type=INCIDENT" + (expected === null ? "" : "&category=" + expected));
+                            }, {}, value);
+                        };
+                        if (width >= 640) {
+                            await page.click('[aria-label="กราฟแท่งหมวดปัญหา เรียงจากมากไปน้อย"] .recharts-bar-rectangle path');
+                        } else {
+                            await page.$eval(categoryButtons, (button) => button.focus());
+                            await page.keyboard.press("Enter");
+                        }
+                        await waitCategory("1");
+                        assert.equal(await page.$$eval(categoryButtons, (items) => items.length), 1, "category cohort must narrow");
+                        await page.evaluate(() => history.back());
+                        await waitCategory(null);
+                        await page.evaluate(() => history.forward());
+                        await waitCategory("1");
+                        await page.evaluate(() => history.back());
+                        await waitCategory(null);
+                        await page.$eval('[aria-label="กรองรายงานตามหมวด ยังไม่จัดหมวดหมู่"]', (button) => button.focus());
+                        await page.keyboard.press("Space");
+                        await waitCategory("uncategorized");
+                        await page.click('[aria-label="กรองตามหมวดหมู่"]');
+                        await page.waitForSelector('[role="option"]');
+                        await page.evaluate(() => [...document.querySelectorAll('[role="option"]')].find((option) => option.textContent.includes("เครือข่ายและอินเทอร์เน็ต")).click());
+                        await waitCategory("2");
+                        await page.click('[aria-label="กรองตามหมวดหมู่"]');
+                        await page.waitForSelector('[role="option"]');
+                        await page.evaluate(() => [...document.querySelectorAll('[role="option"]')].find((option) => option.textContent === "ทุกหมวดหมู่").click());
+                        await waitCategory(null);
+                        assert.equal(await page.$$eval("main a", (links) => links.length), 0, "analytics-only interaction must not expose queue links");
+                        assert.ok((await page.evaluate(() => window.analyticsRequests)).every((url) => url.startsWith("/api/it/analytics?")), "only aggregate API may be requested");
                     }
                     assert.deepEqual(errors, [], "page must not throw");
                     cases += 1;

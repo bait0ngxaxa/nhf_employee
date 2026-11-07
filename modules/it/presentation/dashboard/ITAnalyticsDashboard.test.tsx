@@ -386,6 +386,30 @@ describe("IT analytics Dashboard presentation", () => {
         expect(screen.queryByRole("note")).not.toBeInTheDocument();
     });
 
+    it("filters historical categories for analytics-only viewers, preserving period/type and never requesting Tickets", async () => {
+        fetchMock.mockResolvedValue(response(dashboardPayload("90D", 5)));
+        const onChange = vi.fn();
+        const { rerender } = render(<ITAnalyticsDashboard
+            reportState={{ period: "90D", type: "INCIDENT", category: null }}
+            onReportStateChange={onChange}
+        />);
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        fireEvent.click(screen.getByRole("button", { name: "กรองรายงานตามหมวด อุปกรณ์คอมพิวเตอร์" }));
+        expect(onChange).toHaveBeenLastCalledWith({ period: "90D", type: "INCIDENT", category: 4 });
+        rerender(<ITAnalyticsDashboard reportState={{ period: "90D", type: "INCIDENT", category: 4 }} onReportStateChange={onChange} />);
+        await screen.findByRole("region", { name: "ภาพรวม" });
+        fireEvent.click(screen.getByRole("button", { name: "กรองรายงานตามหมวด ยังไม่จัดหมวดหมู่" }));
+        expect(onChange).toHaveBeenLastCalledWith({ period: "90D", type: "INCIDENT", category: "uncategorized" });
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "กรองตามหมวดหมู่" }), { key: "Enter" });
+        fireEvent.click(await screen.findByRole("option", { name: "ทุกหมวดหมู่" }));
+        expect(onChange).toHaveBeenLastCalledWith({ period: "90D", type: "INCIDENT", category: null });
+        expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+            "/api/it/analytics?period=90D&type=INCIDENT",
+            "/api/it/analytics?period=90D&type=INCIDENT&category=4",
+        ]);
+        expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+
     it("delegates filter changes to a controlling URL owner instead of keeping local state", async () => {
         fetchMock.mockResolvedValue(response(dashboardPayload("7D", 5)));
         const onChange = vi.fn();
@@ -413,11 +437,8 @@ describe("IT analytics Dashboard presentation", () => {
         render(<ITAnalyticsDashboard canOpenOperatorQueue />);
 
         const categories = await screen.findByRole("region", { name: "หมวดปัญหาที่มีการแจ้งมากที่สุด" });
-        const categoryLinks = within(categories).getAllByRole("link", { name: /ดูงานค้างของหมวด .* ในคิวงาน/ });
-        expect(categoryLinks.map((link) => link.getAttribute("href"))).toEqual([
-            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueCategory=4",
-            "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queueCategory=uncategorized",
-        ]);
+        expect(within(categories).queryByRole("link")).not.toBeInTheDocument();
+        expect(within(categories).getByRole("button", { name: "กรองรายงานตามหมวด อุปกรณ์คอมพิวเตอร์" })).toBeInTheDocument();
         const attention = screen.getByRole("region", { name: "สิ่งที่ต้องติดตาม" });
         expect(within(attention).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
             "/dashboard/it?itTab=queue&queueStatus=ACTIVE&queueType=INCIDENT&queuePriority=P0",

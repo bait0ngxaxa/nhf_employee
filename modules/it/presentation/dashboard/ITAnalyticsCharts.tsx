@@ -2,13 +2,13 @@
 
 import { useId, useState, type PointerEvent, type ReactElement, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
 import {
     IT_ANALYTICS_UNASSIGNED_LABEL,
+    IT_ANALYTICS_UNCATEGORIZED_FILTER,
     type ITAnalyticsCategoryFilter,
     type ITAnalyticsDashboard,
 } from "../../contracts";
@@ -119,12 +119,11 @@ const categoryChartConfig = {
 export function ITAnalyticsTopCategoriesPanel({
     topCategories,
     selectedCategory,
-    getCategoryHref,
+    onCategorySelect,
 }: {
     readonly topCategories: ITAnalyticsDashboard["topCategories"];
     readonly selectedCategory: ITAnalyticsCategoryFilter | null;
-    /** Present only when the viewer may also open the operator queue. */
-    readonly getCategoryHref?: (categoryId: number | null) => string;
+    readonly onCategorySelect?: (category: ITAnalyticsCategoryFilter) => void;
 }): ReactElement {
     const descriptionId = useId();
     const tooltip = useTouchFriendlyTooltip();
@@ -132,7 +131,7 @@ export function ITAnalyticsTopCategoriesPanel({
     const total = rows.reduce((sum, row) => sum + row.count, 0) + topCategories.otherTicketCount;
     const maximum = Math.max(0, ...rows.map((row) => row.count));
     const chartData = rows.map((row, index) => ({
-        key: row.categoryId === null ? "uncategorized" : String(row.categoryId),
+        key: row.categoryId === null ? IT_ANALYTICS_UNCATEGORIZED_FILTER : String(row.categoryId),
         axisLabel: `${index + 1}. ${truncateITAnalyticsLabel(row.label, 12)}`,
         label: row.label,
         count: row.count,
@@ -164,7 +163,7 @@ export function ITAnalyticsTopCategoriesPanel({
                         <ChartContainer
                             config={categoryChartConfig}
                             className={"aspect-auto w-full " + AXIS_CLASS_NAME}
-                            style={{ height: `${Math.max(9, rows.length * (getCategoryHref ? 3.3 : 2.75) + 2)}rem` }}
+                            style={{ height: `${Math.max(9, rows.length * (onCategorySelect ? 3.3 : 2.75) + 2)}rem` }}
                         >
                             <BarChart
                                 accessibilityLayer
@@ -202,6 +201,15 @@ export function ITAnalyticsTopCategoriesPanel({
                                     />}
                                 />
                                 <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} maxBarSize={28}
+                                    className={onCategorySelect ? "cursor-pointer" : undefined}
+                                    onClick={(entry) => {
+                                        // Recharts 3.8 BarRectangleItem.payload is the original datum.
+                                        const payload: unknown = entry.payload;
+                                        if (typeof payload !== "object" || payload === null || !("key" in payload)) return;
+                                        const row = rows.find((candidate) =>
+                                            (candidate.categoryId === null ? IT_ANALYTICS_UNCATEGORIZED_FILTER : String(candidate.categoryId)) === payload.key);
+                                        if (row) onCategorySelect?.(row.categoryId ?? IT_ANALYTICS_UNCATEGORIZED_FILTER);
+                                    }}
                                     isAnimationActive={false}>
                                     <LabelList dataKey="count" position="right" className="fill-content-heading text-xs tabular-nums"
                                         formatter={(value: unknown) => typeof value === "number" ? formatITAnalyticsCount(value) : ""} />
@@ -222,15 +230,16 @@ export function ITAnalyticsTopCategoriesPanel({
                                                 {" · "}
                                                 <span className="tabular-nums">{formatITAnalyticsShare(row.count, total)}</span>
                                             </p>
-                                            {getCategoryHref ? (
-                                                <Link
-                                                    href={getCategoryHref(row.categoryId)}
-                                                    aria-label={`ดูงานค้างของหมวด ${row.label} ในคิวงาน`}
-                                                    className={LINK_CLASS_NAME + " min-h-9 text-xs"}
+                                            {onCategorySelect ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onCategorySelect(row.categoryId ?? IT_ANALYTICS_UNCATEGORIZED_FILTER)}
+                                                    aria-label={`กรองรายงานตามหมวด ${row.label}`}
+                                                    aria-pressed={selectedCategory === (row.categoryId ?? IT_ANALYTICS_UNCATEGORIZED_FILTER)}
+                                                    className={LINK_CLASS_NAME + " text-xs"}
                                                 >
-                                                    ดูงานค้างในคิว
-                                                    <ArrowUpRight aria-hidden="true" className="size-3.5" />
-                                                </Link>
+                                                    กรองรายงานหมวดนี้
+                                                </button>
                                             ) : null}
                                         </div>
                                         {/* Below `sm` the list is the bar chart; wider screens use the chart beside it. */}

@@ -163,7 +163,7 @@ describe("IT unified workspace presentation", () => {
             canOpenOperatorQueue: true,
             reportState: { period: "90D", type: null, category: "uncategorized" },
         }));
-        expect(mocks.replace).toHaveBeenCalledWith(
+        expect(mocks.push).toHaveBeenCalledWith(
             "/dashboard/it?itTab=analytics&reportPeriod=7D&reportType=INCIDENT",
             { scroll: false },
         );

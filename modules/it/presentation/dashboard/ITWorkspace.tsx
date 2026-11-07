@@ -55,7 +55,7 @@ export function ITWorkspace({
     const queueFilters = parseITOperatorQueueUrlFilters(searchParams);
     const handleReportStateChange = (next: ITAnalyticsReportState): void => {
         const params = writeITAnalyticsUrlState(new URLSearchParams(searchParams.toString()), next);
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+        router.push(`${pathname}?${params.toString()}`, { scroll: false });
     };
 
     const setActiveTab = (value: string): void => {

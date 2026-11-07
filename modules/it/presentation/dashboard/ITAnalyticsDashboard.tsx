@@ -20,6 +20,7 @@ import {
     IT_TICKET_TYPE_LABELS,
     IT_TICKET_TYPE_OPTIONS,
     type ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
+    type ITAnalyticsCategoryFilter,
     type ITAnalyticsPeriod,
 } from "../../contracts";
 import {
@@ -521,9 +522,11 @@ function BreakdownPanel({ dashboard }: { readonly dashboard: ITAnalyticsDashboar
 export function ITAnalyticsReport({
     dashboard,
     navigation,
+    onCategorySelect,
 }: {
     readonly dashboard: ITAnalyticsDashboardDTO;
     readonly navigation?: ITAnalyticsNavigation;
+    readonly onCategorySelect?: (category: ITAnalyticsCategoryFilter) => void;
 }): ReactElement {
     return (
         <div className="min-w-0 space-y-5">
@@ -531,7 +534,7 @@ export function ITAnalyticsReport({
             <ITAnalyticsTopCategoriesPanel
                 topCategories={dashboard.topCategories}
                 selectedCategory={dashboard.filters.category}
-                getCategoryHref={navigation?.getCategoryHref}
+                onCategorySelect={onCategorySelect}
             />
             <div className="grid min-w-0 gap-5 lg:grid-cols-2">
                 <ITAnalyticsPriorityBacklogPanel
@@ -817,7 +820,11 @@ export function ITAnalyticsDashboard({
                     </Button>
                 </div>
             ) : (
-                <ITAnalyticsReport dashboard={reportState.data} navigation={navigation} />
+                <ITAnalyticsReport
+                    dashboard={reportState.data}
+                    navigation={navigation}
+                    onCategorySelect={(category) => handleStateChange({ ...state, category })}
+                />
             )}
         </section>
     );
