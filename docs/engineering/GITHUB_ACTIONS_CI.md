@@ -23,6 +23,8 @@ Quality generates Next.js types before standalone TypeScript checking. A clean c
 
 Default Vitest discovery/configuration is unchanged: node, RSC, DOM and architecture projects in `vitest.config.ts`. Integration uses `vitest.integration.config.ts`: `__tests__/integration` and IT/Leave/Stock integration directories, serial files, one worker and existing 20-second test/hook deadlines. The unit job excludes these database tests. The new safety tests run in the default node project.
 
+The first hosted unit run exposed pre-existing developer-environment dependencies, reproduced with focused tests in a checkout without `.env`: LIFF Leave adapter and authorization administration fixtures used a live authorization repository, the LINE retry fixture omitted its Stock token, and a date-format expectation assumed Bangkok local time. These tests now inject empty in-memory grant repositories into the real resolver, supply the synthetic Stock token beside the existing mocked fetch, and scope/restore Bangkok timezone for the Thai timestamp test. Original assertions remain intact; no production resolver, authorization rule, formatter or provider behavior changes. Unit verification needs no live database/provider credentials.
+
 No migration integrity/order script exists in NHF. CI does not claim a separate historical migration checksum/order audit. The integration job actually applies all committed migrations to a fresh empty database through `prisma migrate deploy`, retaining the routine-recipient SQL contract coverage. Do not modify historical production migrations to repair CI.
 
 ## Disposable MySQL lifecycle and boundaries

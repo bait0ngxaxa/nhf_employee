@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import {
     formatDate,
     formatThaiDateTimeWithTimeWord,
@@ -29,6 +29,9 @@ describe("Date Helpers", () => {
     });
 
     describe("formatThaiDateTimeWithTimeWord", () => {
+        beforeEach(() => { vi.stubEnv("TZ", "Asia/Bangkok"); });
+        afterEach(() => { vi.unstubAllEnvs(); });
+
         it("formats Thai submitted timestamp with explicit time wording", () => {
             expect(formatThaiDateTimeWithTimeWord("2026-01-01T09:30:00+07:00")).toBe(
                 "1 มกราคม 2569 เวลา 09:30 น.",

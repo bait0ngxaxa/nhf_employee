@@ -75,6 +75,7 @@ describe("LINE Notification Service", () => {
         vi.clearAllMocks();
         vi.stubEnv("LINE_IT_CHANNEL_ACCESS_TOKEN", "test_token");
         vi.stubEnv("LINE_APP_CHANNEL_ACCESS_TOKEN", "nhfapp_test_token");
+        vi.stubEnv("LINE_STOCK_CHANNEL_ACCESS_TOKEN", "stock_test_token");
         vi.stubEnv("PUBLIC_APPROVE_URL", "http://localhost:3000");
 
         fetchMock.mockResolvedValue({

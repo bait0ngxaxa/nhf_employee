@@ -1078,6 +1078,15 @@ describe("Authorization Administration effective permission inspector", () => {
     });
 
     it("does not manufacture ADMIN authority when persisted grants are empty", async () => {
+        const emptyResolution: AuthorizationResolutionData = {
+            userGrants: [], memberships: [], teamRoleGrants: [],
+        };
+        const resolver = createAuthorizationResolver({
+            repository: {
+                load: vi.fn(async () => emptyResolution),
+                loadMany: vi.fn(async () => emptyResolution),
+            },
+        });
         const repository = emptyRepository({
             findUserById: vi.fn(async () => ({
                 ...userRecord(),
@@ -1091,7 +1100,7 @@ describe("Authorization Administration effective permission inspector", () => {
             7,
             {
                 repository,
-                resolver: createAuthorizationResolver(),
+                resolver,
                 effectiveAccessProvider: EMPTY_EFFECTIVE_ACCESS_PROVIDER,
             },
         );
