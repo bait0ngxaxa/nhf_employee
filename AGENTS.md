@@ -107,99 +107,86 @@ UI → Hooks → Services → Data Layer
 
 ## 9. Testing and Verification
 
-Use staged, proportional verification. Do not automatically run every command when a narrower check is sufficient.
+GitHub-hosted CI is the authoritative full-regression gate. Use focused local verification for proportional feedback. Read [the CI operational guide](docs/engineering/GITHUB_ACTIONS_CI.md) when operating CI, diagnosing failures or assessing review readiness.
 
-### Normal iteration
+### Focused local verification
 
-Run only checks proportional to the change. Typical order:
-
-1. relevant targeted test(s)
-2. `architecture:check` when module boundaries may be affected
-3. `lint:strict` when source/config changed
-4. `typecheck` when TypeScript/runtime contracts changed
-
-Examples:
+Inspect relevant code and requirements, implement the smallest correct change, run affected behavioral tests and appropriate static checks, then review the complete diff before committing.
 
 ```bash
-npm run test -- path/to/changed-feature.test.ts
+npm run test -- path/to/affected.test.ts
 npm run architecture:check
 npm run lint:strict
 npm run typecheck
 ```
 
-During routine implementation, pass an explicit test path to `npm run test`. Without a path, this command runs the full repository suite.
+Choose checks proportional to the change. Generate Prisma Client with `npx prisma generate` before checks requiring generated types/client. Without an explicit test path, `npm run test` executes the complete default Vitest suite; MySQL integration has a separate configuration. Preserve existing discovery, concurrency and deadlines.
 
-### Full-suite rule
+Do not routinely run complete unit/integration suites, production builds or a development server after each edit. Full local verification is exceptional: an explicit request, hosted CI unavailable, diagnosis of a specific CI failure, critical regression/security risk, or focused tests insufficient to reproduce the issue. Document the reason and justified scope. A local pass never substitutes for hosted CI.
 
-If a full repository test suite is genuinely justified by broad regression risk, use:
+Use only the verified disposable MySQL lifecycle through `npm run test:integration:mysql`. Never substitute an application, shared or production database. Preserve identity validation before migrations/destructive tests, isolated connection configuration, teardown on failure and the original failing exit code.
 
-```bash
-npm run test
-```
+### Hosted verification and failure investigation
 
-This command uses Vitest's default file parallelism. Do not use the full suite during normal edit/fix iterations. Normally run it no more than once near task completion, only after implementation is complete, targeted tests are green, lint is green, typecheck is green, architecture checks are green where applicable, and the diff is stable.
+All four jobs in [.github/workflows/ci.yml](.github/workflows/ci.yml) must complete successfully for the latest PR HEAD:
 
-### Failure handling
+* Code Quality (including architecture checker)
+* Unit Tests
+* Full MySQL Integration
+* Production Build
 
-If the full suite exposes failures:
+Verify each actual job conclusion on GitHub against the current HEAD. An earlier SHA, local pass, green badge alone, skipped/cancelled/failed job or incomplete run does not satisfy this gate. Reverify all four after every new commit.
 
-1. identify and group the failures by root cause;
-2. reproduce each relevant failure with targeted test commands;
-3. fix the root cause;
-4. rerun only the affected targeted tests;
-5. rerun lint, typecheck, or architecture checks only when the fix affects them;
-6. do not immediately rerun the complete suite after every small edit;
-7. perform another full confirmation only when the corrective diff is stable and the additional full run is justified.
+When CI fails:
 
-Do not use this loop:
+1. Inspect the exact failing job and original logs; identify the failed assertion, command, migration or build step.
+2. Classify infrastructure, portability, resource contention, fixture, configuration and deterministic application defects separately. State uncertainty rather than guessing.
+3. Reproduce the smallest relevant failure where practical; correct the evidenced root cause and run focused local verification.
+4. Push a new commit to the same task branch/PR and inspect CI again for the latest HEAD.
 
-```text
-full suite
-→ one failure
-→ tiny edit
-→ full suite
-→ another tiny edit
-→ full suite
-→ repeat
-```
+Never weaken assertions, silently increase timeouts, suppress failures, add arbitrary retries/exclusions or use `continue-on-error` to obtain green CI. Reproduce resource-sensitive failures in isolation before treating them as product defects. Do not repeat complete local suites for each correction.
 
-### Flaky/resource-sensitive failures
+### Verification integrity
 
-A timeout, worker termination, resource exhaustion, or isolated failure from a broad run must not automatically be treated as a product defect. Reproduce the affected test in isolation first, for example:
+Preserve meaningful coverage for authentication/authorization, resource-level access, business invariants, data correctness, transactions/concurrency, database isolation and critical mutations. Tests should assert behavior. Unit tests establish pure/domain behavior; integration tests establish database and critical mutation behavior; E2E/UAT requires separate actual execution evidence.
 
-```bash
-npm run test -- path/to/failing.test.ts
-```
-
-If the focused test passes consistently and there is evidence of machine or resource contention, classify the broad-run failure separately from a deterministic application regression. Do not modify production code or weaken tests merely to make a resource-sensitive broad suite pass.
-
-### Other checks
-
-* Prefer scripts defined by the repository.
-* Do not build or run the development server unless explicitly requested, required to reproduce an issue, or there is no other reasonable verification method.
-* Tests must verify behavior rather than implementation details.
-* Use unit tests for business rules and pure logic.
-* Use integration tests for database interactions, authorization, and critical mutations.
-* Use E2E tests for critical user flows, including both happy paths and error paths.
-* Do not modify tests merely to make them pass without verifying that the expected behavior is still correct.
-* If a command cannot be run, state the command, the reason, and what remains unverified.
-
-### Build policy
-
-Production builds are expensive and must only be used when justified. Run `npm run build` for framework upgrades, bundler or Next.js configuration changes, routing convention changes, build-time environment behavior, deployment/runtime compatibility, or changes where only a production build can reasonably verify correctness. Do not run a production build repeatedly during normal implementation.
+Report commands actually executed, results, pre-existing versus introduced failures and remaining gaps. CI success is technical evidence, not engineering/security approval, business/UAT acceptance or production deployment authorization. Hosted CI unavailability permits additional local evidence, not an unsupported READY FOR REVIEW claim.
 
 ## 10. Git and Delivery
 
-* Inspect `git status` and `git diff` before and after making changes.
-* Do not use destructive Git commands, force pushes, or reset user work without explicit authorization.
-* Do not modify lockfiles, generated files, or format the entire repository unless required by the task.
-* Keep diffs small, readable, and clearly separated by concern.
-* Before completing the task, summarize:
+### Mandatory Branch and Pull Request Policy
 
-  * Files changed
-  * Behavior changed
-  * Important security or architecture decisions
-  * Commands and tests executed, including results
-  * Remaining limitations, assumptions, or risks
+This policy binds all coding agents, including Codex and Claude Code, for every change: features, bug fixes, tests, refactoring, documentation, dependency updates, migrations, security fixes and CI configuration. Small changes are not exceptions.
+
+1. Never develop, commit or push ordinary task changes directly to `main`. Create a dedicated task branch before editing.
+2. Preserve uncommitted user work when creating/switching branches. Never reset, discard, overwrite or include unrelated work.
+3. Commit and push only task changes to the task branch. Inspect status/diff before and after changes; keep commits scoped and review the complete diff.
+4. Open a Draft PR targeting `main` once implementation is ready for hosted verification. Pending CI and disclosed issues are acceptable in a Draft PR.
+5. Continue CI fixes and review corrections on the same branch and PR.
+6. Never bypass PR delivery because of urgency, failed CI or tooling limitations. Report BLOCKED with the exact blocker when required Git/PR operations cannot be performed safely.
+7. Never automatically merge a PR or enable auto-merge. Only the repository owner may approve merging after required checks and engineering review.
+8. Do not modify repository permissions, branch protection, rulesets, bypass lists or merge policies without explicit owner authorization for that specific action.
+9. Do not force-push, rewrite history, discard work, modify unrelated lockfiles/generated files or format the repository without task-specific justification and authorization where destructive.
+
+A specifically authorized direct-main exception must comply with GitHub rules and be reported explicitly as an exception. Generic instructions to implement, fix, commit or push do not authorize bypassing this policy. Never circumvent GitHub protections.
+
+### Required delivery lifecycle
+
+```text
+Implement → Focused Local Verification → Task Branch Commit → Push → Draft PR → GitHub CI → Fix Failures → READY FOR REVIEW → Engineering Review → Owner Approval → Merge
+```
+
+Report only these delivery status classifications:
+
+* **CI PENDING**: mandatory checks for the latest HEAD have not completed, including runs not yet started.
+* **READY FOR REVIEW**: all four mandatory jobs verified successful for the current PR HEAD and no known blocking defects; engineering review and owner approval remain required.
+* **REQUEST CHANGES**: known blocking defects or failed checks require correction.
+* **BLOCKED**: a stated external dependency or unavailable capability prevents completion; identify the exact blocker and verification gaps.
+
+Local-only changes, an unpushed commit or a missing required PR are incomplete delivery. An older successful run cannot establish current readiness.
+
+### Required delivery report
+
+Report repository/base/task branch, latest commit SHA, PR URL and scoped commit breakdown; files/behavior changed and material architecture/security decisions; focused local checks actually executed; CI run URL and tested SHA, all four job conclusions, unit/integration totals and cleanup outcome; readiness classification, known defects, limitations and owner-only remaining actions. Distinguish technical CI success, engineering approval, business/UAT acceptance and deployment authorization. Leave merging to the owner.
 
 <!-- NEXT-AGENTS-MD-START -->[Next.js Docs Index]|root: ./node_modules/next/dist/docs|STOP. What you remember about Next.js is WRONG for this project. Always search docs and read before any task.|If docs missing, run this command first: npx @next/codemod agents-md --output AGENTS.md|01-app:{04-glossary.md}|01-app/01-getting-started:{01-installation.md,02-project-structure.md,03-layouts-and-pages.md,04-linking-and-navigating.md,05-server-and-client-components.md,06-fetching-data.md,07-mutating-data.md,08-caching.md,09-revalidating.md,10-error-handling.md,11-css.md,12-images.md,13-fonts.md,14-metadata-and-og-images.md,15-route-handlers.md,16-proxy.md,17-deploying.md,18-upgrading.md}|01-app/02-guides:{adopting-partial-prefetching.md,ai-agents.md,analytics.md,authentication.md,authentication-with-cache-components.md,backend-for-frontend.md,building.md,caching-without-cache-components.md,cdn-caching.md,ci-build-caching.md,content-security-policy.md,css-in-js.md,custom-server.md,data-security.md,debugging.md,deploying-to-platforms.md,draft-mode.md,environment-variables.md,forms.md,how-revalidation-works.md,incremental-static-regeneration-cache-components.md,incremental-static-regeneration.md,instant-navigation.md,instrumentation.md,interactive-apps.md,internationalization.md,json-ld.md,lazy-loading.md,local-development.md,mcp.md,mdx.md,memory-usage.md,migrating-to-cache-components.md,multi-tenant.md,multi-zones.md,offline-support.md,open-telemetry.md,optimizing-prefetching.md,package-bundling.md,ppr-platform-guide.md,prefetching.md,preserving-ui-state.md,preventing-flash-before-hydration.md,production-checklist.md,progressive-web-apps.md,public-static-pages.md,redirecting.md,rendering-philosophy.md,sass.md,scripts.md,self-hosting.md,server-actions.md,server-and-client-boundary.md,single-page-applications.md,static-exports.md,streaming.md,tailwind-v3-css.md,third-party-libraries.md,videos.md,view-transitions.md}|01-app/02-guides/client-side-data-fetching:{swr.md,tanstack-query.md}|01-app/02-guides/migrating:{app-router-migration.md,from-create-react-app.md,from-vite.md}|01-app/02-guides/testing:{cypress.md,jest.md,playwright.md,vitest.md}|01-app/02-guides/upgrading:{codemods.md,version-14.md,version-15.md,version-16.md}|01-app/03-api-reference:{07-edge.md,08-turbopack.md}|01-app/03-api-reference/01-directives:{use-cache-private.md,use-cache-remote.md,use-cache.md,use-client.md,use-server.md}|01-app/03-api-reference/02-components:{font.md,form.md,image.md,link.md,script.md}|01-app/03-api-reference/03-file-conventions/01-metadata:{app-icons.md,manifest.md,opengraph-image.md,robots.md,sitemap.md}|01-app/03-api-reference/03-file-conventions/02-route-segment-config:{dynamicParams.md,instant.md,maxDuration.md,preferredRegion.md,prefetch.md,runtime.md}|01-app/03-api-reference/03-file-conventions:{default.md,dynamic-routes.md,error.md,forbidden.md,instrumentation-client.md,instrumentation.md,intercepting-routes.md,layout.md,loading.md,mdx-components.md,middleware.md,not-found.md,page.md,parallel-routes.md,proxy.md,public-folder.md,route-groups.md,route.md,src-folder.md,template.md,unauthorized.md}|01-app/03-api-reference/04-functions:{after.md,cacheLife.md,cacheTag.md,catchError.md,connection.md,cookies.md,draft-mode.md,fetch.md,forbidden.md,generate-image-metadata.md,generate-metadata.md,generate-sitemaps.md,generate-static-params.md,generate-viewport.md,headers.md,image-response.md,io.md,next-request.md,next-response.md,next-root-params.md,not-found.md,permanentRedirect.md,redirect.md,refresh.md,revalidatePath.md,revalidateTag.md,unauthorized.md,unstable_cache.md,unstable_noStore.md,unstable_rethrow.md,updateTag.md,use-link-status.md,use-offline.md,use-params.md,use-pathname.md,use-report-web-vitals.md,use-router.md,use-search-params.md,use-selected-layout-segment.md,use-selected-layout-segments.md,userAgent.md}|01-app/03-api-reference/05-config/01-next-config-js:{adapterPath.md,allowedDevOrigins.md,appDir.md,assetPrefix.md,authInterrupts.md,basePath.md,cacheComponents.md,cacheHandlers.md,cacheLife.md,cacheMaxMemorySize.md,compress.md,crossOrigin.md,cssChunking.md,deploymentId.md,devIndicators.md,distDir.md,env.md,expireTime.md,exportPathMap.md,generateBuildId.md,generateEtags.md,headers.md,htmlLimitedBots.md,httpAgentOptions.md,images.md,incrementalCacheHandlerPath.md,inlineCss.md,instrumentationClientInject.md,logging.md,mdxRs.md,onDemandEntries.md,optimizePackageImports.md,output.md,outputHashSalt.md,pageExtensions.md,partialPrefetching.md,poweredByHeader.md,prefetchInlining.md,productionBrowserSourceMaps.md,proxyClientMaxBodySize.md,reactCompiler.md,reactMaxHeadersLength.md,reactStrictMode.md,redirects.md,rewrites.md,sassOptions.md,serverActions.md,serverComponentsHmrCache.md,serverExternalPackages.md,staleTimes.md,staticGeneration.md,supportsImmutableAssets.md,taint.md,trailingSlash.md,transpilePackages.md,turbopack.md,turbopackChunking.md,turbopackFileSystemCache.md,turbopackIgnoreIssue.md,turbopackLocalPostcssConfig.md,turbopackMemoryEviction.md,turbopackRustReactCompiler.md,typedRoutes.md,typescript.md,urlImports.md,useLightningcss.md,useOffline.md,useTypeScriptCli.md,webVitalsAttribution.md,webpack.md}|01-app/03-api-reference/05-config:{02-typescript.md,03-eslint.md}|01-app/03-api-reference/06-cli:{create-next-app.md,next.md}|01-app/03-api-reference/07-adapters:{01-configuration.md,02-creating-an-adapter.md,03-api-reference.md,04-testing-adapters.md,05-routing-with-next-routing.md,06-implementing-ppr-in-an-adapter.md,07-runtime-integration.md,08-invoking-entrypoints.md,09-output-types.md,10-routing-information.md,11-use-cases.md,12-immutable-static-assets.md}|02-pages/01-getting-started:{01-installation.md,02-project-structure.md,04-images.md,05-fonts.md,06-css.md,11-deploying.md}|02-pages/02-guides:{analytics.md,authentication.md,babel.md,ci-build-caching.md,content-security-policy.md,css-in-js.md,custom-server.md,debugging.md,draft-mode.md,environment-variables.md,forms.md,incremental-static-regeneration.md,instrumentation.md,internationalization.md,lazy-loading.md,mdx.md,multi-zones.md,open-telemetry.md,package-bundling.md,post-css.md,preview-mode.md,production-checklist.md,redirecting.md,sass.md,scripts.md,self-hosting.md,static-exports.md,tailwind-v3-css.md,third-party-libraries.md}|02-pages/02-guides/migrating:{app-router-migration.md,from-create-react-app.md,from-vite.md}|02-pages/02-guides/testing:{cypress.md,jest.md,playwright.md,vitest.md}|02-pages/02-guides/upgrading:{codemods.md,version-10.md,version-11.md,version-12.md,version-13.md,version-14.md,version-9.md}|02-pages/03-building-your-application/01-routing:{01-pages-and-layouts.md,02-dynamic-routes.md,03-linking-and-navigating.md,05-custom-app.md,06-custom-document.md,07-api-routes.md,08-custom-error.md}|02-pages/03-building-your-application/02-rendering:{01-server-side-rendering.md,02-static-site-generation.md,04-automatic-static-optimization.md,05-client-side-rendering.md}|02-pages/03-building-your-application/03-data-fetching:{01-get-static-props.md,02-get-static-paths.md,03-get-server-side-props.md,05-client-side.md}|02-pages/03-building-your-application/06-configuring:{12-error-handling.md}|02-pages/04-api-reference:{06-edge.md,08-turbopack.md}|02-pages/04-api-reference/01-components:{font.md,form.md,head.md,image-legacy.md,image.md,link.md,script.md}|02-pages/04-api-reference/02-file-conventions:{instrumentation.md,proxy.md,public-folder.md,src-folder.md}|02-pages/04-api-reference/03-functions:{catchError.md,get-initial-props.md,get-server-side-props.md,get-static-paths.md,get-static-props.md,next-request.md,next-response.md,use-params.md,use-report-web-vitals.md,use-router.md,use-search-params.md,userAgent.md}|02-pages/04-api-reference/04-config/01-next-config-js:{adapterPath.md,allowedDevOrigins.md,assetPrefix.md,basePath.md,bundlePagesRouterDependencies.md,compress.md,crossOrigin.md,deploymentId.md,devIndicators.md,distDir.md,env.md,exportPathMap.md,generateBuildId.md,generateEtags.md,headers.md,httpAgentOptions.md,images.md,logging.md,onDemandEntries.md,optimizePackageImports.md,output.md,pageExtensions.md,poweredByHeader.md,productionBrowserSourceMaps.md,proxyClientMaxBodySize.md,reactStrictMode.md,redirects.md,rewrites.md,serverExternalPackages.md,trailingSlash.md,transpilePackages.md,turbopack.md,turbopackChunking.md,typescript.md,urlImports.md,useLightningcss.md,useTypeScriptCli.md,webVitalsAttribution.md,webpack.md}|02-pages/04-api-reference/04-config:{01-typescript.md,02-eslint.md}|02-pages/04-api-reference/05-cli:{create-next-app.md,next.md}|02-pages/04-api-reference/06-adapters:{01-configuration.md,02-creating-an-adapter.md,03-api-reference.md,04-testing-adapters.md,05-routing-with-next-routing.md,06-runtime-integration.md,07-invoking-entrypoints.md,08-output-types.md,09-routing-information.md,10-use-cases.md}|03-architecture:{accessibility.md,fast-refresh.md,nextjs-compiler.md,supported-browsers.md}|04-community:{01-contribution-guide.md,02-rspack.md}<!-- NEXT-AGENTS-MD-END -->
