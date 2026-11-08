@@ -12,12 +12,14 @@ Each job checks out without persistent credentials, installs Node **24.22.1 LTS*
 
 | Job ID / required check | Subsequent commands | Job budget |
 | --- | --- | --- |
-| `quality` / **Code Quality** | `npm run architecture:check`, `npm run lint:strict`, `npm run typecheck` | 20 minutes |
+| `quality` / **Code Quality** | `npm run architecture:check`, `npm run lint:strict`, `npx --no-install next typegen`, `npm run typecheck` | 20 minutes |
 | `unit` / **Unit Tests** | `npm run test` | 30 minutes |
 | `integration` / **Full MySQL Integration** | Docker diagnostics; `node scripts/run-mysql-integration-tests.mjs --verify-failure-cleanup`; `npm run test:integration:mysql`; always `node scripts/run-mysql-integration-tests.mjs --cleanup` | 60 minutes |
 | `build` / **Production Build** | `npm run build` | 30 minutes |
 
 Budgets bound setup plus execution; they do not change test deadlines. Initial/final diagnostics show CPU, memory, disk and tool versions without environment dumps. There are no retries, suppressed failures or `continue-on-error` steps.
+
+Quality generates Next.js types before standalone TypeScript checking. A clean checkout has no ignored `next-env.d.ts`, so image imports otherwise fail with TS2307; the initial hosted run and an isolated local checkout reproduced this. `next typegen` generates Next's own declarations without a build. Existing developer/build-generated files can conceal this prerequisite. No custom wildcard declaration or relaxed compiler rule is used.
 
 Default Vitest discovery/configuration is unchanged: node, RSC, DOM and architecture projects in `vitest.config.ts`. Integration uses `vitest.integration.config.ts`: `__tests__/integration` and IT/Leave/Stock integration directories, serial files, one worker and existing 20-second test/hook deadlines. The unit job excludes these database tests. The new safety tests run in the default node project.
 

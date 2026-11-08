@@ -47,6 +47,8 @@ jobs:
         run: npm run architecture:check
       - name: Strict lint
         run: npm run lint:strict
+      - name: Generate Next.js types
+        run: npx --no-install next typegen
       - name: Typecheck
         run: npm run typecheck
 
