@@ -33,7 +33,7 @@ npm run typecheck
 npm run test -- path/to/relevant.test.ts
 ```
 
-ระบุ path ของ test ระหว่างพัฒนา; full suite `npm run test` ใช้เมื่อ scope ของ release คุ้มกับการตรวจทั้ง repository
+ระบุ path ของ test ระหว่างพัฒนา; full regression ใช้ hosted CI ตาม [คู่มือ GitHub Actions](./docs/engineering/GITHUB_ACTIONS_CI.md) และส่งงานผ่าน task branch / Draft PR ตาม AGENTS.md
 
 ## เอกสาร
 
