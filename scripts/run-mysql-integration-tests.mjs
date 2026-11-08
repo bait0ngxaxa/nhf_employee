@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { stripVTControlCharacters } from "node:util";
 import { createConnection } from "mysql2/promise";
 import { assertDisposableMysql } from "./mysql-integration-safety.mjs";
 
@@ -10,14 +11,52 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const write = (message) => process.stdout.write(`[integration] ${message}\n`);
 
+class IntentionalCleanupProbeError extends Error {
+    constructor() {
+        super("Intentional failure to verify disposable cleanup");
+        this.exitCode = 37;
+    }
+}
+
+function safeDiagnostics(output, env) {
+    const sensitiveKey = /pass(?:word|wd)?|pwd|token|secret|credential|(?:api|private|access)[_-]?key|(?:database|connection).*url/i;
+    let text = stripVTControlCharacters(output);
+    // Replace effective child secrets (including encoded forms) before formatting/truncating.
+    const secrets = Object.entries(env).filter(([key, value]) => typeof value === "string" && value &&
+        (sensitiveKey.test(key) || value.includes("://")))
+        .flatMap(([, value]) => {
+            try {
+                const url = new URL(value);
+                return [value, url.password, decodeURIComponent(url.password),
+                    ...Array.from(url.searchParams).filter(([key]) => sensitiveKey.test(key)).map(([, secret]) => secret)];
+            } catch { return [value]; }
+        })
+        .flatMap((value) => [value, encodeURIComponent(value), JSON.stringify(value).slice(1, -1), stripVTControlCharacters(value)])
+        .filter(Boolean).sort((a, b) => b.length - a.length);
+    for (const secret of secrets) text = text.replaceAll(secret, "[REDACTED]");
+    text = text
+        .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g, "[REDACTED]")
+        // Redact whole URLs, including credentials unknown to the child environment.
+        .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, "[REDACTED]")
+        .replace(/\b(Bearer|Basic)\s+[^\s"'<>]+/gi, "$1 [REDACTED]")
+        .replace(/(["']?[\w.-]*(?:pass(?:word|wd)?|pwd|token|secret|credential|(?:api|private|access)[_-]?key|database_url|connection_url)[\w.-]*["']?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}]+)/gi,
+            "$1[REDACTED]")
+        .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
+    return text.trim().split("\n").slice(0, 12).join("\n").slice(0, 2400);
+}
+
 function command(file, args, env, capture = false) {
     const result = spawnSync(file, args, {
         cwd: root, env, encoding: "utf8", stdio: capture ? "pipe" : "inherit",
     });
     if (result.error || result.status !== 0) {
-        // Captured output and command arguments may contain credentials.
-        const error = new Error(`Integration command failed: ${file} (exit ${result.status ?? "unknown"})`);
-        error.exitCode = result.status || 1;
+        const operation = file === "docker" && args[0] === "compose" && ["up", "port", "exec", "down", "ps"].includes(args[7]) ? args[7] : undefined;
+        const label = operation ? `Docker Compose ${operation}` : "Integration command";
+        const detail = capture ? safeDiagnostics(`${result.stdout ?? ""}\n${result.stderr ?? ""}`, env) : "";
+        const reason = /^[A-Z0-9_]+$/.test(result.error?.code ?? "") ? `, ${result.error.code}` : "";
+        // Never print arguments, raw environment or spawn error messages (which can include arguments).
+        const error = new Error(`${label} failed (exit ${result.status ?? "unknown"}${reason})${detail ? `\n${detail}` : ""}`);
+        error.exitCode = result.status ?? 1;
         throw error;
     }
     return result.stdout?.trim() ?? "";
@@ -74,11 +113,7 @@ export async function runIntegration({ env = process.env, execute = command, con
         childEnv.NHF_INTEGRATION_SERVER_UUID = uuid;
         await assertDisposableMysql(childEnv, connect);
         write("Disposable database identity verified before migrations/tests");
-        if (probe) {
-            const error = new Error("Intentional failure to verify disposable cleanup");
-            error.exitCode = 37;
-            throw error;
-        }
+        if (probe) throw new IntentionalCleanupProbeError();
         const run = (label, cli, args) => {
             write(`${label}...`);
             execute(process.execPath, [cli, ...args], childEnv);
@@ -93,9 +128,9 @@ export async function runIntegration({ env = process.env, execute = command, con
     } finally {
         try { down(); } catch (error) { cleanupFailure = error; }
     }
-    if (cleanupFailure) console.error("[integration] Disposable cleanup failed");
+    if (cleanupFailure) console.error(`[integration] Disposable cleanup failed: ${safeDiagnostics(cleanupFailure.message, childEnv)}`);
     if (failure) {
-        if (probe && failure.exitCode === 37 && !cleanupFailure) {
+        if (probe && failure instanceof IntentionalCleanupProbeError && !cleanupFailure) {
             write("Intentional exit 37 observed; cleanup after failure verified");
             return;
         }
