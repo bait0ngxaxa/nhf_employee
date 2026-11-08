@@ -163,4 +163,3 @@ jobs:
         run: npx --no-install prisma generate
       - name: Production build
         run: npm run build
-
