@@ -1,0 +1,166 @@
+name: NHF Employee CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Runner diagnostics
+        run: |
+          node --version
+          npm --version
+          nproc
+          free -h
+          df -h .
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npx --no-install prisma generate
+      - name: Architecture boundaries
+        run: npm run architecture:check
+      - name: Strict lint
+        run: npm run lint:strict
+      - name: Typecheck
+        run: npm run typecheck
+
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Runner diagnostics
+        run: |
+          node --version
+          npm --version
+          nproc
+          free -h
+          df -h .
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npx --no-install prisma generate
+      - name: Complete unit suite
+        run: npm run test
+
+  integration:
+    name: Full MySQL Integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Runner diagnostics
+        run: |
+          node --version
+          npm --version
+          nproc
+          free -h
+          df -h .
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npx --no-install prisma generate
+      - name: Docker diagnostics
+        run: |
+          docker version --format 'Docker Engine: {{.Server.Version}}'
+          docker compose version
+      - name: Verify cleanup after intentional failure
+        run: node scripts/run-mysql-integration-tests.mjs --verify-failure-cleanup
+      - name: Complete MySQL integration suite
+        id: tests
+        run: |
+          start=$SECONDS
+          if npm run test:integration:mysql; then
+            status=0
+          else
+            status=$?
+          fi
+          {
+            echo '### MySQL integration command'
+            echo "Exit code: $status"
+            echo "Elapsed: $((SECONDS - start))s (startup, identity, migrations, tests, cleanup)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - name: Ensure disposable MySQL cleanup
+        if: ${{ always() }}
+        run: node scripts/run-mysql-integration-tests.mjs --cleanup
+      - name: Final runner diagnostics
+        if: ${{ always() }}
+        run: |
+          free -h
+          df -h .
+
+  build:
+    name: Production Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Runner diagnostics
+        run: |
+          node --version
+          npm --version
+          nproc
+          free -h
+          df -h .
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma Client
+        run: npx --no-install prisma generate
+      - name: Production build
+        run: npm run build
+
