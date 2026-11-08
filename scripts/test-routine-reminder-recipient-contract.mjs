@@ -3,6 +3,9 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { createConnection } from "mysql2/promise";
+import { assertDisposableMysql } from "./mysql-integration-safety.mjs";
+
+await assertDisposableMysql();
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

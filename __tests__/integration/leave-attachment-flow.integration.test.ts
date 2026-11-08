@@ -186,40 +186,39 @@ async function createFixture(): Promise<Fixture> {
             departmentId: department.id,
         },
     });
-    const [ownerUser, approverUser, outsiderUser, adminUser] = await Promise.all([
-        prisma.user.create({
-            data: {
-                email: "leave-flow-owner-user@integration.test",
-                name: "Leave Owner",
-                password: "integration-only",
-                employeeId: owner.id,
-            },
-        }),
-        prisma.user.create({
-            data: {
-                email: "leave-flow-approver-user@integration.test",
-                name: "Stored Approver",
-                password: "integration-only",
-                employeeId: approver.id,
-            },
-        }),
-        prisma.user.create({
-            data: {
-                email: "leave-flow-outsider-user@integration.test",
-                name: "Other Employee",
-                password: "integration-only",
-                employeeId: outsider.id,
-            },
-        }),
-        prisma.user.create({
-            data: {
-                email: "leave-flow-admin@integration.test",
-                name: "Leave Admin",
-                password: "integration-only",
-                role: "ADMIN",
-            },
-        }),
-    ]);
+    // Fixture setup is sequential; concurrent user creation is not under test here.
+    const ownerUser = await prisma.user.create({
+        data: {
+            email: "leave-flow-owner-user@integration.test",
+            name: "Leave Owner",
+            password: "integration-only",
+            employeeId: owner.id,
+        },
+    });
+    const approverUser = await prisma.user.create({
+        data: {
+            email: "leave-flow-approver-user@integration.test",
+            name: "Stored Approver",
+            password: "integration-only",
+            employeeId: approver.id,
+        },
+    });
+    const outsiderUser = await prisma.user.create({
+        data: {
+            email: "leave-flow-outsider-user@integration.test",
+            name: "Other Employee",
+            password: "integration-only",
+            employeeId: outsider.id,
+        },
+    });
+    const adminUser = await prisma.user.create({
+        data: {
+            email: "leave-flow-admin@integration.test",
+            name: "Leave Admin",
+            password: "integration-only",
+            role: "ADMIN",
+        },
+    });
 
     return {
         ownerEmployeeId: owner.id,

@@ -1,9 +1,11 @@
 // @vitest-environment node
 import type * as NextServerModule from "next/server";
+import type * as AuthorizationModule from "@/modules/authorization";
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+    authorizationRepository: { load: vi.fn(), loadMany: vi.fn() },
     requireLiffWorkforceSession: vi.fn(),
     getEmployeeLeaveProfile: vi.fn(),
     getLeaveApprovalList: vi.fn(),
@@ -29,6 +31,15 @@ vi.mock("next/server", async (importOriginal) => {
 vi.mock("@/modules/line", () => ({
     requireLiffWorkforceSession: mocks.requireLiffWorkforceSession,
 }));
+vi.mock("@/modules/authorization", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthorizationModule>();
+    return {
+        ...actual,
+        authorization: actual.createAuthorizationResolver({
+            repository: mocks.authorizationRepository,
+        }),
+    };
+});
 vi.mock("@/modules/leave", async (importOriginal) => {
     const actual = await importOriginal();
     return {
@@ -97,6 +108,9 @@ describe("LIFF Leave route adapters", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
+        const emptyResolution = { userGrants: [], memberships: [], teamRoleGrants: [] };
+        mocks.authorizationRepository.load.mockResolvedValue(emptyResolution);
+        mocks.authorizationRepository.loadMany.mockResolvedValue(emptyResolution);
         mocks.requireLiffWorkforceSession.mockResolvedValue(AUTH);
         mocks.getEmployeeLeaveProfile.mockResolvedValue({
             quotas: [],

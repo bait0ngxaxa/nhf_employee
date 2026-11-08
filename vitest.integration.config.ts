@@ -8,6 +8,7 @@ export default defineConfig({
         },
     },
     test: {
+        globalSetup: ["./scripts/mysql-integration-safety.mjs"],
         environment: "node",
         globals: true,
         include: [
