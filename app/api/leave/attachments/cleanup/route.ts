@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { cleanupOrphanedLeaveAttachments } from "@/modules/leave";
+import { verifySharedSecret } from "@/lib/security/shared-secret";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { forbidden, jsonError, notFound, serverError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
@@ -21,12 +22,14 @@ function parseDryRun(request: Request): boolean | null {
 export async function POST(request: Request): Promise<NextResponse> {
     if (!isFeatureEnabled(FEATURE_KEYS.leave)) return notFound();
 
-    const expectedSecret = process.env.LEAVE_ATTACHMENT_CLEANUP_SECRET?.trim();
-    if (!expectedSecret) {
+    const secretCheck = verifySharedSecret(request, {
+        envName: "LEAVE_ATTACHMENT_CLEANUP_SECRET",
+        headerName: CLEANUP_SECRET_HEADER,
+    });
+    if (secretCheck.status === "not_configured") {
         return jsonError(COMMON_API_MESSAGES.cleanupNotConfigured, 503);
     }
-
-    if (request.headers.get(CLEANUP_SECRET_HEADER) !== expectedSecret) {
+    if (secretCheck.status === "invalid") {
         return forbidden();
     }
 

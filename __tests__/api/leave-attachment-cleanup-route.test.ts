@@ -26,7 +26,7 @@ describe("leave attachment cleanup route", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
-        vi.stubEnv("LEAVE_ATTACHMENT_CLEANUP_SECRET", "cleanup-secret");
+        vi.stubEnv("LEAVE_ATTACHMENT_CLEANUP_SECRET", "cleanup-secret-0123456789abcdef01234567");
         vi.mocked(cleanupOrphanedLeaveAttachments).mockResolvedValue({
             scannedCount: 4,
             orphanCount: 2,
@@ -40,7 +40,7 @@ describe("leave attachment cleanup route", () => {
 
     it("rejects cleanup even with a valid secret when Leave is disabled", async () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
-        expect((await POST(createRequest("cleanup-secret"))).status).toBe(404);
+        expect((await POST(createRequest("cleanup-secret-0123456789abcdef01234567"))).status).toBe(404);
         expect(cleanupOrphanedLeaveAttachments).not.toHaveBeenCalled();
     });
 
@@ -62,7 +62,7 @@ describe("leave attachment cleanup route", () => {
             cutoff: new Date("2035-01-01T00:00:00.000Z"),
         });
 
-        const response = await POST(createRequest("cleanup-secret", true));
+        const response = await POST(createRequest("cleanup-secret-0123456789abcdef01234567", true));
         const body = await response.json();
 
         expect(response.status).toBe(200);
@@ -87,7 +87,7 @@ describe("leave attachment cleanup route", () => {
             new Error("database failed"),
         );
 
-        const response = await POST(createRequest("cleanup-secret"));
+        const response = await POST(createRequest("cleanup-secret-0123456789abcdef01234567"));
 
         expect(response.status).toBe(500);
         await expect(response.json()).resolves.toEqual({
@@ -101,7 +101,7 @@ describe("leave attachment cleanup route", () => {
                 "http://localhost/api/leave/attachments/cleanup?dryRun=maybe",
                 {
                     method: "POST",
-                    headers: { "x-cleanup-secret": "cleanup-secret" },
+                    headers: { "x-cleanup-secret": "cleanup-secret-0123456789abcdef01234567" },
                 },
             ),
         );

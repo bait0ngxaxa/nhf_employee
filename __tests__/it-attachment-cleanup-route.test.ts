@@ -28,7 +28,7 @@ afterEach(() => {
 describe("IT attachment cleanup maintenance route", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        process.env.IT_ATTACHMENT_CLEANUP_SECRET = "test-only-secret";
+        process.env.IT_ATTACHMENT_CLEANUP_SECRET = "test-only-secret-0123456789abcdef0123";
         mocks.cleanup.mockResolvedValue({
             scannedCount: 4,
             orphanCount: 2,
@@ -44,17 +44,17 @@ describe("IT attachment cleanup maintenance route", () => {
         expect((await POST(request())).status).toBe(503);
         expect(mocks.cleanup).not.toHaveBeenCalled();
 
-        process.env.IT_ATTACHMENT_CLEANUP_SECRET = "test-only-secret";
+        process.env.IT_ATTACHMENT_CLEANUP_SECRET = "test-only-secret-0123456789abcdef0123";
         expect((await POST(request("", "wrong-secret"))).status).toBe(403);
         expect(mocks.cleanup).not.toHaveBeenCalled();
     });
 
     it("strictly parses dryRun and returns counts without file details", async () => {
-        const invalid = await POST(request("?dryRun=yes", "test-only-secret"));
+        const invalid = await POST(request("?dryRun=yes", "test-only-secret-0123456789abcdef0123"));
         expect(invalid.status).toBe(400);
         expect(mocks.cleanup).not.toHaveBeenCalled();
 
-        const duplicate = await POST(request("?dryRun=true&dryRun=false", "test-only-secret"));
+        const duplicate = await POST(request("?dryRun=true&dryRun=false", "test-only-secret-0123456789abcdef0123"));
         expect(duplicate.status).toBe(400);
 
         mocks.cleanup.mockResolvedValueOnce({
@@ -65,7 +65,7 @@ describe("IT attachment cleanup maintenance route", () => {
             skippedRecentCount: 1,
             dryRun: true,
         });
-        const valid = await POST(request("?dryRun=true", "test-only-secret"));
+        const valid = await POST(request("?dryRun=true", "test-only-secret-0123456789abcdef0123"));
         expect(valid.status).toBe(200);
         expect(mocks.cleanup).toHaveBeenCalledWith({ dryRun: true });
         const body: unknown = await valid.json();
@@ -82,12 +82,12 @@ describe("IT attachment cleanup maintenance route", () => {
     });
 
     it("defaults to deletion mode and masks cleanup errors", async () => {
-        const response = await POST(request("", "test-only-secret"));
+        const response = await POST(request("", "test-only-secret-0123456789abcdef0123"));
         expect(response.status).toBe(200);
         expect(mocks.cleanup).toHaveBeenCalledWith({ dryRun: false });
 
         mocks.cleanup.mockRejectedValueOnce(new Error("private path must not be returned"));
-        const failed = await POST(request("", "test-only-secret"));
+        const failed = await POST(request("", "test-only-secret-0123456789abcdef0123"));
         expect(failed.status).toBe(500);
         expect(await failed.text()).not.toContain("private path");
     });

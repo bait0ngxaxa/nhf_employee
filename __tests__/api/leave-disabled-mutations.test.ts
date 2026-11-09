@@ -36,10 +36,10 @@ describe("disabled Leave mutation endpoints", () => {
         ["LIFF confirm not taken", "PUT", confirmNotTakenLiff],
     ])("rejects %s before invoking operational code", async (_label, method, handler) => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
-        vi.stubEnv("LEAVE_ATTACHMENT_CLEANUP_SECRET", "test-secret");
+        vi.stubEnv("LEAVE_ATTACHMENT_CLEANUP_SECRET", "test-secret-0123456789abcdef0123456789");
         const request = new NextRequest("http://localhost/api/leave", {
             method,
-            headers: { "x-cleanup-secret": "test-secret", "content-type": "application/json" },
+            headers: { "x-cleanup-secret": "test-secret-0123456789abcdef0123456789", "content-type": "application/json" },
             body: "{}",
         });
         expect((await handler(request)).status).toBe(404);
