@@ -1,6 +1,8 @@
 export const HYBRID_ACCESS_COOKIE_NAME = "__Host-nhf_at";
 export const HYBRID_REFRESH_COOKIE_NAME = "__Host-nhf_rt";
 
+export const MIN_HYBRID_ACCESS_TOKEN_SECRET_LENGTH = 32;
+
 const textEncoder = new TextEncoder();
 
 /**
@@ -13,6 +15,12 @@ export function getHybridSecretKey(): Uint8Array {
     if (!secret) {
         throw new Error(
             "Missing required environment variable: AUTH_ACCESS_TOKEN_SECRET",
+        );
+    }
+
+    if (secret.length < MIN_HYBRID_ACCESS_TOKEN_SECRET_LENGTH) {
+        throw new Error(
+            `AUTH_ACCESS_TOKEN_SECRET must be at least ${MIN_HYBRID_ACCESS_TOKEN_SECRET_LENGTH} characters`,
         );
     }
 

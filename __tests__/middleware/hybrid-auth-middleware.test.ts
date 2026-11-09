@@ -109,7 +109,7 @@ describe("hybrid auth proxy", () => {
     });
 
     it("allows protected route when valid hybrid access token exists", async () => {
-        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret";
+        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret-0123456789abcdef";
         const token = await issueAccessToken({
             userId: 1,
             role: "ADMIN",
@@ -124,7 +124,7 @@ describe("hybrid auth proxy", () => {
     });
 
     it("allows stock dashboard route when valid hybrid access token exists", async () => {
-        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret";
+        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret-0123456789abcdef";
         const token = await issueAccessToken({
             userId: 1,
             role: "ADMIN",
@@ -142,7 +142,7 @@ describe("hybrid auth proxy", () => {
     });
 
     it("redirects authenticated user away from /login to /dashboard", async () => {
-        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret";
+        process.env.AUTH_ACCESS_TOKEN_SECRET = "middleware-test-secret-0123456789abcdef";
         const token = await issueAccessToken({
             userId: 1,
             role: "USER",
