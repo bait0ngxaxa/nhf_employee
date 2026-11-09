@@ -1,6 +1,11 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
+import { OUTBOUND_SMTP_TIMEOUTS } from "@/lib/network/outbound-http";
+
 import type { EmailData } from "./types";
+
+/** sendMail attempts inside one sendSmtpEmail call (2s/4s/8s backoff between). */
+export const SMTP_MAX_SEND_ATTEMPTS = 3;
 
 let transporter: Transporter | null = null;
 let isTransporterReady = false;
@@ -42,6 +47,9 @@ function getTransporter(): Transporter {
             maxMessages: 100,
             rateDelta: 1000,
             rateLimit: 5,
+            // Timeouts reject with code ETIMEDOUT and use the existing
+            // retry/false path below. socketTimeout is idle-only (see constant).
+            ...OUTBOUND_SMTP_TIMEOUTS,
         });
     }
     return transporter;
@@ -90,7 +98,7 @@ export async function sendSmtpEmail(emailData: EmailData): Promise<boolean> {
             }
         }
 
-        const maxRetries = 3;
+        const maxRetries = SMTP_MAX_SEND_ATTEMPTS;
         let attempt = 0;
 
         while (attempt < maxRetries) {
