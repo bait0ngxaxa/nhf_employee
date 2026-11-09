@@ -25,6 +25,7 @@ import {
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
 import {
     MAX_OUTBOX_ATTEMPTS,
+    OUTBOX_BATCH_TIME_BUDGET_MS,
     OUTBOX_NOTIFICATION_TYPES,
     OUTBOX_RETRY_BASE_DELAY_MS,
     STALE_OUTBOX_PROCESSING_MINUTES,
@@ -1801,5 +1802,144 @@ describe("processOutbox", () => {
         await processOutbox();
 
         expect(sendLeaveCancelledNotifications).toHaveBeenCalledTimes(1);
+    });
+
+    it("routes a provider request timeout through the FAILED retry path with backoff", async () => {
+        vi.useFakeTimers();
+        const now = new Date("2026-07-13T03:00:00.000Z");
+        vi.setSystemTime(now);
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(
+                asNever([
+                    buildNotification(
+                        130,
+                        "LEAVE_CANCELLED",
+                        JSON.stringify(buildLeavePayload()),
+                    ),
+                ]),
+            );
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
+            new DOMException("The operation timed out.", "TimeoutError"),
+        );
+
+        try {
+            const result = await processOutbox();
+
+            expect(result).toEqual({ processed: 0, failed: 1 });
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                where: { id: 130, status: "PROCESSING" },
+                data: {
+                    status: "FAILED",
+                    attempts: { increment: 1 },
+                    lastError: "The operation timed out.",
+                    nextAttemptAt: new Date(
+                        now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS,
+                    ),
+                },
+            });
+            expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 130, status: "PROCESSING" },
+                    data: expect.objectContaining({ status: "SENT" }),
+                }),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    describe("batch time budget", () => {
+        function claimedIds(): number[] {
+            return prismaMock.notificationOutbox.updateMany.mock.calls
+                .map(([args]) => args)
+                .filter((args) => args.data.status === "PROCESSING")
+                .map((args) => Number((args.where as { id: number }).id));
+        }
+
+        function queueLeaveCancelledCandidates(ids: number[]): void {
+            prismaMock.notificationOutbox.findMany
+                .mockResolvedValueOnce(asNever([]))
+                .mockResolvedValueOnce(
+                    asNever(
+                        ids.map((id) =>
+                            buildNotification(
+                                id,
+                                "LEAVE_CANCELLED",
+                                JSON.stringify(buildLeavePayload()),
+                            ),
+                        ),
+                    ),
+                );
+        }
+
+        it("keeps the budget well inside the stale PROCESSING window", () => {
+            expect(OUTBOX_BATCH_TIME_BUDGET_MS).toBeGreaterThan(0);
+            expect(OUTBOX_BATCH_TIME_BUDGET_MS).toBeLessThanOrEqual(
+                (STALE_OUTBOX_PROCESSING_MINUTES * 60_000) / 2,
+            );
+        });
+
+        it("stops claiming new rows once the budget is spent but finishes the claimed row", async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
+            const consoleWarnSpy = vi
+                .spyOn(console, "warn")
+                .mockImplementation(() => undefined);
+            queueLeaveCancelledCandidates([140, 141, 142]);
+            vi.mocked(sendLeaveCancelledNotifications).mockImplementationOnce(
+                async () => {
+                    vi.advanceTimersByTime(OUTBOX_BATCH_TIME_BUDGET_MS);
+                },
+            );
+
+            try {
+                const result = await processOutbox();
+
+                expect(result).toEqual({ processed: 1, failed: 0 });
+                expect(claimedIds()).toEqual([140]);
+                expect(sendLeaveCancelledNotifications).toHaveBeenCalledTimes(1);
+                expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                    where: { id: 140, status: "PROCESSING" },
+                    data: { status: "SENT", lastError: null },
+                });
+                const touchedIds = prismaMock.notificationOutbox.updateMany.mock.calls
+                    .map(([args]) => Number((args.where as { id: number }).id));
+                expect(touchedIds).not.toContain(141);
+                expect(touchedIds).not.toContain(142);
+                expect(consoleWarnSpy).toHaveBeenCalledWith(
+                    "outbox_batch_budget_exhausted",
+                    expect.objectContaining({
+                        budgetMs: OUTBOX_BATCH_TIME_BUDGET_MS,
+                        unclaimedCandidates: 2,
+                    }),
+                );
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it("keeps claiming while the elapsed time stays under the budget", async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
+            queueLeaveCancelledCandidates([150, 151, 152]);
+            vi.mocked(sendLeaveCancelledNotifications).mockImplementation(
+                async () => {
+                    vi.advanceTimersByTime(
+                        Math.floor((OUTBOX_BATCH_TIME_BUDGET_MS - 1) / 3),
+                    );
+                },
+            );
+
+            try {
+                const result = await processOutbox();
+
+                expect(result).toEqual({ processed: 3, failed: 0 });
+                expect(claimedIds()).toEqual([150, 151, 152]);
+            } finally {
+                vi.mocked(sendLeaveCancelledNotifications).mockReset();
+                vi.useRealTimers();
+            }
+        });
     });
 });

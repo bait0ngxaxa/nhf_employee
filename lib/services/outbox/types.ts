@@ -48,6 +48,14 @@ export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
 export const MAX_OUTBOX_ATTEMPTS = 3;
 export const OUTBOX_RETRY_BASE_DELAY_MS = 60_000;
 export const STALE_OUTBOX_PROCESSING_MINUTES = 10;
+/**
+ * processOutbox stops claiming new rows once a batch has run this long. Half the
+ * stale window leaves a margin for the last claimed row to finish (each provider
+ * request is bounded by OUTBOUND_HTTP_TIMEOUT_MS) before stale recovery could
+ * reclaim it.
+ */
+export const OUTBOX_BATCH_TIME_BUDGET_MS =
+    (STALE_OUTBOX_PROCESSING_MINUTES * 60_000) / 2;
 
 export function isOutboxNotificationType(
     value: string,
