@@ -48,6 +48,20 @@ export type OutboxStatus = (typeof OUTBOX_STATUSES)[number];
 export const MAX_OUTBOX_ATTEMPTS = 3;
 export const OUTBOX_RETRY_BASE_DELAY_MS = 60_000;
 export const STALE_OUTBOX_PROCESSING_MINUTES = 10;
+/**
+ * processOutbox stops claiming new rows once a batch has run this long; rows
+ * already claimed finish normally.
+ *
+ * This bounds how long one processOutbox run lasts and reduces overlap between
+ * cron and wakeup runs. It does NOT protect against stale reclaim: staleness is
+ * judged per row from updatedAt, which the claim (updateMany -> PROCESSING)
+ * refreshes, and unclaimed PENDING/FAILED rows are never stale. What keeps a
+ * row from being reclaimed while its worker still holds it is that one row's
+ * processing time (per-request provider timeout x provider calls per row) stays
+ * below STALE_OUTBOX_PROCESSING_MINUTES.
+ */
+export const OUTBOX_BATCH_TIME_BUDGET_MS =
+    (STALE_OUTBOX_PROCESSING_MINUTES * 60_000) / 2;
 
 export function isOutboxNotificationType(
     value: string,

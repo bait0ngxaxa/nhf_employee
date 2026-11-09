@@ -10,11 +10,40 @@ import type { LineWebhookData } from "@/lib/line";
 import type { LineWebhookData as DirectLineWebhookData } from "@/lib/line/types";
 import type { EmailRequestData } from "@/modules/it";
 import { sendLineAppMessage } from "@/lib/line/messaging";
+import { OUTBOUND_HTTP_TIMEOUT_MS } from "@/lib/network/outbound-http";
 import type { LineFlexMessage } from "@/types/api";
 
 // Mock fetch
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
+
+/**
+ * Node's AbortSignal.timeout is not driven by Vitest fake timers, so replace it
+ * with a fake-timer-backed signal that aborts with the same TimeoutError.
+ */
+function installFakeTimeoutSignal() {
+    vi.useFakeTimers();
+    return vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+        const controller = new AbortController();
+        setTimeout(() => {
+            controller.abort(
+                new DOMException("The operation timed out.", "TimeoutError"),
+            );
+        }, ms);
+        return controller.signal;
+    });
+}
+
+function hangUntilAborted(
+    _input: string,
+    init: { signal?: AbortSignal },
+): Promise<never> {
+    return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+            reject(init.signal?.reason);
+        });
+    });
+}
 
 const flexMessage: LineFlexMessage = {
     type: "flex",
@@ -87,6 +116,8 @@ describe("LINE Notification Service", () => {
 
     afterEach(() => {
         vi.unstubAllEnvs();
+        vi.restoreAllMocks();
+        vi.useRealTimers();
     });
 
     describe("sendLineMessage", () => {
@@ -175,6 +206,59 @@ describe("LINE Notification Service", () => {
             );
         });
 
+        it("returns false instead of success when a push exceeds the request timeout", async () => {
+            const retryKey = "123e4567-e89b-52d3-a456-426614174000";
+            const consoleErrorSpy = vi
+                .spyOn(console, "error")
+                .mockImplementation(() => undefined);
+            const timeoutSpy = installFakeTimeoutSignal();
+            fetchMock.mockImplementation(hangUntilAborted);
+
+            const pending = sendLineMessage("user1", flexMessage, retryKey);
+            await vi.advanceTimersByTimeAsync(OUTBOUND_HTTP_TIMEOUT_MS - 1);
+            let settled = false;
+            void pending.then(() => {
+                settled = true;
+            });
+            await Promise.resolve();
+            expect(settled).toBe(false);
+
+            await vi.advanceTimersByTimeAsync(1);
+
+            await expect(pending).resolves.toBe(false);
+            expect(timeoutSpy).toHaveBeenCalledWith(OUTBOUND_HTTP_TIMEOUT_MS);
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                "LINE API request error",
+                expect.objectContaining({ errorType: "TimeoutError" }),
+            );
+        });
+
+        it("keeps the retry-key 409 duplicate acceptance on the retry after a timeout", async () => {
+            const retryKey = "123e4567-e89b-52d3-a456-426614174000";
+            vi.spyOn(console, "error").mockImplementation(() => undefined);
+            installFakeTimeoutSignal();
+            fetchMock
+                .mockImplementationOnce(hangUntilAborted)
+                .mockResolvedValueOnce({ ok: false, status: 409 });
+
+            const firstAttempt = sendLineMessage("user1", flexMessage, retryKey);
+            await vi.advanceTimersByTimeAsync(OUTBOUND_HTTP_TIMEOUT_MS);
+            await expect(firstAttempt).resolves.toBe(false);
+
+            await expect(
+                sendLineMessage("user1", flexMessage, retryKey),
+            ).resolves.toBe(true);
+            for (const [, init] of fetchMock.mock.calls) {
+                expect(init).toEqual(
+                    expect.objectContaining({
+                        headers: expect.objectContaining({
+                            "X-Line-Retry-Key": retryKey,
+                        }),
+                    }),
+                );
+            }
+        });
+
         it("does not treat a 409 without a retry key as accepted", async () => {
             fetchMock.mockResolvedValue({ ok: false, status: 409 });
 
@@ -236,8 +320,21 @@ describe("LINE Notification Service", () => {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(webhookData),
+                    signal: expect.any(AbortSignal),
                 },
             );
+        });
+
+        it("returns false when the outbound webhook exceeds the request timeout", async () => {
+            vi.stubEnv("LINE_WEBHOOK_URL", "https://hooks.example.com/line");
+            vi.spyOn(console, "error").mockImplementation(() => undefined);
+            installFakeTimeoutSignal();
+            fetchMock.mockImplementation(hangUntilAborted);
+
+            const pending = sendLineWebhook(webhookData);
+            await vi.advanceTimersByTimeAsync(OUTBOUND_HTTP_TIMEOUT_MS);
+
+            await expect(pending).resolves.toBe(false);
         });
 
         it("does not call the network when the outbound URL is not configured", async () => {

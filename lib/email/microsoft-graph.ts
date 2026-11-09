@@ -1,5 +1,10 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
+import {
+    createOutboundHttpSignal,
+    isOutboundHttpTimeoutError,
+} from "@/lib/network/outbound-http";
+
 import type { EmailData } from "./types";
 
 const DEFAULT_EMAIL_FROM_NAME = "NHFapp";
@@ -111,6 +116,12 @@ function getHttpFailureCategory(
     return "http_failure";
 }
 
+function getNetworkFailureCategory(error: unknown): string {
+    return isOutboundHttpTimeoutError(error)
+        ? "ambiguous_timeout"
+        : "ambiguous_network_failure";
+}
+
 function logHttpFailure(
     operation: "token" | "sendMail",
     response: Response,
@@ -196,12 +207,13 @@ async function requestAccessToken(
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             body: tokenBody.toString(),
+            signal: createOutboundHttpSignal(),
         });
-    } catch {
+    } catch (error) {
         console.error("Microsoft Entra token request failed.", {
             provider: "microsoft-graph",
             operation: "token",
-            failureCategory: "ambiguous_network_failure",
+            failureCategory: getNetworkFailureCategory(error),
         });
         return null;
     }
@@ -349,13 +361,16 @@ export async function sendMicrosoftGraphEmail(
                     "Content-Type": "text/plain",
                 },
                 body: mimeMessage.toString("base64"),
+                signal: createOutboundHttpSignal(),
             },
         );
-    } catch {
+    } catch (error) {
+        // A timeout is still ambiguous: Graph may already have accepted the
+        // message, and sendMail has no idempotency key, so a retry can duplicate.
         console.error("Microsoft Graph email request failed.", {
             provider: "microsoft-graph",
             operation: "sendMail",
-            failureCategory: "ambiguous_network_failure",
+            failureCategory: getNetworkFailureCategory(error),
         });
         return false;
     }

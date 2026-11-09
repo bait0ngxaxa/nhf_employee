@@ -22,13 +22,99 @@ import {
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveNotTakenRequestedNotifications,
 } from "@/modules/leave";
+import type * as LeaveModule from "@/modules/leave";
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
 import {
     MAX_OUTBOX_ATTEMPTS,
+    OUTBOX_BATCH_TIME_BUDGET_MS,
     OUTBOX_NOTIFICATION_TYPES,
     OUTBOX_RETRY_BASE_DELAY_MS,
     STALE_OUTBOX_PROCESSING_MINUTES,
+    type OutboxNotificationType,
 } from "@/lib/services/outbox/types";
+import { SMTP_MAX_SEND_ATTEMPTS } from "@/lib/email/smtp";
+import {
+    OUTBOUND_HTTP_TIMEOUT_MS,
+    OUTBOUND_SMTP_TIMEOUTS,
+} from "@/lib/network/outbound-http";
+
+/**
+ * External provider sends performed by one dispatch of each outbox type, traced
+ * through dispatchNotification (lib/services/outbox/processor.ts). Fan-out rows
+ * only write in-app notifications or enqueue child rows; each child row then
+ * performs exactly one sendEmail or one LINE request. Typed as a Record so a
+ * new outbox type cannot be added without tracing it here.
+ */
+const EXTERNAL_SENDS_PER_ROW = {
+    // enqueueEmailRequestNotificationChannels only (modules/it/application/email-request/dispatch.ts)
+    EMAIL_REQUEST: 0,
+    EMAIL_REQUEST_ACCESS_UPDATED: 0,
+    // sendLeaveActionNotifications -> one sendLeaveEmail (modules/leave/infrastructure/notifications/email.ts)
+    LEAVE_ACTION: 1,
+    // enqueue *_LINE child + one sendLeaveEmail via assertEmailSent (modules/leave/application/notifications/notifications.ts)
+    LEAVE_RESULT: 1,
+    LEAVE_CANCELLED: 1,
+    LEAVE_CANCELLATION_REQUESTED: 1,
+    LEAVE_CANCELLED_AFTER_APPROVAL: 1,
+    LEAVE_NOT_TAKEN_REQUESTED: 1,
+    LEAVE_NOT_TAKEN_CONFIRMED: 1,
+    // one sendAppLineNotification (modules/leave/infrastructure/notifications/line.ts)
+    LEAVE_ACTION_LINE: 1,
+    LEAVE_RESULT_LINE: 1,
+    LEAVE_CANCELLED_LINE: 1,
+    LEAVE_CANCELLATION_REQUESTED_LINE: 1,
+    LEAVE_CANCELLED_AFTER_APPROVAL_LINE: 1,
+    LEAVE_NOT_TAKEN_REQUESTED_LINE: 1,
+    LEAVE_NOT_TAKEN_CONFIRMED_LINE: 1,
+    // in-app DB writes + one sendStockLineBroadcast (modules/stock/infrastructure/notifications/outbox.ts)
+    STOCK_REQUEST_LINE: 1,
+    STOCK_LOW_LINE: 1,
+    // one sendEmail (modules/stock/infrastructure/notifications/email.ts)
+    STOCK_REQUEST_RESULT_EMAIL: 1,
+    // one sendAppLineNotification (modules/stock/infrastructure/notifications/line-notifications.ts)
+    STOCK_REQUEST_RESULT_LINE: 1,
+    // in-app writes + child enqueue in a transaction (modules/routine/application/reminders.ts, contract-reminders.ts)
+    ROUTINE_REMINDER_IN_APP: 0,
+    ROUTINE_CONTRACT_EXPIRY_IN_APP: 0,
+    // one sendEmail (modules/routine/application/notifications/email.ts)
+    ROUTINE_REMINDER_EMAIL: 1,
+    ROUTINE_CONTRACT_EXPIRY_EMAIL: 1,
+    // one sendAppLineNotification (reminders.ts / contract-reminders.ts)
+    ROUTINE_REMINDER_LINE: 1,
+    ROUTINE_CONTRACT_EXPIRY_LINE: 1,
+    // modules/it/application/notifications/dispatch.ts: in-app only / one LINE / one sendEmail
+    IT_TICKET_IN_APP: 0,
+    IT_TICKET_LINE: 1,
+    IT_TICKET_EMAIL: 1,
+    // modules/it/application/email-request/dispatch.ts: one sendEmail / one LINE
+    EMAIL_REQUEST_EMAIL: 1,
+    EMAIL_REQUEST_LINE: 1,
+} as const satisfies Record<OutboxNotificationType, number>;
+
+/**
+ * HTTP calls per send: Microsoft Graph = Entra token (when not cached) +
+ * sendMail (lib/email/microsoft-graph.ts); LINE = one fetch (lib/line/messaging.ts).
+ */
+const MAX_HTTP_CALLS_PER_SEND = 2;
+
+/**
+ * SMTP operations per sendSmtpEmail (lib/email/smtp.ts): verifyConnection runs
+ * up to 2 verify() calls before sending, then up to SMTP_MAX_SEND_ATTEMPTS
+ * sendMail calls, each transient failure (ETIMEDOUT/ECONNRESET/ENOTFOUND)
+ * followed by another verifyConnection (up to 2 verify() calls). Each stalled
+ * operation is modelled as setup (connectionTimeout) + one idle socketTimeout.
+ * A server that keeps trickling bytes is not bounded by socketTimeout (idle
+ * timeout); that residual risk is documented on OUTBOUND_SMTP_TIMEOUTS.
+ */
+const SMTP_VERIFY_CALLS_PER_CONNECTION_CHECK = 2;
+const MAX_SMTP_OPERATIONS_PER_SEND =
+    SMTP_VERIFY_CALLS_PER_CONNECTION_CHECK
+    + SMTP_MAX_SEND_ATTEMPTS * (1 + SMTP_VERIFY_CALLS_PER_CONNECTION_CHECK);
+/** Backoff between sendMail attempts: 2^attempt * 1000 ms (lib/email/smtp.ts). */
+const SMTP_BACKOFF_TOTAL_MS = Array.from(
+    { length: SMTP_MAX_SEND_ATTEMPTS },
+    (_unused, index) => 2 ** (index + 1) * 1000,
+).reduce((total, delay) => total + delay, 0);
 
 const leaveNotificationMocks = vi.hoisted(() => ({
     createLeaveActionInAppNotification: vi.fn(),
@@ -1801,5 +1887,223 @@ describe("processOutbox", () => {
         await processOutbox();
 
         expect(sendLeaveCancelledNotifications).toHaveBeenCalledTimes(1);
+    });
+
+    it("routes a timed-out email provider through the real assertEmailSent into FAILED with backoff", async () => {
+        vi.useFakeTimers();
+        const now = new Date("2026-07-13T03:00:00.000Z");
+        vi.setSystemTime(now);
+        const actualLeave = await vi.importActual<typeof LeaveModule>(
+            "@/modules/leave",
+        );
+        // Real Leave orchestration; only the transport is mocked. A provider
+        // timeout is caught by the transport, which resolves false.
+        vi.mocked(sendLeaveCancelledNotifications).mockImplementationOnce(
+            actualLeave.sendLeaveCancelledNotifications,
+        );
+        vi.mocked(sendEmail).mockResolvedValueOnce(false);
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(
+                asNever([
+                    buildNotification(
+                        131,
+                        "LEAVE_CANCELLED",
+                        JSON.stringify(buildLeavePayload()),
+                    ),
+                ]),
+            );
+
+        try {
+            const result = await processOutbox();
+
+            expect(result).toEqual({ processed: 0, failed: 1 });
+            expect(sendEmail).toHaveBeenCalledTimes(1);
+            expect(sendEmail).toHaveBeenCalledWith(
+                expect.objectContaining({ to: "manager@example.com" }),
+            );
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                where: { id: 131, status: "PROCESSING" },
+                data: {
+                    status: "FAILED",
+                    attempts: { increment: 1 },
+                    lastError: "LEAVE_CANCELLED email notification failed",
+                    nextAttemptAt: new Date(
+                        now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS,
+                    ),
+                },
+            });
+            expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 131, status: "PROCESSING" },
+                    data: expect.objectContaining({ status: "SENT" }),
+                }),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("routes a dispatch rejected with a TimeoutError through the FAILED retry path with backoff", async () => {
+        vi.useFakeTimers();
+        const now = new Date("2026-07-13T03:00:00.000Z");
+        vi.setSystemTime(now);
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(
+                asNever([
+                    buildNotification(
+                        130,
+                        "LEAVE_CANCELLED",
+                        JSON.stringify(buildLeavePayload()),
+                    ),
+                ]),
+            );
+        vi.mocked(sendLeaveCancelledNotifications).mockRejectedValueOnce(
+            new DOMException("The operation timed out.", "TimeoutError"),
+        );
+
+        try {
+            const result = await processOutbox();
+
+            expect(result).toEqual({ processed: 0, failed: 1 });
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                where: { id: 130, status: "PROCESSING" },
+                data: {
+                    status: "FAILED",
+                    attempts: { increment: 1 },
+                    lastError: "The operation timed out.",
+                    nextAttemptAt: new Date(
+                        now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS,
+                    ),
+                },
+            });
+            expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 130, status: "PROCESSING" },
+                    data: expect.objectContaining({ status: "SENT" }),
+                }),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    describe("batch time budget", () => {
+        function claimedIds(): number[] {
+            return prismaMock.notificationOutbox.updateMany.mock.calls
+                .map(([args]) => args)
+                .filter((args) => args.data.status === "PROCESSING")
+                .map((args) => Number((args.where as { id: number }).id));
+        }
+
+        function queueLeaveCancelledCandidates(ids: number[]): void {
+            prismaMock.notificationOutbox.findMany
+                .mockResolvedValueOnce(asNever([]))
+                .mockResolvedValueOnce(
+                    asNever(
+                        ids.map((id) =>
+                            buildNotification(
+                                id,
+                                "LEAVE_CANCELLED",
+                                JSON.stringify(buildLeavePayload()),
+                            ),
+                        ),
+                    ),
+                );
+        }
+
+        it("keeps one row's worst-case provider time well inside the stale window", () => {
+            const staleWindowMs = STALE_OUTBOX_PROCESSING_MINUTES * 60_000;
+            const maxSendsPerRow = Math.max(
+                ...Object.values(EXTERNAL_SENDS_PER_ROW),
+            );
+            // Every type was traced; no row performs more than one external send.
+            expect(Object.keys(EXTERNAL_SENDS_PER_ROW).sort()).toEqual(
+                [...OUTBOX_NOTIFICATION_TYPES].sort(),
+            );
+            expect(maxSendsPerRow).toBe(1);
+
+            const maxPerCallTimeoutMs = Math.max(
+                OUTBOUND_HTTP_TIMEOUT_MS,
+                OUTBOUND_SMTP_TIMEOUTS.socketTimeout,
+            );
+            const httpRowMs =
+                maxSendsPerRow * MAX_HTTP_CALLS_PER_SEND * OUTBOUND_HTTP_TIMEOUT_MS;
+            const smtpRowMs =
+                maxSendsPerRow
+                * (MAX_SMTP_OPERATIONS_PER_SEND
+                    * (OUTBOUND_SMTP_TIMEOUTS.connectionTimeout + maxPerCallTimeoutMs)
+                    + SMTP_BACKOFF_TOTAL_MS);
+            const worstRowMs = Math.max(httpRowMs, smtpRowMs);
+
+            expect(MAX_SMTP_OPERATIONS_PER_SEND).toBe(11);
+            expect(httpRowMs).toBe(20_000);
+            expect(smtpRowMs).toBe(234_000);
+            // At least a 2x margin below the stale window.
+            expect(worstRowMs * 2).toBeLessThan(staleWindowMs);
+        });
+
+        it("stops claiming new rows once the budget is spent but finishes the claimed row", async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
+            const consoleWarnSpy = vi
+                .spyOn(console, "warn")
+                .mockImplementation(() => undefined);
+            queueLeaveCancelledCandidates([140, 141, 142]);
+            vi.mocked(sendLeaveCancelledNotifications).mockImplementationOnce(
+                async () => {
+                    vi.advanceTimersByTime(OUTBOX_BATCH_TIME_BUDGET_MS);
+                },
+            );
+
+            try {
+                const result = await processOutbox();
+
+                expect(result).toEqual({ processed: 1, failed: 0 });
+                expect(claimedIds()).toEqual([140]);
+                expect(sendLeaveCancelledNotifications).toHaveBeenCalledTimes(1);
+                expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                    where: { id: 140, status: "PROCESSING" },
+                    data: { status: "SENT", lastError: null },
+                });
+                const touchedIds = prismaMock.notificationOutbox.updateMany.mock.calls
+                    .map(([args]) => Number((args.where as { id: number }).id));
+                expect(touchedIds).not.toContain(141);
+                expect(touchedIds).not.toContain(142);
+                expect(consoleWarnSpy).toHaveBeenCalledWith(
+                    "outbox_batch_budget_exhausted",
+                    expect.objectContaining({
+                        budgetMs: OUTBOX_BATCH_TIME_BUDGET_MS,
+                        unclaimedCandidates: 2,
+                    }),
+                );
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it("keeps claiming while the elapsed time stays under the budget", async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date("2026-07-13T03:00:00.000Z"));
+            queueLeaveCancelledCandidates([150, 151, 152]);
+            vi.mocked(sendLeaveCancelledNotifications).mockImplementation(
+                async () => {
+                    vi.advanceTimersByTime(
+                        Math.floor((OUTBOX_BATCH_TIME_BUDGET_MS - 1) / 3),
+                    );
+                },
+            );
+
+            try {
+                const result = await processOutbox();
+
+                expect(result).toEqual({ processed: 3, failed: 0 });
+                expect(claimedIds()).toEqual([150, 151, 152]);
+            } finally {
+                vi.mocked(sendLeaveCancelledNotifications).mockReset();
+                vi.useRealTimers();
+            }
+        });
     });
 });

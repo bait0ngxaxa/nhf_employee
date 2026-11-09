@@ -29,6 +29,7 @@ import {
 } from "@/modules/routine";
 import {
     MAX_OUTBOX_ATTEMPTS,
+    OUTBOX_BATCH_TIME_BUDGET_MS,
     OUTBOX_RETRY_BASE_DELAY_MS,
     OUTBOX_STATUSES,
     STALE_OUTBOX_PROCESSING_MINUTES,
@@ -301,8 +302,29 @@ export async function dispatchNotification(
 /**
  * ส่ง outbox แบบ at-least-once: side effect ภายนอกอาจสำเร็จก่อน process ล้ม
  * และก่อน mark SENT จึงต้องพึ่ง idempotency ของแต่ละ provider เมื่อ retry.
+ *
+ * Stale recovery ตัดสินแยกทีละแถวจาก updatedAt ซึ่งถูกอัปเดตใหม่ตอน claim
+ * (updateMany → PROCESSING) แถวที่ยังเป็น PENDING/FAILED จึงไม่มีวัน stale
+ * สิ่งที่กันไม่ให้แถวถูก reclaim ระหว่างที่ worker ยังถืออยู่คือเวลาประมวลผล
+ * ของแถวเดียว (timeout ต่อ provider request × จำนวน provider call ต่อแถว)
+ * ต้องน้อยกว่า STALE_OUTBOX_PROCESSING_MINUTES ดู OUTBOUND_HTTP_TIMEOUT_MS
+ * และ OUTBOUND_SMTP_TIMEOUTS
+ *
+ * OUTBOX_BATCH_TIME_BUDGET_MS มีไว้จำกัดความยาวของแต่ละรอบและลดการซ้อนกัน
+ * ของ cron/wakeup เท่านั้น ไม่ได้มีไว้กัน stale: เมื่อเกิน budget จะหยุด claim
+ * แถวใหม่ แถวที่ claim แล้วทำต่อจนจบ แถวที่ยังไม่ claim รอรอบถัดไป
+ *
+ * Residual risk: timeout/abort ฝั่ง client ไม่ได้ยกเลิกงานที่ provider รับไปแล้ว
+ * ถ้า Microsoft Graph sendMail รับคำขอแล้วแต่ response มาไม่ทันก่อน timeout
+ * แถวจะถูก mark FAILED และ retry ซึ่งอาจทำให้ email ซ้ำได้ เพราะ sendMail
+ * ไม่มี idempotency key (LINE ใช้ X-Line-Retry-Key และถือ 409 เป็น success)
+ * SMTP ก็เช่นกัน: timeout หลังส่ง DATA แล้วทำให้ sendSmtpEmail retry ภายใน
+ * และ outbox retry ซ้ำได้ (Message-ID คงเดิมแต่ server ไม่ dedupe ให้)
+ * และ socketTimeout เป็น idle timeout จึงไม่ใช่ total deadline ของ SMTP
+ * กลไกนี้ลดโอกาสส่งซ้ำ ไม่ได้รับประกัน exactly-once
  */
 export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult> {
+    const batchStartedAt = Date.now();
     await markStaleProcessingRows();
     const now = new Date();
 
@@ -323,7 +345,16 @@ export async function processOutbox(batchSize = 10): Promise<OutboxProcessResult
     let processedCount = 0;
     let failedCount = 0;
 
-    for (const notification of candidates) {
+    for (const [index, notification] of candidates.entries()) {
+        if (Date.now() - batchStartedAt >= OUTBOX_BATCH_TIME_BUDGET_MS) {
+            console.warn("outbox_batch_budget_exhausted", {
+                event: "outbox_batch_budget_exhausted",
+                budgetMs: OUTBOX_BATCH_TIME_BUDGET_MS,
+                unclaimedCandidates: candidates.length - index,
+            });
+            break;
+        }
+
         const isClaimed = await claimNotification(notification.id, now);
         if (!isClaimed) {
             continue;
