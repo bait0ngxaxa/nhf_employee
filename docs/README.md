@@ -10,7 +10,7 @@
 - [Production Deployment & LIFF Runbook](./operations/production-deployment.md): **แหล่งอ้างอิงหลักเพียงฉบับเดียวสำหรับ deploy production, LINE/LIFF rollout, scheduler/outbox, Rich Menu, rollback และ monitoring**
 - [Production Acceptance](./operations/production-acceptance.md): ผลตรวจ production ปัจจุบันและข้อกำหนดให้ตรวจใหม่ทุก release
 - [Storage and Attachments](./operations/storage-and-attachments.md): persistent `.uploads/`, backup/restore, Leave และ IT private files
-- [Cloudflare Tunnel](./operations/cloudflare-tunnel.md): network path ที่รองรับผ่าน Nginx
+- [Cloudflare Tunnel](./operations/cloudflare-tunnel.md): network path ของ production (Tunnel → Next.js `127.0.0.1:3000` โดยตรง) และ ingress rule ที่ปิด maintenance/cron endpoint จากภายนอก
 - [Routine reminder verification](./operations/verification/routine-reminder.md): ขั้นตอนทดสอบเฉพาะ reminder
 - [Leave special-reason audit remediation](./operations/leave-special-reason-audit-remediation.md): แผน (ต้องอนุมัติก่อนรัน) สำหรับลบข้อความเหตุผลพิเศษดิบออกจาก audit record เก่า
 - [Notification architecture](./integrations/notifications.md): channel matrix, outbox และการเชื่อมต่อ LINE/Email
