@@ -22,6 +22,7 @@ import {
     sendLeaveNotTakenConfirmedNotifications,
     sendLeaveNotTakenRequestedNotifications,
 } from "@/modules/leave";
+import type * as LeaveModule from "@/modules/leave";
 import type { StockRequestResultEmailPayload } from "@/modules/stock";
 import {
     MAX_OUTBOX_ATTEMPTS,
@@ -1888,7 +1889,62 @@ describe("processOutbox", () => {
         expect(sendLeaveCancelledNotifications).toHaveBeenCalledTimes(1);
     });
 
-    it("routes a provider request timeout through the FAILED retry path with backoff", async () => {
+    it("routes a timed-out email provider through the real assertEmailSent into FAILED with backoff", async () => {
+        vi.useFakeTimers();
+        const now = new Date("2026-07-13T03:00:00.000Z");
+        vi.setSystemTime(now);
+        const actualLeave = await vi.importActual<typeof LeaveModule>(
+            "@/modules/leave",
+        );
+        // Real Leave orchestration; only the transport is mocked. A provider
+        // timeout is caught by the transport, which resolves false.
+        vi.mocked(sendLeaveCancelledNotifications).mockImplementationOnce(
+            actualLeave.sendLeaveCancelledNotifications,
+        );
+        vi.mocked(sendEmail).mockResolvedValueOnce(false);
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(
+                asNever([
+                    buildNotification(
+                        131,
+                        "LEAVE_CANCELLED",
+                        JSON.stringify(buildLeavePayload()),
+                    ),
+                ]),
+            );
+
+        try {
+            const result = await processOutbox();
+
+            expect(result).toEqual({ processed: 0, failed: 1 });
+            expect(sendEmail).toHaveBeenCalledTimes(1);
+            expect(sendEmail).toHaveBeenCalledWith(
+                expect.objectContaining({ to: "manager@example.com" }),
+            );
+            expect(prismaMock.notificationOutbox.updateMany).toHaveBeenCalledWith({
+                where: { id: 131, status: "PROCESSING" },
+                data: {
+                    status: "FAILED",
+                    attempts: { increment: 1 },
+                    lastError: "LEAVE_CANCELLED email notification failed",
+                    nextAttemptAt: new Date(
+                        now.getTime() + OUTBOX_RETRY_BASE_DELAY_MS,
+                    ),
+                },
+            });
+            expect(prismaMock.notificationOutbox.updateMany).not.toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 131, status: "PROCESSING" },
+                    data: expect.objectContaining({ status: "SENT" }),
+                }),
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("routes a dispatch rejected with a TimeoutError through the FAILED retry path with backoff", async () => {
         vi.useFakeTimers();
         const now = new Date("2026-07-13T03:00:00.000Z");
         vi.setSystemTime(now);
