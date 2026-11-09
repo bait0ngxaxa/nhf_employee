@@ -1,24 +1,21 @@
 import { NextResponse } from "next/server";
 
+import { verifySharedSecret } from "@/lib/security/shared-secret";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { cleanupExpiredAuditLogs } from "@/modules/audit";
 
 const CLEANUP_SECRET_HEADER = "x-cleanup-secret";
 
-function getExpectedSecret(): string | null {
-    const expectedSecret = process.env.AUDIT_LOG_CLEANUP_SECRET?.trim();
-    return expectedSecret && expectedSecret.length > 0 ? expectedSecret : null;
-}
-
 export async function POST(request: Request): Promise<NextResponse> {
-    const expectedSecret = getExpectedSecret();
-    if (!expectedSecret) {
+    const secretCheck = verifySharedSecret(request, {
+        envName: "AUDIT_LOG_CLEANUP_SECRET",
+        headerName: CLEANUP_SECRET_HEADER,
+    });
+    if (secretCheck.status === "not_configured") {
         return jsonError(COMMON_API_MESSAGES.cleanupNotConfigured, 503);
     }
-
-    const providedSecret = request.headers.get(CLEANUP_SECRET_HEADER);
-    if (providedSecret !== expectedSecret) {
+    if (secretCheck.status === "invalid") {
         return forbidden();
     }
 

@@ -48,7 +48,7 @@ describe("Audit log cleanup route", () => {
     });
 
     it("returns 403 when cleanup secret header is invalid", async () => {
-        process.env.AUDIT_LOG_CLEANUP_SECRET = "expected-secret";
+        process.env.AUDIT_LOG_CLEANUP_SECRET = "expected-secret-0123456789abcdef0123";
 
         const response = await cleanupAuditLogsRoute(buildRequest("wrong-secret"));
 
@@ -57,14 +57,14 @@ describe("Audit log cleanup route", () => {
     });
 
     it("deletes expired audit logs when cleanup secret matches", async () => {
-        process.env.AUDIT_LOG_CLEANUP_SECRET = "expected-secret";
+        process.env.AUDIT_LOG_CLEANUP_SECRET = "expected-secret-0123456789abcdef0123";
         cleanupExpiredAuditLogsMock.mockResolvedValue({
             deletedCount: 4,
             cutoff: new Date("2026-04-07T12:00:00.000Z"),
         });
 
         const response = await cleanupAuditLogsRoute(
-            buildRequest("expected-secret"),
+            buildRequest("expected-secret-0123456789abcdef0123"),
         );
         const body = await readJson(response);
 

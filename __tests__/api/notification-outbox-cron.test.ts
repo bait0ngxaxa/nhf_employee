@@ -42,7 +42,7 @@ describe("notification outbox cron route", () => {
     });
 
     it("rejects requests with an invalid worker secret", async () => {
-        process.env.NOTIFICATION_OUTBOX_CRON_SECRET = "expected-secret";
+        process.env.NOTIFICATION_OUTBOX_CRON_SECRET = "expected-secret-0123456789abcdef0123";
 
         const response = await POST(buildRequest("wrong-secret"));
 
@@ -51,10 +51,10 @@ describe("notification outbox cron route", () => {
     });
 
     it("processes queued notifications independently of leave API requests", async () => {
-        process.env.NOTIFICATION_OUTBOX_CRON_SECRET = "expected-secret";
+        process.env.NOTIFICATION_OUTBOX_CRON_SECRET = "expected-secret-0123456789abcdef0123";
         processOutboxMock.mockResolvedValue({ processed: 1, failed: 0 });
 
-        const response = await POST(buildRequest("expected-secret"));
+        const response = await POST(buildRequest("expected-secret-0123456789abcdef0123"));
 
         expect(response.status).toBe(200);
         await expect(response.json()).resolves.toEqual({

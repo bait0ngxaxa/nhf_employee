@@ -6,7 +6,7 @@
 
 - `.uploads/` ครอบคลุม Stock uploads และ private attachments ใต้ `.uploads/private/leave/` กับ `.uploads/private/it/`; ทั้งหมดต้องอยู่บน persistent disk และอยู่ใน backup/restore set เดียวกับ MySQL จากช่วงเวลาที่สอดคล้องกัน ห้ามลบระหว่าง deploy/restart
 - ให้ Next.js process เดียวที่รันด้วย non-root user และ working directory คงที่เป็นเจ้าของไฟล์; Nginx ห้ามเสิร์ฟหรือ alias `.uploads/private` โดยตรง การอ่าน **private attachments** ต้องผ่าน route ที่ตรวจ authentication/authorization ฝั่ง server
-- Cloudflare Tunnel ต้องผ่าน Nginx ก่อน Next.js `127.0.0.1:3000`; คง `client_max_body_size 25m;` และ `client_body_timeout 30s;` ตาม configuration ปัจจุบัน ไม่เปิด port 3000 สู่ Internet
+- production ปัจจุบันคือ Cloudflare Tunnel (`cloudflared`) → Next.js `127.0.0.1:3000` โดยตรง ไม่มี Nginx ใน request path และไม่เปิด port 3000 สู่ Internet; body limit จึงมาจากการอ่าน request แบบจำกัดในชั้นแอปเท่านั้น หากใช้ topology สำรองผ่าน Nginx ให้คง `client_max_body_size 25m;` และ `client_body_timeout 30s;`
 - Restore ใน maintenance window: กู้ database และ filesystem จาก backup set เดียวกัน ตรวจ metadata เทียบไฟล์จริงและสิทธิ์อ่านก่อนเปิด traffic; ไฟล์ที่หายต้องกู้จาก backup ไม่สร้าง public copy
 - Orphan cleanup ของแต่ละ domain ต้องใช้ external scheduler, secret แยก และ dry-run ก่อนเปิดลบจริง; ห้าม log secret, storage key, path หรือ private bytes
 - Production รองรับหนึ่ง Next.js process; shared filesystem อย่างเดียวไม่ทำให้ multi-process/multi-host ปลอดภัย เพราะ rate limiter เป็น process-local. การย้อน application ต้องเข้ากับ forward-only schema และคงตาราง/ไฟล์ไว้
@@ -43,7 +43,11 @@ Restore ให้หยุด traffic หรือทำ maintenance window, res
 
 ### Reverse proxy และ process supervisor
 
-คำขอ multipart มีไฟล์รวมได้ 20 MB และ overhead ของ multipart จึงต้องตั้ง body limit อย่างน้อย:
+> **Topology ปัจจุบัน:** production ส่ง traffic จาก Cloudflare Tunnel ตรงไปที่ Next.js `127.0.0.1:3000`
+> โดยไม่ผ่าน Nginx ค่า Nginx ด้านล่างจึงใช้เฉพาะ topology สำรอง และไม่ได้คุ้มครอง production ปัจจุบัน
+> ดู [Cloudflare Tunnel](./cloudflare-tunnel.md)
+
+สำหรับ topology สำรองผ่าน Nginx: คำขอ multipart มีไฟล์รวมได้ 20 MB และ overhead ของ multipart จึงต้องตั้ง body limit อย่างน้อย:
 
 ```nginx
 client_max_body_size 25m;
@@ -51,12 +55,13 @@ client_body_timeout 30s;
 ```
 
 ค่าใน `deployment/nginx/employee_nhf.cloudflare-origin.conf` ใช้ 25m แล้ว ห้ามลดต่ำกว่า 20 MB หรือเพิ่มโดยไม่พิจารณา
-memory/abuse budget และต้องไม่มี static location สำหรับ `.uploads/private` ตัวอย่าง deployment ปัจจุบันคือ
-Cloudflare → Nginx → Next.js `127.0.0.1:3000` → MySQL และ local persistent disk
+memory/abuse budget และต้องไม่มี static location สำหรับ `.uploads/private` เส้นทางของ production ปัจจุบันคือ
+Cloudflare → `cloudflared` → Next.js `127.0.0.1:3000` → MySQL และ local persistent disk (topology สำรองคือ
+Cloudflare → Nginx → Next.js)
 
-ให้ firewall/Cloudflare เปิดถึง Nginx เท่านั้นและ bind Next.js ไว้ที่ loopback; การเปิด port 3000 ตรงสู่ Internet
-จะข้าม body-size/body-timeout controls ของ Nginx และไม่ใช่ deployment ที่รองรับใน phase นี้. L2 รองรับ
-หนึ่ง Next.js production process เท่านั้น; PM2 cluster, หลาย process หลัง Nginx และหลาย host ยังไม่รองรับ
+bind Next.js ไว้ที่ loopback และห้ามเปิด port 3000 ตรงสู่ Internet; host firewall ปิด inbound 80/443 ใน
+production ปัจจุบัน. L2 รองรับ
+หนึ่ง Next.js production process เท่านั้น; PM2 cluster, หลาย process และหลาย host ยังไม่รองรับ
 เพราะ application rate-limit state เป็น process-local และไม่ survive process restart
 
 PM2/systemd ต้อง:
@@ -71,7 +76,7 @@ PM2/systemd ต้อง:
 server ใช้ `Content-Length` เป็นเพียง fast path แล้วอ่าน stream ของ multipart แบบจำกัดไม่เกิน 25 MB ก่อนสร้าง
 `FormData`; body ที่ไม่มีหรือมี `Content-Length` ไม่ถูกต้องจึงยังถูกปฏิเสธด้วย 413 โดยไม่พึ่ง header อย่างเดียว
 Next.js/undici ยัง buffer body ที่ถูกจำกัดแล้วใน memory ระหว่าง `formData()` และรองรับเฉพาะ JPG, PNG, WEBP
-จึงยังไม่ใช่ streaming multipart parser เต็มรูปแบบ: Nginx limit, rate limit, จำนวนไฟล์สูงสุด 3, ขนาดไฟล์ 8 MB
+จึงยังไม่ใช่ streaming multipart parser เต็มรูปแบบ: Nginx limit (เฉพาะ topology สำรอง ไม่มีใน production ปัจจุบัน), rate limit, จำนวนไฟล์สูงสุด 3, ขนาดไฟล์ 8 MB
 และขนาดรวม 20 MB ยังคงเป็น defense-in-depth และ deployment boundary ที่ต้องตรวจใน Phase 5B หากต้องรองรับ
 concurrent upload สูงมากให้ย้ายไป streaming/object storage ใน phase ถัดไป
 
@@ -168,7 +173,7 @@ Node สร้าง directory ของ Ticket ด้วย mode `0750` แล�
 
 ไฟล์ที่รับได้คือ JPG/JPEG, PNG และ WEBP เท่านั้น ระบบ decode เนื้อหาจริง, จำกัด input 8 MiB/file, 3 files/comment, 20 MiB รวม, 40 ล้าน decoded pixels และ resize/แปลงเป็น WEBP ก่อนเขียนไฟล์ถาวร
 
-Nginx ใน `deployment/nginx/employee_nhf.cloudflare-origin.conf` ตั้ง `client_max_body_size 25m` และ `client_body_timeout 30s` อยู่แล้ว ไม่ต้องเพิ่มค่า body limit สำหรับ IT5B แอปอ่าน request stream แบบจำกัด 25,000,000 bytes ก่อน parse multipart; Content-Length ใช้ปฏิเสธเร็วเท่านั้นและไม่แทนการนับ bytes จริง
+ใน topology สำรอง Nginx (`deployment/nginx/employee_nhf.cloudflare-origin.conf`) ตั้ง `client_max_body_size 25m` และ `client_body_timeout 30s` ไว้แล้ว ส่วน production ปัจจุบันไม่มี Nginx ใน request path จึงพึ่ง limit ในแอปเท่านั้น: แอปอ่าน request stream แบบจำกัด 25,000,000 bytes ก่อน parse multipart; Content-Length ใช้ปฏิเสธเร็วเท่านั้นและไม่แทนการนับ bytes จริง
 
 อย่า expose `.uploads/private` ผ่าน Nginx หรือ static hosting การอ่านภาพต้องผ่าน authenticated Next.js route ซึ่งตรวจ active workforce และสิทธิ์ Ticket ปัจจุบัน แล้วตอบเฉพาะ `image/webp`, `private, no-store`, `nosniff` และ `inline`
 

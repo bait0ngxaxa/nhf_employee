@@ -1,3 +1,7 @@
+// Covers the ALTERNATE Nginx topology in deployment/nginx/, which is not used by
+// current production (Cloudflare -> cloudflared -> http://127.0.0.1:3000 directly).
+// Kept until the repository owner decides whether to retire or re-adopt that
+// topology. See docs/operations/cloudflare-tunnel.md (Appendix A).
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 

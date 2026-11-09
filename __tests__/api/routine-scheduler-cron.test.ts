@@ -62,7 +62,7 @@ describe("Routine scheduler cron route", () => {
     });
 
     it("returns 403 for an invalid scheduler secret", async () => {
-        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret";
+        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret-0123456789abcdef0123";
 
         const response = await POST(buildRequest("wrong-secret"));
 
@@ -71,10 +71,10 @@ describe("Routine scheduler cron route", () => {
     });
 
     it("runs the scheduler with the correct secret and returns safe counters", async () => {
-        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret";
+        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret-0123456789abcdef0123";
         runRoutineSchedulerMock.mockResolvedValue(result);
 
-        const response = await POST(buildRequest("expected-secret"));
+        const response = await POST(buildRequest("expected-secret-0123456789abcdef0123"));
 
         expect(response.status).toBe(200);
         await expect(response.json()).resolves.toEqual({ success: true, ...result });
@@ -82,11 +82,11 @@ describe("Routine scheduler cron route", () => {
     });
 
     it("returns a non-success status with counters when the scheduler partially fails", async () => {
-        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret";
+        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret-0123456789abcdef0123";
         const partialResult = { ...result, outboxEnqueued: 15, errors: 4 };
         runRoutineSchedulerMock.mockResolvedValue(partialResult);
 
-        const response = await POST(buildRequest("expected-secret"));
+        const response = await POST(buildRequest("expected-secret-0123456789abcdef0123"));
 
         expect(response.status).toBe(500);
         await expect(response.json()).resolves.toEqual({
@@ -97,10 +97,10 @@ describe("Routine scheduler cron route", () => {
     });
 
     it("does not generate reminders when the feature is explicitly disabled", async () => {
-        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret";
+        process.env.ROUTINE_SCHEDULER_CRON_SECRET = "expected-secret-0123456789abcdef0123";
         process.env.NEXT_PUBLIC_FEATURE_ROUTINE = "false";
 
-        const response = await POST(buildRequest("expected-secret"));
+        const response = await POST(buildRequest("expected-secret-0123456789abcdef0123"));
 
         expect(response.status).toBe(200);
         await expect(response.json()).resolves.toEqual({

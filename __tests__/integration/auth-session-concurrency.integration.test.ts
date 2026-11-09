@@ -339,7 +339,7 @@ async function runEmployeeLifecycle(
 describe.sequential("Auth/session concurrency characterization with real MySQL", () => {
     beforeAll(async () => {
         assertDedicatedDatabase();
-        process.env.AUTH_ACCESS_TOKEN_SECRET ??= "l1-auth-concurrency-test-secret";
+        process.env.AUTH_ACCESS_TOKEN_SECRET ??= "l1-auth-concurrency-test-secret-0123456789";
         await prisma.$connect();
     });
 

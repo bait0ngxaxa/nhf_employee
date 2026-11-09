@@ -251,7 +251,9 @@ Leave notification ใช้ **in-app และ email** ผ่าน Leave notif
 
 `BOOTSTRAP_ADMIN_EMAILS` ใช้ตอน seed/bootstrap เท่านั้น ส่วน `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` ใช้เมื่อ deployment เลือก Docker Compose MySQL
 
-`APP_BASE_URL` ในตัวอย่าง cron เป็น variable ของ external cron runner ไม่ใช่ variable ที่ application อ่านเพื่อสร้าง LIFF URL ให้ตั้งเป็น public HTTPS origin เดียวกับระบบ โดยไม่ใส่ secret
+crontab ของ maintenance/cron endpoint รันบนเครื่องเดียวกับแอปและเรียก `http://127.0.0.1:3000` โดยตรง ไม่เรียกผ่าน public domain เพราะ endpoint เหล่านี้ถูกปิดจากภายนอกที่ Cloudflare Tunnel (ดู [Scheduled Maintenance](#scheduled-maintenance)) ส่วน link ใน notification ใช้ `PUBLIC_APPROVE_URL` ไม่ใช่ Host ของ request ที่ cron ส่งมา
+
+Shared secret ของ maintenance/cron endpoint ทุกตัว (`AUTH_CLEANUP_SECRET`, `AUDIT_LOG_CLEANUP_SECRET`, `IT_ATTACHMENT_CLEANUP_SECRET`, `LEAVE_ATTACHMENT_CLEANUP_SECRET`, `NOTIFICATION_OUTBOX_CRON_SECRET`, `ROUTINE_SCHEDULER_CRON_SECRET`) ต้องยาว **อย่างน้อย 32 ตัวอักษรหลัง trim**; ค่าที่สั้นกว่าถือว่ายังไม่ได้กำหนดและ endpoint ตอบ `503` เช่นเดียวกับ `AUTH_ACCESS_TOKEN_SECRET` ที่ต้องยาวอย่างน้อย 32 ตัวอักษร มิฉะนั้นการออกและตรวจ access token จะล้มเหลว ใช้เช่น `openssl rand -base64 48` สร้างค่าใหม่
 
 ## 3. LINE Developers Console checklist
 
@@ -457,19 +459,19 @@ Notification outbox
 - production ต้องมี owner เดียวต่อ job อย่าตั้ง scheduler หลายตัวให้เรียก endpoint เดียวกันโดยไม่ตั้งใจ
 - repository ไม่ hardcode ความถี่ของ external scheduler; operator ต้องตัดสินใจและบันทึกความถี่จริงใน evidence
 - deployment documentation เดิมยกตัวอย่างเรียก scheduler และ outbox ทุก 1 นาที ซึ่งเป็น operational choice ไม่ใช่ contract ที่ application บังคับ
-- Nginx reference config มี `proxy_read_timeout 60s`; ตั้ง client/job timeout ให้น้อยกว่านี้ตาม workload และตรวจไม่ให้ timeout ทำให้ invocation ซ้ำโดยไม่จำเป็น
+- cron เรียก `http://127.0.0.1:3000` โดยตรง จึงไม่มี proxy timeout คั่นกลาง; ตั้ง client/job timeout (`--max-time`) ตาม workload และให้น้อยกว่ารอบของ cron เพื่อไม่ให้ invocation ซ้อนกันโดยไม่จำเป็น
 - monitor HTTP status และ response body ของทั้งสอง endpoint แยกกัน
 
-ตัวอย่าง smoke command ใช้ shell variable ของ cron runner และไม่พิมพ์ค่า secret:
+ตัวอย่าง smoke command รันบนเครื่อง origin ใช้ shell variable ของ cron runner และไม่พิมพ์ค่า secret:
 
 ```bash
 curl --fail --silent --show-error --max-time 50 --request POST \
   --header "x-routine-secret: ${ROUTINE_SCHEDULER_CRON_SECRET}" \
-  https://<production-domain>/api/cron/routine-scheduler
+  http://127.0.0.1:3000/api/cron/routine-scheduler
 
 curl --fail --silent --show-error --max-time 50 --request POST \
   --header "x-outbox-secret: ${NOTIFICATION_OUTBOX_CRON_SECRET}" \
-  https://<production-domain>/api/cron/notification-outbox
+  http://127.0.0.1:3000/api/cron/notification-outbox
 ```
 
 ใช้ placeholder/secret manager เท่านั้น ห้ามใส่ค่า secret จริงใน shell history และห้ามใช้ `set -x` รอบคำสั่งที่มี secret-bearing header
@@ -499,7 +501,7 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 - `.uploads/private/leave` เป็น persistent storage และ process user อ่าน/เขียนได้
 - ไม่ expose directory นี้ด้วย Nginx static `alias` หรือ public URL
 - database table `leave_attachments` กับ private files ถูก backup/restore เป็น snapshot ที่สอดคล้องกัน
-- reverse proxy มี body limit อย่างน้อย 25 MB (`client_max_body_size 25m`) และ timeout ที่เหมาะสม
+- production ปัจจุบันไม่มี Nginx ใน request path (Cloudflare Tunnel → Next.js โดยตรง) จึงไม่มี reverse-proxy body limit; ยืนยันว่า request boundary 25 MB ถูกบังคับในชั้นแอปตาม [storage operations](./storage-and-attachments.md) หากใช้ topology สำรองผ่าน Nginx ให้คง `client_max_body_size 25m` และ timeout ที่เหมาะสม
 - upload รองรับ JPG, PNG, WEBP และจัดเก็บผลลัพธ์เป็น WebP
 - จำกัดสูงสุด 3 ไฟล์, ไฟล์ละไม่เกิน 8 MB, รวมไม่เกิน 20 MB และ request boundary 25 MB
 - ผู้ใช้ทดสอบเลือกภาพจาก smartphone แล้ว upload/retrieve ได้จริง
@@ -518,7 +520,7 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 6. รัน `npm run build` ด้วย configuration ที่สอดคล้องกับ production หลังตั้ง `NEXT_PUBLIC_*`
 7. รัน `npx prisma migrate deploy` หลัง backup เท่านั้น; migration production เดินหน้า ห้ามใช้ `prisma migrate dev` หรือ `prisma db push` เป็นขั้นตอน deploy ปกติ
 8. Deploy artifact/source ที่ตรงกับ release SHA แล้ว start/restart Next.js ผ่าน supervisor แบบ process เดียว โดย bind `127.0.0.1:3000` และใช้ persistent storage
-9. ตรวจ origin health เช่น `curl --fail http://127.0.0.1:3000/` และ public HTTPS health ผ่าน Cloudflare Tunnel → Nginx → Next.js; ตรวจ Nginx ด้วย `sudo nginx -t` เมื่อตั้งค่าหรือเปลี่ยน reverse proxy
+9. ตรวจ origin health เช่น `curl --fail http://127.0.0.1:3000/` และ public HTTPS health ผ่าน Cloudflare Tunnel → `cloudflared` → Next.js `127.0.0.1:3000`; ยืนยันว่า maintenance/cron endpoint ตอบ `404` จากภายนอก ([Cloudflare Tunnel §9](./cloudflare-tunnel.md#9-การทดสอบจากภายนอก-origin-network)) และ validate ingress ด้วย `cloudflared tunnel ingress validate` เมื่อเปลี่ยน Tunnel configuration
 10. **Mandatory LIFF post-deploy gate:** เปิด `/liff` ใน LINE in-app browser บน Android และ iPhone ตรวจ LIFF ID กับ production LINE Login channel และยืนยัน LINE Login Channel กับ NHFapp Messaging API Channel อยู่ใต้ Provider เดียวกัน
 11. ทดสอบ LINE identity ที่ยังไม่ link เข้าสู่ account-link flow; linked user กลับมาแล้ว restore LIFF workforce session ได้; session หมดอายุแล้ว recovery ได้โดยไม่ replay mutation อัตโนมัติ
 12. ทดสอบ Stock, Leave, Routine ที่เปิดใช้ และ IT requester flow รวม attachment, cross-module navigation, direct deep links และ server-side authorization เมื่อเปิด deep link โดยตรง
@@ -773,9 +775,10 @@ curl --fail http://127.0.0.1:3000/
 ### Process topology และ rate-limit contract
 
 Production topology ที่ repository รองรับในปัจจุบันคือ **หนึ่ง host และหนึ่ง
-Next.js production process** ที่รัน `npm run start` หลัง Nginx upstream เดียว
-เท่านั้น. systemd, Supervisor และ PM2 ใช้ได้ในโหมด single process; PM2 cluster,
-การรัน Next.js หลาย process หลัง Nginx และการกระจายไปหลาย host ยังไม่ใช่ topology
+Next.js production process** ที่รัน `npm run start` bind `127.0.0.1:3000` และรับ
+traffic จาก `cloudflared` บนเครื่องเดียวกันเท่านั้น. systemd, Supervisor และ PM2
+ใช้ได้ในโหมด single process; PM2 cluster,
+การรัน Next.js หลาย process และการกระจายไปหลาย host ยังไม่ใช่ topology
 ที่รองรับ. Node.js อาจทำได้ในทางเทคนิค แต่ห้ามเปิดใช้โดยถือว่า rate limit
 ปลอดภัยแล้ว.
 
@@ -787,18 +790,20 @@ Auth และ mutation rate limit ใน `lib/auth/rate-limit.ts` และ
 atomic พร้อม deployment, failure policy, cleanup, integration test และ runbook
 ที่รองรับ รวมถึง shared/object storage สำหรับ `.uploads/`.
 
-เส้นทาง client IP ที่รองรับคือ `Cloudflare → Nginx → Next.js`. Nginx ตรวจ
-Cloudflare source ranges, ใช้ `real_ip_header CF-Connecting-IP` แล้วเขียนทับ
-`CF-Connecting-IP` ที่ส่งให้แอปจากค่า `$remote_addr` ที่ canonical แล้ว. แอปจึง
-ไม่ใช้ `X-Forwarded-For`, `X-Real-IP` หรือ forwarding header อื่นเป็น fallback.
-ห้ามเปิด `127.0.0.1:3000` ออก Internet. หากใช้ Cloudflare Tunnel ให้ public
-hostname route ผ่าน Nginx เพื่อเปิดใช้งาน **ทั้งแอปพลิเคชัน** โดย configuration
-ของ Tunnel ไม่กำหนด `path` allowlist; การ route ผ่าน Nginx ต้องมี trusted
-tunnel-to-Nginx client-IP contract ที่ operator ตรวจสอบเพิ่ม เพราะ config ใน
-repository นี้ trust เฉพาะ Cloudflare source ranges และไม่ถือว่า local
-`cloudflared` เป็น trusted proxy โดยอัตโนมัติ. การเปิด public ทุก path เป็นเพียง
-network reachability; Auth, authorization, role, LIFF และ webhook signature
-ยังต้องถูกบังคับโดยแอปพลิเคชัน.
+Production topology จริงคือ `Cloudflare edge → Cloudflare Tunnel (cloudflared) →
+Next.js http://127.0.0.1:3000` โดยไม่มี Nginx ใน request path และ host firewall
+(`ufw`) ปิด inbound 80/443. แอปอ่าน client IP จาก `CF-Connecting-IP` เท่านั้น
+(`lib/network/trusted-client-ip.ts`) และไม่ใช้ `X-Forwarded-For`, `X-Real-IP`
+หรือ forwarding header อื่นเป็น fallback. ใน topology นี้ไม่มี Nginx คอยเขียนทับ
+header ดังกล่าว ค่าจึงมาจาก request ที่ Cloudflare ส่งผ่าน `cloudflared` และ
+trust boundary ขึ้นกับการที่ port 3000 รับได้เฉพาะ loopback; operator ต้อง
+ยืนยันพฤติกรรมของ Cloudflare ต่อ `CF-Connecting-IP` ที่ client ส่งมาเองก่อนพึ่ง
+ค่านี้เป็น security control. ห้ามเปิด `127.0.0.1:3000` ออก Internet. public
+hostname เปิดใช้งาน **ทั้งแอปพลิเคชัน** โดย configuration ของ Tunnel ไม่กำหนด
+`path` allowlist ยกเว้น denylist ของ maintenance/cron endpoint ตาม
+[Cloudflare Tunnel §6.1](./cloudflare-tunnel.md#61-ปิด-maintenance-และ-cron-endpoint-จากภายนอก).
+การเปิด public ทุก path เป็นเพียง network reachability; Auth, authorization,
+role, LIFF และ webhook signature ยังต้องถูกบังคับโดยแอปพลิเคชัน.
 
 ถ้าไม่มีหรือมีค่า client identity ที่ไม่ถูกต้อง request จะอยู่ใน shared
 `unknown` bucket สำหรับ pre-auth controls. local development/test ใช้ bucket นี้
@@ -808,6 +813,12 @@ fallback ที่เชื่อ header จาก client.
 
 
 ### Nginx และ Cloudflare
+
+> **Topology สำรอง — ไม่ได้ใช้ใน production ปัจจุบัน:** production ส่ง traffic จาก
+> `cloudflared` ตรงไปที่ `http://127.0.0.1:3000` จึงไม่ได้ติดตั้งหรือใช้ Nginx ใน
+> request path ขั้นตอนในหัวข้อนี้ใช้เฉพาะเมื่อ owner ตัดสินใจกลับไปใช้
+> `Cloudflare Tunnel → Nginx → Next.js` ห้ามแก้ Nginx เพื่อป้องกัน endpoint ใด ๆ
+> ใน production ปัจจุบัน เพราะ request ไม่ผ่าน Nginx
 
 ไฟล์ตัวอย่างอยู่ที่:
 
@@ -839,7 +850,7 @@ sudo systemctl reload nginx
 deploy ปัจจุบัน ระบบใช้ public Cloudflare Tunnel และไม่ใช้ Cloudflare Access
 หรือ Zero Trust authentication gate.
 
-> รายการ Cloudflare IP ใน `cloudflare-real-ip.conf` ต้องตรวจเทียบกับรายการทางการเป็นระยะ และ origin firewall ควรอนุญาตเฉพาะ Cloudflare หรือ tunnel ที่ใช้งาน
+> (topology สำรอง) รายการ Cloudflare IP ใน `cloudflare-real-ip.conf` ต้องตรวจเทียบกับรายการทางการเป็นระยะ และ origin firewall ควรอนุญาตเฉพาะ Cloudflare หรือ tunnel ที่ใช้งาน
 
 ตัวอย่าง Nginx ต้องคง `client_max_body_size 25m;` สำหรับคำขอลาที่มีหลักฐาน และต้องไม่มี `location` ที่ expose
 `.uploads/private` เป็น static file หรือ alias
@@ -850,11 +861,15 @@ deploy ปัจจุบัน ระบบใช้ public Cloudflare Tunnel �
 แอปไม่มี in-process cron และไม่ควรพึ่ง request จากผู้ใช้เพื่อปลุก worker ใน production ให้ตั้ง external
 scheduler เรียก endpoints ต่อไปนี้ด้วย `POST`
 
+crontab รันบนเครื่องเดียวกับแอป จึงเรียก Next.js ที่ `http://127.0.0.1:3000` โดยตรง **ห้ามเรียกผ่าน public
+domain** เพราะ endpoint เหล่านี้ถูกปิดจากภายนอกด้วย Cloudflare Tunnel ingress rule และจะตอบ `404`
+([Cloudflare Tunnel §6.1](./cloudflare-tunnel.md#61-ปิด-maintenance-และ-cron-endpoint-จากภายนอก)) endpoint
+เหล่านี้ไม่ใช้ Host หรือ `X-Forwarded-*` ของ request; link ใน notification สร้างจาก `PUBLIC_APPROVE_URL`
+
 cron process ไม่ได้โหลด `.env` ของ Next.js อัตโนมัติ ต้องส่ง environment variables ให้ cron โดยตรง หรือสร้างไฟล์
 เฉพาะสำหรับ cron ที่อ่านได้เฉพาะผู้ดูแลระบบ เช่น `/etc/employee_nhf/cron.env`:
 
 ```dotenv
-APP_BASE_URL="https://approve.example.com"
 ROUTINE_SCHEDULER_CRON_SECRET="replace-with-production-secret"
 NOTIFICATION_OUTBOX_CRON_SECRET="replace-with-production-secret"
 AUDIT_LOG_CLEANUP_SECRET="replace-with-production-secret"
@@ -863,8 +878,9 @@ LEAVE_ATTACHMENT_CLEANUP_SECRET="replace-with-production-secret"
 IT_ATTACHMENT_CLEANUP_SECRET="replace-with-production-secret"
 ```
 
-ตั้ง permission เป็น `600` และใช้ secret คนละค่ากันทุกตัว `APP_BASE_URL` ต้องเป็น HTTPS origin เดียวกับ
-`PUBLIC_APPROVE_URL` โดยไม่มี `/` ท้าย URL หาก scheduler platform รองรับ environment variables อยู่แล้ว ไม่ต้องสร้างไฟล์นี้
+ตั้ง permission เป็น `600` และใช้ secret คนละค่ากันทุกตัว แต่ละค่าต้องยาวอย่างน้อย 32 ตัวอักษรหลัง trim และต้องตรงกับ
+ค่าใน environment ของ Next.js หาก scheduler platform รองรับ environment variables อยู่แล้ว ไม่ต้องสร้างไฟล์นี้
+`APP_BASE_URL` ที่เคยใช้ในไฟล์นี้ไม่จำเป็นอีกต่อไป
 
 ตัวอย่าง crontab ด้านล่างใช้ `/bin/bash` และโหลดไฟล์ดังกล่าวก่อนเรียก endpoint:
 
@@ -880,13 +896,13 @@ Notification outbox worker ด้านล่างด้วย สำหรั�
 endpoint จะตอบสำเร็จแบบ no-op โดยไม่สร้าง occurrence หรือ reminder:
 
 ```cron
-* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --max-time 50 --request POST --header "x-routine-secret: $ROUTINE_SCHEDULER_CRON_SECRET" "$APP_BASE_URL/api/cron/routine-scheduler"
+* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --max-time 50 --request POST --header "x-routine-secret: $ROUTINE_SCHEDULER_CRON_SECRET" "http://127.0.0.1:3000/api/cron/routine-scheduler"
 ```
 
 ### Notification outbox — ตัวอย่างทุก 1 นาที
 
 ```cron
-* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "$APP_BASE_URL/api/cron/notification-outbox"
+* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "http://127.0.0.1:3000/api/cron/notification-outbox"
 ```
 
 Worker claim สูงสุด 10 รายการต่อ invocation และ process ตามลำดับเวลาสร้าง การเรียกทุก 1 นาทีช่วยระบาย backlog ต่อเนื่อง
@@ -898,7 +914,7 @@ process ในรอบถัดไป โดยอาจช้าสูงส�
 ### Audit log cleanup — วันละครั้ง
 
 ```cron
-15 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUDIT_LOG_CLEANUP_SECRET" "$APP_BASE_URL/api/audit-logs/cleanup"
+15 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUDIT_LOG_CLEANUP_SECRET" "http://127.0.0.1:3000/api/audit-logs/cleanup"
 ```
 
 ระบบลบ audit log ที่เก่ากว่า 90 วัน
@@ -906,7 +922,7 @@ process ในรอบถัดไป โดยอาจช้าสูงส�
 ### Auth token cleanup — วันละครั้ง
 
 ```cron
-30 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUTH_CLEANUP_SECRET" "$APP_BASE_URL/api/auth/cleanup"
+30 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $AUTH_CLEANUP_SECRET" "http://127.0.0.1:3000/api/auth/cleanup"
 ```
 
 ระบบลบ refresh token ที่หมดอายุหรือถูก revoke และเก่ากว่า retention window 7 วัน
@@ -919,13 +935,13 @@ process ในรอบถัดไป โดยอาจช้าสูงส�
 set -a
 . /etc/employee_nhf/cron.env
 set +a
-curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup?dryRun=true"
+curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "http://127.0.0.1:3000/api/leave/attachments/cleanup?dryRun=true"
 ```
 
 เมื่อผล dry-run ถูกต้องจึงเปิด cron ที่ลบจริง:
 
 ```cron
-0 3 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/leave/attachments/cleanup"
+0 3 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "http://127.0.0.1:3000/api/leave/attachments/cleanup"
 ```
 
 งานนี้ scan เฉพาะ private leave directory, เทียบ `storageKey` กับฐานข้อมูล และลบเฉพาะไฟล์ที่เก่ากว่า safety
@@ -939,20 +955,69 @@ window 24 ชั่วโมง จึงไม่ควรลบไฟล์ท
 set -a
 . /etc/employee_nhf/cron.env
 set +a
-curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/it/attachments/cleanup?dryRun=true"
+curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "http://127.0.0.1:3000/api/it/attachments/cleanup?dryRun=true"
 ```
 
 เมื่อผล dry-run ถูกต้องจึงเปิดตัวอย่าง job ของ external scheduler นี้:
 
 ```cron
-45 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/it/attachments/cleanup?dryRun=true"
-0 3 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "$APP_BASE_URL/api/it/attachments/cleanup"
+45 2 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "http://127.0.0.1:3000/api/it/attachments/cleanup?dryRun=true"
+0 3 * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "http://127.0.0.1:3000/api/it/attachments/cleanup"
 ```
 
 ตัวอย่างนี้คงเวลา dry-run `02:45` และ cleanup `03:00` จาก [Storage and attachment operations](./storage-and-attachments.md). Job ต้องมี external owner และใช้ `POST` กับ header `x-cleanup-secret`; ทำงานเฉพาะ `.uploads/private/it/` และห้ามเปิดเผยชื่อไฟล์, storage key หรือ private path. Secret ไม่ได้ตั้งจะตอบ `503`; secret ผิดจะตอบ `403`. รายละเอียดการคัดเลือก orphan และข้อจำกัด storage อยู่ในเอกสาร storage ข้างต้น
 
-ทุก endpoint ตอบ `503` เมื่อไม่ได้ตั้ง secret และ `403` เมื่อ header secret ไม่ตรง Routine scheduler ตอบ `500` พร้อม
+ทุก endpoint ตอบ `503` เมื่อไม่ได้ตั้ง secret หรือ secret สั้นกว่า 32 ตัวอักษรหลัง trim และ `403` เมื่อ header secret ไม่ตรง
+(เทียบแบบ constant-time ใน `lib/security/shared-secret.ts`) Routine scheduler ตอบ `500` พร้อม
 counters เมื่อบางรายการทำงานไม่สำเร็จ `curl --fail` จึงทำให้ cron run นั้นล้มและสามารถแจ้งเตือนผ่านระบบ monitoring ภายนอกได้
+
+### ลำดับ cutover: cron ผ่าน loopback และปิด endpoint จากภายนอก
+
+ทำตามลำดับนี้ หยุดเมื่อขั้นใดไม่ผ่าน ลำดับนี้สำคัญ: ถ้าปิด endpoint ที่ Tunnel ก่อนย้าย crontab cron เดิมที่ยิงผ่าน
+public domain จะได้ `404` ทุกรอบ และถ้า deploy แอปก่อนแก้ secret ที่สั้น endpoint จะตอบ `503` และ login จะใช้ไม่ได้
+
+1. **ยืนยันว่า secret ทุกตัวยาว ≥ 32 ตัวอักษรหลัง trim** ทั้งใน environment ของ Next.js และใน cron environment
+   คำสั่งนี้พิมพ์เฉพาะชื่อและความยาว ไม่พิมพ์ค่า (แทน `<ENV_FILE>` ด้วยไฟล์ environment ของ Next.js และ
+   `/etc/employee_nhf/cron.env` ทีละไฟล์; ใน cron.env จะไม่มี `AUTH_ACCESS_TOKEN_SECRET` ซึ่งเป็นเรื่องปกติ):
+
+   ```bash
+   sudo bash -c 'set -a; . "$1"; set +a
+   for v in AUTH_ACCESS_TOKEN_SECRET AUTH_CLEANUP_SECRET AUDIT_LOG_CLEANUP_SECRET IT_ATTACHMENT_CLEANUP_SECRET \
+            LEAVE_ATTACHMENT_CLEANUP_SECRET NOTIFICATION_OUTBOX_CRON_SECRET ROUTINE_SCHEDULER_CRON_SECRET; do
+     t="$(printf "%s" "${!v}" | sed -e "s/^[[:space:]]*//" -e "s/[[:space:]]*$//")"
+     if [ "${#t}" -ge 32 ]; then s=OK; else s=TOO_SHORT_OR_MISSING; fi
+     printf "%-34s %4d %s\n" "$v" "${#t}" "$s"
+   done' _ <ENV_FILE>
+   ```
+
+   ค่าใดเป็น `TOO_SHORT_OR_MISSING` ให้สร้างใหม่ (เช่น `openssl rand -base64 48`) และอัปเดตทั้ง environment ของแอปและ
+   cron.env ให้ตรงกันก่อนไปขั้นถัดไป การเปลี่ยน `AUTH_ACCESS_TOKEN_SECRET` ทำให้ access token เดิมใช้ไม่ได้และผู้ใช้ต้อง
+   refresh session
+2. **Deploy แอป** ตาม[หัวข้อ 9](#9-ลำดับการ-deploy-production-และ-liff-gate-ที่ต้องผ่าน) แล้วตรวจ
+   `curl --fail http://127.0.0.1:3000/`
+3. **เปลี่ยน crontab** ทุกบรรทัดให้เรียก `http://127.0.0.1:3000` ตามตัวอย่างด้านบน (`crontab -e` ของ user ที่เป็น owner
+   ของ job) แล้วทดสอบด้วยมือบนเครื่อง origin ทีละ endpoint; ต้องได้ HTTP `200`:
+
+   ```bash
+   set -a; . /etc/employee_nhf/cron.env; set +a
+   curl --fail --silent --show-error --max-time 50 --request POST --header "x-routine-secret: $ROUTINE_SCHEDULER_CRON_SECRET" "http://127.0.0.1:3000/api/cron/routine-scheduler"
+   curl --fail --silent --show-error --max-time 50 --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "http://127.0.0.1:3000/api/cron/notification-outbox"
+   curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $LEAVE_ATTACHMENT_CLEANUP_SECRET" "http://127.0.0.1:3000/api/leave/attachments/cleanup?dryRun=true"
+   curl --fail --silent --show-error --request POST --header "x-cleanup-secret: $IT_ATTACHMENT_CLEANUP_SECRET" "http://127.0.0.1:3000/api/it/attachments/cleanup?dryRun=true"
+   ```
+
+   `auth/cleanup` และ `audit-logs/cleanup` ไม่มี dry-run และลบข้อมูลตาม retention จริงเมื่อเรียก ให้ตรวจจากผลรอบ
+   ตามตารางเวลาครั้งถัดไป หรือเรียกด้วยมือเฉพาะเมื่อยอมรับให้ cleanup รอบนั้นทำงานก่อนเวลา
+4. **แก้ `cloudflared` config** เพิ่ม rule denylist ไว้ก่อน rule หลักของ hostname ตาม
+   [Cloudflare Tunnel §6.1](./cloudflare-tunnel.md#61-ปิด-maintenance-และ-cron-endpoint-จากภายนอก) เก็บสำเนา config เดิม
+   ไว้สำหรับ rollback จากนั้นรัน `cloudflared tunnel ingress validate` และ `cloudflared tunnel ingress rule <url>` ให้ได้ผล
+   ตามที่ระบุ แล้วจึง `sudo systemctl restart cloudflared`
+5. **ทดสอบจากภายนอก** (network ที่ไม่ใช่ origin) ตาม
+   [Cloudflare Tunnel §9](./cloudflare-tunnel.md#9-การทดสอบจากภายนอก-origin-network): ทั้ง 6 endpoint ต้องได้ `404`
+   และ `/`, `/dashboard`, `/api/line/webhook` ยังเดินทางถึงแอปตามปกติ จากนั้นติดตามว่า cron รอบถัดไปสำเร็จ
+
+Rollback ของขั้น 4: คืน config เดิมของ `cloudflared`, validate และ restart; crontab ที่ใช้ loopback ทำงานต่อได้ไม่ว่า
+Tunnel rule จะเป็นแบบใด
 
 
 ## Backup และ application rollback

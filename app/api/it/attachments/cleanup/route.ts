@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { cleanupOrphanedITTicketAttachments } from "@/modules/it";
+import { verifySharedSecret } from "@/lib/security/shared-secret";
 import { forbidden, jsonError, operationFailed } from "@/lib/ssot/http";
 
 const CLEANUP_SECRET_HEADER = "x-cleanup-secret";
@@ -17,11 +18,14 @@ function parseDryRun(request: Request): boolean | null {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-    const expectedSecret = process.env.IT_ATTACHMENT_CLEANUP_SECRET?.trim();
-    if (!expectedSecret) {
+    const secretCheck = verifySharedSecret(request, {
+        envName: "IT_ATTACHMENT_CLEANUP_SECRET",
+        headerName: CLEANUP_SECRET_HEADER,
+    });
+    if (secretCheck.status === "not_configured") {
         return jsonError("ยังไม่ได้กำหนดค่าการบำรุงรักษาไฟล์แนบ", 503);
     }
-    if (request.headers.get(CLEANUP_SECRET_HEADER) !== expectedSecret) {
+    if (secretCheck.status === "invalid") {
         return forbidden();
     }
 

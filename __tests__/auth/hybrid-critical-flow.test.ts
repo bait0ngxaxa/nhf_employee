@@ -38,7 +38,7 @@ describe("Hybrid critical flow", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        process.env.AUTH_ACCESS_TOKEN_SECRET = "critical-flow-test-secret";
+        process.env.AUTH_ACCESS_TOKEN_SECRET = "critical-flow-test-secret-0123456789abcdef";
 
         prismaMock.user.findUnique.mockResolvedValue({
             id: 1,

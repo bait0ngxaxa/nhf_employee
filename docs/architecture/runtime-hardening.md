@@ -15,6 +15,18 @@ closure metadata are recorded in
 > superseded by the audited-source evidence and H0 closure metadata in
 > [pre-it-hardening-h0-baseline.md](./pre-it-hardening-h0-baseline.md).
 
+> **Current-state note (production topology, 2026-11-09):** The owner verified
+> on the production server that the actual request path is
+> `Cloudflare → cloudflared → http://127.0.0.1:3000 (Next.js)` with no Nginx in
+> the path and `ufw` denying inbound 80/443. Statements in this historical
+> record that describe `Cloudflare → Nginx → Next.js` as the production
+> topology (for example sections 4.1, 19.2 and 19.4) describe the repository's
+> alternate Nginx topology, not current production. In particular, the
+> Nginx-side `CF-Connecting-IP` canonicalization and request-size limits do
+> not apply to current production. Current operational guidance is in
+> [cloudflare-tunnel.md](../operations/cloudflare-tunnel.md) and
+> [production-deployment.md](../operations/production-deployment.md).
+
 This is a source-backed discovery record. It does not authorize or implement
 runtime hardening, schema changes, migrations, API-contract changes, or
 cleanup. Findings use the current repository as the source of truth. Historical

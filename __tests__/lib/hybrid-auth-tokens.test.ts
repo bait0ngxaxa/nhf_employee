@@ -10,7 +10,7 @@ import {
 
 describe("hybrid auth token utilities", () => {
     beforeEach(() => {
-        process.env.AUTH_ACCESS_TOKEN_SECRET = "unit-test-access-secret";
+        process.env.AUTH_ACCESS_TOKEN_SECRET = "unit-test-access-secret-0123456789abcdef";
         process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = "900";
         process.env.AUTH_REFRESH_TOKEN_TTL_SECONDS = "2592000";
     });
@@ -31,6 +31,29 @@ describe("hybrid auth token utilities", () => {
             sessionId: "session_123",
             tokenVersion: 3,
         });
+    });
+
+    it("refuses to sign or verify with a missing or short access token secret", async () => {
+        const claims = {
+            userId: 42,
+            role: "ADMIN" as const,
+            sessionId: "session_123",
+            tokenVersion: 3,
+        };
+        const token = await issueAccessToken(claims);
+
+        process.env.AUTH_ACCESS_TOKEN_SECRET = `  ${"a".repeat(31)}  `;
+        await expect(issueAccessToken(claims)).rejects.toThrow(
+            "AUTH_ACCESS_TOKEN_SECRET must be at least 32 characters",
+        );
+        await expect(verifyAccessToken(token)).rejects.toThrow(
+            "AUTH_ACCESS_TOKEN_SECRET must be at least 32 characters",
+        );
+
+        delete process.env.AUTH_ACCESS_TOKEN_SECRET;
+        await expect(issueAccessToken(claims)).rejects.toThrow(
+            "Missing required environment variable: AUTH_ACCESS_TOKEN_SECRET",
+        );
     });
 
     it("creates refresh token drafts with hashed token only", () => {
