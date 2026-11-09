@@ -29,7 +29,91 @@ import {
     OUTBOX_NOTIFICATION_TYPES,
     OUTBOX_RETRY_BASE_DELAY_MS,
     STALE_OUTBOX_PROCESSING_MINUTES,
+    type OutboxNotificationType,
 } from "@/lib/services/outbox/types";
+import { SMTP_MAX_SEND_ATTEMPTS } from "@/lib/email/smtp";
+import {
+    OUTBOUND_HTTP_TIMEOUT_MS,
+    OUTBOUND_SMTP_TIMEOUTS,
+} from "@/lib/network/outbound-http";
+
+/**
+ * External provider sends performed by one dispatch of each outbox type, traced
+ * through dispatchNotification (lib/services/outbox/processor.ts). Fan-out rows
+ * only write in-app notifications or enqueue child rows; each child row then
+ * performs exactly one sendEmail or one LINE request. Typed as a Record so a
+ * new outbox type cannot be added without tracing it here.
+ */
+const EXTERNAL_SENDS_PER_ROW = {
+    // enqueueEmailRequestNotificationChannels only (modules/it/application/email-request/dispatch.ts)
+    EMAIL_REQUEST: 0,
+    EMAIL_REQUEST_ACCESS_UPDATED: 0,
+    // sendLeaveActionNotifications -> one sendLeaveEmail (modules/leave/infrastructure/notifications/email.ts)
+    LEAVE_ACTION: 1,
+    // enqueue *_LINE child + one sendLeaveEmail via assertEmailSent (modules/leave/application/notifications/notifications.ts)
+    LEAVE_RESULT: 1,
+    LEAVE_CANCELLED: 1,
+    LEAVE_CANCELLATION_REQUESTED: 1,
+    LEAVE_CANCELLED_AFTER_APPROVAL: 1,
+    LEAVE_NOT_TAKEN_REQUESTED: 1,
+    LEAVE_NOT_TAKEN_CONFIRMED: 1,
+    // one sendAppLineNotification (modules/leave/infrastructure/notifications/line.ts)
+    LEAVE_ACTION_LINE: 1,
+    LEAVE_RESULT_LINE: 1,
+    LEAVE_CANCELLED_LINE: 1,
+    LEAVE_CANCELLATION_REQUESTED_LINE: 1,
+    LEAVE_CANCELLED_AFTER_APPROVAL_LINE: 1,
+    LEAVE_NOT_TAKEN_REQUESTED_LINE: 1,
+    LEAVE_NOT_TAKEN_CONFIRMED_LINE: 1,
+    // in-app DB writes + one sendStockLineBroadcast (modules/stock/infrastructure/notifications/outbox.ts)
+    STOCK_REQUEST_LINE: 1,
+    STOCK_LOW_LINE: 1,
+    // one sendEmail (modules/stock/infrastructure/notifications/email.ts)
+    STOCK_REQUEST_RESULT_EMAIL: 1,
+    // one sendAppLineNotification (modules/stock/infrastructure/notifications/line-notifications.ts)
+    STOCK_REQUEST_RESULT_LINE: 1,
+    // in-app writes + child enqueue in a transaction (modules/routine/application/reminders.ts, contract-reminders.ts)
+    ROUTINE_REMINDER_IN_APP: 0,
+    ROUTINE_CONTRACT_EXPIRY_IN_APP: 0,
+    // one sendEmail (modules/routine/application/notifications/email.ts)
+    ROUTINE_REMINDER_EMAIL: 1,
+    ROUTINE_CONTRACT_EXPIRY_EMAIL: 1,
+    // one sendAppLineNotification (reminders.ts / contract-reminders.ts)
+    ROUTINE_REMINDER_LINE: 1,
+    ROUTINE_CONTRACT_EXPIRY_LINE: 1,
+    // modules/it/application/notifications/dispatch.ts: in-app only / one LINE / one sendEmail
+    IT_TICKET_IN_APP: 0,
+    IT_TICKET_LINE: 1,
+    IT_TICKET_EMAIL: 1,
+    // modules/it/application/email-request/dispatch.ts: one sendEmail / one LINE
+    EMAIL_REQUEST_EMAIL: 1,
+    EMAIL_REQUEST_LINE: 1,
+} as const satisfies Record<OutboxNotificationType, number>;
+
+/**
+ * HTTP calls per send: Microsoft Graph = Entra token (when not cached) +
+ * sendMail (lib/email/microsoft-graph.ts); LINE = one fetch (lib/line/messaging.ts).
+ */
+const MAX_HTTP_CALLS_PER_SEND = 2;
+
+/**
+ * SMTP operations per sendSmtpEmail (lib/email/smtp.ts): verifyConnection runs
+ * up to 2 verify() calls before sending, then up to SMTP_MAX_SEND_ATTEMPTS
+ * sendMail calls, each transient failure (ETIMEDOUT/ECONNRESET/ENOTFOUND)
+ * followed by another verifyConnection (up to 2 verify() calls). Each stalled
+ * operation is modelled as setup (connectionTimeout) + one idle socketTimeout.
+ * A server that keeps trickling bytes is not bounded by socketTimeout (idle
+ * timeout); that residual risk is documented on OUTBOUND_SMTP_TIMEOUTS.
+ */
+const SMTP_VERIFY_CALLS_PER_CONNECTION_CHECK = 2;
+const MAX_SMTP_OPERATIONS_PER_SEND =
+    SMTP_VERIFY_CALLS_PER_CONNECTION_CHECK
+    + SMTP_MAX_SEND_ATTEMPTS * (1 + SMTP_VERIFY_CALLS_PER_CONNECTION_CHECK);
+/** Backoff between sendMail attempts: 2^attempt * 1000 ms (lib/email/smtp.ts). */
+const SMTP_BACKOFF_TOTAL_MS = Array.from(
+    { length: SMTP_MAX_SEND_ATTEMPTS },
+    (_unused, index) => 2 ** (index + 1) * 1000,
+).reduce((total, delay) => total + delay, 0);
 
 const leaveNotificationMocks = vi.hoisted(() => ({
     createLeaveActionInAppNotification: vi.fn(),
@@ -1873,11 +1957,35 @@ describe("processOutbox", () => {
                 );
         }
 
-        it("keeps the budget well inside the stale PROCESSING window", () => {
-            expect(OUTBOX_BATCH_TIME_BUDGET_MS).toBeGreaterThan(0);
-            expect(OUTBOX_BATCH_TIME_BUDGET_MS).toBeLessThanOrEqual(
-                (STALE_OUTBOX_PROCESSING_MINUTES * 60_000) / 2,
+        it("keeps one row's worst-case provider time well inside the stale window", () => {
+            const staleWindowMs = STALE_OUTBOX_PROCESSING_MINUTES * 60_000;
+            const maxSendsPerRow = Math.max(
+                ...Object.values(EXTERNAL_SENDS_PER_ROW),
             );
+            // Every type was traced; no row performs more than one external send.
+            expect(Object.keys(EXTERNAL_SENDS_PER_ROW).sort()).toEqual(
+                [...OUTBOX_NOTIFICATION_TYPES].sort(),
+            );
+            expect(maxSendsPerRow).toBe(1);
+
+            const maxPerCallTimeoutMs = Math.max(
+                OUTBOUND_HTTP_TIMEOUT_MS,
+                OUTBOUND_SMTP_TIMEOUTS.socketTimeout,
+            );
+            const httpRowMs =
+                maxSendsPerRow * MAX_HTTP_CALLS_PER_SEND * OUTBOUND_HTTP_TIMEOUT_MS;
+            const smtpRowMs =
+                maxSendsPerRow
+                * (MAX_SMTP_OPERATIONS_PER_SEND
+                    * (OUTBOUND_SMTP_TIMEOUTS.connectionTimeout + maxPerCallTimeoutMs)
+                    + SMTP_BACKOFF_TOTAL_MS);
+            const worstRowMs = Math.max(httpRowMs, smtpRowMs);
+
+            expect(MAX_SMTP_OPERATIONS_PER_SEND).toBe(11);
+            expect(httpRowMs).toBe(20_000);
+            expect(smtpRowMs).toBe(234_000);
+            // At least a 2x margin below the stale window.
+            expect(worstRowMs * 2).toBeLessThan(staleWindowMs);
         });
 
         it("stops claiming new rows once the budget is spent but finishes the claimed row", async () => {
