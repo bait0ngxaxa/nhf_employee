@@ -1,3 +1,4 @@
+import { createOutboundHttpSignal } from "@/lib/network/outbound-http";
 import type { LineFlexMessage } from "@/types/api";
 
 import { getLineMessagingConfig } from "./config";
@@ -21,6 +22,7 @@ async function sendLineApiRequest(
             method: "POST",
             headers,
             body: JSON.stringify(body),
+            signal: createOutboundHttpSignal(),
         });
 
         if (response.ok || (Boolean(retryKey) && response.status === 409)) {

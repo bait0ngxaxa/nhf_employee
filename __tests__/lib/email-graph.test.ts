@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { OUTBOUND_HTTP_TIMEOUT_MS } from "@/lib/network/outbound-http";
+
 const { sendSmtpEmailMock } = vi.hoisted(() => ({
     sendSmtpEmailMock: vi.fn(),
 }));
@@ -95,6 +97,7 @@ describe("Microsoft Graph email transport", () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
         vi.resetModules();
@@ -257,6 +260,93 @@ describe("Microsoft Graph email transport", () => {
             .join(" ");
         expect(loggedValues).not.toContain(CLIENT_SECRET);
         expect(loggedValues).not.toContain(ACCESS_TOKEN);
+    });
+
+    it("returns false and logs an ambiguous timeout when Graph sendMail exceeds the request timeout", async () => {
+        const consoleErrorSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        // Fake only setTimeout: Nodemailer MIME generation relies on real
+        // setImmediate/nextTick scheduling.
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        const timeoutSpy = vi
+            .spyOn(AbortSignal, "timeout")
+            .mockImplementation((ms: number) => {
+                const controller = new AbortController();
+                setTimeout(() => {
+                    controller.abort(
+                        new DOMException("The operation timed out.", "TimeoutError"),
+                    );
+                }, ms);
+                return controller.signal;
+            });
+        const fetchMock = vi
+            .fn<typeof fetch>()
+            .mockResolvedValueOnce(
+                new Response(
+                    JSON.stringify({
+                        access_token: ACCESS_TOKEN,
+                        expires_in: 3600,
+                    }),
+                    { status: 200 },
+                ),
+            )
+            .mockImplementationOnce((_input, init) =>
+                new Promise<Response>((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => {
+                        reject(init.signal?.reason);
+                    });
+                }),
+            );
+        vi.stubGlobal("fetch", fetchMock);
+
+        try {
+            const pending = sendThroughSharedTransport();
+            await vi.waitFor(() => {
+                expect(fetchMock).toHaveBeenCalledTimes(2);
+            });
+            await vi.advanceTimersByTimeAsync(OUTBOUND_HTTP_TIMEOUT_MS);
+
+            await expect(pending).resolves.toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        for (const [, init] of fetchMock.mock.calls) {
+            expect(init?.signal).toBeInstanceOf(AbortSignal);
+        }
+        expect(timeoutSpy).toHaveBeenCalledWith(OUTBOUND_HTTP_TIMEOUT_MS);
+        expect(sendSmtpEmailMock).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            "Microsoft Graph email request failed.",
+            expect.objectContaining({
+                operation: "sendMail",
+                failureCategory: "ambiguous_timeout",
+            }),
+        );
+    });
+
+    it("returns false when the Entra token request exceeds the request timeout", async () => {
+        const consoleErrorSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => undefined);
+        const fetchMock = vi
+            .fn<typeof fetch>()
+            .mockRejectedValueOnce(
+                new DOMException("The operation timed out.", "TimeoutError"),
+            );
+        vi.stubGlobal("fetch", fetchMock);
+
+        expect(await sendThroughSharedTransport()).toBe(false);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            "Microsoft Entra token request failed.",
+            expect.objectContaining({
+                operation: "token",
+                failureCategory: "ambiguous_timeout",
+            }),
+        );
     });
 
     it("logs the safe Entra OAuth error code for token failures", async () => {

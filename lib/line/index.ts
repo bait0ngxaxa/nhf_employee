@@ -1,3 +1,4 @@
+import { createOutboundHttpSignal } from "@/lib/network/outbound-http";
 import type { LineFlexMessage } from "@/types/api";
 import type { LineWebhookData } from "./types";
 import {
@@ -70,6 +71,7 @@ export async function sendLineWebhook(data: LineWebhookData): Promise<boolean> {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify(data),
+            signal: createOutboundHttpSignal(),
         });
 
         if (response.ok) {
