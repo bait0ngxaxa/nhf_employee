@@ -3,6 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { POST as resetPasswordRoute } from "@/app/api/auth/reset-password/route";
+import {
+    AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const { appendAuditBestEffortMock, hashPasswordMock, prismaMock } = vi.hoisted(() => ({
     appendAuditBestEffortMock: vi.fn(),
@@ -252,5 +261,58 @@ describe("Reset password route", () => {
         expect(prismaMock.user.update).not.toHaveBeenCalled();
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
         expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
+    });
+});
+
+const RESET_URL = "http://localhost/api/auth/reset-password";
+const RESET_HEADERS = { "cf-connecting-ip": "203.0.113.31" };
+const RESET_BODY = {
+    token: "raw-reset-token",
+    password: "StrongPass1",
+    confirmPassword: "StrongPass1",
+};
+
+describe("Reset password route body limit", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 before touching the database (Content-Length %s)",
+        async (contentLength) => {
+            const body = jsonBodyOfExactBytes(RESET_BODY, AUTH_CREDENTIALS_MAX_REQUEST_BYTES + 1);
+
+            const response = await resetPasswordRoute(
+                buildJsonBodyRequest(RESET_URL, body, { headers: RESET_HEADERS, contentLength }),
+            );
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(prismaMock.passwordResetToken.findUnique).not.toHaveBeenCalled();
+            expect(prismaMock.$transaction).not.toHaveBeenCalled();
+        },
+    );
+
+    it("keeps the previous 500 response for malformed JSON", async () => {
+        const response = await resetPasswordRoute(
+            buildJsonBodyRequest(RESET_URL, "{not json", { headers: RESET_HEADERS }),
+        );
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({ error: "Internal server error" });
+        expect(prismaMock.passwordResetToken.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("processes a valid body of exactly the limit", async () => {
+        prismaMock.passwordResetToken.findUnique.mockResolvedValue(null);
+        const body = jsonBodyOfExactBytes(RESET_BODY, AUTH_CREDENTIALS_MAX_REQUEST_BYTES);
+
+        const response = await resetPasswordRoute(
+            buildJsonBodyRequest(RESET_URL, body, { headers: RESET_HEADERS }),
+        );
+
+        // Reaches the token lookup (unknown token -> existing invalid-link 400).
+        expect(response.status).toBe(400);
+        expect(prismaMock.passwordResetToken.findUnique).toHaveBeenCalledTimes(1);
     });
 });

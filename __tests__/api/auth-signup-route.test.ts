@@ -5,7 +5,21 @@ import { Prisma } from "@prisma/client";
 import type * as HybridAuthTokensModule from "@/lib/auth/hybrid/tokens";
 
 import { POST as signupRoute } from "@/app/api/auth/signup/route";
-import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
+import {
+    isAuthRateLimited,
+    recordAuthAttempt,
+    resetAuthRateLimit,
+} from "@/lib/auth/rate-limit";
+import type * as AuthRateLimitModule from "@/lib/auth/rate-limit";
+import {
+    AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const { appendAuditBestEffortMock, prismaMock } = vi.hoisted(() => ({
     appendAuditBestEffortMock: vi.fn(),
@@ -34,6 +48,15 @@ vi.mock("bcryptjs", () => ({
 vi.mock("@/lib/db/prisma", () => ({
     prisma: prismaMock,
 }));
+
+vi.mock("@/lib/auth/rate-limit", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthRateLimitModule>();
+    return {
+        ...actual,
+        isAuthRateLimited: vi.fn(actual.isAuthRateLimited),
+        recordAuthAttempt: vi.fn(actual.recordAuthAttempt),
+    };
+});
 
 vi.mock("@/modules/audit", () => ({
     appendAuditBestEffort: appendAuditBestEffortMock,
@@ -487,5 +510,69 @@ describe("Auth signup route", () => {
 
         expect(rateLimitedResponse.status).toBe(429);
         expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
+    });
+});
+
+const SIGNUP_URL = "http://localhost/api/auth/signup";
+const SIGNUP_HEADERS = {
+    origin: "http://localhost",
+    "x-requested-with": "XMLHttpRequest",
+    "cf-connecting-ip": "203.0.113.41",
+};
+const SIGNUP_BODY = {
+    email: "user@thainhf.org",
+    password: "secret123",
+    confirmPassword: "secret123",
+};
+
+describe("Auth signup route body limit", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        resetAuthRateLimit();
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 before the database or rate-limit bookkeeping (Content-Length %s)",
+        async (contentLength) => {
+            const body = jsonBodyOfExactBytes(SIGNUP_BODY, AUTH_CREDENTIALS_MAX_REQUEST_BYTES + 1);
+
+            const response = await signupRoute(
+                buildJsonBodyRequest(SIGNUP_URL, body, { headers: SIGNUP_HEADERS, contentLength }),
+            );
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(isAuthRateLimited).not.toHaveBeenCalled();
+            expect(recordAuthAttempt).not.toHaveBeenCalled();
+            expect(prismaMock.$transaction).not.toHaveBeenCalled();
+            expect(prismaMock.user.create).not.toHaveBeenCalled();
+        },
+    );
+
+    it("keeps the previous 500 response for malformed JSON", async () => {
+        const response = await signupRoute(
+            buildJsonBodyRequest(SIGNUP_URL, "{not json", { headers: SIGNUP_HEADERS }),
+        );
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({
+            error: "เกิดข้อผิดพลาดในการสมัครสมาชิก",
+        });
+        expect(prismaMock.user.create).not.toHaveBeenCalled();
+    });
+
+    it("processes a valid body of exactly the limit", async () => {
+        const body = jsonBodyOfExactBytes(
+            { ...SIGNUP_BODY, email: "outside@example.com" },
+            AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+        );
+
+        const response = await signupRoute(
+            buildJsonBodyRequest(SIGNUP_URL, body, { headers: SIGNUP_HEADERS }),
+        );
+
+        // Reaches schema validation (non-organization email -> existing 400).
+        expect(response.status).toBe(400);
+        expect(isAuthRateLimited).not.toHaveBeenCalled();
     });
 });

@@ -4,7 +4,17 @@ import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 
 import { POST as forgotPasswordRoute } from "@/app/api/auth/forgot-password/route";
-import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
+import { reserveAuthAttempt, resetAuthRateLimit } from "@/lib/auth/rate-limit";
+import type * as AuthRateLimitModule from "@/lib/auth/rate-limit";
+import {
+    AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const { requestPasswordResetMock, sendEmailMock, afterCallbacks } = vi.hoisted(() => ({
     requestPasswordResetMock: vi.fn(),
@@ -38,6 +48,11 @@ vi.mock("@/modules/auth", () => ({
 vi.mock("@/lib/email", () => ({
     sendEmail: sendEmailMock,
 }));
+
+vi.mock("@/lib/auth/rate-limit", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthRateLimitModule>();
+    return { ...actual, reserveAuthAttempt: vi.fn(actual.reserveAuthAttempt) };
+});
 
 function buildRequest(body: unknown, ipAddress = "203.0.113.50"): NextRequest {
     return new NextRequest("http://localhost/api/auth/forgot-password", {
@@ -290,5 +305,69 @@ describe("forgot-password route", () => {
         } finally {
             errorLog.mockRestore();
         }
+    });
+});
+
+const FORGOT_URL = "http://localhost/api/auth/forgot-password";
+const FORGOT_HEADERS = { "cf-connecting-ip": "203.0.113.90" };
+
+describe("forgot-password route body limit", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        resetAuthRateLimit();
+        requestPasswordResetMock.mockReset();
+        sendEmailMock.mockReset();
+        sendEmailMock.mockResolvedValue(true);
+        afterCallbacks.splice(0);
+        vi.unstubAllEnvs();
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 before token work or the rate-limit reservation (Content-Length %s)",
+        async (contentLength) => {
+            const body = jsonBodyOfExactBytes(
+                { email: "user@thainhf.org" },
+                AUTH_CREDENTIALS_MAX_REQUEST_BYTES + 1,
+            );
+
+            const response = await forgotPasswordRoute(
+                buildJsonBodyRequest(FORGOT_URL, body, { headers: FORGOT_HEADERS, contentLength }),
+            );
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(reserveAuthAttempt).not.toHaveBeenCalled();
+            expect(requestPasswordResetMock).not.toHaveBeenCalled();
+            expect(afterCallbacks).toHaveLength(0);
+        },
+    );
+
+    it("keeps the previous 500 response for malformed JSON", async () => {
+        const response = await forgotPasswordRoute(
+            buildJsonBodyRequest(FORGOT_URL, "{not json", { headers: FORGOT_HEADERS }),
+        );
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({
+            error: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+        });
+        expect(reserveAuthAttempt).not.toHaveBeenCalled();
+        expect(requestPasswordResetMock).not.toHaveBeenCalled();
+    });
+
+    it("accepts a valid body of exactly the limit", async () => {
+        requestPasswordResetMock.mockResolvedValue({ rateLimited: false });
+        const body = jsonBodyOfExactBytes(
+            { email: "user@thainhf.org" },
+            AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+        );
+
+        const response = await forgotPasswordRoute(
+            buildJsonBodyRequest(FORGOT_URL, body, { headers: FORGOT_HEADERS }),
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual(acceptedBody);
+        expect(requestPasswordResetMock).toHaveBeenCalledWith("user@thainhf.org");
     });
 });

@@ -6,6 +6,17 @@ import { POST as hybridLoginRoute } from "@/app/api/auth/hybrid-login/route";
 import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
 import { HYBRID_ACCESS_COOKIE_NAME } from "@/lib/auth/hybrid/constants";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
+import {
+    AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import { reserveAuthAttempt } from "@/lib/auth/rate-limit";
+import type * as AuthRateLimitModule from "@/lib/auth/rate-limit";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const {
     appendAuditBestEffortMock,
@@ -27,6 +38,11 @@ vi.mock("bcryptjs", () => ({
 }));
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: prismaMock }));
+
+vi.mock("@/lib/auth/rate-limit", async (importOriginal) => {
+    const actual = await importOriginal<typeof AuthRateLimitModule>();
+    return { ...actual, reserveAuthAttempt: vi.fn(actual.reserveAuthAttempt) };
+});
 
 vi.mock("@/modules/audit", () => ({
     appendAuditBestEffort: appendAuditBestEffortMock,
@@ -298,5 +314,69 @@ describe("Hybrid login route employee eligibility", () => {
         expect(response.status).toBe(200);
         expect(prismaMock.authRefreshToken.create).toHaveBeenCalledTimes(1);
         expect(response.headers.get("set-cookie")).toContain(HYBRID_ACCESS_COOKIE_NAME);
+    });
+});
+
+const LOGIN_URL = "http://localhost/api/auth/hybrid-login";
+const LOGIN_HEADERS = {
+    origin: "http://localhost",
+    "x-requested-with": "XMLHttpRequest",
+    "cf-connecting-ip": "203.0.113.11",
+    "user-agent": "hybrid-login-test-agent",
+};
+
+describe("Hybrid login route body limit", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        resetAuthRateLimit();
+        resetMutationRateLimit();
+        compareMock.mockResolvedValue(true);
+        issueAccessTokenMock.mockResolvedValue("access-token");
+        prismaMock.authRefreshToken.create.mockResolvedValue({ id: "rt-1" });
+        appendAuditBestEffortMock.mockResolvedValue(undefined);
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 before the database or auth reservation (Content-Length %s)",
+        async (contentLength) => {
+            const body = jsonBodyOfExactBytes(
+                { email: "user@thainhf.org", password: "secret1" },
+                AUTH_CREDENTIALS_MAX_REQUEST_BYTES + 1,
+            );
+
+            const response = await hybridLoginRoute(
+                buildJsonBodyRequest(LOGIN_URL, body, { headers: LOGIN_HEADERS, contentLength }),
+            );
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+            expect(compareMock).not.toHaveBeenCalled();
+            expect(reserveAuthAttempt).not.toHaveBeenCalled();
+        },
+    );
+
+    it("keeps the previous 500 response for malformed JSON", async () => {
+        const response = await hybridLoginRoute(
+            buildJsonBodyRequest(LOGIN_URL, "{not json", { headers: LOGIN_HEADERS }),
+        );
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({ error: "Internal server error" });
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("accepts a valid body of exactly the limit", async () => {
+        prismaMock.user.findUnique.mockResolvedValue(buildUser({ status: "ACTIVE", deletedAt: null }));
+        const body = jsonBodyOfExactBytes(
+            { email: "user@thainhf.org", password: "secret1" },
+            AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+        );
+
+        const response = await hybridLoginRoute(
+            buildJsonBodyRequest(LOGIN_URL, body, { headers: LOGIN_HEADERS }),
+        );
+
+        expect(response.status).toBe(200);
     });
 });
