@@ -121,3 +121,39 @@ export async function readBoundedJsonBody(
         return { ok: false, reason: "INVALID_JSON" };
     }
 }
+
+export type BoundedFormDataResult =
+    | { ok: true; formData: FormData }
+    | { ok: false; reason: "TOO_LARGE" | "READ_FAILED" | "INVALID_FORM_DATA" };
+
+/**
+ * Reads a multipart/urlencoded body through readBoundedBytes before any
+ * FormData is built, so the original request stream is never buffered past
+ * `maxBytes`. Mirrors the bounded multipart parsing used by the Leave and IT
+ * attachment routes.
+ */
+export async function readBoundedFormData(
+    request: Request,
+    maxBytes: number,
+): Promise<BoundedFormDataResult> {
+    const bounded = await readBoundedBytes(request, maxBytes);
+    if (!bounded.ok) return bounded;
+
+    const contentType = request.headers.get("content-type");
+    if (contentType === null || contentType.trim() === "") {
+        return { ok: false, reason: "INVALID_FORM_DATA" };
+    }
+
+    try {
+        const bodyBuffer = new ArrayBuffer(bounded.bytes.byteLength);
+        new Uint8Array(bodyBuffer).set(bounded.bytes);
+        const boundedRequest = new Request("http://localhost/", {
+            method: "POST",
+            headers: { "Content-Type": contentType },
+            body: bodyBuffer,
+        });
+        return { ok: true, formData: await boundedRequest.formData() };
+    } catch {
+        return { ok: false, reason: "INVALID_FORM_DATA" };
+    }
+}

@@ -31,7 +31,8 @@ export type PreAuthRateLimitScope =
     | "routine-occurrence-admin"
     | "it-ticket-create"
     | "email-request-access-update"
-    | "it-ticket-comment-attachment";
+    | "it-ticket-comment-attachment"
+    | "stock-image-upload";
 
 export type AuthenticatedMutationRateLimitScope = Exclude<
     PreAuthRateLimitScope,
@@ -58,6 +59,7 @@ export const PRE_AUTH_IP_RATE_LIMIT_POLICIES = {
     "it-ticket-create": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
     "email-request-access-update": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
     "it-ticket-comment-attachment": { windowMs: 15 * 60 * 1000, maxRequests: 60 },
+    "stock-image-upload": { windowMs: 15 * 60 * 1000, maxRequests: 120 },
 } as const satisfies Record<PreAuthRateLimitScope, MutationRateLimitPolicy>;
 
 export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
@@ -78,6 +80,7 @@ export const AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES = {
     "it-ticket-create": { windowMs: 60 * 1000, maxRequests: 10 },
     "email-request-access-update": { windowMs: 60 * 1000, maxRequests: 40 },
     "it-ticket-comment-attachment": { windowMs: 60 * 1000, maxRequests: 10 },
+    "stock-image-upload": { windowMs: 60 * 1000, maxRequests: 20 },
 } as const satisfies Record<
     AuthenticatedMutationRateLimitScope,
     MutationRateLimitPolicy
