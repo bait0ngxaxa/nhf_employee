@@ -2505,3 +2505,111 @@ describe("architecture checker module boundaries", () => {
         );
     });
 });
+
+describe("architecture checker raw request body reads", () => {
+    const routePath = "app/api/example/route.ts";
+
+    async function rawBodyViolations(
+        filePath: string,
+        source: string,
+        extraFiles: FixtureFiles = {},
+    ): Promise<string[]> {
+        const rootPath = await createFixture({ ...fixtureFiles, ...extraFiles, [filePath]: source });
+        return checkArchitecture({ repositoryRoot: rootPath }).violations
+            .filter((violation) => violation.includes("request body") || violation.includes("rawRequestBodyExemptions"));
+    }
+
+    it.each(["json", "text", "formData", "arrayBuffer", "blob"])(
+        "rejects request.%s() in an API route and points to the bounded reader",
+        async (method) => {
+            const violations = await rawBodyViolations(
+                routePath,
+                `export async function POST(request: Request) {\n    return Response.json(await request.${method}());\n}\n`,
+            );
+
+            expect(violations).toEqual([
+                expect.stringContaining(`${routePath}:2 reads the request body with request.${method}() directly`),
+            ]);
+            expect(violations[0]).toContain("lib/server/request-body.ts");
+            expect(violations[0]).toContain("lib/ssot/request-limits.ts");
+        },
+    );
+
+    it("rejects req.json(), a renamed NextRequest parameter, and request.clone().json()", async () => {
+        const violations = await rawBodyViolations(
+            routePath,
+            [
+                'import type { NextRequest } from "next/server";',
+                "export async function POST(req: Request) { return Response.json(await req.json()); }",
+                "export async function PUT(incoming: NextRequest) { return Response.json(await incoming.formData()); }",
+                "export async function PATCH(request: Request) { return Response.json(await request.clone().json()); }",
+                "",
+            ].join("\n"),
+        );
+
+        expect(violations).toHaveLength(3);
+        expect(violations).toEqual(expect.arrayContaining([
+            expect.stringContaining("request.json() directly"),
+            expect.stringContaining("request.formData() directly"),
+        ]));
+    });
+
+    it("rejects raw reads in shared API route helpers, not only route.ts files", async () => {
+        const violations = await rawBodyViolations(
+            "app/api/example/_lib/mutation.ts",
+            "export async function readBody(request: Request) { return request.json(); }\n",
+        );
+
+        expect(violations).toHaveLength(1);
+    });
+
+    it("allows the bounded readers and response or file body reads", async () => {
+        const violations = await rawBodyViolations(
+            routePath,
+            [
+                'import { readRouteJsonBody } from "@/lib/server/route-json-body";',
+                "export async function POST(request: Request) {",
+                "    const body = await readRouteJsonBody(request, { maxBytes: 1, invalidJson: () => Response.json({}) });",
+                "    const upstream = await fetch(\"https://example.com\");",
+                "    const file = new File([\"x\"], \"x.txt\");",
+                "    return Response.json({ body, upstream: await upstream.json(), file: await file.text() });",
+                "}",
+                "",
+            ].join("\n"),
+        );
+
+        expect(violations).toEqual([]);
+    });
+
+    it("ignores files outside app/api and test sources", async () => {
+        const outside = await rawBodyViolations(
+            "lib/server/example.ts",
+            "export async function read(request: Request) { return request.json(); }\n",
+        );
+        const testSource = await rawBodyViolations(
+            "app/api/example/route.test.ts",
+            "export async function read(request: Request) { return request.json(); }\n",
+        );
+
+        expect(outside).toEqual([]);
+        expect(testSource).toEqual([]);
+    });
+
+    it("allows an exempted raw-body route and flags the exemption once it is stale", async () => {
+        const exempted = await rawBodyViolations(
+            "app/api/line/webhook/route.ts",
+            "export async function POST(request: Request) { return Response.json(await request.text()); }\n",
+        );
+        const stale = await rawBodyViolations(
+            "app/api/line/webhook/route.ts",
+            "export async function POST() { return Response.json({}); }\n",
+        );
+
+        expect(exempted).toEqual([]);
+        expect(stale).toEqual([
+            expect.stringContaining(
+                "app/api/line/webhook/route.ts is listed in rawRequestBodyExemptions but no longer reads the request body directly",
+            ),
+        ]);
+    });
+});
