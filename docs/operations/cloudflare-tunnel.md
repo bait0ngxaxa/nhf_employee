@@ -338,9 +338,8 @@ done
   `lib/ssot/uploads.ts` / constants ของแต่ละ module (สรุปใน
   [storage-and-attachments.md](./storage-and-attachments.md#app-level-request-body-limits))
   route ที่อ่าน body ทุกตัวใต้ `app/api` มี limit ในแอปแล้ว ยกเว้น LINE webhook
-  (raw body สำหรับ signature), leave approvers และ audit log export ซึ่งระบุเหตุผลไว้ใน
-  storage-and-attachments.md และ `npm run architecture:check` กันไม่ให้มี route ใหม่
-  อ่าน body โดยไม่มี limit
+  (raw body สำหรับ signature) ซึ่งระบุเหตุผลไว้ใน storage-and-attachments.md
+  และ `npm run architecture:check` กันไม่ให้มี route ใหม่อ่าน body โดยไม่มี limit
 - อย่าใช้ public hostname หรือ Tunnel path เป็น authorization boundary; path
   denylist ในส่วน 6.1 เป็นเพียงชั้นป้องกันที่สอง
 - อย่าเพิ่ม Cloudflare Zero Trust/Access policy ในคู่มือนี้ เพราะไม่ใช่ส่วนหนึ่ง
