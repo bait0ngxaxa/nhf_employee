@@ -31,7 +31,7 @@ production ไม่มี Nginx ใน request path ดังนั้น limit
 | JSON mutation ขนาดเล็กที่ต้อง login: session revoke, employees POST/PATCH, authorization administration (13 handlers), IT operator PATCH (4 handlers), stock categories POST, stock adjust, email request POST | 16 KiB | `DEFAULT_JSON_MUTATION_MAX_BYTES` (`lib/ssot/request-limits.ts`) |
 | Stock items POST / items/[id] PATCH | 256 KiB | `STOCK_ITEM_JSON_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`); payload สูงสุดที่ schema ยอมรับ ≈ 200 KiB |
 | Employee import (JSON ของแถวจาก CSV) | 10,997,760 bytes | `EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`); คำนวณจาก CSV ≤ 5 MiB และ ≤ 1,000 แถว |
-| Leave approvers `PUT /api/leave/approvers` | 256 KiB | `LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`); schema จำกัด `assignments` ≤ `LEAVE_APPROVER_ASSIGNMENTS_MAX` (5,000) × 49 bytes ต่อรายการ |
+| Leave approvers `PUT /api/leave/approvers` | 256 KiB | `LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`); schema จำกัด `assignments` ≤ `LEAVE_APPROVER_ASSIGNMENTS_MAX` (5,000; `modules/leave/domain/constants.ts`) × 49 bytes ต่อรายการ |
 
 route JSON ข้างบนอ่าน body ผ่าน `readRouteJsonBody` (`lib/server/route-json-body.ts`) ซึ่งครอบ bounded reader เดิม
 response ใหม่มีเพียง `413` ข้อความ `คำขอมีขนาดใหญ่เกินไป`; JSON ที่ผิดรูปแบบยังได้ response เดิมของแต่ละ route

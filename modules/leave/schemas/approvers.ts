@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { LEAVE_APPROVER_ASSIGNMENTS_MAX } from "@/lib/ssot/request-limits";
+import { LEAVE_APPROVER_ASSIGNMENTS_MAX } from "@/modules/leave/domain/constants";
 
 export const leaveApproverAssignmentsSchema = z.object({
     assignments: z

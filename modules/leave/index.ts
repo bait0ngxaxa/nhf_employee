@@ -7,6 +7,7 @@ export {
     leaveRequestIdParamSchema,
 } from "./schemas/leave";
 export { leaveApproverAssignmentsSchema } from "./schemas/approvers";
+export { LEAVE_APPROVER_ASSIGNMENTS_MAX } from "./domain/constants";
 export { leaveReportScopeSchema } from "./schemas/report";
 
 // Route-facing application use cases, queries, and errors.
