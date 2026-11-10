@@ -1696,7 +1696,7 @@ The repository-wide caller inventory was performed for
 | --- | --- | --- |
 | Auth identity/IP limiter | `lib/auth/rate-limit.ts`; process-local `Map`, fixed windows, normalized identity, and a valid trusted-IP value or `unknown` bucket | Login, signup, and forgot-password budgets; reset clears the map |
 | Mutation limiter | `lib/security/mutation-rate-limit.ts`; process-local `Map`, fixed windows, synchronous consumption, periodic/at-cap expiry cleanup, and a 50,000-entry ceiling | Pre-auth trusted-IP and authenticated user budgets; new keys fail closed at capacity |
-| Trusted mutation check | `withTrustedMutation` checks the existing trusted Origin / `X-Requested-With` contract on browser mutations | Rejects untrusted mutation requests before the route handler; it is not a quota |
+| Trusted mutation check | `withTrustedMutation` checks the existing trusted Origin / `X-Requested-With` contract on every browser-callable mutation (see section 24) | Rejects untrusted mutation requests before the route handler; it is not a quota |
 | Request body limits | `lib/server/request-body.ts` and module HTTP helpers bound the body stream; Leave and Stock JSON are 32 KiB, Routine is 64 KiB, and LINE auth is 16 KiB | Oversized or malformed bodies return the existing 413/400 responses |
 | Leave attachments | Maximum three files, 8 MiB per file, 20 MiB total, 25,000,000-byte request bound, and allowlisted image formats/dimensions | Bound before/while multipart processing; private storage and orphan cleanup remain in the Leave module |
 | Database password-reset budget | `PasswordResetToken` rows are counted in the existing one-hour, three-request database check before a new token is created | The database result is a separate durable control; rate-limited, unknown, inactive, and email-send-failure paths retain accepted anti-enumeration behavior |
@@ -3079,3 +3079,82 @@ re-audit record was recorded in this document or the inspected repository
 history. The audited source baseline is therefore evaluated in the H0
 baseline linked above; the historical L6 text is not a current L7 pass
 statement.
+
+## 24. Trusted-mutation (CSRF) contract
+
+This is defense-in-depth. Auth cookies stay `__Host-` prefixed and
+`SameSite=Lax`, no GET handler changes state, there are no Server Actions and
+no permissive CORS. The contract keeps cross-origin forged mutations rejected
+even if cookie attributes change or a same-site subdomain is added later.
+
+### 24.1 Server contract (`lib/auth/csrf.ts`)
+
+A guarded mutation is accepted only when both checks pass:
+
+1. `Origin` is present and is either `request.nextUrl.origin` or the origin of
+   the configured `PUBLIC_APPROVE_URL`. Production traffic reaches Next at
+   `http://127.0.0.1:3000` through cloudflared while browsers send
+   `Origin: https://nhfapp.org`; that origin is trusted only through
+   `PUBLIC_APPROVE_URL`, never through `Host` or `X-Forwarded-*`
+   (`__tests__/lib/auth-csrf.test.ts` reproduces that exact header set).
+   A sibling subdomain is not trusted.
+2. `X-Requested-With` is exactly `XMLHttpRequest`.
+
+A failure returns `403` with the existing `AUTH_ERROR_MESSAGES.forbidden` body.
+Routes apply the check through `withTrustedMutation(handler)` (or
+`assertTrustedMutationRequest` before the first `await`), so it runs before
+authentication, body reads and side effects; CSRF is not enforced in
+`proxy.ts`, whose matcher does not cover `/api`.
+
+Every exported `POST`/`PUT`/`PATCH`/`DELETE` under `app/api` is guarded
+(67 route files, 80 handlers), with or without a session. Only these
+machine-to-machine routes are exempt, each with its reason in
+`trustedMutationExemptions` in `scripts/check-architecture.mjs`:
+
+| Route | Reason |
+| --- | --- |
+| `POST /api/cron/notification-outbox`, `POST /api/cron/routine-scheduler` | Scheduler call authenticated by a shared secret; no browser Origin |
+| `POST /api/auth/cleanup`, `POST /api/audit-logs/cleanup`, `POST /api/it/attachments/cleanup`, `POST /api/leave/attachments/cleanup` | Maintenance call authenticated by a shared secret; not called by browsers |
+| `POST /api/line/webhook` | Called by LINE servers, authenticated by the LINE HMAC signature |
+
+`npm run architecture:check` fails when an exported mutation handler is not
+wrapped (or does not assert first) and is not exempt, and when an exemption
+becomes stale.
+
+### 24.2 Browser contract (`lib/auth/mutation-headers.ts`)
+
+`applyAuthMutationHeaders` / `withAuthMutationHeaders` are the single
+browser-side source of the header and add it to every non-GET/HEAD request
+without overriding an explicit value. `lib/client/api-client.ts`,
+`modules/auth/presentation/browser-api.ts`, `browser-transport.ts`
+(refresh/logout), `fetchLiffWithSessionRecovery` and the remaining direct
+`fetch` mutations in Routine and IT presentation all use it. The browser adds
+`Origin` itself on these same-origin `fetch` mutations. LIFF recovery still
+replays only GET/HEAD; a mutation is never auto-replayed.
+
+### 24.3 Rollout switch (`CSRF_ENFORCEMENT_MODE`)
+
+The 46 route files (55 handlers) guarded by the coverage rollout pass
+`TRUSTED_MUTATION_ROLLOUT` and honour `CSRF_ENFORCEMENT_MODE`, read only in
+`getCsrfEnforcementMode()`:
+
+- unset, empty or any value other than `report`: **enforce** (default; fails
+  closed on a typo).
+- `report`: a failing check logs one sanitized `console.warn`
+  (`[csrf] report mode: trusted mutation check failed; request allowed` with
+  route path, method, failed check `missing-origin` / `untrusted-origin` /
+  `missing-ajax-header` and the Origin host only; never cookies, tokens,
+  query strings or bodies) and lets the request continue to the route's
+  normal authentication and validation.
+
+The 21 route files guarded before the rollout (Auth login/refresh/logout/
+signup/session revoke, Announcements, Authorization Administration, Leave
+special-reason, LINE account-link and LIFF session) do not pass the option and
+always enforce, regardless of the switch.
+
+To finish the rollout: deploy with `CSRF_ENFORCEMENT_MODE=report`, run the UAT
+checklist from the PR on desktop and on the LINE app (iOS and Android), confirm
+the logs contain no `[csrf] report mode` warnings from legitimate traffic, then
+remove the variable (or set it to `enforce`) and restart the app. Any warning
+from a real client is a client bug to fix before enforcing, not a reason to
+exempt the route.

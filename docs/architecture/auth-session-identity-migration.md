@@ -154,8 +154,8 @@ The complete production `lib/auth/**` surface audited in J0 is:
 | `lib/auth/workforce-transaction.ts` | Transaction-bound User/Employee lock and active-state guard. |
 | `lib/auth/employee-account-lifecycle.ts` | Account activation/deactivation, last-admin/self checks, identity sync, token-version and refresh revocation. |
 | `lib/auth/liff.ts` | LIFF workforce identity validation and mixed feature/Leave capability projection. |
-| `lib/auth/csrf.ts` | Trusted-origin/XHR mutation wrapper. |
-| `lib/auth/mutation-headers.ts` | Client mutation header constant. |
+| `lib/auth/csrf.ts` | Trusted-origin/XHR mutation wrapper used by every browser-callable `app/api` mutation, plus the `CSRF_ENFORCEMENT_MODE` rollout switch (see `runtime-hardening.md` §24). |
+| `lib/auth/mutation-headers.ts` | Client mutation header constant and the shared helper that adds it to non-GET/HEAD browser requests. |
 | `lib/auth/rate-limit.ts` | Auth-specific process-local identity/IP attempt limiter. |
 | `lib/auth/return-path.ts` | Safe internal redirect validation. |
 | `lib/auth/client.ts` | Browser hybrid refresh single-flight, 401 refresh/replay, and best-effort logout. |
