@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     const featureResponse = routineFeatureGuard();
     if (featureResponse) return featureResponse;
     const sizeResponse = routineRequestSizeGuard(request);
@@ -112,4 +113,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         return routineErrorResponse(error, "Error creating routine task");
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import type * as AuthorizationModule from "@/modules/authorization";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -164,6 +164,7 @@ import { GET as getRoutineTasks } from "@/app/api/routines/tasks/route";
 import { POST as postRoutineTask } from "@/app/api/routines/tasks/route";
 import { GET as getRoutineOccurrences } from "@/app/api/routines/occurrences/route";
 import { GET as getRoutineOccurrence } from "@/app/api/routines/occurrences/[id]/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const USER = {
     id: 5,
@@ -203,7 +204,7 @@ function request(
     path: string,
     init?: ConstructorParameters<typeof NextRequest>[1],
 ): NextRequest {
-    return new NextRequest(`http://localhost${path}`, init);
+    return trustedNextRequest(`http://localhost${path}`, init);
 }
 
 function expectDashboardAuthorization(

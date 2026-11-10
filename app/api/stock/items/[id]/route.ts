@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -18,10 +19,10 @@ interface RouteParams {
     params: Promise<{ id: string }>;
 }
 
-export async function PATCH(
+export const PATCH = withTrustedMutation(async (
     request: NextRequest,
     { params }: RouteParams,
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
@@ -97,12 +98,12 @@ export async function PATCH(
         console.error("Error updating stock item:", error);
         return serverError();
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);
 
-export async function DELETE(
+export const DELETE = withTrustedMutation(async (
     request: NextRequest,
     { params }: RouteParams,
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
@@ -150,4 +151,4 @@ export async function DELETE(
         console.error("Error deleting stock item:", error);
         return serverError();
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

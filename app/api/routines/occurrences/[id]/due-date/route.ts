@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -18,10 +19,10 @@ import {
 } from "@/modules/routine";
 import { routineDueDateSchema, routineIdParamSchema } from "@/modules/routine";
 
-export async function PATCH(
+export const PATCH = withTrustedMutation(async (
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     const featureResponse = routineFeatureGuard();
     if (featureResponse) return featureResponse;
     const sizeResponse = routineRequestSizeGuard(request);
@@ -63,4 +64,4 @@ export async function PATCH(
     } catch (error) {
         return routineErrorResponse(error, "Error updating routine occurrence due date");
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

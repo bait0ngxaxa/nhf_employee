@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET, PUT } from "@/app/api/leave/approvers/route";
@@ -19,6 +19,7 @@ import {
     CONTENT_LENGTH_MODES,
     jsonBodyOfExactBytes,
 } from "@/__tests__/helpers/request-body-limit";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -185,7 +186,7 @@ describe("PUT /api/leave/approvers", () => {
     });
 
     it("accepts the assignment payload without legacy fields", async () => {
-        const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
             body: JSON.stringify({ assignments: [{ employeeId: 10, managerId: 20 }] }),
         }));
@@ -216,7 +217,7 @@ describe("PUT /api/leave/approvers", () => {
             ),
         );
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/approvers", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/approvers", {
             method: "PUT",
             body: JSON.stringify({ assignments: [{ employeeId: 10, managerId: 20 }] }),
         }));

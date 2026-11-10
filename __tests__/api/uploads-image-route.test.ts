@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as StockModule from "@/modules/stock";
 import type * as LocalUploadModule from "@/lib/uploads/local";
@@ -35,6 +35,7 @@ import {
 import { IMAGE_UPLOAD_MAX_REQUEST_BYTES } from "@/lib/ssot/uploads";
 import { ImageUploadValidationError } from "@/lib/uploads/local";
 import { StockCapabilityDeniedError } from "@/modules/stock";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const AUTH = {
     ok: true as const,
@@ -68,7 +69,7 @@ function buildRequest(
     const formData = new FormData();
     if (scope !== null) formData.set("scope", scope);
     if (file !== null) formData.set("file", file);
-    return new NextRequest("http://localhost/api/uploads/image", {
+    return trustedNextRequest("http://localhost/api/uploads/image", {
         method: "POST",
         headers: { "cf-connecting-ip": init.ip ?? "203.0.113.10", ...init.headers },
         body: formData,
@@ -79,7 +80,7 @@ function buildRawRequest(
     body: BodyInit,
     headers: Record<string, string>,
 ): NextRequest {
-    return new NextRequest("http://localhost/api/uploads/image", {
+    return trustedNextRequest("http://localhost/api/uploads/image", {
         method: "POST",
         headers: { "cf-connecting-ip": "203.0.113.11", ...headers },
         body,

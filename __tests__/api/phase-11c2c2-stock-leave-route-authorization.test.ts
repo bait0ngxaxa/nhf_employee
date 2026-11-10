@@ -2,7 +2,7 @@
 import type * as AuthorizationModule from "@/modules/authorization";
 import type * as NextServerModule from "next/server";
 import type * as StockModule from "@/modules/stock";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -185,6 +185,7 @@ import { GET as getStockItems, POST as postStockItem } from "@/app/api/stock/ite
 import { POST as adjustStockItem } from "@/app/api/stock/items/[id]/adjust/route";
 import { POST as cancelLeaveRequest } from "@/app/api/line/leave/cancel/route";
 import { POST as requestLeaveNotTaken, PUT as confirmLeaveNotTaken } from "@/app/api/line/leave/not-taken/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const DASHBOARD_USER = {
     id: 7,
@@ -225,7 +226,7 @@ function request(
     path: string,
     init?: ConstructorParameters<typeof NextRequest>[1],
 ): NextRequest {
-    return new NextRequest(`http://localhost${path}`, init);
+    return trustedNextRequest(`http://localhost${path}`, init);
 }
 
 function activeTransactionUser(

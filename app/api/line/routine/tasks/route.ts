@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     const featureResponse = routineFeatureGuard("liff");
     if (featureResponse) return featureResponse;
     const sizeResponse = routineRequestSizeGuard(request);
@@ -157,4 +158,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
         return routineErrorResponse(error, "Error creating LIFF routine task");
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

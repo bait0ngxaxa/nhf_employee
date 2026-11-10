@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import type * as ITModule from "@/modules/it";
 
 const mocks = vi.hoisted(() => ({
@@ -38,6 +38,7 @@ import { POST as postRequesterComment } from "@/app/api/it/tickets/[ticketId]/co
 import { GET as getOperatorConversation } from "@/app/api/it/operator/tickets/[ticketId]/conversation/route";
 import { GET as getOperatorActivity } from "@/app/api/it/operator/tickets/[ticketId]/activity/route";
 import { POST as postOperatorComment } from "@/app/api/it/operator/tickets/[ticketId]/comments/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const session = { user: { id: "41", email: "staff@example.test", role: "USER" } };
 const context = { authorizationActor: { userId: 41, employeeId: 84 } };
@@ -64,7 +65,7 @@ function request(
     body?: unknown,
     headers: Record<string, string> = {},
 ): NextRequest {
-    return new NextRequest(url, {
+    return trustedNextRequest(url, {
         method,
         headers,
         ...(body === undefined ? {} : { body: new TextEncoder().encode(JSON.stringify(body)) }),

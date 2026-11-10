@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -25,7 +26,7 @@ function scheduleLeaveOutbox(): void {
     });
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
         return notFound();
     }
@@ -72,4 +73,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         undefined,
         scheduleLeaveOutbox,
     );
-}
+}, TRUSTED_MUTATION_ROLLOUT);

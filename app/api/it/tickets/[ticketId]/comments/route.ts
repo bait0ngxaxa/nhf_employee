@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -22,10 +23,10 @@ import {
 } from "@/modules/it";
 import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";
 
-export async function POST(
+export const POST = withTrustedMutation(async (
     request: NextRequest,
     context: { readonly params: Promise<{ readonly ticketId: string }> },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     const mediaType = getITTicketCommentMediaType(request);
     if (mediaType === "unsupported") {
         return jsonError("รองรับเฉพาะ JSON หรือ multipart/form-data", 415, { success: false });
@@ -88,4 +89,4 @@ export async function POST(
         logITTicketRouteFailure("Error posting requester IT Ticket comment", error);
         return operationFailed(500, { success: false });
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

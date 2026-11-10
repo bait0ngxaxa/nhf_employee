@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
@@ -62,7 +63,7 @@ function scheduleOutbox(): void {
     });
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (req: NextRequest): Promise<NextResponse> => {
     try {
         const authorization = await requireLeaveMutation(req);
         if (!authorization.ok) return authorization.response;
@@ -108,9 +109,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
         return jsonError(COMMON_API_MESSAGES.internalServerError, 500);
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);
 
-export async function PUT(req: NextRequest): Promise<NextResponse> {
+export const PUT = withTrustedMutation(async (req: NextRequest): Promise<NextResponse> => {
     try {
         const authorization = await requireLeaveMutation(req);
         if (!authorization.ok) return authorization.response;
@@ -158,4 +159,4 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         });
         return jsonError(COMMON_API_MESSAGES.operationFailed, 500);
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

@@ -1,4 +1,6 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+
+import { trustedNextRequest } from "./trusted-mutation";
 
 const encoder = new TextEncoder();
 
@@ -72,7 +74,9 @@ export function buildJsonBodyRequest(
         body: mode === "accurate" ? bytes : streamOf(bytes),
         duplex: "half",
     } as ConstructorParameters<typeof NextRequest>[1] & { duplex: "half" };
-    return new NextRequest(url, init);
+    // Body-limit tests exercise guarded browser mutations, so send the
+    // trusted-mutation headers; explicit options.headers still win.
+    return trustedNextRequest(url, init);
 }
 
 export const CONTENT_LENGTH_MODES: readonly ContentLengthMode[] = [

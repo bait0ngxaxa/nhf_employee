@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
@@ -27,7 +28,7 @@ function scheduleLeaveOutbox(): void {
     });
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     if (!isFeatureEnabled(FEATURE_KEYS.leave)) return notFound();
 
     const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
@@ -65,4 +66,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         toLiffLeaveMutationResponse,
         scheduleLeaveOutbox,
     );
-}
+}, TRUSTED_MUTATION_ROLLOUT);

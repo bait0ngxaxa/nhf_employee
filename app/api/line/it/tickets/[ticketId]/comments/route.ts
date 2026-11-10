@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { contentLengthExceedsLimit } from "@/lib/server/request-body";
@@ -27,10 +28,10 @@ interface RouteContext {
     readonly params: Promise<{ readonly ticketId: string }>;
 }
 
-export async function POST(
+export const POST = withTrustedMutation(async (
     request: NextRequest,
     { params }: RouteContext,
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     const mediaType = getITTicketCommentMediaType(request);
     if (mediaType === "unsupported") {
         return jsonError("รองรับเฉพาะ JSON หรือ multipart/form-data", 415, { success: false });
@@ -94,4 +95,4 @@ export async function POST(
         logITTicketRouteFailure("Error posting LIFF IT Ticket comment", error);
         return operationFailed(500, { success: false });
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

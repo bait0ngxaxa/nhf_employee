@@ -6,11 +6,12 @@ import { getApiAuthSession } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import type * as LeaveModule from "@/modules/leave";
 import type * as AuthorizationModule from "@/modules/authorization";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -150,7 +151,7 @@ describe("POST /api/leave/request", () => {
         if (!headers.has("Idempotency-Key")) {
             headers.set("Idempotency-Key", testIdempotencyKey);
         }
-        return new NextRequest(
+        return trustedNextRequest(
             "http://localhost/api/leave/request",
             { ...init, headers },
         );
@@ -218,7 +219,7 @@ describe("POST /api/leave/request", () => {
     it("requires an Idempotency-Key for a valid leave payload", async () => {
         (getApiAuthSession as unknown as { mockResolvedValue: (v: { user: { id: string; name: string } }) => void }).mockResolvedValue({ user: mockUser });
 
-        const req = new NextRequest("http://localhost/api/leave/request", {
+        const req = trustedNextRequest("http://localhost/api/leave/request", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

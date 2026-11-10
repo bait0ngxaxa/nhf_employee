@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -21,7 +22,7 @@ import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (req: NextRequest): Promise<NextResponse> => {
     try {
         if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
             return notFound();
@@ -91,4 +92,4 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
         return jsonError(COMMON_API_MESSAGES.failedToProcessLeaveApproval, 500);
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

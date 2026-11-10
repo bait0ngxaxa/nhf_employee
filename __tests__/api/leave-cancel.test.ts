@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST, PUT } from "@/app/api/leave/cancel/route";
 import { PUT as liffPUT } from "@/app/api/line/leave/cancel/route";
@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db/prisma";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
 import type * as AuthorizationModule from "@/modules/authorization";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -274,7 +275,7 @@ describe("POST /api/leave/cancel", () => {
             overQuotaHalfDays: 0,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "POST", body: JSON.stringify({ leaveId: "leave-1" }),
         }));
 
@@ -328,7 +329,7 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.notification.updateMany).mockResolvedValue({ count: 1 });
         vi.mocked(prisma.notificationOutbox.create).mockRejectedValue(new Error("outbox unavailable"));
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "POST", body: JSON.stringify({ leaveId: "leave-2" }),
         }));
 
@@ -401,7 +402,7 @@ describe("POST /api/leave/cancel", () => {
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({} as never);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "POST",
             body: JSON.stringify({ leaveId: "leave-approved", reason: "กำหนดการเปลี่ยนแปลง" }),
         }));
@@ -428,7 +429,7 @@ describe("POST /api/leave/cancel", () => {
             buildCancellationRequest(),
         );
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "POST",
             body: JSON.stringify({ leaveId: "leave-cancellation" }),
         }));
@@ -447,7 +448,7 @@ describe("POST /api/leave/cancel", () => {
             buildCancellationRequest({ status: "APPROVED" }),
         );
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-cancellation",
@@ -507,7 +508,7 @@ describe("POST /api/leave/cancel", () => {
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
         vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({} as never);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "POST",
             body: JSON.stringify({ leaveId: "leave-cancellation", reason: "ย้ายกำหนดการ" }),
         }));
@@ -579,7 +580,7 @@ describe("POST /api/leave/cancel", () => {
             }),
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "POST",
             body: JSON.stringify({ leaveId: "leave-cancellation", reason: "ย้ายกำหนดการ" }),
         }));
@@ -712,7 +713,7 @@ describe("POST /api/leave/cancel", () => {
             overQuotaHalfDays: 0,
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-confirm" }),
         }));
@@ -828,7 +829,7 @@ describe("POST /api/leave/cancel", () => {
             status: "CANCELLED_AFTER_APPROVAL",
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation" }),
         }));
@@ -884,7 +885,7 @@ describe("POST /api/leave/cancel", () => {
             },
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-expired-confirm" }),
         }));
@@ -918,7 +919,7 @@ describe("POST /api/leave/cancel", () => {
             status: "APPROVED",
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
@@ -988,7 +989,7 @@ describe("POST /api/leave/cancel", () => {
             }),
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
@@ -1044,11 +1045,11 @@ describe("POST /api/leave/cancel", () => {
             }),
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUniqueOrThrow>>);
 
-        const rejectResponse = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const rejectResponse = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
-        const notTakenResponse = await requestNotTaken(new NextRequest(
+        const notTakenResponse = await requestNotTaken(trustedNextRequest(
             "http://localhost/api/leave/not-taken",
             {
                 method: "POST",
@@ -1088,7 +1089,7 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(30));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
@@ -1103,7 +1104,7 @@ describe("POST /api/leave/cancel", () => {
             buildCancellationRequest({ approverId: 10 }),
         );
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
@@ -1141,7 +1142,7 @@ describe("POST /api/leave/cancel", () => {
             }),
         );
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-cancellation",
@@ -1169,7 +1170,7 @@ describe("POST /api/leave/cancel", () => {
         vi.mocked(prisma.user.findFirst).mockResolvedValue(activeAuthorizationUser(99, "ADMIN"));
         vi.mocked(prisma.leaveRequest.findUnique).mockResolvedValue(buildCancellationRequest());
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-cancellation",
@@ -1221,7 +1222,7 @@ describe("POST /api/leave/cancel", () => {
             >,
         );
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
@@ -1273,7 +1274,7 @@ describe("POST /api/leave/cancel", () => {
             >,
         );
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-cancellation",
@@ -1327,7 +1328,7 @@ describe("POST /api/leave/cancel", () => {
             }),
         );
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-cancellation",
@@ -1361,11 +1362,11 @@ describe("POST /api/leave/cancel", () => {
             .mockResolvedValueOnce({ count: 1 })
             .mockResolvedValueOnce({ count: 0 });
 
-        const firstResponse = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const firstResponse = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
-        const secondResponse = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const secondResponse = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-cancellation", action: "REJECT" }),
         }));
@@ -1430,7 +1431,7 @@ describe("POST /api/leave/cancel", () => {
         );
         vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({} as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-confirm",
@@ -1529,7 +1530,7 @@ describe("POST /api/leave/cancel", () => {
         );
         vi.mocked(prisma.notificationOutbox.create).mockResolvedValue({} as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/cancel", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-user-recovery",
@@ -1643,7 +1644,7 @@ describe("PUT /api/line/leave/cancel application authorization", () => {
         action: "CONFIRM" | "REJECT",
         leaveId = "leave-cancellation",
     ): NextRequest {
-        return new NextRequest("http://localhost/api/line/leave/cancel", {
+        return trustedNextRequest("http://localhost/api/line/leave/cancel", {
             method: "PUT",
             body: JSON.stringify({ leaveId, action }),
         });

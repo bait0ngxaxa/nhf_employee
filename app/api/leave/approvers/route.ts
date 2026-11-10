@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -52,7 +53,7 @@ export async function GET(): Promise<NextResponse> {
     }
 }
 
-export async function PUT(req: Request): Promise<NextResponse> {
+export const PUT = withTrustedMutation(async (req: Request): Promise<NextResponse> => {
     try {
         if (!isFeatureEnabled(FEATURE_KEYS.leave)) {
             return notFound();
@@ -120,4 +121,4 @@ export async function PUT(req: Request): Promise<NextResponse> {
             { status: 500 },
         );
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

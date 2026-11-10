@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mockDeep, mockReset } from "vitest-mock-extended";
 import type { PrismaClient } from "@prisma/client";
@@ -10,6 +10,7 @@ import { requireApiSession } from "@/lib/auth/api";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { enforcePreAuthIpRateLimit, enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
 import { PATCH } from "@/app/api/email-request/[id]/access-requirements/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: mockDeep<PrismaClient>() }));
 vi.mock("@/lib/auth/api", () => ({ requireApiSession: vi.fn() }));
@@ -26,7 +27,7 @@ const row = { id: 128, thaiName: "สมชาย", englishName: "Somchai", nick
     createdAt: new Date(), updatedAt: new Date() };
 const input = { documentSystemDecision: "REQUIRED", sharedDriveDecision: "UNDECIDED", sharedDriveAccess: [], expectedAccessVersion: 1 };
 function call(body: unknown = input, id = "128"): Promise<NextResponse> {
-    return PATCH(new NextRequest(`http://localhost/api/email-request/${id}/access-requirements`, { method: "PATCH", body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
+    return PATCH(trustedNextRequest(`http://localhost/api/email-request/${id}/access-requirements`, { method: "PATCH", body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
 }
 describe("PATCH Email Request access requirements (real command boundary)", () => {
     beforeEach(() => {
@@ -85,7 +86,7 @@ describe("PATCH Email Request access requirements (real command boundary)", () =
         expect(db.$transaction).not.toHaveBeenCalled();
     });
     it("bounds malformed and oversized bodies", async () => {
-        const response = await PATCH(new NextRequest("http://localhost/api/email-request/128/access-requirements", { method: "PATCH", body: "{" }), { params: Promise.resolve({ id: "128" }) });
+        const response = await PATCH(trustedNextRequest("http://localhost/api/email-request/128/access-requirements", { method: "PATCH", body: "{" }), { params: Promise.resolve({ id: "128" }) });
         expect(response.status).toBe(400);
         expect((await call({ padding: "x".repeat(5000) })).status).toBe(413);
         expect((await call(input, "1.5")).status).toBe(400);

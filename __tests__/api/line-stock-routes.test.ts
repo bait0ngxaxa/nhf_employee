@@ -2,7 +2,7 @@
 import { StockRequestStatus } from "@prisma/client";
 import type * as NextServerModule from "next/server";
 import type * as StockModule from "@/modules/stock";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 
@@ -106,6 +106,7 @@ import {
     type StockCapabilityAuthorization,
     type StockCapability,
 } from "@/modules/stock";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const USER_AUTH = {
     ok: true as const,
@@ -218,7 +219,7 @@ function request(
     path: string,
     init?: ConstructorParameters<typeof NextRequest>[1],
 ): NextRequest {
-    return new NextRequest(`http://localhost${path}`, init);
+    return trustedNextRequest(`http://localhost${path}`, init);
 }
 
 describe("LIFF Stock route adapters", () => {

@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -42,10 +43,10 @@ function logCommentPostError(error: unknown): void {
     });
 }
 
-export async function POST(
+export const POST = withTrustedMutation(async (
     request: NextRequest,
     context: { readonly params: Promise<{ readonly ticketId: string }> },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     const mediaType = getITTicketCommentMediaType(request);
     if (mediaType === "unsupported") {
         return jsonError("รองรับเฉพาะ JSON หรือ multipart/form-data", 415, { success: false });
@@ -108,4 +109,4 @@ export async function POST(
         logCommentPostError(error);
         return operationFailed(500, { success: false });
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

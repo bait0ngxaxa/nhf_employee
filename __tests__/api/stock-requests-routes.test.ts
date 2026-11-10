@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import type * as StockModule from "@/modules/stock";
 import { GET as getRequestsRoute, POST as postRequestsRoute } from "@/app/api/stock/requests/route";
@@ -29,6 +28,7 @@ import {
     PRE_AUTH_IP_RATE_LIMIT_POLICIES,
     resetMutationRateLimit,
 } from "@/lib/security/mutation-rate-limit";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const stockAuthorizationMock = vi.hoisted(() => ({
     assert: vi.fn(),
@@ -174,26 +174,26 @@ describe("Stock Request Routes", () => {
                 new ArrayBuffer(STOCK_JSON_MUTATION_MAX_BYTES + 1);
 
             const responses = [
-                postRequestsRoute(new NextRequest(
+                postRequestsRoute(trustedNextRequest(
                     "http://localhost/api/stock/requests",
                     { method: "POST", headers: createHeaders(), body: createBody() },
                 )),
                 cancelRequestRoute(
-                    new NextRequest(
+                    trustedNextRequest(
                         "http://localhost/api/stock/requests/71/cancel",
                         { method: "POST", headers: createHeaders(), body: createBody() },
                     ),
                     { params: Promise.resolve({ id: "71" }) },
                 ),
                 issueRequestRoute(
-                    new NextRequest(
+                    trustedNextRequest(
                         "http://localhost/api/stock/requests/71/issue",
                         { method: "POST", headers: createHeaders(), body: createBody() },
                     ),
                     { params: Promise.resolve({ id: "71" }) },
                 ),
                 reviewRequestRoute(
-                    new NextRequest(
+                    trustedNextRequest(
                         "http://localhost/api/stock/requests/71/review",
                         { method: "POST", headers: createHeaders(), body: createBody() },
                     ),
@@ -214,7 +214,7 @@ describe("Stock Request Routes", () => {
         it("should return 401 when unauthorized", async () => {
             vi.mocked(getApiAuthSession).mockResolvedValue(null);
 
-            const request = new NextRequest(
+            const request = trustedNextRequest(
                 "http://localhost/api/stock/requests?scope=all",
             );
             const response = await getRequestsRoute(request);
@@ -246,7 +246,7 @@ describe("Stock Request Routes", () => {
                 } as never);
 
                 const response = await getRequestsRoute(
-                    new NextRequest("http://localhost/api/stock/requests"),
+                    trustedNextRequest("http://localhost/api/stock/requests"),
                 );
 
                 expect(response.status).toBe(403);
@@ -277,7 +277,7 @@ describe("Stock Request Routes", () => {
                 limit: 10,
             } as never);
 
-            const request = new NextRequest(
+            const request = trustedNextRequest(
                 "http://localhost/api/stock/requests?scope=all&search=PRJ-2569&page=1&limit=10",
             );
             const response = await getRequestsRoute(request);
@@ -336,7 +336,7 @@ describe("Stock Request Routes", () => {
                 limit: 10,
             } as never);
 
-            const response = await getRequestsRoute(new NextRequest(
+            const response = await getRequestsRoute(trustedNextRequest(
                 "http://localhost/api/stock/requests?scope=all",
             ));
 
@@ -366,7 +366,7 @@ describe("Stock Request Routes", () => {
                 limit: 20,
             } as never);
 
-            const response = await getRequestsRoute(new NextRequest(
+            const response = await getRequestsRoute(trustedNextRequest(
                 "http://localhost/api/stock/requests?scope=all&userId=999&employeeId=999&role=ADMIN&systemRole=ADMIN&isAdmin=true&capability=stock.inventory.manage&scopes=ALL&channel=LIFF_SELF_SERVICE",
             ));
 
@@ -397,7 +397,7 @@ describe("Stock Request Routes", () => {
         > = [
             [
                 "request creation",
-                () => postRequestsRoute(new NextRequest(
+                () => postRequestsRoute(trustedNextRequest(
                     "http://localhost/api/stock/requests",
                     {
                         method: "POST",
@@ -412,7 +412,7 @@ describe("Stock Request Routes", () => {
             [
                 "request cancellation",
                 () => cancelRequestRoute(
-                    new NextRequest(
+                    trustedNextRequest(
                         "http://localhost/api/stock/requests/55/cancel",
                         { method: "POST" },
                     ),
@@ -421,7 +421,7 @@ describe("Stock Request Routes", () => {
             ],
             [
                 "item browsing",
-                () => getItemsRoute(new NextRequest(
+                () => getItemsRoute(trustedNextRequest(
                     "http://localhost/api/stock/items",
                 )),
             ],
@@ -467,7 +467,7 @@ describe("Stock Request Routes", () => {
             const headers = { "cf-connecting-ip": "203.0.113.20" };
             const policy =
                 PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-request-create"];
-            const prefillRequest = new NextRequest(
+            const prefillRequest = trustedNextRequest(
                 "http://localhost/api/stock/requests",
                 { method: "POST", headers },
             );
@@ -480,7 +480,7 @@ describe("Stock Request Routes", () => {
             }
 
             const response = await postRequestsRoute(
-                new NextRequest("http://localhost/api/stock/requests", {
+                trustedNextRequest("http://localhost/api/stock/requests", {
                     method: "POST",
                     headers,
                     body: "{invalid-json",
@@ -504,7 +504,7 @@ describe("Stock Request Routes", () => {
                 name: "User",
             });
 
-            const request = new NextRequest("http://localhost/api/stock/requests", {
+            const request = trustedNextRequest("http://localhost/api/stock/requests", {
                 method: "POST",
                 body: JSON.stringify({ items: [] }),
             });
@@ -532,7 +532,7 @@ describe("Stock Request Routes", () => {
                 replayed: false,
             } as never);
 
-            const request = new NextRequest("http://localhost/api/stock/requests", {
+            const request = trustedNextRequest("http://localhost/api/stock/requests", {
                 method: "POST",
                 headers: {
                     "Idempotency-Key": "stock-request-7001",
@@ -612,7 +612,7 @@ describe("Stock Request Routes", () => {
             );
 
             const response = await postRequestsRoute(
-                new NextRequest("http://localhost/api/stock/requests", {
+                trustedNextRequest("http://localhost/api/stock/requests", {
                     method: "POST",
                     headers: { "Idempotency-Key": "stock-request-7001" },
                     body: JSON.stringify({
@@ -637,7 +637,7 @@ describe("Stock Request Routes", () => {
                 name: "User",
             });
 
-            const request = new NextRequest("http://localhost/api/stock/requests", {
+            const request = trustedNextRequest("http://localhost/api/stock/requests", {
                 method: "POST",
                 body: JSON.stringify({
                     projectCode: "PRJ-2569/01",
@@ -671,7 +671,7 @@ describe("Stock Request Routes", () => {
             } as never);
 
             const response = await postRequestsRoute(
-                new NextRequest("http://localhost/api/stock/requests", {
+                trustedNextRequest("http://localhost/api/stock/requests", {
                     method: "POST",
                     headers: { "Idempotency-Key": "stock-request-7001" },
                     body: JSON.stringify({
@@ -703,7 +703,7 @@ describe("Stock Request Routes", () => {
             );
 
             const response = await postRequestsRoute(
-                new NextRequest("http://localhost/api/stock/requests", {
+                trustedNextRequest("http://localhost/api/stock/requests", {
                     method: "POST",
                     headers: { "Idempotency-Key": "stock-request-7001" },
                     body: JSON.stringify({
@@ -737,7 +737,7 @@ describe("Stock Request Routes", () => {
                 ),
             );
 
-            const request = new NextRequest(
+            const request = trustedNextRequest(
                 "http://localhost/api/stock/requests/77/issue",
                 {
                     method: "POST",
@@ -777,7 +777,7 @@ describe("Stock Request Routes", () => {
                 ],
             } as never);
 
-            const request = new NextRequest(
+            const request = trustedNextRequest(
                 "http://localhost/api/stock/requests/77/issue",
                 {
                     method: "POST",
@@ -838,7 +838,7 @@ describe("Stock Request Routes", () => {
             } as never);
 
             const response = await issueRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/77/issue",
                     {
                         method: "POST",
@@ -916,7 +916,7 @@ describe("Stock Request Routes", () => {
             );
 
             const response = await issueRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/77/issue",
                     {
                         method: "POST",
@@ -947,7 +947,7 @@ describe("Stock Request Routes", () => {
             );
 
             const response = await issueRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/77/issue",
                     {
                         method: "POST",
@@ -990,7 +990,7 @@ describe("Stock Request Routes", () => {
             } as never);
 
             const response = await reviewRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/77/review",
                     {
                         method: "POST",
@@ -1027,7 +1027,7 @@ describe("Stock Request Routes", () => {
             );
 
             const response = await reviewRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/77/review",
                     {
                         method: "POST",
@@ -1057,7 +1057,7 @@ describe("Stock Request Routes", () => {
             } as never);
 
             const response = await reviewRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/77/review",
                     {
                         method: "POST",
@@ -1107,7 +1107,7 @@ describe("Stock Request Routes", () => {
                 ];
             const invokeReject = (): Promise<Response> =>
                 reviewRequestRoute(
-                    new NextRequest(
+                    trustedNextRequest(
                         "http://localhost/api/stock/requests/77/review",
                         {
                             method: "POST",
@@ -1151,7 +1151,7 @@ describe("Stock Request Routes", () => {
             const headers = { "cf-connecting-ip": "203.0.113.21" };
             const policy =
                 PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-request-cancel"];
-            const prefillRequest = new NextRequest(
+            const prefillRequest = trustedNextRequest(
                 "http://localhost/api/stock/requests/77/review",
                 { method: "POST", headers },
             );
@@ -1163,7 +1163,7 @@ describe("Stock Request Routes", () => {
             }
 
             const response = await reviewRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/77/review",
                     {
                         method: "POST",
@@ -1202,7 +1202,7 @@ describe("Stock Request Routes", () => {
                 requestedBy: 3,
             } as never);
 
-            const request = new NextRequest(
+            const request = trustedNextRequest(
                 "http://localhost/api/stock/requests/55/cancel",
                 {
                     method: "POST",
@@ -1243,7 +1243,7 @@ describe("Stock Request Routes", () => {
             );
 
             const response = await cancelRequestRoute(
-                new NextRequest(
+                trustedNextRequest(
                     "http://localhost/api/stock/requests/55/cancel",
                     {
                         method: "POST",

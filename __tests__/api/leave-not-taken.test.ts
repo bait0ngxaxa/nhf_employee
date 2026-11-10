@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST, PUT } from "@/app/api/leave/not-taken/route";
 import { getApiAuthSession } from "@/lib/auth/server";
@@ -7,6 +6,7 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 import type * as NextServerModule from "next/server";
 import type * as AuthorizationModule from "@/modules/authorization";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -245,7 +245,7 @@ describe("/api/leave/not-taken", () => {
             };
             if (contentLength) headers["Content-Length"] = contentLength;
 
-            const response = await POST(new NextRequest(
+            const response = await POST(trustedNextRequest(
                 "http://localhost/api/leave/not-taken",
                 {
                     method: "POST",
@@ -315,7 +315,7 @@ describe("/api/leave/not-taken", () => {
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
 
-        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+        const req = trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-1",
@@ -414,7 +414,7 @@ describe("/api/leave/not-taken", () => {
         } as never);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 1 });
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-recovery-request",
@@ -518,7 +518,7 @@ describe("/api/leave/not-taken", () => {
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 0 });
 
-        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+        const req = trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "POST",
             body: JSON.stringify({ leaveId: "leave-duplicate", note: "Already requested" }),
         });
@@ -604,7 +604,7 @@ describe("/api/leave/not-taken", () => {
             usedHalfDays: 4,
         } as Awaited<ReturnType<typeof prisma.leaveQuota.update>>);
 
-        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+        const req = trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-2" }),
         });
@@ -650,7 +650,7 @@ describe("/api/leave/not-taken", () => {
     it("rejects confirmation when the approver becomes inactive before the transaction", async () => {
         vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
 
-        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+        const req = trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-2" }),
         });
@@ -735,7 +735,7 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-admin-recovery",
@@ -872,7 +872,7 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-user-recovery",
@@ -953,7 +953,7 @@ describe("/api/leave/not-taken", () => {
             },
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-admin-recovery-no-reason" }),
         }));
@@ -996,7 +996,7 @@ describe("/api/leave/not-taken", () => {
             },
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-admin-owner",
@@ -1047,7 +1047,7 @@ describe("/api/leave/not-taken", () => {
             },
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({
                 leaveId: "leave-active-manager",
@@ -1124,7 +1124,7 @@ describe("/api/leave/not-taken", () => {
             overQuotaHalfDays: 0,
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-assigned-admin" }),
         }));
@@ -1179,7 +1179,7 @@ describe("/api/leave/not-taken", () => {
             },
         } as never);
 
-        const response = await PUT(new NextRequest("http://localhost/api/leave/not-taken", {
+        const response = await PUT(trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-recovery" }),
         }));
@@ -1258,7 +1258,7 @@ describe("/api/leave/not-taken", () => {
             usedHalfDays: -1,
         } as Awaited<ReturnType<typeof prisma.leaveQuota.update>>);
 
-        const req = new NextRequest("http://localhost/api/leave/not-taken", {
+        const req = trustedNextRequest("http://localhost/api/leave/not-taken", {
             method: "PUT",
             body: JSON.stringify({ leaveId: "leave-3" }),
         });

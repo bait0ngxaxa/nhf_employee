@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -58,6 +57,7 @@ vi.mock("@/modules/routine", async (importOriginal) => ({
 
 import { PATCH as patchAssignees } from "@/app/api/routines/occurrences/[id]/assignees/route";
 import { PATCH as patchDueDate } from "@/app/api/routines/occurrences/[id]/due-date/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 describe("legacy Routine occurrence mutation routes", () => {
     beforeEach(() => {
@@ -74,7 +74,7 @@ describe("legacy Routine occurrence mutation routes", () => {
 
     it("rejects a legacy due-date mutation without an expected version", async () => {
         const response = await patchDueDate(
-            new NextRequest("http://localhost/api/routines/occurrences/91/due-date", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91/due-date", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ dueDate: "2026-08-10" }),
@@ -88,7 +88,7 @@ describe("legacy Routine occurrence mutation routes", () => {
 
     it("rejects a legacy assignee mutation without an expected version", async () => {
         const response = await patchAssignees(
-            new NextRequest("http://localhost/api/routines/occurrences/91/assignees", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91/assignees", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -104,7 +104,7 @@ describe("legacy Routine occurrence mutation routes", () => {
 
     it("passes the expected version through both retained legacy routes", async () => {
         const dueDateResponse = await patchDueDate(
-            new NextRequest("http://localhost/api/routines/occurrences/91/due-date", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91/due-date", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -115,7 +115,7 @@ describe("legacy Routine occurrence mutation routes", () => {
             { params: Promise.resolve({ id: "91" }) },
         );
         const assigneeResponse = await patchAssignees(
-            new NextRequest("http://localhost/api/routines/occurrences/91/assignees", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91/assignees", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -153,7 +153,7 @@ describe("legacy Routine occurrence mutation routes", () => {
         mocks.updateDueDate.mockResolvedValue(committedOccurrence);
 
         const response = await patchDueDate(
-            new NextRequest("http://localhost/api/routines/occurrences/91/due-date", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91/due-date", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -186,7 +186,7 @@ describe("legacy Routine occurrence mutation routes", () => {
         mocks.reassign.mockResolvedValue(committedOccurrence);
 
         const response = await patchAssignees(
-            new NextRequest("http://localhost/api/routines/occurrences/91/assignees", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91/assignees", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
