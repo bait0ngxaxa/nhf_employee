@@ -1873,6 +1873,27 @@ or migration and does not claim production deployment evidence.
 Focused API, application, and real-MySQL regression evidence is recorded in
 [pre-it-hardening-h0-baseline.md](pre-it-hardening-h0-baseline.md).
 
+## Trusted-mutation (CSRF) guard coverage
+
+Before the CSRF coverage rollout only 21 mutation route files used the shared
+trusted-mutation contract in `lib/auth/csrf.ts`: Auth login, refresh, logout,
+logout-all, signup and session revoke; Announcement manage; the 10
+Authorization Administration mutation route files (14 handlers); Leave
+special-reason (Dashboard and LIFF); LINE account-link; and LIFF session.
+
+Every browser-callable mutation route under `app/api` now uses it (67 route
+files, 80 handlers), including the Leave, Stock, Routine, IT, Employee, Email
+Request, Notification, upload, forgot-password and reset-password routes and
+their LIFF variants. The check (trusted `Origin` plus
+`X-Requested-With: XMLHttpRequest`) runs before authentication, so it does not
+change any capability, scope or resource-level decision described in this
+document. The only exempt mutation routes are the shared-secret cron/cleanup
+endpoints and the LINE webhook (HMAC signature). The 46 newly guarded route
+files honour the `CSRF_ENFORCEMENT_MODE=report` rollout switch; the 21
+previously guarded files always enforce. The contract, exemption reasons and
+rollout procedure are in `docs/architecture/runtime-hardening.md` §24, and
+`npm run architecture:check` rejects new unguarded mutation exports.
+
 ## IT9A channel policy current state
 
 IT9A extends the central IT capability registry by channel:

@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { NOTIFICATION_MODULES } from "@/shared/notifications/presentation";
 import { after, type NextRequest, NextResponse } from "next/server";
 
@@ -65,7 +66,7 @@ function acceptedResponse(): NextResponse {
     });
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const bodyResult = await readRouteJsonBody(request, {
             maxBytes: AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
@@ -149,4 +150,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             { status: 500 },
         );
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

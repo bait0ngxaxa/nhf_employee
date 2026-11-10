@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
@@ -23,10 +24,10 @@ interface RouteParams {
     params: Promise<{ id: string }>;
 }
 
-export async function POST(
+export const POST = withTrustedMutation(async (
     request: NextRequest,
     { params }: RouteParams,
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const bodySizeResponse = enforceStockJsonBodySize(request);
         if (bodySizeResponse) return bodySizeResponse;
@@ -135,4 +136,4 @@ export async function POST(
         console.error("Error handling stock request review compatibility route:", error);
         return serverError();
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

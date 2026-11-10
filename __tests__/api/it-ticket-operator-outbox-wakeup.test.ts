@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest, type NextResponse } from "next/server";
+import { type NextRequest, type NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
 import {
     DEFAULT_JSON_MUTATION_MAX_BYTES,
@@ -51,6 +51,7 @@ import {
     ITTicketMutationConflictError,
     ITTicketPriorityTerminalError,
 } from "@/modules/it";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const user = { id: 51, role: "USER", email: "operator@example.test", name: "Operator" };
 const context = {
@@ -83,7 +84,7 @@ type Handler = (
 
 async function call(handler: Handler, path: string, body: unknown): Promise<NextResponse> {
     return handler(
-        new NextRequest(`http://localhost/api/it/operator/tickets/19/${path}`, {
+        trustedNextRequest(`http://localhost/api/it/operator/tickets/19/${path}`, {
             method: "PATCH",
             body: JSON.stringify(body),
             headers: { "Content-Type": "application/json" },

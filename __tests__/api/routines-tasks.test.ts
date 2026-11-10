@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +21,7 @@ vi.mock("@/modules/routine", async (importOriginal) => ({
 }));
 
 import { GET, POST } from "@/app/api/routines/tasks/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 describe("GET /api/routines/tasks active filter semantics", () => {
     beforeEach(() => {
@@ -43,7 +43,7 @@ describe("GET /api/routines/tasks active filter semantics", () => {
         ["activeOnly=1", "?activeOnly=1", true],
     ])("passes %s as the correct service semantics", async (_label, query, expected) => {
         const response = await GET(
-            new NextRequest(`http://localhost/api/routines/tasks${query}`),
+            trustedNextRequest(`http://localhost/api/routines/tasks${query}`),
         );
 
         expect(response.status).toBe(200);
@@ -56,7 +56,7 @@ describe("GET /api/routines/tasks active filter semantics", () => {
         ["inactive", "inactive"],
     ])("passes the %s status filter to the service", async (_label, status) => {
         const response = await GET(
-            new NextRequest(`http://localhost/api/routines/tasks?status=${status}`),
+            trustedNextRequest(`http://localhost/api/routines/tasks?status=${status}`),
         );
 
         expect(response.status).toBe(200);
@@ -65,7 +65,7 @@ describe("GET /api/routines/tasks active filter semantics", () => {
 
     it("passes unit and category filters to the service together", async () => {
         const response = await GET(
-            new NextRequest("http://localhost/api/routines/tasks?unitId=3&categoryId=5"),
+            trustedNextRequest("http://localhost/api/routines/tasks?unitId=3&categoryId=5"),
         );
 
         expect(response.status).toBe(200);
@@ -83,7 +83,7 @@ describe("GET /api/routines/tasks active filter semantics", () => {
         });
 
         const response = await GET(
-            new NextRequest("http://localhost/api/routines/tasks"),
+            trustedNextRequest("http://localhost/api/routines/tasks"),
         );
 
         expect(response.status).toBe(200);
@@ -119,7 +119,7 @@ describe("POST /api/routines/tasks idempotency", () => {
 
     it("requires an idempotency key and passes it to the service", async () => {
         const response = await POST(
-            new NextRequest("http://localhost/api/routines/tasks", {
+            trustedNextRequest("http://localhost/api/routines/tasks", {
                 method: "POST",
                 headers: {
                     "content-type": "application/json",
@@ -139,7 +139,7 @@ describe("POST /api/routines/tasks idempotency", () => {
 
     it("does not call the mutation service without an idempotency key", async () => {
         const response = await POST(
-            new NextRequest("http://localhost/api/routines/tasks", {
+            trustedNextRequest("http://localhost/api/routines/tasks", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify(payload),
@@ -153,7 +153,7 @@ describe("POST /api/routines/tasks idempotency", () => {
     it("returns success without creating a second task for a replay", async () => {
         mocks.createTask.mockResolvedValue({ task: { id: 1 }, replayed: true });
         const response = await POST(
-            new NextRequest("http://localhost/api/routines/tasks", {
+            trustedNextRequest("http://localhost/api/routines/tasks", {
                 method: "POST",
                 headers: {
                     "content-type": "application/json",

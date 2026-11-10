@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { NextResponse, after, type NextRequest } from "next/server";
 import { ZodError } from "zod";
 import { requireApiSession } from "@/lib/auth/api";
@@ -9,10 +10,10 @@ import { updateEmailRequestAccessRequirements, EmailRequestAccessConflictError, 
 
 const MAX_BODY_BYTES = 4096;
 
-export async function PATCH(
+export const PATCH = withTrustedMutation(async (
     req: NextRequest,
     context: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const preAuthLimit = enforcePreAuthIpRateLimit(req, "email-request-access-update");
         if (preAuthLimit) return preAuthLimit;
@@ -38,4 +39,4 @@ export async function PATCH(
         console.error("Error updating Email Request access requirements:", error);
         return operationFailed(500, { success: false });
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

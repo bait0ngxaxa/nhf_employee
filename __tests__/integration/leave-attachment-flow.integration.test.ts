@@ -7,7 +7,8 @@ import {
     LeaveStatus,
     LeaveType,
 } from "@prisma/client";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 import {
     afterAll,
     beforeAll,
@@ -262,7 +263,7 @@ function createMultipartRequest(
         reason: "Integration evidence request",
     }));
     files.forEach((file) => formData.append("attachments", file));
-    return new NextRequest("http://localhost/api/leave/request", {
+    return trustedNextRequest("http://localhost/api/leave/request", {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey },
         body: formData,

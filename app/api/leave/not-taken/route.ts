@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -64,7 +65,7 @@ async function authorizeMutation(
     return { ok: true, auth };
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (req: NextRequest): Promise<NextResponse> => {
     const authorization = await authorizeMutation(req);
     if (!authorization.ok) return authorization.response;
     return handleLeaveNotTakenRequest(
@@ -80,9 +81,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         undefined,
         scheduleLeaveOutbox,
     );
-}
+}, TRUSTED_MUTATION_ROLLOUT);
 
-export async function PUT(req: NextRequest): Promise<NextResponse> {
+export const PUT = withTrustedMutation(async (req: NextRequest): Promise<NextResponse> => {
     const authorization = await authorizeMutation(req);
     if (!authorization.ok) return authorization.response;
     return handleLeaveNotTakenConfirmation(req, {
@@ -96,4 +97,4 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         allowAdminOverride: true,
         scheduleOutbox: scheduleLeaveNotTakenConfirmationOutbox,
     });
-}
+}, TRUSTED_MUTATION_ROLLOUT);

@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
@@ -101,4 +102,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         console.error("Error creating stock item:", error);
         return serverError();
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -60,6 +60,7 @@ vi.mock("@/modules/routine", async (importOriginal) => ({
 }));
 
 import { PATCH } from "@/app/api/routines/occurrences/[id]/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 describe("PATCH /api/routines/occurrences/:id", () => {
     beforeEach(() => {
@@ -75,7 +76,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
 
     it("updates due date and assignees through one atomic service call", async () => {
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/occurrences/91", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -111,7 +112,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         mocks.updateOverride.mockResolvedValue(committedOccurrence);
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/occurrences/91", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -149,7 +150,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         });
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/occurrences/91", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91", {
                 method: "PATCH",
                 headers: {
                     "content-type": "application/json",
@@ -213,7 +214,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         });
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/occurrences/91", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -234,7 +235,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         );
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/occurrences/91", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91", {
                 method: "PATCH",
             }),
             { params: Promise.resolve({ id: "not-a-number" }) },
@@ -251,7 +252,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
 
     it("rejects an atomic override without an expected reminder version", async () => {
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/occurrences/91", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -272,7 +273,7 @@ describe("PATCH /api/routines/occurrences/:id", () => {
         );
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/occurrences/91", {
+            trustedNextRequest("http://localhost/api/routines/occurrences/91", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({

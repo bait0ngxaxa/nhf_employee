@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -29,6 +29,7 @@ import {
     PATCH,
 } from "@/app/api/routines/tasks/[id]/route";
 import { RoutineNotFoundError } from "@/modules/routine";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 describe("DELETE /api/routines/tasks/:id", () => {
     beforeEach(() => {
@@ -54,7 +55,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
         });
 
         const response = await GET(
-            new NextRequest("http://localhost/api/routines/tasks/71"),
+            trustedNextRequest("http://localhost/api/routines/tasks/71"),
             { params: Promise.resolve({ id: "71" }) },
         );
 
@@ -77,7 +78,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
         mocks.getTask.mockRejectedValueOnce(new RoutineNotFoundError("ไม่พบงานประจำ"));
 
         const response = await GET(
-            new NextRequest("http://localhost/api/routines/tasks/71"),
+            trustedNextRequest("http://localhost/api/routines/tasks/71"),
             { params: Promise.resolve({ id: "71" }) },
         );
 
@@ -99,7 +100,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
         });
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/tasks/71", {
+            trustedNextRequest("http://localhost/api/routines/tasks/71", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ version: 3, title: "แก้ไขแล้ว" }),
@@ -123,7 +124,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
         });
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/tasks/71", {
+            trustedNextRequest("http://localhost/api/routines/tasks/71", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
@@ -154,7 +155,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
         );
 
         const response = await PATCH(
-            new NextRequest("http://localhost/api/routines/tasks/71", {
+            trustedNextRequest("http://localhost/api/routines/tasks/71", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ version: 3, title: "ไม่ควรแก้ได้" }),
@@ -167,7 +168,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
 
     it("authorizes an admin and deletes exactly the requested task", async () => {
         const response = await DELETE(
-            new NextRequest("http://localhost/api/routines/tasks/71", { method: "DELETE" }),
+            trustedNextRequest("http://localhost/api/routines/tasks/71", { method: "DELETE" }),
             { params: Promise.resolve({ id: "71" }) },
         );
 
@@ -185,7 +186,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
         });
 
         const response = await DELETE(
-            new NextRequest("http://localhost/api/routines/tasks/71", { method: "DELETE" }),
+            trustedNextRequest("http://localhost/api/routines/tasks/71", { method: "DELETE" }),
             { params: Promise.resolve({ id: "71" }) },
         );
 
@@ -201,7 +202,7 @@ describe("DELETE /api/routines/tasks/:id", () => {
         });
 
         const response = await DELETE(
-            new NextRequest("http://localhost/api/routines/tasks/71", { method: "DELETE" }),
+            trustedNextRequest("http://localhost/api/routines/tasks/71", { method: "DELETE" }),
             { params: Promise.resolve({ id: "71" }) },
         );
 

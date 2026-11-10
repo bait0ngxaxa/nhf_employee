@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -11,10 +12,10 @@ import {
     NotificationCapabilityDeniedError,
 } from "@/modules/notification";
 
-export async function PATCH(
+export const PATCH = withTrustedMutation(async (
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     try {
         const auth = await requireApiSession();
         if (!auth.ok) return auth.response;
@@ -49,4 +50,4 @@ export async function PATCH(
         console.error("Error marking notification as read:", error);
         return jsonError(COMMON_API_MESSAGES.failedToMarkNotificationAsRead, 500);
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

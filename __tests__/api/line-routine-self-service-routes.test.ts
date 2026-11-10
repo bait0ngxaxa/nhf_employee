@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -46,6 +46,7 @@ import {
     RoutineConflictError,
     RoutineNotFoundError,
 } from "@/modules/routine";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const AUTH = {
     ok: true as const,
@@ -81,7 +82,7 @@ function request(
     path: string,
     init?: ConstructorParameters<typeof NextRequest>[1],
 ): NextRequest {
-    return new NextRequest(`http://localhost${path}`, init);
+    return trustedNextRequest(`http://localhost${path}`, init);
 }
 
 function taskDetail(

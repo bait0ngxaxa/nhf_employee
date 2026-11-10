@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const preAuthRateLimitResponse = enforcePreAuthIpRateLimit(
             request,
@@ -175,4 +176,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         });
         return serverError();
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

@@ -1,5 +1,4 @@
 // @vitest-environment node
-import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/modules/leave", () => ({}));
@@ -16,6 +15,7 @@ import { POST as createLiff } from "@/app/api/line/leave/request/route";
 import { POST as decideLiff } from "@/app/api/line/leave/decision/route";
 import { POST as cancelLiff, PUT as confirmCancelLiff } from "@/app/api/line/leave/cancel/route";
 import { POST as notTakenLiff, PUT as confirmNotTakenLiff } from "@/app/api/line/leave/not-taken/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 describe("disabled Leave mutation endpoints", () => {
     afterEach(() => vi.unstubAllEnvs());
@@ -37,7 +37,7 @@ describe("disabled Leave mutation endpoints", () => {
     ])("rejects %s before invoking operational code", async (_label, method, handler) => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
         vi.stubEnv("LEAVE_ATTACHMENT_CLEANUP_SECRET", "test-secret-0123456789abcdef0123456789");
-        const request = new NextRequest("http://localhost/api/leave", {
+        const request = trustedNextRequest("http://localhost/api/leave", {
             method,
             headers: { "x-cleanup-secret": "test-secret-0123456789abcdef0123456789", "content-type": "application/json" },
             body: "{}",

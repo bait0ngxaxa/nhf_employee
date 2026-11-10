@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
 import type * as MutationRateLimit from "@/lib/security/mutation-rate-limit";
 
@@ -48,6 +48,7 @@ import {
     ITTicketInputValidationError,
     ITTicketNotFoundError,
 } from "@/modules/it";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const user = { id: 41, role: "USER", email: "staff@example.test", name: "Staff" };
 const actorContext = {
@@ -81,7 +82,7 @@ function authenticated(): void {
 }
 
 function postRequest(body: unknown, idempotencyKey?: string): NextRequest {
-    return new NextRequest("http://localhost/api/it/tickets", {
+    return trustedNextRequest("http://localhost/api/it/tickets", {
         method: "POST",
         body: JSON.stringify(body),
         headers: idempotencyKey === undefined
@@ -91,7 +92,7 @@ function postRequest(body: unknown, idempotencyKey?: string): NextRequest {
 }
 
 function postFormRequest(formData: FormData, idempotencyKey: string): NextRequest {
-    return new NextRequest("http://localhost/api/it/tickets", {
+    return trustedNextRequest("http://localhost/api/it/tickets", {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey },
         body: formData,
@@ -250,7 +251,7 @@ describe("IT requester Ticket API adapters", () => {
     });
 
     it("rejects explicit unsupported content types", async () => {
-        const request = new NextRequest("http://localhost/api/it/tickets", {
+        const request = trustedNextRequest("http://localhost/api/it/tickets", {
             method: "POST",
             headers: {
                 "Content-Type": "text/plain",
@@ -309,7 +310,7 @@ describe("IT requester Ticket API adapters", () => {
     });
 
     it("returns a bounded requester list and validates pagination", async () => {
-        const response = await getTicketList(new NextRequest(
+        const response = await getTicketList(trustedNextRequest(
             "http://localhost/api/it/tickets?page=2&limit=5",
         ));
         expect(response.status).toBe(200);
@@ -319,7 +320,7 @@ describe("IT requester Ticket API adapters", () => {
         });
 
         mocks.listTickets.mockRejectedValueOnce(new ITTicketInputValidationError());
-        const invalid = await getTicketList(new NextRequest(
+        const invalid = await getTicketList(trustedNextRequest(
             "http://localhost/api/it/tickets?page=1&limit=101",
         ));
         expect(invalid.status).toBe(400);
@@ -330,20 +331,20 @@ describe("IT requester Ticket API adapters", () => {
             "it.ticket.read",
             "NO_APPLICABLE_GRANT",
         ));
-        const denied = await getTicketList(new NextRequest("http://localhost/api/it/tickets"));
+        const denied = await getTicketList(trustedNextRequest("http://localhost/api/it/tickets"));
         expect(denied.status).toBe(403);
     });
 
     it("maps inaccessible Tickets to the same 404 and rejects malformed identifiers", async () => {
         mocks.getTicket.mockRejectedValueOnce(new ITTicketNotFoundError());
         const hidden = await getTicketDetail(
-            new NextRequest("http://localhost/api/it/tickets/20"),
+            trustedNextRequest("http://localhost/api/it/tickets/20"),
             { params: Promise.resolve({ ticketId: "20" }) },
         );
         expect(hidden.status).toBe(404);
 
         const invalid = await getTicketDetail(
-            new NextRequest("http://localhost/api/it/tickets/01"),
+            trustedNextRequest("http://localhost/api/it/tickets/01"),
             { params: Promise.resolve({ ticketId: "01" }) },
         );
         expect(invalid.status).toBe(400);

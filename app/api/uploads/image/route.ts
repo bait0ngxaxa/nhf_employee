@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
@@ -62,7 +63,7 @@ async function authorizeImageUpload(): Promise<ImageUploadAuthorization> {
     return { ok: true, userId: auth.user.id };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     // Fast path only: the body is still read through a bounded stream below.
     if (contentLengthExceedsLimit(request, IMAGE_UPLOAD_MAX_REQUEST_BYTES)) {
         return jsonError(REQUEST_TOO_LARGE_MESSAGE, 413);
@@ -116,4 +117,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         });
         return jsonError(UPLOAD_FAILED_MESSAGE, 500);
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

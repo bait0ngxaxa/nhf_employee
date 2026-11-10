@@ -1,7 +1,7 @@
 // @vitest-environment node
 import type * as NextServerModule from "next/server";
 import type * as AuthorizationModule from "@/modules/authorization";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -78,6 +78,7 @@ import { POST as createRequest } from "@/app/api/line/leave/request/route";
 import { GET as getDetail } from "@/app/api/line/leave/requests/[id]/route";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const AUTH = {
     ok: true as const,
@@ -101,7 +102,7 @@ function request(
     path: string,
     init?: ConstructorParameters<typeof NextRequest>[1],
 ): NextRequest {
-    return new NextRequest(`http://localhost${path}`, init);
+    return trustedNextRequest(`http://localhost${path}`, init);
 }
 
 describe("LIFF Leave route adapters", () => {

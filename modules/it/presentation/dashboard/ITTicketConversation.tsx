@@ -8,6 +8,7 @@ import { CircleAlert, MessageSquareText, RefreshCw, Send, X } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { withAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 
 import {
     IT_TICKET_COMMENTABLE_STATUSES,
@@ -310,11 +311,11 @@ export function ITTicketConversation({
                 headers.set("Content-Type", "application/json");
                 requestBody = JSON.stringify({ body });
             }
-            const response = await fetch(commentsRoute(ticketId, operator), {
+            const response = await fetch(commentsRoute(ticketId, operator), withAuthMutationHeaders({
                 method: "POST",
                 headers,
                 body: requestBody,
-            });
+            }));
             const payload: unknown = await response.json().catch(() => null);
             if (!response.ok) {
                 if (response.status === 401 || response.status === 403) setPostingDenied(true);

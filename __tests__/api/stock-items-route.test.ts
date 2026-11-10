@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import type * as StockModule from "@/modules/stock";
 import {
     DELETE as deleteItemRoute,
@@ -33,6 +33,7 @@ import {
     buildMaximalCreateItemPayload,
     buildMaximalUpdateItemPayload,
 } from "@/__tests__/helpers/maximal-stock-payloads";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const stockAuthorizationMock = vi.hoisted(() => ({
     assert: vi.fn(),
@@ -137,7 +138,7 @@ describe("Stock Item Routes", () => {
 
     it("passes request audit context when updating an item", async () => {
         vi.mocked(stockService.updateItem).mockResolvedValue(updatedItem as never);
-        const request = new NextRequest("http://localhost/api/stock/items/42", {
+        const request = trustedNextRequest("http://localhost/api/stock/items/42", {
             method: "PATCH",
             headers: { "user-agent": "stock-route-test" },
             body: JSON.stringify({ name: "ปากกาใหม่" }),
@@ -164,7 +165,7 @@ describe("Stock Item Routes", () => {
         vi.mocked(stockService.updateItem).mockRejectedValue(
             new Error("ยอดคงเหลือของรายการย่อยเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่"),
         );
-        const request = new NextRequest("http://localhost/api/stock/items/42", {
+        const request = trustedNextRequest("http://localhost/api/stock/items/42", {
             method: "PATCH",
             body: JSON.stringify({
                 variants: [{
@@ -191,7 +192,7 @@ describe("Stock Item Routes", () => {
                 "ไม่สามารถปิดรายการย่อยที่ยังมียอดคงเหลือ กรุณาปรับยอดเป็นศูนย์ก่อน",
             ),
         );
-        const request = new NextRequest("http://localhost/api/stock/items/42", {
+        const request = trustedNextRequest("http://localhost/api/stock/items/42", {
             method: "PATCH",
             body: JSON.stringify({ name: "ปากกาใหม่" }),
         });
@@ -208,7 +209,7 @@ describe("Stock Item Routes", () => {
             ...updatedItem,
             isActive: false,
         } as never);
-        const request = new NextRequest("http://localhost/api/stock/items/42", {
+        const request = trustedNextRequest("http://localhost/api/stock/items/42", {
             method: "DELETE",
         });
 
@@ -248,7 +249,7 @@ describe("Stock Item Routes", () => {
         );
 
         const response = await patchItemRoute(
-            new NextRequest("http://localhost/api/stock/items/42", {
+            trustedNextRequest("http://localhost/api/stock/items/42", {
                 method: "PATCH",
                 body: JSON.stringify({ name: "ปากกาใหม่" }),
             }),
@@ -295,7 +296,7 @@ describe("Stock Item Routes", () => {
         vi.mocked(stockService.updateItem).mockResolvedValue(updatedItem as never);
 
         const response = await patchItemRoute(
-            new NextRequest("http://localhost/api/stock/items/42", {
+            trustedNextRequest("http://localhost/api/stock/items/42", {
                 method: "PATCH",
                 body: JSON.stringify({ name: "ปากกาใหม่" }),
             }),
@@ -312,7 +313,7 @@ describe("Stock Item Routes", () => {
         );
 
         const response = await patchItemRoute(
-            new NextRequest("http://localhost/api/stock/items/42", {
+            trustedNextRequest("http://localhost/api/stock/items/42", {
                 method: "PATCH",
                 body: JSON.stringify({ name: "ปากกาใหม่" }),
             }),

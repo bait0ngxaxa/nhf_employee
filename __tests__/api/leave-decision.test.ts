@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/leave/decision/route";
 import { requireApiSession } from "@/lib/auth/api";
@@ -7,6 +6,7 @@ import { processOutbox } from "@/lib/services/outbox/processor";
 import type * as NextServerModule from "next/server";
 import type * as AuthorizationModule from "@/modules/authorization";
 import { formatAuditLogDisplay } from "@/modules/audit/client";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -146,7 +146,7 @@ describe("POST /api/leave/decision", () => {
             },
         } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
 
-        const req = new NextRequest("http://localhost/api/leave/decision", {
+        const req = trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-1",
@@ -198,7 +198,7 @@ describe("POST /api/leave/decision", () => {
             },
         } as never);
 
-        const req = new NextRequest("http://localhost/api/leave/decision", {
+        const req = trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-original-approver",
@@ -273,7 +273,7 @@ describe("POST /api/leave/decision", () => {
             status: "REJECTED",
         } as never);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-admin-assigned",
@@ -360,7 +360,7 @@ describe("POST /api/leave/decision", () => {
             exceptionApprover: null,
         } as never);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-admin-unassigned",
@@ -386,7 +386,7 @@ describe("POST /api/leave/decision", () => {
             approver: { id: 30 },
         } as never);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-processed-other-approver",
@@ -403,7 +403,7 @@ describe("POST /api/leave/decision", () => {
     it("rejects when the approver becomes inactive before the transaction", async () => {
         vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
 
-        const req = new NextRequest("http://localhost/api/leave/decision", {
+        const req = trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-1",
@@ -495,7 +495,7 @@ describe("POST /api/leave/decision", () => {
             id: "quota-1",
         } as Awaited<ReturnType<typeof prisma.leaveQuota.update>>);
 
-        const req = new NextRequest("http://localhost/api/leave/decision", {
+        const req = trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-1",
@@ -570,7 +570,7 @@ describe("POST /api/leave/decision", () => {
             status: "REJECTED",
         } as never);
 
-        const response = await POST(new NextRequest("http://localhost/api/leave/decision", {
+        const response = await POST(trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({
                 leaveId: "leave-rejected",
@@ -664,7 +664,7 @@ describe("POST /api/leave/decision", () => {
             usedHalfDays: 0,
         });
 
-        const req = new NextRequest("http://localhost/api/leave/decision", {
+        const req = trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({ leaveId: "leave-already-over-quota", action: "APPROVE" }),
         });
@@ -725,7 +725,7 @@ describe("POST /api/leave/decision", () => {
         } as Awaited<ReturnType<typeof prisma.leaveRequest.findUnique>>);
         vi.mocked(prisma.leaveRequest.updateMany).mockResolvedValue({ count: 0 });
 
-        const req = new NextRequest("http://localhost/api/leave/decision", {
+        const req = trustedNextRequest("http://localhost/api/leave/decision", {
             method: "POST",
             body: JSON.stringify({ leaveId: "leave-1", action: "APPROVE" }),
         });

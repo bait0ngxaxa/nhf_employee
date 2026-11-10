@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { assignITTicket, assignITTicketBodySchema } from "@/modules/it";
@@ -8,10 +9,10 @@ interface OperatorTicketRouteContext {
     readonly params: Promise<{ readonly ticketId: string }>;
 }
 
-export async function PATCH(
+export const PATCH = withTrustedMutation(async (
     request: NextRequest,
     routeContext: OperatorTicketRouteContext,
-): Promise<NextResponse> {
+): Promise<NextResponse> => {
     const { ticketId } = await routeContext.params;
     return patchITOperatorTicket(
         request,
@@ -25,4 +26,4 @@ export async function PATCH(
                 && input.assigneeUserId !== actorUserId,
         },
     );
-}
+}, TRUSTED_MUTATION_ROLLOUT);

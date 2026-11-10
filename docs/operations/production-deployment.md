@@ -124,6 +124,7 @@ ID token เป็น identity assertion ที่อายุสั้น ใ�
 | `DATABASE_URL` | MySQL/Prisma สำหรับ user, link, Stock, Leave, Routine และ outbox | database secret/configuration |
 | `AUTH_ACCESS_TOKEN_SECRET` | secret ของ normal NHFapp authentication/dashboard | secret manager; ไม่ใช้ร่วมกับ LIFF session secret |
 | `PUBLIC_APPROVE_URL` | public HTTPS origin สำหรับ dashboard/approval และ notification links ที่ไม่ใช่ LIFF | deployment configuration; ห้ามเป็น localhost ใน production |
+| `CSRF_ENFORCEMENT_MODE` | rollout switch ของ CSRF guard บน route ที่เพิ่ง guard; ค่า `report` = log warning `[csrf] report mode` แล้วปล่อย request ผ่าน, ไม่ตั้งค่าหรือค่าอื่น = enforce (ตอบ 403) | deployment configuration; ตั้ง `report` เฉพาะช่วง UAT แล้วลบออกหลัง UAT ผ่าน (ดู `docs/architecture/runtime-hardening.md` §24) |
 
 ตัวอย่างชื่อ variable เท่านั้น:
 

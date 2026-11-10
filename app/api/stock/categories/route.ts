@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
@@ -37,7 +38,7 @@ export async function GET(): Promise<NextResponse> {
     }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
@@ -85,9 +86,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         console.error("Error creating stock category:", error);
         return serverError();
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);
 
-export async function DELETE(request: NextRequest): Promise<NextResponse> {
+export const DELETE = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const auth = await requireActiveWorkforceSession();
         if (!auth.ok) return auth.response;
@@ -128,4 +129,4 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
         console.error("Error deleting stock category:", error);
         return serverError();
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

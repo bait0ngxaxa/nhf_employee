@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -13,7 +14,7 @@ import { jsonError, operationFailed } from "@/lib/ssot/http";
 import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import { EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const auth = await requireApiSession({
             unauthorizedResponse: () => operationFailed(403),
@@ -67,4 +68,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         console.error("Error importing employees:", error);
         return operationFailed(500);
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);
