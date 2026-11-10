@@ -14,7 +14,14 @@ function getChannelSecrets(): readonly string[] {
     return secrets;
 }
 
-// LINE Webhook handler for receiving events
+// LINE Webhook handler for receiving events.
+//
+// Intentionally a no-op acknowledger: it authenticates the LINE platform call
+// (x-line-signature HMAC against the legacy IT/Stock channel secrets), then
+// returns 200 without processing any event. No application code depends on
+// it. The NHFapp secret (LINE_APP_CHANNEL_SECRET) is not accepted here, and no
+// documentation points the NHFapp channel webhook at this route. Removal or extension is an
+// owner decision tied to the LINE Developers console configuration.
 export async function POST(request: NextRequest): Promise<NextResponse> {
     const signature = request.headers.get("x-line-signature");
 
