@@ -202,6 +202,9 @@ describe("forgot-password route", () => {
 
             expect(response.status).toBe(200);
             await expect(readResponse(response)).resolves.toEqual(acceptedBody);
+            // No token work happens, so the user's existing unused reset link
+            // survives and no quota is consumed for a link that is never sent.
+            expect(requestPasswordResetMock).not.toHaveBeenCalled();
             expect(sendEmailMock).not.toHaveBeenCalled();
             expect(errorLog).toHaveBeenCalledWith(
                 expect.stringContaining("public origin is not configured"),
@@ -213,6 +216,30 @@ describe("forgot-password route", () => {
         } finally {
             errorLog.mockRestore();
         }
+    });
+
+    it("does not consume the application rate limit while the origin is misconfigured", async () => {
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "");
+        const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+                const response = await forgotPasswordRoute(
+                    buildRequest({ email: "user@thainhf.org" }, "203.0.113.80"),
+                );
+                expect(response.status).toBe(200);
+            }
+        } finally {
+            errorLog.mockRestore();
+        }
+
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://nhfapp.example");
+        requestPasswordResetMock.mockResolvedValue(KNOWN_USER_RESET);
+        await forgotPasswordRoute(
+            buildRequest({ email: "user@thainhf.org" }, "203.0.113.80"),
+        );
+
+        expect(requestPasswordResetMock).toHaveBeenCalledTimes(1);
     });
 
     it("never uses a spoofed Host or X-Forwarded-Host in the production reset URL", async () => {
