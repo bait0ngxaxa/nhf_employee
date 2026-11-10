@@ -8,6 +8,8 @@ import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth/ssot";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
 import { buildConfiguredPublicUrl } from "@/lib/network/public-url";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { AUTH_CREDENTIALS_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 import { requestPasswordReset } from "@/modules/auth";
 
 const MAX_REQUESTS_PER_HOUR = 3;
@@ -65,10 +67,32 @@ function acceptedResponse(): NextResponse {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const body = await request.json();
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => NextResponse.json(
+                { error: AUTH_FORGOT_PASSWORD_MESSAGES.requestFailedThai },
+                { status: 500 },
+            ),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
 
-        const result = forgotPasswordSchema.safeParse(body);
+        const result = forgotPasswordSchema.safeParse(bodyResult.body);
         if (!result.success) {
+            return acceptedResponse();
+        }
+
+        // Resolve the reset-link origin BEFORE any token work. If production is
+        // misconfigured, requestPasswordReset would otherwise delete the user's
+        // still-valid unused tokens and consume quota for a link never sent.
+        // Production reset links come ONLY from the configured public origin;
+        // never from Host / X-Forwarded-Host (reset-link poisoning).
+        const resetUrl = buildConfiguredPublicUrl("/reset-password", request);
+        if (!resetUrl) {
+            console.error("Password reset email not sent: public origin is not configured", {
+                code: "PUBLIC_ORIGIN_UNCONFIGURED",
+                setting: "PUBLIC_APPROVE_URL",
+            });
             return acceptedResponse();
         }
 
@@ -107,16 +131,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return acceptedResponse();
         }
 
-        // Production reset links come ONLY from the configured public origin;
-        // never from Host / X-Forwarded-Host (reset-link poisoning).
-        const resetUrl = buildConfiguredPublicUrl("/reset-password", request);
-        if (!resetUrl) {
-            console.error("Password reset email not sent: public origin is not configured", {
-                code: "PUBLIC_ORIGIN_UNCONFIGURED",
-                setting: "PUBLIC_APPROVE_URL",
-            });
-            return acceptedResponse();
-        }
         resetUrl.searchParams.set("token", resetRequest.rawToken);
 
         // Delivery runs after the response so response time does not reveal

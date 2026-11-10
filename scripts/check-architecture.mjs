@@ -3028,6 +3028,128 @@ function getBoundaryViolation(owner, target) {
     return `external consumers must use the target module public API "${publicApi}".`;
 }
 
+// Production has no reverse proxy in the request path, so every API body read
+// must be bounded. Route handlers read bodies only through
+// lib/server/request-body.ts (or helpers built on it, such as
+// lib/server/route-json-body.ts) with a limit from lib/ssot/request-limits.ts.
+const rawRequestBodyMethods = new Set(["json", "text", "formData", "arrayBuffer", "blob"]);
+const rawRequestBodyIdentifiers = new Set(["request", "req"]);
+const rawRequestBodyTypeNames = new Set(["Request", "NextRequest"]);
+/** Each exemption must state why the route cannot use the bounded reader. */
+const rawRequestBodyExemptions = new Map([
+    [
+        "app/api/line/webhook/route.ts",
+        "LINE signature verification must run over the exact raw body bytes; reading through the bounded UTF-8 decoder could change those bytes.",
+    ],
+]);
+
+function getRequestTypedParameterNames(sourceFile) {
+    const names = new Set(rawRequestBodyIdentifiers);
+
+    function visit(node) {
+        if (
+            ts.isParameter(node)
+            && ts.isIdentifier(node.name)
+            && node.type !== undefined
+            && ts.isTypeReferenceNode(node.type)
+            && ts.isIdentifier(node.type.typeName)
+            && rawRequestBodyTypeNames.has(node.type.typeName.text)
+        ) {
+            names.add(node.name.text);
+        }
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return names;
+}
+
+function isRequestReceiver(expression, requestNames) {
+    if (ts.isIdentifier(expression)) return requestNames.has(expression.text);
+    // request.clone().json() reads the same unbounded stream.
+    return ts.isCallExpression(expression)
+        && ts.isPropertyAccessExpression(expression.expression)
+        && expression.expression.name.text === "clone"
+        && ts.isIdentifier(expression.expression.expression)
+        && requestNames.has(expression.expression.expression.text);
+}
+
+// Body reads are zero-argument calls; this cheap prefilter skips the TypeScript
+// parse for the many route files whose only matches are e.g. NextResponse.json({...}).
+const rawRequestBodyCallPattern = /\.(?:json|text|formData|arrayBuffer|blob)\(\s*\)/;
+
+function getRawRequestBodyReads(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    if (!rawRequestBodyCallPattern.test(contents)) return [];
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+    const requestNames = getRequestTypedParameterNames(sourceFile);
+    const reads = [];
+
+    function visit(node) {
+        if (
+            ts.isCallExpression(node)
+            && ts.isPropertyAccessExpression(node.expression)
+            && rawRequestBodyMethods.has(node.expression.name.text)
+            && isRequestReceiver(node.expression.expression, requestNames)
+        ) {
+            reads.push({
+                line: sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1,
+                method: node.expression.name.text,
+            });
+        }
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return reads;
+}
+
+function getRawRequestBodyReadViolations(rootPath, sourceFiles) {
+    const apiRoot = resolve(rootPath, "app/api");
+    const violations = [];
+    const exemptFilesWithReads = new Set();
+
+    for (const filePath of sourceFiles) {
+        if (!pathIsWithin(filePath, apiRoot) || isTestSource(filePath, rootPath)) continue;
+        const reads = getRawRequestBodyReads(filePath);
+        if (reads.length === 0) continue;
+
+        const repositoryPath = relativeFilePath(filePath, rootPath);
+        if (rawRequestBodyExemptions.has(repositoryPath)) {
+            exemptFilesWithReads.add(repositoryPath);
+            continue;
+        }
+        for (const read of reads) {
+            violations.push(
+                `${repositoryPath}:${read.line} reads the request body with request.${read.method}() directly. `
+                + "Read it through a bounded reader from lib/server/request-body.ts "
+                + "(for JSON routes, readRouteJsonBody in lib/server/route-json-body.ts) "
+                + "with a limit from lib/ssot/request-limits.ts, or add a justified entry "
+                + "to rawRequestBodyExemptions in scripts/check-architecture.mjs.",
+            );
+        }
+    }
+
+    for (const exemptPath of rawRequestBodyExemptions.keys()) {
+        if (
+            sourceFiles.includes(resolve(rootPath, exemptPath))
+            && !exemptFilesWithReads.has(exemptPath)
+        ) {
+            violations.push(
+                `${exemptPath} is listed in rawRequestBodyExemptions but no longer reads the request body directly; remove the stale exemption.`,
+            );
+        }
+    }
+
+    return violations;
+}
+
 function checkArchitecture(options = {}) {
     // Graph rules share transpilation results only within this synchronous scan.
     // Later scans must read edited files again, even for the same repository root.
@@ -3616,6 +3738,7 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getCapabilityRecipientRoleViolations(rootPath, sourceFiles));
+    violations.push(...getRawRequestBodyReadViolations(rootPath, sourceFiles));
     violations.push(...getEmailRequestCompositionViolations(rootPath, sourceFiles));
     const emailRequestOutboxProcessorViolation =
         getEmailRequestOutboxProcessorViolation(rootPath);

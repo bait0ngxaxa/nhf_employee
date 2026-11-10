@@ -2,6 +2,8 @@ import { after, type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 import {
     assertStockCapability,
     buildStockAuthorizationContext,
@@ -45,8 +47,13 @@ export async function POST(
         const itemId = Number(id);
         if (isNaN(itemId)) return jsonError("ID ไม่ถูกต้อง", 400);
 
-        const body = await request.json();
-        const result = adjustStockSchema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => serverError(),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const result = adjustStockSchema.safeParse(bodyResult.body);
         if (!result.success) {
             return jsonError("ข้อมูลไม่ถูกต้อง", 400, {
                 details: result.error.flatten().fieldErrors,

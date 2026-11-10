@@ -5,11 +5,21 @@ import { clearHybridAuthCookies, getClientMetadata } from "@/lib/auth/hybrid/ses
 import { appendAuditBestEffort } from "@/modules/audit";
 import { resetPassword } from "@/modules/auth";
 import { resetPasswordSchema } from "@/lib/validations/auth";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { AUTH_CREDENTIALS_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
-        const body = await request.json();
-        const result = resetPasswordSchema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => NextResponse.json(
+                { error: AUTH_ERROR_MESSAGES.internalServerError },
+                { status: 500 },
+            ),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const result = resetPasswordSchema.safeParse(bodyResult.body);
 
         if (!result.success) {
             const errors = result.error.flatten();

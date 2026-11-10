@@ -9,6 +9,16 @@ import {
     assignLeaveApprovers,
 } from "@/modules/leave";
 import type * as AuthorizationModule from "@/modules/authorization";
+import {
+    LEAVE_APPROVER_ASSIGNMENTS_MAX,
+    LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const authorizationMocks = vi.hoisted(() => ({
     resolve: vi.fn(),
@@ -212,5 +222,95 @@ describe("PUT /api/leave/approvers", () => {
         }));
 
         expect(response.status).toBe(409);
+    });
+});
+
+describe("PUT /api/leave/approvers body and assignment limits", () => {
+    const APPROVERS_URL = "http://localhost/api/leave/approvers";
+    const MAX_INT_ID = 2147483647;
+
+    function assignments(count: number): Array<{ employeeId: number; managerId: number }> {
+        return Array.from({ length: count }, (_unused, index) => ({
+            employeeId: MAX_INT_ID - index,
+            managerId: MAX_INT_ID,
+        }));
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        authorizationMocks.resolve.mockImplementation(
+            async (actor: unknown, capability: string) => authorizationDecision(actor, capability),
+        );
+        vi.mocked(requireActiveWorkforceSession).mockResolvedValue({
+            ok: true,
+            session: { user: { id: "1", role: "ADMIN" } },
+            user: { id: 1, email: "admin@example.com", name: "Admin", role: "ADMIN" },
+            employeeId: 1,
+        });
+        vi.mocked(assignLeaveApprovers).mockResolvedValue(undefined);
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 after the capability check (Content-Length %s)",
+        async (contentLength) => {
+            const response = await PUT(buildJsonBodyRequest(
+                APPROVERS_URL,
+                jsonBodyOfExactBytes(
+                    { assignments: assignments(1) },
+                    LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES + 1,
+                ),
+                { method: "PUT", contentLength },
+            ));
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            // Existing order: feature flag -> auth -> capability -> body.
+            expect(authorizationMocks.resolve).toHaveBeenCalled();
+            expect(assignLeaveApprovers).not.toHaveBeenCalled();
+        },
+    );
+
+    it("keeps the previous 500 response for malformed JSON", async () => {
+        const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            const response = await PUT(
+                buildJsonBodyRequest(APPROVERS_URL, "{not json", { method: "PUT" }),
+            );
+
+            expect(response.status).toBe(500);
+            await expect(response.json()).resolves.toEqual({ error: "Failed to update approvers" });
+            expect(assignLeaveApprovers).not.toHaveBeenCalled();
+        } finally {
+            errorLog.mockRestore();
+        }
+    });
+
+    it("accepts the maximal payload: assignments at the cap with the largest ids", async () => {
+        const maximal = assignments(LEAVE_APPROVER_ASSIGNMENTS_MAX);
+
+        const response = await PUT(buildJsonBodyRequest(
+            APPROVERS_URL,
+            JSON.stringify({ assignments: maximal }),
+            { method: "PUT" },
+        ));
+
+        expect(response.status).toBe(200);
+        expect(assignLeaveApprovers).toHaveBeenCalledWith(maximal, expect.anything());
+    });
+
+    it("rejects assignments over the cap with the schema's 400 before the service", async () => {
+        const response = await PUT(buildJsonBodyRequest(
+            APPROVERS_URL,
+            JSON.stringify({ assignments: assignments(LEAVE_APPROVER_ASSIGNMENTS_MAX + 1) }),
+            { method: "PUT" },
+        ));
+
+        expect(response.status).toBe(400);
+        const body = await response.json() as { error: string; details: unknown };
+        expect(body.error).toBe("Invalid input");
+        expect(JSON.stringify(body.details)).toContain(
+            `At most ${LEAVE_APPROVER_ASSIGNMENTS_MAX} assignments allowed`,
+        );
+        expect(assignLeaveApprovers).not.toHaveBeenCalled();
     });
 });

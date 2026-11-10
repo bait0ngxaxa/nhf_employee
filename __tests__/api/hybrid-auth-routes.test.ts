@@ -7,6 +7,15 @@ import { POST as logoutRoute } from "@/app/api/auth/logout/route";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
 import { POST as revokeSessionRoute } from "@/app/api/auth/sessions/revoke/route";
 import {
+    DEFAULT_JSON_MUTATION_MAX_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
+import {
     HYBRID_ACCESS_COOKIE_NAME,
     HYBRID_REFRESH_COOKIE_NAME,
 } from "@/lib/auth/hybrid/constants";
@@ -521,3 +530,80 @@ describe("Hybrid auth routes", () => {
         "x-forwarded-for": "198.51.100.20",
         "user-agent": "hybrid-auth-test-agent",
     };
+
+describe("Session revoke route body limit", () => {
+    const REVOKE_URL = "http://localhost/api/auth/sessions/revoke";
+    const revokeHeaders = {
+        origin: "http://localhost",
+        "x-requested-with": "XMLHttpRequest",
+        "cf-connecting-ip": "203.0.113.21",
+        "user-agent": "hybrid-auth-test-agent",
+        cookie: [
+            `${HYBRID_ACCESS_COOKIE_NAME}=access-token`,
+            `${HYBRID_REFRESH_COOKIE_NAME}=old-refresh-token`,
+        ].join("; "),
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        appendAuditBestEffortMock.mockResolvedValue(undefined);
+        prismaMock.authRefreshToken.updateMany.mockResolvedValue({ count: 1 });
+        prismaMock.user.findUnique.mockResolvedValue({
+            email: "u@test.com",
+            isActive: true,
+            deletedAt: null,
+            tokenVersion: 1,
+            employee: null,
+        });
+        prismaMock.authRefreshToken.findFirst
+            .mockResolvedValueOnce({ id: "active-session" })
+            .mockResolvedValueOnce({
+                userId: 1,
+                familyId: "family-1",
+                user: { email: "u@test.com" },
+            });
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 after auth and before revocation (Content-Length %s)",
+        async (contentLength) => {
+            const body = jsonBodyOfExactBytes(
+                { sessionId: "family-1" },
+                DEFAULT_JSON_MUTATION_MAX_BYTES + 1,
+            );
+
+            const response = await revokeSessionRoute(
+                buildJsonBodyRequest(REVOKE_URL, body, { headers: revokeHeaders, contentLength }),
+            );
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+            expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it("keeps the previous 500 response for malformed JSON", async () => {
+        const response = await revokeSessionRoute(
+            buildJsonBodyRequest(REVOKE_URL, "{not json", { headers: revokeHeaders }),
+        );
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({ error: "Internal server error" });
+        expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("revokes with a valid body of exactly the limit", async () => {
+        const body = jsonBodyOfExactBytes({ sessionId: "family-1" }, DEFAULT_JSON_MUTATION_MAX_BYTES);
+
+        const response = await revokeSessionRoute(
+            buildJsonBodyRequest(REVOKE_URL, body, { headers: revokeHeaders }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(prismaMock.authRefreshToken.updateMany).toHaveBeenCalledWith({
+            where: { familyId: "family-1", revokedAt: null },
+            data: { revokedAt: expect.any(Date) },
+        });
+    });
+});

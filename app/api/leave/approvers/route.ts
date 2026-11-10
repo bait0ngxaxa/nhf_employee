@@ -14,6 +14,8 @@ import {
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { forbidden, notFound } from "@/lib/ssot/http";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 
 export async function GET(): Promise<NextResponse> {
     try {
@@ -71,8 +73,16 @@ export async function PUT(req: Request): Promise<NextResponse> {
             "leave.approver.manage",
         );
 
-        const body = await req.json();
-        const parsed = leaveApproverAssignmentsSchema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(req, {
+            maxBytes: LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => NextResponse.json(
+                { error: COMMON_API_MESSAGES.failedToUpdateApprovers },
+                { status: 500 },
+            ),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const parsed = leaveApproverAssignmentsSchema.safeParse(bodyResult.body);
 
         if (!parsed.success) {
             return NextResponse.json(

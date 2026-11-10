@@ -28,6 +28,16 @@ import {
     updateEmployee,
 } from "@/modules/employee";
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
+import {
+    DEFAULT_JSON_MUTATION_MAX_BYTES,
+    EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -621,5 +631,188 @@ describe("Employee mutation routes", () => {
 
         expect(response.status).toBe(400);
         expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+    });
+});
+
+describe("Employee JSON mutation body limits", () => {
+    const CREATE_URL = "http://localhost/api/employees";
+    const UPDATE_URL = "http://localhost/api/employees/12";
+    const CREATE_BODY = {
+        firstName: "สมชาย",
+        lastName: "ใจดี",
+        email: "somchai@thainhf.org",
+        position: "เจ้าหน้าที่",
+        departmentId: 4,
+    };
+    const UPDATE_BODY = { position: "หัวหน้างาน" };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: ADMIN,
+            session: { user: { ...ADMIN, id: String(ADMIN.id) } },
+        });
+        vi.mocked(assertEmployeeCapability).mockResolvedValue({ scopes: ["ALL"] } as never);
+        vi.mocked(assertEmployeeCapabilityScope).mockImplementation(
+            (authorization) => authorization,
+        );
+        vi.mocked(createEmployee).mockResolvedValue({
+            success: true,
+            employee: { id: 12, ...CREATE_BODY },
+        } as never);
+        vi.mocked(updateEmployee).mockResolvedValue({
+            success: true,
+            employee: { id: 12 },
+            auditRecorded: true,
+        } as never);
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "POST rejects an oversized body with 413 after authorization (Content-Length %s)",
+        async (contentLength) => {
+            const body = jsonBodyOfExactBytes(CREATE_BODY, DEFAULT_JSON_MUTATION_MAX_BYTES + 1);
+
+            const response = await createEmployeeRoute(
+                buildJsonBodyRequest(CREATE_URL, body, { contentLength }),
+            );
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(assertEmployeeCapability).toHaveBeenCalledOnce();
+            expect(createEmployee).not.toHaveBeenCalled();
+        },
+    );
+
+    it("POST keeps the previous 500 response for malformed JSON", async () => {
+        const response = await createEmployeeRoute(buildJsonBodyRequest(CREATE_URL, "{not json"));
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({ error: "Operation failed" });
+        expect(createEmployee).not.toHaveBeenCalled();
+    });
+
+    it("POST creates with a valid body of exactly the limit", async () => {
+        const body = jsonBodyOfExactBytes(CREATE_BODY, DEFAULT_JSON_MUTATION_MAX_BYTES);
+
+        const response = await createEmployeeRoute(buildJsonBodyRequest(CREATE_URL, body));
+
+        expect(response.status).toBe(201);
+        expect(createEmployee).toHaveBeenCalledWith(CREATE_BODY);
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "PATCH rejects an oversized body with 413 before the service (Content-Length %s)",
+        async (contentLength) => {
+            const body = jsonBodyOfExactBytes(UPDATE_BODY, DEFAULT_JSON_MUTATION_MAX_BYTES + 1);
+
+            const response = await PATCH(
+                buildJsonBodyRequest(UPDATE_URL, body, { method: "PATCH", contentLength }),
+                employeeParams("12"),
+            );
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            // Existing order: PATCH validates its body before the session check.
+            expect(requireApiSession).not.toHaveBeenCalled();
+            expect(updateEmployee).not.toHaveBeenCalled();
+        },
+    );
+
+    it("PATCH keeps the previous 500 response for malformed JSON", async () => {
+        const response = await PATCH(
+            buildJsonBodyRequest(UPDATE_URL, "{not json", { method: "PATCH" }),
+            employeeParams("12"),
+        );
+
+        expect(response.status).toBe(500);
+        await expect(response.json()).resolves.toEqual({ error: "Failed to update employee" });
+        expect(updateEmployee).not.toHaveBeenCalled();
+    });
+
+    it("PATCH updates with a valid body of exactly the limit", async () => {
+        const body = jsonBodyOfExactBytes(UPDATE_BODY, DEFAULT_JSON_MUTATION_MAX_BYTES);
+
+        const response = await PATCH(
+            buildJsonBodyRequest(UPDATE_URL, body, { method: "PATCH" }),
+            employeeParams("12"),
+        );
+
+        expect(response.status).toBe(200);
+        expect(updateEmployee).toHaveBeenCalledWith(
+            12,
+            UPDATE_BODY,
+            expect.anything(),
+            getEmployeeLeaveOffboardingBlockers,
+            employeeAccountLifecycle,
+        );
+    });
+});
+
+describe("Employee import body limit", () => {
+    const IMPORT_URL = "http://localhost/api/employees/import";
+    const IMPORT_BODY = { employees: [{ firstName: "สมชาย", lastName: "ใจดี" }] };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: ADMIN,
+            session: { user: { ...ADMIN, id: String(ADMIN.id) } },
+        });
+        vi.mocked(assertEmployeeCapability).mockResolvedValue({ scopes: ["ALL"] } as never);
+        vi.mocked(assertEmployeeCapabilityScope).mockImplementation(
+            (authorization) => authorization,
+        );
+        vi.mocked(importEmployeesFromCsvRows).mockResolvedValue({ success: [], errors: [] });
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized import body with 413 after authorization (Content-Length %s)",
+        async (contentLength) => {
+            const response = await importEmployeesRoute(buildJsonBodyRequest(
+                IMPORT_URL,
+                jsonBodyOfExactBytes(IMPORT_BODY, EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES + 1),
+                { contentLength },
+            ));
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(assertEmployeeCapability).toHaveBeenCalledOnce();
+            expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each([
+        ["malformed JSON", "{not json"],
+        ["a JSON null body", "null"],
+    ])("keeps the previous 500 response for %s", async (_label, body) => {
+        const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            const response = await importEmployeesRoute(buildJsonBodyRequest(IMPORT_URL, body));
+
+            expect(response.status).toBe(500);
+            await expect(response.json()).resolves.toEqual({ error: "Operation failed" });
+            expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+        } finally {
+            errorLog.mockRestore();
+        }
+    });
+
+    it("keeps the previous 400 response for a body without an employees array", async () => {
+        const response = await importEmployeesRoute(buildJsonBodyRequest(IMPORT_URL, "[]"));
+
+        expect(response.status).toBe(400);
+        expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+    });
+
+    it("imports with a valid body of exactly the limit", async () => {
+        const response = await importEmployeesRoute(buildJsonBodyRequest(
+            IMPORT_URL,
+            jsonBodyOfExactBytes(IMPORT_BODY, EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES),
+        ));
+
+        expect(response.status).toBe(200);
+        expect(importEmployeesFromCsvRows).toHaveBeenCalledWith(IMPORT_BODY.employees);
     });
 });

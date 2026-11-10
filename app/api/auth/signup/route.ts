@@ -10,6 +10,8 @@ import { AUTH_SIGNUP_MESSAGES } from "@/lib/auth/ssot";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
 import { signupSchema } from "@/lib/validations/auth";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { AUTH_CREDENTIALS_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 import { appendAuditBestEffort } from "@/modules/audit";
 import { signupAccount, SignupEligibilityError } from "@/modules/auth";
 
@@ -29,8 +31,16 @@ function isUniqueConstraintError(error: unknown): boolean {
 export const POST = withTrustedMutation(
     async (request: NextRequest): Promise<NextResponse> => {
         try {
-            const body = await request.json();
-            const parsed = signupSchema.safeParse(body);
+            const bodyResult = await readRouteJsonBody(request, {
+                maxBytes: AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+                // Pre-existing contract: malformed JSON fell through to the 500 catch.
+                invalidJson: () => NextResponse.json(
+                    { error: AUTH_SIGNUP_MESSAGES.signupFailedThai },
+                    { status: 500 },
+                ),
+            });
+            if (!bodyResult.ok) return bodyResult.response;
+            const parsed = signupSchema.safeParse(bodyResult.body);
 
             if (!parsed.success) {
                 return NextResponse.json(

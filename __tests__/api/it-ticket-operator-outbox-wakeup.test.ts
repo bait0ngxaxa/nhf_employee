@@ -2,6 +2,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, type NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
+import {
+    DEFAULT_JSON_MUTATION_MAX_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const mocks = vi.hoisted(() => ({
     requireApiSession: vi.fn(),
@@ -183,5 +192,98 @@ describe("IT operator mutation outbox wakeup", () => {
             await call(patchCategory, "category", { categoryId: 3, expectedVersion: 2 });
             expect(mocks.wakeOutbox).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe("IT operator PATCH body limits", () => {
+    const routes = [
+        {
+            path: "priority",
+            handler: patchPriority,
+            command: mocks.setPriority,
+            body: { priority: "P0", reason: "ระบบหลักล่มทั้งองค์กร", expectedVersion: 2 },
+        },
+        {
+            path: "status",
+            handler: patchStatus,
+            command: mocks.transitionStatus,
+            body: { targetStatus: "IN_PROGRESS", expectedVersion: 2 },
+        },
+        {
+            path: "assignee",
+            handler: patchAssignee,
+            command: mocks.assign,
+            body: { assigneeUserId: 52, expectedVersion: 2 },
+        },
+        {
+            path: "category",
+            handler: patchCategory,
+            command: mocks.setCategory,
+            body: { categoryId: 3, expectedVersion: 2 },
+        },
+    ] as const;
+
+    function send(route: (typeof routes)[number], body: string, contentLength?: "accurate" | "missing" | "lying") {
+        return route.handler(
+            buildJsonBodyRequest(`http://localhost/api/it/operator/tickets/19/${route.path}`, body, {
+                method: "PATCH",
+                contentLength,
+            }),
+            { params: Promise.resolve({ ticketId: "19" }) },
+        );
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mocks.requireApiSession.mockResolvedValue({ ok: true, user, session: { user } });
+        mocks.buildContext.mockResolvedValue(context);
+        for (const route of routes) {
+            route.command.mockResolvedValue({ ticket, changed: false });
+        }
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 before the command on every route (Content-Length %s)",
+        async (contentLength) => {
+            for (const route of routes) {
+                const response = await send(
+                    route,
+                    jsonBodyOfExactBytes(route.body, DEFAULT_JSON_MUTATION_MAX_BYTES + 1),
+                    contentLength,
+                );
+
+                expect(response.status, route.path).toBe(413);
+                expect(await response.json()).toEqual({
+                    error: REQUEST_BODY_TOO_LARGE_MESSAGE,
+                    success: false,
+                });
+                expect(route.command, route.path).not.toHaveBeenCalled();
+            }
+        },
+    );
+
+    it("keeps the previous 400 response for malformed JSON on every route", async () => {
+        for (const route of routes) {
+            const response = await send(route, "{not json");
+
+            expect(response.status, route.path).toBe(400);
+            expect(await response.json()).toEqual({
+                success: false,
+                error: "รูปแบบข้อมูลไม่ถูกต้อง",
+            });
+            expect(route.command).not.toHaveBeenCalled();
+        }
+    });
+
+    it("runs the command with a valid body of exactly the limit on every route", async () => {
+        for (const route of routes) {
+            const response = await send(
+                route,
+                jsonBodyOfExactBytes(route.body, DEFAULT_JSON_MUTATION_MAX_BYTES),
+            );
+
+            expect(response.status, route.path).toBe(200);
+            expect(route.command, route.path).toHaveBeenCalledTimes(1);
+        }
     });
 });

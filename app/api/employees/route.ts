@@ -1,4 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 import { requireApiSession } from "@/lib/auth/api";
 import { getTrustedClientIp } from "@/lib/network/trusted-client-ip";
 import {
@@ -91,8 +93,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
         assertEmployeeCapabilityScope(authorization, "ALL");
 
-        const body = await request.json();
-        const result = createEmployeeSchema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => operationFailed(500),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const result = createEmployeeSchema.safeParse(bodyResult.body);
         if (!result.success) {
             const errors = result.error.flatten();
             return operationFailed(400, { details: errors.fieldErrors });

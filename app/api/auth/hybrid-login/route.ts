@@ -6,6 +6,8 @@ import { withTrustedMutation } from "@/lib/auth/csrf";
 import { reserveAuthAttempt } from "@/lib/auth/rate-limit";
 import { setHybridAuthCookies, getClientMetadata } from "@/lib/auth/hybrid/session";
 import { enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { AUTH_CREDENTIALS_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 import { appendAuditBestEffort } from "@/modules/audit";
 import { authenticateHybridLogin } from "@/modules/auth";
 
@@ -28,8 +30,16 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         );
         if (rateLimitResponse) return rateLimitResponse;
 
-        const body = await request.json();
-        const parsed = hybridLoginSchema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => NextResponse.json(
+                { error: AUTH_ERROR_MESSAGES.internalServerError },
+                { status: 500 },
+            ),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const parsed = hybridLoginSchema.safeParse(bodyResult.body);
 
         if (!parsed.success) {
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.invalidCredentialsPayload }, { status: 400 });
