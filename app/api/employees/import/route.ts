@@ -10,6 +10,8 @@ import {
     importEmployeesFromCsvRows,
 } from "@/modules/employee";
 import { jsonError, operationFailed } from "@/lib/ssot/http";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
@@ -25,7 +27,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
         assertEmployeeCapabilityScope(authorization, "ALL");
 
-        const { employees } = await request.json();
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => operationFailed(500),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        // Same destructuring as before: a JSON `null` body still throws into
+        // the 500 catch, and the Array.isArray guard below validates the rest.
+        const { employees } = bodyResult.body as { readonly employees?: unknown };
 
         if (!employees || !Array.isArray(employees)) {
             return operationFailed(400);

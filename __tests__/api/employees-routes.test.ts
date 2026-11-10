@@ -30,6 +30,7 @@ import {
 import { getEmployeeLeaveOffboardingBlockers } from "@/modules/leave";
 import {
     DEFAULT_JSON_MUTATION_MAX_BYTES,
+    EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES,
     REQUEST_BODY_TOO_LARGE_MESSAGE,
 } from "@/lib/ssot/request-limits";
 import {
@@ -745,5 +746,73 @@ describe("Employee JSON mutation body limits", () => {
             getEmployeeLeaveOffboardingBlockers,
             employeeAccountLifecycle,
         );
+    });
+});
+
+describe("Employee import body limit", () => {
+    const IMPORT_URL = "http://localhost/api/employees/import";
+    const IMPORT_BODY = { employees: [{ firstName: "สมชาย", lastName: "ใจดี" }] };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(requireApiSession).mockResolvedValue({
+            ok: true,
+            user: ADMIN,
+            session: { user: { ...ADMIN, id: String(ADMIN.id) } },
+        });
+        vi.mocked(assertEmployeeCapability).mockResolvedValue({ scopes: ["ALL"] } as never);
+        vi.mocked(assertEmployeeCapabilityScope).mockImplementation(
+            (authorization) => authorization,
+        );
+        vi.mocked(importEmployeesFromCsvRows).mockResolvedValue({ success: [], errors: [] });
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized import body with 413 after authorization (Content-Length %s)",
+        async (contentLength) => {
+            const response = await importEmployeesRoute(buildJsonBodyRequest(
+                IMPORT_URL,
+                jsonBodyOfExactBytes(IMPORT_BODY, EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES + 1),
+                { contentLength },
+            ));
+
+            expect(response.status).toBe(413);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+            expect(assertEmployeeCapability).toHaveBeenCalledOnce();
+            expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each([
+        ["malformed JSON", "{not json"],
+        ["a JSON null body", "null"],
+    ])("keeps the previous 500 response for %s", async (_label, body) => {
+        const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            const response = await importEmployeesRoute(buildJsonBodyRequest(IMPORT_URL, body));
+
+            expect(response.status).toBe(500);
+            await expect(response.json()).resolves.toEqual({ error: "Operation failed" });
+            expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+        } finally {
+            errorLog.mockRestore();
+        }
+    });
+
+    it("keeps the previous 400 response for a body without an employees array", async () => {
+        const response = await importEmployeesRoute(buildJsonBodyRequest(IMPORT_URL, "[]"));
+
+        expect(response.status).toBe(400);
+        expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+    });
+
+    it("imports with a valid body of exactly the limit", async () => {
+        const response = await importEmployeesRoute(buildJsonBodyRequest(
+            IMPORT_URL,
+            jsonBodyOfExactBytes(IMPORT_BODY, EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES),
+        ));
+
+        expect(response.status).toBe(200);
+        expect(importEmployeesFromCsvRows).toHaveBeenCalledWith(IMPORT_BODY.employees);
     });
 });

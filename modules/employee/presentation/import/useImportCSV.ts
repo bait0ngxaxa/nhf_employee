@@ -11,9 +11,11 @@ import { validateCSVFile } from "@/lib/helpers/file-validation";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { EMPLOYEE_IMPORT_CSV_MAX_FILE_BYTES } from "@/lib/ssot/request-limits";
 import { getImportResultStatus, IMPORT_RESULT_MESSAGES } from "./import-result-status";
 
-const MAX_CSV_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+// Shared with the server-side import body limit derivation (lib/ssot/request-limits.ts).
+const MAX_CSV_FILE_SIZE_BYTES = EMPLOYEE_IMPORT_CSV_MAX_FILE_BYTES;
 const MAX_IMPORT_ROWS = 1000;
 
 interface UseImportCSVOptions {
