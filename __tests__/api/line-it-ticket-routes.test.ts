@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
 
 const mocks = vi.hoisted(() => ({
@@ -57,6 +57,7 @@ import {
     ITTicketNotCommentableError,
     ITTicketNotFoundError,
 } from "@/modules/it";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const user = { id: 41, email: "staff@example.test", name: "Staff", role: "USER" };
 const employeeId = 84;
@@ -113,7 +114,7 @@ function jsonRequest(
     body?: unknown,
     headers: Record<string, string> = {},
 ): NextRequest {
-    return new NextRequest(url, {
+    return trustedNextRequest(url, {
         method,
         headers: {
             ...(body === undefined ? {} : { "Content-Type": "application/json" }),
@@ -137,7 +138,7 @@ function multipartCommentRequest(): NextRequest {
     form.append("attachments", new File([new Uint8Array([1, 2, 3])], "proof.png", {
         type: "image/png",
     }));
-    return new NextRequest("http://localhost/api/line/it/tickets/19/comments", {
+    return trustedNextRequest("http://localhost/api/line/it/tickets/19/comments", {
         method: "POST",
         headers: { "Idempotency-Key": "comment-key" },
         body: form,
@@ -154,7 +155,7 @@ function multipartCreateRequest(withAttachment: boolean): NextRequest {
             type: "image/png",
         }));
     }
-    return new NextRequest("http://localhost/api/line/it/tickets", {
+    return trustedNextRequest("http://localhost/api/line/it/tickets", {
         method: "POST",
         headers: { "Idempotency-Key": "multipart-create-key" },
         body: form,
@@ -294,7 +295,7 @@ describe("LIFF IT Ticket API routes", () => {
     });
 
     it("rejects explicitly unsupported create media types before mutation", async () => {
-        const request = new NextRequest("http://localhost/api/line/it/tickets", {
+        const request = trustedNextRequest("http://localhost/api/line/it/tickets", {
             method: "POST",
             headers: {
                 "Content-Type": "text/plain",

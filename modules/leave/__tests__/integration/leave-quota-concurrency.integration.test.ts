@@ -3,6 +3,7 @@ import { PUT as liffAmend } from "@/app/api/line/leave/special-reason/route";
 import type * as LineModule from "@/modules/line";
 import { NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { amendPendingLeaveSpecialReason } from "../../application/requests/amend-special-reason";
@@ -195,7 +196,7 @@ function createRequest(
     idempotencyKey: string,
     startDate: string,
 ): NextRequest {
-    return new NextRequest("http://localhost/api/leave/request", {
+    return trustedNextRequest("http://localhost/api/leave/request", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

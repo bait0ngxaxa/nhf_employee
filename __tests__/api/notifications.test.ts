@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET as getAllNotifications } from "@/app/api/notifications/all/route";
@@ -12,6 +11,7 @@ import {
     markAllReadForUser,
     markReadForUser,
 } from "@/modules/notification";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const notificationMocks = vi.hoisted(() => ({
     createForUserOnce: vi.fn(),
@@ -106,7 +106,7 @@ describe("Notification API Routes", () => {
     describe("GET /api/notifications", () => {
         it("returns unauthorized if no session exists", async () => {
             mockGetApiAuthSession.mockResolvedValue(null);
-            const req = new NextRequest("http://localhost/api/notifications");
+            const req = trustedNextRequest("http://localhost/api/notifications");
 
             const res = await getNotifications(req);
 
@@ -119,7 +119,7 @@ describe("Notification API Routes", () => {
             mockGetApiAuthSession.mockResolvedValue({
                 user: { ...mockUser, id: "not-a-number" },
             } as never);
-            const req = new NextRequest("http://localhost/api/notifications");
+            const req = trustedNextRequest("http://localhost/api/notifications");
 
             const res = await getNotifications(req);
 
@@ -135,7 +135,7 @@ describe("Notification API Routes", () => {
             ];
             mockListLatestForUser.mockResolvedValue({ notifications, unreadCount: 1 } as never);
 
-            const req = new NextRequest(
+            const req = trustedNextRequest(
                 "http://localhost/api/notifications?userId=2",
             );
             const res = await getNotifications(req);
@@ -172,7 +172,7 @@ describe("Notification API Routes", () => {
                 ),
             );
 
-            const req = new NextRequest("http://localhost/api/notifications");
+            const req = trustedNextRequest("http://localhost/api/notifications");
             const res = await getNotifications(req);
 
             expect(res.status).toBe(403);
@@ -185,7 +185,7 @@ describe("Notification API Routes", () => {
             const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
             try {
-                const req = new NextRequest("http://localhost/api/notifications");
+                const req = trustedNextRequest("http://localhost/api/notifications");
                 const res = await getNotifications(req);
 
                 expect(res.status).toBe(500);
@@ -208,7 +208,7 @@ describe("Notification API Routes", () => {
             };
             mockListHistoryForUser.mockResolvedValue(result as never);
 
-            const req = new NextRequest(
+            const req = trustedNextRequest(
                 "http://localhost/api/notifications/all?filter=all",
             );
             const res = await getAllNotifications(req);
@@ -240,7 +240,7 @@ describe("Notification API Routes", () => {
             };
             mockListHistoryForUser.mockResolvedValue(result as never);
 
-            const req = new NextRequest(
+            const req = trustedNextRequest(
                 `http://localhost/api/notifications/all?filter=all&cursor=${encodeURIComponent(compositeCursor)}`,
             );
             const res = await getAllNotifications(req);
@@ -265,7 +265,7 @@ describe("Notification API Routes", () => {
             };
             mockListHistoryForUser.mockResolvedValue(result as never);
 
-            const req = new NextRequest(
+            const req = trustedNextRequest(
                 `http://localhost/api/notifications/all?filter=unread&cursor=${legacyCursor}`,
             );
             const res = await getAllNotifications(req);
@@ -286,7 +286,7 @@ describe("Notification API Routes", () => {
             const notification = { id: "notif-123", isRead: true };
             mockMarkReadForUser.mockResolvedValue(notification as never);
             const params = Promise.resolve({ id: "notif-123" });
-            const req = new NextRequest("http://localhost/api/notifications/notif-123/read", {
+            const req = trustedNextRequest("http://localhost/api/notifications/notif-123/read", {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ userId: 2 }),
@@ -317,7 +317,7 @@ describe("Notification API Routes", () => {
             );
 
             const res = await markAsRead(
-                new NextRequest("http://localhost/api/notifications/notif-123/read", {
+                trustedNextRequest("http://localhost/api/notifications/notif-123/read", {
                     method: "PATCH",
                 }),
                 { params: Promise.resolve({ id: "notif-123" }) },
@@ -330,7 +330,7 @@ describe("Notification API Routes", () => {
         it("returns unauthorized for patch without a session", async () => {
             mockGetApiAuthSession.mockResolvedValue(null);
             const params = Promise.resolve({ id: "123" });
-            const req = new NextRequest("http://localhost/api/notifications/123/read", {
+            const req = trustedNextRequest("http://localhost/api/notifications/123/read", {
                 method: "PATCH",
             });
 
@@ -345,7 +345,7 @@ describe("Notification API Routes", () => {
             const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
             try {
-                const req = new NextRequest("http://localhost/api/notifications/123/read", {
+                const req = trustedNextRequest("http://localhost/api/notifications/123/read", {
                     method: "PATCH",
                 });
                 const res = await markAsRead(req, { params: Promise.resolve({ id: "123" }) });
@@ -361,7 +361,7 @@ describe("Notification API Routes", () => {
         it("returns the count from the user-scoped mark-all command", async () => {
             mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
             mockMarkAllReadForUser.mockResolvedValue(5);
-            const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {
+            const req = trustedNextRequest("http://localhost/api/notifications/mark-all-read", {
                 method: "POST",
             });
 
@@ -378,7 +378,7 @@ describe("Notification API Routes", () => {
         it("keeps zero unread rows as a successful result", async () => {
             mockGetApiAuthSession.mockResolvedValue({ user: mockUser } as never);
             mockMarkAllReadForUser.mockResolvedValue(0);
-            const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {
+            const req = trustedNextRequest("http://localhost/api/notifications/mark-all-read", {
                 method: "POST",
             });
 
@@ -394,7 +394,7 @@ describe("Notification API Routes", () => {
             const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
             try {
-                const req = new NextRequest("http://localhost/api/notifications/mark-all-read", {
+                const req = trustedNextRequest("http://localhost/api/notifications/mark-all-read", {
                     method: "POST",
                 });
                 const res = await markAllAsRead(req);

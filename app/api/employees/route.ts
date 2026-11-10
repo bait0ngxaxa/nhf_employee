@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, NextResponse } from "next/server";
 import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 // NOTE: normalized to remove mojibake
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const auth = await requireApiSession({
             unauthorizedResponse: () => operationFailed(403),
@@ -145,4 +146,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         console.error("Error creating employee:", error);
         return operationFailed(500);
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

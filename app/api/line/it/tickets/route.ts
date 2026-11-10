@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import {
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     const preAuthLimit = enforcePreAuthIpRateLimit(request, "it-ticket-create");
     if (preAuthLimit) return preAuthLimit;
 
@@ -97,4 +98,4 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         logITTicketRouteFailure("Error creating LIFF IT Ticket", error);
         return operationFailed(500, { success: false });
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
 
 const mocks = vi.hoisted(() => ({
@@ -34,6 +34,7 @@ import {
     ITTicketMutationConflictError,
     ITTicketPriorityTerminalError,
 } from "@/modules/it";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const user = { id: 51, role: "USER", email: "operator@example.test", name: "Operator" };
 const context = {
@@ -65,7 +66,7 @@ const ticket = {
 };
 
 function request(body: unknown): NextRequest {
-    return new NextRequest("http://localhost/api/it/operator/tickets/19/priority", {
+    return trustedNextRequest("http://localhost/api/it/operator/tickets/19/priority", {
         method: "PATCH",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },

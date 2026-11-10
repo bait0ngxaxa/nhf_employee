@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 
 import { POST as forgotPasswordRoute } from "@/app/api/auth/forgot-password/route";
@@ -15,6 +15,7 @@ import {
     CONTENT_LENGTH_MODES,
     jsonBodyOfExactBytes,
 } from "@/__tests__/helpers/request-body-limit";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const { requestPasswordResetMock, sendEmailMock, afterCallbacks } = vi.hoisted(() => ({
     requestPasswordResetMock: vi.fn(),
@@ -55,7 +56,7 @@ vi.mock("@/lib/auth/rate-limit", async (importOriginal) => {
 });
 
 function buildRequest(body: unknown, ipAddress = "203.0.113.50"): NextRequest {
-    return new NextRequest("http://localhost/api/auth/forgot-password", {
+    return trustedNextRequest("http://localhost/api/auth/forgot-password", {
         method: "POST",
         headers: {
             "content-type": "application/json",
@@ -174,7 +175,7 @@ describe("forgot-password route", () => {
     };
 
     function buildSpoofedRequest(): NextRequest {
-        return new NextRequest("http://localhost/api/auth/forgot-password", {
+        return trustedNextRequest("http://localhost/api/auth/forgot-password", {
             method: "POST",
             headers: {
                 "content-type": "application/json",

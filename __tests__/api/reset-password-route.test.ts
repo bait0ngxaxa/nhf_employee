@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 
 import { POST as resetPasswordRoute } from "@/app/api/auth/reset-password/route";
 import {
@@ -12,6 +12,7 @@ import {
     CONTENT_LENGTH_MODES,
     jsonBodyOfExactBytes,
 } from "@/__tests__/helpers/request-body-limit";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const { appendAuditBestEffortMock, hashPasswordMock, prismaMock } = vi.hoisted(() => ({
     appendAuditBestEffortMock: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock("@/modules/audit", () => ({
 }));
 
 function buildRequest(password = "StrongPass1"): NextRequest {
-    return new NextRequest("http://localhost/api/auth/reset-password", {
+    return trustedNextRequest("http://localhost/api/auth/reset-password", {
         method: "POST",
         headers: {
             "content-type": "application/json",

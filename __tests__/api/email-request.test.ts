@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
 
@@ -19,6 +19,7 @@ import {
     CONTENT_LENGTH_MODES,
     jsonBodyOfExactBytes,
 } from "@/__tests__/helpers/request-body-limit";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const authorizationMocks = vi.hoisted(() => ({
     assertEmailRequestCapability: vi.fn(),
@@ -154,11 +155,11 @@ describe("/api/email-request", () => {
             response: NextResponse.json({ success: false }, { status: 401 }),
         } as never);
 
-        const postResponse = await POST(new NextRequest(
+        const postResponse = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             { method: "POST", body: JSON.stringify(VALID_BODY) },
         ));
-        const getResponse = await GET(new NextRequest(
+        const getResponse = await GET(trustedNextRequest(
             "http://localhost/api/email-request",
         ));
 
@@ -169,7 +170,7 @@ describe("/api/email-request", () => {
     });
 
     it("rejects a missing Idempotency-Key before creating a request", async () => {
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             { method: "POST", body: JSON.stringify(VALID_BODY) },
         ));
@@ -182,7 +183,7 @@ describe("/api/email-request", () => {
     });
 
     it("rejects an invalid Idempotency-Key with 400 before creating a request", async () => {
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             {
                 method: "POST",
@@ -202,7 +203,7 @@ describe("/api/email-request", () => {
             emailRequest: EXISTING_EMAIL_REQUEST,
         } as never);
 
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             {
                 method: "POST",
@@ -275,7 +276,7 @@ describe("/api/email-request", () => {
             emailRequest: { ...EXISTING_EMAIL_REQUEST, requestedBy: configuredUser.id },
         } as never);
 
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             {
                 method: "POST",
@@ -318,7 +319,7 @@ describe("/api/email-request", () => {
             ),
         );
 
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             {
                 method: "POST",
@@ -339,7 +340,7 @@ describe("/api/email-request", () => {
             ),
         );
 
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             { method: "POST", body: JSON.stringify(VALID_BODY) },
         ));
@@ -357,7 +358,7 @@ describe("/api/email-request", () => {
             emailRequest: EXISTING_EMAIL_REQUEST,
         } as never);
 
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             {
                 method: "POST",
@@ -388,7 +389,7 @@ describe("/api/email-request", () => {
             new EmailRequestIdempotencyConflictError(),
         );
 
-        const response = await POST(new NextRequest(
+        const response = await POST(trustedNextRequest(
             "http://localhost/api/email-request",
             {
                 method: "POST",
@@ -410,7 +411,7 @@ describe("/api/email-request", () => {
         "?limit=0",
         "?limit=101",
     ])("rejects malformed pagination %s before querying", async (query) => {
-        const response = await GET(new NextRequest(
+        const response = await GET(trustedNextRequest(
             `http://localhost/api/email-request${query}`,
         ));
 
@@ -427,7 +428,7 @@ describe("/api/email-request", () => {
             pagination: { page: 2, limit: 100, total: 101, totalPages: 2 },
         });
 
-        const response = await GET(new NextRequest(
+        const response = await GET(trustedNextRequest(
             "http://localhost/api/email-request?page=2&limit=100",
         ));
 
@@ -458,7 +459,7 @@ describe("/api/email-request", () => {
             ),
         );
 
-        const response = await GET(new NextRequest(
+        const response = await GET(trustedNextRequest(
             "http://localhost/api/email-request",
         ));
 
@@ -473,7 +474,7 @@ describe("/api/email-request", () => {
     ])("projects row editing for another request: $own/$all", async ({ own, all, expected }) => {
         authorizationMocks.getEmailRequestPresentationCapabilities.mockResolvedValue({ canReadRequests: true, canCreateRequests: false, canUpdateOwnRequests: own, canUpdateAllRequests: all });
         emailRequestService.getEmailRequests.mockResolvedValue({ emailRequests: [{ ...EXISTING_EMAIL_REQUEST, requestedBy: 99 }], pagination: { page: 1, limit: 10, total: 1, totalPages: 1 } });
-        const response = await GET(new NextRequest("http://localhost/api/email-request"));
+        const response = await GET(trustedNextRequest("http://localhost/api/email-request"));
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({ emailRequests: [{ canUpdateAccessRequirements: expected }] });
     });

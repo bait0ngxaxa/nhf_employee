@@ -1,4 +1,4 @@
-import { after, NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
 
@@ -38,6 +38,7 @@ import {
     CONTENT_LENGTH_MODES,
     jsonBodyOfExactBytes,
 } from "@/__tests__/helpers/request-body-limit";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 vi.mock("next/server", async (importOriginal) => {
     const actual = await importOriginal<typeof NextServerModule>();
@@ -113,6 +114,13 @@ function employeeParams(id: string): { params: Promise<{ id: string }> } {
     return { params: Promise.resolve({ id }) };
 }
 
+/** A trusted browser mutation whose body reader is a spy that must stay unused. */
+function trustedBodySpyRequest(json: () => Promise<unknown>): NextRequest {
+    const request = trustedNextRequest("http://localhost/api/employees", { method: "POST" });
+    Object.defineProperty(request, "json", { value: json });
+    return request;
+}
+
 function denyEmployeeCapability(capability: string): void {
     vi.mocked(assertEmployeeCapability).mockRejectedValue(
         new EmployeeCapabilityDeniedError(capability, "CHANNEL_NOT_SUPPORTED"),
@@ -156,7 +164,7 @@ describe("Employee mutation routes", () => {
             pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
         });
 
-        const response = await listEmployeesRoute(new NextRequest(
+        const response = await listEmployeesRoute(trustedNextRequest(
             "http://localhost/api/employees?search=Somchai",
         ));
 
@@ -184,7 +192,7 @@ describe("Employee mutation routes", () => {
             pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
         });
 
-        const response = await listEmployeesRoute(new NextRequest(
+        const response = await listEmployeesRoute(trustedNextRequest(
             "http://localhost/api/employees?search=Somchai&userId=999&employeeId=999&role=ADMIN&systemRole=ADMIN&isAdmin=true&capability=employee.delete&scope=ALL&channel=LIFF_SELF_SERVICE",
         ));
 
@@ -239,7 +247,7 @@ describe("Employee mutation routes", () => {
         " 12 ",
         "9007199254740992",
     ])("PATCH rejects invalid employee ID %j", async (id) => {
-        const response = await PATCH(new NextRequest(
+        const response = await PATCH(trustedNextRequest(
             `http://localhost/api/employees/${encodeURIComponent(id)}`,
             { method: "PATCH", body: JSON.stringify({ firstName: "New" }) },
         ), employeeParams(id));
@@ -259,7 +267,7 @@ describe("Employee mutation routes", () => {
         " 12 ",
         "9007199254740992",
     ])("DELETE rejects invalid employee ID %j", async (id) => {
-        const response = await DELETE(new NextRequest(
+        const response = await DELETE(trustedNextRequest(
             `http://localhost/api/employees/${encodeURIComponent(id)}`,
             { method: "DELETE" },
         ), employeeParams(id));
@@ -278,7 +286,7 @@ describe("Employee mutation routes", () => {
             },
         } as never);
 
-        const response = await PATCH(new NextRequest(
+        const response = await PATCH(trustedNextRequest(
             "http://localhost/api/employees/12",
             {
                 method: "PATCH",
@@ -345,7 +353,7 @@ describe("Employee mutation routes", () => {
             beforeData: { hireDate: previousHireDate },
         } as never);
 
-        const response = await PATCH(new NextRequest(
+        const response = await PATCH(trustedNextRequest(
             "http://localhost/api/employees/12",
             {
                 method: "PATCH",
@@ -383,7 +391,7 @@ describe("Employee mutation routes", () => {
             },
         } as never);
 
-        const response = await createEmployeeRoute(new NextRequest(
+        const response = await createEmployeeRoute(trustedNextRequest(
             "http://localhost/api/employees",
             {
                 method: "POST",
@@ -420,7 +428,7 @@ describe("Employee mutation routes", () => {
             auditRecorded: true,
         });
 
-        const response = await DELETE(new NextRequest(
+        const response = await DELETE(trustedNextRequest(
             "http://localhost/api/employees/12",
             { method: "DELETE" },
         ), employeeParams("12"));
@@ -453,7 +461,7 @@ describe("Employee mutation routes", () => {
             auditRecorded: false,
         });
 
-        const response = await DELETE(new NextRequest(
+        const response = await DELETE(trustedNextRequest(
             "http://localhost/api/employees/12",
             {
                 method: "DELETE",
@@ -488,7 +496,7 @@ describe("Employee mutation routes", () => {
         });
         const json = vi.fn().mockRejectedValue(new Error("body must not be read"));
 
-        const response = await route({ json } as unknown as NextRequest);
+        const response = await route(trustedBodySpyRequest(json));
 
         expect(response.status).toBe(403);
         expect(json).not.toHaveBeenCalled();
@@ -507,7 +515,7 @@ describe("Employee mutation routes", () => {
             employee: { id: 12 },
         } as never);
 
-        const response = await PATCH(new NextRequest(
+        const response = await PATCH(trustedNextRequest(
             "http://localhost/api/employees/12",
             { method: "PATCH", body: JSON.stringify({ firstName: "Granted" }) },
         ), employeeParams("12"));
@@ -541,7 +549,7 @@ describe("Employee mutation routes", () => {
         denyEmployeeCapability("employee.create");
         const json = vi.fn().mockRejectedValue(new Error("body must not be read"));
 
-        const response = await createEmployeeRoute({ json } as unknown as NextRequest);
+        const response = await createEmployeeRoute(trustedBodySpyRequest(json));
 
         expect(response.status).toBe(403);
         expect(json).not.toHaveBeenCalled();
@@ -559,7 +567,7 @@ describe("Employee mutation routes", () => {
         denyEmployeeCapability("employee.import");
         const json = vi.fn().mockRejectedValue(new Error("body must not be read"));
 
-        const response = await importEmployeesRoute({ json } as unknown as NextRequest);
+        const response = await importEmployeesRoute(trustedBodySpyRequest(json));
 
         expect(response.status).toBe(403);
         expect(json).not.toHaveBeenCalled();
@@ -575,7 +583,7 @@ describe("Employee mutation routes", () => {
         });
         denyEmployeeCapability("employee.update");
 
-        const response = await PATCH(new NextRequest(
+        const response = await PATCH(trustedNextRequest(
             "http://localhost/api/employees/12",
             { method: "PATCH", body: JSON.stringify({ firstName: "Denied" }) },
         ), employeeParams("12"));
@@ -594,7 +602,7 @@ describe("Employee mutation routes", () => {
         });
         denyEmployeeCapability("employee.delete");
 
-        const response = await DELETE(new NextRequest(
+        const response = await DELETE(trustedNextRequest(
             "http://localhost/api/employees/12",
             { method: "DELETE" },
         ), employeeParams("12"));
@@ -612,7 +620,7 @@ describe("Employee mutation routes", () => {
         });
         const employees = Array.from({ length: 1000 }, () => ({}));
 
-        const response = await importEmployeesRoute(new NextRequest(
+        const response = await importEmployeesRoute(trustedNextRequest(
             "http://localhost/api/employees/import",
             { method: "POST", body: JSON.stringify({ employees }) },
         ));
@@ -624,7 +632,7 @@ describe("Employee mutation routes", () => {
     it("rejects 1001 import rows before entering the import service", async () => {
         const employees = Array.from({ length: 1001 }, () => ({}));
 
-        const response = await importEmployeesRoute(new NextRequest(
+        const response = await importEmployeesRoute(trustedNextRequest(
             "http://localhost/api/employees/import",
             { method: "POST", body: JSON.stringify({ employees }) },
         ));

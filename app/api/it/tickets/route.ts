@@ -1,3 +1,4 @@
+import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -20,7 +21,7 @@ import {
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
 import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export const POST = withTrustedMutation(async (request: NextRequest): Promise<NextResponse> => {
     try {
         const auth = await requireApiSession({
             unauthorizedResponse: () => unauthorized({ success: false }),
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         logITTicketRouteFailure("Error creating IT Ticket", error);
         return operationFailed(500, { success: false });
     }
-}
+}, TRUSTED_MUTATION_ROLLOUT);
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     try {

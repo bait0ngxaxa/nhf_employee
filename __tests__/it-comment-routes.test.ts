@@ -37,6 +37,7 @@ import {
     ITTicketAttachmentValidationError,
     ITTicketNotCommentableError,
 } from "@/modules/it";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const user = { id: 41, role: "USER", email: "staff@example.test", name: "Staff" };
 const actorContext = {
@@ -66,7 +67,7 @@ function jsonRequest(
     const headers = new Headers();
     if (idempotencyKey !== null) headers.set("Idempotency-Key", idempotencyKey);
     if (contentType !== null) headers.set("Content-Type", contentType);
-    return new NextRequest(`http://localhost/api/it/${operator ? "operator/" : ""}tickets/19/comments`, {
+    return trustedNextRequest(`http://localhost/api/it/${operator ? "operator/" : ""}tickets/19/comments`, {
         method: "POST",
         headers,
         body: new TextEncoder().encode(JSON.stringify(body)),
@@ -82,7 +83,7 @@ function multipartRequest(
     for (const [key, value] of entries) form.append(key, value);
     const headers = new Headers();
     if (idempotencyKey !== null) headers.set("Idempotency-Key", idempotencyKey);
-    return new NextRequest(
+    return trustedNextRequest(
         `http://localhost/api/it/${operator ? "operator/" : ""}tickets/19/comments`,
         { method: "POST", headers, body: form },
     );
@@ -198,7 +199,7 @@ describe.each([
     });
 
     it("rejects malformed multipart, missing body, duplicate body, and authority fields", async () => {
-        const malformedMultipart = new NextRequest(
+        const malformedMultipart = trustedNextRequest(
             "http://localhost/api/it/tickets/19/comments",
             {
                 method: "POST",
@@ -225,7 +226,7 @@ describe.each([
     });
 
     it("rejects unsupported media types, excessive declared/streamed envelopes, and missing keys", async () => {
-        const unsupported = new NextRequest("http://localhost/api/it/tickets/19/comments", {
+        const unsupported = trustedNextRequest("http://localhost/api/it/tickets/19/comments", {
             method: "POST",
             headers: { "Content-Type": "text/plain", "Idempotency-Key": "comment-key" },
             body: "text",
@@ -233,7 +234,7 @@ describe.each([
         expect((await post()(unsupported, { params: Promise.resolve({ ticketId: "19" }) })).status)
             .toBe(415);
 
-        const oversizedHeader = new NextRequest("http://localhost/api/it/tickets/19/comments", {
+        const oversizedHeader = trustedNextRequest("http://localhost/api/it/tickets/19/comments", {
             method: "POST",
             headers: {
                 "Content-Type": "multipart/form-data; boundary=boundary",
@@ -245,7 +246,7 @@ describe.each([
         expect((await post()(oversizedHeader, { params: Promise.resolve({ ticketId: "19" }) })).status)
             .toBe(413);
 
-        const oversizedStream = new NextRequest("http://localhost/api/it/tickets/19/comments", {
+        const oversizedStream = trustedNextRequest("http://localhost/api/it/tickets/19/comments", {
             method: "POST",
             headers: {
                 "Content-Type": "multipart/form-data; boundary=boundary",

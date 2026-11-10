@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
 
 const mocks = vi.hoisted(() => ({
@@ -52,6 +52,7 @@ import {
     ITTicketQueueCursorStaleError,
     ITWorkforceDeniedError,
 } from "@/modules/it";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const user = { id: 41, role: "USER", email: "staff@example.test", name: "Staff" };
 const actorContext = {
@@ -80,7 +81,7 @@ function authenticated(): void {
 }
 
 function patchRequest(url: string, body: unknown): NextRequest {
-    return new NextRequest(url, {
+    return trustedNextRequest(url, {
         method: "PATCH",
         body: JSON.stringify(body),
         headers: { "Content-Type": "application/json" },
@@ -109,13 +110,13 @@ describe("IT operator API adapters", () => {
             response: NextResponse.json({ success: false }, { status: 401 }),
         });
 
-        const queue = await getOperatorQueue(new NextRequest("http://localhost/api/it/operator/tickets"));
+        const queue = await getOperatorQueue(trustedNextRequest("http://localhost/api/it/operator/tickets"));
         const detail = await getOperatorTicket(
-            new NextRequest("http://localhost/api/it/operator/tickets/19"),
+            trustedNextRequest("http://localhost/api/it/operator/tickets/19"),
             ticketParams("19"),
         );
         const reference = await getOperatorReference(
-            new NextRequest("http://localhost/api/it/operator/reference"),
+            trustedNextRequest("http://localhost/api/it/operator/reference"),
         );
         const mutation = await patchAssignee(
             patchRequest("http://localhost/api/it/operator/tickets/19/assignee", {
@@ -143,14 +144,14 @@ describe("IT operator API adapters", () => {
             "NO_APPLICABLE_GRANT",
         ));
         const queueDenied = await getOperatorQueue(
-            new NextRequest("http://localhost/api/it/operator/tickets"),
+            trustedNextRequest("http://localhost/api/it/operator/tickets"),
         );
         const detailDenied = await getOperatorTicket(
-            new NextRequest("http://localhost/api/it/operator/tickets/19"),
+            trustedNextRequest("http://localhost/api/it/operator/tickets/19"),
             ticketParams("19"),
         );
         const invalidId = await getOperatorTicket(
-            new NextRequest("http://localhost/api/it/operator/tickets/019"),
+            trustedNextRequest("http://localhost/api/it/operator/tickets/019"),
             ticketParams("019"),
         );
 
@@ -161,7 +162,7 @@ describe("IT operator API adapters", () => {
     });
 
     it("propagates only filters and never uses a caller scope as authority", async () => {
-        await getOperatorQueue(new NextRequest(
+        await getOperatorQueue(trustedNextRequest(
             "http://localhost/api/it/operator/tickets?status=OPEN&scope=all",
         ));
 
@@ -178,7 +179,7 @@ describe("IT operator API adapters", () => {
         ));
 
         const response = await getOperatorReference(
-            new NextRequest("http://localhost/api/it/operator/reference"),
+            trustedNextRequest("http://localhost/api/it/operator/reference"),
         );
 
         expect(response.status).toBe(403);
@@ -186,7 +187,7 @@ describe("IT operator API adapters", () => {
 
     it("maps a stale queue cursor to an explicit 409 outcome and a malformed cursor to 400", async () => {
         mocks.listTickets.mockRejectedValueOnce(new ITTicketQueueCursorStaleError());
-        const stale = await getOperatorQueue(new NextRequest(
+        const stale = await getOperatorQueue(trustedNextRequest(
             "http://localhost/api/it/operator/tickets?status=ACTIVE&cursor=abc",
         ));
         expect(stale.status).toBe(409);
@@ -197,7 +198,7 @@ describe("IT operator API adapters", () => {
         });
 
         mocks.listTickets.mockRejectedValueOnce(new ITTicketInputValidationError());
-        const malformed = await getOperatorQueue(new NextRequest(
+        const malformed = await getOperatorQueue(trustedNextRequest(
             "http://localhost/api/it/operator/tickets?cursor=not-valid",
         ));
         expect(malformed.status).toBe(400);
@@ -207,7 +208,7 @@ describe("IT operator API adapters", () => {
         mocks.listTickets.mockRejectedValueOnce(new Error("database-secret-detail"));
 
         const response = await getOperatorQueue(
-            new NextRequest("http://localhost/api/it/operator/tickets"),
+            trustedNextRequest("http://localhost/api/it/operator/tickets"),
         );
         const payload: unknown = await response.json();
 
@@ -461,7 +462,7 @@ describe("IT operator API adapters", () => {
         );
         mocks.getTicket.mockRejectedValueOnce(new ITTicketNotFoundError());
         const missingTicket = await getOperatorTicket(
-            new NextRequest("http://localhost/api/it/operator/tickets/404"),
+            trustedNextRequest("http://localhost/api/it/operator/tickets/404"),
             ticketParams("404"),
         );
 

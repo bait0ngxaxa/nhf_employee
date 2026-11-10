@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { POST as resetPasswordRoute } from "@/app/api/auth/reset-password/route";
@@ -23,7 +24,7 @@ function hashToken(token: string): string {
 }
 
 function buildRequest(token: string, password: string): NextRequest {
-    return new NextRequest("http://localhost/api/auth/reset-password", {
+    return trustedNextRequest("http://localhost/api/auth/reset-password", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

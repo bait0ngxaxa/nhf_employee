@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import type * as NextServerModule from "next/server";
 import type * as AuthorizationModule from "@/modules/authorization";
 import type * as StockModule from "@/modules/stock";
@@ -273,6 +273,7 @@ import { POST as cancelLiffLeaveRequest } from "@/app/api/line/leave/cancel/rout
 import { POST as decideLiffLeaveRequest } from "@/app/api/line/leave/decision/route";
 import { POST as requestLiffLeaveNotTaken } from "@/app/api/line/leave/not-taken/route";
 import { PUT as confirmLiffLeaveNotTaken } from "@/app/api/line/leave/not-taken/route";
+import { trustedNextRequest } from "@/__tests__/helpers/trusted-mutation";
 
 const USER = {
     id: 7,
@@ -390,7 +391,7 @@ function request(
     path: string,
     init?: ConstructorParameters<typeof NextRequest>[1],
 ): NextRequest {
-    return new NextRequest(`http://localhost${path}`, init);
+    return trustedNextRequest(`http://localhost${path}`, init);
 }
 
 async function expectDirectConfigurationBoundary(
