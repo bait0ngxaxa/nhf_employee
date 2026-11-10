@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as NextServerModule from "next/server";
 
 import { POST as forgotPasswordRoute } from "@/app/api/auth/forgot-password/route";
 import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
@@ -12,7 +13,7 @@ const { requestPasswordResetMock, sendEmailMock, afterCallbacks } = vi.hoisted((
 }));
 
 vi.mock("next/server", async (importOriginal) => {
-    const actual = await importOriginal<typeof import("next/server")>();
+    const actual = await importOriginal<typeof NextServerModule>();
     return {
         ...actual,
         // Capture deferred work instead of running it, so tests can prove that
