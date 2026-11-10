@@ -3032,16 +3032,29 @@ function getBoundaryViolation(owner, target) {
 // must be bounded. Route handlers read bodies only through
 // lib/server/request-body.ts (or helpers built on it, such as
 // lib/server/route-json-body.ts) with a limit from lib/ssot/request-limits.ts.
+// The rule covers app/api plus the places route helpers live: module
+// presentation layers (modules/**/presentation/**) and lib/server/**. Tests are
+// excluded. Reads on a locally constructed Request (e.g. lib/server/request-body.ts
+// readBoundedFormData and modules/it/presentation/http/ticket-create-request.ts
+// re-parsing already-bounded bytes) are not reads of the incoming request and are
+// not flagged, so they need no exemption.
 const rawRequestBodyMethods = new Set(["json", "text", "formData", "arrayBuffer", "blob"]);
 const rawRequestBodyIdentifiers = new Set(["request", "req"]);
 const rawRequestBodyTypeNames = new Set(["Request", "NextRequest"]);
-/** Each exemption must state why the route cannot use the bounded reader. */
+/** Each exemption must state why the file cannot use the bounded reader. */
 const rawRequestBodyExemptions = new Map([
     [
         "app/api/line/webhook/route.ts",
         "LINE signature verification must run over the exact raw body bytes; reading through the bounded UTF-8 decoder could change those bytes.",
     ],
 ]);
+
+function isRawRequestBodyScope(filePath, rootPath) {
+    const repositoryPath = relativeFilePath(filePath, rootPath);
+    return pathIsWithin(filePath, resolve(rootPath, "app/api"))
+        || pathIsWithin(filePath, resolve(rootPath, "lib/server"))
+        || /^modules\/(?:[^/]+\/)+presentation\//.test(repositoryPath);
+}
 
 function getRequestTypedParameterNames(sourceFile) {
     const names = new Set(rawRequestBodyIdentifiers);
@@ -3110,18 +3123,21 @@ function getRawRequestBodyReads(filePath) {
     return reads;
 }
 
-function getRawRequestBodyReadViolations(rootPath, sourceFiles) {
-    const apiRoot = resolve(rootPath, "app/api");
+function getRawRequestBodyReadViolations(
+    rootPath,
+    sourceFiles,
+    exemptions = rawRequestBodyExemptions,
+) {
     const violations = [];
     const exemptFilesWithReads = new Set();
 
     for (const filePath of sourceFiles) {
-        if (!pathIsWithin(filePath, apiRoot) || isTestSource(filePath, rootPath)) continue;
+        if (!isRawRequestBodyScope(filePath, rootPath) || isTestSource(filePath, rootPath)) continue;
         const reads = getRawRequestBodyReads(filePath);
         if (reads.length === 0) continue;
 
         const repositoryPath = relativeFilePath(filePath, rootPath);
-        if (rawRequestBodyExemptions.has(repositoryPath)) {
+        if (exemptions.has(repositoryPath)) {
             exemptFilesWithReads.add(repositoryPath);
             continue;
         }
@@ -3136,7 +3152,7 @@ function getRawRequestBodyReadViolations(rootPath, sourceFiles) {
         }
     }
 
-    for (const exemptPath of rawRequestBodyExemptions.keys()) {
+    for (const exemptPath of exemptions.keys()) {
         if (
             sourceFiles.includes(resolve(rootPath, exemptPath))
             && !exemptFilesWithReads.has(exemptPath)
@@ -3948,7 +3964,12 @@ function checkArchitecture(options = {}) {
     }
 
     violations.push(...getCapabilityRecipientRoleViolations(rootPath, sourceFiles));
-    violations.push(...getRawRequestBodyReadViolations(rootPath, sourceFiles));
+    violations.push(...getRawRequestBodyReadViolations(
+        rootPath,
+        sourceFiles,
+        // Test-only override; the repository check always uses the map above.
+        options.rawRequestBodyExemptions ?? rawRequestBodyExemptions,
+    ));
     violations.push(...getTrustedMutationViolations(rootPath, sourceFiles));
     violations.push(...getEmailRequestCompositionViolations(rootPath, sourceFiles));
     const emailRequestOutboxProcessorViolation =

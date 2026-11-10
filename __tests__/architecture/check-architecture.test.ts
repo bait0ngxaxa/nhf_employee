@@ -2513,9 +2513,10 @@ describe("architecture checker raw request body reads", () => {
         filePath: string,
         source: string,
         extraFiles: FixtureFiles = {},
+        rawRequestBodyExemptions?: ReadonlyMap<string, string>,
     ): Promise<string[]> {
         const rootPath = await createFixture({ ...fixtureFiles, ...extraFiles, [filePath]: source });
-        return checkArchitecture({ repositoryRoot: rootPath }).violations
+        return checkArchitecture({ repositoryRoot: rootPath, rawRequestBodyExemptions }).violations
             .filter((violation) => violation.includes("request body") || violation.includes("rawRequestBodyExemptions"));
     }
 
@@ -2581,18 +2582,75 @@ describe("architecture checker raw request body reads", () => {
         expect(violations).toEqual([]);
     });
 
-    it("ignores files outside app/api and test sources", async () => {
-        const outside = await rawBodyViolations(
-            "lib/server/example.ts",
-            "export async function read(request: Request) { return request.json(); }\n",
+    it("ignores files outside the scanned scopes and test sources", async () => {
+        const rawRead = "export async function read(request: Request) { return request.json(); }\n";
+        const outside = await rawBodyViolations("modules/x/application/example.ts", rawRead);
+        const apiTest = await rawBodyViolations("app/api/example/route.test.ts", rawRead);
+        const presentationTest = await rawBodyViolations(
+            "modules/x/presentation/http/__tests__/body.test.ts",
+            rawRead,
         );
-        const testSource = await rawBodyViolations(
-            "app/api/example/route.test.ts",
-            "export async function read(request: Request) { return request.json(); }\n",
-        );
+        const libServerTest = await rawBodyViolations("lib/server/example.test.ts", rawRead);
 
         expect(outside).toEqual([]);
-        expect(testSource).toEqual([]);
+        expect(apiTest).toEqual([]);
+        expect(presentationTest).toEqual([]);
+        expect(libServerTest).toEqual([]);
+    });
+
+    it.each([
+        "modules/x/presentation/http/body.ts",
+        "modules/x/presentation/nested/deeper/body.ts",
+        "lib/server/example.ts",
+    ])("rejects a raw request body read in the helper scope %s", async (helperPath) => {
+        const violations = await rawBodyViolations(
+            helperPath,
+            "export async function readBody(request: Request) {\n    return request.json();\n}\n",
+        );
+
+        expect(violations).toEqual([
+            expect.stringContaining(`${helperPath}:2 reads the request body with request.json() directly`),
+        ]);
+    });
+
+    it("does not flag re-parsing a locally constructed Request built from bounded bytes", async () => {
+        const violations = await rawBodyViolations(
+            "modules/x/presentation/http/form.ts",
+            [
+                "export async function parse(request: Request, bytes: Uint8Array) {",
+                '    const boundedRequest = new Request(request.url, { method: "POST", body: bytes });',
+                "    return boundedRequest.formData();",
+                "}",
+                "",
+            ].join("\n"),
+        );
+
+        expect(violations).toEqual([]);
+    });
+
+    it("allows an exempted presentation helper and flags its exemption once it is stale", async () => {
+        const helperPath = "modules/x/presentation/http/raw.ts";
+        const exemptions = new Map([[helperPath, "Fixture reason."]]);
+
+        const exempted = await rawBodyViolations(
+            helperPath,
+            "export async function read(request: Request) { return request.text(); }\n",
+            {},
+            exemptions,
+        );
+        const stale = await rawBodyViolations(
+            helperPath,
+            'export async function read() { return ""; }\n',
+            {},
+            exemptions,
+        );
+
+        expect(exempted).toEqual([]);
+        expect(stale).toEqual([
+            expect.stringContaining(
+                `${helperPath} is listed in rawRequestBodyExemptions but no longer reads the request body directly`,
+            ),
+        ]);
     });
 
     it("allows an exempted raw-body route and flags the exemption once it is stale", async () => {
