@@ -50,9 +50,27 @@ business authorization ในชั้นแอปพลิเคชันตา
 > จาก request ที่ Cloudflare edge ส่งผ่าน `cloudflared` โดยตรง ความถูกต้องของ
 > trust boundary นี้จึงขึ้นกับเงื่อนไขว่า (1) port 3000 รับได้เฉพาะ loopback และ
 > (2) process เดียวที่ส่ง traffic จาก Internet เข้า port 3000 คือ `cloudflared`
-> ผู้ดูแลต้องยืนยันพฤติกรรมของ Cloudflare ต่อ `CF-Connecting-IP` ที่ client ส่งมา
-> เองกับเอกสาร Cloudflare ก่อนพึ่งค่านี้เป็น security control และต้องทบทวนใหม่
-> หากเปลี่ยน topology
+>
+> **ผลการยืนยัน (บันทึกเมื่อ 2026-11-09):** owner ส่ง request จากภายนอกไปที่
+> `https://nhfapp.org/api/auth/login` พร้อม header `CF-Connecting-IP: 1.2.3.4`
+> ที่ client ใส่เอง Cloudflare ปฏิเสธที่ edge ด้วย `error code: 1000` และ request
+> ไม่ถึง origin ผลนี้ตรงกับเอกสาร Cloudflare ที่ระบุว่า request ที่มี header
+> `CF-Connecting-IP` เป็นสาเหตุหนึ่งของ
+> [Error 1000](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1000/)
+> และ [Cloudflare HTTP headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/)
+> ที่ระบุว่า `CF-Connecting-IP` ถูกส่งเฉพาะบน traffic จาก Cloudflare edge ไปยัง origin
+>
+> **ข้อสรุป:** ภายใต้ topology ปัจจุบัน client ปลอม `CF-Connecting-IP` ไม่ได้ จึง
+> เชื่อถือ per-IP rate limit ได้ โดยขึ้นกับเงื่อนไขทั้งหมดต่อไปนี้:
+>
+> - port 3000 bind เฉพาะ loopback (`127.0.0.1`)
+> - host firewall ไม่เปิด inbound 80/443
+> - `cloudflared` เป็น ingress เดียวเข้า Next.js
+> - ไม่มี Cloudflare Worker คั่นหน้าแอปบน zone นี้ (เอกสาร HTTP headers ระบุว่าใน
+>   same-zone Worker subrequest ค่า `CF-Connecting-IP` มาจาก `x-real-ip` ซึ่ง
+>   Worker script กำหนดได้)
+>
+> ต้องทำการยืนยันนี้ซ้ำทุกครั้งที่ topology เปลี่ยน
 
 ## 2. ค่าที่ต้องแทนที่ในคู่มือ
 
@@ -315,9 +333,12 @@ done
   `127.0.0.1:3000`
 - ใน topology ปัจจุบัน TLS สิ้นสุดที่ Cloudflare edge และช่วง `cloudflared` →
   Next.js เป็น HTTP บน loopback; request-size limit และ timeout ของ Nginx
-  **ไม่อยู่ใน request path** จึงต้องพึ่ง limit ในชั้นแอป (เช่น bounded body read
-  ของ upload route ตาม `storage-and-attachments.md`) ผู้ดูแลควรทบทวนว่า route ที่
-  รับ body ทุกตัวมี limit ในแอปเพียงพอ
+  **ไม่อยู่ใน request path** จึงต้องพึ่ง limit ในชั้นแอปเท่านั้น ค่า limit ของ JSON
+  route อยู่ที่ `lib/ssot/request-limits.ts` และของ upload อยู่ที่
+  `lib/ssot/uploads.ts` / constants ของแต่ละ module (สรุปใน
+  [storage-and-attachments.md](./storage-and-attachments.md#app-level-request-body-limits))
+  route JSON บางตัวยังอ่าน body โดยไม่มี limit ในแอป และมีแผนย้ายไปใช้ bounded
+  reader ใน PR แยก
 - อย่าใช้ public hostname หรือ Tunnel path เป็น authorization boundary; path
   denylist ในส่วน 6.1 เป็นเพียงชั้นป้องกันที่สอง
 - อย่าเพิ่ม Cloudflare Zero Trust/Access policy ในคู่มือนี้ เพราะไม่ใช่ส่วนหนึ่ง
@@ -331,6 +352,8 @@ webhook signature, mutation idempotency และ request/body limits ของ 
 
 ## 11. แหล่งอ้างอิง
 
+- [Cloudflare — Error 1000 (Troubleshooting 1xxx errors)](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1000/)
+- [Cloudflare — HTTP request headers (`CF-Connecting-IP`)](https://developers.cloudflare.com/fundamentals/reference/http-headers/)
 - [Cloudflare Tunnel — Configuration file (ingress rules, `path` regex, `ingress validate`/`ingress rule`)](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/local-management/configuration-file/)
 - [Cloudflare WAF — Custom rules](https://developers.cloudflare.com/waf/custom-rules/)
 - [Cloudflare Tunnel — Published applications](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/)

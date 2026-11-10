@@ -501,7 +501,7 @@ Leave notification acceptance ให้ตรวจ **in-app, email และ pe
 - `.uploads/private/leave` เป็น persistent storage และ process user อ่าน/เขียนได้
 - ไม่ expose directory นี้ด้วย Nginx static `alias` หรือ public URL
 - database table `leave_attachments` กับ private files ถูก backup/restore เป็น snapshot ที่สอดคล้องกัน
-- production ปัจจุบันไม่มี Nginx ใน request path (Cloudflare Tunnel → Next.js โดยตรง) จึงไม่มี reverse-proxy body limit; ยืนยันว่า request boundary 25 MB ถูกบังคับในชั้นแอปตาม [storage operations](./storage-and-attachments.md) หากใช้ topology สำรองผ่าน Nginx ให้คง `client_max_body_size 25m` และ timeout ที่เหมาะสม
+- production ปัจจุบันไม่มี Nginx ใน request path (Cloudflare Tunnel → Next.js โดยตรง) จึงไม่มี reverse-proxy body limit; request boundary 25 MB ของ attachment ถูกบังคับในชั้นแอปแล้ว และ limit ในชั้นแอปทั้งหมดสรุปไว้ที่ [App-level request body limits](./storage-and-attachments.md#app-level-request-body-limits) หากใช้ topology สำรองผ่าน Nginx ให้คง `client_max_body_size 25m` และ timeout ที่เหมาะสม
 - upload รองรับ JPG, PNG, WEBP และจัดเก็บผลลัพธ์เป็น WebP
 - จำกัดสูงสุด 3 ไฟล์, ไฟล์ละไม่เกิน 8 MB, รวมไม่เกิน 20 MB และ request boundary 25 MB
 - ผู้ใช้ทดสอบเลือกภาพจาก smartphone แล้ว upload/retrieve ได้จริง
@@ -796,9 +796,16 @@ Next.js http://127.0.0.1:3000` โดยไม่มี Nginx ใน request pat
 (`lib/network/trusted-client-ip.ts`) และไม่ใช้ `X-Forwarded-For`, `X-Real-IP`
 หรือ forwarding header อื่นเป็น fallback. ใน topology นี้ไม่มี Nginx คอยเขียนทับ
 header ดังกล่าว ค่าจึงมาจาก request ที่ Cloudflare ส่งผ่าน `cloudflared` และ
-trust boundary ขึ้นกับการที่ port 3000 รับได้เฉพาะ loopback; operator ต้อง
-ยืนยันพฤติกรรมของ Cloudflare ต่อ `CF-Connecting-IP` ที่ client ส่งมาเองก่อนพึ่ง
-ค่านี้เป็น security control. ห้ามเปิด `127.0.0.1:3000` ออก Internet. public
+trust boundary ขึ้นกับการที่ port 3000 รับได้เฉพาะ loopback. **ยืนยันแล้วเมื่อ
+2026-11-09:** request จากภายนอกที่ client ใส่ `CF-Connecting-IP` มาเองถูก
+Cloudflare ปฏิเสธด้วย error 1000 ก่อนถึง origin (ตรงกับ
+[Cloudflare Error 1000](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1000/)
+และ [Cloudflare HTTP headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/))
+ดังนั้นภายใต้ topology ปัจจุบัน client ปลอม header นี้ไม่ได้และ per-IP rate limit
+เชื่อถือได้ โดยมีเงื่อนไขว่า port 3000 bind เฉพาะ loopback, ไม่มี inbound 80/443,
+`cloudflared` เป็น ingress เดียว และไม่มี Cloudflare Worker คั่นหน้าแอป; ต้อง
+ยืนยันซ้ำเมื่อ topology เปลี่ยน รายละเอียดอยู่ใน
+[Cloudflare Tunnel §1](./cloudflare-tunnel.md). ห้ามเปิด `127.0.0.1:3000` ออก Internet. public
 hostname เปิดใช้งาน **ทั้งแอปพลิเคชัน** โดย configuration ของ Tunnel ไม่กำหนด
 `path` allowlist ยกเว้น denylist ของ maintenance/cron endpoint ตาม
 [Cloudflare Tunnel §6.1](./cloudflare-tunnel.md#61-ปิด-maintenance-และ-cron-endpoint-จากภายนอก).
@@ -902,7 +909,7 @@ endpoint จะตอบสำเร็จแบบ no-op โดยไม่ส�
 ### Notification outbox — ตัวอย่างทุก 1 นาที
 
 ```cron
-* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "http://127.0.0.1:3000/api/cron/notification-outbox"
+* * * * * . /etc/employee_nhf/cron.env && curl --fail --silent --show-error --max-time 50 --request POST --header "x-outbox-secret: $NOTIFICATION_OUTBOX_CRON_SECRET" "http://127.0.0.1:3000/api/cron/notification-outbox"
 ```
 
 Worker claim สูงสุด 10 รายการต่อ invocation และ process ตามลำดับเวลาสร้าง การเรียกทุก 1 นาทีช่วยระบาย backlog ต่อเนื่อง
@@ -977,17 +984,31 @@ counters เมื่อบางรายการทำงานไม่ส�
 public domain จะได้ `404` ทุกรอบ และถ้า deploy แอปก่อนแก้ secret ที่สั้น endpoint จะตอบ `503` และ login จะใช้ไม่ได้
 
 1. **ยืนยันว่า secret ทุกตัวยาว ≥ 32 ตัวอักษรหลัง trim** ทั้งใน environment ของ Next.js และใน cron environment
-   คำสั่งนี้พิมพ์เฉพาะชื่อและความยาว ไม่พิมพ์ค่า (แทน `<ENV_FILE>` ด้วยไฟล์ environment ของ Next.js และ
-   `/etc/employee_nhf/cron.env` ทีละไฟล์; ใน cron.env จะไม่มี `AUTH_ACCESS_TOKEN_SECRET` ซึ่งเป็นเรื่องปกติ):
+   คำสั่งนี้พิมพ์เฉพาะชื่อ ความยาว และ `OK`/`TOO_SHORT_OR_MISSING` ไม่พิมพ์ค่า (แทน `<ENV_FILE>` ด้วยไฟล์
+   environment ของ Next.js และ `/etc/employee_nhf/cron.env` ทีละไฟล์; ใน cron.env จะไม่มี
+   `AUTH_ACCESS_TOKEN_SECRET` ซึ่งเป็นเรื่องปกติ) สคริปต์อ่านไฟล์ด้วย `grep`/`sed` ทีละตัวแปร **ไม่ source ไฟล์**
+   จึงไม่รันคำสั่งที่อยู่ในค่า (เช่น `$(...)` หรือ backtick) และไม่พังเมื่อค่ามีช่องว่าง, `$` หรือ backtick
+   รองรับ `export KEY=`, ค่าใน quote เดี่ยว/คู่, comment ท้ายบรรทัดของค่าที่ไม่มี quote และใช้บรรทัดสุดท้ายถ้าซ้ำ;
+   ไม่ขยาย `$VAR` ในค่า (นับความยาวตามตัวอักษรในไฟล์) และไม่รองรับค่าหลายบรรทัด:
 
    ```bash
-   sudo bash -c 'set -a; . "$1"; set +a
+   sudo bash -s -- <ENV_FILE> <<'SH'
+   f="$1"
    for v in AUTH_ACCESS_TOKEN_SECRET AUTH_CLEANUP_SECRET AUDIT_LOG_CLEANUP_SECRET IT_ATTACHMENT_CLEANUP_SECRET \
             LEAVE_ATTACHMENT_CLEANUP_SECRET NOTIFICATION_OUTBOX_CRON_SECRET ROUTINE_SCHEDULER_CRON_SECRET; do
-     t="$(printf "%s" "${!v}" | sed -e "s/^[[:space:]]*//" -e "s/[[:space:]]*$//")"
-     if [ "${#t}" -ge 32 ]; then s=OK; else s=TOO_SHORT_OR_MISSING; fi
-     printf "%-34s %4d %s\n" "$v" "${#t}" "$s"
-   done' _ <ENV_FILE>
+     line="$(grep -E "^[[:space:]]*(export[[:space:]]+)?${v}[[:space:]]*=" "$f" | tail -n 1)"
+     val="${line#*=}"
+     val="$(printf '%s' "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+     case "$val" in
+       \"*\") val="${val:1:${#val}-2}" ;;
+       \'*\') val="${val:1:${#val}-2}" ;;
+       *) val="$(printf '%s' "$val" | sed -e 's/[[:space:]]#.*$//')" ;;
+     esac
+     val="$(printf '%s' "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+     if [ "${#val}" -ge 32 ]; then s=OK; else s=TOO_SHORT_OR_MISSING; fi
+     printf '%-34s %4d %s\n' "$v" "${#val}" "$s"
+   done
+   SH
    ```
 
    ค่าใดเป็น `TOO_SHORT_OR_MISSING` ให้สร้างใหม่ (เช่น `openssl rand -base64 48`) และอัปเดตทั้ง environment ของแอปและ
