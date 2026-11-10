@@ -1,5 +1,9 @@
 import { getLineConfig } from "@/lib/line/config";
 import { LineIdentityVerificationError } from "@/lib/line/errors";
+import {
+    createOutboundHttpSignal,
+    isOutboundHttpTimeoutError,
+} from "@/lib/network/outbound-http";
 
 import type { VerifiedLineIdentity } from "../../application/types";
 
@@ -65,8 +69,17 @@ export async function verifyLineIdToken(
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             body: requestBody.toString(),
+            signal: createOutboundHttpSignal(),
         });
-    } catch {
+    } catch (error) {
+        // Sanitized category only; never log the ID token or upstream details.
+        console.error("LINE ID token verification request failed.", {
+            provider: "line-login",
+            operation: "verify-id-token",
+            failureCategory: isOutboundHttpTimeoutError(error)
+                ? "timeout"
+                : "network_failure",
+        });
         throw new LineIdentityVerificationError(
             "UPSTREAM_ERROR",
             "LINE ID token verification is unavailable",
