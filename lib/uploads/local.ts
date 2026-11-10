@@ -6,17 +6,14 @@ import {
     IMAGE_UPLOAD_ACCEPTED_TYPES,
     IMAGE_UPLOAD_MAX_BYTES,
 } from "@/lib/ssot/uploads";
+import {
+    PUBLIC_IMAGE_UPLOAD_SCOPE_SEGMENTS as SCOPE_SEGMENTS,
+    type PublicImageUploadScope as UploadScope,
+} from "@/lib/uploads/public-path";
 
 const UPLOAD_ROOT = path.join(process.cwd(), ".uploads");
 const MAX_DIMENSION = 1600;
 const WEBP_QUALITY = 80;
-
-const SCOPE_SEGMENTS = {
-    item: ["stock", "items"],
-    variant: ["stock", "variants"],
-} as const;
-
-type UploadScope = keyof typeof SCOPE_SEGMENTS;
 
 function isAllowedImageType(contentType: string): boolean {
     return IMAGE_UPLOAD_ACCEPTED_TYPES.includes(
