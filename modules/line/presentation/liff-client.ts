@@ -4,6 +4,7 @@ import {
     type UnauthorizedRecoveryMetadata,
     type UnauthorizedRecoveryHandler,
 } from "@/lib/client/api-client";
+import { withAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 import type { LiffSessionResponse } from "../application/types";
 import { API_ROUTES } from "@/lib/ssot/routes";
 
@@ -120,7 +121,8 @@ export async function fetchLiffWithSessionRecovery(
     init?: RequestInit,
 ): Promise<Response> {
     const method = init?.method?.toUpperCase() ?? "GET";
-    let response = await fetch(input, init);
+    const requestInit = withAuthMutationHeaders(init);
+    let response = await fetch(input, requestInit);
     if (response.status !== 401) return response;
 
     const recovery = await handleLiffUnauthorized({
@@ -129,7 +131,7 @@ export async function fetchLiffWithSessionRecovery(
         response,
     });
     if (recovery.replay && isSafeLiffReadMethod(method) && !init?.signal?.aborted) {
-        response = await fetch(input, init);
+        response = await fetch(input, requestInit);
     }
     return response;
 }

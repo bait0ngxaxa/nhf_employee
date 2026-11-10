@@ -229,10 +229,12 @@ describe("IT Ticket self-service presentation", () => {
         expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
         const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
         expect(postCalls).toHaveLength(2);
-        const firstHeaders = postCalls[0][1]?.headers as Record<string, string>;
-        const secondHeaders = postCalls[1][1]?.headers as Record<string, string>;
-        expect(firstHeaders["Idempotency-Key"]).toBe("it-ticket-key-001");
-        expect(secondHeaders["Idempotency-Key"]).toBe(firstHeaders["Idempotency-Key"]);
+        const firstHeaders = new Headers(postCalls[0][1]?.headers);
+        const secondHeaders = new Headers(postCalls[1][1]?.headers);
+        expect(firstHeaders.get("Idempotency-Key")).toBe("it-ticket-key-001");
+        expect(secondHeaders.get("Idempotency-Key")).toBe(firstHeaders.get("Idempotency-Key"));
+        expect(firstHeaders.get("X-Requested-With")).toBe("XMLHttpRequest");
+        expect(secondHeaders.get("X-Requested-With")).toBe("XMLHttpRequest");
         expect(randomUUID).toHaveBeenCalledTimes(1);
         expect(JSON.parse(String(postCalls[0][1]?.body))).toEqual({
             type: "INCIDENT",

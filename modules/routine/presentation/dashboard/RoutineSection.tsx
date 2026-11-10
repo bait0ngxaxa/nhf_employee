@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { withAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 import { downloadXlsx } from "@/lib/client/xlsx-download";
 import type { RoutineTaskStatusFilter } from "../../schemas/routine";
 
@@ -416,11 +417,11 @@ function RoutineTaskSettings({
         activeMutationLockRef.current.add(task.id);
         setPendingTaskId(task.id);
         try {
-            const response = await fetch(API_ROUTES.routines.taskById(task.id), {
+            const response = await fetch(API_ROUTES.routines.taskById(task.id), withAuthMutationHeaders({
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ version: task.version, isActive: !task.isActive }),
-            });
+            }));
             const body: unknown = await response.json().catch(() => null);
             if (!response.ok) throw new Error(
                 typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
@@ -441,9 +442,9 @@ function RoutineTaskSettings({
     async function deleteTask(task: RoutineTask): Promise<void> {
         if (!canDeleteTasks || task.canDelete !== true) return;
         try {
-            const response = await fetch(API_ROUTES.routines.taskById(task.id), {
+            const response = await fetch(API_ROUTES.routines.taskById(task.id), withAuthMutationHeaders({
                 method: "DELETE",
-            });
+            }));
             const body: unknown = await response.json().catch(() => null);
             if (!response.ok) throw new Error(
                 typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"

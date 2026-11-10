@@ -22,6 +22,7 @@ import {
     setRoutineAssigneeRole,
 } from "../../domain/assignees";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { withAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 
 import { RoutineAssigneePicker } from "./RoutineAssigneePicker";
 import type {
@@ -75,11 +76,11 @@ function errorMessage(body: unknown): string {
 }
 
 async function sendRoutineMutation(url: string, payload: unknown): Promise<void> {
-    const response = await fetch(url, {
+    const response = await fetch(url, withAuthMutationHeaders({
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
-    });
+    }));
     const body: unknown = await response.json().catch(() => null);
     if (!response.ok) throw new Error(errorMessage(body));
 }

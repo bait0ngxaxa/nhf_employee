@@ -1,4 +1,4 @@
-import { AUTH_MUTATION_HEADERS } from "@/lib/auth/mutation-headers";
+import { applyAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 import {
     fetchWithRefresh,
     isHybridReplayableMethod,
@@ -123,9 +123,7 @@ export async function authApiRequest<T>(
     if (data !== undefined && !requestHeaders.has("Content-Type")) {
         requestHeaders.set("Content-Type", "application/json");
     }
-    if (method !== "GET" && method !== "HEAD" && !requestHeaders.has("X-Requested-With")) {
-        requestHeaders.set("X-Requested-With", AUTH_MUTATION_HEADERS["X-Requested-With"]);
-    }
+    applyAuthMutationHeaders(requestHeaders, method);
 
     const requestInit: RequestInit = {
         ...requestConfig,
