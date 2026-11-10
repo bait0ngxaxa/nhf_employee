@@ -3045,10 +3045,6 @@ const rawRequestBodyExemptions = new Map([
         "app/api/leave/approvers/route.ts",
         "PENDING owner decision: the assignments array has no schema maximum, so no realistic limit can be derived from code.",
     ],
-    [
-        "app/api/audit-logs/export/route.ts",
-        "PENDING owner decision: no UI caller and no body schema exist, so no realistic limit can be derived from code.",
-    ],
 ]);
 
 function getRequestTypedParameterNames(sourceFile) {

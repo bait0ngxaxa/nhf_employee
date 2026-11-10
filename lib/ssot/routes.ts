@@ -391,7 +391,6 @@ export const API_ROUTES = {
     },
     auditLogs: {
         cleanup: "/api/audit-logs/cleanup",
-        export: "/api/audit-logs/export",
     },
     authorizationAdministration: {
         overview: "/api/authorization/administration",

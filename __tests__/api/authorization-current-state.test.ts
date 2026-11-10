@@ -47,7 +47,6 @@ vi.mock("@/lib/server/audit", () => ({
 }));
 
 import { GET as getEmployeeExport } from "@/app/api/employees/export/route";
-import { POST as logAuditExport } from "@/app/api/audit-logs/export/route";
 
 async function createExportResponse(): Promise<Response> {
     const workbook = new ExcelJS.Workbook();
@@ -188,31 +187,5 @@ describe("Phase 0 authorization current-state characterization", () => {
             maxRows: 2000, recordCount: 2001,
         });
         expect(mocks.logDataExport).not.toHaveBeenCalled();
-    });
-
-    it("preserves current USER access to the audit export logging route", async () => {
-        const response = await logAuditExport(
-            new NextRequest("http://localhost/api/audit-logs/export", {
-                method: "POST",
-                body: JSON.stringify({
-                    entityType: "Employee",
-                    recordCount: 0,
-                    filters: { status: "ACTIVE" },
-                }),
-            }),
-        );
-
-        expect(response.status).toBe(200);
-        expect(mocks.logDataExport).toHaveBeenCalledWith(
-            "Employee",
-            5,
-            "user@example.com",
-            expect.objectContaining({
-                metadata: expect.objectContaining({
-                    recordCount: 0,
-                    filters: { status: "ACTIVE" },
-                }),
-            }),
-        );
     });
 });
