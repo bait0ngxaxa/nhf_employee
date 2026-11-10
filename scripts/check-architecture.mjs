@@ -3150,6 +3150,216 @@ function getRawRequestBodyReadViolations(rootPath, sourceFiles) {
     return violations;
 }
 
+// Every browser-callable mutation in app/api must pass the shared CSRF contract
+// in lib/auth/csrf.ts (trusted Origin + X-Requested-With) before it
+// authenticates, reads the body or causes side effects. Only machine-to-machine
+// endpoints with their own authentication may be exempt.
+const trustedMutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const trustedMutationModule = "@/lib/auth/csrf";
+/** Each exemption must state why the route is not a browser mutation. */
+const trustedMutationExemptions = new Map([
+    [
+        "app/api/cron/notification-outbox/route.ts",
+        "Machine-to-machine cron trigger authenticated by a shared secret; sent by the scheduler, never by a browser, so it carries no Origin.",
+    ],
+    [
+        "app/api/cron/routine-scheduler/route.ts",
+        "Machine-to-machine cron trigger authenticated by a shared secret; sent by the scheduler, never by a browser, so it carries no Origin.",
+    ],
+    [
+        "app/api/auth/cleanup/route.ts",
+        "Machine-to-machine maintenance endpoint authenticated by a shared secret; not called by browser clients.",
+    ],
+    [
+        "app/api/audit-logs/cleanup/route.ts",
+        "Machine-to-machine maintenance endpoint authenticated by a shared secret; not called by browser clients.",
+    ],
+    [
+        "app/api/it/attachments/cleanup/route.ts",
+        "Machine-to-machine maintenance endpoint authenticated by a shared secret; not called by browser clients.",
+    ],
+    [
+        "app/api/leave/attachments/cleanup/route.ts",
+        "Machine-to-machine maintenance endpoint authenticated by a shared secret; not called by browser clients.",
+    ],
+    [
+        "app/api/line/webhook/route.ts",
+        "Called by LINE platform servers (no browser Origin) and authenticated by the LINE HMAC signature over the raw body.",
+    ],
+]);
+
+function isRouteHandlerSource(filePath) {
+    return /^route\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(filePath.split(/[\\/]/).at(-1) ?? "");
+}
+
+function hasExportModifier(node) {
+    return ts.canHaveModifiers(node)
+        && (ts.getModifiers(node) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+function getTrustedMutationLocalNames(sourceFile) {
+    const names = { wrapper: new Set(), assertion: new Set() };
+    for (const statement of sourceFile.statements) {
+        if (
+            !ts.isImportDeclaration(statement)
+            || getStringLiteralText(statement.moduleSpecifier) !== trustedMutationModule
+            || statement.importClause?.isTypeOnly
+        ) continue;
+        const bindings = statement.importClause?.namedBindings;
+        if (bindings === undefined || !ts.isNamedImports(bindings)) continue;
+        for (const element of bindings.elements) {
+            if (element.isTypeOnly) continue;
+            const importedName = (element.propertyName ?? element.name).text;
+            if (importedName === "withTrustedMutation") names.wrapper.add(element.name.text);
+            if (importedName === "assertTrustedMutationRequest") names.assertion.add(element.name.text);
+        }
+    }
+    return names;
+}
+
+function isCallTo(node, localNames) {
+    return ts.isCallExpression(node)
+        && ts.isIdentifier(node.expression)
+        && localNames.has(node.expression.text);
+}
+
+function containsAwait(node) {
+    let found = false;
+    function visit(child) {
+        if (found) return;
+        // Awaits inside nested functions do not run before the statement completes.
+        if (ts.isFunctionLike(child)) return;
+        if (ts.isAwaitExpression(child)) {
+            found = true;
+            return;
+        }
+        ts.forEachChild(child, visit);
+    }
+    visit(node);
+    return found;
+}
+
+function containsCallTo(node, localNames) {
+    let found = false;
+    function visit(child) {
+        if (found) return;
+        if (ts.isFunctionLike(child)) return;
+        if (isCallTo(child, localNames)) {
+            found = true;
+            return;
+        }
+        ts.forEachChild(child, visit);
+    }
+    visit(node);
+    return found;
+}
+
+/**
+ * A function-declaration handler is guarded when a top-level statement of its
+ * body calls the CSRF guard before the body's first await, i.e. before
+ * authentication, body reads or persistence can start.
+ */
+function assertsTrustedMutationFirst(body, guardNames) {
+    if (body === undefined || guardNames.size === 0) return false;
+    for (const statement of body.statements) {
+        if (containsCallTo(statement, guardNames)) return true;
+        if (containsAwait(statement)) return false;
+    }
+    return false;
+}
+
+function getUnguardedMutationHandlers(filePath) {
+    const contents = readFileSync(filePath, "utf8");
+    if (!/\b(?:POST|PUT|PATCH|DELETE)\b/.test(contents)) return [];
+    const sourceFile = ts.createSourceFile(
+        filePath,
+        contents,
+        ts.ScriptTarget.Latest,
+        true,
+        getScriptKind(filePath),
+    );
+    const localNames = getTrustedMutationLocalNames(sourceFile);
+    const unguarded = [];
+    const lineOf = (node) => sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+
+    for (const statement of sourceFile.statements) {
+        if (
+            ts.isFunctionDeclaration(statement)
+            && hasExportModifier(statement)
+            && statement.name !== undefined
+            && trustedMutationMethods.has(statement.name.text)
+        ) {
+            // Also accepts the curried form `return withTrustedMutation(handler)(request)`.
+            const guardNames = new Set([...localNames.assertion, ...localNames.wrapper]);
+            if (!assertsTrustedMutationFirst(statement.body, guardNames)) {
+                unguarded.push({ method: statement.name.text, line: lineOf(statement) });
+            }
+            continue;
+        }
+        if (ts.isVariableStatement(statement) && hasExportModifier(statement)) {
+            for (const declaration of statement.declarationList.declarations) {
+                if (!ts.isIdentifier(declaration.name) || !trustedMutationMethods.has(declaration.name.text)) continue;
+                if (declaration.initializer === undefined || !isCallTo(declaration.initializer, localNames.wrapper)) {
+                    unguarded.push({ method: declaration.name.text, line: lineOf(declaration) });
+                }
+            }
+            continue;
+        }
+        // Re-exports such as `export { handler as POST }` cannot be verified.
+        if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+            for (const element of statement.exportClause.elements) {
+                if (trustedMutationMethods.has(element.name.text)) {
+                    unguarded.push({ method: element.name.text, line: lineOf(element) });
+                }
+            }
+        }
+    }
+    return unguarded;
+}
+
+function getTrustedMutationViolations(rootPath, sourceFiles) {
+    const apiRoot = resolve(rootPath, "app/api");
+    const violations = [];
+    const exemptFilesWithMutations = new Set();
+
+    for (const filePath of sourceFiles) {
+        if (
+            !pathIsWithin(filePath, apiRoot)
+            || isTestSource(filePath, rootPath)
+            || !isRouteHandlerSource(filePath)
+        ) continue;
+        const unguarded = getUnguardedMutationHandlers(filePath);
+        if (unguarded.length === 0) continue;
+
+        const repositoryPath = relativeFilePath(filePath, rootPath);
+        if (trustedMutationExemptions.has(repositoryPath)) {
+            exemptFilesWithMutations.add(repositoryPath);
+            continue;
+        }
+        for (const handler of unguarded) {
+            violations.push(
+                `${repositoryPath}:${handler.line} exports ${handler.method} without the trusted-mutation CSRF guard. `
+                + "Wrap it as `export const " + handler.method + " = withTrustedMutation(...)` "
+                + "(or call assertTrustedMutationRequest before the first await) from lib/auth/csrf.ts, "
+                + "or add a justified machine-to-machine entry to trustedMutationExemptions in scripts/check-architecture.mjs.",
+            );
+        }
+    }
+
+    for (const exemptPath of trustedMutationExemptions.keys()) {
+        if (
+            sourceFiles.includes(resolve(rootPath, exemptPath))
+            && !exemptFilesWithMutations.has(exemptPath)
+        ) {
+            violations.push(
+                `${exemptPath} is listed in trustedMutationExemptions but no longer exports an unguarded mutation; remove the stale exemption.`,
+            );
+        }
+    }
+
+    return violations;
+}
+
 function checkArchitecture(options = {}) {
     // Graph rules share transpilation results only within this synchronous scan.
     // Later scans must read edited files again, even for the same repository root.
@@ -3739,6 +3949,7 @@ function checkArchitecture(options = {}) {
 
     violations.push(...getCapabilityRecipientRoleViolations(rootPath, sourceFiles));
     violations.push(...getRawRequestBodyReadViolations(rootPath, sourceFiles));
+    violations.push(...getTrustedMutationViolations(rootPath, sourceFiles));
     violations.push(...getEmailRequestCompositionViolations(rootPath, sourceFiles));
     const emailRequestOutboxProcessorViolation =
         getEmailRequestOutboxProcessorViolation(rootPath);
@@ -3803,7 +4014,7 @@ function reportResult(result) {
     process.exitCode = 1;
 }
 
-export { checkArchitecture };
+export { checkArchitecture, trustedMutationExemptions };
 
 const isMainModule = process.argv[1] !== undefined
     && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
