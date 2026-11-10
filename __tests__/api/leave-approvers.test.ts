@@ -7,10 +7,10 @@ import { prisma } from "@/lib/db/prisma";
 import {
     ApproverAssignmentError,
     assignLeaveApprovers,
+    LEAVE_APPROVER_ASSIGNMENTS_MAX,
 } from "@/modules/leave";
 import type * as AuthorizationModule from "@/modules/authorization";
 import {
-    LEAVE_APPROVER_ASSIGNMENTS_MAX,
     LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
     REQUEST_BODY_TOO_LARGE_MESSAGE,
 } from "@/lib/ssot/request-limits";

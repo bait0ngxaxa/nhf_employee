@@ -8,7 +8,6 @@ import {
     EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES,
     EMPLOYEE_IMPORT_LIMIT_BASIS_ROWS,
     EMPLOYEE_IMPORT_ROW_JSON_OVERHEAD_BYTES,
-    LEAVE_APPROVER_ASSIGNMENTS_MAX,
     LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
     STOCK_ITEM_JSON_MAX_REQUEST_BYTES,
 } from "@/lib/ssot/request-limits";
@@ -37,7 +36,10 @@ import {
     createItemSchema,
     updateItemSchema,
 } from "@/modules/stock";
-import { leaveApproverAssignmentsSchema } from "@/modules/leave";
+import {
+    LEAVE_APPROVER_ASSIGNMENTS_MAX,
+    leaveApproverAssignmentsSchema,
+} from "@/modules/leave";
 import {
     buildMaximalCreateItemPayload,
     buildMaximalUpdateItemPayload,

@@ -140,6 +140,65 @@ describe("NHFapp LINE ID token verification", () => {
         });
     });
 
+    it("bounds the verification request with the shared outbound timeout signal", async () => {
+        mockVerificationResponse({
+            sub: "U123",
+            aud: "nhfapp-channel-id",
+            exp: Math.floor(Date.now() / 1000) + 60,
+        });
+
+        await expect(verifyLineIdToken("id-token")).resolves.toEqual({
+            lineUserId: "U123",
+        });
+
+        const [, request] = fetchMock.mock.calls[0] ?? [];
+        expect(request?.signal).toBeInstanceOf(AbortSignal);
+        expect(request?.signal?.aborted).toBe(false);
+    });
+
+    it("maps a LINE verify timeout to the existing unavailable path and logs only a category", async () => {
+        const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        fetchMock.mockRejectedValueOnce(
+            new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+        );
+
+        await expect(verifyLineIdToken("secret-id-token")).rejects.toMatchObject({
+            code: "UPSTREAM_ERROR",
+            statusCode: 502,
+            message: "LINE ID token verification is unavailable",
+        });
+
+        expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            "LINE ID token verification request failed.",
+            {
+                provider: "line-login",
+                operation: "verify-id-token",
+                failureCategory: "timeout",
+            },
+        );
+        expect(JSON.stringify(consoleErrorSpy.mock.calls)).not.toContain("secret-id-token");
+        consoleErrorSpy.mockRestore();
+    });
+
+    it("logs a non-timeout network failure as a separate sanitized category", async () => {
+        const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        fetchMock.mockRejectedValueOnce(new Error("network details"));
+
+        await expect(verifyLineIdToken("secret-id-token")).rejects.toMatchObject({
+            code: "UPSTREAM_ERROR",
+        });
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            "LINE ID token verification request failed.",
+            expect.objectContaining({ failureCategory: "network_failure" }),
+        );
+        const logged = JSON.stringify(consoleErrorSpy.mock.calls);
+        expect(logged).not.toContain("secret-id-token");
+        expect(logged).not.toContain("network details");
+        consoleErrorSpy.mockRestore();
+    });
+
     it("fails explicitly when the NHFapp LINE configuration is missing", () => {
         vi.stubEnv("LINE_LOGIN_CHANNEL_ID", "   ");
 

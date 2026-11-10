@@ -55,6 +55,27 @@ function getTransporter(): Transporter {
     return transporter;
 }
 
+/**
+ * Drops the cached transporter, closing its pooled connections first so a
+ * replaced pool does not linger. close() is synchronous in nodemailer 10.x
+ * (Mailer.close: () => void); any failure is swallowed so cleanup can never
+ * throw into the send path.
+ */
+function discardTransporter(): void {
+    const previous = transporter;
+    transporter = null;
+    if (!previous) return;
+
+    try {
+        previous.close();
+    } catch (error) {
+        console.error(
+            "❌ SMTP transporter close failed:",
+            getSafeErrorMessage(error),
+        );
+    }
+}
+
 async function verifyConnection(): Promise<boolean> {
     try {
         await getTransporter().verify();
@@ -67,7 +88,7 @@ async function verifyConnection(): Promise<boolean> {
         );
         isTransporterReady = false;
 
-        transporter = null;
+        discardTransporter();
         try {
             await getTransporter().verify();
             isTransporterReady = true;
@@ -132,7 +153,7 @@ export async function sendSmtpEmail(emailData: EmailData): Promise<boolean> {
                     errorCode === "ENOTFOUND"
                 ) {
                     isTransporterReady = false;
-                    transporter = null;
+                    discardTransporter();
                     const reconnected = await verifyConnection();
                     if (!reconnected && attempt === maxRetries) {
                         console.error(
