@@ -27,11 +27,23 @@ production ไม่มี Nginx ใน request path ดังนั้น limit
 | Leave JSON / Stock JSON ที่ผ่าน module HTTP helper | 32 KiB | `LEAVE_JSON_MUTATION_MAX_BYTES`, `STOCK_JSON_MUTATION_MAX_BYTES` (`lib/ssot/request-limits.ts`) |
 | LINE auth | 16 KiB | `LINE_AUTH_MAX_REQUEST_BYTES` (`modules/line/presentation/http.ts`) |
 | Announcement manage / Email request access requirements | 8,192 / 4,096 bytes | ค่าคงที่ภายใน route |
+| Pre-auth credentials: `hybrid-login`, `signup`, `forgot-password`, `reset-password` | 4 KiB | `AUTH_CREDENTIALS_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`) |
+| JSON mutation ขนาดเล็กที่ต้อง login: session revoke, employees POST/PATCH, authorization administration (13 handlers), IT operator PATCH (4 handlers), stock categories POST, stock adjust, email request POST | 16 KiB | `DEFAULT_JSON_MUTATION_MAX_BYTES` (`lib/ssot/request-limits.ts`) |
+| Stock items POST / items/[id] PATCH | 256 KiB | `STOCK_ITEM_JSON_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`); payload สูงสุดที่ schema ยอมรับ ≈ 200 KiB |
+| Employee import (JSON ของแถวจาก CSV) | 10,997,760 bytes | `EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`); คำนวณจาก CSV ≤ 5 MiB และ ≤ 1,000 แถว |
 
-**ยังไม่มี limit ในแอป:** route ที่ยังเรียก `request.json()` ตรง (เช่น auth, employees, employee import แบบ JSON,
-authorization administration, IT operator PATCH, stock categories/items, leave approvers, email request, audit log export)
-มีแผนย้ายไปใช้ bounded reader พร้อมค่า default/override ใน `lib/ssot/request-limits.ts` ใน PR แยก จนกว่าจะเสร็จ
-route เหล่านี้ถูกจำกัดโดย plan limit ของ Cloudflare เท่านั้น LINE webhook อ่าน raw body เพื่อตรวจ signature และอยู่นอกแผนนี้
+route JSON ข้างบนอ่าน body ผ่าน `readRouteJsonBody` (`lib/server/route-json-body.ts`) ซึ่งครอบ bounded reader เดิม
+response ใหม่มีเพียง `413` ข้อความ `คำขอมีขนาดใหญ่เกินไป`; JSON ที่ผิดรูปแบบยังได้ response เดิมของแต่ละ route
+ค่าที่คำนวณได้มี test ยืนยันกับ payload ใหญ่ที่สุดที่ schema ยอมรับ (`__tests__/lib/request-limits.test.ts`)
+และ `npm run architecture:check` จะ fail ถ้ามีไฟล์ใต้ `app/api` เรียก `request.json()` / `.text()` / `.formData()` /
+`.arrayBuffer()` / `.blob()` ตรงโดยไม่อยู่ใน exemption list
+
+**ตั้งใจยังไม่จำกัดขนาด (exemption ใน `scripts/check-architecture.mjs`):**
+
+- `POST /api/line/webhook`: อ่าน raw body เพื่อตรวจ LINE signature ไม่ได้เพิ่ม cap เพราะ LINE ไม่ได้ระบุขนาด webhook
+  สูงสุดให้คำนวณ limit ได้ และการปฏิเสธ webhook ที่ถูกต้องจะทำให้ event หาย route นี้ยังถูกจำกัดโดย plan limit ของ Cloudflare เท่านั้น
+- `PUT /api/leave/approvers`: array `assignments` ไม่มีค่าสูงสุดใน schema จึงคำนวณ limit จาก code ไม่ได้ รอ owner ตัดสินใจ
+- `POST /api/audit-logs/export`: ไม่มี UI ที่เรียกใช้และไม่มี schema ของ body จึงคำนวณ limit ไม่ได้ รอ owner ตัดสินใจ
 
 ## Leave-specific rules and procedures
 

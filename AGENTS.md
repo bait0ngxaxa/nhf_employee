@@ -67,6 +67,8 @@ Standard order for server-side mutations:
 7. Cache invalidation or revalidation
 8. Sanitized response
 
+Production has no reverse proxy enforcing body size, so API handlers under `app/api` must never call `request.json()`, `.text()`, `.formData()`, `.arrayBuffer()` or `.blob()` directly. Read bodies through `lib/server/request-body.ts` (JSON routes: `readRouteJsonBody` in `lib/server/route-json-body.ts`) with a limit from `lib/ssot/request-limits.ts`, keeping the route's existing malformed-input response; `npm run architecture:check` enforces this, and exceptions require a reasoned entry in `rawRequestBodyExemptions` in `scripts/check-architecture.mjs`.
+
 ## 6. Architecture and Single Source of Truth
 
 * Types, constants, validation schemas, and business rules must each have a single authoritative source.
