@@ -2613,3 +2613,148 @@ describe("architecture checker raw request body reads", () => {
         ]);
     });
 });
+
+describe("architecture checker trusted-mutation CSRF guard", () => {
+    const routePath = "app/api/example/route.ts";
+    const csrfImport = 'import { withTrustedMutation, assertTrustedMutationRequest } from "@/lib/auth/csrf";';
+
+    async function csrfViolations(
+        filePath: string,
+        source: string,
+        extraFiles: FixtureFiles = {},
+    ): Promise<string[]> {
+        const rootPath = await createFixture({ ...fixtureFiles, ...extraFiles, [filePath]: source });
+        return checkArchitecture({ repositoryRoot: rootPath }).violations
+            .filter((violation) => violation.includes("trusted-mutation") || violation.includes("trustedMutationExemptions"));
+    }
+
+    it.each(["POST", "PUT", "PATCH", "DELETE"])(
+        "rejects an unguarded exported %s and points to lib/auth/csrf.ts",
+        async (method) => {
+            const violations = await csrfViolations(
+                routePath,
+                `export async function ${method}(request: Request) {\n    return Response.json({ ok: true });\n}\n`,
+            );
+
+            expect(violations).toEqual([
+                expect.stringContaining(`${routePath}:1 exports ${method} without the trusted-mutation CSRF guard`),
+            ]);
+            expect(violations[0]).toContain("withTrustedMutation");
+            expect(violations[0]).toContain("trustedMutationExemptions");
+        },
+    );
+
+    it("accepts withTrustedMutation wrappers, including an aliased import and rollout options", async () => {
+        const violations = await csrfViolations(
+            routePath,
+            [
+                'import { withTrustedMutation as guard, TRUSTED_MUTATION_ROLLOUT } from "@/lib/auth/csrf";',
+                "export async function GET() { return Response.json({}); }",
+                "export const POST = guard(async (request: Request) => Response.json({}));",
+                "export const DELETE = guard(async (request: Request) => Response.json({}), TRUSTED_MUTATION_ROLLOUT);",
+                "",
+            ].join("\n"),
+        );
+
+        expect(violations).toEqual([]);
+    });
+
+    it("accepts assertTrustedMutationRequest or a curried wrapper before the first await", async () => {
+        const violations = await csrfViolations(
+            routePath,
+            [
+                csrfImport,
+                "declare function preAuthLimit(request: Request): Response | null;",
+                "declare function authenticate(): Promise<boolean>;",
+                "export async function PUT(request: Request) {",
+                "    const limited = preAuthLimit(request);",
+                "    if (limited) return limited;",
+                "    const csrf = assertTrustedMutationRequest(request);",
+                "    if (csrf) return csrf;",
+                "    await authenticate();",
+                "    return Response.json({});",
+                "}",
+                "export async function POST(request: Request) {",
+                "    return withTrustedMutation(async (inner: Request) => Response.json({}))(request);",
+                "}",
+                "",
+            ].join("\n"),
+        );
+
+        expect(violations).toEqual([]);
+    });
+
+    it("rejects a CSRF assertion that only runs after authentication has awaited", async () => {
+        const violations = await csrfViolations(
+            routePath,
+            [
+                csrfImport,
+                "declare function authenticate(): Promise<boolean>;",
+                "export async function PATCH(request: Request) {",
+                "    await authenticate();",
+                "    const csrf = assertTrustedMutationRequest(request);",
+                "    if (csrf) return csrf;",
+                "    return Response.json({});",
+                "}",
+                "",
+            ].join("\n"),
+        );
+
+        expect(violations).toEqual([
+            expect.stringContaining(`${routePath}:3 exports PATCH without the trusted-mutation CSRF guard`),
+        ]);
+    });
+
+    it("rejects unverifiable exports and guards that are not imported from lib/auth/csrf", async () => {
+        const violations = await csrfViolations(
+            routePath,
+            [
+                'import type { withTrustedMutation as typeOnly } from "@/lib/auth/csrf";',
+                'import { withTrustedMutation } from "@/lib/other/csrf";',
+                "async function handler(request: Request) { return Response.json({}); }",
+                "export const POST = handler;",
+                "export const PUT = withTrustedMutation(handler);",
+                "export { handler as DELETE };",
+                "",
+            ].join("\n"),
+        );
+
+        expect(violations).toHaveLength(3);
+        expect(violations).toEqual(expect.arrayContaining([
+            expect.stringContaining("exports POST without"),
+            expect.stringContaining("exports PUT without"),
+            expect.stringContaining("exports DELETE without"),
+        ]));
+    });
+
+    it("ignores reads, non-route helpers, files outside app/api and test sources", async () => {
+        const source = "export async function POST(request: Request) { return Response.json({}); }\n";
+        const reads = await csrfViolations(routePath, "export async function GET() { return Response.json({}); }\n");
+        const helper = await csrfViolations("app/api/example/_lib/handlers.ts", source);
+        const outside = await csrfViolations("app/example/route.ts", source);
+        const testSource = await csrfViolations("app/api/example/route.test.ts", source);
+
+        expect(reads).toEqual([]);
+        expect(helper).toEqual([]);
+        expect(outside).toEqual([]);
+        expect(testSource).toEqual([]);
+    });
+
+    it("allows an exempted machine-to-machine route and flags the exemption once it is stale", async () => {
+        const exempted = await csrfViolations(
+            "app/api/line/webhook/route.ts",
+            "export async function POST(request: Request) { return Response.json({}); }\n",
+        );
+        const stale = await csrfViolations(
+            "app/api/cron/routine-scheduler/route.ts",
+            `${csrfImport}\nexport const POST = withTrustedMutation(async (request: Request) => Response.json({}));\n`,
+        );
+
+        expect(exempted).toEqual([]);
+        expect(stale).toEqual([
+            expect.stringContaining(
+                "app/api/cron/routine-scheduler/route.ts is listed in trustedMutationExemptions but no longer exports an unguarded mutation",
+            ),
+        ]);
+    });
+});
