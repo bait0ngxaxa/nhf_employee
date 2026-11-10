@@ -5,7 +5,7 @@
  * eliminating the need for boilerplate try/catch blocks in UI components.
  */
 
-import { AUTH_MUTATION_HEADERS } from "@/lib/auth/mutation-headers";
+import { applyAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 import {
     fetchWithRefresh,
     isHybridReplayableMethod,
@@ -98,13 +98,7 @@ function createHeaders(
         reqHeaders.set("Content-Type", "application/json");
     }
 
-    const upperMethod = method?.toUpperCase();
-    if (upperMethod && upperMethod !== "GET" && upperMethod !== "HEAD") {
-        if (!reqHeaders.has("X-Requested-With")) {
-            reqHeaders.set("X-Requested-With", AUTH_MUTATION_HEADERS["X-Requested-With"]);
-        }
-    }
-    return reqHeaders;
+    return applyAuthMutationHeaders(reqHeaders, method);
 }
 
 async function parseResponse(response: Response): Promise<unknown> {

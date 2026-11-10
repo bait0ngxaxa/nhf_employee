@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogFooter } from "@/components/ui/dialog";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { withAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 
 import type {
     RoutineBusinessDayPolicy,
@@ -423,11 +424,11 @@ function RoutineTaskForm({
                 initialTask
                     ? API_ROUTES.routines.taskById(initialTask.id)
                     : API_ROUTES.routines.tasks,
-                {
+                withAuthMutationHeaders({
                     method: initialTask ? "PATCH" : "POST",
                     headers,
                     body: JSON.stringify(parsed.data),
-                },
+                }),
             );
             const body: unknown = await response.json().catch(() => null);
             if (!response.ok) {

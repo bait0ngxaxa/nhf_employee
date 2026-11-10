@@ -128,6 +128,7 @@ describe("IT Ticket conversation attachment UI", () => {
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
         expect(new Headers(postInit?.headers).get("Content-Type")).toBe("application/json");
+        expect(new Headers(postInit?.headers).get("X-Requested-With")).toBe("XMLHttpRequest");
         expect(postInit?.body).toBe(JSON.stringify({ body: "ช่วยตรวจสอบด้วยค่ะ" }));
 
         rerender(

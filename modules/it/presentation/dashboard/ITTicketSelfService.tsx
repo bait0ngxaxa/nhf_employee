@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, CircleAlert, Plus, RefreshCw, TicketCheck, X } from "lucide-react";
 
 import { API_ROUTES, APP_ROUTES } from "@/lib/ssot/routes";
+import { withAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -229,11 +230,11 @@ export function ITTicketSelfService({
                 for (const file of selectedFiles) formData.append("attachments", file, file.name);
                 body = formData;
             }
-            const response = await fetch(API_ROUTES.itTickets.list, {
+            const response = await fetch(API_ROUTES.itTickets.list, withAuthMutationHeaders({
                 method: "POST",
                 headers,
                 body,
-            });
+            }));
             const responseBody: unknown = await response.json().catch(() => null);
             if (!response.ok) throw new Error(readITRequesterError(responseBody, response.status));
             const createdTicket = isITTicketResponseRecord(responseBody) && responseBody.success === true

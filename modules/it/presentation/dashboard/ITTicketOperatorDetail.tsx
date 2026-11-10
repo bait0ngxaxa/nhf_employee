@@ -19,6 +19,7 @@ import {
     IT_DASHBOARD_TABS,
     toDashboardITTabPath,
 } from "@/lib/ssot/routes";
+import { withAuthMutationHeaders } from "@/lib/auth/mutation-headers";
 import { ITTicketConversation } from "./ITTicketConversation";
 import { ITTicketActivity } from "../ITTicketActivity";
 
@@ -214,11 +215,11 @@ export function ITTicketOperatorDetail({
         setBusy(true);
 
         try {
-            const response = await fetch(route, {
+            const response = await fetch(route, withAuthMutationHeaders({
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...body, expectedVersion: ticket.version }),
-            });
+            }));
             const payload: unknown = await response.json().catch(() => null);
             if (!response.ok) {
                 const message = readITOperatorError(payload, response.status, true);
