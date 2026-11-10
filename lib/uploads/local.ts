@@ -6,17 +6,22 @@ import {
     IMAGE_UPLOAD_ACCEPTED_TYPES,
     IMAGE_UPLOAD_MAX_BYTES,
 } from "@/lib/ssot/uploads";
+import {
+    PUBLIC_IMAGE_UPLOAD_SCOPE_SEGMENTS as SCOPE_SEGMENTS,
+    type PublicImageUploadScope as UploadScope,
+} from "@/lib/uploads/public-path";
 
 const UPLOAD_ROOT = path.join(process.cwd(), ".uploads");
 const MAX_DIMENSION = 1600;
 const WEBP_QUALITY = 80;
 
-const SCOPE_SEGMENTS = {
-    item: ["stock", "items"],
-    variant: ["stock", "variants"],
-} as const;
-
-type UploadScope = keyof typeof SCOPE_SEGMENTS;
+/** Intentional, client-safe validation failure (file type or size). */
+export class ImageUploadValidationError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "ImageUploadValidationError";
+    }
+}
 
 function isAllowedImageType(contentType: string): boolean {
     return IMAGE_UPLOAD_ACCEPTED_TYPES.includes(
@@ -72,11 +77,11 @@ export async function saveLocalImageUpload(input: {
     const { file, scope } = input;
 
     if (!isAllowedImageType(file.type)) {
-        throw new Error("รองรับเฉพาะไฟล์ JPG, PNG และ WEBP");
+        throw new ImageUploadValidationError("รองรับเฉพาะไฟล์ JPG, PNG และ WEBP");
     }
 
     if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
-        throw new Error("ไฟล์รูปต้องมีขนาดไม่เกิน 8MB");
+        throw new ImageUploadValidationError("ไฟล์รูปต้องมีขนาดไม่เกิน 8MB");
     }
 
     const sourceBuffer = Buffer.from(await file.arrayBuffer());

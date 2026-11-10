@@ -71,3 +71,28 @@ export function getPublicOrigin(request?: NextRequest): string {
 export function buildPublicUrl(path: string, request?: NextRequest): URL {
     return new URL(path, getPublicOrigin(request));
 }
+
+/**
+ * Builds a URL for security-sensitive links (e.g. password reset) that must
+ * never be derived from client-controlled headers in production.
+ *
+ * - Production: uses ONLY the configured PUBLIC_APPROVE_URL origin. If it is
+ *   missing, unparseable or a local origin, returns `null` (fail closed) and
+ *   never falls back to Host / X-Forwarded-Host.
+ * - Non-production: same behaviour as `buildPublicUrl` for local development.
+ */
+export function buildConfiguredPublicUrl(
+    path: string,
+    request?: NextRequest,
+): URL | null {
+    if (!isProduction()) {
+        return buildPublicUrl(path, request);
+    }
+
+    const configuredOrigin = getConfiguredPublicOrigin();
+    if (!configuredOrigin || isLocalOrigin(configuredOrigin)) {
+        return null;
+    }
+
+    return new URL(path, configuredOrigin);
+}

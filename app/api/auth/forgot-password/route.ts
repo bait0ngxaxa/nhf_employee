@@ -1,5 +1,5 @@
 import { NOTIFICATION_MODULES } from "@/shared/notifications/presentation";
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 
 import { sendEmail } from "@/lib/email";
 import { generatePasswordResetEmailHTML } from "@/lib/email/templates/password-reset";
@@ -7,7 +7,7 @@ import { reserveAuthAttempt } from "@/lib/auth/rate-limit";
 import { forgotPasswordSchema } from "@/lib/validations/auth";
 import { AUTH_FORGOT_PASSWORD_MESSAGES } from "@/lib/auth/ssot";
 import { getClientMetadata } from "@/lib/auth/hybrid/session";
-import { buildPublicUrl } from "@/lib/network/public-url";
+import { buildConfiguredPublicUrl } from "@/lib/network/public-url";
 import { requestPasswordReset } from "@/modules/auth";
 
 const MAX_REQUESTS_PER_HOUR = 3;
@@ -16,6 +16,45 @@ const FORGOT_PASSWORD_RATE_LIMIT_POLICY = {
     maxAttemptsPerIdentity: MAX_REQUESTS_PER_HOUR,
     maxAttemptsPerIp: 30,
 } as const;
+
+function errorTypeOf(error: unknown): string {
+    return error instanceof Error ? error.name : typeof error;
+}
+
+/**
+ * Logs only non-identifying context: never the token, the reset URL or the
+ * recipient address.
+ */
+function schedulePasswordResetEmail(input: {
+    readonly to: string;
+    readonly name: string;
+    readonly resetUrl: string;
+}): void {
+    after(async () => {
+        try {
+            const sent = await sendEmail({
+                to: input.to,
+                subject: AUTH_FORGOT_PASSWORD_MESSAGES.resetSubjectThai,
+                fromName: NOTIFICATION_MODULES.Account.sender,
+                html: generatePasswordResetEmailHTML(input.resetUrl, input.name),
+                text: AUTH_FORGOT_PASSWORD_MESSAGES.resetMailTextThai(
+                    input.name,
+                    input.resetUrl,
+                ),
+            });
+            if (!sent) {
+                console.error("Password reset email delivery failed", {
+                    code: "EMAIL_NOT_SENT",
+                });
+            }
+        } catch (error) {
+            console.error("Password reset email delivery failed", {
+                code: "EMAIL_DELIVERY_ERROR",
+                errorType: errorTypeOf(error),
+            });
+        }
+    });
+}
 
 function acceptedResponse(): NextResponse {
     return NextResponse.json({
@@ -68,18 +107,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return acceptedResponse();
         }
 
-        const resetUrl = buildPublicUrl("/reset-password", request);
+        // Production reset links come ONLY from the configured public origin;
+        // never from Host / X-Forwarded-Host (reset-link poisoning).
+        const resetUrl = buildConfiguredPublicUrl("/reset-password", request);
+        if (!resetUrl) {
+            console.error("Password reset email not sent: public origin is not configured", {
+                code: "PUBLIC_ORIGIN_UNCONFIGURED",
+                setting: "PUBLIC_APPROVE_URL",
+            });
+            return acceptedResponse();
+        }
         resetUrl.searchParams.set("token", resetRequest.rawToken);
 
-        await sendEmail({
+        // Delivery runs after the response so response time does not reveal
+        // whether the account exists.
+        schedulePasswordResetEmail({
             to: resetRequest.user.email,
-            subject: AUTH_FORGOT_PASSWORD_MESSAGES.resetSubjectThai,
-            fromName: NOTIFICATION_MODULES.Account.sender,
-            html: generatePasswordResetEmailHTML(resetUrl.toString(), resetRequest.user.name),
-            text: AUTH_FORGOT_PASSWORD_MESSAGES.resetMailTextThai(
-                resetRequest.user.name,
-                resetUrl.toString(),
-            ),
+            name: resetRequest.user.name,
+            resetUrl: resetUrl.toString(),
         });
 
         return acceptedResponse();

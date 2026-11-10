@@ -1,14 +1,35 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import type * as NextServerModule from "next/server";
 
 import { POST as forgotPasswordRoute } from "@/app/api/auth/forgot-password/route";
 import { resetAuthRateLimit } from "@/lib/auth/rate-limit";
 
-const { requestPasswordResetMock, sendEmailMock } = vi.hoisted(() => ({
+const { requestPasswordResetMock, sendEmailMock, afterCallbacks } = vi.hoisted(() => ({
     requestPasswordResetMock: vi.fn(),
     sendEmailMock: vi.fn(),
+    afterCallbacks: [] as Array<() => unknown>,
 }));
+
+vi.mock("next/server", async (importOriginal) => {
+    const actual = await importOriginal<typeof NextServerModule>();
+    return {
+        ...actual,
+        // Capture deferred work instead of running it, so tests can prove that
+        // nothing is sent on the request path.
+        after: vi.fn((callback: () => unknown) => {
+            afterCallbacks.push(callback);
+        }),
+    };
+});
+
+async function flushAfterCallbacks(): Promise<void> {
+    const pending = afterCallbacks.splice(0);
+    for (const callback of pending) {
+        await callback();
+    }
+}
 
 vi.mock("@/modules/auth", () => ({
     requestPasswordReset: requestPasswordResetMock,
@@ -46,6 +67,8 @@ describe("forgot-password route", () => {
         requestPasswordResetMock.mockReset();
         sendEmailMock.mockReset();
         sendEmailMock.mockResolvedValue(true);
+        afterCallbacks.splice(0);
+        vi.unstubAllEnvs();
     });
 
     it("returns the accepted anti-enumeration response for invalid input", async () => {
@@ -77,6 +100,11 @@ describe("forgot-password route", () => {
         expect(knownResponse.status).toBe(200);
         await expect(readResponse(unknownResponse)).resolves.toEqual(acceptedBody);
         await expect(readResponse(knownResponse)).resolves.toEqual(acceptedBody);
+        // Neither response awaited delivery: the send is deferred until after().
+        expect(sendEmailMock).not.toHaveBeenCalled();
+        expect(afterCallbacks).toHaveLength(1);
+
+        await flushAfterCallbacks();
         expect(sendEmailMock).toHaveBeenCalledTimes(1);
         expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({
             subject: "[NHFapp][Account] คำขอรีเซ็ตรหัสผ่าน",
@@ -122,5 +150,118 @@ describe("forgot-password route", () => {
             await expect(readResponse(response)).resolves.toEqual(acceptedBody);
         }
         expect(requestPasswordResetMock).toHaveBeenCalledTimes(3);
+    });
+
+    const KNOWN_USER_RESET = {
+        rateLimited: false,
+        rawToken: "raw-secret-token",
+        user: { email: "known@thainhf.org", name: "Known User" },
+    };
+
+    function buildSpoofedRequest(): NextRequest {
+        return new NextRequest("http://localhost/api/auth/forgot-password", {
+            method: "POST",
+            headers: {
+                "content-type": "application/json",
+                "cf-connecting-ip": "203.0.113.60",
+                host: "attacker.example",
+                "x-forwarded-host": "evil.example",
+                "x-forwarded-proto": "https",
+            },
+            body: JSON.stringify({ email: "known@thainhf.org" }),
+        });
+    }
+
+    it("does not wait for a slow email provider before responding", async () => {
+        requestPasswordResetMock.mockResolvedValue(KNOWN_USER_RESET);
+        sendEmailMock.mockReturnValue(new Promise<boolean>(() => undefined));
+
+        const response = await forgotPasswordRoute(
+            buildRequest({ email: "known@thainhf.org" }),
+        );
+
+        expect(response.status).toBe(200);
+        await expect(readResponse(response)).resolves.toEqual(acceptedBody);
+        expect(sendEmailMock).not.toHaveBeenCalled();
+        expect(afterCallbacks).toHaveLength(1);
+    });
+
+    it.each([
+        ["missing", undefined],
+        ["unparseable", "not a url"],
+        ["localhost", "http://localhost:3000"],
+    ])("fails closed in production when PUBLIC_APPROVE_URL is %s", async (_label, value) => {
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("PUBLIC_APPROVE_URL", value);
+        requestPasswordResetMock.mockResolvedValue(KNOWN_USER_RESET);
+        const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        try {
+            const response = await forgotPasswordRoute(buildSpoofedRequest());
+            await flushAfterCallbacks();
+
+            expect(response.status).toBe(200);
+            await expect(readResponse(response)).resolves.toEqual(acceptedBody);
+            expect(sendEmailMock).not.toHaveBeenCalled();
+            expect(errorLog).toHaveBeenCalledWith(
+                expect.stringContaining("public origin is not configured"),
+                expect.objectContaining({ code: "PUBLIC_ORIGIN_UNCONFIGURED" }),
+            );
+            const logged = JSON.stringify(errorLog.mock.calls);
+            expect(logged).not.toContain("raw-secret-token");
+            expect(logged).not.toContain("known@thainhf.org");
+        } finally {
+            errorLog.mockRestore();
+        }
+    });
+
+    it("never uses a spoofed Host or X-Forwarded-Host in the production reset URL", async () => {
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("PUBLIC_APPROVE_URL", "https://nhfapp.example");
+        requestPasswordResetMock.mockResolvedValue(KNOWN_USER_RESET);
+
+        const response = await forgotPasswordRoute(buildSpoofedRequest());
+        await flushAfterCallbacks();
+
+        expect(response.status).toBe(200);
+        expect(sendEmailMock).toHaveBeenCalledTimes(1);
+        const sent = JSON.stringify(sendEmailMock.mock.calls[0]);
+        expect(sent).toContain("https://nhfapp.example/reset-password?token=raw-secret-token");
+        expect(sent).not.toContain("attacker.example");
+        expect(sent).not.toContain("evil.example");
+    });
+
+    it.each([
+        ["the provider reports failure", () => sendEmailMock.mockResolvedValue(false)],
+        [
+            "the provider throws",
+            () => sendEmailMock.mockRejectedValue(
+                new Error("SMTP rejected known@thainhf.org raw-secret-token"),
+            ),
+        ],
+    ])("logs delivery failure safely when %s", async (_label, arrange) => {
+        requestPasswordResetMock.mockResolvedValue(KNOWN_USER_RESET);
+        arrange();
+        const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+        try {
+            const response = await forgotPasswordRoute(
+                buildRequest({ email: "known@thainhf.org" }, "203.0.113.70"),
+            );
+            await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+
+            expect(response.status).toBe(200);
+            await expect(readResponse(response)).resolves.toEqual(acceptedBody);
+            expect(errorLog).toHaveBeenCalledWith(
+                "Password reset email delivery failed",
+                expect.objectContaining({ code: expect.any(String) }),
+            );
+            const logged = JSON.stringify(errorLog.mock.calls);
+            expect(logged).not.toContain("raw-secret-token");
+            expect(logged).not.toContain("reset-password");
+            expect(logged).not.toContain("known@thainhf.org");
+        } finally {
+            errorLog.mockRestore();
+        }
     });
 });

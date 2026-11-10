@@ -30,6 +30,13 @@ describe("mutation rate limit", () => {
             .toEqual({ windowMs: 60 * 1000, maxRequests: 10 });
     });
 
+    it("uses the dedicated process-local Stock image upload budgets", () => {
+        expect(PRE_AUTH_IP_RATE_LIMIT_POLICIES["stock-image-upload"])
+            .toEqual({ windowMs: 15 * 60 * 1000, maxRequests: 120 });
+        expect(AUTHENTICATED_MUTATION_RATE_LIMIT_POLICIES["stock-image-upload"])
+            .toEqual({ windowMs: 60 * 1000, maxRequests: 20 });
+    });
+
     it("uses the dedicated process-local IT Ticket creation budgets", () => {
         expect(PRE_AUTH_IP_RATE_LIMIT_POLICIES["it-ticket-create"])
             .toEqual({ windowMs: 15 * 60 * 1000, maxRequests: 60 });

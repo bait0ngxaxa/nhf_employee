@@ -11,6 +11,28 @@
 - Orphan cleanup ของแต่ละ domain ต้องใช้ external scheduler, secret แยก และ dry-run ก่อนเปิดลบจริง; ห้าม log secret, storage key, path หรือ private bytes
 - Production รองรับหนึ่ง Next.js process; shared filesystem อย่างเดียวไม่ทำให้ multi-process/multi-host ปลอดภัย เพราะ rate limiter เป็น process-local. การย้อน application ต้องเข้ากับ forward-only schema และคงตาราง/ไฟล์ไว้
 
+## App-level request body limits
+
+production ไม่มี Nginx ใน request path ดังนั้น limit ด้านล่างเป็นชั้นเดียวในแอปที่จำกัดขนาด body (นอกเหนือจาก plan limit ของ Cloudflare)
+ทุกตัวใช้ bounded reader ใน `lib/server/request-body.ts`: Content-Length ใช้ปฏิเสธเร็วเท่านั้น และแอปยังนับ bytes จริงจาก stream
+ก่อน parse JSON หรือสร้าง `FormData`; เกิน limit ตอบ `413`
+
+| Request | Limit | แหล่งค่า |
+| --- | --- | --- |
+| Leave request multipart (หลักฐาน) | 25,000,000 bytes | `LEAVE_ATTACHMENT_MAX_REQUEST_BYTES` (`modules/leave/infrastructure/attachments/constants.ts`) |
+| IT Ticket create (JSON และ multipart) และ IT comment multipart | 25,000,000 bytes | `IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES` (`modules/it/contracts.ts`) |
+| Stock image upload `POST /api/uploads/image` | 8 MiB + 64 KiB multipart overhead (8,454,144 bytes) | `IMAGE_UPLOAD_MAX_REQUEST_BYTES` (`lib/ssot/uploads.ts`) |
+| IT comment JSON | 64 KiB | `IT_TICKET_COMMENT_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`) |
+| Routine JSON | 64 KiB | `ROUTINE_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`) |
+| Leave JSON / Stock JSON ที่ผ่าน module HTTP helper | 32 KiB | `LEAVE_JSON_MUTATION_MAX_BYTES`, `STOCK_JSON_MUTATION_MAX_BYTES` (`lib/ssot/request-limits.ts`) |
+| LINE auth | 16 KiB | `LINE_AUTH_MAX_REQUEST_BYTES` (`modules/line/presentation/http.ts`) |
+| Announcement manage / Email request access requirements | 8,192 / 4,096 bytes | ค่าคงที่ภายใน route |
+
+**ยังไม่มี limit ในแอป:** route ที่ยังเรียก `request.json()` ตรง (เช่น auth, employees, employee import แบบ JSON,
+authorization administration, IT operator PATCH, stock categories/items, leave approvers, email request, audit log export)
+มีแผนย้ายไปใช้ bounded reader พร้อมค่า default/override ใน `lib/ssot/request-limits.ts` ใน PR แยก จนกว่าจะเสร็จ
+route เหล่านี้ถูกจำกัดโดย plan limit ของ Cloudflare เท่านั้น LINE webhook อ่าน raw body เพื่อตรวจ signature และอยู่นอกแผนนี้
+
 ## Leave-specific rules and procedures
 
 ### Storage boundary และ permission
