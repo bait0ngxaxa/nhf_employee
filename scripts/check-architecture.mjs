@@ -3041,10 +3041,6 @@ const rawRequestBodyExemptions = new Map([
         "app/api/line/webhook/route.ts",
         "LINE signature verification must run over the exact raw body bytes; reading through the bounded UTF-8 decoder could change those bytes.",
     ],
-    [
-        "app/api/leave/approvers/route.ts",
-        "PENDING owner decision: the assignments array has no schema maximum, so no realistic limit can be derived from code.",
-    ],
 ]);
 
 function getRequestTypedParameterNames(sourceFile) {

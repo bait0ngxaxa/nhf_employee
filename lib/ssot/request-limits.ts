@@ -54,3 +54,13 @@ export const EMPLOYEE_IMPORT_ROW_JSON_OVERHEAD_BYTES = 512;
 export const EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES =
     2 * EMPLOYEE_IMPORT_CSV_MAX_FILE_BYTES
     + EMPLOYEE_IMPORT_LIMIT_BASIS_ROWS * EMPLOYEE_IMPORT_ROW_JSON_OVERHEAD_BYTES;
+
+// Leave approver assignments: owner-chosen ceiling of one assignment per
+// employee (duplicate employeeIds are already rejected), i.e. the largest
+// workforce a single approver save supports. Enforced by
+// leaveApproverAssignmentsSchema.
+export const LEAVE_APPROVER_ASSIGNMENTS_MAX = 5000;
+
+// 5,000 assignments × 49 B (largest: {"employeeId":2147483647,"managerId":2147483647},
+// since ids are MySQL INT ≤ 10 digits) + 1 KiB envelope = 246,024 B → 256 KiB.
+export const LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES = 256 * 1024;

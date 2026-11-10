@@ -8,6 +8,8 @@ import {
     EMPLOYEE_IMPORT_JSON_MAX_REQUEST_BYTES,
     EMPLOYEE_IMPORT_LIMIT_BASIS_ROWS,
     EMPLOYEE_IMPORT_ROW_JSON_OVERHEAD_BYTES,
+    LEAVE_APPROVER_ASSIGNMENTS_MAX,
+    LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
     STOCK_ITEM_JSON_MAX_REQUEST_BYTES,
 } from "@/lib/ssot/request-limits";
 import {
@@ -35,6 +37,7 @@ import {
     createItemSchema,
     updateItemSchema,
 } from "@/modules/stock";
+import { leaveApproverAssignmentsSchema } from "@/modules/leave";
 import {
     buildMaximalCreateItemPayload,
     buildMaximalUpdateItemPayload,
@@ -163,5 +166,28 @@ describe("request body limit derivations", () => {
             status: "",
         }) + ",";
         expect(utf8ByteLength(keyOverheadRow)).toBeLessThan(EMPLOYEE_IMPORT_ROW_JSON_OVERHEAD_BYTES);
+    });
+    it("fits the maximal schema-valid Leave approver payload and rejects one over the cap", () => {
+        // Employee ids are MySQL INT, so the largest real id has 10 digits.
+        const largestAssignment = { employeeId: 2147483647, managerId: 2147483647 };
+        expect(utf8ByteLength(`${JSON.stringify(largestAssignment)},`)).toBe(49);
+        expect(LEAVE_APPROVER_ASSIGNMENTS_MAX * 49 + 1024).toBeLessThanOrEqual(
+            LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
+        );
+
+        const build = (count: number): { assignments: Array<typeof largestAssignment> } => ({
+            assignments: Array.from({ length: count }, (_unused, index) => ({
+                employeeId: largestAssignment.employeeId - index,
+                managerId: largestAssignment.managerId,
+            })),
+        });
+
+        expectFits(
+            leaveApproverAssignmentsSchema,
+            build(LEAVE_APPROVER_ASSIGNMENTS_MAX),
+            LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
+        );
+        expect(leaveApproverAssignmentsSchema.safeParse(build(LEAVE_APPROVER_ASSIGNMENTS_MAX + 1)).success)
+            .toBe(false);
     });
 });

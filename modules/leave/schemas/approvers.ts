@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { LEAVE_APPROVER_ASSIGNMENTS_MAX } from "@/lib/ssot/request-limits";
+
 export const leaveApproverAssignmentsSchema = z.object({
     assignments: z
         .array(
@@ -9,6 +11,10 @@ export const leaveApproverAssignmentsSchema = z.object({
             }),
         )
         .min(1, "At least one assignment required")
+        .max(
+            LEAVE_APPROVER_ASSIGNMENTS_MAX,
+            `At most ${LEAVE_APPROVER_ASSIGNMENTS_MAX} assignments allowed`,
+        )
         .superRefine((assignments, context) => {
             const seenEmployeeIds = new Set<number>();
             assignments.forEach((assignment, index) => {
