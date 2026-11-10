@@ -1,6 +1,8 @@
 import type { NextResponse } from "next/server";
 
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import { badRequest, forbidden, jsonError, notFound } from "@/lib/ssot/http";
+import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 import {
     AuthorizationAdministrationAccessError,
     AuthorizationAdministrationMutationError,
@@ -13,12 +15,13 @@ export async function readAuthorizationAdministrationJsonBody(
     | { readonly ok: true; readonly body: unknown }
     | { readonly ok: false; readonly response: NextResponse }
 > {
-    try {
-        const body: unknown = await request.json();
-        return { ok: true, body };
-    } catch {
-        return { ok: false, response: badRequest({ code: "INVALID_INPUT" }) };
-    }
+    const result = await readRouteJsonBody(request, {
+        maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
+        invalidJson: () => badRequest({ code: "INVALID_INPUT" }),
+    });
+    return result.ok
+        ? { ok: true, body: result.body }
+        : { ok: false, response: result.response };
 }
 
 const BAD_REQUEST_CODES = new Set<AuthorizationAdministrationMutationErrorCode>([

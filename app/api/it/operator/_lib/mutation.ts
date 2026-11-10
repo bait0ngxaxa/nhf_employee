@@ -10,6 +10,8 @@ import {
 import type { ITAuthorizationContext } from "@/modules/it";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import { scheduleITTicketOutboxWakeup } from "@/lib/server/it-ticket-outbox-wakeup";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 
 import { mapITOperatorRouteError, parseITOperatorTicketId } from "./response";
 
@@ -49,13 +51,13 @@ export async function patchITOperatorTicket<TBody extends object>(
             return jsonError("รหัส Ticket ไม่ถูกต้อง", 400, { success: false });
         }
 
-        let body: unknown;
-        try {
-            body = await request.json();
-        } catch {
-            return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false });
-        }
-        const parsed = schema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            invalidJson: () => jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false }),
+            tooLargeDetails: { success: false },
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const parsed = schema.safeParse(bodyResult.body);
         if (!parsed.success) {
             return jsonError("กรุณาตรวจสอบข้อมูลที่ส่งมา", 400, { success: false });
         }

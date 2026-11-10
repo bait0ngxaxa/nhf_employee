@@ -16,6 +16,8 @@ import {
     getAuditFamilyCorrelation,
 } from "@/modules/auth";
 import { appendAuditBestEffort } from "@/modules/audit";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 
 const revokeSessionSchema = z.object({
     sessionId: z.string().min(1).max(64),
@@ -29,8 +31,16 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.unauthorized }, { status: 401 });
         }
 
-        const body = await request.json();
-        const parsed = revokeSessionSchema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => NextResponse.json(
+                { error: AUTH_ERROR_MESSAGES.internalServerError },
+                { status: 500 },
+            ),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const parsed = revokeSessionSchema.safeParse(bodyResult.body);
         if (!parsed.success) {
             return NextResponse.json({ error: AUTH_ERROR_MESSAGES.forbidden }, { status: 400 });
         }

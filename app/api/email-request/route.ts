@@ -20,6 +20,8 @@ import {
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { idempotencyKeySchema } from "@/lib/validations/idempotency";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
@@ -47,8 +49,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return jsonError("กรุณาระบุ Idempotency-Key ที่ถูกต้อง", 400);
         }
 
-        const body = await req.json();
-        const validation = emailRequestSchema.safeParse(body);
+        const bodyResult = await readRouteJsonBody(req, {
+            maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => operationFailed(500, { success: false }),
+            tooLargeDetails: { success: false },
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const validation = emailRequestSchema.safeParse(bodyResult.body);
 
         if (!validation.success) {
             const errorMessages = validation.error.issues.map((issue) => issue.message).join(", ");

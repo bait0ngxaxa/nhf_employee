@@ -7,6 +7,15 @@ import type * as AuthModule from "@/modules/auth";
 import type * as AuthorizationModule from "@/modules/authorization";
 
 import { AUTH_MUTATION_HEADERS } from "@/lib/auth/csrf";
+import {
+    DEFAULT_JSON_MUTATION_MAX_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const mocks = vi.hoisted(() => ({
     requireAdminSession: vi.fn(),
@@ -703,5 +712,66 @@ describe("Authorization Administration mutation API boundary", () => {
 
         expect(response.status).toBe(403);
         expect(await response.json()).toEqual({ error: "Forbidden" });
+    });
+    const bodyRoutes = mutationRoutes.filter((route) => route.body !== undefined);
+    const bodyLimitHeaders = { ...AUTH_MUTATION_HEADERS, origin: "http://localhost" };
+
+    it("covers every JSON body mutation route with the body-limit cases", () => {
+        expect(bodyRoutes.length).toBe(13);
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 before the command on every JSON route (Content-Length %s)",
+        async (contentLength) => {
+            for (const route of bodyRoutes) {
+                const response = await invokeRoute(
+                    route.handler,
+                    buildJsonBodyRequest(
+                        `http://localhost${route.path}`,
+                        jsonBodyOfExactBytes(route.body, DEFAULT_JSON_MUTATION_MAX_BYTES + 1),
+                        { method: route.method, headers: bodyLimitHeaders, contentLength },
+                    ),
+                    route.params,
+                );
+
+                expect(response.status, `${route.method} ${route.path}`).toBe(413);
+                expect(await response.json()).toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+                expect(route.command, `${route.method} ${route.path}`).not.toHaveBeenCalled();
+            }
+        },
+    );
+
+    it("keeps the previous 400 INVALID_INPUT response for malformed JSON on every JSON route", async () => {
+        for (const route of bodyRoutes) {
+            const response = await invokeRoute(
+                route.handler,
+                buildJsonBodyRequest(`http://localhost${route.path}`, "{not json", {
+                    method: route.method,
+                    headers: bodyLimitHeaders,
+                }),
+                route.params,
+            );
+
+            expect(response.status, `${route.method} ${route.path}`).toBe(400);
+            expect(await response.json()).toEqual({ error: "Bad request", code: "INVALID_INPUT" });
+            expect(route.command).not.toHaveBeenCalled();
+        }
+    });
+
+    it("runs the command with a valid body of exactly the limit on every JSON route", async () => {
+        for (const route of bodyRoutes) {
+            const response = await invokeRoute(
+                route.handler,
+                buildJsonBodyRequest(
+                    `http://localhost${route.path}`,
+                    jsonBodyOfExactBytes(route.body, DEFAULT_JSON_MUTATION_MAX_BYTES),
+                    { method: route.method, headers: bodyLimitHeaders },
+                ),
+                route.params,
+            );
+
+            expect(response.status, `${route.method} ${route.path}`).toBeLessThan(300);
+            expect(route.command, `${route.method} ${route.path}`).toHaveBeenCalledTimes(1);
+        }
     });
 });

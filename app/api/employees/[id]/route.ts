@@ -1,4 +1,6 @@
 import { after, type NextRequest, NextResponse } from "next/server";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
 
 import { requireApiSession } from "@/lib/auth/api";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
@@ -53,8 +55,15 @@ export async function PATCH(
             return jsonError(COMMON_API_MESSAGES.invalidEmployeeId, 400);
         }
 
-        const body = await request.json();
-        const validationResult = updateEmployeeSchema.safeParse(body);
+        // Existing order: this route validates the body before the session
+        // check. The read is now bounded, so it can no longer exhaust memory.
+        const bodyResult = await readRouteJsonBody(request, {
+            maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            // Pre-existing contract: malformed JSON fell through to the 500 catch.
+            invalidJson: () => jsonError(COMMON_API_MESSAGES.failedToUpdateEmployee, 500),
+        });
+        if (!bodyResult.ok) return bodyResult.response;
+        const validationResult = updateEmployeeSchema.safeParse(bodyResult.body);
         if (!validationResult.success) {
             const errors = validationResult.error.flatten();
             return jsonError(COMMON_API_MESSAGES.invalidInput, 400, {

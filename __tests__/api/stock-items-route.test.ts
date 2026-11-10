@@ -14,9 +14,37 @@ import {
     StockCapabilityDeniedError,
 } from "@/modules/stock";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
+import type * as NextServerModule from "next/server";
+import { POST as createCategoryRoute } from "@/app/api/stock/categories/route";
+import { POST as createItemRoute } from "@/app/api/stock/items/route";
+import { POST as adjustItemRoute } from "@/app/api/stock/items/[id]/adjust/route";
+import { resetMutationRateLimit } from "@/lib/security/mutation-rate-limit";
+import {
+    DEFAULT_JSON_MUTATION_MAX_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+    STOCK_ITEM_JSON_MAX_REQUEST_BYTES,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
+import {
+    buildMaximalCreateItemPayload,
+    buildMaximalUpdateItemPayload,
+} from "@/__tests__/helpers/maximal-stock-payloads";
 
 const stockAuthorizationMock = vi.hoisted(() => ({
     assert: vi.fn(),
+}));
+
+vi.mock("next/server", async (importOriginal) => {
+    const actual = await importOriginal<typeof NextServerModule>();
+    return { ...actual, after: vi.fn((callback: () => unknown) => callback()) };
+});
+
+vi.mock("@/lib/services/outbox/processor", () => ({
+    processOutbox: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/lib/auth/server", () => ({
@@ -45,6 +73,9 @@ vi.mock("@/modules/stock", async () => {
         stockService: {
             ...actual.stockService,
             updateItem: vi.fn(),
+            createCategory: vi.fn(),
+            createItem: vi.fn(),
+            adjustStock: vi.fn(),
         },
     };
 });
@@ -289,5 +320,136 @@ describe("Stock Item Routes", () => {
         );
 
         expect(response.status).toBe(403);
+    });
+});
+
+describe("Stock JSON mutation body limits", () => {
+    type StockRoute = {
+        readonly label: string;
+        readonly url: string;
+        readonly method: "POST" | "PATCH";
+        readonly limit: number;
+        readonly body: Record<string, unknown>;
+        readonly maximalBody?: () => Record<string, unknown>;
+        readonly invoke: (request: NextRequest) => Promise<Response>;
+        readonly command: () => unknown;
+        readonly successStatus: number;
+    };
+
+    const idParams = (): { params: Promise<{ id: string }> } => ({
+        params: Promise.resolve({ id: "42" }),
+    });
+    const routes: readonly StockRoute[] = [
+        {
+            label: "POST /api/stock/categories",
+            url: "http://localhost/api/stock/categories",
+            method: "POST",
+            limit: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            body: { name: "เครื่องเขียน" },
+            invoke: (request) => createCategoryRoute(request),
+            command: () => stockService.createCategory,
+            successStatus: 201,
+        },
+        {
+            label: "POST /api/stock/items",
+            url: "http://localhost/api/stock/items",
+            method: "POST",
+            limit: STOCK_ITEM_JSON_MAX_REQUEST_BYTES,
+            body: { name: "ปากกา", categoryId: 1, variants: [{ unit: "ด้าม", quantity: 1, minStock: 1 }] },
+            maximalBody: buildMaximalCreateItemPayload,
+            invoke: (request) => createItemRoute(request),
+            command: () => stockService.createItem,
+            successStatus: 201,
+        },
+        {
+            label: "PATCH /api/stock/items/[id]",
+            url: "http://localhost/api/stock/items/42",
+            method: "PATCH",
+            limit: STOCK_ITEM_JSON_MAX_REQUEST_BYTES,
+            body: { name: "ปากกาใหม่" },
+            maximalBody: buildMaximalUpdateItemPayload,
+            invoke: (request) => patchItemRoute(request, idParams()),
+            command: () => stockService.updateItem,
+            successStatus: 200,
+        },
+        {
+            label: "POST /api/stock/items/[id]/adjust",
+            url: "http://localhost/api/stock/items/42/adjust",
+            method: "POST",
+            limit: DEFAULT_JSON_MUTATION_MAX_BYTES,
+            body: { type: "IN", quantity: 5, minStock: 1 },
+            invoke: (request) => adjustItemRoute(request, idParams()),
+            command: () => stockService.adjustStock,
+            successStatus: 200,
+        },
+    ];
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        resetMutationRateLimit();
+        mockAdmin();
+        stockAuthorizationMock.assert.mockResolvedValue({ scopes: ["ALL"] } as never);
+        vi.mocked(stockService.createCategory).mockResolvedValue({ id: 1 } as never);
+        vi.mocked(stockService.createItem).mockResolvedValue({ id: 42 } as never);
+        vi.mocked(stockService.updateItem).mockResolvedValue(updatedItem as never);
+        vi.mocked(stockService.adjustStock).mockResolvedValue({ id: 7 } as never);
+    });
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized body with 413 before the Stock command (Content-Length %s)",
+        async (contentLength) => {
+            for (const route of routes) {
+                const response = await route.invoke(buildJsonBodyRequest(
+                    route.url,
+                    jsonBodyOfExactBytes(route.body, route.limit + 1),
+                    { method: route.method, contentLength },
+                ));
+
+                expect(response.status, route.label).toBe(413);
+                expect(await response.json()).toEqual({ error: REQUEST_BODY_TOO_LARGE_MESSAGE });
+                expect(route.command(), route.label).not.toHaveBeenCalled();
+            }
+        },
+    );
+
+    it("keeps the previous 500 response for malformed JSON", async () => {
+        for (const route of routes) {
+            const response = await route.invoke(
+                buildJsonBodyRequest(route.url, "{not json", { method: route.method }),
+            );
+
+            expect(response.status, route.label).toBe(500);
+            expect(await response.json()).toEqual({ error: "Internal server error" });
+            expect(route.command(), route.label).not.toHaveBeenCalled();
+        }
+    });
+
+    it("runs the command with a valid body of exactly the limit", async () => {
+        for (const route of routes) {
+            const response = await route.invoke(buildJsonBodyRequest(
+                route.url,
+                jsonBodyOfExactBytes(route.body, route.limit),
+                { method: route.method },
+            ));
+
+            expect(response.status, route.label).toBe(route.successStatus);
+            expect(route.command(), route.label).toHaveBeenCalledTimes(1);
+        }
+    });
+
+    it("accepts the maximal schema-valid Stock item payloads padded to exactly the limit", async () => {
+        const itemRoutes = routes.filter((candidate) => candidate.maximalBody !== undefined);
+        expect(itemRoutes).toHaveLength(2);
+        for (const route of itemRoutes) {
+            const payload = route.maximalBody === undefined ? {} : route.maximalBody();
+            const response = await route.invoke(buildJsonBodyRequest(
+                route.url,
+                jsonBodyOfExactBytes(payload, route.limit),
+                { method: route.method },
+            ));
+
+            expect(response.status, route.label).toBe(route.successStatus);
+            expect(route.command(), route.label).toHaveBeenCalledTimes(1);
+        }
     });
 });

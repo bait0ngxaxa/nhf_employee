@@ -10,6 +10,15 @@ import {
     EmailRequestCapabilityDeniedError,
 } from "@/modules/it";
 import { processOutbox } from "@/lib/services/outbox/processor";
+import {
+    DEFAULT_JSON_MUTATION_MAX_BYTES,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
+import {
+    buildJsonBodyRequest,
+    CONTENT_LENGTH_MODES,
+    jsonBodyOfExactBytes,
+} from "@/__tests__/helpers/request-body-limit";
 
 const authorizationMocks = vi.hoisted(() => ({
     assertEmailRequestCapability: vi.fn(),
@@ -467,5 +476,58 @@ describe("/api/email-request", () => {
         const response = await GET(new NextRequest("http://localhost/api/email-request"));
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({ emailRequests: [{ canUpdateAccessRequirements: expected }] });
+    });
+    const EMAIL_REQUEST_URL = "http://localhost/api/email-request";
+    const idempotencyHeaders = { "Idempotency-Key": "body-limit-key-0001" };
+
+    it.each(CONTENT_LENGTH_MODES)(
+        "rejects an oversized POST body with 413 before creating a request (Content-Length %s)",
+        async (contentLength) => {
+            const response = await POST(buildJsonBodyRequest(
+                EMAIL_REQUEST_URL,
+                jsonBodyOfExactBytes(VALID_BODY, DEFAULT_JSON_MUTATION_MAX_BYTES + 1),
+                { headers: idempotencyHeaders, contentLength },
+            ));
+
+            expect(response.status).toBe(413);
+            expect(await response.json()).toEqual({
+                error: REQUEST_BODY_TOO_LARGE_MESSAGE,
+                success: false,
+            });
+            expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
+            expect(createAuditLog).not.toHaveBeenCalled();
+        },
+    );
+
+    it("keeps the previous 500 response for a malformed POST body", async () => {
+        const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            const response = await POST(buildJsonBodyRequest(EMAIL_REQUEST_URL, "{not json", {
+                headers: idempotencyHeaders,
+            }));
+
+            expect(response.status).toBe(500);
+            expect(await response.json()).toEqual({ error: "Operation failed", success: false });
+            expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
+        } finally {
+            errorLog.mockRestore();
+        }
+    });
+
+    it("creates a request with a valid POST body of exactly the limit", async () => {
+        vi.mocked(emailRequestService.createEmailRequest).mockResolvedValue({
+            success: true,
+            replayed: false,
+            emailRequest: EXISTING_EMAIL_REQUEST,
+        } as never);
+
+        const response = await POST(buildJsonBodyRequest(
+            EMAIL_REQUEST_URL,
+            jsonBodyOfExactBytes(VALID_BODY, DEFAULT_JSON_MUTATION_MAX_BYTES),
+            { headers: idempotencyHeaders },
+        ));
+
+        expect(response.status).toBe(201);
+        expect(emailRequestService.createEmailRequest).toHaveBeenCalledTimes(1);
     });
 });
