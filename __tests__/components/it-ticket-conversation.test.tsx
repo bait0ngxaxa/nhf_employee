@@ -144,11 +144,13 @@ describe("IT Ticket conversation attachment UI", () => {
         await screen.findByRole("alert");
         expect(allowDashboardNavigation()).toBe(false);
         expect(alert).toHaveBeenLastCalledWith(expect.stringContaining("ส่งข้อความเดิม"));
-        // Clearing the draft must not make the uncertain attempt look clean.
+        // Unresolved attempts lock the composer and remain dirty until the original operation is retried.
         fireEvent.change(field, { target: { value: "" } });
+        expect(field).toBeDisabled();
+        expect(field).toHaveValue("ข้อความเดิม");
         expect(allowDashboardNavigation()).toBe(false);
         fireEvent.change(field, { target: { value: "ข้อความเดิม" } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
         expect(keys[0]).toBe(keys[1]);
         expect(allowDashboardNavigation()).toBe(true);
@@ -264,7 +266,7 @@ describe("IT Ticket conversation attachment UI", () => {
         fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความเดิม" } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByRole("alert");
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
         expect(keys[0]).not.toBe("");
         expect(keys[0]).toBe(keys[1]);
@@ -297,7 +299,9 @@ describe("IT Ticket conversation attachment UI", () => {
         expect(await screen.findByAltText("ตัวอย่างรูปภาพ proof.png")).toBeTruthy();
 
         fireEvent.change(bodyField, { target: { value: " \nข้อความเดิม\t " } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        expect(bodyField).toBeDisabled();
+        expect(bodyField).toHaveValue("ข้อความเดิม");
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
         expect(keys[0]).toBe(keys[1]);
         expect(bodyField.value).toBe("");
@@ -315,18 +319,27 @@ describe("IT Ticket conversation attachment UI", () => {
         expect(screen.queryByAltText("ตัวอย่างรูปภาพ proof.png")).toBeNull();
     });
 
-    it("uses a new key when the canonical body changes after an uncertain request", async () => {
+    it("keeps the original payload and key when the body is edited during an uncertain request", async () => {
         const keys: string[] = [];
+        const payloads: Array<{ readonly body: string; readonly attachments: readonly string[] }> = [];
         let postCount = 0;
         const proof = file("proof.png", "same-image-content");
         setupFetch(async (init) => {
             keys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+            const requestBody = init.body;
+            if (!(requestBody instanceof FormData)) throw new Error("Expected multipart comment retry");
+            payloads.push({
+                body: String(requestBody.get("body")),
+                attachments: requestBody.getAll("attachments").map((attachment) =>
+                    attachment instanceof File ? `${attachment.name}:${attachment.size}` : String(attachment),
+                ),
+            });
             postCount += 1;
             if (postCount === 1) throw new Error("network result uncertain");
             return jsonResponse(submittedComment(
                 [attachmentSummary("b".repeat(32), "proof.png")],
-                "ข้อความใหม่",
-                "cm-updated-body",
+                "ข้อความเดิม",
+                "cm-original-body",
             ));
         });
         renderConversation();
@@ -336,18 +349,34 @@ describe("IT Ticket conversation attachment UI", () => {
         fireEvent.change(input, { target: { files: [proof] } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByRole("alert");
+        expect(bodyField).toBeDisabled();
+        expect(input).toBeDisabled();
         fireEvent.change(bodyField, { target: { value: "ข้อความใหม่" } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        expect(bodyField).toHaveValue("ข้อความเดิม");
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
         expect(keys).toHaveLength(2);
-        expect(keys[1]).not.toBe(keys[0]);
+        expect(keys[1]).toBe(keys[0]);
+        expect(payloads).toEqual([
+            { body: "ข้อความเดิม", attachments: ["proof.png:18"] },
+            { body: "ข้อความเดิม", attachments: ["proof.png:18"] },
+        ]);
     });
 
-    it("uses a new key when attachment content changes after an uncertain request", async () => {
+    it("keeps the original attachment and key when attachments are changed during an uncertain request", async () => {
         const keys: string[] = [];
+        const payloads: Array<{ readonly body: string; readonly attachments: readonly string[] }> = [];
         let postCount = 0;
         setupFetch(async (init) => {
             keys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+            const requestBody = init.body;
+            if (!(requestBody instanceof FormData)) throw new Error("Expected multipart comment retry");
+            payloads.push({
+                body: String(requestBody.get("body")),
+                attachments: requestBody.getAll("attachments").map((attachment) =>
+                    attachment instanceof File ? `${attachment.name}:${attachment.size}` : String(attachment),
+                ),
+            });
             postCount += 1;
             if (postCount === 1) throw new Error("network result uncertain");
             return jsonResponse(submittedComment(
@@ -362,11 +391,17 @@ describe("IT Ticket conversation attachment UI", () => {
         fireEvent.change(input, { target: { files: [file("proof.png", "first-content")] } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByRole("alert");
+        expect(input).toBeDisabled();
         fireEvent.click(screen.getByRole("button", { name: "นำรูป proof.png ออก" }));
         fireEvent.change(input, { target: { files: [file("proof.png", "changed-content")] } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        expect(screen.getByText("proof.png")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
         await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
         expect(keys).toHaveLength(2);
-        expect(keys[1]).not.toBe(keys[0]);
+        expect(keys[1]).toBe(keys[0]);
+        expect(payloads).toEqual([
+            { body: "ข้อความเดิม", attachments: ["proof.png:13"] },
+            { body: "ข้อความเดิม", attachments: ["proof.png:13"] },
+        ]);
     });
 });

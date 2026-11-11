@@ -92,7 +92,7 @@ function mockApiImplementation(
     });
 }
 
-function postedCommentResponse(replayed = false): Response {
+function postedCommentResponse(replayed = false, body = "ขออัปเดตผลตรวจสอบค่ะ"): Response {
     return apiResponse({
         success: true,
         replayed,
@@ -102,7 +102,7 @@ function postedCommentResponse(replayed = false): Response {
             createdAt: "2026-09-03T01:00:00.000Z",
             authorDisplayName: "ผู้แจ้งตัวอย่าง",
             authorSide: "REQUESTER",
-            body: "ขออัปเดตผลตรวจสอบค่ะ",
+            body,
             attachments: [],
         },
     }, replayed ? 200 : 201);
@@ -454,7 +454,7 @@ describe("IT Ticket requester detail", () => {
         expect(await screen.findByRole("alert")).toHaveTextContent("network result uncertain");
         expect(screen.getByText("การตอบกลับจะไม่เปลี่ยนสถานะ Ticket อัตโนมัติ"))
             .toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
 
         expect(await screen.findByText("ข้อความนี้ถูกส่งเรียบร้อยแล้ว")).toBeInTheDocument();
         expect(screen.getByText("ขออัปเดตผลตรวจสอบค่ะ")).toBeInTheDocument();
@@ -466,14 +466,14 @@ describe("IT Ticket requester detail", () => {
         expect(JSON.parse(String(postCalls[0][1]?.body))).toEqual({ body: "ขออัปเดตผลตรวจสอบค่ะ" });
     });
 
-    it("uses a new idempotency key when the canonical body changes after uncertainty", async () => {
-        randomUUID.mockReturnValueOnce("it-comment-key-a").mockReturnValueOnce("it-comment-key-b");
+    it("keeps the original body and idempotency key when the draft changes after uncertainty", async () => {
+        randomUUID.mockReturnValueOnce("it-comment-key-a");
         mockApiImplementation(async (input, init) => {
             if (init?.method === "POST") {
                 const count = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST").length;
                 return count === 1
                     ? Promise.reject(new Error("network result uncertain"))
-                    : postedCommentResponse();
+                    : postedCommentResponse(true, "ข้อความแรก");
             }
             if (String(input).includes("/conversation")) return conversationResponse();
             return String(input).includes("/activity")
@@ -485,14 +485,20 @@ describe("IT Ticket requester detail", () => {
         fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความแรก" } });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         await screen.findByRole("alert");
-        fireEvent.change(screen.getByLabelText("ตอบกลับ"), { target: { value: "ข้อความใหม่" } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
-        await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
+        const composer = screen.getByLabelText("ตอบกลับ");
+        expect(composer).toBeDisabled();
+        fireEvent.change(composer, { target: { value: "ข้อความใหม่" } });
+        expect(composer).toHaveValue("ข้อความแรก");
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
+        await screen.findByText("ข้อความนี้ถูกส่งเรียบร้อยแล้ว");
 
         const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
         const firstKey = (postCalls[0][1]?.headers as Headers).get("Idempotency-Key");
         const secondKey = (postCalls[1][1]?.headers as Headers).get("Idempotency-Key");
         expect(firstKey).toBe("it-comment-key-a");
-        expect(secondKey).toBe("it-comment-key-b");
+        expect(secondKey).toBe(firstKey);
+        expect(JSON.parse(String(postCalls[0][1]?.body))).toEqual({ body: "ข้อความแรก" });
+        expect(JSON.parse(String(postCalls[1][1]?.body))).toEqual({ body: "ข้อความแรก" });
+        expect(randomUUID).toHaveBeenCalledOnce();
     });
 });
