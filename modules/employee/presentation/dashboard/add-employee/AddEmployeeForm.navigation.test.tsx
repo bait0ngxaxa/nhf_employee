@@ -28,10 +28,10 @@ beforeEach(() => { Object.defineProperty(HTMLElement.prototype, "scrollIntoView"
 afterEach(() => { vi.restoreAllMocks(); Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView"); });
 
 describe("actual form navigation protection", () => {
-    it("blocks employee creation in flight and explains reconciliation after lost response", async () => {
+    it("preserves uncertain employee data, prevents duplicate submission, and requires explicit recovery acknowledgement", async () => {
         const request = deferred<ApiResponse<unknown>>();
         mocks.post.mockReturnValue(request.promise);
-        render(<AddEmployeeForm canReadDepartments />);
+        render(<AddEmployeeForm canReadDepartments canReadEmployees={false} />);
         fillFields({ firstName: "สมชาย", lastName: "ใจดี", email: "employee@example.test", phone: "0812345678", position: "Staff" });
         fireEvent.keyDown(screen.getByRole("combobox", { name: "แผนก" }), { key: "ArrowDown" });
         fireEvent.click(await screen.findByRole("option", { name: "IT" }));
@@ -40,9 +40,64 @@ describe("actual form navigation protection", () => {
         expect(allowDashboardNavigation()).toBe(false);
         await act(async () => request.resolve({ success: false, code: "NETWORK_ERROR", error: "connection lost", errorThai: "ขาดการเชื่อมต่อ" }));
         expect(allowDashboardNavigation()).toBe(false);
-        expect(window.alert).toHaveBeenLastCalledWith(expect.stringContaining("รายชื่อพนักงานในแท็บใหม่"));
-        expect(document.getElementById("email")).toHaveValue("employee@example.test");
+        expect(window.alert).toHaveBeenLastCalledWith(expect.stringContaining("สิทธิ์ที่ได้รับ"));
+        expect(screen.getByRole("heading", { name: "ผลการเพิ่มพนักงานยังไม่ชัดเจน" })).toBeInTheDocument();
+        expect(screen.getByText(/ติดต่อผู้ดูแลระบบ/)).toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: "ตรวจสอบรายชื่อพนักงานในแท็บใหม่" })).not.toBeInTheDocument();
+        const email = document.getElementById("email");
+        if (!(email instanceof HTMLInputElement)) throw new Error("Missing actual employee email field");
+        expect(email).toHaveValue("employee@example.test");
+        expect(email).toBeDisabled();
+        fireEvent.change(email, { target: { value: "edited@example.test" } });
+        expect(email).toHaveValue("employee@example.test");
+        expect(screen.getByRole("button", { name: "เพิ่มพนักงาน" })).toBeDisabled();
+        const form = document.querySelector("form");
+        if (!(form instanceof HTMLFormElement)) throw new Error("Missing actual employee form");
+        fireEvent.submit(form);
+        expect(mocks.post).toHaveBeenCalledOnce();
+
+        fireEvent.click(screen.getByRole("button", { name: "รับทราบผลที่ยังไม่ยืนยัน" }));
+        expect(document.querySelector('[data-navigation-unresolved="true"]')).not.toBeInTheDocument();
+        expect(email).toHaveValue("employee@example.test");
+        expect(email).toBeDisabled();
+        expect(screen.getByRole("button", { name: "เพิ่มพนักงาน" })).toBeDisabled();
+        expect(screen.getByRole("link", { name: "ออกจากแบบฟอร์มโดยไม่ส่งซ้ำ" })).toHaveAttribute("href", "/dashboard");
+        expect(allowDashboardNavigation()).toBe(true);
+        expect(window.confirm).toHaveBeenCalled();
     });
 
+    it("offers the employee list for reconciliation only when list access is explicitly granted", async () => {
+        mocks.post.mockRejectedValueOnce(new TypeError("connection lost"));
+        render(<AddEmployeeForm canReadDepartments canReadEmployees />);
+        fillFields({ firstName: "สมชาย", lastName: "ใจดี", email: "employee@example.test", phone: "0812345678", position: "Staff" });
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "แผนก" }), { key: "ArrowDown" });
+        fireEvent.click(await screen.findByRole("option", { name: "IT" }));
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มพนักงาน" }));
 
+        const listLink = await screen.findByRole("link", { name: "ตรวจสอบรายชื่อพนักงานในแท็บใหม่" });
+        expect(listLink).toHaveAttribute("href", "/dashboard/employees");
+        expect(listLink).toHaveAttribute("target", "_blank");
+        expect(screen.getByText(/อย่าส่งคำขอซ้ำ/)).toBeInTheDocument();
+    });
+
+    it("separates confirmed validation failures and confirmed creation success from unknown outcomes", async () => {
+        const rendered = render(<AddEmployeeForm canReadDepartments canReadEmployees />);
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มพนักงาน" }));
+        await waitFor(() => expect(screen.getByText("กรุณากรอกชื่อ")).toBeInTheDocument());
+        expect(mocks.post).not.toHaveBeenCalled();
+        expect(document.querySelector('[data-navigation-unresolved="true"]')).not.toBeInTheDocument();
+        rendered.unmount();
+
+        mocks.post.mockResolvedValueOnce({ success: true, data: { success: true }, status: 201, requestId: "created" });
+        render(<AddEmployeeForm canReadDepartments canReadEmployees />);
+        fillFields({ firstName: "สมชาย", lastName: "ใจดี", email: "employee@example.test", phone: "0812345678", position: "Staff" });
+        fireEvent.keyDown(screen.getByRole("combobox", { name: "แผนก" }), { key: "ArrowDown" });
+        fireEvent.click(await screen.findByRole("option", { name: "IT" }));
+        fireEvent.click(screen.getByRole("button", { name: "เพิ่มพนักงาน" }));
+
+        await waitFor(() => expect(mocks.post).toHaveBeenCalledOnce());
+        await waitFor(() => expect(document.getElementById("email")).toHaveValue(""));
+        expect(document.querySelector('[data-navigation-unresolved="true"]')).not.toBeInTheDocument();
+        expect(allowDashboardNavigation()).toBe(true);
+    });
 });

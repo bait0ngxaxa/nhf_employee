@@ -296,7 +296,7 @@ describe("EmailRequestProvider", () => {
         );
     });
 
-    it("uses a new idempotency key after form data changes following a failure", async () => {
+    it("keeps an uncertain email request immutable and retries it with the original key", async () => {
         vi.mocked(apiPost).mockResolvedValue(createErrorResponse("Network Error", 503));
 
         render(
@@ -308,15 +308,19 @@ describe("EmailRequestProvider", () => {
         fillValidForm();
         fireEvent.click(screen.getByTestId("submit-btn"));
         await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(1));
+        const originalPayload = vi.mocked(apiPost).mock.calls[0]?.[1];
         fireEvent.change(screen.getByTestId("input-position"), {
             target: { value: "ผู้จัดการ" },
         });
+        expect(screen.getByTestId("input-position")).not.toHaveValue("ผู้จัดการ");
         fireEvent.click(screen.getByTestId("submit-btn"));
         await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
 
+        const secondPayload = vi.mocked(apiPost).mock.calls[1]?.[1];
+        expect(secondPayload).toEqual(originalPayload);
         const firstConfig = vi.mocked(apiPost).mock.calls[0]?.[2];
         const secondConfig = vi.mocked(apiPost).mock.calls[1]?.[2];
-        expect(new Headers(firstConfig?.headers).get("Idempotency-Key")).not.toBe(
+        expect(new Headers(firstConfig?.headers).get("Idempotency-Key")).toBe(
             new Headers(secondConfig?.headers).get("Idempotency-Key"),
         );
     });

@@ -29,9 +29,11 @@ beforeEach(() => { Object.defineProperty(HTMLElement.prototype, "scrollIntoView"
 afterEach(() => { vi.restoreAllMocks(); Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView"); });
 
 describe("actual form navigation protection", () => {
-    it("retains the email-request retry key while pending or uncertain", async () => {
+    it("locks the submitted payload and retries an unresolved email request with its original key", async () => {
         const request = deferred<ApiResponse<unknown>>();
-        mocks.post.mockReturnValueOnce(request.promise).mockResolvedValueOnce({ success: true, data: { success: true }, status: 200, requestId: "test" });
+        mocks.post.mockReturnValueOnce(request.promise)
+            .mockRejectedValueOnce(new TypeError("connection lost"))
+            .mockResolvedValueOnce({ success: true, data: { success: true }, status: 200, requestId: "test" });
         render(<EmailRequestProvider capabilities={{ canReadRequests: false, canCreateRequests: true, canUpdateOwnRequests: false, canUpdateAllRequests: false }}><EmailRequestForm /></EmailRequestProvider>);
         fillFields({ thaiName: "สมชาย ใจดี", englishName: "Somchai Jaidee", nickname: "ชาย", phone: "0812345678", position: "Staff", department: "IT", replyEmail: "reply@example.test" });
         // Choose explicit decisions via the real controls.
@@ -42,10 +44,25 @@ describe("actual form navigation protection", () => {
         expect(allowDashboardNavigation()).toBe(false);
         await act(async () => request.resolve({ success: false, code: "NETWORK_ERROR", error: "connection lost", errorThai: "ขาดการเชื่อมต่อ" }));
         expect(allowDashboardNavigation()).toBe(false);
-        expect(window.alert).toHaveBeenLastCalledWith(expect.stringContaining("ข้อมูลเดิม"));
-        fireEvent.click(screen.getByRole("button", { name: /ส่งคำร้อง/ }));
+        expect(window.alert).toHaveBeenLastCalledWith(expect.stringContaining("ข้อมูลชุดเดิม"));
+        const originalName = screen.getByDisplayValue("สมชาย ใจดี");
+        expect(originalName).toBeDisabled();
+        fireEvent.change(originalName, { target: { value: "ข้อมูลที่แก้ไขต้องไม่ถูกบันทึก" } });
+        expect(screen.getByDisplayValue("สมชาย ใจดี")).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("button", { name: /ส่งคำร้องเดิมอีกครั้ง/ }));
         await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(2));
+        expect(allowDashboardNavigation()).toBe(false);
+
+        fireEvent.click(screen.getByRole("button", { name: /ส่งคำร้องเดิมอีกครั้ง/ }));
+        await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(3));
         await waitFor(() => expect(allowDashboardNavigation()).toBe(true));
-        expect(mocks.post.mock.calls[0][2]).toEqual(mocks.post.mock.calls[1][2]);
+        const firstAttempt = mocks.post.mock.calls[0];
+        for (const retry of mocks.post.mock.calls.slice(1)) {
+            expect(retry?.[1]).toEqual(firstAttempt?.[1]);
+            expect(retry?.[2]).toEqual(firstAttempt?.[2]);
+        }
+        expect(firstAttempt?.[2]).toMatchObject({ headers: { "Idempotency-Key": expect.any(String) } });
+        expect(document.querySelector("#thaiName")).toHaveValue("");
     });
 });

@@ -1,13 +1,11 @@
 "use client";
 
-import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
-
 import { useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, CircleAlert, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { DashboardNavigationLink } from "@/components/dashboard/layout/DashboardNavigationLink";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -424,12 +422,19 @@ export function ITTicketOperatorDetail({
     const fieldClassName = "mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-content-body outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60";
 
     return (
-        <section className="min-h-[calc(100dvh-6rem)]">
+        <section
+            data-navigation-submitting={busy}
+            data-navigation-unresolved={mutationReviewReason !== null}
+            data-navigation-recovery={mutationReviewReason === "CONCURRENT_CHANGE"
+                ? "Ticket มีการเปลี่ยนแปลง กรุณาตรวจสอบข้อมูลล่าสุดให้เสร็จก่อนเปลี่ยนหน้า"
+                : "ยังยืนยันผลการบันทึกไม่ได้ กรุณาตรวจสอบข้อมูล Ticket ล่าสุดให้เสร็จก่อนเปลี่ยนหน้า"}
+            className="min-h-[calc(100dvh-6rem)]"
+        >
             <div className="mx-auto max-w-6xl space-y-5">
-                <Link onNavigate={(event) => { if (!allowDashboardNavigation()) event.preventDefault(); }} href={toDashboardITTabPath(IT_DASHBOARD_TABS.queue)} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                <DashboardNavigationLink href={toDashboardITTabPath(IT_DASHBOARD_TABS.queue)} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                     <ArrowLeft aria-hidden="true" className="size-4" />
                     กลับไปยังคิว IT Ticket
-                </Link>
+                </DashboardNavigationLink>
 
                 {loading && !ticket ? (
                     <div role="status" aria-label="กำลังโหลด Ticket" className="space-y-4">

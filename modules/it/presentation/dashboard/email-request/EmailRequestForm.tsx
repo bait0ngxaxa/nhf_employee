@@ -134,7 +134,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                         data-navigation-dirty={Object.values(formData).some((value) => Array.isArray(value) ? value.length > 0 : value !== "" && value !== "UNDECIDED")}
                         data-navigation-submitting={isLoading}
                         data-navigation-unresolved={hasUnresolvedSubmission}
-                        data-navigation-recovery="ยังยืนยันผลคำร้องไม่ได้ กรุณาลองส่งข้อมูลเดิมอีกครั้งเพื่อยืนยันผลก่อนเปลี่ยนหน้า"
+                        data-navigation-recovery="ยังยืนยันผลคำร้องไม่ได้ แบบฟอร์มถูกล็อกไว้ กรุณาส่งข้อมูลชุดเดิมอีกครั้งด้วยรหัสเดิมก่อนเปลี่ยนหน้า"
                         onSubmit={submitEmailRequest}
                         className="space-y-8"
                         noValidate
@@ -153,7 +153,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     placeholder="เช่น นาย สมชาย ใจดี"
                                     autoComplete="name"
                                     maxLength={120}
-                                    disabled={isLoading}
+                                    disabled={isLoading || hasUnresolvedSubmission}
                                     onChange={handleInputChange}
                                 />
                                 <EmailRequestField
@@ -164,7 +164,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     placeholder="e.g. Mr. Somchai Jaidee"
                                     autoComplete="name"
                                     maxLength={120}
-                                    disabled={isLoading}
+                                    disabled={isLoading || hasUnresolvedSubmission}
                                     onChange={handleInputChange}
                                 />
                                 <EmailRequestField
@@ -175,7 +175,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     placeholder="เช่น ชาย"
                                     autoComplete="nickname"
                                     maxLength={80}
-                                    disabled={isLoading}
+                                    disabled={isLoading || hasUnresolvedSubmission}
                                     onChange={handleInputChange}
                                 />
                                 <EmailRequestField
@@ -187,7 +187,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     autoComplete="tel"
                                     inputMode="tel"
                                     maxLength={20}
-                                    disabled={isLoading}
+                                    disabled={isLoading || hasUnresolvedSubmission}
                                     onChange={handleInputChange}
                                 />
                                 <EmailRequestField
@@ -198,7 +198,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     placeholder="เช่น เจ้าหน้าที่บัญชี"
                                     autoComplete="organization-title"
                                     maxLength={120}
-                                    disabled={isLoading}
+                                    disabled={isLoading || hasUnresolvedSubmission}
                                     onChange={handleInputChange}
                                 />
                                 <EmailRequestField
@@ -209,7 +209,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     placeholder="เช่น มสช. สพบ."
                                     autoComplete="organization"
                                     maxLength={120}
-                                    disabled={isLoading}
+                                    disabled={isLoading || hasUnresolvedSubmission}
                                     onChange={handleInputChange}
                                 />
                                 <div className="md:col-span-2">
@@ -223,7 +223,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                         autoComplete="email"
                                         inputMode="email"
                                         maxLength={254}
-                                        disabled={isLoading}
+                                        disabled={isLoading || hasUnresolvedSubmission}
                                         onChange={handleInputChange}
                                     />
                                 </div>
@@ -236,10 +236,15 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                             sharedDriveDecision={formData.sharedDriveDecision}
                             error={fieldErrors.sharedDriveAccess}
                             selectedDrives={selectedDrives}
-                            disabled={isLoading}
+                            disabled={isLoading || hasUnresolvedSubmission}
                             onChange={handleInputChange}
                         />
 
+                        {hasUnresolvedSubmission ? (
+                            <p role="status" className="text-sm leading-6 text-content-secondary">
+                                ยังยืนยันผลคำร้องไม่ได้ ระบบจะส่งข้อมูลชุดเดิมด้วยรหัสเดิมอีกครั้ง กรุณาอย่าแก้ไขข้อมูลจนกว่าจะได้รับผลยืนยัน
+                            </p>
+                        ) : null}
 
                         <div className="flex flex-col-reverse gap-3 border-t border-border-subtle pt-5 sm:flex-row sm:justify-end">
                             {onCancel && (
@@ -248,7 +253,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                     variant="outline"
                                     onClick={() => { if (allowDashboardNavigation()) onCancel(); }}
                                     className="h-11 rounded-xl px-6"
-                                    disabled={isLoading}
+                                    disabled={isLoading || hasUnresolvedSubmission}
                                 >
                                     ยกเลิก
                                 </Button>
@@ -266,7 +271,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 ) : (
                                     <>
                                         <Send className="mr-2 h-4 w-4" />
-                                        ส่งคำร้อง
+                                        {hasUnresolvedSubmission ? "ส่งคำร้องเดิมอีกครั้ง" : "ส่งคำร้อง"}
                                     </>
                                 )}
                             </Button>
