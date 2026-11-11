@@ -15,6 +15,7 @@ export function AddEmployeeSection() {
     const { user } = useDashboardDataContext();
     const { mutate } = useSWRConfig();
     const canReadStats = user?.employeeCapabilities?.canReadStats === true;
+    const canReadEmployees = user?.employeeCapabilities?.canReadEmployees === true;
 
     return (
         <div className="min-h-[calc(100dvh-6rem)]">
@@ -34,16 +35,17 @@ export function AddEmployeeSection() {
                     </div>
                     <Button
                         variant="outline"
-                        onClick={() => handleMenuClick("employee-management")}
+                        onClick={() => handleMenuClick(canReadEmployees ? "employee-management" : "dashboard")}
                         className="h-11 w-full justify-center gap-2 rounded-xl border-border-subtle bg-surface text-content-body hover:bg-surface-subtle sm:w-auto"
                     >
                         <Users className="h-4 w-4" />
-                        <span>กลับไปรายชื่อ</span>
+                        <span>{canReadEmployees ? "กลับไปรายชื่อ" : "กลับหน้าหลัก"}</span>
                     </Button>
                 </div>
 
                 <div className="space-y-8">
                     <AddEmployeeForm
+                        canReadEmployees={canReadEmployees}
                         canReadDepartments={user?.departmentCapabilities?.canReadDepartments === true}
                         onSuccess={() => {
                             if (canReadStats) {

@@ -63,6 +63,14 @@ export function DashboardHomeSkeleton(): ReactElement {
             aria-label="กำลังโหลดหน้าหลักแดชบอร์ด"
         >
             <div className="mx-auto max-w-7xl space-y-6">
+                <div className="space-y-4 lg:hidden">
+                    <Skeleton className="h-7 w-56 max-w-full" />
+                    <Skeleton className="h-5 w-40" />
+                    <div className="grid grid-cols-3 gap-2 min-[360px]:grid-cols-4">
+                        {Array.from({ length: 4 }).map((_, index) => <div key={index} className="flex flex-col items-center gap-2"><Skeleton className="size-16 rounded-2xl" /><Skeleton className="h-10 w-16" /></div>)}
+                    </div>
+                </div>
+                <div className="hidden space-y-6 lg:block">
                 <div className="grid gap-8 border-b border-border-subtle pb-8 @3xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] @3xl:items-end">
                     <div className="min-w-0 max-w-3xl">
                         <Skeleton className="mb-5 h-4 w-20 rounded-sm" />
@@ -125,6 +133,7 @@ export function DashboardHomeSkeleton(): ReactElement {
                             />
                         ))}
                     </div>
+                </div>
                 </div>
             </div>
         </div>

@@ -39,7 +39,7 @@ export function StockBrowseCartBar(props: StockBrowseCartBarProps) {
 
     return (
         <>
-            <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-[calc(1rem+env(safe-area-inset-left))] right-[calc(1rem+env(safe-area-inset-right))] z-30 sm:left-auto sm:right-[calc(1.5rem+env(safe-area-inset-right))] sm:w-auto">
+            <div className="dashboard-floating-action fixed bottom-[calc(var(--dashboard-mobile-nav-height,0px)+1rem+env(safe-area-inset-bottom))] left-[calc(1rem+env(safe-area-inset-left))] right-[calc(1rem+env(safe-area-inset-right))] z-30 sm:left-auto sm:right-[calc(1.5rem+env(safe-area-inset-right))] sm:w-auto">
                 <Button
                     type="button"
                     onClick={() => setOpen(true)}

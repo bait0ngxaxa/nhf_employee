@@ -1,3 +1,4 @@
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AnnouncementTicker } from "./AnnouncementTicker";
@@ -54,6 +55,27 @@ describe("Announcement presentation", () => {
         fireEvent.click(screen.getByRole("button", { name: "บันทึกและเผยแพร่" }));
         await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ action: "publish", content: "ข่าวใหม่", version: 0 }));
         expect(await screen.findByText("เผยแพร่ประกาศแล้ว")).toBeVisible();
+    });
+
+    it("blocks navigation during publication and preserves unknown results until reload", async () => {
+        const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+        let rejectSave: ((reason: Error) => void) | undefined;
+        mocks.save.mockImplementation(() => new Promise((_resolve, reject) => { rejectSave = reject; }));
+        mocks.load.mockResolvedValue({ ...initial, content: "ฉบับล่าสุด", version: 2 });
+        render(<AnnouncementManager initialState={initial} />);
+        fireEvent.click(screen.getByRole("button", { name: "บันทึกและเผยแพร่" }));
+        expect(allowDashboardNavigation()).toBe(false);
+        expect(alert).toHaveBeenLastCalledWith(expect.stringContaining("กำลังบันทึก"));
+        rejectSave?.(new Error("ผลการบันทึกไม่แน่นอน"));
+        await screen.findByRole("alert");
+        expect(allowDashboardNavigation()).toBe(false);
+        expect(alert).toHaveBeenLastCalledWith(expect.stringContaining("โหลดข้อมูลล่าสุด"));
+        expect(screen.getByLabelText("ข้อความประกาศ")).toHaveValue(initial.content);
+        fireEvent.click(screen.getByRole("button", { name: "โหลดข้อมูลล่าสุด" }));
+        fireEvent.click(screen.getByRole("button", { name: "ยืนยันโหลดใหม่" }));
+        await waitFor(() => expect(screen.getByLabelText("ข้อความประกาศ")).toHaveValue("ฉบับล่าสุด"));
+        expect(allowDashboardNavigation()).toBe(true);
+        alert.mockRestore();
     });
 
     it("retains unsaved text after a conflict and confirms before reloading", async () => {

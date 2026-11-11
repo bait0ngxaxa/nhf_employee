@@ -69,6 +69,22 @@ describe("NotificationDropdown read/update presentation", () => {
         routerPush.mockReset();
     });
 
+    it.each(["submitting", "unresolved"])("does not navigate or mark notifications read while a form is %s", async (state) => {
+        const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+        const marker = document.createElement("form");
+        marker.setAttribute(`data-navigation-${state}`, "true");
+        document.body.append(marker);
+        renderDropdown(true, buildItem({ isRead: false, actionUrl: "/dashboard/it/19" }));
+        fireEvent.pointerDown(await screen.findByRole("button", { name: /เปิดการแจ้งเตือน/ }), { button: 0 });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /แจ้งเตือนทดสอบ/ }));
+        expect(routerPush).not.toHaveBeenCalled();
+        expect(apiPatch).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "ดูประวัติทั้งหมด" }));
+        expect(routerPush).not.toHaveBeenCalled();
+        expect(alert).toHaveBeenCalledTimes(2);
+        marker.remove(); alert.mockRestore();
+    });
+
     it("keeps mark-one and mark-all mutations for read+update users", async () => {
         const item = buildItem({ isRead: false, actionUrl: null });
         vi.mocked(apiPatch).mockResolvedValue(success({}));

@@ -8,7 +8,7 @@ import {
 import Link from "next/link";
 import type { ReactElement } from "react";
 
-import { cn } from "@/lib/ui/utils";
+import { mobileNavigationItemClassName } from "@/lib/ui/mobile-navigation-styles";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 interface LiffBottomNavProps {
@@ -79,12 +79,7 @@ export function LiffBottomNav({ pathname }: LiffBottomNavProps): ReactElement {
                             key={item.key}
                             href={item.href}
                             aria-current={active ? "page" : undefined}
-                            className={cn(
-                                "relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs font-semibold leading-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
-                                active
-                                    ? "text-brand-solid"
-                                    : "text-content-muted hover:bg-surface-subtle hover:text-content-body",
-                            )}
+                            className={mobileNavigationItemClassName(active)}
                         >
                             {active ? (
                                 <span

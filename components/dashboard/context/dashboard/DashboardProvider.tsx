@@ -1,5 +1,7 @@
 "use client";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import {
     useState,
     useCallback,
@@ -96,6 +98,7 @@ export function DashboardProvider({
 
     const handleMenuClick = useCallback(
         (menuId: string) => {
+            if (!allowDashboardNavigation()) return;
             setMobileNavOpen(false);
 
             const menuItem = DASHBOARD_MENU_ITEMS.find(

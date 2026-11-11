@@ -38,12 +38,15 @@ interface UseAddEmployeeReturn {
     departments: Department[];
     canReadDepartments: boolean;
     isLoading: boolean;
+    hasUnresolvedSubmission: boolean;
+    recoveryAcknowledged: boolean;
     error: string;
     fieldErrors: Record<string, string>;
     handleFieldChange: <K extends keyof EmployeeFormData>(
         field: K,
         value: EmployeeFormData[K],
     ) => void;
+    acknowledgeUnresolvedSubmission: () => void;
     handleSubmit: (e: React.FormEvent) => Promise<void>;
 }
 
@@ -60,6 +63,8 @@ export function useAddEmployee({
     const departments = departmentData?.departments || [];
 
     const [isLoading, setIsLoading] = useState(false);
+    const [hasUnresolvedSubmission, setHasUnresolvedSubmission] = useState(false);
+    const [recoveryAcknowledged, setRecoveryAcknowledged] = useState(false);
     const [error, setError] = useState("");
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -68,6 +73,7 @@ export function useAddEmployee({
             field: K,
             value: EmployeeFormData[K],
         ): void => {
+            if (isLoading || hasUnresolvedSubmission || recoveryAcknowledged) return;
             setFormData((prev) => ({ ...prev, [field]: value }));
             setError("");
             setFieldErrors((current) => {
@@ -80,12 +86,18 @@ export function useAddEmployee({
                 return next;
             });
         },
-        [],
+        [hasUnresolvedSubmission, isLoading, recoveryAcknowledged],
     );
+
+    const acknowledgeUnresolvedSubmission = (): void => {
+        if (!hasUnresolvedSubmission || isLoading) return;
+        setHasUnresolvedSubmission(false);
+        setRecoveryAcknowledged(true);
+    };
 
     const handleSubmit = async (e: React.FormEvent): Promise<void> => {
         e.preventDefault();
-        if (isLoading) {
+        if (isLoading || hasUnresolvedSubmission || recoveryAcknowledged) {
             return;
         }
 
@@ -135,6 +147,8 @@ export function useAddEmployee({
             });
 
             if (apiResult.success) {
+                setHasUnresolvedSubmission(false);
+                setRecoveryAcknowledged(false);
                 toast.success("เพิ่มพนักงานสำเร็จ", {
                     description:
                         "ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว",
@@ -145,8 +159,10 @@ export function useAddEmployee({
                 return;
             }
 
+            setHasUnresolvedSubmission(apiResult.status === undefined || apiResult.status >= 500);
             setError(apiResult.error);
         } catch (submitError) {
+            setHasUnresolvedSubmission(true);
             setError(getAddEmployeeErrorMessage(submitError));
         } finally {
             setIsLoading(false);
@@ -158,9 +174,12 @@ export function useAddEmployee({
         departments,
         canReadDepartments,
         isLoading,
+        hasUnresolvedSubmission,
+        recoveryAcknowledged,
         error,
         fieldErrors,
         handleFieldChange,
+        acknowledgeUnresolvedSubmission,
         handleSubmit,
     };
 }

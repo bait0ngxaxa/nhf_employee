@@ -5,8 +5,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactElement, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
+import type { MenuItem } from "@/types/dashboard";
 import { cn } from "@/lib/ui/utils";
 import {
     useDashboardUIContext,
@@ -276,6 +277,32 @@ function RegularCard({
     );
 }
 
+const COMPACT_LABELS: Readonly<Record<string, string>> = {
+    stock: "เบิกวัสดุ",
+    "leave-management": "วันลา",
+    routine: "งานประจำ",
+    "it-workspace": "บริการ IT",
+};
+
+function CompactQuickAction({ item, onClick }: { item: MenuItem; onClick: () => void }): ReactElement {
+    const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
+    const Icon = item.icon;
+    return (
+        <button type="button" onClick={onClick} data-shortcut-id={item.id}
+            aria-label={`${COMPACT_LABELS[item.id]}${item.unavailable ? " (ยังไม่พร้อมให้บริการ)" : ""}`}
+            className="group flex min-w-0 w-full flex-col items-center gap-2 rounded-2xl bg-transparent px-0.5 pt-1 pb-2 text-center text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dashboard-focus focus-visible:ring-offset-2">
+            <span data-shortcut-icon className={cn(
+                "flex size-16 shrink-0 items-center justify-center rounded-2xl transition-transform duration-150 group-active:translate-y-px motion-reduce:transform-none",
+                item.unavailable ? "bg-surface-raised text-content-muted" : [config.featuredSurface, "text-content-on-brand"],
+            )}>
+                <Icon className="size-7" aria-hidden="true" />
+            </span>
+            <span data-shortcut-label className="line-clamp-2 h-10 w-full max-w-full text-xs font-semibold leading-5 [overflow-wrap:anywhere]">{COMPACT_LABELS[item.id]}</span>
+            {item.unavailable ? <span className="text-xs leading-5 text-content-secondary">ยังไม่พร้อม</span> : null}
+        </button>
+    );
+}
+
 const FEATURED_ORDER = new Map([
     ["stock", 0],
     ["leave-management", 1],
@@ -323,14 +350,14 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
 
     return (
         <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-dashboard-workspace p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
-            <div className="relative z-10 mx-auto max-w-7xl space-y-6">
+            <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-4 lg:block lg:space-y-6">
                 {announcement}
                 <section
                     aria-labelledby="dashboard-home-heading"
-                    className="border-b border-border-subtle pb-8"
+                    className="border-b border-border-subtle pb-4 lg:pb-8"
                 >
                     <div className="min-w-0 max-w-3xl">
-                        <div className="mb-5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-foreground">
+                        <div className="mb-5 hidden items-center lg:flex gap-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-foreground">
                             <span
                                 className="size-2 rounded-[2px] bg-brand-solid"
                                 aria-hidden="true"
@@ -343,7 +370,7 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
                                 id="dashboard-home-heading"
                                 data-page-heading
                                 tabIndex={-1}
-                                className="max-w-[22ch] text-3xl font-bold leading-[1.12] tracking-[-0.03em] text-content-heading [overflow-wrap:anywhere] sm:text-4xl @3xl:text-[2.75rem]"
+                                className="max-w-[22ch] text-xl font-bold leading-snug lg:text-3xl lg:leading-[1.12] tracking-[-0.03em] text-content-heading [overflow-wrap:anywhere] lg:text-4xl lg:@3xl:text-[2.75rem]"
                             >
                                 <span className="block sm:inline"><ClientDashboardGreeting />,</span>{" "}
                                 <span className="text-brand-foreground">
@@ -363,7 +390,7 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
                             </p>
                         </div>
 
-                        <dl className="mt-8 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-4 border-t border-border-subtle pt-4 sm:gap-x-10">
+                        <dl className="mt-8 hidden max-w-2xl lg:grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border-subtle pt-4 sm:gap-x-10">
                             <div className="min-w-0">
                                 <dt className="text-xs font-semibold tracking-[0.08em] text-content-muted">
                                     ทีม
@@ -384,9 +411,17 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
                     </div>
 
                 </section>
-                <LineAddFriendCard tone="light" />
+                <section aria-label="เมนูด่วน" className="lg:hidden">
+                    <h2 className="mb-3 text-base font-bold text-content-heading">เมนูด่วน</h2>
+                    {featuredItems.length === 0 ? <p className="rounded-xl border border-border-subtle bg-surface-raised p-4 text-sm text-content-secondary">ยังไม่มีเมนูที่พร้อมใช้งานสำหรับบัญชีนี้</p> : (
+                        <div className="dashboard-compact-actions grid grid-cols-3 gap-2 min-[360px]:grid-cols-4">
+                            {featuredItems.filter((item) => FEATURED_ORDER.has(item.id)).map((item) => <CompactQuickAction key={item.id} item={item} onClick={() => handleMenuClick(item.id)} />)}
+                        </div>
+                    )}
+                </section>
+                <div><LineAddFriendCard tone="light" /></div>
 
-                <div className="pt-4">
+                <div className="hidden pt-4 lg:block">
                     {allMenuItems.length === 0 && (
                         <div className="rounded-3xl border border-border-subtle bg-surface-raised p-8 text-center text-content-secondary shadow-sm">
                             ยังไม่มีเมนูที่พร้อมใช้งานสำหรับบัญชีนี้

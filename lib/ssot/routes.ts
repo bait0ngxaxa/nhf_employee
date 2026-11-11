@@ -6,6 +6,7 @@ export const APP_ROUTES = {
     signup: "/signup",
     refreshSession: "/auth/refresh",
     dashboard: "/dashboard",
+    dashboardMore: "/dashboard/more",
     dashboardAnnouncements: "/dashboard/announcements",
     dashboardLeave: "/dashboard/leave",
     dashboardStock: "/dashboard/stock",
@@ -41,6 +42,7 @@ export function isLiffAppPath(pathname: string | null | undefined): boolean {
 
 export const APP_DASHBOARD_TABS = {
     dashboard: "dashboard",
+    more: "more",
     announcements: "announcements",
     leaveManagement: "leave-management",
     leaveHistory: "leave-history",
@@ -79,6 +81,7 @@ export function toDashboardITTabPath(tab: ITDashboardTab): string {
 
 export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
     dashboard: APP_ROUTES.dashboard,
+    more: APP_ROUTES.dashboardMore,
     announcements: APP_ROUTES.dashboardAnnouncements,
     "leave-management": APP_ROUTES.dashboardLeave,
     "leave-history": `${APP_ROUTES.dashboardLeave}?leaveTab=my-leave`,
@@ -103,6 +106,7 @@ export const DASHBOARD_MENU_PATHS: Readonly<Record<DashboardMenuId, string>> = {
 const DASHBOARD_PATH_MENU_ENTRIES: ReadonlyArray<
     readonly [string, DashboardMenuId]
 > = [
+    [APP_ROUTES.dashboardMore, APP_DASHBOARD_TABS.more],
     [APP_ROUTES.dashboardAnnouncements, APP_DASHBOARD_TABS.announcements],
     [APP_ROUTES.dashboardEmployeeImport, APP_DASHBOARD_TABS.importEmployee],
     [APP_ROUTES.dashboardEmployeeNew, APP_DASHBOARD_TABS.addEmployee],

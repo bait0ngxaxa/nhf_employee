@@ -66,6 +66,11 @@ function createIdempotencyKey(): string {
     return `email_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+interface EmailRequestAttempt {
+    readonly key: string;
+    readonly payload: EmailRequestFormData;
+}
+
 function getValidationErrors(
     formData: EmailRequestFormData,
 ): {
@@ -122,11 +127,12 @@ export function EmailRequestProvider({
     const [formData, setFormData] =
         useState<EmailRequestFormData>(initialFormData);
     const [isFormLoading, setIsFormLoading] = useState(false);
+    const [hasUnresolvedSubmission, setHasUnresolvedSubmission] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<
         Partial<Record<keyof EmailRequestFormData, string>>
     >({});
-    const pendingIdempotencyKeyRef = useRef<string | null>(null);
+    const pendingAttemptRef = useRef<EmailRequestAttempt | null>(null);
 
     // SWR for List
     const {
@@ -161,6 +167,7 @@ export function EmailRequestProvider({
     // Form handlers
     const handleInputChange = useCallback(
         (e: ChangeEvent<HTMLInputElement>) => {
+            if (isFormLoading || hasUnresolvedSubmission) return;
             const { name, type, checked, value } = e.target;
             const field = name as keyof EmailRequestFormData;
             setFormData((prev) => {
@@ -194,7 +201,6 @@ export function EmailRequestProvider({
                     [field]: value,
                 };
             });
-            pendingIdempotencyKeyRef.current = null;
             setFormError(null);
             setFieldErrors((current) => {
                 if (!current[field]) {
@@ -206,7 +212,7 @@ export function EmailRequestProvider({
                 return next;
             });
         },
-        [],
+        [hasUnresolvedSubmission, isFormLoading],
     );
 
     const handleSubmit = useCallback(
@@ -216,36 +222,48 @@ export function EmailRequestProvider({
                 return false;
             }
 
-            const validation = getValidationErrors(formData);
-            if (!validation.data) {
-                setFieldErrors(validation.errors);
-                setFormError("กรุณาตรวจสอบข้อมูลที่กรอก");
+            let attempt = pendingAttemptRef.current;
+            if (!hasUnresolvedSubmission) {
+                const validation = getValidationErrors(formData);
+                if (!validation.data) {
+                    setFieldErrors(validation.errors);
+                    setFormError("กรุณาตรวจสอบข้อมูลที่กรอก");
 
-                if (validation.firstErrorField) {
-                    focusInvalidField(validation.firstErrorField);
+                    if (validation.firstErrorField) {
+                        focusInvalidField(validation.firstErrorField);
+                    }
+
+                    return false;
                 }
 
+                attempt = {
+                    key: createIdempotencyKey(),
+                    payload: {
+                        ...validation.data,
+                        sharedDriveAccess: [...validation.data.sharedDriveAccess],
+                    },
+                };
+                pendingAttemptRef.current = attempt;
+            } else if (!attempt) {
                 return false;
             }
 
             setIsFormLoading(true);
             setFormError(null);
             setFieldErrors({});
-            const idempotencyKey =
-                pendingIdempotencyKeyRef.current ?? createIdempotencyKey();
-            pendingIdempotencyKeyRef.current = idempotencyKey;
 
             try {
                 const response = await apiPost<{ success: boolean; error?: string }>(
                     API_ROUTES.emailRequest.list,
-                    validation.data,
+                    attempt.payload,
                     {
-                        headers: { "Idempotency-Key": idempotencyKey },
+                        headers: { "Idempotency-Key": attempt.key },
                     },
                 );
 
                 if (response.success) {
-                    pendingIdempotencyKeyRef.current = null;
+                    setHasUnresolvedSubmission(false);
+                    pendingAttemptRef.current = null;
                     setFormData(initialFormData);
                     toast.success("ส่งคำร้องพนักงานใหม่สำเร็จ", {
                         description: "คำร้องถูกส่งไปยังทีมไอทีแล้ว",
@@ -255,17 +273,23 @@ export function EmailRequestProvider({
                     }
                     return true;
                 } else {
+                    const unresolved = response.status === undefined
+                        || response.status >= 500
+                        || response.status === 409;
+                    setHasUnresolvedSubmission(unresolved);
+                    if (!unresolved) pendingAttemptRef.current = null;
                     setFormError(response.error || "เกิดข้อผิดพลาด");
                     return false;
                 }
             } catch (err) {
+                setHasUnresolvedSubmission(true);
                 setFormError(getSubmitErrorMessage(err));
                 return false;
             } finally {
                 setIsFormLoading(false);
             }
         },
-        [capabilities.canReadRequests, formData, isFormLoading, mutate],
+        [capabilities.canReadRequests, formData, hasUnresolvedSubmission, isFormLoading, mutate],
     );
 
     const value = useMemo<EmailRequestContextValue>(
@@ -279,6 +303,7 @@ export function EmailRequestProvider({
             refreshList,
             formData,
             isFormLoading,
+            hasUnresolvedSubmission,
             formError,
             fieldErrors,
             handleInputChange,
@@ -294,6 +319,7 @@ export function EmailRequestProvider({
             refreshList,
             formData,
             isFormLoading,
+            hasUnresolvedSubmission,
             formError,
             fieldErrors,
             handleInputChange,

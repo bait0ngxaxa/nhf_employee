@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
 import type {
     ITOperatorReferenceData,
     ITOperatorTicketDetail,
@@ -47,7 +48,7 @@ const CAPABILITIES: ITPresentationCapabilities = {
 
 const REFERENCE_DATA: ITOperatorReferenceData = {
     categories: [],
-    assignableOperators: [],
+    assignableOperators: [{ userId: 51, employeeId: 91, displayName: "อารี ใจเย็น" }],
 };
 
 function buildTicket(
@@ -179,10 +180,72 @@ describe("ITTicketOperatorDetail terminal transition confirmation", () => {
         vi.clearAllMocks();
         fetchMock.mockReset();
         vi.stubGlobal("fetch", fetchMock);
+        vi.spyOn(window, "alert").mockImplementation(() => {});
+        vi.spyOn(window, "confirm").mockReturnValue(true);
     });
 
     afterEach(() => {
+        vi.restoreAllMocks();
         vi.unstubAllGlobals();
+    });
+
+    it.each(["assignment", "priority", "status"] as const)(
+        "blocks navigation while a %s mutation is pending and allows it after confirmation",
+        async (mutation) => {
+            let resolvePatch: ((response: Response) => void) | undefined;
+            const pendingResponse = new Promise<Response>((resolve) => {
+                resolvePatch = resolve;
+            });
+            const rendered = renderTicket(buildTicket("OPEN"));
+            rendered.setPendingPatchResponse(pendingResponse);
+            await screen.findByRole("heading", { name: "เครื่องพิมพ์ใช้งานไม่ได้" });
+
+            if (mutation === "assignment") {
+                fireEvent.change(screen.getByRole("combobox", { name: "ผู้รับผิดชอบ Ticket" }), {
+                    target: { value: "51" },
+                });
+                fireEvent.click(screen.getByRole("button", { name: "บันทึกผู้รับผิดชอบ" }));
+            } else if (mutation === "priority") {
+                fireEvent.change(screen.getByRole("combobox", { name: "ระดับความสำคัญ" }), {
+                    target: { value: "P1" },
+                });
+                fireEvent.change(screen.getByRole("textbox", { name: "เหตุผลการเปลี่ยน Priority" }), {
+                    target: { value: "ผลกระทบต่อการทำงาน" },
+                });
+                fireEvent.click(screen.getByRole("button", { name: "บันทึก Priority" }));
+            } else {
+                fireEvent.click(screen.getByRole("button", { name: "เริ่มดำเนินการ" }));
+            }
+
+            await waitFor(() => expect(getPatchCalls()).toHaveLength(1));
+            expect(document.querySelector('[data-navigation-submitting="true"]')).toBeInTheDocument();
+            expect(allowDashboardNavigation()).toBe(false);
+
+            const updatedTicket = buildTicket("IN_PROGRESS", 5);
+            rendered.setCurrentTicket(updatedTicket);
+            resolvePatch?.(jsonResponse(mutationSnapshot(updatedTicket)));
+            await waitFor(() => expect(allowDashboardNavigation()).toBe(true));
+            expect(getPatchCalls()).toHaveLength(1);
+        },
+    );
+
+    it("blocks navigation through reconciliation after an ambiguous server result", async () => {
+        const rendered = renderTicket(buildTicket("OPEN"));
+        await screen.findByRole("heading", { name: "เครื่องพิมพ์ใช้งานไม่ได้" });
+        rendered.enqueuePatchResponse(jsonResponse({ success: false, error: "Unavailable" }, 503));
+
+        fireEvent.click(screen.getByRole("button", { name: "เริ่มดำเนินการ" }));
+
+        expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถยืนยันผลการบันทึกล่าสุดได้");
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+            API_ROUTES.itOperatorTickets.byId(19),
+            expect.objectContaining({ signal: expect.any(AbortSignal) }),
+        ));
+        expect(document.querySelector('[data-navigation-unresolved="true"]')).toBeInTheDocument();
+        expect(allowDashboardNavigation()).toBe(false);
+
+        fireEvent.click(await screen.findByRole("button", { name: "ตรวจสอบข้อมูลล่าสุดแล้ว" }));
+        await waitFor(() => expect(allowDashboardNavigation()).toBe(true));
     });
 
     it("keeps non-terminal transitions immediate", async () => {
@@ -316,12 +379,14 @@ describe("ITTicketOperatorDetail terminal transition confirmation", () => {
             "Ticket นี้มีการเปลี่ยนแปลงจากผู้ใช้อื่น",
         );
         await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+        expect(allowDashboardNavigation()).toBe(false);
         expect(getPatchCalls()).toHaveLength(1);
         expect(screen.getByRole("button", { name: "ยกเลิก" })).toBeDisabled();
         expect(screen.getByText("กำลังดำเนินการ", { selector: "span" })).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole("button", { name: "ตรวจสอบข้อมูลล่าสุดแล้ว" }));
         expect(screen.getByRole("button", { name: "ยกเลิก" })).toBeEnabled();
+        expect(allowDashboardNavigation()).toBe(true);
         expect(getPatchCalls()).toHaveLength(1);
         expect(toast.error).toHaveBeenCalledWith(
             "Ticket มีการเปลี่ยนแปลง กรุณาตรวจสอบข้อมูลล่าสุด",

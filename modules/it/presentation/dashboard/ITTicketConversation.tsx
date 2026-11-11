@@ -63,6 +63,13 @@ function formatAttachmentSize(sizeBytes: number): string {
     })} MiB`;
 }
 
+interface ITTicketCommentAttempt {
+    readonly signature: string;
+    readonly key: string;
+    readonly body: string;
+    readonly files: readonly File[];
+}
+
 function ConversationEntry({ item }: { readonly item: ITTicketConversationItem }): ReactElement {
     const isOperatorMessage = item.authorSide === "OPERATOR";
     return (
@@ -144,6 +151,8 @@ export function ITTicketConversation({
     const [selectedAttachments, setSelectedAttachmentsState] = useState<SelectedITTicketAttachment[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [posting, setPosting] = useState(false);
+    const [unresolvedPost, setUnresolvedPost] = useState(false);
+    const [recoveryExitAcknowledged, setRecoveryExitAcknowledged] = useState(false);
     const [postError, setPostError] = useState<string | null>(null);
     const [postMessage, setPostMessage] = useState<string | null>(null);
     const [postingDenied, setPostingDenied] = useState(false);
@@ -157,7 +166,7 @@ export function ITTicketConversation({
     const postInFlight = useRef(false);
     const olderInFlight = useRef(false);
     const selectedAttachmentsRef = useRef<SelectedITTicketAttachment[]>([]);
-    const idempotencyAttempt = useRef<{ readonly signature: string; readonly key: string } | null>(null);
+    const idempotencyAttempt = useRef<ITTicketCommentAttempt | null>(null);
 
     const updateSelectedAttachments = (next: SelectedITTicketAttachment[]): void => {
         selectedAttachmentsRef.current = next;
@@ -238,6 +247,7 @@ export function ITTicketConversation({
     };
 
     const handleDraftChange = (value: string): void => {
+        if (posting || unresolvedPost || postInFlight.current) return;
         setDraft(value);
         setPostError(null);
         setPostMessage(null);
@@ -245,6 +255,10 @@ export function ITTicketConversation({
 
     const handleAttachmentSelection = (event: ChangeEvent<HTMLInputElement>): void => {
         const input = event.currentTarget;
+        if (posting || unresolvedPost || postInFlight.current) {
+            input.value = "";
+            return;
+        }
         const incoming = Array.from(input.files ?? []);
         input.value = "";
         if (incoming.length === 0) return;
@@ -268,6 +282,7 @@ export function ITTicketConversation({
     };
 
     const handleRemoveAttachment = (index: number): void => {
+        if (posting || unresolvedPost || postInFlight.current) return;
         const current = selectedAttachmentsRef.current;
         const removed = current[index];
         if (!removed) return;
@@ -280,37 +295,56 @@ export function ITTicketConversation({
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
-        const body = draft.trim();
-        if (!body || !canPost || postInFlight.current) return;
+        if (!canPost || postInFlight.current) return;
+        const existingAttempt = idempotencyAttempt.current;
+        let retryAttempt: ITTicketCommentAttempt | null = null;
+        let body = draft.trim();
+        let files: readonly File[] = selectedAttachmentsRef.current.map((attachment) => attachment.file);
+        if (unresolvedPost) {
+            if (!existingAttempt) return;
+            retryAttempt = existingAttempt;
+            body = retryAttempt.body;
+            files = retryAttempt.files;
+        }
+        if (!body) return;
 
-        const files = selectedAttachmentsRef.current.map((attachment) => attachment.file);
         postInFlight.current = true;
+        setRecoveryExitAcknowledged(false);
         setPosting(true);
         setPostError(null);
         setPostMessage(null);
         try {
-            const signature = await createITTicketCommentAttemptSignature(
-                ticketId,
-                operator,
-                body,
-                files,
-            );
-            const existingAttempt = idempotencyAttempt.current;
-            const idempotencyKey = existingAttempt?.signature === signature
-                ? existingAttempt.key
-                : globalThis.crypto.randomUUID();
-            idempotencyAttempt.current = { signature, key: idempotencyKey };
+            let attempt = retryAttempt;
+            if (!unresolvedPost) {
+                const signature = await createITTicketCommentAttemptSignature(
+                    ticketId,
+                    operator,
+                    body,
+                    files,
+                );
+                attempt = existingAttempt?.signature === signature
+                    ? existingAttempt
+                    : {
+                        signature,
+                        key: globalThis.crypto.randomUUID(),
+                        body,
+                        files: [...files],
+                    };
+                idempotencyAttempt.current = attempt;
+            }
+            if (!attempt) return;
             let requestBody: BodyInit;
-            const headers = new Headers({ "Idempotency-Key": idempotencyKey });
-            if (files.length > 0) {
+            const headers = new Headers({ "Idempotency-Key": attempt.key });
+            if (attempt.files.length > 0) {
                 const formData = new FormData();
-                formData.append("body", body);
-                for (const file of files) formData.append("attachments", file, file.name);
+                formData.append("body", attempt.body);
+                for (const file of attempt.files) formData.append("attachments", file, file.name);
                 requestBody = formData;
             } else {
                 headers.set("Content-Type", "application/json");
-                requestBody = JSON.stringify({ body });
+                requestBody = JSON.stringify({ body: attempt.body });
             }
+            setUnresolvedPost(true);
             const response = await fetch(commentsRoute(ticketId, operator), withAuthMutationHeaders({
                 method: "POST",
                 headers,
@@ -318,6 +352,7 @@ export function ITTicketConversation({
             }));
             const payload: unknown = await response.json().catch(() => null);
             if (!response.ok) {
+                if (response.status < 500 && response.status !== 409) setUnresolvedPost(false);
                 if (response.status === 401 || response.status === 403) setPostingDenied(true);
                 throw new Error(readITTicketReadError(payload, response.status, operator));
             }
@@ -337,6 +372,7 @@ export function ITTicketConversation({
             } else {
                 setConversationRetry((retry) => retry + 1);
             }
+            setUnresolvedPost(false);
             setDraft("");
             for (const attachment of selectedAttachmentsRef.current) {
                 URL.revokeObjectURL(attachment.previewUrl);
@@ -356,7 +392,7 @@ export function ITTicketConversation({
     };
 
     return (
-        <section aria-labelledby="it-ticket-conversation-heading" className="space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4 md:p-6">
+        <section data-navigation-submitting={posting} data-navigation-unresolved={unresolvedPost && !recoveryExitAcknowledged} data-navigation-recovery="ยังยืนยันผลการส่งข้อความไม่ได้ กรุณาส่งข้อความเดิมซ้ำ หรือรับทราบความเสี่ยงหากไม่สามารถตอบกลับได้แล้ว" aria-labelledby="it-ticket-conversation-heading" className="space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4 md:p-6">
             <header className="flex items-start gap-3">
                 <MessageSquareText aria-hidden="true" className="mt-1 size-5 shrink-0 text-brand-foreground" />
                 <div className="min-w-0 space-y-1">
@@ -412,8 +448,21 @@ export function ITTicketConversation({
                 )
             ) : null}
 
+            {unresolvedPost && !posting ? (
+                canPost ? <p className="text-sm text-content-secondary">ยังยืนยันผลการส่งข้อความไม่ได้ ระบบจะลองส่งข้อความและไฟล์ชุดเดิมด้วยรหัสเดิม กรุณาส่งซ้ำเพื่อยืนยันผลก่อนเปลี่ยนหน้า</p> : (
+                    <div className="space-y-3 text-sm text-content-secondary">
+                        <p>ยังยืนยันไม่ได้ว่าข้อความเดิมถูกส่งแล้วหรือไม่ และขณะนี้ไม่สามารถตอบกลับได้ กรุณาตรวจสอบบทสนทนาหรือติดต่อเจ้าหน้าที่ IT ก่อนส่งข้อความซ้ำ การออกจากหน้านี้จะสูญเสียข้อมูลสำหรับลองส่งรายการเดิมอีกครั้ง</p>
+                        {recoveryExitAcknowledged ? <p role="status">รับทราบผลที่ยังไม่ยืนยันแล้ว คุณสามารถออกจากหน้านี้ได้ ระบบไม่ได้ยืนยันว่าข้อความถูกส่งสำเร็จ</p> : (
+                            <Button type="button" variant="outline" onClick={() => {
+                                if (postInFlight.current) return;
+                                if (window.confirm("ผลการส่งข้อความยังไม่ยืนยัน หากออกจากหน้านี้จะสูญเสียข้อมูลสำหรับลองส่งรายการเดิม กรุณาตรวจสอบกับเจ้าหน้าที่ IT ก่อนส่งซ้ำ ต้องการอนุญาตให้ออกจากหน้านี้หรือไม่?")) setRecoveryExitAcknowledged(true);
+                            }}>รับทราบความเสี่ยงและอนุญาตให้ออกจากหน้านี้</Button>
+                        )}
+                    </div>
+                )
+            ) : null}
             {canPost ? (
-                <form className="space-y-3 border-t border-border-neutral pt-5" onSubmit={(event) => void handleSubmit(event)}>
+                <form data-navigation-dirty={draft.length > 0 || selectedAttachments.length > 0} className="space-y-3 border-t border-border-neutral pt-5" onSubmit={(event) => void handleSubmit(event)}>
                     <label htmlFor={`it-ticket-comment-${ticketId}`} className="block text-sm font-semibold text-content-heading">
                         ตอบกลับ
                     </label>
@@ -422,7 +471,7 @@ export function ITTicketConversation({
                         value={draft}
                         maxLength={IT_TICKET_COMMENT_MAX_LENGTH}
                         rows={4}
-                        disabled={posting}
+                        disabled={posting || unresolvedPost}
                         onChange={(event) => handleDraftChange(event.target.value)}
                         placeholder="พิมพ์ข้อความที่ต้องการส่งถึงอีกฝ่าย"
                         aria-describedby={`it-ticket-comment-limit-${ticketId}`}
@@ -437,7 +486,7 @@ export function ITTicketConversation({
                             type="file"
                             multiple
                             accept={`${IT_TICKET_ATTACHMENT_ACCEPTED_TYPES.join(",")},.jpg,.jpeg,.png,.webp`}
-                            disabled={posting || selectedAttachments.length >= IT_TICKET_ATTACHMENT_MAX_FILES}
+                            disabled={posting || unresolvedPost || selectedAttachments.length >= IT_TICKET_ATTACHMENT_MAX_FILES}
                             onChange={handleAttachmentSelection}
                             aria-describedby={`it-ticket-attachments-help-${ticketId}`}
                             aria-invalid={attachmentError ? true : undefined}
@@ -463,7 +512,7 @@ export function ITTicketConversation({
                                                 type="button"
                                                 size="sm"
                                                 variant="ghost"
-                                                disabled={posting}
+                                                disabled={posting || unresolvedPost}
                                                 onClick={() => handleRemoveAttachment(index)}
                                                 aria-label={`นำรูป ${attachment.file.name} ออก`}
                                                 className="min-h-11"
@@ -481,9 +530,9 @@ export function ITTicketConversation({
                         <p id={`it-ticket-comment-limit-${ticketId}`} className="text-xs leading-5 text-content-muted">
                             {draft.length.toLocaleString("th-TH")}/{IT_TICKET_COMMENT_MAX_LENGTH.toLocaleString("th-TH")} ตัวอักษร · ขีดจำกัดทางเทคนิคของระบบ
                         </p>
-                        <Button type="submit" disabled={posting || draft.trim().length === 0} aria-busy={posting}>
+                        <Button type="submit" disabled={posting || (!unresolvedPost && draft.trim().length === 0)} aria-busy={posting}>
                             <Send aria-hidden="true" />
-                            {posting ? "กำลังส่ง…" : "ส่งข้อความ"}
+                            {posting ? "กำลังส่ง…" : unresolvedPost ? "ส่งข้อความเดิมอีกครั้ง" : "ส่งข้อความ"}
                         </Button>
                     </div>
                     {operator || status !== "WAITING_REQUESTER" ? null : (
