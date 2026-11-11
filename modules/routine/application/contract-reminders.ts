@@ -43,6 +43,8 @@ export const ROUTINE_CONTRACT_EXPIRY_LINE_OUTBOX_TYPE =
     "ROUTINE_CONTRACT_EXPIRY_LINE" as const;
 export const ROUTINE_CONTRACT_EXPIRY_SEND_HOUR = 9;
 
+const OUTBOX_EVENT_KEY_QUERY_CHUNK_SIZE = 500;
+
 export interface RoutineContractExpiryEnqueueResult {
     considered: number;
     enqueued: number;
@@ -261,6 +263,12 @@ export async function enqueueDueRoutineContractExpiryReminders(
         orderBy: [{ contractEndDate: "asc" }, { id: "asc" }],
     });
 
+    const candidates: Array<{
+        taskId: number;
+        eventKey: string;
+        contractEndDate: CalendarDate;
+        notificationDate: CalendarDate;
+    }> = [];
     for (const task of tasks) {
         const contractEndDate = currentContractEndDate(task);
         if (!contractEndDate) continue;
@@ -275,36 +283,82 @@ export async function enqueueDueRoutineContractExpiryReminders(
         const notificationDate = getRoutineContractExpiryNotificationDate(
             contractEndDate,
         );
+        candidates.push({
+            taskId: task.id,
+            eventKey: buildRoutineContractExpiryEventKey(
+                task.id,
+                contractEndDate,
+            ),
+            contractEndDate,
+            notificationDate,
+        });
+    }
+
+    for (
+        let offset = 0;
+        offset < candidates.length;
+        offset += OUTBOX_EVENT_KEY_QUERY_CHUNK_SIZE
+    ) {
+        const batch = candidates.slice(
+            offset,
+            offset + OUTBOX_EVENT_KEY_QUERY_CHUNK_SIZE,
+        );
+        let existingEventKeys: Set<string>;
         try {
-            await prisma.notificationOutbox.create({
-                data: {
-                    type: ROUTINE_CONTRACT_EXPIRY_OUTBOX_TYPE,
-                    eventKey: buildRoutineContractExpiryEventKey(
-                        task.id,
-                        contractEndDate,
-                    ),
-                    payload: JSON.stringify({
-                        taskId: task.id,
-                        contractEndDate,
-                        notificationDate,
-                        scheduledFor: getRoutineContractExpiryScheduledFor(
-                            contractEndDate,
-                        ).toISOString(),
-                        createdAt: now.toISOString(),
-                    } satisfies RoutineContractExpiryOutboxPayload),
-                },
+            const existingRows = await prisma.notificationOutbox.findMany({
+                where: { eventKey: { in: batch.map(({ eventKey }) => eventKey) } },
+                select: { eventKey: true },
             });
-            result.enqueued += 1;
+            existingEventKeys = new Set(
+                existingRows.flatMap(({ eventKey }) =>
+                    eventKey === null ? [] : [eventKey],
+                ),
+            );
         } catch (error) {
-            if (isUniqueEventKeyConflict(error)) {
+            for (const candidate of batch) {
+                result.errors += 1;
+                console.error("Routine contract expiry enqueue failed", {
+                    taskId: candidate.taskId,
+                    errorType: error instanceof Error ? error.name : "UnknownError",
+                });
+            }
+            continue;
+        }
+
+        for (const candidate of batch) {
+            if (existingEventKeys.has(candidate.eventKey)) {
                 result.duplicatesSkipped += 1;
                 continue;
             }
-            result.errors += 1;
-            console.error("Routine contract expiry enqueue failed", {
-                taskId: task.id,
-                errorType: error instanceof Error ? error.name : "UnknownError",
-            });
+
+            try {
+                await prisma.notificationOutbox.create({
+                    data: {
+                        type: ROUTINE_CONTRACT_EXPIRY_OUTBOX_TYPE,
+                        eventKey: candidate.eventKey,
+                        payload: JSON.stringify({
+                            taskId: candidate.taskId,
+                            contractEndDate: candidate.contractEndDate,
+                            notificationDate: candidate.notificationDate,
+                            scheduledFor: getRoutineContractExpiryScheduledFor(
+                                candidate.contractEndDate,
+                            ).toISOString(),
+                            createdAt: now.toISOString(),
+                        } satisfies RoutineContractExpiryOutboxPayload),
+                    },
+                });
+                result.enqueued += 1;
+            } catch (error) {
+                if (isUniqueEventKeyConflict(error)) {
+                    result.duplicatesSkipped += 1;
+                    continue;
+                }
+                result.errors += 1;
+                console.error("Routine contract expiry enqueue failed", {
+                    taskId: candidate.taskId,
+                    errorType: error instanceof Error ? error.name : "UnknownError",
+                });
+            }
         }
     }
 

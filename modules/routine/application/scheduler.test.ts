@@ -80,6 +80,7 @@ describe("Routine scheduler", () => {
         prismaMock.userCapabilityGrant.findMany.mockResolvedValue(asNever([]));
         prismaMock.teamMembership.findMany.mockResolvedValue(asNever([]));
         prismaMock.teamRoleCapabilityGrant.findMany.mockResolvedValue(asNever([]));
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([]));
         prismaMock.notificationOutbox.create.mockResolvedValue(
             asNever({ id: 501 }),
         );
@@ -112,6 +113,10 @@ describe("Routine scheduler", () => {
                     '"scheduledFor":"2026-08-03T02:00:00.000Z"',
                 ),
             }),
+        });
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledWith({
+            where: { eventKey: { in: ["routine:91:rule:31:version:2"] } },
+            select: { eventKey: true },
         });
         expect(enqueueDueRoutineContractExpiryRemindersMock).toHaveBeenCalledWith(
             now,
@@ -197,7 +202,58 @@ describe("Routine scheduler", () => {
         );
     });
 
-    it("counts a duplicate event key instead of creating another outbox row", async () => {
+    it("skips existing event keys without attempting a create", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([
+            { eventKey: "routine:91:rule:31:version:2" },
+        ]));
+
+        const result = await runRoutineScheduler(
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result.outboxEnqueued).toBe(0);
+        expect(result.duplicatesSkipped).toBe(1);
+        expect(result.errors).toBe(0);
+        expect(prismaMock.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
+    it("creates only missing reminder event keys from the run", async () => {
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            buildOccurrence(),
+            buildOccurrence({ id: 92 }),
+        ]));
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([
+            { eventKey: "routine:91:rule:31:version:2" },
+        ]));
+
+        const result = await runRoutineScheduler(
+            new Date("2026-08-03T02:00:00.000Z"),
+        );
+
+        expect(result.outboxEnqueued).toBe(1);
+        expect(result.duplicatesSkipped).toBe(1);
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledWith({
+            where: {
+                eventKey: {
+                    in: [
+                        "routine:91:rule:31:version:2",
+                        "routine:92:rule:31:version:2",
+                    ],
+                },
+            },
+            select: { eventKey: true },
+        });
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                eventKey: "routine:92:rule:31:version:2",
+            }),
+        });
+    });
+
+    it("maps a unique-key race after the pre-check to a duplicate", async () => {
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([]));
         prismaMock.notificationOutbox.create.mockRejectedValue({
             code: "P2002",
             meta: { target: ["eventKey"] },
@@ -210,6 +266,8 @@ describe("Routine scheduler", () => {
         expect(result.outboxEnqueued).toBe(0);
         expect(result.duplicatesSkipped).toBe(1);
         expect(result.errors).toBe(0);
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledTimes(1);
     });
 
     it.each([

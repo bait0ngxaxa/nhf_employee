@@ -125,6 +125,7 @@ describe("Routine contract expiry scheduling", () => {
     beforeEach(() => {
         mockReset(prismaMock);
         vi.clearAllMocks();
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([]));
         prismaMock.notificationOutbox.create.mockResolvedValue(
             asNever({ id: 501 }),
         );
@@ -175,6 +176,12 @@ describe("Routine contract expiry scheduling", () => {
                 payload: JSON.stringify(buildPayload()),
             },
         });
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledWith({
+            where: {
+                eventKey: { in: ["routine-contract:71:end:2026-12-31"] },
+            },
+            select: { eventKey: true },
+        });
     });
 
     it("does not enqueue before the notification date and time", async () => {
@@ -192,16 +199,68 @@ describe("Routine contract expiry scheduling", () => {
             .toBe("2026-11-30T02:00:00.000Z");
     });
 
-    it("uses the unique event key to skip repeated scheduler runs", async () => {
+    it("skips an existing contract event without attempting a create", async () => {
         prismaMock.routineTask.findMany.mockResolvedValue(
             asNever([buildTask()]),
         );
-        prismaMock.notificationOutbox.create
-            .mockResolvedValueOnce(asNever({ id: 501 }))
-            .mockRejectedValueOnce({
-                code: "P2002",
-                meta: { target: ["eventKey"] },
-            });
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([
+            { eventKey: "routine-contract:71:end:2026-12-31" },
+        ]));
+
+        const result = await enqueueDueRoutineContractExpiryReminders(
+            new Date("2026-11-30T02:00:00.000Z"),
+        );
+
+        expect(result.enqueued).toBe(0);
+        expect(result.duplicatesSkipped).toBe(1);
+        expect(result.errors).toBe(0);
+        expect(prismaMock.notificationOutbox.create).not.toHaveBeenCalled();
+    });
+
+    it("creates only missing contract event keys from the batch", async () => {
+        prismaMock.routineTask.findMany.mockResolvedValue(asNever([
+            buildTask(),
+            buildTask({ id: 72 }),
+        ]));
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([
+            { eventKey: "routine-contract:71:end:2026-12-31" },
+        ]));
+
+        const result = await enqueueDueRoutineContractExpiryReminders(
+            new Date("2026-11-30T02:00:00.000Z"),
+        );
+
+        expect(result.enqueued).toBe(1);
+        expect(result.duplicatesSkipped).toBe(1);
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledWith({
+            where: {
+                eventKey: {
+                    in: [
+                        "routine-contract:71:end:2026-12-31",
+                        "routine-contract:72:end:2026-12-31",
+                    ],
+                },
+            },
+            select: { eventKey: true },
+        });
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                eventKey: "routine-contract:72:end:2026-12-31",
+            }),
+        });
+    });
+
+    it("uses the pre-check result to skip repeated scheduler runs", async () => {
+        prismaMock.routineTask.findMany.mockResolvedValue(
+            asNever([buildTask()]),
+        );
+        prismaMock.notificationOutbox.findMany
+            .mockResolvedValueOnce(asNever([]))
+            .mockResolvedValueOnce(asNever([
+                { eventKey: "routine-contract:71:end:2026-12-31" },
+            ]));
         const now = new Date("2026-11-30T02:00:00.000Z");
 
         const first = await enqueueDueRoutineContractExpiryReminders(now);
@@ -209,7 +268,28 @@ describe("Routine contract expiry scheduling", () => {
 
         expect(first.enqueued).toBe(1);
         expect(second.duplicatesSkipped).toBe(1);
-        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledTimes(2);
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("maps a unique-key race after the pre-check to a duplicate", async () => {
+        prismaMock.routineTask.findMany.mockResolvedValue(
+            asNever([buildTask()]),
+        );
+        prismaMock.notificationOutbox.findMany.mockResolvedValue(asNever([]));
+        prismaMock.notificationOutbox.create.mockRejectedValue({
+            code: "P2002",
+            meta: { target: ["eventKey"] },
+        });
+
+        const result = await enqueueDueRoutineContractExpiryReminders(
+            new Date("2026-11-30T02:00:00.000Z"),
+        );
+
+        expect(result.enqueued).toBe(0);
+        expect(result.duplicatesSkipped).toBe(1);
+        expect(result.errors).toBe(0);
+        expect(prismaMock.notificationOutbox.findMany).toHaveBeenCalledTimes(1);
+        expect(prismaMock.notificationOutbox.create).toHaveBeenCalledTimes(1);
     });
 
     it("creates a new deterministic event when the contract end date changes", async () => {
