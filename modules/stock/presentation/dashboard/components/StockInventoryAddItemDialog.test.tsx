@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { apiPost } from "@/lib/client/api-client";
+import { apiPatch, apiPost } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
+import { EditItemDialog } from "./StockInventoryEditDialog";
+import type { StockItem } from "../context/types";
 import { AddItemDialog } from "./StockInventoryAddItemDialog";
 
 vi.mock("@/lib/client/api-client", () => ({
     apiPost: vi.fn(),
+    apiPatch: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -42,6 +45,47 @@ describe("AddItemDialog", () => {
 
             return { success: true, data: {} } as never;
         });
+    });
+
+    it.each(["add", "edit"])("%s sends only one request for two synchronous submits", async (mode) => {
+        let finish: (() => void) | undefined;
+        const pending = new Promise<void>((resolve) => { finish = resolve; });
+        const response = async () => {
+            await pending;
+            return { success: true, data: {}, status: 200, requestId: "test" } as const;
+        };
+        vi.mocked(apiPost).mockImplementation(response);
+        vi.mocked(apiPatch).mockImplementation(response);
+        const onSuccess = vi.fn();
+        if (mode === "add") {
+            render(<AddItemDialog open sessionId={1} categories={categories} canManageInventory onClose={() => undefined} onSuccess={onSuccess} />);
+            fireEvent.change(screen.getByLabelText(/^ชื่อวัสดุ/), { target: { value: "กระดาษ" } });
+            fireEvent.click(screen.getByRole("combobox"));
+            fireEvent.click(screen.getByRole("option", { name: "สำนักงาน" }));
+        } else {
+            const item: StockItem = {
+                id: 1, defaultVariantId: 11, name: "กระดาษ", sku: "ITEM", unit: "ชิ้น",
+                quantity: 1, minStock: 1, categoryId: 1, isActive: true,
+                reservedQuantity: 0, availableQuantity: 1,
+                category: { id: 1, name: "สำนักงาน" },
+                variants: [{ id: 11, stockItemId: 1, sku: "X", unit: "ชิ้น", quantity: 1,
+                    minStock: 1, isActive: true, imageUrl: null, reservedQuantity: 0, availableQuantity: 1 }],
+            };
+            render(<EditItemDialog item={item} categories={categories} canManageInventory onClose={() => undefined} onSuccess={onSuccess} />);
+            fireEvent.change(screen.getByLabelText(/^ชื่อวัสดุ/), { target: { value: "กระดาษใหม่" } });
+        }
+        const form = screen.getByLabelText(/^ชื่อวัสดุ/).closest("form");
+        expect(form).not.toBeNull();
+        act(() => {
+            form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+            form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        });
+        expect(mode === "add" ? apiPost : apiPatch).toHaveBeenCalledTimes(1);
+        finish?.();
+        await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+        if (form) fireEvent.submit(form);
+        await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(2));
+        expect(mode === "add" ? apiPost : apiPatch).toHaveBeenCalledTimes(2);
     });
 
     it("preserves the complete draft during a session and resets it on the next session", async () => {

@@ -12,6 +12,7 @@ import {
     createStockCommandActor,
     StockCapabilityDeniedError,
     stockService,
+    StockVariantSkuConflictError,
     updateItemSchema,
 } from "@/modules/stock";
 
@@ -66,6 +67,9 @@ export const PATCH = withTrustedMutation(async (
         }
         if (error instanceof WorkforceAuthorizationError) {
             return jsonError(error.message, 403);
+        }
+        if (error instanceof StockVariantSkuConflictError) {
+            return jsonError(error.message, 409);
         }
         const message = error instanceof Error ? error.message : "";
         if (

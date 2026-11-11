@@ -1,3 +1,5 @@
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { StockVariantSkuConflictError } from "@/modules/stock";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type NextRequest } from "next/server";
 import type * as StockModule from "@/modules/stock";
@@ -134,6 +136,21 @@ describe("Stock Item Routes", () => {
             defaultScopes: [],
             isAdministrative: true,
         });
+    });
+
+    it.each(["POST", "PATCH"])("%s maps pre-check and raced P2002 to the same 409", async (method) => {
+        for (const error of [new StockVariantSkuConflictError(), new PrismaClientKnownRequestError(
+            "Unique constraint failed", { code: "P2002", clientVersion: "test" },
+        )]) {
+            const mutation = method === "POST" ? stockService.createItem : stockService.updateItem;
+            vi.mocked(mutation).mockRejectedValueOnce(error);
+            const request = trustedNextRequest("http://localhost/api/stock/items/42", {
+                method, body: JSON.stringify({ name: "วัสดุ", categoryId: 1, variants: [{ unit: "ชิ้น", quantity: 1, minStock: 1 }] }),
+            });
+            const response = method === "POST" ? await createItemRoute(request) : await patchItemRoute(request, { params: Promise.resolve({ id: "42" }) });
+            expect(response.status).toBe(409);
+            expect(await response.json()).toMatchObject({ error: "รหัสวัสดุ (SKU) นี้มีอยู่แล้ว" });
+        }
     });
 
     it("passes request audit context when updating an item", async () => {

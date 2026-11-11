@@ -1,3 +1,4 @@
+import { assertVariantSkuAvailable, loadVariantSkuConflicts } from "../../infrastructure/persistence/variant-sku-check";
 import { type StockTxType } from "@prisma/client";
 import {
     defineStockAuditDetails,
@@ -31,7 +32,7 @@ import {
     ensureDefaultCategoryId,
 } from "../../infrastructure/persistence/write-helpers";
 import { updateItemInTransaction } from "../../infrastructure/persistence/item-update.shared";
-import type { StockTxClient } from "../../infrastructure/persistence/item-update.types";
+import type { StockTxClient, StockItemWithDetails } from "../../infrastructure/persistence/item-update.types";
 import type {
     AdjustStockResult,
     CreateStockItemInput,
@@ -416,7 +417,7 @@ export async function deleteCategory(
 export async function createItem(
     data: CreateStockItemInput,
     actor: StockAuthorizedCommandActor,
-) {
+): Promise<StockItemWithDetails> {
     const sku = data.sku?.trim() ? data.sku.trim() : generateSku();
     const variants = data.variants ?? [];
     const totalQuantity =
@@ -428,6 +429,9 @@ export async function createItem(
             ? variants.reduce((sum, variant) => sum + variant.minStock, 0)
             : (data.minStock ?? 1);
     const fallbackUnit = variants[0]?.unit ?? data.unit ?? "ชิ้น";
+    const variantSkus = variants.length === 0 ? [sku] : variants.map(
+        (variant, index) => variant.sku?.trim() || `${sku}-V${index + 1}`,
+    );
 
     return prisma.$transaction(async (tx) => {
         await resolveStockCapabilityInTransaction(
@@ -435,6 +439,7 @@ export async function createItem(
             actor,
             "stock.inventory.manage",
         );
+        const skuConflicts = await loadVariantSkuConflicts(tx, variantSkus);
         const categoryId = data.categoryId ?? (await ensureDefaultCategoryId(tx));
         const item = await tx.stockItem.create({
             data: {
@@ -458,6 +463,7 @@ export async function createItem(
 
         // Initial quantities are opening balances and are recorded in the stock ledger.
         if (variants.length === 0) {
+            assertVariantSkuAvailable(skuConflicts, 0);
             const variant = await createDefaultVariantForNewItem(
                 tx,
                 {
@@ -471,10 +477,11 @@ export async function createItem(
         } else {
             for (let index = 0; index < variants.length; index += 1) {
                 const variant = variants[index];
+                assertVariantSkuAvailable(skuConflicts, index);
                 const variantRecord = await tx.stockItemVariant.create({
                     data: {
                         stockItemId: item.id,
-                        sku: variant.sku?.trim() ? variant.sku.trim() : `${sku}-V${index + 1}`,
+                        sku: variantSkus[index],
                         unit: variant.unit,
                         quantity: variant.quantity,
                         minStock: variant.minStock,
