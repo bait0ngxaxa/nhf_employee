@@ -100,6 +100,30 @@ describe("ITTicketConversation mutation recovery", () => {
         }
     });
 
+    it.each(["permission", "status"])("offers an explicit recovery exit after %s changes without losing retry identity", async (change) => {
+        const view = render(<ITTicketConversation ticketId={19} status="OPEN" canComment operator />);
+        await screen.findByText("ยังไม่มีข้อความในบทสนทนา");
+        fireEvent.change(screen.getByRole("textbox", { name: "ตอบกลับ" }), { target: { value: "ข้อความเดิม" } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByRole("alert");
+        view.rerender(<ITTicketConversation ticketId={19} status={change === "status" ? "CLOSED" : "OPEN"} canComment={change !== "permission"} operator />);
+        expect(allowDashboardNavigation()).toBe(false);
+        expect(screen.queryByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" })).not.toBeInTheDocument();
+        vi.mocked(window.confirm).mockReturnValueOnce(false);
+        fireEvent.click(screen.getByRole("button", { name: "รับทราบความเสี่ยงและอนุญาตให้ออกจากหน้านี้" }));
+        expect(allowDashboardNavigation()).toBe(false);
+        fireEvent.click(screen.getByRole("button", { name: "รับทราบความเสี่ยงและอนุญาตให้ออกจากหน้านี้" }));
+        expect(allowDashboardNavigation()).toBe(true);
+        view.rerender(<ITTicketConversation ticketId={19} status="OPEN" canComment operator />);
+        expect(screen.getByRole("textbox", { name: "ตอบกลับ" })).toHaveValue("ข้อความเดิม");
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
+        await screen.findByRole("alert");
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความเดิมอีกครั้ง" }));
+        await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("ถูกส่งเรียบร้อยแล้ว"));
+        expect(new Set(capturedRequests.map((request) => request.key)).size).toBe(1);
+        expect(capturedRequests.every((request) => request.submission.body === "ข้อความเดิม")).toBe(true);
+    });
+
     it("locks the original message and attachment through lost responses and resolves with one idempotent submission", async () => {
         const fetchMock = globalThis.fetch;
         render(<ITTicketConversation ticketId={19} status="OPEN" canComment operator />);

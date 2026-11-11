@@ -152,6 +152,7 @@ export function ITTicketConversation({
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [posting, setPosting] = useState(false);
     const [unresolvedPost, setUnresolvedPost] = useState(false);
+    const [recoveryExitAcknowledged, setRecoveryExitAcknowledged] = useState(false);
     const [postError, setPostError] = useState<string | null>(null);
     const [postMessage, setPostMessage] = useState<string | null>(null);
     const [postingDenied, setPostingDenied] = useState(false);
@@ -308,6 +309,7 @@ export function ITTicketConversation({
         if (!body) return;
 
         postInFlight.current = true;
+        setRecoveryExitAcknowledged(false);
         setPosting(true);
         setPostError(null);
         setPostMessage(null);
@@ -390,7 +392,7 @@ export function ITTicketConversation({
     };
 
     return (
-        <section data-navigation-submitting={posting} data-navigation-unresolved={unresolvedPost} data-navigation-recovery="ยังยืนยันผลการส่งข้อความไม่ได้ กรุณาลองส่งข้อความเดิมอีกครั้งเพื่อยืนยันผลก่อนเปลี่ยนหน้า" aria-labelledby="it-ticket-conversation-heading" className="space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4 md:p-6">
+        <section data-navigation-submitting={posting} data-navigation-unresolved={unresolvedPost && !recoveryExitAcknowledged} data-navigation-recovery="ยังยืนยันผลการส่งข้อความไม่ได้ กรุณาส่งข้อความเดิมซ้ำ หรือรับทราบความเสี่ยงหากไม่สามารถตอบกลับได้แล้ว" aria-labelledby="it-ticket-conversation-heading" className="space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4 md:p-6">
             <header className="flex items-start gap-3">
                 <MessageSquareText aria-hidden="true" className="mt-1 size-5 shrink-0 text-brand-foreground" />
                 <div className="min-w-0 space-y-1">
@@ -446,7 +448,19 @@ export function ITTicketConversation({
                 )
             ) : null}
 
-            {unresolvedPost && !posting ? <p className="text-sm text-content-secondary">ยังยืนยันผลการส่งข้อความไม่ได้ ระบบจะลองส่งข้อความและไฟล์ชุดเดิมด้วยรหัสเดิม กรุณาส่งซ้ำเพื่อยืนยันผลก่อนเปลี่ยนหน้า</p> : null}
+            {unresolvedPost && !posting ? (
+                canPost ? <p className="text-sm text-content-secondary">ยังยืนยันผลการส่งข้อความไม่ได้ ระบบจะลองส่งข้อความและไฟล์ชุดเดิมด้วยรหัสเดิม กรุณาส่งซ้ำเพื่อยืนยันผลก่อนเปลี่ยนหน้า</p> : (
+                    <div className="space-y-3 text-sm text-content-secondary">
+                        <p>ยังยืนยันไม่ได้ว่าข้อความเดิมถูกส่งแล้วหรือไม่ และขณะนี้ไม่สามารถตอบกลับได้ กรุณาตรวจสอบบทสนทนาหรือติดต่อเจ้าหน้าที่ IT ก่อนส่งข้อความซ้ำ การออกจากหน้านี้จะสูญเสียข้อมูลสำหรับลองส่งรายการเดิมอีกครั้ง</p>
+                        {recoveryExitAcknowledged ? <p role="status">รับทราบผลที่ยังไม่ยืนยันแล้ว คุณสามารถออกจากหน้านี้ได้ ระบบไม่ได้ยืนยันว่าข้อความถูกส่งสำเร็จ</p> : (
+                            <Button type="button" variant="outline" onClick={() => {
+                                if (postInFlight.current) return;
+                                if (window.confirm("ผลการส่งข้อความยังไม่ยืนยัน หากออกจากหน้านี้จะสูญเสียข้อมูลสำหรับลองส่งรายการเดิม กรุณาตรวจสอบกับเจ้าหน้าที่ IT ก่อนส่งซ้ำ ต้องการอนุญาตให้ออกจากหน้านี้หรือไม่?")) setRecoveryExitAcknowledged(true);
+                            }}>รับทราบความเสี่ยงและอนุญาตให้ออกจากหน้านี้</Button>
+                        )}
+                    </div>
+                )
+            ) : null}
             {canPost ? (
                 <form data-navigation-dirty={draft.length > 0 || selectedAttachments.length > 0} className="space-y-3 border-t border-border-neutral pt-5" onSubmit={(event) => void handleSubmit(event)}>
                     <label htmlFor={`it-ticket-comment-${ticketId}`} className="block text-sm font-semibold text-content-heading">
