@@ -140,6 +140,28 @@ describe.sequential("stock mutations with real MySQL", () => {
         expect(await prisma.stockItem.count({ where: { sku: "SKU-WITHIN" } })).toBe(0);
     });
 
+    it.each([true, false])("rename-away before create = %s follows submitted order with real SKU collation", async (renameFirst) => {
+        const fixture = await createStockFixture(prisma, { suffix: `rename-order-${renameFirst}` });
+        await prisma.stockItemVariant.update({ where: { id: fixture.variant.id }, data: { sku: "REUSE-X" } });
+        const rename = {
+            id: fixture.variant.id, expectedQuantity: fixture.quantity, sku: "REUSE-Y",
+            unit: fixture.variant.unit, quantity: fixture.quantity, minStock: 1, attributes: [],
+        };
+        const create = { sku: "reuse-x", unit: fixture.variant.unit, quantity: 0, minStock: 1, attributes: [] };
+        const saving = stockService.updateItem(fixture.item.id, {
+            variants: renameFirst ? [rename, create] : [create, rename],
+        }, fixture.issuerActor);
+        if (renameFirst) {
+            await expect(saving).resolves.toMatchObject({ id: fixture.item.id });
+            const variants = await prisma.stockItemVariant.findMany({ where: { stockItemId: fixture.item.id }, orderBy: { id: "asc" }, select: { sku: true } });
+            expect(variants.map(({ sku }) => sku)).toEqual(["REUSE-Y", "reuse-x"]);
+        } else {
+            await expect(saving).rejects.toBeInstanceOf(StockVariantSkuConflictError);
+            expect((await prisma.stockItemVariant.findUniqueOrThrow({ where: { id: fixture.variant.id } })).sku).toBe("REUSE-X");
+            expect(await prisma.stockItemVariant.count({ where: { stockItemId: fixture.item.id } })).toBe(1);
+        }
+    });
+
     it("reads item inventory permanently from active variants", async () => {
         const fixture = await createStockFixture(prisma, {
             suffix: "variant-read",

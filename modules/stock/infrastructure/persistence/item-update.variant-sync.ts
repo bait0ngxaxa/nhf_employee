@@ -351,7 +351,7 @@ export async function updateItemWithVariants(
     });
     // Include updates in the plan: an earlier rename can reserve a later create's SKU.
     // Only creates consume these checks; updates keep their original validation/P2002 path.
-    const skuConflicts = await loadVariantSkuConflicts(tx, plannedSkus);
+    const skuConflicts = await loadVariantSkuConflicts(tx, plannedSkus, variants.map((variant) => variant.id));
 
     const nextItem = await tx.stockItem.update({
         where: { id: itemId },

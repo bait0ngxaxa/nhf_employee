@@ -16,11 +16,11 @@ describe("rename-away/create submitted-order characterization", () => {
         tx.stockTransaction.upsert.mockResolvedValue({ id: 91 } as never);
         // SQL's early snapshot matches X to A; SQL does not decide whether A has moved by create time.
         tx.$queryRaw.mockResolvedValue([{ ordinal: renameFirst ? 1 : 0, existingId: 11, occurrence: 1 }]);
-        tx.stockItemVariant.updateMany.mockImplementation(async (args) => {
+        tx.stockItemVariant.updateMany.mockImplementation((args) => {
             if (args.data.sku === "Y") holders.set(11, "Y");
-            return { count: 1 };
+            return { count: 1 } as never;
         });
-        tx.stockItemVariant.create.mockImplementation(async (args) => {
+        tx.stockItemVariant.create.mockImplementation((args) => {
             if ([...holders.values()].includes(String(args.data.sku))) {
                 throw new Prisma.PrismaClientKnownRequestError("รหัสวัสดุ (SKU) นี้มีอยู่แล้ว", { code: "P2002", clientVersion: "test" });
             }
