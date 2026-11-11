@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -158,6 +158,7 @@ export function EditItemDialog({
     onSuccess,
 }: EditItemDialogProps) {
     const [loading, setLoading] = useState(false);
+    const submittingRef = useRef(false);
     const [itemName, setItemName] = useState(item.name);
     const [itemDescription, setItemDescription] = useState(item.description ?? "");
     const [selectedCategoryId, setSelectedCategoryId] = useState(
@@ -215,7 +216,7 @@ export function EditItemDialog({
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
 
-        if (!canManageInventory) return;
+        if (!canManageInventory || submittingRef.current) return;
 
         if (!hasChanges) {
             return;
@@ -228,6 +229,7 @@ export function EditItemDialog({
             return;
         }
 
+        submittingRef.current = true;
         setLoading(true);
 
         try {
@@ -250,6 +252,7 @@ export function EditItemDialog({
             const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
             toast.error(message);
         } finally {
+            submittingRef.current = false;
             setLoading(false);
         }
     }

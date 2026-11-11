@@ -21,6 +21,8 @@ import {
     trackUploadUrl,
 } from "./item-update.types";
 
+import { assertVariantSkuAvailable, loadVariantSkuConflicts } from "./variant-sku-check";
+
 const MAX_VARIANT_SKU_LENGTH = 50;
 
 async function getItemForVariantUpdate(
@@ -125,19 +127,17 @@ function createAvailableVariantSku(
 async function createSubmittedVariant(
     tx: StockTxClient,
     itemId: number,
-    parentSku: string,
     parentImageUrl: string | null,
     variant: SubmittedVariant,
     index: number,
-    usedSkus: Set<string>,
+    nextSku: string,
+    skuConflicts: Set<number>,
     performedBy: number,
     tracking: UploadUrlTracking,
 ): Promise<void> {
     // A variant added during item editing follows createItem: its initial quantity is an opening balance.
     const nextVariantImageUrl = variant.imageUrl ?? parentImageUrl;
-    const normalizedSku = variant.sku?.trim();
-    const nextSku =
-        normalizedSku || createAvailableVariantSku(parentSku, index + 1, usedSkus);
+    assertVariantSkuAvailable(skuConflicts, index);
     const createdVariant = await tx.stockItemVariant.create({
         data: {
             stockItemId: itemId,
@@ -237,7 +237,8 @@ async function syncSubmittedVariants(
     nextItem: Pick<ExistingItemRecord, "sku" | "imageUrl" | "isActive">,
     variants: SubmittedVariant[],
     existingVariantById: Map<number, ExistingVariantRecord>,
-    usedSkus: Set<string>,
+    plannedSkus: string[],
+    skuConflicts: Set<number>,
     userId: number,
     tracking: UploadUrlTracking,
 ): Promise<Set<number>> {
@@ -250,11 +251,11 @@ async function syncSubmittedVariants(
             await createSubmittedVariant(
                 tx,
                 itemId,
-                nextItem.sku,
                 nextItem.imageUrl,
                 variant,
                 index,
-                usedSkus,
+                plannedSkus[index],
+                skuConflicts,
                 userId,
                 tracking,
             );
@@ -341,6 +342,16 @@ export async function updateItemWithVariants(
     const usedSkus = collectUsedVariantSkus(existingVariants, variants);
 
     assertSubmittedVariantsExist(variants, existingVariantById);
+    const parentSku = itemData.sku ?? item.sku;
+    const plannedSkus = variants.map((variant, index) => {
+        if (variant.id) {
+            return variant.sku?.trim() || existingVariantById.get(variant.id)?.sku || `${parentSku}-V${index + 1}`;
+        }
+        return variant.sku?.trim() || createAvailableVariantSku(parentSku, index + 1, usedSkus);
+    });
+    // Include updates in the plan: an earlier rename can reserve a later create's SKU.
+    // Only creates consume these checks; updates keep their original validation/P2002 path.
+    const skuConflicts = await loadVariantSkuConflicts(tx, plannedSkus);
 
     const nextItem = await tx.stockItem.update({
         where: { id: itemId },
@@ -364,7 +375,8 @@ export async function updateItemWithVariants(
         nextItem,
         variants,
         existingVariantById,
-        usedSkus,
+        plannedSkus,
+        skuConflicts,
         userId,
         tracking,
     );

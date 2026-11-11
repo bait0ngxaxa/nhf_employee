@@ -150,7 +150,7 @@ export {
     getStockRequestReportMeta,
     getStockRequestReportYears,
 } from "./infrastructure/reports/report-export";
-export { StockInvariantViolationError } from "./domain/errors";
+export { StockInvariantViolationError, StockVariantSkuConflictError } from "./domain/errors";
 
 export {
     buildStockRequestResultLineEventKey,

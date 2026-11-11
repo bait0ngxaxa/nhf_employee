@@ -115,6 +115,7 @@ const AddItemDialogSession = forwardRef<
     ref,
 ): ReactElement {
     const [loading, setLoading] = useState(false);
+    const submittingRef = useRef(false);
     const [selectedCategoryId, setSelectedCategoryId] = useState("");
     const [itemImageUrl, setItemImageUrl] = useState("");
     const [variants, setVariants] = useState<VariantDraft[]>([createEmptyVariant()]);
@@ -130,7 +131,7 @@ const AddItemDialogSession = forwardRef<
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
 
-        if (!canManageInventory) return;
+        if (!canManageInventory || submittingRef.current) return;
 
         if (!selectedCategoryId) {
             toast.error("กรุณาเลือกหมวดหมู่");
@@ -148,6 +149,7 @@ const AddItemDialogSession = forwardRef<
             return;
         }
 
+        submittingRef.current = true;
         setLoading(true);
 
         try {
@@ -171,6 +173,8 @@ const AddItemDialogSession = forwardRef<
                 error instanceof Error ? error.message : STOCK_ADMIN_TEXT.genericError;
             toast.error(message);
             setLoading(false);
+        } finally {
+            submittingRef.current = false;
         }
     }
 

@@ -22,6 +22,7 @@ function save(variants: SubmittedVariant[]): ReturnType<typeof updateItemWithVar
 describe("variant sync error precedence (writes stay in submitted order)", () => {
     beforeEach(() => {
         mockReset(tx);
+        tx.$queryRaw.mockResolvedValue([{ ordinal: 0 }]);
         tx.stockItem.findUniqueOrThrow.mockResolvedValue({ id: 1, sku: "ITEM", unit: "ชิ้น", imageUrl: null, isActive: true } as never);
         tx.stockItem.update.mockResolvedValue({ id: 1, sku: "ITEM", imageUrl: null, isActive: true } as never);
         tx.stockItemVariant.findMany.mockResolvedValue([
@@ -30,6 +31,20 @@ describe("variant sync error precedence (writes stay in submitted order)", () =>
         ] as never);
         tx.stockItemVariant.create.mockRejectedValue(duplicate());
         tx.stockItemVariant.updateMany.mockResolvedValue({ count: 1 });
+    });
+
+    it("pre-detected conflict replaces create without reaching removal validation", async () => {
+        tx.$queryRaw.mockResolvedValue([{ ordinal: 0 }]);
+        await expect(save([submitted("X")])).rejects.toThrow("รหัสวัสดุ (SKU) นี้มีอยู่แล้ว");
+        expect(tx.stockItemVariant.create).not.toHaveBeenCalled();
+        expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+        expect(tx.stockRequestItem.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("a race after a clear pre-check still propagates P2002 to the route", async () => {
+        tx.$queryRaw.mockResolvedValue([]);
+        await expect(save([submitted("NEW")])).rejects.toMatchObject({ code: "P2002" });
+        expect(tx.stockItemVariant.create).toHaveBeenCalledTimes(1);
     });
 
     it("stale quantity before a later duplicate SKU wins", async () => {

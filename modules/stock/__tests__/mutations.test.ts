@@ -115,6 +115,7 @@ function expectNoParentInventoryUpdate(): void {
 describe("Stock Service Mutations", () => {
     beforeEach(() => {
         mockReset(prismaMock);
+        prismaMock.$queryRaw.mockResolvedValue([]);
         prismaMock.$transaction.mockImplementation(async (arg) => {
             const callback = arg as (client: PrismaClient) => unknown;
             return callback(prismaMock as unknown as PrismaClient);
@@ -228,6 +229,31 @@ describe("Stock Service Mutations", () => {
                     details: expect.stringContaining('"requestId":"req-2"'),
                 }),
             });
+        });
+
+        it.each(["typed", "generated", "default"])("pre-checks %s variant SKU before creating", async (mode) => {
+            prismaMock.$queryRaw.mockResolvedValue([{ ordinal: 0 }]);
+            prismaMock.stockItem.create.mockResolvedValue(asNever({ id: 51, sku: "ITEM", unit: "ชิ้น", imageUrl: null, isActive: true }));
+            await expect(stockService.createItem({
+                name: "วัสดุ", sku: "ITEM", categoryId: 4,
+                ...(mode === "default" ? { variants: [] } : { variants: [{
+                    ...(mode === "typed" ? { sku: "TAKEN" } : {}),
+                    unit: "ชิ้น", quantity: 1, minStock: 1, attributes: [],
+                }] }),
+            }, commandActor(2))).rejects.toThrow("รหัสวัสดุ (SKU) นี้มีอยู่แล้ว");
+            expect(prismaMock.stockItemVariant.create).not.toHaveBeenCalled();
+            expect(prismaMock.$queryRaw.mock.calls.filter(([query]) => typeof query === "object" && query !== null && "sql" in query && String(query.sql).includes("WITH requested"))).toHaveLength(1);
+        });
+
+        it("rejects a duplicate at the second create, after the first variant was written", async () => {
+            prismaMock.$queryRaw.mockResolvedValue([{ ordinal: 1 }]);
+            prismaMock.stockItem.create.mockResolvedValue(asNever({ id: 51, sku: "ITEM", unit: "ชิ้น", imageUrl: null, isActive: true }));
+            prismaMock.stockItemVariant.create.mockResolvedValue(asNever({ id: 511 }));
+            await expect(stockService.createItem({
+                name: "วัสดุ", sku: "ITEM", categoryId: 4,
+                variants: [1, 2].map(() => ({ sku: "SAME", unit: "ชิ้น", quantity: 1, minStock: 1, attributes: [] })),
+            }, commandActor(2))).rejects.toThrow("รหัสวัสดุ (SKU) นี้มีอยู่แล้ว");
+            expect(prismaMock.stockItemVariant.create).toHaveBeenCalledTimes(1);
         });
 
         it("should create separate StockItem and StockVariant audit records", async () => {

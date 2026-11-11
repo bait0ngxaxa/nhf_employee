@@ -16,7 +16,7 @@ import {
     setStockItemDefaultVariantIfUnset,
 } from "../../infrastructure/persistence/default-variant-writer";
 import { createNewStockRequest } from "../../application/requests/request-creation";
-import { StockInvariantViolationError } from "../../domain/errors";
+import { StockInvariantViolationError, StockVariantSkuConflictError } from "../../domain/errors";
 import { lockStockInventoryRows } from "../../infrastructure/persistence/locks";
 import { createStockOpeningBalanceTransaction } from "../../infrastructure/persistence/write-helpers";
 import {
@@ -111,6 +111,33 @@ describe.sequential("stock mutations with real MySQL", () => {
     beforeEach(async () => {
         await dropRollbackTrigger();
         await cleanIntegrationDatabase(prisma);
+    });
+
+    it.each(["typed", "generated", "default", "inactive", "collation"])("rejects %s SKU conflicts with a domain error, not P2002, and rolls back", async (mode) => {
+        const fixture = await createStockFixture(prisma, { suffix: `sku-${mode}` });
+        const itemSku = `SKU-CHECK-${mode}`;
+        const reservedSku = mode === "generated" ? `${itemSku}-V1` : mode === "default" ? itemSku : "RESERVED-SKU";
+        await prisma.stockItemVariant.update({ where: { id: fixture.variant.id }, data: {
+            sku: reservedSku, ...(mode === "inactive" ? { isActive: false } : {}),
+        } });
+        await expect(stockService.createItem({
+            name: "วัสดุซ้ำ", sku: itemSku, categoryId: fixture.category.id,
+            ...(mode === "default" ? { variants: [] } : { variants: [{
+                ...(mode === "generated" ? {} : { sku: mode === "collation" ? "reserved-sku" : reservedSku }),
+                unit: "ชิ้น", quantity: 1, minStock: 1, attributes: [],
+            }] }),
+        }, fixture.issuerActor)).rejects.toBeInstanceOf(StockVariantSkuConflictError);
+        expect(await prisma.stockItem.count({ where: { sku: itemSku } })).toBe(0);
+        expect(await prisma.stockItemVariant.count({ where: { stockItemId: fixture.item.id } })).toBe(1);
+    });
+
+    it("rejects duplicate request SKUs under the database collation and rolls back", async () => {
+        const fixture = await createStockFixture(prisma, { suffix: "sku-within" });
+        await expect(stockService.createItem({
+            name: "วัสดุซ้ำ", sku: "SKU-WITHIN", categoryId: fixture.category.id,
+            variants: ["DUPLICATE", "duplicate"].map((sku) => ({ sku, unit: "ชิ้น", quantity: 1, minStock: 1, attributes: [] })),
+        }, fixture.issuerActor)).rejects.toBeInstanceOf(StockVariantSkuConflictError);
+        expect(await prisma.stockItem.count({ where: { sku: "SKU-WITHIN" } })).toBe(0);
     });
 
     it("reads item inventory permanently from active variants", async () => {

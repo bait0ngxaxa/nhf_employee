@@ -6,3 +6,10 @@ export class StockInvariantViolationError extends Error {
         this.name = "StockInvariantViolationError";
     }
 }
+
+export class StockVariantSkuConflictError extends Error {
+    constructor() {
+        super("รหัสวัสดุ (SKU) นี้มีอยู่แล้ว");
+        this.name = "StockVariantSkuConflictError";
+    }
+}
