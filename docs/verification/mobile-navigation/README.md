@@ -13,7 +13,11 @@ Read-only DEMI behavioral reference: `46f27bcf161f124d2c3231612db6778ea3d52919`.
   remains discoverable through its existing unavailable page in More/Home.
 - Routes come from `lib/ssot/routes.ts`. Home matches exactly; module paths match
   complete segments. Module query parameters remain module-owned; query changes
-  do not select Home. Overflow routes do not select an unrelated primary tab.
+  do not select Home. Authorized overflow routes select More, including IT, employee administration,
+  audit, authorization, sessions and permitted notifications. Canonical paths are
+  resolved most-specific first, before checking the supplied authorized groups
+  and existing IT/notification capabilities; denied child routes never inherit
+  an authorized parent. Unknown Dashboard prefixes stay inactive.
 - `/dashboard/more` inherits the existing authenticated server layout and lists
   every supplied authorized group. Account, theme, sessions and logout reuse the
   extracted existing account menu. No settings destination was invented.
@@ -47,7 +51,7 @@ Read-only DEMI behavioral reference: `46f27bcf161f124d2c3231612db6778ea3d52919`.
 - No schema, migration, package, API, business-rule, authentication or session
   changes. No summaries, KPI widgets or summary fetching were introduced.
 
-## Executed local evidence
+## Original implementation local evidence (before review corrections)
 
 - `npx prisma generate`: passed (Prisma 6.19.3).
 - `npm run architecture:check`: passed, 1493 repository source files.
@@ -148,3 +152,30 @@ Home presentation and LIFF item styling without changing either channel's auth.
 - Initial new test failures were test-driving mistakes (changing a Radix trigger
   as if it were a native select; incorrect radio label). Corrected tests operate
   the actual keyboard-select/radio controls; production validation was preserved.
+
+## Review correction: active overflow evidence
+
+- Focused navigation/Home/LIFF tests: **4 files / 75 tests passed**.
+- Ownership tests cover IT overview/queue/details, primary IT nested routes,
+  employee administration, denied employee create/import children, audit,
+  authorization, sessions, capability-dependent notifications, query state,
+  unknown paths, prefix boundaries and removed permissions.
+- Rendered harness also checks More on an IT query deep link and actual fixture
+  browser back/forward between that overflow destination and Home.
+
+## Final review-correction checks
+
+- `npx prisma generate`: passed.
+- `npm run architecture:check`: passed, **1498 source files**. The first run
+  caught cross-module imports in the new combined form test; tests were colocated
+  with their owning modules, then the unmodified checker passed.
+- `npm run lint:strict`: passed; focused ESLint on relocated tests also passed.
+- `npm run typecheck`: passed.
+- Final rendered harness: **88 cases passed**, including 422px, both themes and
+  overflow history checks. Actual screenshots above show the corrected launcher.
+- Relocated actual-form regression tests: **3 files / 3 tests passed**.
+- Complete source diff, unchanged desktop FeaturedCard/RegularCard function
+  regions and Sidebar/server route-access files, and UTF-8 replacement-character
+  scan checked against reviewed HEAD `979936e2`. `git diff --check` passed.
+- No full local suite or production build run; final-head hosted CI is recorded
+  in PR #17. The PR remains Draft; no merge/readiness transition is authorized.

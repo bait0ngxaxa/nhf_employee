@@ -48,6 +48,19 @@ describe("browser mobile navigation", () => {
         expect(nav.querySelector('[aria-current="page"]')).toBeNull();
     });
 
+    it("updates More ownership for deep links, history and capability changes", () => {
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: { id: "1", role: "USER", notificationCapabilities: { canReadInbox: true, canUpdateInbox: false } }, isAdmin: false, availableMenuGroups: DASHBOARD_MENU_GROUPS });
+        const view = render(<DashboardBottomNav />);
+        for (const path of ["/dashboard/it", "/dashboard/employees/new", "/dashboard/audit", "/dashboard/authorization", "/dashboard/sessions", "/dashboard/notifications", "/dashboard/it"]) {
+            state.pathname = path;
+            view.rerender(<DashboardBottomNav />);
+            expect(screen.getByRole("link", { name: "เพิ่มเติม" })).toHaveAttribute("aria-current", "page");
+        }
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: undefined, isAdmin: false, availableMenuGroups: [] });
+        view.rerender(<DashboardBottomNav />);
+        expect(screen.getByRole("navigation").querySelector('[aria-current="page"]')).toBeNull();
+    });
+
     it("updates visible tabs as capability-filtered groups change", () => {
         const view = render(<DashboardBottomNav />);
         vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: undefined, isAdmin: false, availableMenuGroups: [] });

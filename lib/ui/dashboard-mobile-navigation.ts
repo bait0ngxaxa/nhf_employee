@@ -1,5 +1,8 @@
 import { House, MoreHorizontal } from "lucide-react";
-import { APP_ROUTES, toDashboardMenuPath } from "@/lib/ssot/routes";
+import { APP_ROUTES, DASHBOARD_MENU_PATHS, getDashboardMenuIdFromPathname, toDashboardMenuPath } from "@/lib/ssot/routes";
+import { canAccessITAnalytics, canAccessITTicketQueue } from "@/constants/dashboard";
+import type { ITPresentationCapabilities } from "@/modules/it/client";
+import type { NotificationPresentationCapabilities } from "@/modules/notification/client";
 import type { MenuGroup, MenuItem } from "@/types/dashboard";
 
 export interface DashboardMobileTab {
@@ -35,16 +38,39 @@ export function projectDashboardMobileTabs(groups: readonly MenuGroup[]): Dashbo
     ];
 }
 
-/** Query state belongs to the module; changing it never activates Home. */
+/** Query state belongs to its module; ownership uses all authorized destinations, not just visible tabs. */
 export function resolveDashboardMobileTab(
     requestedPath: string | null,
     tabs: readonly DashboardMobileTab[],
+    groups: readonly MenuGroup[],
+    capabilities: {
+        itCapabilities?: ITPresentationCapabilities;
+        notificationCapabilities?: NotificationPresentationCapabilities;
+    } = {},
 ): string | null {
     if (!requestedPath) return null;
     const pathname = requestedPath.split(/[?#]/, 1)[0].replace(/\/+$/, "");
-    const matches = tabs.filter((tab) => {
-        const base = tab.href.split("?", 1)[0];
-        return pathname === base || (tab.id !== "dashboard" && pathname.startsWith(`${base}/`));
-    });
-    return matches.sort((a, b) => b.href.length - a.href.length)[0]?.id ?? null;
+    // Resolve the most specific canonical destination BEFORE checking availability.
+    // An unauthorized /employees/new must never fall back to the authorized /employees parent.
+    const base = Object.values(DASHBOARD_MENU_PATHS)
+        .map((href) => href.split("?", 1)[0])
+        .filter((path) => pathname === path || (
+            path !== APP_ROUTES.dashboard && path !== APP_ROUTES.dashboardMore
+            && pathname.startsWith(`${path}/`)
+        ))
+        .sort((a, b) => b.length - a.length)[0];
+    if (!base) return null;
+    const owner = getDashboardMenuIdFromPathname(base);
+    if (owner === "dashboard" || owner === "more") return owner;
+
+    const availableIds = new Set(groups.flatMap((group) => group.items)
+        .filter((item) => !item.comingSoon).map((item) => item.id));
+    const authorized = owner === "sessions"
+        || (owner === "notifications" ? capabilities.notificationCapabilities?.canReadInbox === true : availableIds.has(owner));
+    if (!authorized) return null;
+    // The IT workspace consolidates several destinations with existing, narrower access contracts.
+    if (base === APP_ROUTES.dashboardITQueue && !canAccessITTicketQueue(capabilities.itCapabilities)) return null;
+    if (base === APP_ROUTES.dashboardITAnalytics && !canAccessITAnalytics(capabilities.itCapabilities)) return null;
+    if (base === APP_ROUTES.dashboardIT && pathname !== base && capabilities.itCapabilities?.canReadOwnTickets !== true) return null;
+    return tabs.find((tab) => tab.id === owner)?.id ?? "more";
 }

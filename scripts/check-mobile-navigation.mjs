@@ -153,6 +153,17 @@ try {
                         await page.goForward();
                         await page.waitForURL("**/dashboard/more");
                         assert.equal(await page.getByRole("link", { name: "เพิ่มเติม", exact: true }).getAttribute("aria-current"), "page");
+                        await page.goto(origin + "/dashboard/it?itTab=queue");
+                        assert.equal(await page.getByRole("link", { name: "เพิ่มเติม", exact: true }).getAttribute("aria-current"), "page");
+                        page.once("dialog", dialog => dialog.accept());
+                        await page.getByRole("link", { name: "หน้าแรก", exact: true }).click();
+                        await page.waitForURL("**/dashboard");
+                        await page.goBack();
+                        await page.waitForURL("**/dashboard/it?itTab=queue");
+                        assert.equal(await page.getByRole("link", { name: "เพิ่มเติม", exact: true }).getAttribute("aria-current"), "page");
+                        await page.goForward();
+                        await page.waitForURL("**/dashboard");
+                        assert.equal(await page.getByRole("link", { name: "หน้าแรก", exact: true }).getAttribute("aria-current"), "page");
                     }
                 } else {
                     assert.equal(await page.getByRole("navigation", { name: "เมนูบริการ NHFapp ผ่าน LINE" }).isVisible(), true);

@@ -8,9 +8,9 @@ import { mobileNavigationItemClassName } from "@/lib/ui/mobile-navigation-styles
 import { DashboardNavigationLink } from "./DashboardNavigationLink";
 
 export function DashboardBottomNav(): ReactElement {
-    const { availableMenuGroups } = useDashboardDataContext();
+    const { user, availableMenuGroups } = useDashboardDataContext();
     const tabs = projectDashboardMobileTabs(availableMenuGroups);
-    const activeId = resolveDashboardMobileTab(usePathname(), tabs);
+    const activeId = resolveDashboardMobileTab(usePathname(), tabs, availableMenuGroups, user);
     return (
         <nav aria-label="เมนูหลักบนมือถือ" className="dashboard-bottom-nav fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle bg-surface-raised lg:hidden">
             <ul className="grid h-16" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
