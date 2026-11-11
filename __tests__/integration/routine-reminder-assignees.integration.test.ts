@@ -9,14 +9,12 @@ import {
     getRoutineReminderScheduledFor,
     toBangkokCalendarDate,
 } from "@/modules/routine";
-import { addCalendarMonths, endOfMonth } from "@/modules/routine/domain/schedule";
 import {
     createRoutineTaskInTransaction,
     updateRoutineTask,
 } from "@/modules/routine";
 import {
     buildRoutineContractExpiryEventKey,
-    getRoutineContractExpiryNotificationDate,
     buildRoutineReminderEventKey,
     dispatchRoutineReminderOutbox,
     runRoutineScheduler,
@@ -389,17 +387,13 @@ describe("Routine reminder multiple-assignee integration", () => {
 
     it("skips an existing reminder outbox event on the next scheduler run", async () => {
         const fixture = await createRoutineReminderFixture();
-        const contractEndDate = endOfMonth(
-            addCalendarMonths(getCurrentBangkokDate(), 1),
-        );
-        const contractNotificationDate =
-            getRoutineContractExpiryNotificationDate(contractEndDate);
+        const contractEndDate = addCalendarDays(getCurrentBangkokDate(), 2);
         const now = getRoutineReminderScheduledFor(
-            contractNotificationDate,
+            getCurrentBangkokDate(),
             0,
             9,
         );
-        const dueDate = addCalendarDays(toBangkokCalendarDate(now), 2);
+        const dueDate = contractEndDate;
         const task = await runSerializableTransaction((tx: Prisma.TransactionClient) =>
             createRoutineTaskInTransaction(
                 tx,
