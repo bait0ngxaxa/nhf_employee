@@ -9,13 +9,17 @@ import {
     getRoutineReminderScheduledFor,
     toBangkokCalendarDate,
 } from "@/modules/routine";
+import { addCalendarMonths, endOfMonth } from "@/modules/routine/domain/schedule";
 import {
     createRoutineTaskInTransaction,
     updateRoutineTask,
 } from "@/modules/routine";
 import {
+    buildRoutineContractExpiryEventKey,
+    getRoutineContractExpiryNotificationDate,
     buildRoutineReminderEventKey,
     dispatchRoutineReminderOutbox,
+    runRoutineScheduler,
 } from "@/modules/routine";
 import type { RoutineCommandActor } from "@/modules/routine";
 import { routineReminderEmailOutboxPayloadSchema } from "@/modules/routine";
@@ -178,6 +182,7 @@ function routineTaskInput(
     fixture: RoutineReminderFixture,
     dueDate: string,
     includeCoOwner: boolean,
+    contractEndDate?: string,
 ) {
     return {
         unitId: fixture.unitId,
@@ -185,6 +190,7 @@ function routineTaskInput(
         title: "ตรวจสอบระบบหลายผู้รับผิดชอบ",
         scheduleType: "ONE_TIME" as const,
         scheduleConfig: { date: dueDate },
+        ...(contractEndDate ? { contractEndDate } : {}),
         businessDayPolicy: "NONE" as const,
         isActive: true,
         assignees: [
@@ -379,5 +385,69 @@ describe("Routine reminder multiple-assignee integration", () => {
             { userId: fixture.ownerUserId, email: fixture.ownerEmail },
             { userId: fixture.coOwnerUserId, email: fixture.coOwnerEmail },
         ]);
+    });
+
+    it("skips an existing reminder outbox event on the next scheduler run", async () => {
+        const fixture = await createRoutineReminderFixture();
+        const contractEndDate = endOfMonth(
+            addCalendarMonths(getCurrentBangkokDate(), 1),
+        );
+        const contractNotificationDate =
+            getRoutineContractExpiryNotificationDate(contractEndDate);
+        const now = getRoutineReminderScheduledFor(
+            contractNotificationDate,
+            0,
+            9,
+        );
+        const dueDate = addCalendarDays(toBangkokCalendarDate(now), 2);
+        const task = await runSerializableTransaction((tx: Prisma.TransactionClient) =>
+            createRoutineTaskInTransaction(
+                tx,
+                routineTaskInput(fixture, dueDate, false, contractEndDate),
+                fixture.actor,
+            ),
+        );
+        const occurrence = await findOnlyOccurrence(task.id);
+        const reminderRule = occurrence.task.reminderRules[0];
+        if (!reminderRule) throw new Error("ไม่พบกฎแจ้งเตือนสำหรับ integration test");
+
+        const first = await runRoutineScheduler(now);
+        const second = await runRoutineScheduler(now);
+
+        expect(first).toEqual(expect.objectContaining({
+            outboxEnqueued: 1,
+            duplicatesSkipped: 0,
+            contractOutboxEnqueued: 1,
+            contractDuplicatesSkipped: 0,
+            errors: 0,
+        }));
+        expect(second).toEqual(expect.objectContaining({
+            outboxEnqueued: 0,
+            duplicatesSkipped: 1,
+            contractOutboxEnqueued: 0,
+            contractDuplicatesSkipped: 1,
+            errors: 0,
+        }));
+        const outboxEvents = await prisma.notificationOutbox.findMany({
+            where: { type: "ROUTINE_REMINDER_IN_APP" },
+            select: { eventKey: true },
+        });
+        expect(outboxEvents).toEqual([{
+            eventKey: buildRoutineReminderEventKey(
+                occurrence.id,
+                reminderRule.id,
+                occurrence.reminderVersion,
+            ),
+        }]);
+        const contractOutboxEvents = await prisma.notificationOutbox.findMany({
+            where: { type: "ROUTINE_CONTRACT_EXPIRY_IN_APP" },
+            select: { eventKey: true },
+        });
+        expect(contractOutboxEvents).toEqual([{
+            eventKey: buildRoutineContractExpiryEventKey(
+                task.id,
+                contractEndDate,
+            ),
+        }]);
     });
 });

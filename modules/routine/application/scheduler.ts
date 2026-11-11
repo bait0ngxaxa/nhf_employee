@@ -21,6 +21,8 @@ import {
     type RoutineReminderRecipientScope,
 } from "../domain/reminder-recipients";
 
+const OUTBOX_EVENT_KEY_QUERY_CHUNK_SIZE = 500;
+
 export interface RoutineSchedulerResult {
     occurrencesCreated: number;
     remindersConsidered: number;
@@ -136,17 +138,18 @@ function buildRoutineReminderPayload(
     });
 }
 
+type RoutineReminderCandidate = {
+    eventKey: string;
+    occurrence: RoutineSchedulerOccurrence;
+    rule: RoutineSchedulerOccurrence["task"]["reminderRules"][number];
+    dueDate: string;
+};
+
 async function enqueueRoutineReminder(
-    occurrence: RoutineSchedulerOccurrence,
-    rule: RoutineSchedulerOccurrence["task"]["reminderRules"][number],
-    dueDate: string,
+    candidate: RoutineReminderCandidate,
     now: Date,
 ): Promise<"ENQUEUED" | "DUPLICATE"> {
-    const eventKey = buildRoutineReminderEventKey(
-        occurrence.id,
-        rule.id,
-        occurrence.reminderVersion,
-    );
+    const { eventKey, occurrence, rule, dueDate } = candidate;
     try {
         await prisma.notificationOutbox.create({
             data: {
@@ -278,6 +281,7 @@ export async function runRoutineScheduler(
             scope: "ALL",
         })
         : [];
+    const reminderCandidates: RoutineReminderCandidate[] = [];
     for (const occurrence of occurrences) {
         if (!occurrence.task.isActive) {
             result.inactiveSkipped += 1;
@@ -305,13 +309,60 @@ export async function runRoutineScheduler(
                 continue;
             }
 
+            reminderCandidates.push({
+                eventKey: buildRoutineReminderEventKey(
+                    occurrence.id,
+                    rule.id,
+                    occurrence.reminderVersion,
+                ),
+                occurrence,
+                rule,
+                dueDate,
+            });
+        }
+    }
+
+    for (
+        let offset = 0;
+        offset < reminderCandidates.length;
+        offset += OUTBOX_EVENT_KEY_QUERY_CHUNK_SIZE
+    ) {
+        const candidates = reminderCandidates.slice(
+            offset,
+            offset + OUTBOX_EVENT_KEY_QUERY_CHUNK_SIZE,
+        );
+        let existingEventKeys: Set<string>;
+        try {
+            const existingRows = await prisma.notificationOutbox.findMany({
+                where: {
+                    eventKey: { in: candidates.map(({ eventKey }) => eventKey) },
+                },
+                select: { eventKey: true },
+            });
+            existingEventKeys = new Set(
+                existingRows.flatMap(({ eventKey }) =>
+                    eventKey === null ? [] : [eventKey],
+                ),
+            );
+        } catch (error) {
+            for (const candidate of candidates) {
+                result.errors += 1;
+                console.error("Routine scheduler reminder enqueue failed", {
+                    occurrenceId: candidate.occurrence.id,
+                    ruleId: candidate.rule.id,
+                    errorType: error instanceof Error ? error.name : "UnknownError",
+                });
+            }
+            continue;
+        }
+
+        for (const candidate of candidates) {
+            if (existingEventKeys.has(candidate.eventKey)) {
+                result.duplicatesSkipped += 1;
+                continue;
+            }
             try {
-                const outcome = await enqueueRoutineReminder(
-                    occurrence,
-                    rule,
-                    dueDate,
-                    now,
-                );
+                const outcome = await enqueueRoutineReminder(candidate, now);
                 if (outcome === "ENQUEUED") {
                     result.outboxEnqueued += 1;
                 } else {
@@ -320,8 +371,8 @@ export async function runRoutineScheduler(
             } catch (error) {
                 result.errors += 1;
                 console.error("Routine scheduler reminder enqueue failed", {
-                    occurrenceId: occurrence.id,
-                    ruleId: rule.id,
+                    occurrenceId: candidate.occurrence.id,
+                    ruleId: candidate.rule.id,
                     errorType: error instanceof Error ? error.name : "UnknownError",
                 });
             }
