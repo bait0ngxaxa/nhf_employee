@@ -6,14 +6,20 @@ import { useDashboardDataContext } from "@/components/dashboard/context/dashboar
 import { DashboardAccountMenu } from "@/components/dashboard/layout/DashboardAccountMenu";
 import { DashboardNavigationLink } from "@/components/dashboard/layout/DashboardNavigationLink";
 import { APP_ROUTES, toDashboardMenuPath } from "@/lib/ssot/routes";
+import { DASHBOARD_MENU_ITEMS } from "@/constants/dashboard";
 
 export function DashboardMoreSection(): ReactElement {
     const { user, availableMenuGroups } = useDashboardDataContext();
+    const importItem = DASHBOARD_MENU_ITEMS.find((item) => item.id === "import-employee");
+    const menuGroups = user?.employeeCapabilities?.canImportEmployees === true
+        && importItem && !availableMenuGroups.some((group) => group.items.some((item) => item.id === importItem.id))
+        ? [...availableMenuGroups, { id: "employee-import", label: "นำเข้าข้อมูล", items: [importItem] }]
+        : availableMenuGroups;
     return (
         <div className="mx-auto max-w-3xl space-y-8">
             <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold text-content-heading">เพิ่มเติม</h1>
             <nav aria-label="เมนูเพิ่มเติม" className="space-y-6">
-                {availableMenuGroups.map((group) => (
+                {menuGroups.map((group) => (
                     <section key={group.id} aria-labelledby={`more-${group.id}`}>
                         <h2 id={`more-${group.id}`} className="mb-2 text-sm font-semibold text-content-secondary">{group.label}</h2>
                         <ul className="divide-y divide-border-subtle rounded-xl border border-border-subtle bg-surface-raised">

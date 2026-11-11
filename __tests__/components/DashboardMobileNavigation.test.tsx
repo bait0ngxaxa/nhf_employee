@@ -47,6 +47,14 @@ beforeEach(() => {
 });
 
 describe("browser mobile navigation", () => {
+    it.each([true, false])("offers Import in More only with import capability (%s)", (canImportEmployees) => {
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: { id: "1", role: "USER", employeeCapabilities: employeeCapabilities({ canImportEmployees }) }, isAdmin: false, availableMenuGroups: [] });
+        render(<DashboardMoreSection />);
+        expect(document.querySelector('a[href="/dashboard/employees/import"]') !== null).toBe(canImportEmployees);
+        expect(document.querySelector('a[href="/dashboard/employees"]')).toBeNull();
+        expect(document.querySelector('a[href="/dashboard/employees/new"]')).toBeNull();
+    });
+
     it("uses real browser destinations and follows route history and nested module paths", () => {
         const view = render(<DashboardBottomNav />);
         const nav = screen.getByRole("navigation");
