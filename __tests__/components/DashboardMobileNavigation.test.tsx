@@ -50,7 +50,7 @@ describe("browser mobile navigation", () => {
 
     it("updates visible tabs as capability-filtered groups change", () => {
         const view = render(<DashboardBottomNav />);
-        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: null, isAdmin: false, availableMenuGroups: [] });
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: undefined, isAdmin: false, availableMenuGroups: [] });
         view.rerender(<DashboardBottomNav />);
         expect(screen.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/dashboard", "/dashboard/more"]);
     });

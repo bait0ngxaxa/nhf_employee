@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -10,6 +10,8 @@ import {
 import { DashboardHomeSection } from "@/components/dashboard/sections/DashboardHomeSection";
 import { getAvailableMenuGroups } from "@/constants/dashboard";
 import { getCurrentGreeting } from "@/components/dashboard/sections/DashboardGreeting";
+import type { MenuGroup } from "@/types/dashboard";
+import { DASHBOARD_MENU_GROUPS } from "@/constants/dashboard";
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
     useDashboardDataContext: vi.fn(),
@@ -161,6 +163,71 @@ describe("DashboardHomeSection identity presentation", () => {
         expect(screen.getByText("ทีม IT")).toBeInTheDocument();
         expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
+    });
+});
+
+describe("compact NHF quick actions", () => {
+    function renderHome(groups: MenuGroup[]): ReturnType<typeof render> {
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: { id: "1", name: "ทดสอบ", role: "USER" }, isAdmin: false, availableMenuGroups: groups });
+        vi.mocked(useDashboardUIContext).mockReturnValue({ selectedMenu: "dashboard", mobileNavOpen: false, setMobileNavOpen: vi.fn(), desktopSidebarCollapsed: false, setDesktopSidebarCollapsed: vi.fn(), handleMenuClick: vi.fn(), handleSignOut: vi.fn(), router: {} as never });
+        return render(<DashboardHomeSection announcement={<p>ประกาศทดสอบ</p>} />);
+    }
+
+    it("preserves module branding and destinations while keeping desktop Featured Cards", () => {
+        renderHome([DASHBOARD_MENU_GROUPS[0]]);
+        const grid = screen.getByRole("region", { name: "เมนูด่วน" });
+        const buttons = within(grid).getAllByRole("button");
+        expect(buttons.map((button) => button.textContent)).toEqual(["เบิกวัสดุ", "วันลา", "งานประจำ", "บริการ IT"]);
+        expect(buttons[0]).toHaveClass("bg-module-stock-dashboard-surface");
+        expect(buttons[1]).toHaveClass("bg-module-leave-dashboard-surface");
+        expect(buttons[2]).toHaveClass("bg-module-routine-dashboard-surface");
+        expect(buttons[3]).toHaveClass("bg-module-it-dashboard-surface");
+        for (const button of buttons) {
+            expect(button).toHaveClass("h-28", "focus-visible:ring-2");
+            expect(button.querySelector(".line-clamp-2")).not.toBeNull();
+            expect(button).not.toHaveTextContent("Quick action");
+        }
+        fireEvent.click(buttons[2]);
+        expect(useDashboardUIContext().handleMenuClick).toHaveBeenCalledWith("routine");
+        expect(screen.getByRole("button", { name: /NHF IT-TICKET/ })).toHaveClass("min-h-[196px]");
+        expect(screen.getByText("ประกาศทดสอบ")).toBeInTheDocument();
+        expect(screen.getByTestId("line-add-friend-card")).toBeInTheDocument();
+    });
+
+    it("supports a single module and additional administrative services without filler", () => {
+        const group = DASHBOARD_MENU_GROUPS[0];
+        const view = renderHome([{ ...group, items: group.items.filter((item) => item.id === "stock") }]);
+        expect(within(screen.getByRole("region", { name: "เมนูด่วน" })).getAllByRole("button")).toHaveLength(1);
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: undefined, isAdmin: true, availableMenuGroups: DASHBOARD_MENU_GROUPS });
+        view.rerender(<DashboardHomeSection />);
+        const grid = screen.getByRole("region", { name: "เมนูด่วน" });
+        expect(within(grid).getByRole("button", { name: "จัดการสิทธิ์การใช้งาน" })).toBeInTheDocument();
+        fireEvent.click(within(grid).getByRole("button", { name: "จัดการสิทธิ์การใช้งาน" }));
+        expect(useDashboardUIContext().handleMenuClick).toHaveBeenCalledWith("authorization-administration");
+    });
+
+    it("shows an empty state and follows actual feature/capability filtering", () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "true");
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", "false");
+        try {
+            renderHome(getAvailableMenuGroups(false));
+            const grid = screen.getByRole("region", { name: "เมนูด่วน" });
+            expect(within(grid).queryByRole("button")).not.toBeInTheDocument();
+            expect(within(grid).getByText("ยังไม่มีเมนูที่พร้อมใช้งานสำหรับบัญชีนี้")).toBeInTheDocument();
+        } finally { vi.unstubAllEnvs(); }
+    });
+
+    it("keeps unavailable Leave discoverable and clamps long Thai labels", () => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
+        try {
+            const groups = getAvailableMenuGroups(false);
+            const longLabel = "รายการบริการสำหรับพนักงานและผู้ดูแลระบบที่มีข้อความภาษาไทยยาว";
+            groups[0].items.push({ ...DASHBOARD_MENU_GROUPS[1].items[0], sidebarLabel: longLabel });
+            renderHome(groups);
+            const grid = screen.getByRole("region", { name: "เมนูด่วน" });
+            expect(within(grid).getByRole("button", { name: "วันลา (ยังไม่พร้อมให้บริการ)" })).not.toBeDisabled();
+            expect(within(grid).getByText(longLabel)).toHaveClass("line-clamp-2", "[overflow-wrap:anywhere]");
+        } finally { vi.unstubAllEnvs(); }
     });
 });
 
