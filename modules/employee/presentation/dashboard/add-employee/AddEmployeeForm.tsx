@@ -11,7 +11,7 @@ import { useAddEmployee } from "./useAddEmployee";
 export function AddEmployeeForm({
     onSuccess,
     canReadDepartments,
-}: AddEmployeeFormProps) {
+}: AddEmployeeFormProps): React.ReactElement {
     const {
         formData,
         departments,
@@ -26,7 +26,7 @@ export function AddEmployeeForm({
     return (
         <Card className="mx-auto w-full max-w-3xl rounded-xl border-border-subtle bg-surface-raised shadow-none">
             <CardContent className="pt-6">
-                <form onSubmit={handleSubmit} noValidate aria-busy={isLoading}>
+                <form data-navigation-dirty={Object.values(formData).some((value) => value !== "")} onSubmit={handleSubmit} noValidate aria-busy={isLoading}>
                     <div className="flex flex-col gap-6">
                         <EmployeeFormFields
                             formData={formData}

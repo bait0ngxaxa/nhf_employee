@@ -37,7 +37,7 @@ export function AnnouncementManager({ initialState }: { initialState: Announceme
     }
 
     return (
-        <section aria-labelledby="announcement-heading" className="mx-auto max-w-3xl space-y-6 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-6">
+        <section data-navigation-dirty={content !== state.content} aria-labelledby="announcement-heading" className="mx-auto max-w-3xl space-y-6 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-6">
             <div className="space-y-2">
                 <h1 id="announcement-heading" className="text-2xl font-bold text-content-heading">จัดการประกาศ</h1>
                 <p className="text-sm leading-6 text-content-muted">ประกาศเดียวสำหรับพนักงานทุกคนบนหน้าหลัก รองรับข้อความภาษาไทยและอังกฤษ</p>

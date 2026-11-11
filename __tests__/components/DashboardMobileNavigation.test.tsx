@@ -85,4 +85,14 @@ describe("browser mobile navigation", () => {
         render(<DashboardNavigationLink href="/dashboard/more">เพิ่มเติม</DashboardNavigationLink>);
         expect(screen.getByRole("status")).toHaveTextContent("กำลังเปิดหน้า");
     });
+
+    it("reuses the existing account logout confirmation from More", async () => {
+        render(<DashboardMoreSection />);
+        fireEvent.pointerDown(screen.getByRole("button", { name: "เมนูผู้ใช้" }), { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: "ออกจากระบบ" }));
+        const dialog = await screen.findByRole("dialog", { name: "ออกจากระบบบัญชีนี้?" });
+        expect(useDashboardUIContext().handleSignOut).not.toHaveBeenCalled();
+        fireEvent.click(within(dialog).getByRole("button", { name: "ออกจากระบบ", exact: true }));
+        expect(useDashboardUIContext().handleSignOut).toHaveBeenCalledOnce();
+    });
 });

@@ -128,6 +128,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                     )}
 
                     <form
+                        data-navigation-dirty={Object.values(formData).some((value) => Array.isArray(value) ? value.length > 0 : value !== "" && value !== "UNDECIDED")}
                         onSubmit={submitEmailRequest}
                         className="space-y-8"
                         noValidate

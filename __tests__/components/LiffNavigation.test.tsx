@@ -146,4 +146,27 @@ describe("LIFF application shell navigation", () => {
         expect(within(screen.getByRole("banner")).getByText("บริการของฉัน")).toBeInTheDocument();
         expect(screen.getByText("Not found")).toBeInTheDocument();
     });
+
+    it.each([
+        ["/liff/stock/requests/7", "วัสดุ"],
+        ["/liff/leave/requests/7", "วันลา"],
+        ["/liff/routine/tasks/7", "งานประจำ"],
+        ["/liff/it/7", "IT"],
+    ])("retains LIFF channel destinations and shared focus styles at %s", (pathname, label) => {
+        usePathnameMock.mockReturnValue(pathname);
+        render(<LiffAppShell><main>บริการ</main></LiffAppShell>);
+        const nav = screen.getByRole("navigation");
+        const active = within(nav).getByRole("link", { name: label });
+        expect(active).toHaveAttribute("aria-current", "page");
+        expect(active).toHaveClass("bg-brand-surface", "focus-visible:ring-brand-focus", "min-h-12");
+        for (const link of within(nav).getAllByRole("link")) {
+            expect(link.getAttribute("href")).toMatch(/^\/liff(?:\/|$)/);
+        }
+    });
+
+    it.each(["/liff/stock-other", "/liff/leave-other", "/liff/routine-other", "/liff/it-other"])("does not activate a tab for an unrelated prefix %s", (pathname) => {
+        usePathnameMock.mockReturnValue(pathname);
+        render(<LiffAppShell><main>บริการ</main></LiffAppShell>);
+        expect(screen.getByRole("navigation").querySelector('[aria-current="page"]')).toBeNull();
+    });
 });
