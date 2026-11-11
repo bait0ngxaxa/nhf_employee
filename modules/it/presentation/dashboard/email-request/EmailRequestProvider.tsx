@@ -122,6 +122,7 @@ export function EmailRequestProvider({
     const [formData, setFormData] =
         useState<EmailRequestFormData>(initialFormData);
     const [isFormLoading, setIsFormLoading] = useState(false);
+    const [hasUnresolvedSubmission, setHasUnresolvedSubmission] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<
         Partial<Record<keyof EmailRequestFormData, string>>
@@ -195,6 +196,7 @@ export function EmailRequestProvider({
                 };
             });
             pendingIdempotencyKeyRef.current = null;
+            setHasUnresolvedSubmission(false);
             setFormError(null);
             setFieldErrors((current) => {
                 if (!current[field]) {
@@ -245,6 +247,7 @@ export function EmailRequestProvider({
                 );
 
                 if (response.success) {
+                    setHasUnresolvedSubmission(false);
                     pendingIdempotencyKeyRef.current = null;
                     setFormData(initialFormData);
                     toast.success("ส่งคำร้องพนักงานใหม่สำเร็จ", {
@@ -255,10 +258,12 @@ export function EmailRequestProvider({
                     }
                     return true;
                 } else {
+                    setHasUnresolvedSubmission(response.status === undefined || response.status >= 500 || response.status === 409);
                     setFormError(response.error || "เกิดข้อผิดพลาด");
                     return false;
                 }
             } catch (err) {
+                setHasUnresolvedSubmission(true);
                 setFormError(getSubmitErrorMessage(err));
                 return false;
             } finally {
@@ -279,6 +284,7 @@ export function EmailRequestProvider({
             refreshList,
             formData,
             isFormLoading,
+            hasUnresolvedSubmission,
             formError,
             fieldErrors,
             handleInputChange,
@@ -294,6 +300,7 @@ export function EmailRequestProvider({
             refreshList,
             formData,
             isFormLoading,
+            hasUnresolvedSubmission,
             formError,
             fieldErrors,
             handleInputChange,

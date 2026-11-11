@@ -1,5 +1,7 @@
 "use client";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import {
     useMemo,
     type ChangeEvent,
@@ -92,6 +94,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
     const {
         formData,
         isFormLoading: isLoading,
+        hasUnresolvedSubmission,
         formError: error,
         fieldErrors,
         handleInputChange,
@@ -129,6 +132,9 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
 
                     <form
                         data-navigation-dirty={Object.values(formData).some((value) => Array.isArray(value) ? value.length > 0 : value !== "" && value !== "UNDECIDED")}
+                        data-navigation-submitting={isLoading}
+                        data-navigation-unresolved={hasUnresolvedSubmission}
+                        data-navigation-recovery="ยังยืนยันผลคำร้องไม่ได้ กรุณาลองส่งข้อมูลเดิมอีกครั้งเพื่อยืนยันผลก่อนเปลี่ยนหน้า"
                         onSubmit={submitEmailRequest}
                         className="space-y-8"
                         noValidate
@@ -240,7 +246,7 @@ export function EmailRequestForm({ onCancel, onSuccess }: EmailRequestFormProps)
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={onCancel}
+                                    onClick={() => { if (allowDashboardNavigation()) onCancel(); }}
                                     className="h-11 rounded-xl px-6"
                                     disabled={isLoading}
                                 >

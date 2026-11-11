@@ -1,5 +1,7 @@
 "use client";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import { cn } from "@/lib/ui/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +68,7 @@ export function DashboardAccountMenu(): ReactElement {
             return;
         }
 
+        if (!allowDashboardNavigation()) return;
         setIsLoggingOut(true);
         setLogoutError("");
         try {

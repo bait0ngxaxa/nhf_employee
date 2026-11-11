@@ -20,6 +20,7 @@ export interface EmailRequestContextValue {
     // Form data
     formData: EmailRequestFormData;
     isFormLoading: boolean;
+    hasUnresolvedSubmission: boolean;
     formError: string | null;
     fieldErrors: Partial<Record<keyof EmailRequestFormData, string>>;
     handleInputChange: (e: ChangeEvent<HTMLInputElement>) => void;

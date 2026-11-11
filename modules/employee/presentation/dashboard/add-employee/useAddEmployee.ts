@@ -38,6 +38,7 @@ interface UseAddEmployeeReturn {
     departments: Department[];
     canReadDepartments: boolean;
     isLoading: boolean;
+    hasUnresolvedSubmission: boolean;
     error: string;
     fieldErrors: Record<string, string>;
     handleFieldChange: <K extends keyof EmployeeFormData>(
@@ -60,6 +61,7 @@ export function useAddEmployee({
     const departments = departmentData?.departments || [];
 
     const [isLoading, setIsLoading] = useState(false);
+    const [hasUnresolvedSubmission, setHasUnresolvedSubmission] = useState(false);
     const [error, setError] = useState("");
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -135,6 +137,7 @@ export function useAddEmployee({
             });
 
             if (apiResult.success) {
+                setHasUnresolvedSubmission(false);
                 toast.success("เพิ่มพนักงานสำเร็จ", {
                     description:
                         "ข้อมูลพนักงานใหม่ถูกเพิ่มเข้าระบบเรียบร้อยแล้ว",
@@ -145,8 +148,10 @@ export function useAddEmployee({
                 return;
             }
 
+            setHasUnresolvedSubmission(apiResult.status === undefined || apiResult.status >= 500);
             setError(apiResult.error);
         } catch (submitError) {
+            setHasUnresolvedSubmission(true);
             setError(getAddEmployeeErrorMessage(submitError));
         } finally {
             setIsLoading(false);
@@ -158,6 +163,7 @@ export function useAddEmployee({
         departments,
         canReadDepartments,
         isLoading,
+        hasUnresolvedSubmission,
         error,
         fieldErrors,
         handleFieldChange,

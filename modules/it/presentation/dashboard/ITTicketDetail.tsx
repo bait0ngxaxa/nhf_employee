@@ -1,5 +1,7 @@
 "use client";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import { useEffect, useState, type ReactElement } from "react";
 import Link from "next/link";
 import { ArrowLeft, CircleAlert } from "lucide-react";
@@ -75,7 +77,7 @@ export function ITTicketDetail({
     return (
         <section className="min-h-[calc(100dvh-6rem)]">
             <div className="mx-auto max-w-4xl space-y-5">
-                <Link href={APP_ROUTES.dashboardIT} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                <Link onNavigate={(event) => { if (!allowDashboardNavigation()) event.preventDefault(); }} href={APP_ROUTES.dashboardIT} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                     <ArrowLeft aria-hidden="true" className="size-4" />
                     กลับไปยังรายการ Ticket
                 </Link>

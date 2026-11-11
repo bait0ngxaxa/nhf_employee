@@ -3,6 +3,7 @@
 import Link, { useLinkStatus } from "next/link";
 import { Loader2 } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
 
 function NavigationPending(): ReactElement | null {
     const { pending } = useLinkStatus();
@@ -13,8 +14,7 @@ function NavigationPending(): ReactElement | null {
 export function DashboardNavigationLink({ children, ...props }: ComponentProps<typeof Link>): ReactElement {
     return (
         <Link {...props} prefetch={false} scroll={false} onNavigate={(event) => {
-            if (document.querySelector('[data-navigation-dirty="true"]')
-                && !window.confirm("มีข้อมูลที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?")) {
+            if (!allowDashboardNavigation()) {
                 event.preventDefault();
                 return;
             }

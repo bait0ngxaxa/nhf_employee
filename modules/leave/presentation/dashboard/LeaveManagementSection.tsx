@@ -1,5 +1,7 @@
 "use client";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import { useRouter } from "next/navigation";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { EmployeeLeaveDashboard } from "./EmployeeLeaveDashboard";
@@ -53,6 +55,7 @@ export function LeaveManagementSection({ routeTab = "my-leave" }: LeaveManagemen
             return;
         }
 
+        if (!allowDashboardNavigation()) return;
         router.push(toDashboardLeaveTabPath(value), { scroll: false });
     }
 

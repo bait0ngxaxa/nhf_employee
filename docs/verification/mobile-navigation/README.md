@@ -26,7 +26,15 @@ Read-only DEMI behavioral reference: `46f27bcf161f124d2c3231612db6778ea3d52919`.
   Existing modal forms retain their focus/dismiss protection. Inline approver
   assignments, IT conversation drafts, employee/new-staff-request forms and
   announcement edits expose their existing state to the new navigation links;
-  cancelling keeps the form mounted. This is not a new
+  cancelling keeps the form mounted. A shared guard checks submitting before
+  unresolved outcome before ordinary dirty confirmation. Pending mutations cannot
+  be discarded through a confirm dialog. Unknown IT/Email outcomes retain the
+  existing retry keys; IT remains guarded even if its draft is cleared.
+  Recovery messages direct IT/Email to retry the same request, announcements to
+  copy/reload the existing version, approvers to retry the same assignments, and
+  employee creation to check the list in a new tab before retrying.
+  Sidebar/account session actions, logout, notification actions/history, Leave
+  tab changes and IT detail return links use the same guard. This is not a new
   global browser-unload/history interception system.
 - `FeaturedCard` and `RegularCard` implementations, desktop Sidebar primitives,
   server route-access code remain unchanged. Desktop grid classes remain unchanged.
@@ -124,3 +132,19 @@ suite or production build was run.
 Revert the task commits through an owner-reviewed PR. No database migration or
 business-data repair is required. Reverting restores the previous browser drawer,
 Home presentation and LIFF item styling without changing either channel's auth.
+
+## Review correction: mutation regression evidence
+
+- Actual IT conversation and AnnouncementManager: pending requests block navigation;
+  uncertain results retain drafts and existing recovery paths. IT direct retry
+  keeps the same idempotency key, even after a blocked navigation attempt.
+- Actual ApproverManagement/useApproverManagementModel, AddEmployeeForm/useAddEmployee,
+  EmailRequestForm/EmailRequestProvider: **3 integration-at-component tests passed**.
+  No synthetic form model substitutes for these components.
+- Focused related regressions: **7 files / 64 tests passed**; final affected link,
+  IT and announcement check: **3 files / 24 tests passed**. Totals overlap.
+- Notification actions cannot navigate or mark read when the guard blocks; account
+  logout and provider menu navigation are also covered.
+- Initial new test failures were test-driving mistakes (changing a Radix trigger
+  as if it were a native select; incorrect radio label). Corrected tests operate
+  the actual keyboard-select/radio controls; production validation was preserved.

@@ -2,6 +2,8 @@ import { webcrypto } from "node:crypto";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import { ITTicketConversation } from "@/modules/it/client";
 
 const ticketId = 19;
@@ -114,6 +116,43 @@ describe("IT Ticket conversation attachment UI", () => {
             configurable: true,
             value: vi.fn(),
         });
+    });
+
+    it("protects dirty, in-flight and unknown comment outcomes without losing retry identity", async () => {
+        const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+        const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+        let rejectPost: ((reason: Error) => void) | undefined;
+        const keys: string[] = [];
+        setupFetch(async (init) => {
+            keys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+            if (keys.length === 1) return new Promise<Response>((_resolve, reject) => { rejectPost = reject; });
+            return jsonResponse(submittedComment([], "ข้อความเดิม"));
+        });
+        renderConversation();
+        expect(allowDashboardNavigation()).toBe(true);
+        const field = screen.getByLabelText("ตอบกลับ");
+        fireEvent.change(field, { target: { value: "ข้อความเดิม" } });
+        expect(allowDashboardNavigation()).toBe(false);
+        expect(confirm).toHaveBeenCalledOnce();
+        confirm.mockReturnValue(true);
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await waitFor(() => expect(keys).toHaveLength(1));
+        expect(allowDashboardNavigation()).toBe(false);
+        expect(alert).toHaveBeenLastCalledWith(expect.stringContaining("กำลังบันทึก"));
+        expect(confirm).toHaveBeenCalledOnce();
+        rejectPost?.(new Error("network result unknown"));
+        await screen.findByRole("alert");
+        expect(allowDashboardNavigation()).toBe(false);
+        expect(alert).toHaveBeenLastCalledWith(expect.stringContaining("ส่งข้อความเดิม"));
+        // Clearing the draft must not make the uncertain attempt look clean.
+        fireEvent.change(field, { target: { value: "" } });
+        expect(allowDashboardNavigation()).toBe(false);
+        fireEvent.change(field, { target: { value: "ข้อความเดิม" } });
+        fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
+        await screen.findByText("ส่งข้อความเรียบร้อยแล้ว");
+        expect(keys[0]).toBe(keys[1]);
+        expect(allowDashboardNavigation()).toBe(true);
+        confirm.mockRestore(); alert.mockRestore();
     });
 
     it("keeps body-only comments on JSON and hides the composer without permission or in terminal state", async () => {

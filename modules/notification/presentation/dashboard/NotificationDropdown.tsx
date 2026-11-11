@@ -1,5 +1,7 @@
 "use client";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import type React from "react";
 import { useRef, useState } from "react";
 import useSWR from "swr";
@@ -121,6 +123,7 @@ export function NotificationDropdown({
         );
 
         if (normalizedActionUrl) {
+            if (!allowDashboardNavigation()) return;
             setOpen(false);
             router.push(normalizedActionUrl);
 
@@ -261,6 +264,7 @@ export function NotificationDropdown({
                         variant="ghost"
                         className="h-11 w-full rounded-lg text-sm font-semibold text-content-body hover:bg-surface-subtle hover:text-content-heading"
                         onClick={() => {
+                            if (!allowDashboardNavigation()) return;
                             setOpen(false);
                             router.push(
                                 toDashboardMenuPath(

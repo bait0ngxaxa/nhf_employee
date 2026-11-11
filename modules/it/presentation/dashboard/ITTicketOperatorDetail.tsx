@@ -1,5 +1,7 @@
 "use client";
 
+import { allowDashboardNavigation } from "@/lib/ui/dashboard-navigation-guard";
+
 import { useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -424,7 +426,7 @@ export function ITTicketOperatorDetail({
     return (
         <section className="min-h-[calc(100dvh-6rem)]">
             <div className="mx-auto max-w-6xl space-y-5">
-                <Link href={toDashboardITTabPath(IT_DASHBOARD_TABS.queue)} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                <Link onNavigate={(event) => { if (!allowDashboardNavigation()) event.preventDefault(); }} href={toDashboardITTabPath(IT_DASHBOARD_TABS.queue)} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                     <ArrowLeft aria-hidden="true" className="size-4" />
                     กลับไปยังคิว IT Ticket
                 </Link>

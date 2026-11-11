@@ -80,10 +80,35 @@ describe("browser mobile navigation", () => {
         confirm.mockRestore();
     });
 
+    it.each(["submitting", "unresolved"])("blocks links when %s even if discard is confirmed", (stateName) => {
+        const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+        const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+        const attrs = { [`data-navigation-${stateName}`]: "true" };
+        render(<><form {...attrs} data-navigation-dirty="true" /><DashboardNavigationLink href="/dashboard/more">เพิ่มเติม</DashboardNavigationLink></>);
+        fireEvent.click(screen.getByRole("link"));
+        expect(state.navigated).not.toHaveBeenCalled();
+        expect(confirm).not.toHaveBeenCalled();
+        expect(alert).toHaveBeenCalledOnce();
+        alert.mockRestore(); confirm.mockRestore();
+    });
+
     it("announces pending navigation", () => {
         state.pending = true;
         render(<DashboardNavigationLink href="/dashboard/more">เพิ่มเติม</DashboardNavigationLink>);
         expect(screen.getByRole("status")).toHaveTextContent("กำลังเปิดหน้า");
+    });
+
+    it("keeps the session mounted when logout is attempted during a mutation", async () => {
+        const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+        render(<><form data-navigation-submitting="true" /><DashboardMoreSection /></>);
+        fireEvent.pointerDown(screen.getByRole("button", { name: "เมนูผู้ใช้" }), { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: "ออกจากระบบ" }));
+        const dialog = await screen.findByRole("dialog", { name: "ออกจากระบบบัญชีนี้?" });
+        fireEvent.click(within(dialog).getByRole("button", { name: "ออกจากระบบ" }));
+        expect(useDashboardUIContext().handleSignOut).not.toHaveBeenCalled();
+        expect(within(dialog).getByRole("button", { name: "ออกจากระบบ" })).toBeEnabled();
+        expect(alert).toHaveBeenCalledOnce();
+        alert.mockRestore();
     });
 
     it("reuses the existing account logout confirmation from More", async () => {

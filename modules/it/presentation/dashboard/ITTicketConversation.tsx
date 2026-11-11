@@ -144,6 +144,7 @@ export function ITTicketConversation({
     const [selectedAttachments, setSelectedAttachmentsState] = useState<SelectedITTicketAttachment[]>([]);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
     const [posting, setPosting] = useState(false);
+    const [unresolvedPost, setUnresolvedPost] = useState(false);
     const [postError, setPostError] = useState<string | null>(null);
     const [postMessage, setPostMessage] = useState<string | null>(null);
     const [postingDenied, setPostingDenied] = useState(false);
@@ -311,6 +312,7 @@ export function ITTicketConversation({
                 headers.set("Content-Type", "application/json");
                 requestBody = JSON.stringify({ body });
             }
+            setUnresolvedPost(true);
             const response = await fetch(commentsRoute(ticketId, operator), withAuthMutationHeaders({
                 method: "POST",
                 headers,
@@ -318,6 +320,7 @@ export function ITTicketConversation({
             }));
             const payload: unknown = await response.json().catch(() => null);
             if (!response.ok) {
+                if (response.status < 500 && response.status !== 409) setUnresolvedPost(false);
                 if (response.status === 401 || response.status === 403) setPostingDenied(true);
                 throw new Error(readITTicketReadError(payload, response.status, operator));
             }
@@ -337,6 +340,7 @@ export function ITTicketConversation({
             } else {
                 setConversationRetry((retry) => retry + 1);
             }
+            setUnresolvedPost(false);
             setDraft("");
             for (const attachment of selectedAttachmentsRef.current) {
                 URL.revokeObjectURL(attachment.previewUrl);
@@ -356,7 +360,7 @@ export function ITTicketConversation({
     };
 
     return (
-        <section aria-labelledby="it-ticket-conversation-heading" className="space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4 md:p-6">
+        <section data-navigation-submitting={posting} data-navigation-unresolved={unresolvedPost} data-navigation-recovery="ยังยืนยันผลการส่งข้อความไม่ได้ กรุณาลองส่งข้อความเดิมอีกครั้งเพื่อยืนยันผลก่อนเปลี่ยนหน้า" aria-labelledby="it-ticket-conversation-heading" className="space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4 md:p-6">
             <header className="flex items-start gap-3">
                 <MessageSquareText aria-hidden="true" className="mt-1 size-5 shrink-0 text-brand-foreground" />
                 <div className="min-w-0 space-y-1">
@@ -412,6 +416,7 @@ export function ITTicketConversation({
                 )
             ) : null}
 
+            {unresolvedPost && !posting ? <p className="text-sm text-content-secondary">ยังยืนยันผลการส่งข้อความไม่ได้ กรุณาลองส่งข้อความเดิมอีกครั้งเพื่อยืนยันผลก่อนเปลี่ยนหน้า</p> : null}
             {canPost ? (
                 <form data-navigation-dirty={draft.length > 0 || selectedAttachments.length > 0} className="space-y-3 border-t border-border-neutral pt-5" onSubmit={(event) => void handleSubmit(event)}>
                     <label htmlFor={`it-ticket-comment-${ticketId}`} className="block text-sm font-semibold text-content-heading">

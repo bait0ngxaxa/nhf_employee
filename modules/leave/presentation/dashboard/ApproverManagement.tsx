@@ -44,7 +44,7 @@ export function ApproverManagement() {
     }
 
     return (
-        <div className="space-y-6" data-navigation-dirty={model.assignments.size > 0}>
+        <div className="space-y-6" data-navigation-dirty={model.assignments.size > 0} data-navigation-submitting={model.isSaving} data-navigation-unresolved={model.assignments.size > 0 && model.saveMsg?.type === "err"} data-navigation-recovery="ยังยืนยันผลการกำหนดผู้อนุมัติไม่ได้ กรุณาลองบันทึกรายการเดิมอีกครั้งก่อนเปลี่ยนหน้า">
             <ApproverStats
                 totalEmployees={model.employees.length}
                 activeApprovers={model.activeApprovers.length}

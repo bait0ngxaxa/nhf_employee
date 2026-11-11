@@ -148,6 +148,19 @@ function SignOutProbe(): ReactElement {
 }
 
 describe("DashboardProvider navigation state", () => {
+    it("guards Sidebar and account session programmatic navigation while submitting", () => {
+        const alert = vi.spyOn(window, "alert").mockImplementation(() => {});
+        function NavigationProbe(): ReactElement {
+            const { handleMenuClick } = useDashboardUIContext();
+            return <><form data-navigation-submitting="true" /><button onClick={() => handleMenuClick("sessions")}>Sessions</button></>;
+        }
+        render(<DashboardProvider><NavigationProbe /></DashboardProvider>);
+        fireEvent.click(screen.getByRole("button", { name: "Sessions" }));
+        expect(navigationMocks.router.push).not.toHaveBeenCalled();
+        expect(alert).toHaveBeenCalledOnce();
+        alert.mockRestore();
+    });
+
     beforeEach(() => {
         navigationMocks.router.push.mockReset();
         navigationMocks.router.replace.mockReset();
