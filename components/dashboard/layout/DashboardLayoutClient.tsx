@@ -9,6 +9,7 @@ import {
 } from "react";
 import { DashboardSidebar } from "@/components/dashboard/layout/DashboardSidebar";
 import { DashboardNavbar } from "@/components/dashboard/layout/DashboardNavbar";
+import { DashboardBottomNav } from "@/components/dashboard/layout/DashboardBottomNav";
 import { DashboardShellSkeleton } from "@/components/dashboard/feedback/DashboardShellSkeleton";
 import { useDashboardContext } from "@/components/dashboard/context";
 import { getDashboardPageLabel } from "@/constants/dashboard";
@@ -83,7 +84,7 @@ export function DashboardLayoutClient({
     }
 
     return (
-        <div className="bg-dashboard-canvas flex h-dvh min-h-0">
+        <div className="dashboard-app-shell bg-dashboard-canvas flex h-dvh min-h-0">
             {/* Desktop Sidebar */}
             <div className="hidden h-full flex-shrink-0 lg:block">
                 <DashboardSidebar variant="desktop" />
@@ -113,6 +114,7 @@ export function DashboardLayoutClient({
                     {children}
                 </main>
             </div>
+            <DashboardBottomNav />
         </div>
     );
 }

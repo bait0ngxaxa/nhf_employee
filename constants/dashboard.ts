@@ -118,6 +118,7 @@ function getDashboardMenuItem(menuId: string): MenuItem {
 
 const DASHBOARD_PAGE_LABELS: Readonly<Record<string, string>> = {
     dashboard: "หน้าหลัก",
+    more: "เพิ่มเติม",
     "manager-approval": "อนุมัติการลา",
     "leave-history": "ประวัติการลา",
     notifications: "การแจ้งเตือน",

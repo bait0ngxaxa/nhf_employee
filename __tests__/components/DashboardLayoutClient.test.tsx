@@ -20,6 +20,11 @@ vi.mock("@/components/dashboard/layout/DashboardSidebar", () => ({
     DashboardSidebar: () => <nav aria-label="เมนูหลัก" />,
 }));
 
+
+vi.mock("@/components/dashboard/layout/DashboardBottomNav", () => ({
+    DashboardBottomNav: () => <nav aria-label="เมนูหลักบนมือถือ" />,
+}));
+
 describe("DashboardLayoutClient page navigation", () => {
     const scrollTo = vi.fn();
 

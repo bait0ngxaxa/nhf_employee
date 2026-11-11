@@ -44,7 +44,7 @@ export function ApproverManagement() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" data-navigation-dirty={model.assignments.size > 0}>
             <ApproverStats
                 totalEmployees={model.employees.length}
                 activeApprovers={model.activeApprovers.length}
@@ -110,7 +110,7 @@ export function ApproverManagement() {
             </Card>
 
             {model.assignments.size > 0 ? (
-                <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2">
+                <div className="dashboard-floating-action fixed bottom-[calc(var(--dashboard-mobile-nav-height,0px)+1rem+env(safe-area-inset-bottom))] left-1/2 z-30 w-[calc(100vw-1.5rem)] max-w-3xl -translate-x-1/2 lg:bottom-4 lg:z-50">
                     <div
                         role="status"
                         className="flex items-center justify-between gap-3 rounded-lg border border-module-leave-border bg-surface-raised px-4 py-3 shadow-md"

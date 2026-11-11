@@ -413,7 +413,7 @@ export function ITTicketConversation({
             ) : null}
 
             {canPost ? (
-                <form className="space-y-3 border-t border-border-neutral pt-5" onSubmit={(event) => void handleSubmit(event)}>
+                <form data-navigation-dirty={draft.length > 0 || selectedAttachments.length > 0} className="space-y-3 border-t border-border-neutral pt-5" onSubmit={(event) => void handleSubmit(event)}>
                     <label htmlFor={`it-ticket-comment-${ticketId}`} className="block text-sm font-semibold text-content-heading">
                         ตอบกลับ
                     </label>
