@@ -67,7 +67,7 @@ export function DashboardHomeSkeleton(): ReactElement {
                     <Skeleton className="h-7 w-56 max-w-full" />
                     <Skeleton className="h-5 w-40" />
                     <div className="grid grid-cols-3 gap-2 min-[360px]:grid-cols-4">
-                        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-28 rounded-2xl" />)}
+                        {Array.from({ length: 4 }).map((_, index) => <div key={index} className="flex flex-col items-center gap-2"><Skeleton className="size-16 rounded-2xl" /><Skeleton className="h-10 w-16" /></div>)}
                     </div>
                 </div>
                 <div className="hidden space-y-6 lg:block">

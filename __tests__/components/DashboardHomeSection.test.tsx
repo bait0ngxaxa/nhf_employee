@@ -178,12 +178,14 @@ describe("compact NHF quick actions", () => {
         const grid = screen.getByRole("region", { name: "เมนูด่วน" });
         const buttons = within(grid).getAllByRole("button");
         expect(buttons.map((button) => button.textContent)).toEqual(["เบิกวัสดุ", "วันลา", "งานประจำ", "บริการ IT"]);
-        expect(buttons[0]).toHaveClass("bg-module-stock-dashboard-surface");
-        expect(buttons[1]).toHaveClass("bg-module-leave-dashboard-surface");
-        expect(buttons[2]).toHaveClass("bg-module-routine-dashboard-surface");
-        expect(buttons[3]).toHaveClass("bg-module-it-dashboard-surface");
+        expect(buttons[0].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-stock-dashboard-surface");
+        expect(buttons[1].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-leave-dashboard-surface");
+        expect(buttons[2].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-routine-dashboard-surface");
+        expect(buttons[3].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-it-dashboard-surface");
         for (const button of buttons) {
-            expect(button).toHaveClass("h-28", "focus-visible:ring-2");
+            expect(button).toHaveClass("bg-transparent", "focus-visible:ring-2");
+            expect(button.querySelector("[data-shortcut-icon]")).toHaveClass("size-16");
+            expect(button.querySelector("[data-shortcut-label]")?.parentElement).toBe(button);
             expect(button.querySelector(".line-clamp-2")).not.toBeNull();
             expect(button).not.toHaveTextContent("Quick action");
         }
@@ -201,9 +203,34 @@ describe("compact NHF quick actions", () => {
         vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: undefined, isAdmin: true, availableMenuGroups: DASHBOARD_MENU_GROUPS });
         view.rerender(<DashboardHomeSection />);
         const grid = screen.getByRole("region", { name: "เมนูด่วน" });
-        expect(within(grid).getByRole("button", { name: "จัดการสิทธิ์การใช้งาน" })).toBeInTheDocument();
-        fireEvent.click(within(grid).getByRole("button", { name: "จัดการสิทธิ์การใช้งาน" }));
-        expect(useDashboardUIContext().handleMenuClick).toHaveBeenCalledWith("authorization-administration");
+        expect(within(grid).getAllByRole("button")).toHaveLength(4);
+        expect(within(grid).queryByText("จัดการสิทธิ์การใช้งาน")).not.toBeInTheDocument();
+        expect(within(grid).queryByText(/ทั้งหมด|เพิ่มเติม/)).not.toBeInTheDocument();
+        // Secondary services remain in the unchanged desktop presentation.
+        expect(screen.getByRole("button", { name: /จัดการสิทธิ์การใช้งาน/ })).toBeInTheDocument();
+    });
+
+    it("uses only Stock and Routine for a limited capability set", () => {
+        const group = DASHBOARD_MENU_GROUPS[0];
+        renderHome([{ ...group, items: group.items.filter(item => ["stock", "routine"].includes(item.id)) }]);
+        expect(within(screen.getByRole("region", { name: "เมนูด่วน" })).getAllByRole("button").map(button => button.textContent)).toEqual(["เบิกวัสดุ", "งานประจำ"]);
+    });
+
+    it("does not substitute administrative services when no featured module is available", () => {
+        renderHome(DASHBOARD_MENU_GROUPS.slice(1));
+        const grid = screen.getByRole("region", { name: "เมนูด่วน" });
+        expect(within(grid).queryByRole("button")).not.toBeInTheDocument();
+        expect(within(grid).getByText("ยังไม่มีเมนูที่พร้อมใช้งานสำหรับบัญชีนี้")).toBeInTheDocument();
+    });
+
+    it("places the announcement before the greeting and actions in DOM reading order", () => {
+        renderHome(DASHBOARD_MENU_GROUPS);
+        const announcement = screen.getByText("ประกาศทดสอบ");
+        const greeting = screen.getByRole("heading", { level: 1 });
+        const grid = screen.getByRole("region", { name: "เมนูด่วน" });
+        expect(announcement.compareDocumentPosition(greeting) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(greeting.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(announcement.parentElement?.className).not.toMatch(/order-/);
     });
 
     it("shows an empty state and follows actual feature/capability filtering", () => {
@@ -226,7 +253,12 @@ describe("compact NHF quick actions", () => {
             renderHome(groups);
             const grid = screen.getByRole("region", { name: "เมนูด่วน" });
             expect(within(grid).getByRole("button", { name: "วันลา (ยังไม่พร้อมให้บริการ)" })).not.toBeDisabled();
-            expect(within(grid).getByText(longLabel)).toHaveClass("line-clamp-2", "[overflow-wrap:anywhere]");
+            expect(within(grid).queryByText(longLabel)).not.toBeInTheDocument();
+            const leave = within(grid).getByRole("button", { name: "วันลา (ยังไม่พร้อมให้บริการ)" });
+            expect(within(leave).getByText("ยังไม่พร้อม")).toBeVisible();
+            expect(leave.querySelector("[data-shortcut-icon]")).toHaveClass("bg-surface-raised");
+            fireEvent.click(leave);
+            expect(useDashboardUIContext().handleMenuClick).toHaveBeenCalledWith("leave-management");
         } finally { vi.unstubAllEnvs(); }
     });
 });

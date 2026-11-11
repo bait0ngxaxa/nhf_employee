@@ -29,9 +29,13 @@ Read-only DEMI behavioral reference: `46f27bcf161f124d2c3231612db6778ea3d52919`.
   cancelling keeps the form mounted. This is not a new
   global browser-unload/history interception system.
 - `FeaturedCard` and `RegularCard` implementations, desktop Sidebar primitives,
-  DashboardProvider and server route-access code were compared against `main`
-  and remain unchanged. Desktop grid classes remain unchanged. Mobile cards use
-  the same filtered items, icons, handlers and `MENU_ITEM_CONFIG` tokens.
+  server route-access code remain unchanged. Desktop grid classes remain unchanged.
+  Mobile launcher shortcuts use only `featuredItems` in `FEATURED_ORDER` (Stock,
+  Leave, Routine, IT), the existing icons, handlers and module tokens on icon tiles.
+  Administrative/secondary services remain in More and Desktop Sidebar only.
+  Published announcements precede greeting/actions in DOM and visual order; null
+  announcements render no empty container. Unavailable Leave stays navigable with
+  a subdued tile and visible status.
 - No schema, migration, package, API, business-rule, authentication or session
   changes. No summaries, KPI widgets or summary fetching were introduced.
 
@@ -60,10 +64,14 @@ Read-only DEMI behavioral reference: `46f27bcf161f124d2c3231612db6778ea3d52919`.
 
 ## Rendered browser evidence
 
-`node scripts/check-mobile-navigation.mjs` passed **64 cases** in local Chromium:
-320, 375, 390, 768, 1024, 1440px; light and dark themes; Dashboard Home, More,
+`node scripts/check-mobile-navigation.mjs` passed **88 cases** in local Chromium:
+320, 375, 390, 422, 768, 1024, 1440px; light and dark themes; Dashboard Home, More,
 an inline-form/floating-action fixture and LIFF shell. Additional 320/390px
-fixtures cover one module, no modules, disabled flags and long Thai labels.
+fixtures cover one/two/no modules, administrative-only services, disabled flags,
+long Thai source labels, unavailable Leave and unpublished announcements.
+Assertions verify the exact four allowed IDs, transparent outer wrappers, one
+64px icon tile, labels outside tiles and announcement DOM/visual order.
+Home focused Vitest: **20 tests passed** after the product correction.
 Checks cover navigation visibility at `lg`, 3/4-column density, 44px minimum
 targets, no horizontal page overflow, sidebar collapse/expand, keyboard focus,
 cancel/accept navigation with dirty state, browser history and floating-action
@@ -93,6 +101,9 @@ Optional positional argument selects one viewport for focused feedback, e.g.
 | Surface | Light | Dark |
 | --- | --- | --- |
 | Dashboard 390px | [render](390-dashboard-light.png) | [render](390-dashboard-dark.png) |
+| No announcement 390px | [render](390-dashboard-no-announcement-light.png) | [render](390-dashboard-no-announcement-dark.png) |
+| Unavailable Leave 390px | [render](390-dashboard-unavailable-light.png) | [render](390-dashboard-unavailable-dark.png) |
+| Stock/Routine only 390px | [render](390-dashboard-limited-light.png) | [render](390-dashboard-limited-dark.png) |
 | More 390px | [render](390-dashboard-more-light.png) | [render](390-dashboard-more-dark.png) |
 | Desktop 1440px | [render](1440-dashboard-light.png) | [render](1440-dashboard-dark.png) |
 | LIFF 390px | [render](390-liff-routine-light.png) | [render](390-liff-routine-dark.png) |

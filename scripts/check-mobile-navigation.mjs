@@ -22,6 +22,7 @@ const bundle = await build({
             import { DashboardLayoutClient } from "./components/dashboard/layout/DashboardLayoutClient";
             import { DashboardHomeSection } from "./components/dashboard/sections/DashboardHomeSection";
             import { DashboardMoreSection } from "./components/dashboard/sections/DashboardMoreSection";
+            import { AnnouncementTicker } from "./modules/announcements/presentation/AnnouncementTicker";
             import { LiffAppShell } from "./components/liff/LiffAppShell";
             import { DASHBOARD_MENU_GROUPS, getAvailableMenuGroups } from "./constants/dashboard";
             import { getDashboardMenuIdFromPathname, toDashboardMenuPath } from "./lib/ssot/routes";
@@ -34,16 +35,19 @@ const bundle = await build({
                 let groups = DASHBOARD_MENU_GROUPS;
                 if (variant === "one") groups = [{ ...groups[0], items: groups[0].items.filter(i => i.id === "stock") }];
                 if (variant === "none") groups = [];
+                if (variant === "limited") groups = [{ ...groups[0], items: groups[0].items.filter(i => ["stock", "routine"].includes(i.id)) }];
+                if (variant === "admin-only") groups = groups.slice(1);
+                if (variant === "unavailable") groups = groups.map(g => ({ ...g, items: g.items.map(i => i.id === "leave-management" ? { ...i, unavailable: true } : i) }));
                 if (variant === "disabled") groups = getAvailableMenuGroups(false);
-                if (variant === "long") groups = groups.map(g => ({ ...g, items: g.items.map(i => i.id === "employee-management" ? { ...i, sidebarLabel: "บริการพนักงานและผู้ดูแลระบบที่มีชื่อภาษาไทยยาวมาก" } : i) }));
+                if (variant === "long") groups = groups.map(g => ({ ...g, items: g.items.map(i => i.id === "routine" ? { ...i, label: "บริการพนักงานและผู้ดูแลระบบที่มีชื่อภาษาไทยยาวมาก" } : i) }));
                 const user = { id: "fixture", name: "พนักงาน ทดสอบ", email: "fixture@example.test", role: "ADMIN", teams: [{ id: 1, name: "NHF" }], department: "NHF" };
                 const ui = { selectedMenu: getDashboardMenuIdFromPathname(pathname), mobileNavOpen: false, setMobileNavOpen() {}, desktopSidebarCollapsed: collapsed, setDesktopSidebarCollapsed: setCollapsed, router, handleMenuClick: id => router.push(toDashboardMenuPath(id)), handleSignOut: async () => setSignedOut(true) };
                 if (pathname.startsWith("/liff")) return <LiffAppShell><main id="main" className="p-4"><h1>บริการผ่าน LINE</h1><div style={{height: "100vh"}}>เนื้อหาทดสอบ</div></main></LiffAppShell>;
-                return <DashboardDataContext.Provider value={{status: "authenticated", user, isAdmin: true, availableMenuGroups: groups}}><DashboardUIContext.Provider value={ui}><DashboardLayoutClient>{signedOut ? <h1>ออกจากระบบแล้ว (fixture)</h1> : pathname === "/dashboard/more" ? <DashboardMoreSection /> : pathname === "/dashboard" ? <DashboardHomeSection announcement={<aside className="rounded-xl bg-brand-surface p-3 text-sm text-brand-strong">ประกาศสำหรับพนักงาน NHF</aside>} /> : <section><h1 data-page-heading tabIndex={-1}>บริการทดสอบ</h1><form data-navigation-dirty="true"><textarea aria-label="ข้อความที่ยังไม่ได้บันทึก" defaultValue="ร่างข้อความ" /></form><div style={{ height: "110vh" }} /><div className="dashboard-floating-action fixed bottom-[calc(var(--dashboard-mobile-nav-height,0px)+1rem+env(safe-area-inset-bottom))] right-4 z-30"><button className="min-h-11 rounded-md bg-brand-solid p-3">บันทึก</button></div></section>}</DashboardLayoutClient></DashboardUIContext.Provider></DashboardDataContext.Provider>;
+                return <DashboardDataContext.Provider value={{status: "authenticated", user, isAdmin: true, availableMenuGroups: groups}}><DashboardUIContext.Provider value={ui}><DashboardLayoutClient>{signedOut ? <h1>ออกจากระบบแล้ว (fixture)</h1> : pathname === "/dashboard/more" ? <DashboardMoreSection /> : pathname === "/dashboard" ? <DashboardHomeSection announcement={<AnnouncementTicker content={variant === "no-announcement" ? null : "ประกาศสำหรับพนักงาน NHF — ตรวจสอบข่าวสารก่อนเริ่มงาน"} />} /> : <section><h1 data-page-heading tabIndex={-1}>บริการทดสอบ</h1><form data-navigation-dirty="true"><textarea aria-label="ข้อความที่ยังไม่ได้บันทึก" defaultValue="ร่างข้อความ" /></form><div style={{ height: "110vh" }} /><div className="dashboard-floating-action fixed bottom-[calc(var(--dashboard-mobile-nav-height,0px)+1rem+env(safe-area-inset-bottom))] right-4 z-30"><button className="min-h-11 rounded-md bg-brand-solid p-3">บันทึก</button></div></section>}</DashboardLayoutClient></DashboardUIContext.Provider></DashboardDataContext.Provider>;
             }
             createRoot(document.getElementById("root")).render(<Fixture />);`,
     },
-    bundle: true, write: false, format: "iife", jsx: "automatic",
+    outfile: join(output, "fixture.js"), bundle: true, write: false, format: "iife", jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"', "process.env.NEXT_PUBLIC_FEATURE_LEAVE": '"false"', "process.env.NEXT_PUBLIC_FEATURE_ROUTINE": '"false"' },
     loader: { ".png": "dataurl" },
     plugins: [{ name: "fixture-boundaries", setup(context) {
@@ -71,8 +75,8 @@ const bundle = await build({
     } }],
 });
 const css = await postcss([tailwind()]).process(await readFile("app/globals.css", "utf8"), { from: resolve("app/globals.css") });
-await writeFile(join(output, "fixture.js"), bundle.outputFiles[0].contents);
-const html = `<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>${css.css}</style><body style="font-family:'Noto Sans Thai',sans-serif"><div id="root"></div><script src="/fixture.js"></script></body></html>`;
+await writeFile(join(output, "fixture.js"), bundle.outputFiles.find(file => file.path.endsWith(".js")).contents);
+const html = `<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>${css.css}\n${bundle.outputFiles.find(file => file.path.endsWith(".css"))?.text ?? ""}</style><body style="font-family:'Noto Sans Thai',sans-serif"><div id="root"></div><script src="/fixture.js"></script></body></html>`;
 const server = createServer(async (req, res) => {
     if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript"); res.end(await readFile(join(output, "fixture.js"))); return; }
     if (req.url?.startsWith("/api/")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ status: "linked" })); return; }
@@ -87,7 +91,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(
 const browser = await chromium.launch({ executablePath: process.env.MOBILE_NAV_BROWSER_PATH || undefined, headless: true });
 let cases = 0;
 try {
-    for (const width of (process.argv[2] ? [Number(process.argv[2])] : [320, 375, 390, 768, 1024, 1440])) {
+    for (const width of (process.argv[2] ? [Number(process.argv[2])] : [320, 375, 390, 422, 768, 1024, 1440])) {
         for (const theme of ["light", "dark"]) {
             const page = await browser.newPage({ viewport: { width, height: 900 } });
             const errors = [];
@@ -108,8 +112,20 @@ try {
                         if (mobile) {
                             assert.equal(await grid.locator(".dashboard-compact-actions").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length), width < 360 ? 3 : 4);
                             const boxes = await grid.getByRole("button").evaluateAll(items => items.map(el => { const b = el.getBoundingClientRect(); return { width: b.width, height: b.height }; }));
-                            assert.ok(boxes.every(box => box.width >= 44 && box.height === 112));
-                            assert.equal(await grid.getByRole("button").count(), 10);
+                            assert.ok(boxes.every(box => box.width >= 44 && box.height >= 112));
+                            assert.deepEqual(await grid.locator("[data-shortcut-id]").evaluateAll(items => items.map(el => el.dataset.shortcutId)), ["stock", "leave-management", "routine", "it-workspace"]);
+                            const visual = await grid.locator("[data-shortcut-id]").evaluateAll(items => items.map(el => {
+                                const icon = el.querySelector("[data-shortcut-icon]");
+                                const label = el.querySelector("[data-shortcut-label]");
+                                return { transparent: getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)", border: getComputedStyle(el).borderWidth, iconSize: icon.getBoundingClientRect().width, labelOutside: label.parentElement === el, labelTransparent: getComputedStyle(label).backgroundColor === "rgba(0, 0, 0, 0)" };
+                            }));
+                            assert.ok(visual.every(item => item.transparent && item.border === "0px" && item.iconSize === 64 && item.labelOutside && item.labelTransparent));
+                            assert.equal(await page.evaluate(() => {
+                                const announcement = document.querySelector('[aria-label="ประกาศ"]');
+                                const heading = document.querySelector("#dashboard-home-heading");
+                                const actions = document.querySelector('[aria-label="เมนูด่วน"]');
+                                return announcement.getBoundingClientRect().bottom <= heading.getBoundingClientRect().top && heading.getBoundingClientRect().bottom <= actions.getBoundingClientRect().top && !!(announcement.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING);
+                            }), true);
                         } else {
                             const toggle = page.getByRole("button", { name: "ย่อเมนู", exact: true });
                             await toggle.click();
@@ -149,14 +165,17 @@ try {
                 cases++;
             }
             if (width === 320 || width === 390) {
-                for (const [variant, expected] of [["one", 1], ["none", 0], ["disabled", 1], ["long", 10]]) {
+                for (const [variant, expected] of [["one", 1], ["limited", 2], ["none", 0], ["admin-only", 0], ["disabled", 1], ["long", 4], ["unavailable", 4], ["no-announcement", 4]]) {
                     await page.goto(origin + "/dashboard?fixture=" + variant);
                     const grid = page.getByRole("region", { name: "เมนูด่วน" });
                     await grid.waitFor().catch(cause => { throw new Error(`${variant}: ${errors.join(" | ")}`, { cause }); });
                     if (theme === "dark") await page.evaluate(() => document.documentElement.classList.add("dark"));
                     assert.equal(await grid.getByRole("button").count(), expected, variant);
                     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, variant);
-                    if (variant === "long") assert.equal(await grid.getByRole("button", { name: "บริการพนักงานและผู้ดูแลระบบที่มีชื่อภาษาไทยยาวมาก" }).evaluate(el => el.scrollWidth <= el.clientWidth), true);
+                    if (variant === "long") assert.equal(await grid.getByRole("button", { name: "งานประจำ" }).evaluate(el => el.scrollWidth <= el.clientWidth), true);
+                    if (variant === "no-announcement") assert.equal(await page.getByRole("region", { name: "ประกาศ", exact: true }).count(), 0);
+                    if (variant === "unavailable") assert.equal(await grid.getByText("ยังไม่พร้อม", { exact: true }).isVisible(), true);
+                    if (screenshots && width === 390 && ["no-announcement", "unavailable", "limited"].includes(variant)) await page.screenshot({ animations: "disabled", path: join(screenshots, `390-dashboard-${variant}-${theme}.png`) });
                     cases++;
                 }
             }

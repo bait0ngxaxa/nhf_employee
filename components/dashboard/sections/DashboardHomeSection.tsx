@@ -288,16 +288,17 @@ function CompactQuickAction({ item, onClick }: { item: MenuItem; onClick: () => 
     const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
     const Icon = item.icon;
     return (
-        <button type="button" onClick={onClick}
-            aria-label={`${COMPACT_LABELS[item.id] ?? item.sidebarLabel ?? item.label}${item.unavailable ? " (ยังไม่พร้อมให้บริการ)" : ""}`}
-            className={cn(
-                "flex h-28 min-w-0 w-full flex-col items-center justify-center gap-2 rounded-2xl border px-1.5 py-3 text-center transition-[background-color,transform] duration-150 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                config.featured ? [config.featuredSurface, config.featuredBorder, config.featuredFocus, "text-content-on-brand"] : ["border-border-muted bg-surface-raised hover:bg-surface-subtle focus-visible:ring-dashboard-focus", config.text],
+        <button type="button" onClick={onClick} data-shortcut-id={item.id}
+            aria-label={`${COMPACT_LABELS[item.id]}${item.unavailable ? " (ยังไม่พร้อมให้บริการ)" : ""}`}
+            className="group flex min-w-0 w-full flex-col items-center gap-2 rounded-2xl bg-transparent px-0.5 pt-1 pb-2 text-center text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dashboard-focus focus-visible:ring-offset-2">
+            <span data-shortcut-icon className={cn(
+                "flex size-16 shrink-0 items-center justify-center rounded-2xl transition-transform duration-150 group-active:translate-y-px motion-reduce:transform-none",
+                item.unavailable ? "bg-surface-raised text-content-muted" : [config.featuredSurface, "text-content-on-brand"],
             )}>
-            <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", config.featured ? "border border-content-on-brand/25 bg-content-on-brand/15" : "bg-surface-subtle")}>
-                <Icon className="size-6" aria-hidden="true" />
+                <Icon className="size-7" aria-hidden="true" />
             </span>
-            <span className={cn("line-clamp-2 h-9 w-full max-w-full rounded-md text-xs font-semibold leading-[1.125rem] [overflow-wrap:anywhere]", config.featured && [config.featuredControlSurface, config.text])}>{COMPACT_LABELS[item.id] ?? item.sidebarLabel ?? item.label}</span>
+            <span data-shortcut-label className="line-clamp-2 h-10 w-full max-w-full text-xs font-semibold leading-5 [overflow-wrap:anywhere]">{COMPACT_LABELS[item.id]}</span>
+            {item.unavailable ? <span className="text-xs leading-5 text-content-secondary">ยังไม่พร้อม</span> : null}
         </button>
     );
 }
@@ -350,10 +351,10 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
     return (
         <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-dashboard-workspace p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
             <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-4 lg:block lg:space-y-6">
-                {announcement ? <div className="order-3">{announcement}</div> : null}
+                {announcement}
                 <section
                     aria-labelledby="dashboard-home-heading"
-                    className="order-1 border-b border-border-subtle pb-4 lg:pb-8"
+                    className="border-b border-border-subtle pb-4 lg:pb-8"
                 >
                     <div className="min-w-0 max-w-3xl">
                         <div className="mb-5 hidden items-center lg:flex gap-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-foreground">
@@ -410,15 +411,15 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
                     </div>
 
                 </section>
-                <section aria-label="เมนูด่วน" className="order-2 lg:hidden">
+                <section aria-label="เมนูด่วน" className="lg:hidden">
                     <h2 className="mb-3 text-base font-bold text-content-heading">เมนูด่วน</h2>
-                    {activeItems.length === 0 ? <p className="rounded-xl border border-border-subtle bg-surface-raised p-4 text-sm text-content-secondary">ยังไม่มีเมนูที่พร้อมใช้งานสำหรับบัญชีนี้</p> : (
+                    {featuredItems.length === 0 ? <p className="rounded-xl border border-border-subtle bg-surface-raised p-4 text-sm text-content-secondary">ยังไม่มีเมนูที่พร้อมใช้งานสำหรับบัญชีนี้</p> : (
                         <div className="dashboard-compact-actions grid grid-cols-3 gap-2 min-[360px]:grid-cols-4">
-                            {activeItems.map((item) => <CompactQuickAction key={item.id} item={item} onClick={() => handleMenuClick(item.id)} />)}
+                            {featuredItems.filter((item) => FEATURED_ORDER.has(item.id)).map((item) => <CompactQuickAction key={item.id} item={item} onClick={() => handleMenuClick(item.id)} />)}
                         </div>
                     )}
                 </section>
-                <div className="order-4"><LineAddFriendCard tone="light" /></div>
+                <div><LineAddFriendCard tone="light" /></div>
 
                 <div className="hidden pt-4 lg:block">
                     {allMenuItems.length === 0 && (
