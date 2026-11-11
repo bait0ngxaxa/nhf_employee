@@ -92,7 +92,7 @@ describe("browser mobile navigation", () => {
         fireEvent.click(await screen.findByRole("menuitem", { name: "ออกจากระบบ" }));
         const dialog = await screen.findByRole("dialog", { name: "ออกจากระบบบัญชีนี้?" });
         expect(useDashboardUIContext().handleSignOut).not.toHaveBeenCalled();
-        fireEvent.click(within(dialog).getByRole("button", { name: "ออกจากระบบ", exact: true }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "ออกจากระบบ" }));
         expect(useDashboardUIContext().handleSignOut).toHaveBeenCalledOnce();
     });
 });
