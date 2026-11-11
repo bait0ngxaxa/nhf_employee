@@ -6,6 +6,22 @@ import { DashboardBottomNav } from "@/components/dashboard/layout/DashboardBotto
 import { DashboardMoreSection } from "@/components/dashboard/sections/DashboardMoreSection";
 import { DashboardNavigationLink } from "@/components/dashboard/layout/DashboardNavigationLink";
 import { DASHBOARD_MENU_GROUPS } from "@/constants/dashboard";
+import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
+
+function employeeCapabilities(
+    overrides: Partial<EmployeePresentationCapabilities> = {},
+): EmployeePresentationCapabilities {
+    return {
+        canReadEmployees: false,
+        canReadStats: false,
+        canCreateEmployees: false,
+        canUpdateEmployees: false,
+        canDeleteEmployees: false,
+        canImportEmployees: false,
+        canExportEmployees: false,
+        ...overrides,
+    };
+}
 
 const state = vi.hoisted(() => ({ pathname: "/dashboard", pending: false, navigated: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: () => state.pathname }));
@@ -37,11 +53,11 @@ describe("browser mobile navigation", () => {
         expect(nav).toHaveClass("lg:hidden");
         expect(within(nav).getAllByRole("link")).toHaveLength(5);
         expect(screen.getByRole("link", { name: "หน้าแรก" })).toHaveAttribute("aria-current", "page");
-        for (const pathname of ["/dashboard/routine", "/dashboard/stock/requests/7", "/dashboard/leave", "/dashboard/routine"]) {
+        for (const pathname of ["/dashboard/routine", "/dashboard/stock", "/dashboard/leave", "/dashboard/routine"]) {
             state.pathname = pathname;
             view.rerender(<DashboardBottomNav />);
             const current = nav.querySelector('[aria-current="page"]');
-            expect(current?.getAttribute("href")).toBe(pathname.includes("stock") ? "/dashboard/stock" : pathname);
+            expect(current?.getAttribute("href")).toBe(pathname);
         }
         state.pathname = "/dashboard/stock-other";
         view.rerender(<DashboardBottomNav />);
@@ -49,7 +65,7 @@ describe("browser mobile navigation", () => {
     });
 
     it("updates More ownership for deep links, history and capability changes", () => {
-        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: { id: "1", role: "USER", notificationCapabilities: { canReadInbox: true, canUpdateInbox: false } }, isAdmin: false, availableMenuGroups: DASHBOARD_MENU_GROUPS });
+        vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: { id: "1", role: "USER", employeeCapabilities: employeeCapabilities({ canCreateEmployees: true }), notificationCapabilities: { canReadInbox: true, canUpdateInbox: false } }, isAdmin: false, availableMenuGroups: DASHBOARD_MENU_GROUPS });
         const view = render(<DashboardBottomNav />);
         for (const path of ["/dashboard/it", "/dashboard/employees/new", "/dashboard/audit", "/dashboard/authorization", "/dashboard/sessions", "/dashboard/notifications", "/dashboard/it"]) {
             state.pathname = path;
@@ -57,6 +73,55 @@ describe("browser mobile navigation", () => {
             expect(screen.getByRole("link", { name: "เพิ่มเติม" })).toHaveAttribute("aria-current", "page");
         }
         vi.mocked(useDashboardDataContext).mockReturnValue({ status: "authenticated", user: undefined, isAdmin: false, availableMenuGroups: [] });
+        view.rerender(<DashboardBottomNav />);
+        expect(screen.getByRole("navigation").querySelector('[aria-current="page"]')).toBeNull();
+    });
+
+    it("tracks Employee Import ownership across back/forward path changes and permission updates", () => {
+        const importOnlyGroups = DASHBOARD_MENU_GROUPS.map((group) => ({
+            ...group,
+            items: group.items.filter((item) => item.id !== "employee-management" && item.id !== "add-employee"),
+        })).filter((group) => group.items.length > 0);
+        const employeeListGroups = DASHBOARD_MENU_GROUPS.map((group) => ({
+            ...group,
+            items: group.items.filter((item) => item.id === "employee-management"),
+        })).filter((group) => group.items.length > 0);
+        const view = render(<DashboardBottomNav />);
+
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: { id: "1", role: "USER", employeeCapabilities: employeeCapabilities({ canImportEmployees: true }) },
+            isAdmin: false,
+            availableMenuGroups: importOnlyGroups,
+        });
+        state.pathname = "/dashboard/employees/import";
+        view.rerender(<DashboardBottomNav />);
+        expect(screen.getByRole("link", { name: "เพิ่มเติม" })).toHaveAttribute("aria-current", "page");
+
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: { id: "1", role: "USER", employeeCapabilities: employeeCapabilities({ canReadEmployees: true }) },
+            isAdmin: false,
+            availableMenuGroups: employeeListGroups,
+        });
+        state.pathname = "/dashboard/employees";
+        view.rerender(<DashboardBottomNav />);
+        expect(screen.getByRole("link", { name: "ข้อมูลพนักงาน" })).toHaveAttribute("aria-current", "page");
+
+        state.pathname = "/dashboard/employees/import";
+        view.rerender(<DashboardBottomNav />);
+        expect(screen.getByRole("navigation").querySelector('[aria-current="page"]')).toBeNull();
+
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: { id: "1", role: "USER", employeeCapabilities: employeeCapabilities({ canImportEmployees: true }) },
+            isAdmin: false,
+            availableMenuGroups: importOnlyGroups,
+        });
+        view.rerender(<DashboardBottomNav />);
+        expect(screen.getByRole("link", { name: "เพิ่มเติม" })).toHaveAttribute("aria-current", "page");
+
+        state.pathname = "/dashboard/employees/import/unknown";
         view.rerender(<DashboardBottomNav />);
         expect(screen.getByRole("navigation").querySelector('[aria-current="page"]')).toBeNull();
     });
