@@ -32,7 +32,7 @@ const HOME = {
     },
     modules: {
         stock: { enabled: true, status: "available" as const },
-        leave: { enabled: false, status: "unavailable" as const },
+        leave: { enabled: true, status: "available" as const },
         routine: { enabled: true, status: "available" as const },
         it: { enabled: true, status: "available" as const },
     },
@@ -111,24 +111,131 @@ describe("LIFF home", () => {
         mocks.fetchLiffHome.mockResolvedValue(HOME);
     });
 
-    it("renders the server-available modules and safely identifies the workforce", async () => {
-        render(<LiffHomeApp />);
+    it("renders exactly four shortcuts in the approved order with their original routes", async () => {
+        const { container } = render(<LiffHomeApp />);
 
         expect(await screen.findByRole("heading", { name: "สวัสดี พนักงาน ทดสอบ" })).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /เบิกวัสดุและติดตามคำขอ/ })).toHaveAttribute(
-            "href",
-            "/liff/stock",
+
+        const grid = container.querySelector<HTMLElement>("[data-shortcut-grid]");
+        const shortcuts = Array.from(
+            grid?.querySelectorAll<HTMLElement>("[data-shortcut-id]") ?? [],
         );
-        expect(screen.getByRole("link", { name: /ดูงานประจำของฉัน/ })).toHaveAttribute(
-            "href",
-            "/liff/routine",
-        );
-        expect(screen.getByRole("link", { name: /แจ้งปัญหา IT/ })).toHaveAttribute(
-            "href",
-            "/liff/it",
-        );
-        expect(screen.getByText("บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณ")).toBeInTheDocument();
+        expect(grid).toHaveClass("grid", "grid-cols-4");
+        expect(shortcuts.map((shortcut) => shortcut.dataset.shortcutId)).toEqual([
+            "stock",
+            "leave",
+            "routine",
+            "it",
+        ]);
+        expect(shortcuts).toHaveLength(4);
+
+        expect(screen.getByRole("link", { name: "เบิกวัสดุ" })).toHaveAttribute("href", "/liff/stock");
+        expect(screen.getByRole("link", { name: "วันลา" })).toHaveAttribute("href", "/liff/leave");
+        expect(screen.getByRole("link", { name: "งานประจำ" })).toHaveAttribute("href", "/liff/routine");
+        expect(screen.getByRole("link", { name: "บริการ IT" })).toHaveAttribute("href", "/liff/it");
+        expect(screen.queryByText(/เพิ่มเติม|ทั้งหมด|more|all services/i)).not.toBeInTheDocument();
         expect(screen.getByText("บริการของฉัน")).toBeInTheDocument();
+    });
+
+    it("keeps labels outside transparent shortcut wrappers and preserves module tiles and icons", async () => {
+        const { container } = render(<LiffHomeApp />);
+        await screen.findByRole("link", { name: "เบิกวัสดุ" });
+
+        const shortcutStyles = [
+            ["stock", "bg-module-stock-dashboard-surface", "lucide-boxes"],
+            ["leave", "bg-module-leave-dashboard-surface", "lucide-calendar-range"],
+            ["routine", "bg-module-routine-dashboard-surface", "lucide-clipboard-check"],
+            ["it", "bg-module-it-dashboard-surface", "lucide-headset"],
+        ] as const;
+
+        for (const [key, surfaceClassName, iconClassName] of shortcutStyles) {
+            const shortcut = container.querySelector<HTMLElement>(`[data-shortcut-id="${key}"]`);
+            const tile = shortcut?.querySelector<HTMLElement>("[data-shortcut-icon]");
+            const label = shortcut?.querySelector<HTMLElement>("[data-shortcut-label]");
+
+            expect(shortcut).toHaveClass("bg-transparent", "min-h-28", "focus-visible:ring-2");
+            expect(shortcut?.className).not.toMatch(/\b(?:border|shadow|bg-module)-/);
+            expect(shortcut?.children).toHaveLength(2);
+            expect(tile?.parentElement).toBe(shortcut);
+            expect(tile).toHaveClass("size-16", "rounded-2xl", surfaceClassName, "text-content-on-brand");
+            expect(tile?.querySelector("svg")).toHaveClass("size-7", iconClassName);
+            expect(label?.parentElement).toBe(shortcut);
+            expect(label).toHaveClass("line-clamp-2", "h-10");
+            expect(tile?.textContent).not.toContain(label?.textContent ?? "");
+        }
+    });
+
+    it("renders an unavailable module visibly without making it interactive", async () => {
+        mocks.fetchLiffHome.mockResolvedValueOnce({
+            ...HOME,
+            modules: {
+                ...HOME.modules,
+                leave: { enabled: false as const, status: "unavailable" as const },
+            },
+        });
+
+        const { container } = render(<LiffHomeApp />);
+        await screen.findByRole("link", { name: "เบิกวัสดุ" });
+
+        const leave = container.querySelector<HTMLElement>('[data-shortcut-id="leave"]');
+        expect(leave?.tagName).toBe("DIV");
+        expect(leave).toHaveAttribute("aria-disabled", "true");
+        expect(leave).toHaveAttribute("data-module-enabled", "false");
+        expect(leave?.querySelector("[data-shortcut-label]")).toHaveTextContent("วันลา");
+        expect(leave?.querySelector("[data-shortcut-status]")).toHaveTextContent("ยังไม่พร้อม");
+        expect(leave?.querySelector("[data-shortcut-icon]")).toHaveClass(
+            "bg-surface-raised",
+            "text-content-muted",
+        );
+        expect(screen.queryByRole("link", { name: "วันลา" })).not.toBeInTheDocument();
+    });
+
+    it("preserves the coming-soon classification with a visible Thai status", async () => {
+        mocks.fetchLiffHome.mockResolvedValueOnce({
+            ...HOME,
+            modules: {
+                ...HOME.modules,
+                leave: { enabled: false as const, status: "coming-soon" as const },
+            },
+        });
+
+        const { container } = render(<LiffHomeApp />);
+        await screen.findByRole("link", { name: "เบิกวัสดุ" });
+
+        const leave = container.querySelector<HTMLElement>('[data-shortcut-id="leave"]');
+        expect(leave?.tagName).toBe("DIV");
+        expect(leave?.querySelector("[data-shortcut-status]")).toHaveTextContent("เร็ว ๆ นี้");
+        expect(screen.queryByRole("link", { name: "วันลา" })).not.toBeInTheDocument();
+    });
+
+    it("uses the bootstrap workforce name when the Home response has no name", async () => {
+        mocks.useLiffWorkforce.mockReturnValue({
+            ...HOME.workforce,
+            name: "ชื่อจาก LIFF",
+        });
+        mocks.fetchLiffHome.mockResolvedValueOnce({
+            ...HOME,
+            workforce: { ...HOME.workforce, name: null },
+        });
+
+        render(<LiffHomeApp />);
+
+        expect(await screen.findByRole("heading", { name: "สวัสดี ชื่อจาก LIFF" })).toBeInTheDocument();
+    });
+
+    it("falls back to the employee label when both workforce names are blank", async () => {
+        mocks.useLiffWorkforce.mockReturnValue({
+            ...HOME.workforce,
+            name: "   ",
+        });
+        mocks.fetchLiffHome.mockResolvedValueOnce({
+            ...HOME,
+            workforce: { ...HOME.workforce, name: "  " },
+        });
+
+        render(<LiffHomeApp />);
+
+        expect(await screen.findByRole("heading", { name: "สวัสดี พนักงาน" })).toBeInTheDocument();
     });
 
     it("renders IT as a disabled non-link when requester entry is unavailable", async () => {
@@ -148,16 +255,19 @@ describe("LIFF home", () => {
             },
         });
 
-        render(<LiffHomeApp />);
+        const { container } = render(<LiffHomeApp />);
 
         await waitFor(() => {
-            expect(screen.queryByRole("link", { name: /แจ้งปัญหา IT/ })).not.toBeInTheDocument();
+            expect(screen.queryByRole("link", { name: "บริการ IT" })).not.toBeInTheDocument();
         });
-        expect(screen.getByText("แจ้งปัญหา IT")).toBeInTheDocument();
-        expect(screen.getAllByText("บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณ")).toHaveLength(2);
+        const itShortcut = container.querySelector<HTMLElement>('[data-shortcut-id="it"]');
+        expect(itShortcut?.tagName).toBe("DIV");
+        expect(itShortcut).toHaveAttribute("aria-disabled", "true");
+        expect(screen.getByText("บริการ IT")).toBeInTheDocument();
+        expect(screen.getByText("ยังไม่พร้อม")).toBeInTheDocument();
     });
 
-    it("keeps the Routine card navigable for a read-only actor", async () => {
+    it("keeps the Routine shortcut navigable for a read-only actor", async () => {
         const readOnlyHome = {
             ...HOME,
             capabilities: {
@@ -175,7 +285,7 @@ describe("LIFF home", () => {
 
         render(<LiffHomeApp />);
 
-        expect(await screen.findByRole("link", { name: /ดูงานประจำของฉัน/ })).toHaveAttribute(
+        expect(await screen.findByRole("link", { name: "งานประจำ" })).toHaveAttribute(
             "href",
             "/liff/routine",
         );
@@ -205,9 +315,9 @@ describe("LIFF home", () => {
         render(<LiffHomeApp />);
 
         await waitFor(() => {
-            expect(screen.queryByRole("link", { name: /ดูงานประจำของฉัน/ })).not.toBeInTheDocument();
+            expect(screen.queryByRole("link", { name: "งานประจำ" })).not.toBeInTheDocument();
         });
-        expect(screen.getAllByText("บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณ")).toHaveLength(2);
+        expect(screen.getByText("ยังไม่พร้อม")).toBeInTheDocument();
     });
 
     it("shows a safe retryable error instead of backend details", async () => {
