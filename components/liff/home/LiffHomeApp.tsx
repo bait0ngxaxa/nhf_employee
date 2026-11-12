@@ -1,12 +1,10 @@
 "use client";
 
 import {
-    ArrowUpRight,
     Boxes,
     CalendarRange,
     ClipboardCheck,
     Headset,
-    LockKeyhole,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -30,52 +28,42 @@ import { cn } from "@/lib/ui/utils";
 
 type LiffHomeState = "LOADING" | "READY" | "ERROR";
 
-interface ModuleCardConfig {
+interface ModuleShortcutConfig {
     key: keyof LiffHomeResponse["modules"];
     label: string;
-    title: string;
-    description: string;
     href: string;
     icon: LucideIcon;
-    accentClassName: string;
+    surfaceClassName: string;
 }
 
-const MODULE_CARDS: readonly ModuleCardConfig[] = [
+const MODULE_SHORTCUTS: readonly ModuleShortcutConfig[] = [
     {
         key: "stock",
-        label: "วัสดุ",
-        title: "เบิกวัสดุและติดตามคำขอ",
-        description: "จัดการงานวัสดุของคุณในที่เดียว",
+        label: "เบิกวัสดุ",
         href: APP_ROUTES.line.stock,
         icon: Boxes,
-        accentClassName: "text-module-stock-badge-foreground",
+        surfaceClassName: "bg-module-stock-dashboard-surface",
     },
     {
         key: "leave",
         label: "วันลา",
-        title: "ดูสิทธิ์และจัดการวันลา",
-        description: "ตรวจสอบข้อมูลวันลาและคำขอของคุณ",
         href: APP_ROUTES.line.leave,
         icon: CalendarRange,
-        accentClassName: "text-module-leave-badge-foreground",
+        surfaceClassName: "bg-module-leave-dashboard-surface",
     },
     {
         key: "routine",
         label: "งานประจำ",
-        title: "ดูงานประจำของฉัน",
-        description: "ติดตามงานประจำและกำหนดส่งที่ได้รับมอบหมาย",
         href: APP_ROUTES.line.routine,
         icon: ClipboardCheck,
-        accentClassName: "text-module-routine-badge-foreground",
+        surfaceClassName: "bg-module-routine-dashboard-surface",
     },
     {
         key: "it",
-        label: "IT",
-        title: "แจ้งปัญหา IT",
-        description: "ขอความช่วยเหลือและติดตาม Ticket ของคุณ",
+        label: "บริการ IT",
         href: APP_ROUTES.line.it,
         icon: Headset,
-        accentClassName: "text-brand-solid",
+        surfaceClassName: "bg-module-it-dashboard-surface",
     },
 ];
 
@@ -89,68 +77,49 @@ function getHomeErrorMessage(error: unknown): string {
     return "ไม่สามารถโหลดบริการของคุณได้ กรุณาลองใหม่อีกครั้ง";
 }
 
-function getModuleStatusLabel(module: LiffHomeModule): string {
-    switch (module.status) {
-        case "available":
-            return "เปิดใช้งาน";
-        case "coming-soon":
-            return "เร็ว ๆ นี้";
-        default:
-            return "ไม่พร้อมใช้งาน";
-    }
+function getUnavailableModuleStatusLabel(module: LiffHomeModule): string {
+    return module.status === "coming-soon" ? "เร็ว ๆ นี้" : "ยังไม่พร้อม";
 }
 
-interface ModuleCardProps {
-    config: ModuleCardConfig;
+interface ModuleShortcutProps {
+    config: ModuleShortcutConfig;
     module: LiffHomeModule;
 }
 
-function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
+function ModuleShortcut({ config, module }: ModuleShortcutProps): ReactElement {
     const Icon = config.icon;
-    const statusLabel = getModuleStatusLabel(module);
+    const className = cn(
+        "group flex min-h-28 min-w-0 w-full flex-col items-center gap-2 bg-transparent px-0.5 pt-1 pb-2 text-center text-content-primary",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dashboard-focus focus-visible:ring-offset-2",
+    );
     const content = (
         <>
-            <div className="flex min-w-0 items-start gap-3">
-                <Icon
-                    className={cn(
-                        "mt-1 size-5 shrink-0",
-                        module.enabled ? config.accentClassName : "text-content-muted",
-                    )}
-                    aria-hidden="true"
-                />
-                <div className="min-w-0 flex-1 pt-0.5">
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <h3 className="break-words text-base font-bold leading-6 text-content-heading">
-                            {config.title}
-                        </h3>
-                        <span
-                            className={cn(
-                                "text-xs font-semibold leading-5",
-                                module.enabled
-                                    ? config.accentClassName
-                                    : "text-content-muted",
-                            )}
-                        >
-                            {statusLabel}
-                        </span>
-                    </div>
-                    <p className="mt-1 break-words text-sm leading-6 text-content-secondary">
-                        {module.enabled
-                            ? config.description
-                            : "บริการนี้ยังไม่เปิดใช้งานสำหรับบัญชีของคุณ"}
-                    </p>
-                </div>
-            </div>
-            <div className="mt-1 shrink-0">
-                {module.enabled ? (
-                    <ArrowUpRight
-                        className={cn("size-5", config.accentClassName)}
-                        aria-hidden="true"
-                    />
-                ) : (
-                    <LockKeyhole className="size-5 text-content-muted" aria-hidden="true" />
+            <span
+                data-shortcut-icon
+                className={cn(
+                    "flex size-16 shrink-0 items-center justify-center rounded-2xl transition-transform duration-150 group-active:translate-y-px motion-reduce:transform-none",
+                    module.enabled
+                        ? [config.surfaceClassName, "text-content-on-brand"]
+                        : "bg-surface-raised text-content-muted",
                 )}
-            </div>
+                aria-hidden="true"
+            >
+                <Icon className="size-7" aria-hidden="true" />
+            </span>
+            <span
+                data-shortcut-label
+                className="line-clamp-2 h-10 w-full max-w-full [overflow-wrap:anywhere] text-xs font-semibold leading-5"
+            >
+                {config.label}
+            </span>
+            {!module.enabled ? (
+                <span
+                    data-shortcut-status
+                    className="text-xs leading-5 text-content-secondary"
+                >
+                    {getUnavailableModuleStatusLabel(module)}
+                </span>
+            ) : null}
         </>
     );
 
@@ -158,8 +127,9 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
         return (
             <div
                 aria-disabled="true"
+                data-shortcut-id={config.key}
                 data-module-enabled="false"
-                className="flex min-h-24 w-full items-start justify-between gap-3 border-b border-border-subtle py-4 opacity-70"
+                className={cn(className, "text-content-muted")}
             >
                 {content}
             </div>
@@ -169,11 +139,9 @@ function ModuleCard({ config, module }: ModuleCardProps): ReactElement {
     return (
         <Link
             href={config.href}
+            data-shortcut-id={config.key}
             data-module-enabled="true"
-            className={cn(
-                "group flex min-h-24 w-full items-start justify-between gap-4 border-b border-border-subtle py-4 transition-[color,border-color] hover:border-brand-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus/40",
-                config.key === "routine" && "bg-brand-surface/30 px-3",
-            )}
+            className={cn(className, "rounded-2xl")}
         >
             {content}
         </Link>
@@ -273,9 +241,9 @@ export function LiffHomeApp(): ReactElement {
                             </p>
                         </div>
                     </div>
-                    <div className="border-t border-border-subtle">
-                        {MODULE_CARDS.map((config) => (
-                            <ModuleCard
+                    <div data-shortcut-grid className="grid grid-cols-4 gap-2">
+                        {MODULE_SHORTCUTS.map((config) => (
+                            <ModuleShortcut
                                 key={config.key}
                                 config={config}
                                 module={home.modules[config.key]}
