@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -50,4 +50,4 @@ export const PATCH = withTrustedMutation(async (
         console.error("Error marking notification as read:", error);
         return jsonError(COMMON_API_MESSAGES.failedToMarkNotificationAsRead, 500);
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

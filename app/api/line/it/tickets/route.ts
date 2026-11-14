@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import {
@@ -98,4 +98,4 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         logITTicketRouteFailure("Error creating LIFF IT Ticket", error);
         return operationFailed(500, { success: false });
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

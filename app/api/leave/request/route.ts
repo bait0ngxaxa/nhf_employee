@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -73,4 +73,4 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         undefined,
         scheduleLeaveOutbox,
     );
-}, TRUSTED_MUTATION_ROLLOUT);
+});

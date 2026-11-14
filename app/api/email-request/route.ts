@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse, after } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -129,7 +129,7 @@ export const POST = withTrustedMutation(async (req: NextRequest): Promise<NextRe
         console.error("Error processing email request:", error);
         return operationFailed(500, { success: false });
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
     try {

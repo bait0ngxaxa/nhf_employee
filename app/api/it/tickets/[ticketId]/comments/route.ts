@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -89,4 +89,4 @@ export const POST = withTrustedMutation(async (
         logITTicketRouteFailure("Error posting requester IT Ticket comment", error);
         return operationFailed(500, { success: false });
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

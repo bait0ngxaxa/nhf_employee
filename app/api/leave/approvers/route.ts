@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -121,4 +121,4 @@ export const PUT = withTrustedMutation(async (req: Request): Promise<NextRespons
             { status: 500 },
         );
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

@@ -1888,10 +1888,10 @@ their LIFF variants. The check (trusted `Origin` plus
 `X-Requested-With: XMLHttpRequest`) runs before authentication, so it does not
 change any capability, scope or resource-level decision described in this
 document. The only exempt mutation routes are the shared-secret cron/cleanup
-endpoints and the LINE webhook (HMAC signature). The 46 newly guarded route
-files honour the `CSRF_ENFORCEMENT_MODE=report` rollout switch; the 21
-previously guarded files always enforce. The contract, exemption reasons and
-rollout procedure are in `docs/architecture/runtime-hardening.md` §24, and
+endpoints and the LINE webhook (HMAC signature). All 67 guarded route
+files always enforce; the staged CSRF rollout is complete and its switch was
+removed on 2026-11-14. The contract, exemption reasons and historical rollout
+note are in `docs/architecture/runtime-hardening.md` §24, and
 `npm run architecture:check` rejects new unguarded mutation exports.
 
 ## IT9A channel policy current state

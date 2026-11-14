@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -92,4 +92,4 @@ export const POST = withTrustedMutation(async (req: NextRequest): Promise<NextRe
         }
         return jsonError(COMMON_API_MESSAGES.failedToProcessLeaveApproval, 500);
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

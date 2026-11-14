@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, NextResponse } from "next/server";
 import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
@@ -133,7 +133,7 @@ export const PATCH = withTrustedMutation(async (
         console.error("Error updating employee:", error);
         return jsonError(COMMON_API_MESSAGES.failedToUpdateEmployee, 500);
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});
 
 export const DELETE = withTrustedMutation(async (
     request: NextRequest,
@@ -197,4 +197,4 @@ export const DELETE = withTrustedMutation(async (
         console.error("Error deleting employee:", error);
         return jsonError(COMMON_API_MESSAGES.failedToDeleteEmployee, 500);
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

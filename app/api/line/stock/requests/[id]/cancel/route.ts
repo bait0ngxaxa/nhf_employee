@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
@@ -101,4 +101,4 @@ export const POST = withTrustedMutation(async (
         });
         return serverError();
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

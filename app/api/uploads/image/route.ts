@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import {
@@ -117,4 +117,4 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         });
         return jsonError(UPLOAD_FAILED_MESSAGE, 500);
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

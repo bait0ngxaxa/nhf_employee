@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { assignITTicket, assignITTicketBodySchema } from "@/modules/it";
@@ -26,4 +26,4 @@ export const PATCH = withTrustedMutation(async (
                 && input.assigneeUserId !== actorUserId,
         },
     );
-}, TRUSTED_MUTATION_ROLLOUT);
+});

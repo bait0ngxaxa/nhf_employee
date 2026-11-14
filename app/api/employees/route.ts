@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, NextResponse } from "next/server";
 import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import { DEFAULT_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
@@ -146,4 +146,4 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         console.error("Error creating employee:", error);
         return operationFailed(500);
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

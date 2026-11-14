@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -102,7 +102,7 @@ export const PATCH = withTrustedMutation(async (
         console.error("Error updating stock item:", error);
         return serverError();
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});
 
 export const DELETE = withTrustedMutation(async (
     request: NextRequest,
@@ -155,4 +155,4 @@ export const DELETE = withTrustedMutation(async (
         console.error("Error deleting stock item:", error);
         return serverError();
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});
