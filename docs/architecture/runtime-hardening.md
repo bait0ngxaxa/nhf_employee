@@ -3132,29 +3132,10 @@ without overriding an explicit value. `lib/client/api-client.ts`,
 `Origin` itself on these same-origin `fetch` mutations. LIFF recovery still
 replays only GET/HEAD; a mutation is never auto-replayed.
 
-### 24.3 Rollout switch (`CSRF_ENFORCEMENT_MODE`)
+### 24.3 Completed CSRF rollout (historical note)
 
-The 46 route files (55 handlers) guarded by the coverage rollout pass
-`TRUSTED_MUTATION_ROLLOUT` and honour `CSRF_ENFORCEMENT_MODE`, read only in
-`getCsrfEnforcementMode()`:
-
-- unset, empty or any value other than `report`: **enforce** (default; fails
-  closed on a typo).
-- `report`: a failing check logs one sanitized `console.warn`
-  (`[csrf] report mode: trusted mutation check failed; request allowed` with
-  route path, method, failed check `missing-origin` / `untrusted-origin` /
-  `missing-ajax-header` and the Origin host only; never cookies, tokens,
-  query strings or bodies) and lets the request continue to the route's
-  normal authentication and validation.
-
-The 21 route files guarded before the rollout (Auth login/refresh/logout/
-signup/session revoke, Announcements, Authorization Administration, Leave
-special-reason, LINE account-link and LIFF session) do not pass the option and
-always enforce, regardless of the switch.
-
-To finish the rollout: deploy with `CSRF_ENFORCEMENT_MODE=report`, run the UAT
-checklist from the PR on desktop and on the LINE app (iOS and Android), confirm
-the logs contain no `[csrf] report mode` warnings from legitimate traffic, then
-remove the variable (or set it to `enforce`) and restart the app. Any warning
-from a real client is a client bug to fix before enforcing, not a reason to
-exempt the route.
+The rollout completed after dashboard and LIFF UAT on iOS/Android and several
+problem-free days of owner monitoring in production enforce mode. On 2026-11-14,
+the `CSRF_ENFORCEMENT_MODE` switch and rollout options were removed. All guarded
+routes now always enforce the unchanged trusted-Origin/XHR contract; a leftover
+environment variable has no effect.
