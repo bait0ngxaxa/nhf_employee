@@ -2702,14 +2702,14 @@ describe("architecture checker trusted-mutation CSRF guard", () => {
         },
     );
 
-    it("accepts withTrustedMutation wrappers, including an aliased import and rollout options", async () => {
+    it("accepts withTrustedMutation wrappers, including an aliased import", async () => {
         const violations = await csrfViolations(
             routePath,
             [
-                'import { withTrustedMutation as guard, TRUSTED_MUTATION_ROLLOUT } from "@/lib/auth/csrf";',
+                'import { withTrustedMutation as guard } from "@/lib/auth/csrf";',
                 "export async function GET() { return Response.json({}); }",
                 "export const POST = guard(async (request: Request) => Response.json({}));",
-                "export const DELETE = guard(async (request: Request) => Response.json({}), TRUSTED_MUTATION_ROLLOUT);",
+                "export const DELETE = guard(async (request: Request) => Response.json({}));",
                 "",
             ].join("\n"),
         );

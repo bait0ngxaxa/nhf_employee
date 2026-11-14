@@ -2,11 +2,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/ssot";
+
 import {
     assertTrustedMutationRequest,
-    CSRF_ENFORCEMENT_MODE_ENV,
-    getCsrfEnforcementMode,
-    TRUSTED_MUTATION_ROLLOUT,
     withTrustedMutation,
 } from "@/lib/auth/csrf";
 
@@ -88,7 +87,6 @@ describe("auth csrf guard", () => {
 
         expect(request.nextUrl.origin).not.toBe("https://nhfapp.org");
         expect(assertTrustedMutationRequest(request)).toBeNull();
-        expect(assertTrustedMutationRequest(request, TRUSTED_MUTATION_ROLLOUT)).toBeNull();
     });
 
     it("rejects the production tunnel request when PUBLIC_APPROVE_URL is missing", () => {
@@ -119,88 +117,35 @@ describe("auth csrf guard", () => {
     });
 });
 
-describe("CSRF_ENFORCEMENT_MODE rollout switch", () => {
-    afterEach(() => {
-        vi.unstubAllEnvs();
-        vi.restoreAllMocks();
-    });
+describe("trusted mutation wrapper", () => {
+    const untrustedHeaders: Record<string, string>[] = [
+        { "x-requested-with": "XMLHttpRequest" },
+        { origin: "https://evil.example.com", "x-requested-with": "XMLHttpRequest" },
+        { origin: "http://localhost" },
+    ];
 
-    function untrustedRequest(headers: Record<string, string>): NextRequest {
-        return new NextRequest("http://localhost/api/stock/requests?token=query-secret", {
-            method: "POST",
-            headers: { cookie: "__Host-nhf_access=secret-cookie", ...headers },
-            body: JSON.stringify({ password: "body-secret" }),
-        });
-    }
-
-    it.each([undefined, "", "enforce", "ENFORCE", "reprot", "off"])(
-        "enforces for value %s",
-        (value) => {
-            if (value !== undefined) vi.stubEnv(CSRF_ENFORCEMENT_MODE_ENV, value);
-            expect(getCsrfEnforcementMode()).toBe("enforce");
-        },
-    );
-
-    it.each(["report", " Report "])("reports for value %s", (value) => {
-        vi.stubEnv(CSRF_ENFORCEMENT_MODE_ENV, value);
-        expect(getCsrfEnforcementMode()).toBe("report");
-    });
-
-    it.each([
-        ["missing-origin", { "x-requested-with": "XMLHttpRequest" }, null],
-        ["untrusted-origin", { origin: "https://evil.example.com", "x-requested-with": "XMLHttpRequest" }, "evil.example.com"],
-        ["missing-ajax-header", { origin: "http://localhost" }, "localhost"],
-    ] as const)(
-        "report mode lets a rollout route through on %s and logs a sanitized warning",
-        (check, headers, originHost) => {
-            vi.stubEnv(CSRF_ENFORCEMENT_MODE_ENV, "report");
-            const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-            const response = assertTrustedMutationRequest(untrustedRequest(headers), TRUSTED_MUTATION_ROLLOUT);
-
-            expect(response).toBeNull();
-            expect(warn).toHaveBeenCalledOnce();
-            expect(warn).toHaveBeenCalledWith(
-                "[csrf] report mode: trusted mutation check failed; request allowed",
-                { route: "/api/stock/requests", method: "POST", check, originHost },
-            );
-            const logged = JSON.stringify(warn.mock.calls);
-            expect(logged).not.toContain("secret-cookie");
-            expect(logged).not.toContain("query-secret");
-            expect(logged).not.toContain("body-secret");
-        },
-    );
-
-    it("report mode never relaxes routes that were guarded before the rollout", () => {
-        vi.stubEnv(CSRF_ENFORCEMENT_MODE_ENV, "report");
-        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-        const response = assertTrustedMutationRequest(untrustedRequest({}));
-
-        expect(response?.status).toBe(403);
-        expect(warn).not.toHaveBeenCalled();
-    });
-
-    it("enforce mode rejects rollout routes without logging a report", () => {
-        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-        const response = assertTrustedMutationRequest(untrustedRequest({}), TRUSTED_MUTATION_ROLLOUT);
-
-        expect(response?.status).toBe(403);
-        expect(warn).not.toHaveBeenCalled();
-    });
-
-    it("withTrustedMutation calls the handler in report mode and short-circuits in enforce mode", async () => {
-        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    it.each(untrustedHeaders)("rejects untrusted headers before calling the handler: %j", async (headers) => {
         const handler = vi.fn(async (): Promise<NextResponse> => NextResponse.json({ ok: true }));
-        const route = withTrustedMutation(handler, TRUSTED_MUTATION_ROLLOUT);
+        const response = await withTrustedMutation(handler)(new NextRequest("http://localhost/api/test", {
+            method: "POST",
+            headers,
+        }));
 
-        expect((await route(untrustedRequest({}))).status).toBe(403);
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toEqual({ error: AUTH_ERROR_MESSAGES.forbidden });
         expect(handler).not.toHaveBeenCalled();
+    });
 
-        vi.stubEnv(CSRF_ENFORCEMENT_MODE_ENV, "report");
-        expect((await route(untrustedRequest({}))).status).toBe(200);
-        expect(handler).toHaveBeenCalledOnce();
+    it("passes a trusted request and route context through to the handler", async () => {
+        const request = new NextRequest("http://localhost/api/test", {
+            method: "POST",
+            headers: { origin: "http://localhost", "x-requested-with": "XMLHttpRequest" },
+        });
+        const context = { params: Promise.resolve({ id: "1" }) };
+        const expected = NextResponse.json({ ok: true });
+        const handler = vi.fn(async (_request: NextRequest, _context: typeof context): Promise<NextResponse> => expected);
+
+        expect(await withTrustedMutation(handler)(request, context)).toBe(expected);
+        expect(handler).toHaveBeenCalledExactlyOnceWith(request, context);
     });
 });
-
