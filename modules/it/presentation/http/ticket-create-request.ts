@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { readBoundedBytes, readBoundedJsonBody } from "@/lib/server/request-body";
+import { readBoundedBytes } from "@/lib/server/request-body";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 import { jsonError } from "@/lib/ssot/http";
 
 import { createITTicketInputSchema } from "../../application/ticket-schemas";
@@ -30,16 +32,13 @@ export async function parseITTicketCreateHttpInput(
     mediaType: Exclude<ITTicketCreateMediaType, "unsupported">,
 ): Promise<ParsedITTicketCreateHttpInput | NextResponse> {
     if (mediaType === "json") {
-        const result = await readBoundedJsonBody(request, IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES);
-        if (!result.ok) {
-            const tooLarge = result.reason === "TOO_LARGE";
-            return jsonError(
-                tooLarge ? "คำขอมีขนาดใหญ่เกินไป" : "รูปแบบข้อมูลไม่ถูกต้อง",
-                tooLarge ? 413 : 400,
-                { success: false },
-            );
-        }
-        const parsed = createITTicketInputSchema.safeParse(result.value);
+        const result = await readRouteJsonBody(request, {
+            maxBytes: IT_TICKET_ATTACHMENT_MAX_REQUEST_BYTES,
+            invalidJsonDetails: { success: false },
+            tooLargeDetails: { success: false },
+        });
+        if (!result.ok) return result.response;
+        const parsed = createITTicketInputSchema.safeParse(result.body);
         if (!parsed.success) {
             return jsonError("กรุณาตรวจสอบประเภท หัวข้อ และรายละเอียด Ticket", 400, {
                 success: false,
@@ -52,7 +51,7 @@ export async function parseITTicketCreateHttpInput(
     if (!bounded.ok) {
         const tooLarge = bounded.reason === "TOO_LARGE";
         return jsonError(
-            tooLarge ? "คำขอมีขนาดใหญ่เกินไป" : "รูปแบบข้อมูลไม่ถูกต้อง",
+            tooLarge ? "คำขอมีขนาดใหญ่เกินไป" : REQUEST_BODY_INVALID_JSON_MESSAGE,
             tooLarge ? 413 : 400,
             { success: false },
         );
@@ -60,7 +59,7 @@ export async function parseITTicketCreateHttpInput(
 
     const contentType = request.headers.get("content-type");
     if (contentType === null) {
-        return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false });
+        return jsonError(REQUEST_BODY_INVALID_JSON_MESSAGE, 400, { success: false });
     }
 
     let formData: FormData;
@@ -72,7 +71,7 @@ export async function parseITTicketCreateHttpInput(
         });
         formData = await boundedRequest.formData();
     } catch {
-        return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false });
+        return jsonError(REQUEST_BODY_INVALID_JSON_MESSAGE, 400, { success: false });
     }
 
     const scalarFields = new Map<string, string>();
@@ -95,7 +94,7 @@ export async function parseITTicketCreateHttpInput(
             scalarFields.set(field, value);
             continue;
         }
-        return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false });
+        return jsonError(REQUEST_BODY_INVALID_JSON_MESSAGE, 400, { success: false });
     }
 
     const parsed = createITTicketInputSchema.safeParse({

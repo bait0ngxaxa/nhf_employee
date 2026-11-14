@@ -2,7 +2,8 @@ import { withTrustedMutation } from "@/lib/auth/csrf";
 import { NextResponse, after, type NextRequest } from "next/server";
 import { ZodError } from "zod";
 import { requireApiSession } from "@/lib/auth/api";
-import { contentLengthExceedsLimit, readBoundedJsonBody } from "@/lib/server/request-body";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { contentLengthExceedsLimit } from "@/lib/server/request-body";
 import { forbidden, jsonError, operationFailed, unauthorized } from "@/lib/ssot/http";
 import { processOutbox } from "@/lib/services/outbox/processor";
 import { enforcePreAuthIpRateLimit, enforceAuthenticatedMutationRateLimit } from "@/lib/security/mutation-rate-limit";
@@ -24,9 +25,12 @@ export const PATCH = withTrustedMutation(async (
         if (principalLimit) return principalLimit;
         const { id: rawId } = await context.params;
         if (!/^[1-9]\d*$/.test(rawId) || Number(rawId) > 2_147_483_647) return jsonError("รหัสคำร้องไม่ถูกต้อง", 400);
-        const body = await readBoundedJsonBody(req, MAX_BODY_BYTES);
-        if (!body.ok) return jsonError("ข้อมูลคำร้องไม่ถูกต้อง", body.reason === "TOO_LARGE" ? 413 : 400);
-        const result = await updateEmailRequestAccessRequirements(Number(rawId), body.value, auth.user);
+        const body = await readRouteJsonBody(req, {
+            maxBytes: MAX_BODY_BYTES,
+            tooLargeMessage: "ข้อมูลคำร้องไม่ถูกต้อง",
+        });
+        if (!body.ok) return body.response;
+        const result = await updateEmailRequestAccessRequirements(Number(rawId), body.body, auth.user);
         if (result.changed) after(async () => {
             await processOutbox().catch((error: unknown) => console.error("Email Request access outbox failed:", error));
         });

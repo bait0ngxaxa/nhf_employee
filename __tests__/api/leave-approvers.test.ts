@@ -1,3 +1,4 @@
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -271,15 +272,15 @@ describe("PUT /api/leave/approvers body and assignment limits", () => {
         },
     );
 
-    it("keeps the previous 500 response for malformed JSON", async () => {
+    it("returns canonical 400 for malformed JSON", async () => {
         const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
         try {
             const response = await PUT(
                 buildJsonBodyRequest(APPROVERS_URL, "{not json", { method: "PUT" }),
             );
 
-            expect(response.status).toBe(500);
-            await expect(response.json()).resolves.toEqual({ error: "Failed to update approvers" });
+            expect(response.status).toBe(400);
+            await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_INVALID_JSON_MESSAGE });
             expect(assignLeaveApprovers).not.toHaveBeenCalled();
         } finally {
             errorLog.mockRestore();

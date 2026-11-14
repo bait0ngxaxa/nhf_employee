@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { apiPost } from "@/lib/client/api-client";
 import type { ApiResponse } from "@/lib/client/api-client";
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 
 // Mock useSWR
 vi.mock("swr");
@@ -33,10 +34,12 @@ const TestComponent = () => {
         emailRequests,
         isFormLoading,
         formError,
+        hasUnresolvedSubmission,
     } = useEmailRequestContext();
 
     return (
         <div>
+            <div data-testid="unresolved">{String(hasUnresolvedSubmission)}</div>
             <div data-testid="loading-state">
                 {isFormLoading ? "Loading" : "Idle"}
             </div>
@@ -294,6 +297,30 @@ describe("EmailRequestProvider", () => {
         expect(new Headers(firstConfig?.headers).get("Idempotency-Key")).toBe(
             new Headers(secondConfig?.headers).get("Idempotency-Key"),
         );
+    });
+
+    it.each([400, 500])("clears rejected 400 attempts and retains unknown 500 attempts (status %s)", async (status) => {
+        vi.mocked(apiPost).mockResolvedValue(createErrorResponse(REQUEST_BODY_INVALID_JSON_MESSAGE, status));
+        render(<EmailRequestProvider capabilities={fullCapabilities}><TestComponent /></EmailRequestProvider>);
+        fillValidForm();
+        fireEvent.click(screen.getByTestId("submit-btn"));
+        await waitFor(() => expect(screen.getByTestId("error-state")).toHaveTextContent(REQUEST_BODY_INVALID_JSON_MESSAGE));
+        expect(screen.getByTestId("unresolved")).toHaveTextContent(String(status === 500));
+        const originalPayload = vi.mocked(apiPost).mock.calls[0]?.[1];
+        const firstKey = new Headers(vi.mocked(apiPost).mock.calls[0]?.[2]?.headers).get("Idempotency-Key");
+        expect(firstKey).toBeTruthy();
+        fireEvent.change(screen.getByTestId("input-position"), { target: { value: "ผู้จัดการ" } });
+        expect(screen.getByTestId("input-position")).toHaveValue(status === 400 ? "ผู้จัดการ" : "เจ้าหน้าที่บัญชี");
+        fireEvent.click(screen.getByTestId("submit-btn"));
+        await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+        const nextKey = new Headers(vi.mocked(apiPost).mock.calls[1]?.[2]?.headers).get("Idempotency-Key");
+        if (status === 400) {
+            expect(nextKey).not.toBe(firstKey);
+            expect(vi.mocked(apiPost).mock.calls[1]?.[1]).toMatchObject({ position: "ผู้จัดการ" });
+        } else {
+            expect(nextKey).toBe(firstKey);
+            expect(vi.mocked(apiPost).mock.calls[1]?.[1]).toEqual(originalPayload);
+        }
     });
 
     it("keeps an uncertain email request immutable and retries it with the original key", async () => {

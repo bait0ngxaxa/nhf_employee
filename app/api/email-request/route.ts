@@ -52,8 +52,7 @@ export const POST = withTrustedMutation(async (req: NextRequest): Promise<NextRe
 
         const bodyResult = await readRouteJsonBody(req, {
             maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
-            // Pre-existing contract: malformed JSON fell through to the 500 catch.
-            invalidJson: () => operationFailed(500, { success: false }),
+            invalidJsonDetails: { success: false },
             tooLargeDetails: { success: false },
         });
         if (!bodyResult.ok) return bodyResult.response;

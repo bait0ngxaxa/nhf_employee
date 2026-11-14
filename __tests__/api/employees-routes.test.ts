@@ -1,3 +1,4 @@
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 import { after, type NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
@@ -692,12 +693,14 @@ describe("Employee JSON mutation body limits", () => {
         },
     );
 
-    it("POST keeps the previous 500 response for malformed JSON", async () => {
+    it("POST returns canonical 400 for malformed JSON", async () => {
         const response = await createEmployeeRoute(buildJsonBodyRequest(CREATE_URL, "{not json"));
 
-        expect(response.status).toBe(500);
-        await expect(response.json()).resolves.toEqual({ error: "Operation failed" });
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_INVALID_JSON_MESSAGE });
         expect(createEmployee).not.toHaveBeenCalled();
+        expect(appendEmployeeCreateAudit).not.toHaveBeenCalled();
+        expect(after).not.toHaveBeenCalled();
     });
 
     it("POST creates with a valid body of exactly the limit", async () => {
@@ -727,14 +730,14 @@ describe("Employee JSON mutation body limits", () => {
         },
     );
 
-    it("PATCH keeps the previous 500 response for malformed JSON", async () => {
+    it("PATCH returns canonical 400 for malformed JSON", async () => {
         const response = await PATCH(
             buildJsonBodyRequest(UPDATE_URL, "{not json", { method: "PATCH" }),
             employeeParams("12"),
         );
 
-        expect(response.status).toBe(500);
-        await expect(response.json()).resolves.toEqual({ error: "Failed to update employee" });
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_INVALID_JSON_MESSAGE });
         expect(updateEmployee).not.toHaveBeenCalled();
     });
 
@@ -791,8 +794,14 @@ describe("Employee import body limit", () => {
         },
     );
 
+    it("rejects malformed import JSON before importing", async () => {
+        const response = await importEmployeesRoute(buildJsonBodyRequest(IMPORT_URL, "{not json"));
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_INVALID_JSON_MESSAGE });
+        expect(importEmployeesFromCsvRows).not.toHaveBeenCalled();
+    });
+
     it.each([
-        ["malformed JSON", "{not json"],
         ["a JSON null body", "null"],
     ])("keeps the previous 500 response for %s", async (_label, body) => {
         const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);

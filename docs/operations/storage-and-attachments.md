@@ -34,7 +34,10 @@ production ไม่มี Nginx ใน request path ดังนั้น limit
 | Leave approvers `PUT /api/leave/approvers` | 256 KiB | `LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES` (`lib/ssot/request-limits.ts`); schema จำกัด `assignments` ≤ `LEAVE_APPROVER_ASSIGNMENTS_MAX` (5,000; `modules/leave/domain/constants.ts`) × 49 bytes ต่อรายการ |
 
 route JSON ข้างบนอ่าน body ผ่าน `readRouteJsonBody` (`lib/server/route-json-body.ts`) ซึ่งครอบ bounded reader เดิม
-response ใหม่มีเพียง `413` ข้อความ `คำขอมีขนาดใหญ่เกินไป`; JSON ที่ผิดรูปแบบยังได้ response เดิมของแต่ละ route
+JSON ที่ผิดรูปแบบ อ่านไม่ได้ หรือไม่ใช่ UTF-8 (`INVALID_JSON`) ตอบ `400` ข้อความ `รูปแบบข้อมูลไม่ถูกต้อง`
+จาก `REQUEST_BODY_INVALID_JSON_MESSAGE` ใน `lib/ssot/request-limits.ts`; helper เป็นผู้กำหนด status เองและ route เพิ่มได้เฉพาะ envelope fields
+ข้อยกเว้นที่รักษา contract เดิมคือ authorization administration: `400 {"error":"Bad request","code":"INVALID_INPUT"}`
+response `413` และ schema validation คงข้อความและ envelope เดิม; ดู [inventory และผลตรวจ side effects/client](../engineering/JSON_BODY_CONTRACT.md)
 ค่าที่คำนวณได้มี test ยืนยันกับ payload ใหญ่ที่สุดที่ schema ยอมรับ (`__tests__/lib/request-limits.test.ts`)
 และ `npm run architecture:check` จะ fail ถ้ามีไฟล์ใต้ `app/api` เรียก `request.json()` / `.text()` / `.formData()` /
 `.arrayBuffer()` / `.blob()` ตรงโดยไม่อยู่ใน exemption list (`rawRequestBodyExemptions`) ซึ่งปัจจุบันมีเพียง LINE webhook

@@ -14,6 +14,9 @@
 /** Shared client-safe message for 413 responses (byte-identical to existing module messages). */
 export const REQUEST_BODY_TOO_LARGE_MESSAGE = "คำขอมีขนาดใหญ่เกินไป";
 
+/** Shared client-safe message for malformed/unreadable JSON (400). */
+export const REQUEST_BODY_INVALID_JSON_MESSAGE = "รูปแบบข้อมูลไม่ถูกต้อง";
+
 // ── Pre-auth credential payloads ───────────────────────────────────────────
 
 // Login, signup, forgot and reset password: email ≤ 254 chars (RFC 5321), reset

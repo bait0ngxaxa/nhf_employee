@@ -88,7 +88,10 @@ describe("PATCH Email Request access requirements (real command boundary)", () =
     it("bounds malformed and oversized bodies", async () => {
         const response = await PATCH(trustedNextRequest("http://localhost/api/email-request/128/access-requirements", { method: "PATCH", body: "{" }), { params: Promise.resolve({ id: "128" }) });
         expect(response.status).toBe(400);
-        expect((await call({ padding: "x".repeat(5000) })).status).toBe(413);
+        expect(await response.json()).toEqual({ error: "รูปแบบข้อมูลไม่ถูกต้อง" });
+        const oversizedResponse = await call({ padding: "x".repeat(5000) });
+        expect(oversizedResponse.status).toBe(413);
+        expect(await oversizedResponse.json()).toEqual({ error: "ข้อมูลคำร้องไม่ถูกต้อง" });
         expect((await call(input, "1.5")).status).toBe(400);
     });
 

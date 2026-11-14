@@ -268,10 +268,7 @@ describe("IT operator PATCH body limits", () => {
             const response = await send(route, "{not json");
 
             expect(response.status, route.path).toBe(400);
-            expect(await response.json()).toEqual({
-                success: false,
-                error: "รูปแบบข้อมูลไม่ถูกต้อง",
-            });
+            expect(await response.text()).toBe('{"error":"รูปแบบข้อมูลไม่ถูกต้อง","success":false}');
             expect(route.command).not.toHaveBeenCalled();
         }
     });

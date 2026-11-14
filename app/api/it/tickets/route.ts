@@ -1,3 +1,4 @@
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -43,7 +44,7 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
 
         const mediaType = getITTicketCreateMediaType(request);
         if (mediaType === "unsupported") {
-            return jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 415, { success: false });
+            return jsonError(REQUEST_BODY_INVALID_JSON_MESSAGE, 415, { success: false });
         }
         const parsed = await parseITTicketCreateHttpInput(request, mediaType);
         if (isITTicketCreateParseFailure(parsed)) return parsed;

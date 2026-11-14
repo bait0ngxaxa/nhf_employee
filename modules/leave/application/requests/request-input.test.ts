@@ -7,6 +7,7 @@ import {
     type LeaveRequestInputError,
 } from "./request-input";
 import { LEAVE_ATTACHMENT_MAX_REQUEST_BYTES } from "../../infrastructure/attachments/constants";
+import { LEAVE_JSON_MUTATION_MAX_BYTES, REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 
 const VALID_PAYLOAD = {
     leaveType: "PERSONAL",
@@ -29,6 +30,17 @@ function createMultipartRequest(files: readonly File[] = []): Request {
 }
 
 describe("parseLeaveRequestInput", () => {
+    it.each(["{", ""])("rejects malformed JSON before schema validation: %s", async (body) => {
+        await expect(parseLeaveRequestInput(new Request("http://localhost/api/leave/request", {
+            method: "POST", body,
+        }))).rejects.toMatchObject({ statusCode: 400, message: REQUEST_BODY_INVALID_JSON_MESSAGE });
+    });
+
+    it("keeps the JSON 413 contract", async () => {
+        await expect(parseLeaveRequestInput(new Request("http://localhost/api/leave/request", {
+            method: "POST", body: " ".repeat(LEAVE_JSON_MUTATION_MAX_BYTES + 1),
+        }))).rejects.toMatchObject({ statusCode: 413, message: "คำขอมีขนาดใหญ่เกินไป" });
+    });
     it("parses a legacy JSON request without attachments", async () => {
         const request = new Request("http://localhost/api/leave/request", {
             method: "POST",

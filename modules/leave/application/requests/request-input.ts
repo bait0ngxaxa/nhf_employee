@@ -1,10 +1,10 @@
 import { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
 import { LEAVE_ATTACHMENT_MAX_REQUEST_BYTES } from "@/modules/leave/infrastructure/attachments/constants";
-import { LEAVE_JSON_MUTATION_MAX_BYTES } from "@/lib/ssot/request-limits";
+import { LEAVE_JSON_MUTATION_MAX_BYTES, REQUEST_BODY_INVALID_JSON_MESSAGE, REQUEST_BODY_TOO_LARGE_MESSAGE } from "@/lib/ssot/request-limits";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import {
     contentLengthExceedsLimit,
     readBoundedBytes,
-    readBoundedJsonBody,
 } from "@/lib/server/request-body";
 import {
     validateLeaveAttachments,
@@ -59,19 +59,19 @@ function parseJsonString(value: string): unknown {
 }
 
 async function parseJsonRequest(request: Request): Promise<ParsedLeaveRequestInput> {
-    const result = await readBoundedJsonBody(
-        request,
-        LEAVE_JSON_MUTATION_MAX_BYTES,
-    );
+    const result = await readRouteJsonBody(request, {
+        maxBytes: LEAVE_JSON_MUTATION_MAX_BYTES,
+    });
     if (!result.ok) {
+        const tooLarge = result.response.status === 413;
         throw new LeaveRequestInputError(
-            result.reason === "TOO_LARGE"
-                ? "คำขอมีขนาดใหญ่เกินไป"
-                : COMMON_API_MESSAGES.invalidInput,
-            result.reason === "TOO_LARGE" ? 413 : 400,
+            tooLarge
+                ? REQUEST_BODY_TOO_LARGE_MESSAGE
+                : REQUEST_BODY_INVALID_JSON_MESSAGE,
+            tooLarge ? 413 : 400,
         );
     }
-    return { payload: parsePayload(result.value), attachments: [] };
+    return { payload: parsePayload(result.body), attachments: [] };
 }
 
 async function parseMultipartRequest(

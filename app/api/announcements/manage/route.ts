@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/auth/api";
 import { withTrustedMutation } from "@/lib/auth/csrf";
-import { contentLengthExceedsLimit, readBoundedJsonBody } from "@/lib/server/request-body";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
+import { contentLengthExceedsLimit } from "@/lib/server/request-body";
 import { enforceAuthenticatedMutationRateLimit, enforcePreAuthIpRateLimit } from "@/lib/security/mutation-rate-limit";
 import { badRequest, forbidden, jsonError, operationFailed } from "@/lib/ssot/http";
 import { APP_ROUTES } from "@/lib/ssot/routes";
@@ -32,10 +33,12 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         if (!auth.ok) return auth.response;
         const principalLimit = enforceAuthenticatedMutationRateLimit("announcement-update", auth.user.id);
         if (principalLimit) return principalLimit;
-        const body = await readBoundedJsonBody(request, MAX_BODY_BYTES);
-        if (!body.ok) return body.reason === "TOO_LARGE"
-            ? jsonError("ข้อความมีขนาดใหญ่เกินไป", 413) : badRequest();
-        const announcement = await mutateAnnouncement(auth.user, body.value);
+        const body = await readRouteJsonBody(request, {
+            maxBytes: MAX_BODY_BYTES,
+            tooLargeMessage: "ข้อความมีขนาดใหญ่เกินไป",
+        });
+        if (!body.ok) return body.response;
+        const announcement = await mutateAnnouncement(auth.user, body.body);
         revalidatePath(APP_ROUTES.dashboard);
         revalidatePath(APP_ROUTES.dashboardAnnouncements);
         return NextResponse.json({ announcement }, { headers: { "Cache-Control": "no-store" } });

@@ -17,7 +17,9 @@ export async function readAuthorizationAdministrationJsonBody(
 > {
     const result = await readRouteJsonBody(request, {
         maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
-        invalidJson: () => badRequest({ code: "INVALID_INPUT" }),
+        invalidJsonDetails: { code: "INVALID_INPUT" },
+        // Preserve the existing administration API contract byte-for-byte.
+        invalidJsonMessage: "Bad request",
     });
     return result.ok
         ? { ok: true, body: result.body }

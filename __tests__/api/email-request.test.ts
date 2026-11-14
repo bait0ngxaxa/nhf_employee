@@ -1,3 +1,4 @@
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 import { NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as NextServerModule from "next/server";
@@ -500,16 +501,18 @@ describe("/api/email-request", () => {
         },
     );
 
-    it("keeps the previous 500 response for a malformed POST body", async () => {
+    it("returns canonical 400 for malformed POST body", async () => {
         const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
         try {
             const response = await POST(buildJsonBodyRequest(EMAIL_REQUEST_URL, "{not json", {
                 headers: idempotencyHeaders,
             }));
 
-            expect(response.status).toBe(500);
-            expect(await response.json()).toEqual({ error: "Operation failed", success: false });
+            expect(response.status).toBe(400);
+            expect(await response.json()).toEqual({ error: REQUEST_BODY_INVALID_JSON_MESSAGE, success: false });
             expect(emailRequestService.createEmailRequest).not.toHaveBeenCalled();
+            expect(createAuditLog).not.toHaveBeenCalled();
+            expect(processOutbox).not.toHaveBeenCalled();
         } finally {
             errorLog.mockRestore();
         }

@@ -2,30 +2,32 @@ import type { NextResponse } from "next/server";
 
 import { readBoundedJsonBody } from "@/lib/server/request-body";
 import { jsonError } from "@/lib/ssot/http";
-import { REQUEST_BODY_TOO_LARGE_MESSAGE } from "@/lib/ssot/request-limits";
+import type { COMMON_API_MESSAGES } from "@/lib/ssot/messages";
+import {
+    REQUEST_BODY_INVALID_JSON_MESSAGE,
+    REQUEST_BODY_TOO_LARGE_MESSAGE,
+} from "@/lib/ssot/request-limits";
 
 export type RouteJsonBodyResult =
     | { readonly ok: true; readonly body: unknown }
     | { readonly ok: false; readonly response: NextResponse };
 
+type InvalidJsonDetails = Record<string, unknown> & { readonly error?: never };
+
 export interface RouteJsonBodyOptions {
     /** Limit from lib/ssot/request-limits.ts. */
     readonly maxBytes: number;
-    /**
-     * The route's pre-existing response for malformed JSON (or an unreadable /
-     * non-UTF-8 body). Routes pass their previous response so migrating to the
-     * bounded reader does not change the malformed-input contract.
-     */
-    readonly invalidJson: () => NextResponse;
+    /** Extra envelope fields only; the helper owns the error message and status. */
+    readonly invalidJsonDetails?: InvalidJsonDetails;
+    /** Preserve authorization administration's existing 400 Bad request contract only. */
+    readonly invalidJsonMessage?: typeof COMMON_API_MESSAGES.badRequest;
     /** Extra fields merged into the 413 body to match the route's error shape. */
     readonly tooLargeDetails?: Record<string, unknown>;
+    /** Preserve existing endpoint-specific 413 messages. */
+    readonly tooLargeMessage?: string;
 }
 
-/**
- * Reads a JSON route body through readBoundedJsonBody. The only new response
- * this introduces is 413 REQUEST_BODY_TOO_LARGE_MESSAGE for an oversized body
- * (Content-Length fast path, then the actual streamed byte count).
- */
+/** Bounded JSON reader: malformed/unreadable JSON is always a client error (400). */
 export async function readRouteJsonBody(
     request: Request,
     options: RouteJsonBodyOptions,
@@ -36,7 +38,18 @@ export async function readRouteJsonBody(
     return {
         ok: false,
         response: result.reason === "TOO_LARGE"
-            ? jsonError(REQUEST_BODY_TOO_LARGE_MESSAGE, 413, options.tooLargeDetails)
-            : options.invalidJson(),
+            ? jsonError(
+                options.tooLargeMessage ?? REQUEST_BODY_TOO_LARGE_MESSAGE,
+                413,
+                options.tooLargeDetails,
+            )
+            : jsonError(
+                options.invalidJsonMessage ?? REQUEST_BODY_INVALID_JSON_MESSAGE,
+                400,
+                {
+                    ...options.invalidJsonDetails,
+                    error: options.invalidJsonMessage ?? REQUEST_BODY_INVALID_JSON_MESSAGE,
+                },
+            ),
     };
 }

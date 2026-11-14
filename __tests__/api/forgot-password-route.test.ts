@@ -7,6 +7,7 @@ import { POST as forgotPasswordRoute } from "@/app/api/auth/forgot-password/rout
 import { reserveAuthAttempt, resetAuthRateLimit } from "@/lib/auth/rate-limit";
 import type * as AuthRateLimitModule from "@/lib/auth/rate-limit";
 import {
+    REQUEST_BODY_INVALID_JSON_MESSAGE,
     AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
     REQUEST_BODY_TOO_LARGE_MESSAGE,
 } from "@/lib/ssot/request-limits";
@@ -343,14 +344,14 @@ describe("forgot-password route body limit", () => {
         },
     );
 
-    it("keeps the previous 500 response for malformed JSON", async () => {
+    it("returns canonical 400 for malformed JSON", async () => {
         const response = await forgotPasswordRoute(
             buildJsonBodyRequest(FORGOT_URL, "{not json", { headers: FORGOT_HEADERS }),
         );
 
-        expect(response.status).toBe(500);
+        expect(response.status).toBe(400);
         await expect(response.json()).resolves.toEqual({
-            error: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+            error: REQUEST_BODY_INVALID_JSON_MESSAGE,
         });
         expect(reserveAuthAttempt).not.toHaveBeenCalled();
         expect(requestPasswordResetMock).not.toHaveBeenCalled();
