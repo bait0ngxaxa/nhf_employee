@@ -174,8 +174,12 @@ describe("Announcement authenticated lifecycle", () => {
         expect((await POST(request({}, false))).status).toBe(403);
         const malformed = new NextRequest("http://localhost/api/announcements/manage", { method: "POST",
             headers: { origin: "http://localhost", "x-requested-with": "XMLHttpRequest" }, body: "{" });
-        expect((await POST(malformed)).status).toBe(400);
-        expect((await POST(request({ content: "a".repeat(9000) }))).status).toBe(413);
+        const malformedResponse = await POST(malformed);
+        expect(malformedResponse.status).toBe(400);
+        expect(await malformedResponse.json()).toEqual({ error: "รูปแบบข้อมูลไม่ถูกต้อง" });
+        const oversizedResponse = await POST(request({ content: "a".repeat(9000) }));
+        expect(oversizedResponse.status).toBe(413);
+        expect(await oversizedResponse.json()).toEqual({ error: "ข้อความมีขนาดใหญ่เกินไป" });
     });
 
     it("propagates audit failure through the transaction and returns a sanitized error", async () => {

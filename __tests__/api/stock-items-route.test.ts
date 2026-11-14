@@ -1,3 +1,4 @@
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { StockVariantSkuConflictError } from "@/modules/stock";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -430,14 +431,14 @@ describe("Stock JSON mutation body limits", () => {
         },
     );
 
-    it("keeps the previous 500 response for malformed JSON", async () => {
+    it("returns canonical 400 for malformed JSON", async () => {
         for (const route of routes) {
             const response = await route.invoke(
                 buildJsonBodyRequest(route.url, "{not json", { method: route.method }),
             );
 
-            expect(response.status, route.label).toBe(500);
-            expect(await response.json()).toEqual({ error: "Internal server error" });
+            expect(response.status, route.label).toBe(400);
+            expect(await response.json()).toEqual({ error: REQUEST_BODY_INVALID_JSON_MESSAGE });
             expect(route.command(), route.label).not.toHaveBeenCalled();
         }
     });

@@ -7,6 +7,7 @@ import { POST as logoutRoute } from "@/app/api/auth/logout/route";
 import { POST as logoutAllRoute } from "@/app/api/auth/logout-all/route";
 import { POST as revokeSessionRoute } from "@/app/api/auth/sessions/revoke/route";
 import {
+    REQUEST_BODY_INVALID_JSON_MESSAGE,
     DEFAULT_JSON_MUTATION_MAX_BYTES,
     REQUEST_BODY_TOO_LARGE_MESSAGE,
 } from "@/lib/ssot/request-limits";
@@ -583,14 +584,15 @@ describe("Session revoke route body limit", () => {
         },
     );
 
-    it("keeps the previous 500 response for malformed JSON", async () => {
+    it("returns canonical 400 for malformed JSON", async () => {
         const response = await revokeSessionRoute(
             buildJsonBodyRequest(REVOKE_URL, "{not json", { headers: revokeHeaders }),
         );
 
-        expect(response.status).toBe(500);
-        await expect(response.json()).resolves.toEqual({ error: "Internal server error" });
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({ error: REQUEST_BODY_INVALID_JSON_MESSAGE });
         expect(prismaMock.authRefreshToken.updateMany).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("revokes with a valid body of exactly the limit", async () => {

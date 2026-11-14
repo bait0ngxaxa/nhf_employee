@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { REQUEST_BODY_INVALID_JSON_MESSAGE } from "@/lib/ssot/request-limits";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -549,16 +550,18 @@ describe("Auth signup route body limit", () => {
         },
     );
 
-    it("keeps the previous 500 response for malformed JSON", async () => {
+    it("returns canonical 400 for malformed JSON", async () => {
         const response = await signupRoute(
             buildJsonBodyRequest(SIGNUP_URL, "{not json", { headers: SIGNUP_HEADERS }),
         );
 
-        expect(response.status).toBe(500);
+        expect(response.status).toBe(400);
         await expect(response.json()).resolves.toEqual({
-            error: "เกิดข้อผิดพลาดในการสมัครสมาชิก",
+            error: REQUEST_BODY_INVALID_JSON_MESSAGE,
         });
         expect(prismaMock.user.create).not.toHaveBeenCalled();
+        expect(recordAuthAttempt).not.toHaveBeenCalled();
+        expect(appendAuditBestEffortMock).not.toHaveBeenCalled();
     });
 
     it("processes a valid body of exactly the limit", async () => {

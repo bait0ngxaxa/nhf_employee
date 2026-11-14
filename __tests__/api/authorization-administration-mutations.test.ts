@@ -753,7 +753,7 @@ describe("Authorization Administration mutation API boundary", () => {
             );
 
             expect(response.status, `${route.method} ${route.path}`).toBe(400);
-            expect(await response.json()).toEqual({ error: "Bad request", code: "INVALID_INPUT" });
+            expect(await response.text()).toBe('{"error":"Bad request","code":"INVALID_INPUT"}');
             expect(route.command).not.toHaveBeenCalled();
         }
     });
