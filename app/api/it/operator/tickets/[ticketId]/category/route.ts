@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { setITTicketCategory, setITTicketCategoryBodySchema } from "@/modules/it";
@@ -15,4 +15,4 @@ export const PATCH = withTrustedMutation(async (
 ): Promise<NextResponse> => {
     const { ticketId } = await routeContext.params;
     return patchITOperatorTicket(request, ticketId, setITTicketCategoryBodySchema, setITTicketCategory);
-}, TRUSTED_MUTATION_ROLLOUT);
+});

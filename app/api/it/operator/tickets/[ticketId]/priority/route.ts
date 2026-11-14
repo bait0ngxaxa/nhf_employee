@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { setITTicketPriority, setITTicketPriorityBodySchema } from "@/modules/it";
@@ -20,4 +20,4 @@ export const PATCH = withTrustedMutation(async (
         setITTicketPriorityBodySchema,
         setITTicketPriority,
     );
-}, TRUSTED_MUTATION_ROLLOUT);
+});

@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { WorkforceAuthorizationError } from "@/lib/auth/workforce-transaction";
@@ -106,4 +106,4 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         console.error("Error creating stock item:", error);
         return serverError();
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

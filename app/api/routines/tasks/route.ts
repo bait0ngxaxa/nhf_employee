@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -113,4 +113,4 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
     } catch (error) {
         return routineErrorResponse(error, "Error creating routine task");
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

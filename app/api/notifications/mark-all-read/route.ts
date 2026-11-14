@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -48,4 +48,4 @@ export const POST = withTrustedMutation(async (_req: NextRequest): Promise<NextR
             { status: 500 },
         );
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

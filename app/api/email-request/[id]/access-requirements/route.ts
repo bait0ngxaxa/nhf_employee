@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { NextResponse, after, type NextRequest } from "next/server";
 import { ZodError } from "zod";
 import { requireApiSession } from "@/lib/auth/api";
@@ -39,4 +39,4 @@ export const PATCH = withTrustedMutation(async (
         console.error("Error updating Email Request access requirements:", error);
         return operationFailed(500, { success: false });
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

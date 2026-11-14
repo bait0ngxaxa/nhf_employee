@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireLiffWorkforceSession } from "@/modules/line";
@@ -132,7 +132,7 @@ export const PATCH = withTrustedMutation(async (
     } catch (error) {
         return routineErrorResponse(error, "Error updating LIFF routine task");
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});
 
 export const DELETE = withTrustedMutation(async (
     request: NextRequest,
@@ -162,4 +162,4 @@ export const DELETE = withTrustedMutation(async (
     } catch (error) {
         return routineErrorResponse(error, "Error deleting LIFF routine task");
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

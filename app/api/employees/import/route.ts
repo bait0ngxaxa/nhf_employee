@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireApiSession } from "@/lib/auth/api";
@@ -68,4 +68,4 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
         console.error("Error importing employees:", error);
         return operationFailed(500);
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

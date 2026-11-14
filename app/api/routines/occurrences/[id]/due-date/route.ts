@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -64,4 +64,4 @@ export const PATCH = withTrustedMutation(async (
     } catch (error) {
         return routineErrorResponse(error, "Error updating routine occurrence due date");
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { type NextRequest, NextResponse } from "next/server";
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
 import { forbidden, jsonError, serverError } from "@/lib/ssot/http";
@@ -105,4 +105,4 @@ export const POST = withTrustedMutation(async (
         console.error("Error cancelling stock request:", error);
         return serverError();
     }
-}, TRUSTED_MUTATION_ROLLOUT);
+});

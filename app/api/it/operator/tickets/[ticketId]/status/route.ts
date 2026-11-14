@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { transitionITTicketStatus, transitionITTicketStatusBodySchema } from "@/modules/it";
@@ -25,4 +25,4 @@ export const PATCH = withTrustedMutation(async (
                     || input.targetStatus === "RESOLVED"),
         },
     );
-}, TRUSTED_MUTATION_ROLLOUT);
+});

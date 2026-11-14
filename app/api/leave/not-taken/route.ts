@@ -1,4 +1,4 @@
-import { TRUSTED_MUTATION_ROLLOUT, withTrustedMutation } from "@/lib/auth/csrf";
+import { withTrustedMutation } from "@/lib/auth/csrf";
 import { after, type NextRequest, type NextResponse } from "next/server";
 
 import { requireActiveWorkforceSession } from "@/lib/auth/workforce";
@@ -81,7 +81,7 @@ export const POST = withTrustedMutation(async (req: NextRequest): Promise<NextRe
         undefined,
         scheduleLeaveOutbox,
     );
-}, TRUSTED_MUTATION_ROLLOUT);
+});
 
 export const PUT = withTrustedMutation(async (req: NextRequest): Promise<NextResponse> => {
     const authorization = await authorizeMutation(req);
@@ -97,4 +97,4 @@ export const PUT = withTrustedMutation(async (req: NextRequest): Promise<NextRes
         allowAdminOverride: true,
         scheduleOutbox: scheduleLeaveNotTakenConfirmationOutbox,
     });
-}, TRUSTED_MUTATION_ROLLOUT);
+});
