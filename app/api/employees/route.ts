@@ -96,8 +96,6 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
 
         const bodyResult = await readRouteJsonBody(request, {
             maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
-            // Pre-existing contract: malformed JSON fell through to the 500 catch.
-            invalidJson: () => operationFailed(500),
         });
         if (!bodyResult.ok) return bodyResult.response;
         const result = createEmployeeSchema.safeParse(bodyResult.body);

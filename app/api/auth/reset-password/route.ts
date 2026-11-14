@@ -13,11 +13,6 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
     try {
         const bodyResult = await readRouteJsonBody(request, {
             maxBytes: AUTH_CREDENTIALS_MAX_REQUEST_BYTES,
-            // Pre-existing contract: malformed JSON fell through to the 500 catch.
-            invalidJson: () => NextResponse.json(
-                { error: AUTH_ERROR_MESSAGES.internalServerError },
-                { status: 500 },
-            ),
         });
         if (!bodyResult.ok) return bodyResult.response;
         const result = resetPasswordSchema.safeParse(bodyResult.body);

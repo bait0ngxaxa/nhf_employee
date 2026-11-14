@@ -4,9 +4,9 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 import {
     contentLengthExceedsLimit,
-    readBoundedJsonBody,
 } from "@/lib/server/request-body";
 import { isFeatureEnabled, FEATURE_KEYS } from "@/lib/ssot/features";
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import { jsonError, notFound } from "@/lib/ssot/http";
 import { ROUTINE_API_MESSAGES } from "@/lib/ssot/messages";
 import { ROUTINE_MAX_REQUEST_BYTES } from "@/lib/ssot/request-limits";
@@ -35,19 +35,7 @@ export function routineRequestSizeGuard(
 export async function readRoutineJsonBody(
     request: NextRequest,
 ): Promise<{ ok: true; body: unknown } | { ok: false; response: NextResponse }> {
-    const result = await readBoundedJsonBody(request, ROUTINE_MAX_REQUEST_BYTES);
-    if (!result.ok) {
-        return {
-            ok: false,
-            response: jsonError(
-                result.reason === "TOO_LARGE"
-                    ? "คำขอมีขนาดใหญ่เกินไป"
-                    : ROUTINE_API_MESSAGES.invalidInput,
-                result.reason === "TOO_LARGE" ? 413 : 400,
-            ),
-        };
-    }
-    return { ok: true, body: result.value };
+    return readRouteJsonBody(request, { maxBytes: ROUTINE_MAX_REQUEST_BYTES });
 }
 
 export function routineErrorResponse(

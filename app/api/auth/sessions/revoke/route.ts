@@ -33,11 +33,6 @@ export const POST = withTrustedMutation(async (request: NextRequest): Promise<Ne
 
         const bodyResult = await readRouteJsonBody(request, {
             maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
-            // Pre-existing contract: malformed JSON fell through to the 500 catch.
-            invalidJson: () => NextResponse.json(
-                { error: AUTH_ERROR_MESSAGES.internalServerError },
-                { status: 500 },
-            ),
         });
         if (!bodyResult.ok) return bodyResult.response;
         const parsed = revokeSessionSchema.safeParse(bodyResult.body);

@@ -159,6 +159,8 @@ export function useAddEmployee({
                 return;
             }
 
+            // 4xx (including malformed JSON → 400) is rejected before side effects;
+            // 5xx means the outcome is unknown, so require reconciliation.
             setHasUnresolvedSubmission(apiResult.status === undefined || apiResult.status >= 500);
             setError(apiResult.error);
         } catch (submitError) {

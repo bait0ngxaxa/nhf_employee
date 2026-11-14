@@ -273,6 +273,8 @@ export function EmailRequestProvider({
                     }
                     return true;
                 } else {
+                    // 4xx except 409 (including malformed JSON → 400) is rejected before side effects;
+                    // 5xx/409 means the outcome is unknown, so retain the attempt for retry.
                     const unresolved = response.status === undefined
                         || response.status >= 500
                         || response.status === 409;

@@ -76,11 +76,6 @@ export const PUT = withTrustedMutation(async (req: Request): Promise<NextRespons
 
         const bodyResult = await readRouteJsonBody(req, {
             maxBytes: LEAVE_APPROVERS_JSON_MAX_REQUEST_BYTES,
-            // Pre-existing contract: malformed JSON fell through to the 500 catch.
-            invalidJson: () => NextResponse.json(
-                { error: COMMON_API_MESSAGES.failedToUpdateApprovers },
-                { status: 500 },
-            ),
         });
         if (!bodyResult.ok) return bodyResult.response;
         const parsed = leaveApproverAssignmentsSchema.safeParse(bodyResult.body);

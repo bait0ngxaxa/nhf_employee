@@ -1,6 +1,7 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { readRouteJsonBody } from "@/lib/server/route-json-body";
 import { badRequest, jsonError } from "@/lib/ssot/http";
 
 export const LINE_AUTH_MAX_REQUEST_BYTES = 16 * 1024;
@@ -22,77 +23,18 @@ export function lineRequestSizeGuard(
     return null;
 }
 
-type LineRequestBodyResult =
-    | { ok: true; body: string }
-    | { ok: false; reason: "too-large" | "read-error" };
-
-async function readRequestBodyWithinLimit(
-    request: NextRequest,
-): Promise<LineRequestBodyResult> {
-    const stream = request.body;
-    if (!stream) return { ok: true, body: "" };
-
-    const reader = stream.getReader();
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-
-    try {
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (!value) continue;
-
-            totalBytes += value.byteLength;
-            if (totalBytes > LINE_AUTH_MAX_REQUEST_BYTES) {
-                try {
-                    await reader.cancel();
-                } catch {
-                    // The request is already known to exceed the hard limit.
-                }
-                return { ok: false, reason: "too-large" };
-            }
-            chunks.push(value);
-        }
-    } catch {
-        return { ok: false, reason: "read-error" };
-    } finally {
-        reader.releaseLock();
-    }
-
-    const bodyBytes = new Uint8Array(totalBytes);
-    let offset = 0;
-    for (const chunk of chunks) {
-        bodyBytes.set(chunk, offset);
-        offset += chunk.byteLength;
-    }
-
-    return { ok: true, body: new TextDecoder().decode(bodyBytes) };
-}
-
 export async function readLineIdToken(
     request: NextRequest,
 ): Promise<
     | { ok: true; idToken: string }
     | { ok: false; response: NextResponse }
 > {
-    const bodyResult = await readRequestBodyWithinLimit(request);
-    if (!bodyResult.ok) {
-        return {
-            ok: false,
-            response: bodyResult.reason === "too-large"
-                ? jsonError("คำขอมีขนาดใหญ่เกินไป", 413)
-                : badRequest(),
-        };
-    }
+    const bodyResult = await readRouteJsonBody(request, {
+        maxBytes: LINE_AUTH_MAX_REQUEST_BYTES,
+    });
+    if (!bodyResult.ok) return bodyResult;
 
-    let body: unknown;
-    try {
-        body = JSON.parse(bodyResult.body) as unknown;
-    } catch {
-        return { ok: false, response: badRequest() };
-    }
-
-    const parsed = lineIdTokenRequestSchema.safeParse(body);
+    const parsed = lineIdTokenRequestSchema.safeParse(bodyResult.body);
     if (!parsed.success) {
         return { ok: false, response: badRequest() };
     }

@@ -53,7 +53,7 @@ export async function patchITOperatorTicket<TBody extends object>(
 
         const bodyResult = await readRouteJsonBody(request, {
             maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
-            invalidJson: () => jsonError("รูปแบบข้อมูลไม่ถูกต้อง", 400, { success: false }),
+            invalidJsonDetails: { success: false },
             tooLargeDetails: { success: false },
         });
         if (!bodyResult.ok) return bodyResult.response;

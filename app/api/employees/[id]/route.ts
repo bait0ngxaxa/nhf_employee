@@ -60,8 +60,6 @@ export const PATCH = withTrustedMutation(async (
         // check. The read is now bounded, so it can no longer exhaust memory.
         const bodyResult = await readRouteJsonBody(request, {
             maxBytes: DEFAULT_JSON_MUTATION_MAX_BYTES,
-            // Pre-existing contract: malformed JSON fell through to the 500 catch.
-            invalidJson: () => jsonError(COMMON_API_MESSAGES.failedToUpdateEmployee, 500),
         });
         if (!bodyResult.ok) return bodyResult.response;
         const validationResult = updateEmployeeSchema.safeParse(bodyResult.body);
