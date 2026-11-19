@@ -95,7 +95,7 @@ export function useSessionManagement({
                 return;
             }
 
-            toast.success("นำอุปกรณ์ออกจากระบบแล้ว");
+            toast.success("ออกจากระบบรายการนี้แล้ว");
             await mutate();
         } catch {
             toast.error(SESSION_REVOKE_FAILURE);
@@ -106,7 +106,7 @@ export function useSessionManagement({
 
     const handleRevokeOtherSessions = async (): Promise<void> => {
         if (otherSessions.length === 0) {
-            toast.info("ไม่มีอุปกรณ์อื่นที่เข้าสู่ระบบ");
+            toast.info("ไม่มีรายการเข้าสู่ระบบอื่น");
             return;
         }
 
@@ -125,16 +125,16 @@ export function useSessionManagement({
             const failedCount = failures.length;
             if (failedCount > 0) {
                 const messages = [...new Set(failures.map((result) => getSessionError(result, "revoke")))];
-                toast.error(`นำอุปกรณ์ออกจากระบบไม่สำเร็จ ${failedCount} รายการ`, {
+                toast.error(`ออกจากระบบไม่สำเร็จ ${failedCount} รายการ`, {
                     description: messages.join(" "),
                 });
             } else {
-                toast.success("ออกจากระบบอุปกรณ์อื่นทั้งหมดแล้ว");
+                toast.success("ออกจากระบบรายการอื่นทั้งหมดแล้ว");
             }
 
             await mutate();
         } catch {
-            toast.error("ไม่สามารถออกจากระบบอุปกรณ์อื่นได้");
+            toast.error("ออกจากระบบรายการอื่นไม่สำเร็จ กรุณาโหลดรายการล่าสุด");
         } finally {
             setIsRevokingOthers(false);
         }

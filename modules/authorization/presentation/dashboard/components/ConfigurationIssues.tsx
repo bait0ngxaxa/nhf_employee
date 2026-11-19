@@ -18,7 +18,7 @@ export function ConfigurationIssues({
             <TriangleAlert className="h-5 w-5" aria-hidden="true" />
             <AlertTitle>{title} ({issues.length})</AlertTitle>
             <AlertDescription>
-                <p className="leading-6">ตรวจสอบรายการด้านล่างก่อนปรับสิทธิ์</p>
+                <p className="leading-6">บางรายการอาจใช้กำหนดการเข้าถึงอย่างปลอดภัยไม่ได้ กรุณาตรวจสอบก่อนปรับสิทธิ์</p>
                 <ul className="mt-3 space-y-2 text-sm">
                     {issues.map((issue, index) => (
                         <li key={`${issue.source}-${issue.code}-${index}`} className="flex gap-2 leading-5">

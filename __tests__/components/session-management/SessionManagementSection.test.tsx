@@ -35,8 +35,8 @@ describe("SessionManagementSection", () => {
         render(<SessionManagementSection />);
 
         expect(
-            screen.getByRole("status", { name: "กำลังโหลดรายการอุปกรณ์" }),
+            screen.getByRole("status", { name: "กำลังโหลดรายการเข้าสู่ระบบ" }),
         ).toBeInTheDocument();
-        expect(screen.queryByText("กำลังโหลดรายการอุปกรณ์...")).not.toBeInTheDocument();
+        expect(screen.queryByText("กำลังโหลดรายการเข้าสู่ระบบ...")).not.toBeInTheDocument();
     });
 });

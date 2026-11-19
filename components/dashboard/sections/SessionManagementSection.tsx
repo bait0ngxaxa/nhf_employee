@@ -26,7 +26,7 @@ function SessionErrorState({ message, onRetry }: { message: string; onRetry: () 
                             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-danger-foreground" />
                             <div role="alert" className="min-w-0 space-y-1">
                                 <p className="font-semibold text-status-danger-strong">
-                                    โหลดรายการอุปกรณ์ไม่สำเร็จ
+                                    เปิดรายการเข้าสู่ระบบไม่สำเร็จ
                                 </p>
                                 <p className="text-sm leading-6 text-status-danger-strong [overflow-wrap:anywhere]">
                                     {message}

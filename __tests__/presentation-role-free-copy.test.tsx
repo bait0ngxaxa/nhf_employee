@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const getCurrentUserProjection = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ back: vi.fn(), push: vi.fn() }));
@@ -13,15 +13,29 @@ vi.mock("next/navigation", () => ({
 import Home from "@/app/page";
 import AccessDenied from "@/app/access-denied/page";
 import { LiffModuleLanding } from "@/components/liff/LiffModuleLanding";
+import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
 import { PermissionState } from "@/components/ui/state";
 
 describe("role-free public presentation copy", () => {
-    it("introduces employee services and account actions", async () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each([
+        [true, true],
+        [false, true],
+        [true, false],
+        [false, false],
+    ])("describes available services with Leave %s and Routine %s", async (leave, routine) => {
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", String(leave));
+        vi.stubEnv("NEXT_PUBLIC_FEATURE_ROUTINE", String(routine));
+        expect(isFeatureEnabled(FEATURE_KEYS.leave)).toBe(leave);
+        expect(isFeatureEnabled(FEATURE_KEYS.routine)).toBe(routine);
         getCurrentUserProjection.mockResolvedValue(null);
 
         render(await Home());
 
-        expect(screen.getByText(/ยื่นคำขอลา เบิกวัสดุ ติดตามงานประจำ/)).toBeInTheDocument();
+        expect(screen.getByText(/บริการที่เปิดให้ใช้งาน/)).toBeVisible();
+        if (!leave) expect(screen.queryByText(/ยื่นคำขอลา/)).not.toBeInTheDocument();
+        if (!routine) expect(screen.queryByText(/ติดตามงานประจำ/)).not.toBeInTheDocument();
         expect(screen.getByRole("link", { name: "ลงทะเบียนบัญชี" })).toHaveAttribute("href", "/signup");
         expect(screen.getByRole("link", { name: "เข้าสู่ระบบ" })).toHaveAttribute("href", "/login");
         expect(screen.queryByText("เข้าถึงตามบทบาท")).not.toBeInTheDocument();

@@ -133,7 +133,7 @@ export default async function Home() {
                             National Health Foundation Application
                         </h1>
                         <p className="mt-5 max-w-3xl text-base font-medium leading-8 text-content-body sm:text-lg">
-                            บริการสำหรับพนักงานมูลนิธิสาธารณสุขแห่งชาติ ยื่นคำขอลา เบิกวัสดุ ติดตามงานประจำ และแจ้งปัญหา IT ได้ในที่เดียว
+                            NHFapp รวมบริการและงานภายในมูลนิธิสาธารณสุขแห่งชาติไว้ในที่เดียว ให้พนักงานเข้าใช้บริการที่เปิดให้ใช้งานได้สะดวก
                         </p>
                     </div>
 
