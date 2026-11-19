@@ -119,7 +119,7 @@ describe("LIFF Routine client contract", () => {
         await expect(fetchLiffRoutineTask(71)).rejects.toMatchObject({
             name: "LiffApiError",
             status: 409,
-            message: "ข้อมูล Routine เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่",
+            message: "ข้อมูลงานประจำเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลล่าสุด",
         });
     });
 

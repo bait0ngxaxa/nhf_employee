@@ -29,7 +29,8 @@ describe("role-free public presentation copy", () => {
     it("does not disclose an administrator category on access denied", () => {
         render(<AccessDenied />);
 
-        expect(screen.getByText(/คุณยังไม่มีสิทธิ์เข้าถึงส่วนนี้/)).toBeInTheDocument();
+        expect(screen.getByText("บัญชีนี้เปิดหน้านี้ไม่ได้")).toBeInTheDocument();
+        expect(screen.getByText(/ติดต่อผู้ดูแลระบบ/)).toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบเท่านั้น")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
     });

@@ -120,9 +120,9 @@ function mapStatusToCode(status: number): ApiErrorCode {
 function getThaiErrorMessageByCode(code: ApiErrorCode): string {
     switch (code) {
         case "UNAUTHORIZED":
-            return "ไม่มีสิทธิ์เข้าถึง กรุณาเข้าสู่ระบบใหม่";
+            return "กรุณาเข้าสู่ระบบอีกครั้ง";
         case "FORBIDDEN":
-            return "คุณไม่มีสิทธิ์ดำเนินการนี้";
+            return "บัญชีนี้ดำเนินการรายการนี้ไม่ได้";
         case "VALIDATION_ERROR":
             return "ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง";
         case "TIMEOUT":
@@ -141,6 +141,9 @@ function containsThai(text: string): boolean {
 }
 
 function resolveThaiErrorMessage(code: ApiErrorCode, rawMessage: string): string {
+    if (code === "UNAUTHORIZED" || code === "INTERNAL_ERROR") {
+        return getThaiErrorMessageByCode(code);
+    }
     if (containsThai(rawMessage)) {
         return rawMessage;
     }

@@ -381,17 +381,17 @@ export function readITRequesterError(
     status: number,
     detail = false,
 ): string {
-    if (status === 401) return "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง";
-    if (status === 403) return detail
-        ? "บัญชีนี้ไม่มีสิทธิ์อ่าน Ticket"
-        : "บัญชีนี้ไม่มีสิทธิ์อ่านรายการ Ticket";
-    if (status === 404 && detail) return "ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้";
+    if (status === 401) return "กรุณาเข้าสู่ระบบอีกครั้ง";
+    if (status === 403) return "บัญชีนี้ทำรายการนี้ไม่ได้ หากต้องใช้งาน กรุณาติดต่อทีม IT";
+    if (status === 404) return "ไม่พบคำขอที่เปิดดูได้";
+    if (status >= 500) return "บริการ IT ขัดข้องชั่วคราว กรุณาลองอีกครั้ง";
     if (isITTicketResponseRecord(payload) && typeof payload.error === "string") {
         return payload.error;
     }
+    if (status === 409) return "ดำเนินการต่อไม่ได้ กรุณาตรวจสอบสถานะคำขอล่าสุด";
     return detail
-        ? "ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง"
-        : "ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองอีกครั้ง";
+        ? "ไม่สามารถโหลดคำขอได้ กรุณาลองอีกครั้ง"
+        : "ไม่สามารถเชื่อมต่อบริการ IT ได้ กรุณาลองอีกครั้ง";
 }
 
 export function readITOperatorError(
@@ -399,9 +399,12 @@ export function readITOperatorError(
     status: number,
     detail = false,
 ): string {
-    if (status === 401) return "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง";
+    if (status === 401) return "กรุณาเข้าสู่ระบบอีกครั้ง";
     if (status === 403) return "บัญชีนี้ไม่มีสิทธิ์ดำเนินการกับคิว IT Ticket";
     if (status === 404 && detail) return "ไม่พบ Ticket ที่ระบุ";
+    if (status >= 500) return detail
+        ? "ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง"
+        : "ไม่สามารถเชื่อมต่อคิว IT Ticket ได้ กรุณาลองอีกครั้ง";
     if (status === 409) {
         return isITTicketResponseRecord(payload) && typeof payload.error === "string"
             ? payload.error
@@ -748,19 +751,16 @@ export function readITTicketReadError(
     status: number,
     operator: boolean,
 ): string {
-    if (status === 401) return "เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง";
-    if (status === 403) return "สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงไม่สามารถดำเนินการได้";
+    if (status === 401) return "กรุณาเข้าสู่ระบบอีกครั้ง";
+    if (status === 403) return "บัญชีนี้ดำเนินการกับรายการนี้ไม่ได้ หากต้องใช้งาน กรุณาติดต่อทีม IT";
     if (status === 404) return operator
         ? "ไม่พบ Ticket ที่ระบุ"
-        : "ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้";
-    if (status === 409 && isITTicketResponseRecord(payload)
-        && typeof payload.error === "string") {
-        return payload.error;
-    }
+        : "ไม่พบคำขอที่เปิดดูได้";
+    if (status >= 500) return "ระบบขัดข้องชั่วคราว กรุณาลองอีกครั้ง";
     if (isITTicketResponseRecord(payload) && typeof payload.error === "string") {
         return payload.error;
     }
-    return status >= 500
-        ? "ระบบขัดข้องชั่วคราว กรุณาลองอีกครั้ง"
+    return status === 409
+        ? "ดำเนินการต่อไม่ได้ กรุณาตรวจสอบสถานะคำขอล่าสุด"
         : "ไม่สามารถดำเนินการได้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง";
 }

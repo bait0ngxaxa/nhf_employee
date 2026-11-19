@@ -395,7 +395,7 @@ export function LiffLeaveApp(): ReactElement {
             setSelectedDetailActionIntent(null);
             setOperationalNotice(
                 error instanceof LiffApiError && error.status === 404
-                    ? "ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ดูรายการดังกล่าว"
+                    ? "ไม่พบคำขอลาที่เปิดดูได้"
                     : getViewError(error),
             );
         }

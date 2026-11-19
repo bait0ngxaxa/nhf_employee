@@ -680,7 +680,7 @@ describe("LIFF Leave app orchestration", () => {
         render(<LiffLeaveApp />);
 
         await waitFor(() => {
-            expect(screen.getByText("ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ดูรายการดังกล่าว"))
+            expect(screen.getByText("ไม่พบคำขอลาที่เปิดดูได้"))
                 .toBeInTheDocument();
         });
         expect(screen.queryByText(/รายละเอียด private_leave/)).not.toBeInTheDocument();

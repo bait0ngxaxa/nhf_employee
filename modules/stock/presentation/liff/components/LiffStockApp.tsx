@@ -166,7 +166,7 @@ function resolveStockDeepLinkNoticeSession(
         return {
             intentKey: intent.key,
             outcome: "read-denied",
-            notice: "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้",
+            notice: "บัญชีนี้เปิดรายละเอียดคำขอเบิกนี้ไม่ได้",
         };
     }
 
@@ -450,7 +450,7 @@ export function LiffStockApp(): ReactElement {
         const canReadRequest = capabilities?.canReadOwnRequests === true
             || capabilities?.canReadAllRequests === true;
         if (!canReadRequest) {
-            setOperationalNotice("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้");
+            setOperationalNotice("บัญชีนี้เปิดรายละเอียดคำขอเบิกนี้ไม่ได้");
             return;
         }
         if (isProcessorIntent && capabilities?.canProcessRequests !== true) {

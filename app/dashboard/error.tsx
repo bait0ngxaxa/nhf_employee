@@ -36,16 +36,8 @@ export default function DashboardError({ error, reset }: ErrorProps) {
                 </CardHeader>
                 <CardContent className="text-center space-y-4">
                     <p className="text-sm text-content-neutral-secondary">
-                        เกิดข้อผิดพลาดในการโหลดข้อมูล Dashboard
+                        กรุณาลองอีกครั้ง หากยังพบปัญหา กรุณาติดต่อผู้ดูแลระบบ
                     </p>
-
-                    {process.env.NODE_ENV === "development" && (
-                        <div className="rounded-lg border border-status-attention-border bg-status-attention-surface p-2 text-left">
-                            <p className="text-xs font-mono text-status-attention-foreground break-all">
-                                {error.message}
-                            </p>
-                        </div>
-                    )}
 
                     <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
                         <Button

@@ -29,7 +29,7 @@ import { ITTicketInitialAttachments } from "./ITTicketInitialAttachments";
 
 type ITRequesterDetailState =
     | { readonly key: string; readonly kind: "loaded"; readonly ticket: ITRequesterTicketDetail }
-    | { readonly key: string; readonly kind: "error"; readonly message: string };
+    | { readonly key: string; readonly kind: "error"; readonly message: string; readonly status?: number };
 
 export function ITTicketDetail({
     ticketId,
@@ -43,7 +43,7 @@ export function ITTicketDetail({
     const requestKey = `${ticketId}:${retryKey}`;
     const currentDetailState = detailState?.key === requestKey ? detailState : null;
     const ticket = currentDetailState?.kind === "loaded" ? currentDetailState.ticket : null;
-    const error = currentDetailState?.kind === "error" ? currentDetailState.message : null;
+    const error = currentDetailState?.kind === "error" ? currentDetailState : null;
     const loading = currentDetailState === null;
 
     useEffect(() => {
@@ -51,23 +51,35 @@ export function ITTicketDetail({
         void fetch(API_ROUTES.itTickets.byId(ticketId), { signal: controller.signal })
             .then(async (response) => {
                 const payload: unknown = await response.json().catch(() => null);
-                if (!response.ok) throw new Error(readITRequesterError(payload, response.status, true));
-                if (!isITTicketResponseRecord(payload) || payload.success !== true) {
-                    throw new Error("ข้อมูลคำขอไม่ถูกต้อง กรุณาลองอีกครั้ง");
-                }
-                const parsed = parseITRequesterTicketDetail(payload.ticket);
-                if (parsed === null) throw new Error("ข้อมูลคำขอไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 if (controller.signal.aborted) return;
+                if (!response.ok) {
+                    setDetailState({
+                        key: requestKey,
+                        kind: "error",
+                        message: readITRequesterError(payload, response.status, true),
+                        status: response.status,
+                    });
+                    return;
+                }
+                const parsed = isITTicketResponseRecord(payload) && payload.success === true
+                    ? parseITRequesterTicketDetail(payload.ticket)
+                    : null;
+                if (parsed === null) {
+                    setDetailState({
+                        key: requestKey,
+                        kind: "error",
+                        message: "โหลดรายละเอียดคำขอไม่สำเร็จ กรุณาลองอีกครั้ง",
+                    });
+                    return;
+                }
                 setDetailState({ key: requestKey, kind: "loaded", ticket: parsed });
             })
-            .catch((cause: unknown) => {
+            .catch(() => {
                 if (controller.signal.aborted) return;
                 setDetailState({
                     key: requestKey,
                     kind: "error",
-                    message: cause instanceof Error
-                        ? cause.message
-                        : readITRequesterError(null, 500, true),
+                    message: readITRequesterError(null, 500, true),
                 });
             });
 
@@ -92,11 +104,17 @@ export function ITTicketDetail({
                     <div role="alert" className="space-y-4 rounded-xl border border-rose-200 bg-rose-50 p-5 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
                         <div className="flex gap-3">
                             <CircleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-                            <p>{error}</p>
+                            <p>{error.message}</p>
                         </div>
-                        <Button type="button" variant="outline" onClick={() => setRetryKey((current) => current + 1)}>
-                            ลองอีกครั้ง
-                        </Button>
+                        {error.status === 401 ? (
+                            <Button asChild variant="outline">
+                                <Link href={APP_ROUTES.login}>เข้าสู่ระบบอีกครั้ง</Link>
+                            </Button>
+                        ) : error.status !== 403 && error.status !== 404 ? (
+                            <Button type="button" variant="outline" onClick={() => setRetryKey((current) => current + 1)}>
+                                ลองอีกครั้ง
+                            </Button>
+                        ) : null}
                     </div>
                 ) : null}
                 {!loading && !error && ticket ? (

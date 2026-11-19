@@ -19,7 +19,7 @@ export default function Page(): ReactElement {
     return (
         <LiffModuleLanding
             module="leave"
-            enabled={false}
+            reason="disabled"
         />
     );
 }

@@ -28,17 +28,17 @@ function getStockApiErrorMessage(
         case 401:
             return isRecoveredLiffUnauthorizedResponse(response)
                 ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
-                : "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง";
+                : "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ";
         case 403:
-            return response.errorThai || "คุณไม่มีสิทธิ์ดำเนินการกับคำขอเบิกนี้";
+            return "บัญชีนี้ดำเนินการงานวัสดุนี้ไม่ได้ หากต้องใช้งาน กรุณาติดต่อผู้ดูแลระบบ";
         case 404:
-            return response.errorThai || "ไม่พบรายการเบิก หรือคุณไม่มีสิทธิ์ดูรายการนี้";
+            return response.errorThai || "ไม่พบรายการเบิกที่เปิดดูได้";
         case 409:
-            return response.errorThai || "ข้อมูล Stock เปลี่ยนไปแล้ว กรุณาโหลดข้อมูลใหม่";
+            return response.errorThai || "ข้อมูลวัสดุเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลล่าสุด";
         case 429:
             return "คุณทำรายการถี่เกินไป กรุณารอสักครู่แล้วลองใหม่";
         default:
-            return response.errorThai || "ไม่สามารถเชื่อมต่อข้อมูล Stock ได้";
+            return response.errorThai || "ไม่สามารถโหลดข้อมูลวัสดุได้ กรุณาลองอีกครั้ง";
     }
 }
 

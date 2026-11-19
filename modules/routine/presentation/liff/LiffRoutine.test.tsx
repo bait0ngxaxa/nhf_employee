@@ -344,7 +344,7 @@ describe("LiffRoutineApp", () => {
         render(<LiffRoutineApp />);
 
         expect(
-            await screen.findByRole("heading", { name: "งานประจำ ยังไม่พร้อมใช้งาน" }),
+            await screen.findByRole("heading", { name: "บัญชีนี้เปิดบริการงานประจำไม่ได้" }),
         ).toBeInTheDocument();
         expect(mocks.fetchLiffRoutineTasks).not.toHaveBeenCalled();
         expect(mocks.fetchLiffRoutineSummary).not.toHaveBeenCalled();
@@ -482,7 +482,7 @@ describe("LiffRoutineApp", () => {
 
         expect(
             await screen.findByText(
-                "ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์เข้าถึงรายการดังกล่าว กำลังแสดงงาน Routine ของคุณตามปกติ",
+                "เปิดงานจากลิงก์นี้ไม่ได้ คุณยังดูรายการงานประจำของคุณได้ด้านล่าง",
             ),
         ).toBeInTheDocument();
         expect(screen.getByText("ตรวจสอบระบบ")).toBeInTheDocument();
@@ -1109,7 +1109,7 @@ describe("LiffRoutineApp", () => {
         });
         fireEvent.click(within(formDialog).getByRole("button", { name: "เพิ่ม Routine ของฉัน" }));
 
-        expect(await screen.findByRole("heading", { name: "งานประจำ ยังไม่พร้อมใช้งาน" })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: "บัญชีนี้เปิดบริการงานประจำไม่ได้" })).toBeInTheDocument();
         expect(mocks.fetchLiffHome).toHaveBeenCalledTimes(2);
         expect(mocks.fetchLiffRoutineSummary).toHaveBeenCalledTimes(1);
         expect(mocks.fetchLiffRoutineTasks).toHaveBeenCalledTimes(1);

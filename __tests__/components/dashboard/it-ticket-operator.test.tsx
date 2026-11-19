@@ -185,7 +185,7 @@ describe("IT operator queue presentation", () => {
             .mockResolvedValueOnce(referenceResponse());
         render(<ITTicketOperatorQueue />);
 
-        expect(await screen.findByRole("alert")).toHaveTextContent("temporary");
+        expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถเชื่อมต่อคิว IT Ticket ได้");
         fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
         expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
     });
@@ -698,7 +698,7 @@ describe("IT operator Ticket detail presentation", () => {
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
-        expect(await screen.findByRole("alert")).toHaveTextContent("temporary");
+        expect(await screen.findByRole("alert")).toHaveTextContent("ระบบขัดข้องชั่วคราว");
         const activity = await screen.findByRole("list", { name: "ประวัติการดำเนินการ #19" });
         expect(within(activity).getByText("ผู้ดำเนินการ: อารี ใจเย็น")).toBeInTheDocument();
         expect(within(activity).getByText("รับเรื่องแล้ว")).toBeInTheDocument();

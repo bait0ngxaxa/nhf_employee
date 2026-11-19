@@ -172,7 +172,7 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
 
-        expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถเชื่อมต่อระบบได้");
+        expect(await screen.findByRole("alert")).toHaveTextContent("บริการ IT ขัดข้องชั่วคราว");
         fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
         expect(await screen.findByText("ยังไม่มีคำขอ")).toBeInTheDocument();
     });
@@ -354,7 +354,7 @@ describe("IT Ticket requester detail", () => {
         render(<ITTicketDetail ticketId={900} canCommentOwnTickets />);
 
         expect(await screen.findByRole("alert"))
-            .toHaveTextContent("ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้");
+            .toHaveTextContent("ไม่พบคำขอที่เปิดดูได้");
         expect(fetchMock).toHaveBeenCalledWith("/api/it/tickets/900", expect.anything());
     });
 

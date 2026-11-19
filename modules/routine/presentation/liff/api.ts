@@ -50,19 +50,19 @@ function getRoutineApiErrorMessage(
         case 401:
             return isRecoveredLiffUnauthorizedResponse(response)
                 ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
-                : "การยืนยันตัวตนหมดอายุ กรุณาลองใหม่อีกครั้ง";
+                : "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ";
         case 403:
-            return "บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้";
+            return "บัญชีนี้เปิดงานประจำไม่ได้ หากต้องใช้งาน กรุณาติดต่อผู้ดูแลระบบ";
         case 404:
             return response.errorThai || ROUTINE_API_MESSAGES.liffResourceNotFound;
         case 409:
-            return response.errorThai || "ข้อมูล Routine เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่";
+            return response.errorThai || "ข้อมูลงานประจำเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลล่าสุด";
         case 413:
             return "คำขอ Routine มีขนาดใหญ่เกินไป";
         case 429:
             return "คุณทำรายการ Routine ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่";
         default:
-            return response.errorThai || "ไม่สามารถเชื่อมต่อข้อมูล Routine ได้";
+            return response.errorThai || "ไม่สามารถโหลดข้อมูลงานประจำได้ กรุณาลองอีกครั้ง";
     }
 }
 

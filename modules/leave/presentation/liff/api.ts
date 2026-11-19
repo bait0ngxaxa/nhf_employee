@@ -24,17 +24,17 @@ function getLeaveApiErrorMessage(
         case 401:
             return isRecoveredLiffUnauthorizedResponse(response)
                 ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
-                : "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง";
+                : "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ";
         case 403:
-            return "คุณไม่มีสิทธิ์ดำเนินการกับคำขอลานี้";
+            return "บัญชีนี้ดำเนินการงานวันลานี้ไม่ได้ หากต้องใช้งาน กรุณาติดต่อผู้ดูแลระบบ";
         case 404:
-            return response.errorThai || "ไม่พบรายการลา หรือยังไม่เปิดใช้งาน Leave";
+            return response.errorThai || "ไม่พบข้อมูลวันลาที่เปิดดูได้";
         case 409:
             return response.errorThai || "สถานะคำขอลาเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลใหม่";
         case 413:
             return "ไฟล์แนบหรือคำขอมีขนาดใหญ่เกินไป";
         default:
-            return response.errorThai || "ไม่สามารถเชื่อมต่อข้อมูล Leave ได้";
+            return response.errorThai || "ไม่สามารถโหลดข้อมูลวันลาได้ กรุณาลองอีกครั้ง";
     }
 }
 
@@ -183,7 +183,7 @@ export async function fetchLiffLeaveAttachment(
     if (!response.ok) {
         throw new LiffApiError(
             response.status === 401
-                ? "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง"
+                ? "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ"
                 : "ไม่สามารถเปิดไฟล์แนบนี้ได้",
             response.status,
         );

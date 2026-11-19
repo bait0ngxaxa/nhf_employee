@@ -600,7 +600,7 @@ describe("LIFF Stock app orchestration", () => {
 
         render(<LiffStockApp />);
 
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้เปิดรายละเอียดคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(await screen.findByRole("tab", { name: /รอดำเนินการ/ }))
             .toBeInTheDocument();
