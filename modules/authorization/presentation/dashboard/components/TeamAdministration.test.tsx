@@ -174,7 +174,9 @@ describe("TeamAdministration", () => {
         renderTeam();
 
         expect(screen.getByText(/พบการตั้งค่าสิทธิ์ของทีมที่ต้องตรวจสอบ/)).toBeInTheDocument();
-        expect(screen.queryByText("old.capability")).not.toBeInTheDocument();
+        expect(screen.getByText("old.capability")).not.toBeVisible();
+        fireEvent.click(screen.getByText("รายละเอียดทางเทคนิค"));
+        expect(screen.getByText("old.capability")).toBeVisible();
         fireEvent.click(screen.getByRole("button", { name: "หน้าที่ในทีมและสิทธิ์" }));
         expect(screen.getByRole("button", { name: "เพิ่มหน้าที่" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "สมาชิก" }));

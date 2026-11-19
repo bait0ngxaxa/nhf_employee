@@ -18,7 +18,7 @@ export function ConfigurationIssues({
             <TriangleAlert className="h-5 w-5" aria-hidden="true" />
             <AlertTitle>{title} ({issues.length})</AlertTitle>
             <AlertDescription>
-                <p className="leading-6">พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ บางสิทธิ์ของผู้ใช้นี้ไม่สามารถนำมาใช้งานได้อย่างปลอดภัย</p>
+                <p className="leading-6">ตรวจสอบรายการด้านล่างก่อนปรับสิทธิ์</p>
                 <ul className="mt-3 space-y-2 text-sm">
                     {issues.map((issue, index) => (
                         <li key={`${issue.source}-${issue.code}-${index}`} className="flex gap-2 leading-5">
@@ -27,6 +27,23 @@ export function ConfigurationIssues({
                         </li>
                     ))}
                 </ul>
+                <details className="mt-3 border-t border-status-warning-border pt-1">
+                    <summary className="min-h-11 cursor-pointer content-center rounded-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        รายละเอียดทางเทคนิค
+                    </summary>
+                    <ul className="space-y-2 pb-2 text-xs">
+                        {issues.map((issue, index) => (
+                            <li key={`${issue.source}-${issue.code}-${index}`} className="space-y-1 [overflow-wrap:anywhere]">
+                                <p><code>{issue.source}</code> · <code>{issue.code}</code></p>
+                                {issue.capabilityKey !== undefined ? <p>รหัสสิทธิ์ <code>{issue.capabilityKey}</code></p> : null}
+                                {issue.scope !== undefined ? <p>รหัสขอบเขต <code>{issue.scope}</code></p> : null}
+                                {issue.teamId !== undefined ? <p>รหัสทีม <code>{issue.teamId}</code></p> : null}
+                                {issue.teamRoleId !== undefined ? <p>รหัสหน้าที่ในทีม <code>{issue.teamRoleId}</code></p> : null}
+                                {issue.userId !== undefined ? <p>รหัสผู้ใช้ <code>{issue.userId}</code></p> : null}
+                            </li>
+                        ))}
+                    </ul>
+                </details>
             </AlertDescription>
         </Alert>
     );

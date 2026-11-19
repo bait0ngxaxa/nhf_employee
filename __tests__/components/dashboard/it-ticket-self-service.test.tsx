@@ -283,6 +283,31 @@ describe("IT Ticket self-service presentation", () => {
 });
 
 describe("IT Ticket requester detail", () => {
+    it("offers reauthentication when the detail API returns 401", async () => {
+        fetchMock.mockResolvedValue(apiResponse({ error: "raw sign-in error" }, 401));
+
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+
+        const alert = await screen.findByRole("alert");
+        expect(alert).not.toHaveTextContent("raw sign-in error");
+        expect(screen.getByRole("link", { name: "เข้าสู่ระบบอีกครั้ง" })).toHaveAttribute("href", "/login");
+        expect(screen.queryByRole("button", { name: "ลองอีกครั้ง" })).not.toBeInTheDocument();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps an account denial distinct from reauthentication or a service failure", async () => {
+        fetchMock.mockResolvedValue(apiResponse({ error: "it.ticket.read OWN" }, 403));
+
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+
+        const alert = await screen.findByRole("alert");
+        expect(alert).toHaveTextContent(/บัญชีนี้.*ติดต่อทีม IT/);
+        expect(alert).not.toHaveTextContent(/it\.ticket\.read|OWN/);
+        expect(screen.queryByRole("link", { name: "เข้าสู่ระบบอีกครั้ง" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลองอีกครั้ง" })).not.toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /กลับไปยังรายการคำขอ/ })).toHaveAttribute("href", "/dashboard/it");
+    });
+
     it("loads creation evidence for the requester detail through a private image fetch", async () => {
         const attachment = {
             id: "a".repeat(32),
