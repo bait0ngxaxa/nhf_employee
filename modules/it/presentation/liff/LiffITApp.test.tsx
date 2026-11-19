@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as LiffApi from "./api";
 
 const mocks = vi.hoisted(() => ({
     fetchTickets: vi.fn(),
@@ -150,7 +151,7 @@ describe("LiffITApp requester experience", () => {
     });
 
     it("shows the real detail API denial and keeps backend diagnostics out of the view", async () => {
-        const api = await vi.importActual<typeof import("./api")>("./api");
+        const api = await vi.importActual<typeof LiffApi>("./api");
         vi.stubGlobal("fetch", vi.fn(async () => Response.json(
             { error: "it.ticket.read OWN internal-host" },
             { status: 403 },

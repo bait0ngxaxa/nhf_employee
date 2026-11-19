@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
 import type { LeavePresentationCapabilities } from "../../application/types";
 import type { ApproverLeaveAction, EmployeeLeaveAction, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
+import type * as LineClient from "@/modules/line/client";
+import type * as LiffApi from "./api";
 
 const mocks = vi.hoisted(() => {
     return {
@@ -37,7 +39,7 @@ vi.mock("./api", () => ({
 }));
 
 vi.mock("@/modules/line/client", async (importOriginal) => ({
-    ...await importOriginal<typeof import("@/modules/line/client")>(),
+    ...await importOriginal<typeof LineClient>(),
     fetchLiffHome: mocks.fetchHome,
 }));
 
@@ -654,7 +656,7 @@ describe("LIFF Leave app orchestration", () => {
             id: "leave-1", viewerRole: "APPROVER", availableActions: ["APPROVE"],
             leaveType: "SICK", startDate: "2031-01-01", endDate: "2031-01-01",
         });
-        const api = await vi.importActual<typeof import("./api")>("./api");
+        const api = await vi.importActual<typeof LiffApi>("./api");
         const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
             Response.json({ error: "leave.request.approve ASSIGNED" }, { status: 403 }),
         );

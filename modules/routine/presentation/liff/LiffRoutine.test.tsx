@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as LineClient from "@/modules/line/client";
+import type * as LiffApi from "./api";
 
 const mocks = vi.hoisted(() => {
     return {
@@ -20,7 +22,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/modules/line/client", async (importOriginal) => ({
-    ...await importOriginal<typeof import("@/modules/line/client")>(),
+    ...await importOriginal<typeof LineClient>(),
     fetchLiffHome: mocks.fetchLiffHome,
 }));
 
@@ -1388,7 +1390,7 @@ describe("LiffRoutineApp", () => {
     });
 
     it("shows the update endpoint denial in the task editor", async () => {
-        const api = await vi.importActual<typeof import("./api")>("./api");
+        const api = await vi.importActual<typeof LiffApi>("./api");
         const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
             Response.json({ error: "routine.task.update ALL" }, { status: 403 }),
         );

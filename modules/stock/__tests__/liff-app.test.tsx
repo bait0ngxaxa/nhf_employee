@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
+import type * as LineClient from "@/modules/line/client";
+import type * as LiffApi from "../presentation/liff/api";
 
 import { LiffApiError } from "@/modules/line/client";
 import type {
@@ -36,7 +38,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/modules/line/client", async (importOriginal) => ({
-    ...await importOriginal<typeof import("@/modules/line/client")>(),
+    ...await importOriginal<typeof LineClient>(),
     fetchLiffHome: mocks.fetchHome,
     useLiffWorkforce: mocks.useLiffWorkforce,
 }));
@@ -639,7 +641,7 @@ describe("LIFF Stock app orchestration", () => {
     it("shows the issue endpoint denial in the processor confirmation", async () => {
         mocks.search = "requestId=71&action=issue";
         mockProcessorHome();
-        const api = await vi.importActual<typeof import("../presentation/liff/api")>("../presentation/liff/api");
+        const api = await vi.importActual<typeof LiffApi>("../presentation/liff/api");
         const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
             Response.json({ error: "stock.request.issue ALL" }, { status: 403 }),
         );
