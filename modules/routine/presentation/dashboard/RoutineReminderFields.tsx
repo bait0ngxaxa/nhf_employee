@@ -5,6 +5,8 @@ import { BellPlus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ROUTINE_REMINDER_RECIPIENT_SCOPES } from "../../domain/reminder-recipients";
+import { ROUTINE_REMINDER_RECIPIENT_SCOPE_LABELS } from "./labels";
 import { getRoutineFieldErrorId } from "./focus-invalid-field";
 import {
     parseRoutineSendTime,
@@ -53,21 +55,12 @@ export function getRoutineReminderFieldErrors(
     }, {});
 }
 
-const REMINDER_SCOPE_OPTIONS: ReadonlyArray<{
-    value: RoutineReminderRecipientScope;
-    label: string;
-}> = [
-    { value: "ASSIGNEES", label: "ผู้รับผิดชอบ" },
-    { value: "ALL_READERS", label: "ผู้ที่มีสิทธิ์ดูงานทั้งหมด" },
-    { value: "ASSIGNEES_AND_ALL_READERS", label: "ผู้รับผิดชอบและผู้ที่มีสิทธิ์ดูงานทั้งหมด" },
-];
-
 function isRoutineReminderPreset(value: string): value is RoutineReminderPreset {
     return ROUTINE_REMINDER_PRESETS.some((preset) => preset.value === value);
 }
 
 function isReminderRecipientScope(value: string): value is RoutineReminderRecipientScope {
-    return REMINDER_SCOPE_OPTIONS.some((option) => option.value === value);
+    return ROUTINE_REMINDER_RECIPIENT_SCOPES.some((scope) => scope === value);
 }
 
 interface RoutineReminderFieldsProps {
@@ -117,7 +110,7 @@ export function RoutineReminderFields({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
                     <p className="max-w-prose text-sm leading-6 text-content-secondary">
-                        ตรวจตามเวลาไทย (Asia/Bangkok) และแจ้งเตือนในระบบ อีเมล และ LINE เมื่อผู้รับเชื่อมบัญชีไว้
+                        แจ้งเตือนตามเวลาไทย ผ่านระบบและอีเมล ผู้ที่เชื่อมบัญชี LINE ไว้จะได้รับแจ้งเตือนทาง LINE ด้วย
                     </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -217,8 +210,8 @@ export function RoutineReminderFields({
                                                 if (isReminderRecipientScope(value)) onUpdateRule(index, { recipientScope: value });
                                             }}
                                         >
-                                            {REMINDER_SCOPE_OPTIONS.map((option) => (
-                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            {ROUTINE_REMINDER_RECIPIENT_SCOPES.map((scope) => (
+                                                <option key={scope} value={scope}>{ROUTINE_REMINDER_RECIPIENT_SCOPE_LABELS[scope]}</option>
                                             ))}
                                         </select>
                                     </label>

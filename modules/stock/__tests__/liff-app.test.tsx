@@ -365,7 +365,7 @@ describe("LIFF Stock app orchestration", () => {
         );
 
         expect(screen.getByRole("status")).toHaveTextContent(
-            "กำลังตรวจสอบสิทธิ์การใช้งาน Stock",
+            "กำลังโหลดบริการเบิกวัสดุ",
         );
         await waitFor(() => expect(mocks.fetchHome).toHaveBeenCalledTimes(2));
 
@@ -374,7 +374,7 @@ describe("LIFF Stock app orchestration", () => {
             modules: {},
             capabilities: { stockCapabilities: EMPLOYEE_STOCK_CAPABILITIES },
         });
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
             .not.toBeInTheDocument();
@@ -388,7 +388,7 @@ describe("LIFF Stock app orchestration", () => {
             await oldProcessorHome.promise;
         });
 
-        expect(screen.getByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(screen.getByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
             .not.toBeInTheDocument();
@@ -439,7 +439,7 @@ describe("LIFF Stock app orchestration", () => {
         fireEvent.click(screen.getByRole("button", { name: "ลองตรวจสอบอีกครั้ง" }));
 
         expect(screen.getByRole("status")).toHaveTextContent(
-            "กำลังตรวจสอบสิทธิ์การใช้งาน Stock",
+            "กำลังโหลดบริการเบิกวัสดุ",
         );
         expect(await screen.findByRole("heading", { name: "เลือกวัสดุที่ต้องการเบิก" }))
             .toBeInTheDocument();
@@ -542,7 +542,7 @@ describe("LIFF Stock app orchestration", () => {
 
         render(<LiffStockApp />);
 
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).not.toHaveBeenCalled();
         expect(mocks.issueRequest).not.toHaveBeenCalled();
@@ -557,7 +557,7 @@ describe("LIFF Stock app orchestration", () => {
 
         const view = render(<LiffStockApp />);
 
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).not.toHaveBeenCalled();
         expect(mocks.issueRequest).not.toHaveBeenCalled();
@@ -570,12 +570,12 @@ describe("LIFF Stock app orchestration", () => {
         fireEvent.click(screen.getByRole("button", { name: "รายละเอียด" }));
         expect(await screen.findByRole("heading", { name: "รายละเอียดคำขอ #70" }))
             .toBeInTheDocument();
-        expect(screen.queryByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(screen.queryByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .not.toBeInTheDocument();
         expect(mocks.search).toBe("requestId=71&action=issue");
 
         view.rerender(<LiffStockApp />);
-        expect(screen.queryByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(screen.queryByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .not.toBeInTheDocument();
         expect(mocks.fetchRequest).toHaveBeenCalledTimes(1);
         expect(mocks.fetchRequest).toHaveBeenCalledWith(70);

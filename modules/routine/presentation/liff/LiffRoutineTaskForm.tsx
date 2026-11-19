@@ -577,7 +577,7 @@ export const LiffRoutineTaskForm = forwardRef<
                             <p className="font-semibold">
                                 {mode === "CREATE"
                                     ? "งานนี้จะเป็นของคุณโดยอัตโนมัติ"
-                                    : "คุณกำลังแก้ไขงานที่คุณมีสิทธิ์แก้ไข"}
+                                    : "แก้ไขรายละเอียดงานประจำ"}
                             </p>
                             <p className="mt-1">
                                 การแจ้งเตือนจะส่งให้ผู้รับผิดชอบของคุณตามกฎที่ตั้งไว้

@@ -109,7 +109,7 @@ function postedCommentResponse(replayed = false, body = "ขออัปเด�
 }
 
 async function openCreateDialog(): Promise<void> {
-    await screen.findByText("ยังไม่มี Ticket");
+    await screen.findByText("ยังไม่มีคำขอ");
     fireEvent.click(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" }));
     fireEvent.change(screen.getByLabelText("หัวข้อ"), {
         target: { value: "  ขอความช่วยเหลือระบบงาน  " },
@@ -152,7 +152,7 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
 
-        expect(await screen.findByRole("status", { name: "กำลังโหลด Ticket" }))
+        expect(await screen.findByRole("status", { name: "กำลังโหลดคำขอ" }))
             .toBeInTheDocument();
     });
 
@@ -161,7 +161,7 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
 
-        expect(await screen.findByText("ยังไม่มี Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ยังไม่มีคำขอ")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" })).toBeInTheDocument();
     });
 
@@ -174,7 +174,7 @@ describe("IT Ticket self-service presentation", () => {
 
         expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถเชื่อมต่อระบบได้");
         fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
-        expect(await screen.findByText("ยังไม่มี Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ยังไม่มีคำขอ")).toBeInTheDocument();
     });
 
     it("lists Ticket identity, type, current status, timestamps, and a detail link", async () => {
@@ -200,7 +200,7 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
         await openCreateDialog();
-        const form = screen.getByRole("button", { name: "ส่ง Ticket" }).closest("form");
+        const form = screen.getByRole("button", { name: "ส่งคำขอ" }).closest("form");
         expect(form).not.toBeNull();
         fireEvent.submit(form as HTMLFormElement);
         fireEvent.submit(form as HTMLFormElement);
@@ -210,7 +210,7 @@ describe("IT Ticket self-service presentation", () => {
         expect(postCalls).toHaveLength(1);
 
         pendingPost.resolve?.(createdTicketResponse());
-        expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(await screen.findByText("ส่งคำขอ #19 เรียบร้อยแล้ว")).toBeInTheDocument();
     });
 
     it("reuses the logical submission key after an uncertain network result", async () => {
@@ -222,11 +222,11 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
         await openCreateDialog();
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         expect(await screen.findByRole("alert")).toHaveTextContent("network result uncertain");
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
 
-        expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(await screen.findByText("ส่งคำขอ #19 เรียบร้อยแล้ว")).toBeInTheDocument();
         const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
         expect(postCalls).toHaveLength(2);
         const firstHeaders = new Headers(postCalls[0][1]?.headers);
@@ -267,9 +267,9 @@ describe("IT Ticket self-service presentation", () => {
         fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
             target: { files: [selectedFile] },
         });
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
 
-        expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(await screen.findByText("ส่งคำขอ #19 เรียบร้อยแล้ว")).toBeInTheDocument();
         const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
         const body = postCall?.[1]?.body;
         expect(body).toBeInstanceOf(FormData);

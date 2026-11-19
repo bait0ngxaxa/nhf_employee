@@ -53,10 +53,10 @@ export function ITTicketDetail({
                 const payload: unknown = await response.json().catch(() => null);
                 if (!response.ok) throw new Error(readITRequesterError(payload, response.status, true));
                 if (!isITTicketResponseRecord(payload) || payload.success !== true) {
-                    throw new Error("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
+                    throw new Error("ข้อมูลคำขอไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 }
                 const parsed = parseITRequesterTicketDetail(payload.ticket);
-                if (parsed === null) throw new Error("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
+                if (parsed === null) throw new Error("ข้อมูลคำขอไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 if (controller.signal.aborted) return;
                 setDetailState({ key: requestKey, kind: "loaded", ticket: parsed });
             })
@@ -79,11 +79,11 @@ export function ITTicketDetail({
             <div className="mx-auto max-w-4xl space-y-5">
                 <Link onNavigate={(event) => { if (!allowDashboardNavigation()) event.preventDefault(); }} href={APP_ROUTES.dashboardIT} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-brand-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
                     <ArrowLeft aria-hidden="true" className="size-4" />
-                    กลับไปยังรายการ Ticket
+                    กลับไปยังรายการคำขอ
                 </Link>
 
                 {loading ? (
-                    <div role="status" aria-label="กำลังโหลด Ticket" className="space-y-5">
+                    <div role="status" aria-label="กำลังโหลดคำขอ" className="space-y-5">
                         <Skeleton className="h-8 w-1/2" />
                         <Skeleton className="h-64 w-full rounded-xl" />
                     </div>
@@ -107,7 +107,7 @@ export function ITTicketDetail({
                                     {ticket.title}
                                 </h1>
                                 <p className="text-sm font-medium leading-6 text-content-secondary">
-                                    Ticket #{ticket.id}<span aria-hidden="true" className="mx-2">·</span>{IT_TICKET_TYPE_LABELS[ticket.type]}
+                                    คำขอ #{ticket.id}<span aria-hidden="true" className="mx-2">·</span>{IT_TICKET_TYPE_LABELS[ticket.type]}
                                 </p>
                             </div>
                             <span className={`inline-flex min-h-7 w-fit shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold ${IT_TICKET_STATUS_STYLES[ticket.status]}`}>

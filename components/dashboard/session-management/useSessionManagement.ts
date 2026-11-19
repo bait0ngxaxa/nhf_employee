@@ -63,13 +63,13 @@ export function useSessionManagement({
                 throw new Error(result.error);
             }
 
-            toast.success("ยกเลิกเซสชันเรียบร้อย");
+            toast.success("นำอุปกรณ์ออกจากระบบแล้ว");
             await mutate();
         } catch (revokeError) {
             const message =
                 revokeError instanceof Error
                     ? revokeError.message
-                    : "ไม่สามารถยกเลิกเซสชันได้";
+                    : "ไม่สามารถนำอุปกรณ์ออกจากระบบได้";
             toast.error(message);
         } finally {
             setRevokingId(null);
@@ -78,7 +78,7 @@ export function useSessionManagement({
 
     const handleRevokeOtherSessions = async (): Promise<void> => {
         if (otherSessions.length === 0) {
-            toast.info("ไม่มีเซสชันอื่นที่กำลังใช้งาน");
+            toast.info("ไม่มีอุปกรณ์อื่นที่เข้าสู่ระบบ");
             return;
         }
 
@@ -95,7 +95,7 @@ export function useSessionManagement({
 
             const failedCount = revokeResults.filter((result) => !result.success).length;
             if (failedCount > 0) {
-                toast.error(`ยกเลิกเซสชันล้มเหลว ${failedCount} รายการ`);
+                toast.error(`นำอุปกรณ์ออกจากระบบไม่สำเร็จ ${failedCount} รายการ`);
             } else {
                 toast.success("ออกจากระบบอุปกรณ์อื่นทั้งหมดแล้ว");
             }

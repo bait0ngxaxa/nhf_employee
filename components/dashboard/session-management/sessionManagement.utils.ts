@@ -131,7 +131,7 @@ export function getConfirmTexts(confirmAction: ConfirmAction | null): {
 } {
     const title =
         confirmAction?.type === "revoke-session"
-            ? "ยืนยันยกเลิกเซสชันนี้?"
+            ? "ยืนยันออกจากระบบบนอุปกรณ์นี้?"
             : confirmAction?.type === "signout-current"
               ? "ยืนยันออกจากระบบอุปกรณ์นี้?"
               : "ยืนยันออกจากระบบอุปกรณ์อื่น?";
@@ -140,7 +140,7 @@ export function getConfirmTexts(confirmAction: ConfirmAction | null): {
         confirmAction?.type === "revoke-session"
             ? "อุปกรณ์นี้จะต้องเข้าสู่ระบบใหม่อีกครั้ง"
             : confirmAction?.type === "signout-current"
-              ? "เซสชันปัจจุบันของคุณจะสิ้นสุดทันที"
+              ? "คุณจะออกจากระบบบนอุปกรณ์นี้ทันที"
               : "ระบบจะออกจากระบบทุกอุปกรณ์อื่นที่ยังใช้งานอยู่";
 
     return { title, description };

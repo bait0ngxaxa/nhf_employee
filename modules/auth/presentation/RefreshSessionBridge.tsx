@@ -21,7 +21,7 @@ function resolveNextPath(value: string | null): string {
 export function RefreshSessionBridge(): React.ReactElement {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [message, setMessage] = useState("กำลังตรวจสอบสิทธิ์");
+    const [message, setMessage] = useState("กำลังตรวจสอบการเข้าสู่ระบบ");
     const nextPath = useMemo(
         () => resolveNextPath(searchParams.get("next")),
         [searchParams],

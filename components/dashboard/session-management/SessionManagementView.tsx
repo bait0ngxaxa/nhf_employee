@@ -92,14 +92,14 @@ function SessionRow({
                         className="h-11 w-full border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
                         onClick={() => onRequestRevoke(session.id)}
                         disabled={isRevoking || isValidating}
-                        aria-label={`ยกเลิกเซสชัน ${parsed.browser} ${parsed.os}`}
+                        aria-label={`ออกจากระบบ ${parsed.browser} ${parsed.os}`}
                     >
                         {isRevoking ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                         ) : (
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
                         )}
-                        ยกเลิกเซสชัน
+                        ออกจากระบบ
                     </Button>
                 ) : null}
             </div>
@@ -146,7 +146,7 @@ export function SessionManagementView({
                                 tabIndex={-1}
                                 className="text-2xl font-bold tracking-tight text-content-heading"
                             >
-                                จัดการเซสชัน
+                                อุปกรณ์ที่เข้าสู่ระบบ
                             </h1>
                             <p className="mt-0.5 text-sm text-content-secondary">
                                 ตรวจสอบอุปกรณ์ที่กำลังเข้าถึงบัญชีของคุณ
@@ -182,7 +182,7 @@ export function SessionManagementView({
                                 อุปกรณ์ที่กำลังใช้งาน <span className="text-status-info-foreground">{sessions.length}</span>
                             </h3>
                             <p className="mt-0.5 text-sm text-content-secondary">
-                                เลือกยกเลิกอุปกรณ์ที่คุณไม่รู้จักได้ทันที
+                                เลือกออกจากระบบบนอุปกรณ์ที่คุณไม่รู้จัก
                             </p>
                         </div>
                         <Button
@@ -215,7 +215,7 @@ export function SessionManagementView({
                     ) : (
                         <div className="px-5 py-12 text-center">
                             <Clock3 className="mx-auto h-5 w-5 text-content-subtle" aria-hidden="true" />
-                            <p className="mt-3 text-sm font-semibold text-content-primary">ไม่พบเซสชันที่กำลังใช้งาน</p>
+                            <p className="mt-3 text-sm font-semibold text-content-primary">ไม่พบอุปกรณ์ที่เข้าสู่ระบบ</p>
                             <p className="mt-1 text-sm text-content-secondary">ลองโหลดข้อมูลใหม่อีกครั้ง</p>
                         </div>
                     )}

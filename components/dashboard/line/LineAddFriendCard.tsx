@@ -94,13 +94,13 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
             <DialogContent closeLabel="ปิด" className="p-4 sm:p-6" onOpenAutoFocus={(event) => { event.preventDefault(); titleRef.current?.focus(); }}>
                 <DialogHeader className="pr-10 text-left">
                     <DialogTitle ref={titleRef} tabIndex={-1} className="leading-7 text-content-heading">เริ่มใช้งาน NHFapp ผ่าน LINE</DialogTitle>
-                    <DialogDescription className="leading-6 text-content-secondary">เพิ่มเพื่อน LINE Official Account และเชื่อมบัญชี NHFapp เพื่อใช้บริการต่าง ๆ ตามสิทธิ์ของคุณ</DialogDescription>
+                    <DialogDescription className="leading-6 text-content-secondary">เพิ่มเพื่อน LINE Official Account และเชื่อมบัญชี NHFapp เพื่อใช้บริการผ่าน LINE</DialogDescription>
                 </DialogHeader>
                 <DialogScrollArea className="pr-1">
                     <ol className="space-y-3 text-sm leading-6 text-content-secondary">
                         <li><span className="font-semibold text-content-primary">1. เพิ่มเพื่อน LINE Official Account</span><p>เพิ่มเพื่อนผ่านลิงก์หรือสแกน QR Code ด้วย LINE</p></li>
-                        <li><span className="font-semibold text-content-primary">2. เชื่อมบัญชี NHFapp</span><p>ผู้ที่มีสิทธิ์เชื่อมบัญชี NHFapp กับ LINE เพียงครั้งเดียว</p></li>
-                        <li><span className="font-semibold text-content-primary">3. เริ่มใช้บริการ</span><p>เข้าใช้บริการ NHFapp ที่รองรับผ่าน LINE ได้ตามสิทธิ์</p></li>
+                        <li><span className="font-semibold text-content-primary">2. เชื่อมบัญชี NHFapp</span><p>ลงชื่อเข้าใช้ NHFapp เพื่อเชื่อมบัญชีกับ LINE ครั้งเดียว</p></li>
+                        <li><span className="font-semibold text-content-primary">3. เริ่มใช้บริการ</span><p>เปิดเมนูบริการ NHFapp จากแชต LINE</p></li>
                     </ol>
                     <div className="mt-5 border-t border-border-subtle pt-4">
                         <h3 className="font-semibold text-content-heading">บริการที่รองรับ</h3>
@@ -110,7 +110,6 @@ export function LineAddFriendCard({ className }: LineAddFriendCardProps = {}): R
                             <li>ติดตามงาน Routine</li>
                             <li>แจ้งปัญหา IT และติดตาม Ticket</li>
                         </ul>
-                        <p className="mt-2 text-sm text-content-secondary">บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ</p>
                     </div>
                     <div className="mt-4 border-t border-border-subtle pt-1">
                     {status === "loading" ? <p className="mt-3 text-sm text-content-secondary" role="status">กำลังตรวจสอบสถานะการเชื่อมบัญชี…</p> : null}

@@ -87,7 +87,7 @@ function StockContent() {
                     className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong"
                     role="status"
                 >
-                    บัญชีนี้ยังไม่มีสิทธิ์ใช้งานส่วน Stock ที่เปิดอยู่
+                    บัญชีนี้เปิดหน้างานวัสดุนี้ไม่ได้
                 </div>
             )}
         </SectionShell>

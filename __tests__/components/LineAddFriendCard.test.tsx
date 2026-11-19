@@ -25,7 +25,7 @@ describe("LineAddFriendCard", () => {
         expect(screen.getByRole("heading", { name: "เริ่มใช้งาน NHFapp ผ่าน LINE" })).toHaveFocus();
         for (const step of ["1. เพิ่มเพื่อน LINE Official Account", "2. เชื่อมบัญชี NHFapp", "3. เริ่มใช้บริการ"]) expect(screen.getByText(step)).toBeInTheDocument();
         for (const text of ["เบิกวัสดุและติดตามคำขอ", "ดูข้อมูลและจัดการวันลา", "ติดตามงาน Routine", "แจ้งปัญหา IT และติดตาม Ticket"]) expect(screen.getByText(new RegExp(text))).toBeInTheDocument();
-        expect(screen.getByText("บริการที่ใช้งานได้ขึ้นอยู่กับสิทธิ์ของบัญชีคุณ")).toBeInTheDocument();
+        expect(screen.getByText("ลงชื่อเข้าใช้ NHFapp เพื่อเชื่อมบัญชีกับ LINE ครั้งเดียว")).toBeInTheDocument();
         expect(screen.getByAltText("QR Code สำหรับเพิ่ม NHF เป็นเพื่อนใน LINE")).toHaveAttribute("src", expect.stringContaining("950gaxzt"));
         expect(screen.getByText("LINE OA ID: @950gaxzt")).toBeInTheDocument();
         const add = await screen.findByRole("link", { name: "เพิ่มเพื่อนใน LINE" });

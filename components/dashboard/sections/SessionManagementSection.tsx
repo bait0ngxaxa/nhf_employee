@@ -18,7 +18,7 @@ function SessionErrorState({ onRetry }: { onRetry: () => void }) {
                     tabIndex={-1}
                     className="text-2xl font-bold tracking-tight text-content-heading"
                 >
-                    จัดการเซสชัน
+                    อุปกรณ์ที่เข้าสู่ระบบ
                 </h1>
                 <Card className="rounded-xl border-status-danger-border bg-surface-raised shadow-none">
                     <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -26,7 +26,7 @@ function SessionErrorState({ onRetry }: { onRetry: () => void }) {
                             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-danger-foreground" />
                             <div className="min-w-0 space-y-1">
                                 <p className="font-semibold text-status-danger-strong">
-                                    โหลดข้อมูลเซสชันไม่สำเร็จ
+                                    โหลดรายการอุปกรณ์ไม่สำเร็จ
                                 </p>
                                 <p className="text-sm leading-6 text-status-danger-strong [overflow-wrap:anywhere]">
                                     กรุณาลองใหม่อีกครั้ง หากยังไม่สำเร็จให้เข้าสู่ระบบใหม่

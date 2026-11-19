@@ -392,14 +392,14 @@ describe("LIFF Leave app orchestration", () => {
                 canCreateOwnRequests: false,
             }));
         });
-        expect(await screen.findByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+        expect(await screen.findByText("บัญชีนี้เปิดหน้าวันลานี้ไม่ได้"))
             .toBeInTheDocument();
 
         await act(async () => {
             olderHome.resolve(leaveHome("บัญชีเก่า"));
         });
 
-        expect(screen.getByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+        expect(screen.getByText("บัญชีนี้เปิดหน้าวันลานี้ไม่ได้"))
             .toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "ยื่นลา" })).not.toBeInTheDocument();
         expect(mocks.fetchProfile).not.toHaveBeenCalled();
@@ -492,7 +492,7 @@ describe("LIFF Leave app orchestration", () => {
 
         render(<LiffLeaveApp />);
 
-        expect(await screen.findByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+        expect(await screen.findByText("บัญชีนี้เปิดหน้าวันลานี้ไม่ได้"))
             .toBeInTheDocument();
         expect(mocks.fetchProfile).not.toHaveBeenCalled();
         expect(mocks.fetchApprovals).not.toHaveBeenCalled();

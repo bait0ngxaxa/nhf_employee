@@ -125,7 +125,7 @@ function loadingLabel(state: LiffBootstrapState): string {
         case "LINE_AUTHENTICATING":
             return "กำลังยืนยันตัวตนกับ LINE…";
         case "SESSION_ESTABLISHING":
-            return "กำลังเตรียมสิทธิ์การเข้าถึง…";
+            return "กำลังเข้าสู่ NHFapp…";
         case "LINKING":
             return "กำลังเชื่อมบัญชีกับ NHFapp…";
         default:

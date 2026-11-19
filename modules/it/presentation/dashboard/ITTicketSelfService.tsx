@@ -67,7 +67,7 @@ function TicketStatus({ status }: { status: ITTicketStatus }): ReactElement {
 
 function TicketListSkeleton(): ReactElement {
     return (
-        <div role="status" aria-label="กำลังโหลด Ticket" className="space-y-4 p-5">
+        <div role="status" aria-label="กำลังโหลดคำขอ" className="space-y-4 p-5">
             {[0, 1, 2].map((row) => (
                 <div key={row} className="space-y-3 border-b border-border-neutral pb-4 last:border-b-0">
                     <Skeleton className="h-5 w-2/3" />
@@ -159,7 +159,7 @@ export function ITTicketSelfService({
                 const payload: unknown = await response.json().catch(() => null);
                 if (!response.ok) throw new Error(readITRequesterError(payload, response.status));
                 const parsed = parseITRequesterTicketList(payload);
-                if (parsed === null) throw new Error("ข้อมูลรายการ Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
+                if (parsed === null) throw new Error("ข้อมูลรายการคำขอ ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 if (controller.signal.aborted) return;
                 setListState({ key: requestKey, kind: "loaded", list: parsed });
             })
@@ -170,7 +170,7 @@ export function ITTicketSelfService({
                     kind: "error",
                     message: error instanceof Error
                         ? error.message
-                        : "ไม่สามารถโหลดรายการ Ticket ได้ กรุณาลองอีกครั้ง",
+                        : "ไม่สามารถโหลดรายการคำขอได้ กรุณาลองอีกครั้ง",
                 });
             });
 
@@ -253,13 +253,13 @@ export function ITTicketSelfService({
             }
             updateSelectedAttachments([]);
             setDialogOpen(false);
-            setCreatedMessage(`ส่ง Ticket #${createdTicket.id} เรียบร้อยแล้ว`);
+            setCreatedMessage(`ส่งคำขอ #${createdTicket.id} เรียบร้อยแล้ว`);
             setPage(1);
             setRefreshKey((current) => current + 1);
         } catch (error) {
             setCreateError(error instanceof Error
                 ? error.message
-                : "ไม่สามารถส่ง Ticket ได้ กรุณาลองอีกครั้ง");
+                : "ไม่สามารถส่งคำขอได้ กรุณาลองอีกครั้ง");
         } finally {
             createInFlightRef.current = false;
             setCreating(false);
@@ -273,7 +273,7 @@ export function ITTicketSelfService({
                 <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                     {!embedded ? <div className="min-w-0 space-y-1">
                         <h1 data-page-heading tabIndex={-1} className="text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
-                            Ticket ของฉัน
+                            คำขอของฉัน
                         </h1>
                         <p className="max-w-[70ch] text-sm font-medium leading-6 text-content-secondary">
                             แจ้งปัญหาหรือขอความช่วยเหลือ และติดตามสถานะคำขอของคุณได้ที่นี่
@@ -303,7 +303,7 @@ export function ITTicketSelfService({
                         <div className="flex items-end justify-between gap-3">
                             <div>
                                 <h2 id="it-ticket-list-heading" className="text-lg font-semibold text-content-heading">
-                                    รายการ Ticket
+                                    รายการคำขอ
                                 </h2>
                                 {list ? (
                                     <p className="mt-1 text-sm text-content-secondary">
@@ -334,7 +334,7 @@ export function ITTicketSelfService({
                         {!loading && !listError && list?.tickets.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-border-neutral bg-surface-subtle px-5 py-10 text-center">
                                 <TicketCheck aria-hidden="true" className="mx-auto size-8 text-content-muted" />
-                                <h3 className="mt-3 font-semibold text-content-heading">ยังไม่มี Ticket</h3>
+                                <h3 className="mt-3 font-semibold text-content-heading">ยังไม่มีคำขอ</h3>
                                 <p className="mx-auto mt-1 max-w-[52ch] text-sm leading-6 text-content-secondary">
                                     เมื่อส่งคำขอแล้ว คุณจะกลับมาติดตามสถานะได้จากรายการนี้
                                 </p>
@@ -343,7 +343,7 @@ export function ITTicketSelfService({
                         {!loading && !listError && list && list.tickets.length > 0 ? (
                             <Card className="gap-0 overflow-hidden py-0">
                                 <CardContent className="px-0 py-0">
-                                    <ul aria-label="Ticket ของฉัน" className="divide-y divide-border-neutral">
+                                    <ul aria-label="คำขอของฉัน" className="divide-y divide-border-neutral">
                                         {list.tickets.map((ticket) => (
                                             <li key={ticket.id}>
                                                 <Link
@@ -371,7 +371,7 @@ export function ITTicketSelfService({
                         ) : null}
 
                         {!loading && !listError && list && list.pagination.totalPages > 1 ? (
-                            <nav aria-label="แบ่งหน้ารายการ Ticket" className="flex items-center justify-between gap-3 pt-2">
+                            <nav aria-label="แบ่งหน้ารายการคำขอ" className="flex items-center justify-between gap-3 pt-2">
                                 <Button
                                     type="button"
                                     size="sm"
@@ -400,7 +400,7 @@ export function ITTicketSelfService({
                     </section>
                 ) : (
                     <p className="rounded-lg border border-border-neutral bg-surface-subtle p-4 text-sm text-content-secondary">
-                        คุณสามารถสร้าง Ticket ได้ แต่บัญชีนี้ไม่มีสิทธิ์อ่านรายการ Ticket
+                        บัญชีนี้ส่งคำขอได้ หากต้องการติดตามรายการ กรุณาติดต่อทีม IT
                     </p>
                 )}
             </div>
@@ -412,7 +412,7 @@ export function ITTicketSelfService({
                     <DialogHeader>
                         <DialogTitle>แจ้งปัญหา / ขอความช่วยเหลือ</DialogTitle>
                         <DialogDescription>
-                            ระบุประเภทคำขอ หัวข้อ และรายละเอียด ระบบจะบันทึก Ticket ในนามบัญชีของคุณ
+                            ระบุประเภทคำขอ หัวข้อ และรายละเอียดเพื่อให้ทีม IT ดำเนินการ
                         </DialogDescription>
                     </DialogHeader>
                     <form className="min-h-0 flex flex-1 flex-col" onSubmit={handleCreate}>
@@ -506,7 +506,7 @@ export function ITTicketSelfService({
                                 ยกเลิก
                             </Button>
                             <Button type="submit" disabled={creating} aria-busy={creating}>
-                                {creating ? "กำลังส่ง…" : "ส่ง Ticket"}
+                                {creating ? "กำลังส่ง…" : "ส่งคำขอ"}
                             </Button>
                         </DialogFooter>
                     </form>

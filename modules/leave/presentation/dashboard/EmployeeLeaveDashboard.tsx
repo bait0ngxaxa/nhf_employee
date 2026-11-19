@@ -39,7 +39,7 @@ export function EmployeeLeaveDashboard({
                 className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong"
                 role="status"
             >
-                บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูลวันลาของตนเอง
+                บัญชีนี้เปิดข้อมูลวันลาของตนเองไม่ได้
             </div>
         );
     }

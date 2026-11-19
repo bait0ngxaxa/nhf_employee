@@ -486,7 +486,7 @@ export function LiffITConversation({
                         }}
                     >
                         <RefreshCw aria-hidden="true" className="size-4" />
-                        {requiresTicketRefresh ? "โหลดสถานะ Ticket ล่าสุด" : "โหลดบทสนทนาอีกครั้ง"}
+                        {requiresTicketRefresh ? "โหลดสถานะคำขอล่าสุด" : "โหลดบทสนทนาอีกครั้ง"}
                     </Button>
                 </div>
             ) : null}
@@ -517,12 +517,12 @@ export function LiffITConversation({
 
             {!commentable ? (
                 <p className="rounded-xl border border-border-neutral bg-surface-subtle p-4 text-sm leading-6 text-content-secondary">
-                    Ticket นี้อยู่ในสถานะ {IT_TICKET_STATUS_LABELS[status]} จึงอ่านบทสนทนาได้ แต่ไม่สามารถส่งข้อความตอบกลับได้
+                    คำขอนี้อยู่ในสถานะ {IT_TICKET_STATUS_LABELS[status]} จึงอ่านบทสนทนาได้ แต่ไม่สามารถส่งข้อความตอบกลับได้
                 </p>
             ) : null}
             {commentable && status === "WAITING_REQUESTER" ? (
                 <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-                    การตอบกลับของคุณจะไม่เปลี่ยนสถานะ Ticket โดยอัตโนมัติ
+                    การตอบกลับของคุณจะไม่เปลี่ยนสถานะคำขอโดยอัตโนมัติ
                 </p>
             ) : null}
             {postError && !canReply ? (
@@ -531,7 +531,7 @@ export function LiffITConversation({
                     {refreshAfterConflictAt === refreshVersion ? (
                         <Button type="button" variant="outline" className="min-h-11 w-full" onClick={onTicketRefresh} disabled={ticketRefreshing} aria-busy={ticketRefreshing}>
                             <RefreshCw aria-hidden="true" className="size-4" />
-                            {ticketRefreshing ? "กำลังโหลดสถานะ Ticket…" : "โหลดสถานะ Ticket ล่าสุด"}
+                            {ticketRefreshing ? "กำลังโหลดสถานะคำขอ…" : "โหลดสถานะคำขอล่าสุด"}
                         </Button>
                     ) : null}
                 </div>
@@ -599,7 +599,7 @@ export function LiffITConversation({
                             {refreshAfterConflictAt === refreshVersion ? (
                                 <Button type="button" variant="outline" className="min-h-11 w-full" onClick={onTicketRefresh} disabled={ticketRefreshing} aria-busy={ticketRefreshing}>
                                     <RefreshCw aria-hidden="true" className="size-4" />
-                                    {ticketRefreshing ? "กำลังโหลดสถานะ Ticket…" : "โหลดสถานะ Ticket ล่าสุด"}
+                                    {ticketRefreshing ? "กำลังโหลดสถานะคำขอ…" : "โหลดสถานะคำขอล่าสุด"}
                                 </Button>
                             ) : null}
                         </div>
