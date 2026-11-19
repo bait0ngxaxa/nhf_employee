@@ -35,7 +35,7 @@ export function DashboardMoreSection(): ReactElement {
                 <section aria-labelledby="more-account">
                     <h2 id="more-account" className="mb-2 text-sm font-semibold text-content-secondary">บัญชีและการใช้งาน</h2>
                     <div className="space-y-2 rounded-xl border border-border-subtle bg-surface-raised p-3">
-                        <DashboardNavigationLink href={APP_ROUTES.dashboardSessions} className="flex min-h-11 items-center gap-3 rounded-md px-2 text-sm text-content-body hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-brand-focus"><Smartphone className="size-5" aria-hidden="true" />จัดการเซสชัน</DashboardNavigationLink>
+                        <DashboardNavigationLink href={APP_ROUTES.dashboardSessions} className="flex min-h-11 items-center gap-3 rounded-md px-2 text-sm text-content-body hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-brand-focus"><Smartphone className="size-5" aria-hidden="true" />อุปกรณ์ที่เข้าสู่ระบบ</DashboardNavigationLink>
                         {user?.notificationCapabilities?.canReadInbox === true ? <DashboardNavigationLink href={APP_ROUTES.dashboardNotifications} className="flex min-h-11 items-center gap-3 rounded-md px-2 text-sm text-content-body hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-brand-focus"><Bell className="size-5" aria-hidden="true" />การแจ้งเตือน</DashboardNavigationLink> : null}
                         <p className="px-2 text-sm text-content-secondary">ข้อมูลบัญชี ธีม และออกจากระบบ</p>
                         <DashboardAccountMenu />

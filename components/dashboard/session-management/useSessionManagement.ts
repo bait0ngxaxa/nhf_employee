@@ -4,14 +4,45 @@ import { useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 
-import { apiGet, apiPost } from "@/lib/client/api-client";
+import { apiGet, apiPost, type ApiResponse } from "@/lib/client/api-client";
 import { API_ROUTES } from "@/lib/ssot/routes";
 import type { ConfirmAction, SessionItem, SessionsResponse } from "./types";
+
+const SESSION_LIST_FAILURE = "โหลดรายการเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
+const SESSION_REVOKE_FAILURE = "ออกจากระบบรายการนี้ไม่สำเร็จ กรุณาโหลดรายการล่าสุด";
+
+function getSessionError(
+    failure: Extract<ApiResponse<unknown>, { success: false }>,
+    operation: "list" | "revoke",
+): string {
+    switch (failure.status) {
+        case 401:
+            return "กรุณาเข้าสู่ระบบอีกครั้ง";
+        case 403:
+            return operation === "list"
+                ? "บัญชีนี้เปิดรายการเข้าสู่ระบบไม่ได้"
+                : "บัญชีนี้ออกจากระบบรายการนี้ไม่ได้";
+        case 404:
+        case 409:
+            return "รายการเข้าสู่ระบบอาจไม่พร้อมใช้งานแล้ว กรุณาโหลดรายการล่าสุด";
+        case 400:
+        case 422:
+            return "ข้อมูลรายการเข้าสู่ระบบไม่ถูกต้อง กรุณาโหลดรายการล่าสุด";
+        default:
+            if (failure.code === "TIMEOUT") {
+                return "การเชื่อมต่อใช้เวลานานเกินไป กรุณาโหลดรายการล่าสุด";
+            }
+            if (failure.status === undefined) {
+                return "เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วโหลดรายการใหม่";
+            }
+            return operation === "list" ? SESSION_LIST_FAILURE : SESSION_REVOKE_FAILURE;
+    }
+}
 
 async function fetchSessions(): Promise<SessionsResponse> {
     const result = await apiGet<SessionsResponse>(API_ROUTES.auth.sessions);
     if (!result.success) {
-        throw new Error(result.error);
+        throw new Error(getSessionError(result, "list"));
     }
 
     return result.data;
@@ -60,17 +91,14 @@ export function useSessionManagement({
                 { sessionId },
             );
             if (!result.success) {
-                throw new Error(result.error);
+                toast.error(getSessionError(result, "revoke"));
+                return;
             }
 
-            toast.success("ยกเลิกเซสชันเรียบร้อย");
+            toast.success("ออกจากระบบรายการนี้แล้ว");
             await mutate();
-        } catch (revokeError) {
-            const message =
-                revokeError instanceof Error
-                    ? revokeError.message
-                    : "ไม่สามารถยกเลิกเซสชันได้";
-            toast.error(message);
+        } catch {
+            toast.error(SESSION_REVOKE_FAILURE);
         } finally {
             setRevokingId(null);
         }
@@ -78,7 +106,7 @@ export function useSessionManagement({
 
     const handleRevokeOtherSessions = async (): Promise<void> => {
         if (otherSessions.length === 0) {
-            toast.info("ไม่มีเซสชันอื่นที่กำลังใช้งาน");
+            toast.info("ไม่มีรายการเข้าสู่ระบบอื่น");
             return;
         }
 
@@ -93,16 +121,20 @@ export function useSessionManagement({
                 ),
             );
 
-            const failedCount = revokeResults.filter((result) => !result.success).length;
+            const failures = revokeResults.filter((result) => !result.success);
+            const failedCount = failures.length;
             if (failedCount > 0) {
-                toast.error(`ยกเลิกเซสชันล้มเหลว ${failedCount} รายการ`);
+                const messages = [...new Set(failures.map((result) => getSessionError(result, "revoke")))];
+                toast.error(`ออกจากระบบไม่สำเร็จ ${failedCount} รายการ`, {
+                    description: messages.join(" "),
+                });
             } else {
-                toast.success("ออกจากระบบอุปกรณ์อื่นทั้งหมดแล้ว");
+                toast.success("ออกจากระบบรายการอื่นทั้งหมดแล้ว");
             }
 
             await mutate();
         } catch {
-            toast.error("ไม่สามารถออกจากระบบอุปกรณ์อื่นได้");
+            toast.error("ออกจากระบบรายการอื่นไม่สำเร็จ กรุณาโหลดรายการล่าสุด");
         } finally {
             setIsRevokingOthers(false);
         }

@@ -84,7 +84,7 @@ describe("IT Ticket Activity", () => {
 
         const conversation = await screen.findByRole("list", { name: "ข้อความในการสนทนา" });
         const activity = await screen.findByRole("list", {
-            name: "ประวัติการดำเนินการ Ticket #" + ticketId,
+            name: "ประวัติการดำเนินการ #" + ticketId,
         });
         expect(within(conversation).getByText("ข้อความใหม่")).toBeInTheDocument();
         expect(within(conversation).queryByText("รับเรื่องแล้ว")).not.toBeInTheDocument();
@@ -165,7 +165,7 @@ describe("IT Ticket Activity", () => {
         );
 
         await waitFor(() => expect(screen.queryByRole("list", {
-            name: `ประวัติการดำเนินการ Ticket #${ticketId}`,
+            name: `ประวัติการดำเนินการ #${ticketId}`,
         })).not.toBeInTheDocument());
         expect(screen.getByText("ยังไม่มีประวัติการดำเนินการ")).toBeInTheDocument();
 
@@ -179,7 +179,7 @@ describe("IT Ticket Activity", () => {
             />,
         );
         const operatorActivity = await screen.findByRole("list", {
-            name: `ประวัติการดำเนินการ Ticket #${ticketId}`,
+            name: `ประวัติการดำเนินการ #${ticketId}`,
         });
         expect(within(operatorActivity).getByText(/เปลี่ยนระดับความสำคัญจาก P2/)).toBeInTheDocument();
         expect(within(operatorActivity).getByText(/เหตุผล: ระบบสำคัญขัดข้องหลายหน่วยงาน/)).toBeInTheDocument();
@@ -221,7 +221,7 @@ describe("IT Ticket Activity", () => {
         const summary = screen.getByText("ประวัติการดำเนินการ");
         fireEvent.click(summary);
         const activity = await screen.findByRole("list", {
-            name: "ประวัติการดำเนินการ Ticket #" + ticketId,
+            name: "ประวัติการดำเนินการ #" + ticketId,
         });
         expect(within(activity).getByText("อัปเดตการรับเรื่อง")).toBeInTheDocument();
         expect(within(activity).getByText("ปรับข้อมูลการจัดหมวดหมู่")).toBeInTheDocument();

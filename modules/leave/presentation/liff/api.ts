@@ -19,27 +19,41 @@ import type { LeaveRequestValues } from "../../schemas/leave";
 
 function getLeaveApiErrorMessage(
     response: Extract<ApiResponse<unknown>, { success: false }>,
+    accessDenied: string,
 ): string {
     switch (response.status) {
         case 401:
             return isRecoveredLiffUnauthorizedResponse(response)
                 ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
-                : "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง";
+                : "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ";
         case 403:
-            return "คุณไม่มีสิทธิ์ดำเนินการกับคำขอลานี้";
+            return accessDenied;
         case 404:
-            return response.errorThai || "ไม่พบรายการลา หรือยังไม่เปิดใช้งาน Leave";
+            return "ไม่พบข้อมูลวันลาที่เปิดดูได้";
         case 409:
-            return response.errorThai || "สถานะคำขอลาเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลใหม่";
+            return response.errorThai && response.errorThai === response.error
+                ? response.errorThai
+                : "สถานะคำขอลาเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลใหม่";
         case 413:
             return "ไฟล์แนบหรือคำขอมีขนาดใหญ่เกินไป";
+        case 400:
+        case 422:
+            return response.errorThai || "ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง";
         default:
-            return response.errorThai || "ไม่สามารถเชื่อมต่อข้อมูล Leave ได้";
+            if (response.status === undefined) {
+                return response.code === "TIMEOUT"
+                    ? "การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่"
+                    : "เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่";
+            }
+            return "บริการวันลาไม่พร้อมใช้งานชั่วคราว กรุณาลองอีกครั้ง";
     }
 }
 
-async function unwrapLeaveResponse<T>(response: ApiResponse<T>): Promise<T> {
-    return unwrapLiffResponse(response, getLeaveApiErrorMessage);
+async function unwrapLeaveResponse<T>(
+    response: ApiResponse<T>,
+    accessDenied: string,
+): Promise<T> {
+    return unwrapLiffResponse(response, (failure) => getLeaveApiErrorMessage(failure, accessDenied));
 }
 
 export async function fetchLiffLeaveProfile(input: {
@@ -58,6 +72,7 @@ export async function fetchLiffLeaveProfile(input: {
             `${API_ROUTES.line.leaveMe}?${params.toString()}`,
             LIFF_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดข้อมูลและประวัติวันลาไม่ได้",
     );
 }
 
@@ -76,6 +91,7 @@ export async function fetchLiffLeaveApprovals(input: {
             `${API_ROUTES.line.leaveApprovals}?${params.toString()}`,
             LIFF_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดรายการคำขอลาที่รอพิจารณาไม่ได้",
     );
 }
 
@@ -87,6 +103,7 @@ export async function fetchLiffLeaveRequest(
             API_ROUTES.line.leaveRequestById(requestId),
             LIFF_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดรายละเอียดคำขอลาไม่ได้",
     );
 }
 
@@ -109,24 +126,29 @@ export async function submitLiffLeaveRequest(
                 headers: { "Idempotency-Key": idempotencyKey },
             },
         ),
+        "บัญชีนี้ส่งคำขอลาไม่ได้",
     );
 }
 
 async function postLeaveMutation(
     route: string,
     payload: Record<string, unknown>,
+    accessDenied: string,
 ): Promise<void> {
     await unwrapLeaveResponse(
         await apiPost<unknown>(route, payload, LIFF_API_REQUEST_OPTIONS),
+        accessDenied,
     );
 }
 
 async function putLeaveMutation(
     route: string,
     payload: Record<string, unknown>,
+    accessDenied: string,
 ): Promise<void> {
     await unwrapLeaveResponse(
         await apiPut<unknown>(route, payload, LIFF_API_REQUEST_OPTIONS),
+        accessDenied,
     );
 }
 
@@ -134,14 +156,22 @@ export async function cancelLiffLeave(
     leaveId: string,
     reason?: string,
 ): Promise<void> {
-    return postLeaveMutation(API_ROUTES.line.leaveCancel, { leaveId, reason });
+    return postLeaveMutation(
+        API_ROUTES.line.leaveCancel,
+        { leaveId, reason },
+        "บัญชีนี้ยกเลิกคำขอลาไม่ได้",
+    );
 }
 
 export async function requestLiffLeaveNotTaken(
     leaveId: string,
     note: string,
 ): Promise<void> {
-    return postLeaveMutation(API_ROUTES.line.leaveNotTaken, { leaveId, note });
+    return postLeaveMutation(
+        API_ROUTES.line.leaveNotTaken,
+        { leaveId, note },
+        "บัญชีนี้ส่งคำขอแจ้งไม่ได้ใช้วันลาไม่ได้",
+    );
 }
 
 export async function submitLiffLeaveDecision(input: {
@@ -150,14 +180,22 @@ export async function submitLiffLeaveDecision(input: {
     action: "APPROVE" | "REJECT";
     reason?: string;
 }): Promise<void> {
-    return postLeaveMutation(API_ROUTES.line.leaveDecision, input);
+    return postLeaveMutation(
+        API_ROUTES.line.leaveDecision,
+        input,
+        "บัญชีนี้พิจารณาคำขอลาไม่ได้",
+    );
 }
 
 export async function confirmLiffLeaveNotTaken(
     leaveId: string,
     reason?: string,
 ): Promise<void> {
-    return putLeaveMutation(API_ROUTES.line.leaveNotTaken, { leaveId, reason });
+    return putLeaveMutation(
+        API_ROUTES.line.leaveNotTaken,
+        { leaveId, reason },
+        "บัญชีนี้ยืนยันการไม่ได้ใช้วันลาไม่ได้",
+    );
 }
 
 export async function decideLiffLeaveCancellation(input: {
@@ -165,7 +203,11 @@ export async function decideLiffLeaveCancellation(input: {
     action: "CONFIRM" | "REJECT";
     reason?: string;
 }): Promise<void> {
-    return putLeaveMutation(API_ROUTES.line.leaveCancel, input);
+    return putLeaveMutation(
+        API_ROUTES.line.leaveCancel,
+        input,
+        "บัญชีนี้พิจารณาคำขอยกเลิกวันลาไม่ได้",
+    );
 }
 
 export async function fetchLiffLeaveAttachment(
@@ -183,7 +225,7 @@ export async function fetchLiffLeaveAttachment(
     if (!response.ok) {
         throw new LiffApiError(
             response.status === 401
-                ? "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง"
+                ? "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ"
                 : "ไม่สามารถเปิดไฟล์แนบนี้ได้",
             response.status,
         );

@@ -211,12 +211,12 @@ describe("IT requester LIFF API adapter", () => {
 
     it("maps authorization, hidden resources, conflicts, size limits, rate limits, and service errors safely", async () => {
         const cases = [
-            [403, "บัญชีนี้ยังไม่มีสิทธิ์ดูรายการ Ticket"],
-            [404, "ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้"],
-            [409, "Ticket มีการเปลี่ยนแปลง กรุณาตรวจสอบสถานะล่าสุดก่อนลองอีกครั้ง"],
+            [403, "บัญชีนี้เปิดรายการคำขอไม่ได้ หากต้องใช้งาน กรุณาติดต่อทีม IT"],
+            [404, "ไม่พบคำขอที่เปิดดูได้"],
+            [409, "คำขอมีการเปลี่ยนแปลง กรุณาตรวจสอบสถานะล่าสุดก่อนดำเนินการ"],
             [413, "ข้อความหรือรูปภาพมีขนาดใหญ่เกินไป กรุณาลดขนาดแล้วลองอีกครั้ง"],
             [429, "ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่"],
-            [503, "ระบบ Ticket ขัดข้องชั่วคราว กรุณาลองอีกครั้ง"],
+            [503, "บริการ IT ขัดข้องชั่วคราว กรุณาลองอีกครั้ง"],
         ] as const;
 
         for (const [status, message] of cases) {
@@ -286,7 +286,7 @@ describe("IT requester LIFF API adapter", () => {
         await expect(fetchLiffITAttachment("hidden-id")).rejects.toMatchObject({
             name: "LiffApiError",
             status: 404,
-            message: "ไม่พบรูปภาพนี้หรือคุณไม่มีสิทธิ์ดูรูปภาพ",
+            message: "ไม่พบรูปภาพที่เปิดดูได้",
         });
         vi.unstubAllGlobals();
 

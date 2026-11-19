@@ -70,7 +70,7 @@ function SessionRow({
                     <span className="text-sm text-content-secondary">{parsed.os}</span>
                     {session.isCurrent ? (
                         <Badge className="bg-status-info-surface-strong text-status-info-strong hover:bg-status-info-surface-strong">
-                            อุปกรณ์นี้
+                            รายการปัจจุบัน
                         </Badge>
                     ) : null}
                 </div>
@@ -89,17 +89,17 @@ function SessionRow({
                     <Button
                         variant="outline"
                         size="sm"
-                        className="h-11 w-full border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
+                        className="h-auto min-h-11 w-full whitespace-normal border-status-danger-border text-status-danger-strong hover:bg-status-danger-surface hover:text-status-danger-strong"
                         onClick={() => onRequestRevoke(session.id)}
                         disabled={isRevoking || isValidating}
-                        aria-label={`ยกเลิกเซสชัน ${parsed.browser} ${parsed.os}`}
+                        aria-label={`ออกจากระบบรายการนี้ ${parsed.browser} ${parsed.os}`}
                     >
                         {isRevoking ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                         ) : (
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
                         )}
-                        ยกเลิกเซสชัน
+                        ออกจากระบบรายการนี้
                     </Button>
                 ) : null}
             </div>
@@ -146,10 +146,10 @@ export function SessionManagementView({
                                 tabIndex={-1}
                                 className="text-2xl font-bold tracking-tight text-content-heading"
                             >
-                                จัดการเซสชัน
+                                อุปกรณ์ที่เข้าสู่ระบบ
                             </h1>
                             <p className="mt-0.5 text-sm text-content-secondary">
-                                ตรวจสอบอุปกรณ์ที่กำลังเข้าถึงบัญชีของคุณ
+                                ตรวจสอบรายการเข้าสู่ระบบของบัญชีคุณ อุปกรณ์เดียวอาจมีหลายรายการจากเบราว์เซอร์หรือโปรไฟล์ต่างกัน
                             </p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
@@ -164,13 +164,13 @@ export function SessionManagementView({
                             ) : (
                                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                             )}
-                            ออกจากอุปกรณ์อื่น
+                            ออกจากระบบรายการอื่นทั้งหมด
                         </Button>
                         <Button
                             onClick={() => onSetConfirmAction({ type: "signout-current" })}
                             className="h-11 bg-status-info-solid text-content-on-brand hover:bg-status-info-solid-hover"
                         >
-                            ออกจากอุปกรณ์นี้
+                            ออกจากระบบที่กำลังใช้งาน
                         </Button>
                     </div>
                 </header>
@@ -178,11 +178,11 @@ export function SessionManagementView({
                 <div className="overflow-hidden rounded-xl border border-border-subtle bg-surface-raised">
                     <div className="flex flex-col gap-3 border-b border-border-subtle px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <h3 className="font-semibold text-content-heading">
-                                อุปกรณ์ที่กำลังใช้งาน <span className="text-status-info-foreground">{sessions.length}</span>
-                            </h3>
+                            <h2 className="font-semibold text-content-heading">
+                                รายการเข้าสู่ระบบที่ยังใช้งานได้
+                            </h2>
                             <p className="mt-0.5 text-sm text-content-secondary">
-                                เลือกยกเลิกอุปกรณ์ที่คุณไม่รู้จักได้ทันที
+                                ทั้งหมด {sessions.length} รายการ
                             </p>
                         </div>
                         <Button
@@ -215,7 +215,7 @@ export function SessionManagementView({
                     ) : (
                         <div className="px-5 py-12 text-center">
                             <Clock3 className="mx-auto h-5 w-5 text-content-subtle" aria-hidden="true" />
-                            <p className="mt-3 text-sm font-semibold text-content-primary">ไม่พบเซสชันที่กำลังใช้งาน</p>
+                            <p className="mt-3 text-sm font-semibold text-content-primary">ไม่พบรายการเข้าสู่ระบบ</p>
                             <p className="mt-1 text-sm text-content-secondary">ลองโหลดข้อมูลใหม่อีกครั้ง</p>
                         </div>
                     )}

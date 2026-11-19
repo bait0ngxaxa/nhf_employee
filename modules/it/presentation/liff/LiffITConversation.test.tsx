@@ -196,7 +196,7 @@ describe("LiffITConversation", () => {
 
             expect(await screen.findByRole("alert")).toHaveTextContent(`อ่านบทสนทนาไม่ได้ (${status})`);
             expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
-            fireEvent.click(screen.getByRole("button", { name: "โหลดสถานะ Ticket ล่าสุด" }));
+            fireEvent.click(screen.getByRole("button", { name: "โหลดสถานะคำขอล่าสุด" }));
 
             expect(onTicketRefresh).toHaveBeenCalledTimes(1);
         },
@@ -216,7 +216,7 @@ describe("LiffITConversation", () => {
             mocks.fetchConversation.mockResolvedValueOnce({ items: [COMMENT], olderCursor: null, hasMore: false });
             renderConversation(status);
             expect(await screen.findByText("ข้อความล่าสุดจากเจ้าหน้าที่")).toBeInTheDocument();
-            expect(screen.getByText(`Ticket นี้อยู่ในสถานะ ${status === "RESOLVED" ? "แก้ไขแล้ว" : status === "CLOSED" ? "ปิดงานแล้ว" : "ยกเลิกแล้ว"} จึงอ่านบทสนทนาได้ แต่ไม่สามารถส่งข้อความตอบกลับได้`)).toBeInTheDocument();
+            expect(screen.getByText(`คำขอนี้อยู่ในสถานะ ${status === "RESOLVED" ? "แก้ไขแล้ว" : status === "CLOSED" ? "ปิดงานแล้ว" : "ยกเลิกแล้ว"} จึงอ่านบทสนทนาได้ แต่ไม่สามารถส่งข้อความตอบกลับได้`)).toBeInTheDocument();
             expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
         },
     );
@@ -437,7 +437,7 @@ describe("LiffITConversation", () => {
         });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
         expect(await screen.findByRole("alert")).toHaveTextContent("Ticket มีการเปลี่ยนแปลง");
-        const reloadButton = await screen.findByRole("button", { name: "โหลดสถานะ Ticket ล่าสุด" });
+        const reloadButton = await screen.findByRole("button", { name: "โหลดสถานะคำขอล่าสุด" });
         fireEvent.click(reloadButton);
         expect(onTicketRefresh).toHaveBeenCalledTimes(1);
 

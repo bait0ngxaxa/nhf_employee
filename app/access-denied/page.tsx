@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, ArrowLeft, Home } from 'lucide-react';
+import { APP_ROUTES } from '@/lib/ssot/routes';
 
 export default function AccessDenied() {
   const router = useRouter();
@@ -16,20 +17,13 @@ export default function AccessDenied() {
             <Shield className="h-8 w-8 text-status-error-muted" />
           </div>
           <CardTitle className="text-2xl font-bold text-status-error-emphasis">
-            ไม่มีสิทธิ์เข้าถึง
+            บัญชีนี้เปิดหน้านี้ไม่ได้
           </CardTitle>
           <CardDescription className="text-status-error-foreground">
-            คุณไม่มีสิทธิ์ในการเข้าถึงส่วนนี้ของระบบ
+            หากต้องใช้งานหน้านี้ กรุณาติดต่อผู้ดูแลระบบ
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="text-center text-content-neutral-secondary">
-            <p>
-              คุณยังไม่มีสิทธิ์เข้าถึงส่วนนี้ หากคิดว่าสิทธิ์ของคุณไม่ถูกต้อง
-              กรุณาติดต่อผู้รับผิดชอบระบบ
-            </p>
-          </div>
-          
           <div className="flex flex-col gap-3">
             <Button 
               onClick={() => router.back()}
@@ -41,7 +35,7 @@ export default function AccessDenied() {
             </Button>
             
             <Button 
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push(APP_ROUTES.dashboard)}
               className="w-full flex items-center gap-2"
             >
               <Home className="h-4 w-4" />

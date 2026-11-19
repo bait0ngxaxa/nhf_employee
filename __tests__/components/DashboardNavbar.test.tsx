@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardNavbar } from "@/components/dashboard/layout/DashboardNavbar";
 import {
@@ -84,7 +84,7 @@ describe("DashboardNavbar mobile navigation", () => {
         expect(notificationDropdownMock).not.toHaveBeenCalled();
     });
 
-    it("shows Team context without exposing the internal system role", () => {
+    it("shows the employee name without exposing the Team or system role", () => {
         mockNavbarContext(false);
         vi.mocked(useDashboardDataContext).mockReturnValue({
             status: "authenticated",
@@ -101,13 +101,14 @@ describe("DashboardNavbar mobile navigation", () => {
 
         render(<DashboardNavbar />);
 
-        expect(screen.getAllByText("ทีม IT").length).toBeGreaterThan(0);
+        expect(screen.getByRole("button", { name: "สมชาย ใจดี" })).toBeInTheDocument();
+        expect(screen.queryByText("ทีม IT")).not.toBeInTheDocument();
         expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
         expect(screen.queryByText("บทบาทระบบ")).not.toBeInTheDocument();
     });
 
-    it("uses the neutral no-Team fallback", () => {
+    it("shows the account controls for an employee without Teams", () => {
         mockNavbarContext(false);
         vi.mocked(useDashboardDataContext).mockReturnValue({
             status: "authenticated",
@@ -123,10 +124,38 @@ describe("DashboardNavbar mobile navigation", () => {
         });
         render(<DashboardNavbar />);
 
-        expect(screen.getAllByText("ยังไม่กำหนดทีม").length).toBeGreaterThan(0);
+        expect(screen.getByRole("button", { name: "เมนูผู้ใช้" })).toBeInTheDocument();
+        expect(screen.queryByText("ยังไม่กำหนดทีม")).not.toBeInTheDocument();
         expect(screen.queryByText("USER")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ใช้งาน")).not.toBeInTheDocument();
     });
+
+    it.each(["สมชาย ใจดี", "เมนูผู้ใช้"])(
+        "shows the HR department and account actions in the %s menu",
+        (triggerName) => {
+            mockNavbarContext(false);
+            const context = vi.mocked(useDashboardDataContext)();
+            vi.mocked(useDashboardDataContext).mockReturnValue({
+                ...context,
+                user: {
+                    ...context.user,
+                    name: "สมชาย ใจดี",
+                    department: "การเงิน",
+                    teams: [{ id: 1, name: "ทีมจัดซื้อ" }, { id: 2, name: "ทีมสต็อก" }],
+                },
+            });
+
+            render(<DashboardNavbar />);
+
+            fireEvent.keyDown(screen.getByRole("button", { name: triggerName }), { key: "Enter" });
+
+            const menu = screen.getByRole("menu");
+            expect(within(menu).getByText("แผนก การเงิน")).toBeVisible();
+            expect(within(menu).queryByText(/ทีมจัดซื้อ|ทีมสต็อก/)).not.toBeInTheDocument();
+            fireEvent.click(within(menu).getByRole("menuitem", { name: "อุปกรณ์ที่เข้าสู่ระบบ" }));
+            expect(vi.mocked(useDashboardUIContext)().handleMenuClick).toHaveBeenCalledWith("sessions");
+        },
+    );
 
     it("passes independent read-only Notification update state to the dropdown", () => {
         mockNavbarContext(false);

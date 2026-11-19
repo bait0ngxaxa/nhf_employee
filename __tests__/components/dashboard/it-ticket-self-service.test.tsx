@@ -109,7 +109,7 @@ function postedCommentResponse(replayed = false, body = "ขออัปเด�
 }
 
 async function openCreateDialog(): Promise<void> {
-    await screen.findByText("ยังไม่มี Ticket");
+    await screen.findByText("ยังไม่มีคำขอ");
     fireEvent.click(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" }));
     fireEvent.change(screen.getByLabelText("หัวข้อ"), {
         target: { value: "  ขอความช่วยเหลือระบบงาน  " },
@@ -147,12 +147,39 @@ afterEach(() => {
 });
 
 describe("IT Ticket self-service presentation", () => {
+    it("shows a submission denial while keeping raw diagnostics out of the form", async () => {
+        fetchMock.mockResolvedValueOnce(emptyListResponse())
+            .mockResolvedValueOnce(apiResponse({ error: "SQL connection failed: internal-host:3306" }, 403));
+
+        render(<ITTicketSelfService capabilities={capabilities} />);
+        await openCreateDialog();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
+
+        expect(await screen.findByText(/บัญชีนี้ส่งคำขอแจ้งปัญหา IT ไม่ได้/)).toBeVisible();
+        expect(screen.queryByText(/internal-host/)).not.toBeInTheDocument();
+        expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    });
+
+    it("keeps actionable business validation in the submit form", async () => {
+        fetchMock.mockResolvedValueOnce(emptyListResponse())
+            .mockResolvedValueOnce(apiResponse({
+                error: "กรุณาเลือกหมวดหมู่ที่เปิดใช้งานก่อนส่งคำขอ",
+            }, 400));
+
+        render(<ITTicketSelfService capabilities={capabilities} />);
+        await openCreateDialog();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
+
+        expect(await screen.findByText("กรุณาเลือกหมวดหมู่ที่เปิดใช้งานก่อนส่งคำขอ")).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "หัวข้อ" })).toHaveValue("  ขอความช่วยเหลือระบบงาน  ");
+    });
+
     it("shows a skeleton while the bounded requester list is loading", async () => {
         mockApiImplementation(() => new Promise<Response>(() => undefined));
 
         render(<ITTicketSelfService capabilities={capabilities} />);
 
-        expect(await screen.findByRole("status", { name: "กำลังโหลด Ticket" }))
+        expect(await screen.findByRole("status", { name: "กำลังโหลดคำขอ" }))
             .toBeInTheDocument();
     });
 
@@ -161,7 +188,7 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
 
-        expect(await screen.findByText("ยังไม่มี Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ยังไม่มีคำขอ")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" })).toBeInTheDocument();
     });
 
@@ -172,9 +199,9 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
 
-        expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถเชื่อมต่อระบบได้");
+        expect(await screen.findByRole("alert")).toHaveTextContent("บริการ IT ขัดข้องชั่วคราว");
         fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
-        expect(await screen.findByText("ยังไม่มี Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ยังไม่มีคำขอ")).toBeInTheDocument();
     });
 
     it("lists Ticket identity, type, current status, timestamps, and a detail link", async () => {
@@ -200,7 +227,7 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
         await openCreateDialog();
-        const form = screen.getByRole("button", { name: "ส่ง Ticket" }).closest("form");
+        const form = screen.getByRole("button", { name: "ส่งคำขอ" }).closest("form");
         expect(form).not.toBeNull();
         fireEvent.submit(form as HTMLFormElement);
         fireEvent.submit(form as HTMLFormElement);
@@ -210,7 +237,7 @@ describe("IT Ticket self-service presentation", () => {
         expect(postCalls).toHaveLength(1);
 
         pendingPost.resolve?.(createdTicketResponse());
-        expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(await screen.findByText("ส่งคำขอ #19 เรียบร้อยแล้ว")).toBeInTheDocument();
     });
 
     it("reuses the logical submission key after an uncertain network result", async () => {
@@ -222,11 +249,11 @@ describe("IT Ticket self-service presentation", () => {
 
         render(<ITTicketSelfService capabilities={capabilities} />);
         await openCreateDialog();
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         expect(await screen.findByRole("alert")).toHaveTextContent("network result uncertain");
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
 
-        expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(await screen.findByText("ส่งคำขอ #19 เรียบร้อยแล้ว")).toBeInTheDocument();
         const postCalls = fetchMock.mock.calls.filter(([, options]) => options?.method === "POST");
         expect(postCalls).toHaveLength(2);
         const firstHeaders = new Headers(postCalls[0][1]?.headers);
@@ -267,9 +294,9 @@ describe("IT Ticket self-service presentation", () => {
         fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
             target: { files: [selectedFile] },
         });
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
 
-        expect(await screen.findByText("ส่ง Ticket #19 เรียบร้อยแล้ว")).toBeInTheDocument();
+        expect(await screen.findByText("ส่งคำขอ #19 เรียบร้อยแล้ว")).toBeInTheDocument();
         const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
         const body = postCall?.[1]?.body;
         expect(body).toBeInstanceOf(FormData);
@@ -283,6 +310,31 @@ describe("IT Ticket self-service presentation", () => {
 });
 
 describe("IT Ticket requester detail", () => {
+    it("offers reauthentication when the detail API returns 401", async () => {
+        fetchMock.mockResolvedValue(apiResponse({ error: "raw sign-in error" }, 401));
+
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+
+        const alert = await screen.findByRole("alert");
+        expect(alert).not.toHaveTextContent("raw sign-in error");
+        expect(screen.getByRole("link", { name: "เข้าสู่ระบบอีกครั้ง" })).toHaveAttribute("href", "/login");
+        expect(screen.queryByRole("button", { name: "ลองอีกครั้ง" })).not.toBeInTheDocument();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps an account denial distinct from reauthentication or a service failure", async () => {
+        fetchMock.mockResolvedValue(apiResponse({ error: "it.ticket.read OWN" }, 403));
+
+        render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
+
+        const alert = await screen.findByRole("alert");
+        expect(alert).toHaveTextContent(/บัญชีนี้เปิดรายละเอียดคำขอไม่ได้.*ติดต่อทีม IT/);
+        expect(alert).not.toHaveTextContent(/it\.ticket\.read|OWN/);
+        expect(screen.queryByRole("link", { name: "เข้าสู่ระบบอีกครั้ง" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "ลองอีกครั้ง" })).not.toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /กลับไปยังรายการคำขอ/ })).toHaveAttribute("href", "/dashboard/it");
+    });
+
     it("loads creation evidence for the requester detail through a private image fetch", async () => {
         const attachment = {
             id: "a".repeat(32),
@@ -354,7 +406,7 @@ describe("IT Ticket requester detail", () => {
         render(<ITTicketDetail ticketId={900} canCommentOwnTickets />);
 
         expect(await screen.findByRole("alert"))
-            .toHaveTextContent("ไม่พบ Ticket หรือคุณไม่มีสิทธิ์ดูรายการนี้");
+            .toHaveTextContent("ไม่พบคำขอที่เปิดดูได้");
         expect(fetchMock).toHaveBeenCalledWith("/api/it/tickets/900", expect.anything());
     });
 

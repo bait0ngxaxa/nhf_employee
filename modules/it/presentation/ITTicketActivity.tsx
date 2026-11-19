@@ -189,7 +189,7 @@ export function ITTicketActivity({
                                 </Button>
                             </div>
                         ) : null}
-                        <ol aria-label={`ประวัติการดำเนินการ Ticket #${ticketId}`} className="ml-4 border-l border-border-neutral pl-4">
+                        <ol aria-label={`ประวัติการดำเนินการ #${ticketId}`} className="ml-4 border-l border-border-neutral pl-4">
                             {visibleItems.map((item) => (
                                 <li key={item.id} className="relative pb-5 last:pb-0">
                                     <span

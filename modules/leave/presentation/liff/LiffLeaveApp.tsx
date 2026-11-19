@@ -395,7 +395,7 @@ export function LiffLeaveApp(): ReactElement {
             setSelectedDetailActionIntent(null);
             setOperationalNotice(
                 error instanceof LiffApiError && error.status === 404
-                    ? "ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ดูรายการดังกล่าว"
+                    ? "ไม่พบคำขอลาที่เปิดดูได้"
                     : getViewError(error),
             );
         }
@@ -477,7 +477,7 @@ export function LiffLeaveApp(): ReactElement {
         request: LiffEmployeeLeaveRequest | LiffLeaveApprovalItem | LiffLeaveRequestDetailData,
     ): void => {
         if (!canUseLiffLeaveAction(action, leaveCapabilitiesRef.current)) {
-            setOperationalNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
+            setOperationalNotice("บัญชีนี้ดำเนินการคำขอลานี้ไม่ได้ หากต้องดำเนินการ กรุณาติดต่อผู้ดูแลระบบ");
             return;
         }
         const fromDetail = selectedDetail !== null;
@@ -505,7 +505,7 @@ export function LiffLeaveApp(): ReactElement {
         if (!canUseLiffLeaveAction(action, leaveCapabilitiesRef.current)) {
             setMutationIntent(null);
             setMutationError(null);
-            setOperationalNotice("สิทธิ์ของคุณสำหรับการดำเนินการนี้ไม่พร้อมใช้งาน กรุณาโหลดข้อมูลใหม่");
+            setOperationalNotice("บัญชีนี้ดำเนินการคำขอลานี้ไม่ได้ หากต้องดำเนินการ กรุณาติดต่อผู้ดูแลระบบ");
             return;
         }
         setIsMutating(true);
@@ -717,7 +717,7 @@ export function LiffLeaveApp(): ReactElement {
                         className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong"
                         role="status"
                     >
-                        บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่
+                        บัญชีนี้เปิดหน้าวันลานี้ไม่ได้
                     </div>
                 )}
             </div>

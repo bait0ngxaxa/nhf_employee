@@ -67,7 +67,7 @@ export function ITWorkspace({
     const tabs: SectionTabItem[] = [
         {
             value: IT_DASHBOARD_TABS.myTickets,
-            label: "Ticket ของฉัน",
+            label: "คำขอของฉัน",
             visible: visibleTabs.includes(IT_DASHBOARD_TABS.myTickets),
             content: <ITTicketSelfService capabilities={capabilities} embedded />,
         },
@@ -115,7 +115,7 @@ export function ITWorkspace({
                 />
             ) : (
                 <div role="status" className="border-y border-status-warning-border bg-status-warning-surface px-4 py-5 text-sm leading-6 text-status-warning-strong">
-                    บัญชีนี้ยังไม่มีสิทธิ์ใช้งานส่วนบริการ IT ที่เปิดอยู่
+                    บัญชีนี้เปิดหน้าบริการ IT นี้ไม่ได้
                 </div>
             )}
         </SectionShell>

@@ -135,13 +135,13 @@ export function ensureStockApiSuccess<T>(
         return response.data;
     }
 
-    const message =
-        response.details !== undefined
-            ? resolveStockApiErrorMessage(
-                  response.details,
-                  response.errorThai || response.error || fallback,
-              )
-            : response.errorThai || response.error || fallback;
+    const canShowValidation = response.status === 400 || response.status === 422
+        || response.status === 409;
+    const message = canShowValidation
+        ? resolveStockApiErrorMessage(response.details, response.errorThai || fallback)
+        : response.status === 404
+            ? "ไม่พบข้อมูลวัสดุที่เปิดดูได้"
+            : response.errorThai || fallback;
 
     throw new Error(message);
 }

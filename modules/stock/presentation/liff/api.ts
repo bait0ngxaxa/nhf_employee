@@ -23,27 +23,41 @@ const LIFF_STOCK_API_REQUEST_OPTIONS = {
 
 function getStockApiErrorMessage(
     response: Extract<ApiResponse<unknown>, { success: false }>,
+    accessDenied: string,
 ): string {
     switch (response.status) {
         case 401:
             return isRecoveredLiffUnauthorizedResponse(response)
                 ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
-                : "การยืนยันตัวตนหมดอายุ กรุณาเปิด NHFapp จาก LINE อีกครั้ง";
+                : "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ";
         case 403:
-            return response.errorThai || "คุณไม่มีสิทธิ์ดำเนินการกับคำขอเบิกนี้";
+            return accessDenied;
         case 404:
-            return response.errorThai || "ไม่พบรายการเบิก หรือคุณไม่มีสิทธิ์ดูรายการนี้";
+            return "ไม่พบข้อมูลวัสดุที่เปิดดูได้";
         case 409:
-            return response.errorThai || "ข้อมูล Stock เปลี่ยนไปแล้ว กรุณาโหลดข้อมูลใหม่";
+            return response.errorThai && response.errorThai === response.error
+                ? response.errorThai
+                : "ข้อมูลวัสดุเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลล่าสุด";
         case 429:
             return "คุณทำรายการถี่เกินไป กรุณารอสักครู่แล้วลองใหม่";
+        case 400:
+        case 422:
+            return response.errorThai || "ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง";
         default:
-            return response.errorThai || "ไม่สามารถเชื่อมต่อข้อมูล Stock ได้";
+            if (response.status === undefined) {
+                return response.code === "TIMEOUT"
+                    ? "การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่"
+                    : "เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่";
+            }
+            return "บริการเบิกวัสดุไม่พร้อมใช้งานชั่วคราว กรุณาลองอีกครั้ง";
     }
 }
 
-async function unwrapStockResponse<T>(response: ApiResponse<T>): Promise<T> {
-    return unwrapLiffResponse(response, getStockApiErrorMessage);
+async function unwrapStockResponse<T>(
+    response: ApiResponse<T>,
+    accessDenied: string,
+): Promise<T> {
+    return unwrapLiffResponse(response, (failure) => getStockApiErrorMessage(failure, accessDenied));
 }
 
 function appendListFilters(
@@ -77,6 +91,7 @@ export async function fetchLiffStockItems(input: {
             appendListFilters(API_ROUTES.line.stockItems, input),
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดรายการวัสดุไม่ได้",
     );
 }
 
@@ -86,6 +101,7 @@ export async function fetchLiffStockCategories(): Promise<LiffStockCategory[]> {
             API_ROUTES.line.stockCategories,
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดหมวดหมู่วัสดุไม่ได้",
     );
     return response.categories;
 }
@@ -102,6 +118,7 @@ export async function fetchLiffStockVariantAvailability(
             `${API_ROUTES.line.stockAvailability}?${params.toString()}`,
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้ดูจำนวนวัสดุที่พร้อมเบิกไม่ได้",
     );
     return response.variants;
 }
@@ -115,6 +132,7 @@ export async function submitLiffStockRequest(
             ...LIFF_STOCK_API_REQUEST_OPTIONS,
             headers: { "Idempotency-Key": idempotencyKey },
         }),
+        "บัญชีนี้ส่งคำขอเบิกวัสดุไม่ได้",
     );
 }
 
@@ -129,6 +147,7 @@ export async function fetchLiffStockMyRequests(input: {
             appendListFilters(API_ROUTES.line.stockRequests, input),
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดรายการคำขอเบิกวัสดุไม่ได้",
     );
 }
 
@@ -140,6 +159,7 @@ export async function fetchLiffStockRequest(
             API_ROUTES.line.stockRequestById(requestId),
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดรายละเอียดคำขอเบิกไม่ได้",
     );
 }
 
@@ -153,6 +173,7 @@ export async function cancelLiffStockRequest(
             { cancelReason: cancelReason?.trim() || null },
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้ยกเลิกคำขอเบิกไม่ได้",
     );
 }
 
@@ -166,6 +187,7 @@ export async function fetchLiffStockProcessingQueue(input: {
             appendListFilters(API_ROUTES.line.stockProcessing, input),
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้เปิดรายการรอจ่ายวัสดุไม่ได้",
     );
 }
 
@@ -176,6 +198,7 @@ export async function issueLiffStockRequest(requestId: number): Promise<void> {
             {},
             LIFF_STOCK_API_REQUEST_OPTIONS,
         ),
+        "บัญชีนี้จ่ายวัสดุสำหรับคำขอไม่ได้",
     );
 }
 

@@ -166,7 +166,7 @@ function resolveStockDeepLinkNoticeSession(
         return {
             intentKey: intent.key,
             outcome: "read-denied",
-            notice: "บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้",
+            notice: "บัญชีนี้เปิดรายละเอียดคำขอเบิกนี้ไม่ได้",
         };
     }
 
@@ -176,7 +176,7 @@ function resolveStockDeepLinkNoticeSession(
         return {
             intentKey: intent.key,
             outcome: "process-denied",
-            notice: "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้",
+            notice: "บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้",
         };
     }
 
@@ -450,12 +450,12 @@ export function LiffStockApp(): ReactElement {
         const canReadRequest = capabilities?.canReadOwnRequests === true
             || capabilities?.canReadAllRequests === true;
         if (!canReadRequest) {
-            setOperationalNotice("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้");
+            setOperationalNotice("บัญชีนี้เปิดรายละเอียดคำขอเบิกนี้ไม่ได้");
             return;
         }
         if (isProcessorIntent && capabilities?.canProcessRequests !== true) {
             setOperationalNotice(
-                "บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้",
+                "บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้",
             );
             return;
         }
@@ -774,8 +774,8 @@ export function LiffStockApp(): ReactElement {
         if (!canUseAction) {
             setOperationalNotice(
                 action === "ISSUE"
-                    ? "บัญชีนี้ไม่มีสิทธิ์จ่ายวัสดุ"
-                    : "บัญชีนี้ไม่มีสิทธิ์ยกเลิกคำขอนี้",
+                    ? "บัญชีนี้จ่ายวัสดุไม่ได้"
+                    : "บัญชีนี้ยกเลิกคำขอนี้ไม่ได้",
             );
             return;
         }
@@ -815,8 +815,8 @@ export function LiffStockApp(): ReactElement {
         if (!canUseAction) {
             setMutationError(
                 action === "ISSUE"
-                    ? "บัญชีนี้ไม่มีสิทธิ์จ่ายวัสดุ"
-                    : "บัญชีนี้ไม่มีสิทธิ์ยกเลิกคำขอนี้",
+                    ? "บัญชีนี้จ่ายวัสดุไม่ได้"
+                    : "บัญชีนี้ยกเลิกคำขอนี้ไม่ได้",
             );
             setDecisionIntent(null);
             setDecisionFromDetail(false);
@@ -943,7 +943,7 @@ export function LiffStockApp(): ReactElement {
                 className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
             >
                 <div className="mx-auto flex min-h-64 w-full max-w-lg items-center justify-center text-sm font-medium text-content-secondary" role="status">
-                    กำลังตรวจสอบสิทธิ์การใช้งาน Stock…
+                    กำลังโหลดบริการเบิกวัสดุ…
                 </div>
             </main>
         );
@@ -977,7 +977,7 @@ export function LiffStockApp(): ReactElement {
                 className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
             >
                 <div className="mx-auto flex min-h-64 w-full max-w-lg items-center justify-center px-4 text-center text-sm leading-6 text-content-secondary" role="status">
-                    บัญชีนี้ยังไม่มีพื้นที่ใช้งาน Stock ใน NHFapp
+                    บัญชีนี้ใช้บริการเบิกวัสดุไม่ได้ หากต้องใช้บริการ กรุณาติดต่อผู้ดูแลระบบ
                 </div>
             </main>
         );

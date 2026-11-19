@@ -206,7 +206,7 @@ export function LiffRoutineApp(): ReactElement {
                 const focusedTask = focusedTasksResponse?.tasks[0] ?? null;
                 if (!focusedTask) {
                     nextFocusNotice =
-                        "ไม่พบงานนี้ หรือคุณไม่มีสิทธิ์เข้าถึงรายการดังกล่าว กำลังแสดงงาน Routine ของคุณตามปกติ";
+                        "เปิดงานจากลิงก์นี้ไม่ได้ คุณยังดูรายการงานประจำของคุณได้ด้านล่าง";
                 } else {
                     nextFocusedTaskId = focusedTask.id;
                     initialTasks = [
@@ -617,7 +617,7 @@ export function LiffRoutineApp(): ReactElement {
     }, []);
 
     if (presentedState === "UNAVAILABLE") {
-        return <LiffModuleLanding module="routine" enabled={false} />;
+        return <LiffModuleLanding module="routine" reason="account-unavailable" />;
     }
 
     if (presentedState === "ERROR") {

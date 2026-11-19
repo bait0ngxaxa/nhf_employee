@@ -148,7 +148,7 @@ export function ITTicketOperatorDetail({
         void fetch(API_ROUTES.itOperatorTickets.byId(ticketId), { signal: controller.signal })
             .then(async (response) => {
                 const payload: unknown = await response.json().catch(() => null);
-                if (!response.ok) throw new Error(readITOperatorError(payload, response.status, true));
+                if (!response.ok) throw new Error(readITOperatorError(payload, response.status, "detail"));
                 if (!isITTicketResponseRecord(payload) || payload.success !== true) {
                     throw new Error("ข้อมูล Ticket ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 }
@@ -173,7 +173,7 @@ export function ITTicketOperatorDetail({
                     kind: "error",
                     message: cause instanceof Error
                         ? cause.message
-                        : readITOperatorError(null, 500, true),
+                        : readITOperatorError(null, 500, "detail"),
                 });
             });
         return () => controller.abort();
@@ -222,7 +222,7 @@ export function ITTicketOperatorDetail({
             }));
             const payload: unknown = await response.json().catch(() => null);
             if (!response.ok) {
-                const message = readITOperatorError(payload, response.status, true);
+                const message = readITOperatorError(payload, response.status, "update");
                 if (response.status === 409) {
                     if (isITOperatorMutationVersionConflict(payload)) {
                         setMutationReviewReason("CONCURRENT_CHANGE");

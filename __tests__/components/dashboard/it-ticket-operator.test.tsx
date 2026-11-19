@@ -185,7 +185,7 @@ describe("IT operator queue presentation", () => {
             .mockResolvedValueOnce(referenceResponse());
         render(<ITTicketOperatorQueue />);
 
-        expect(await screen.findByRole("alert")).toHaveTextContent("temporary");
+        expect(await screen.findByRole("alert")).toHaveTextContent("ไม่สามารถเชื่อมต่อคิว IT Ticket ได้");
         fireEvent.click(screen.getByRole("button", { name: "ลองอีกครั้ง" }));
         expect(await screen.findByText("ไม่พบ Ticket ในตัวกรองนี้")).toBeInTheDocument();
     });
@@ -698,8 +698,8 @@ describe("IT operator Ticket detail presentation", () => {
 
         render(<ITTicketOperatorDetail ticketId={19} capabilities={operatorCapabilities} />);
 
-        expect(await screen.findByRole("alert")).toHaveTextContent("temporary");
-        const activity = await screen.findByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" });
+        expect(await screen.findByRole("alert")).toHaveTextContent("ระบบขัดข้องชั่วคราว");
+        const activity = await screen.findByRole("list", { name: "ประวัติการดำเนินการ #19" });
         expect(within(activity).getByText("ผู้ดำเนินการ: อารี ใจเย็น")).toBeInTheDocument();
         expect(within(activity).getByText("รับเรื่องแล้ว")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "เริ่มดำเนินการ" })).toBeEnabled();
@@ -967,7 +967,7 @@ describe("IT operator Ticket detail presentation", () => {
         expect(accessWarning.closest('[role="alert"]')).toHaveTextContent(
             "สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงปิดการดำเนินการไว้",
         );
-        expect(toast.error).toHaveBeenCalledWith("บัญชีนี้ไม่มีสิทธิ์ดำเนินการกับคิว IT Ticket");
+        expect(toast.error).toHaveBeenCalledWith("บัญชีนี้บันทึกการเปลี่ยนแปลง IT Ticket ไม่ได้");
         expect(toast.error).toHaveBeenCalledTimes(1);
         expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
         expect(screen.queryByText("internal authorization detail")).not.toBeInTheDocument();
@@ -1098,7 +1098,7 @@ describe("IT operator Ticket detail presentation", () => {
 
         expect(await screen.findByText("ส่งข้อความเรียบร้อยแล้ว")).toBeInTheDocument();
         expect(screen.getAllByText("กำลังตรวจสอบให้ค่ะ")).toHaveLength(1);
-        expect(within(screen.getByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" }))
+        expect(within(screen.getByRole("list", { name: "ประวัติการดำเนินการ #19" }))
             .getByText("รับเรื่องแล้ว")).toBeInTheDocument();
         const postCall = fetchMock.mock.calls.find(([, options]) => options?.method === "POST");
         expect(postCall?.[0]).toBe("/api/it/operator/tickets/19/comments");
@@ -1154,7 +1154,7 @@ describe("IT operator Ticket detail presentation", () => {
         expect(screen.queryByText("เปลี่ยนสถานะเป็นกำลังดำเนินการแล้ว")).not.toBeInTheDocument();
         expect(screen.queryByText(/รุ่น \d+/)).not.toBeInTheDocument();
         await screen.findByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน");
-        const activity = screen.getByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" });
+        const activity = screen.getByRole("list", { name: "ประวัติการดำเนินการ #19" });
         expect(await within(activity).findByText("เริ่มดำเนินการ")).toBeInTheDocument();
         expect(within(activity).getByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน")).toBeInTheDocument();
         expect(activityReadCount).toBe(2);
@@ -1295,7 +1295,7 @@ describe("IT operator Ticket detail presentation", () => {
         expect(toast.error).toHaveBeenCalledTimes(1);
         expect(sonnerToast.error.mock.calls.flat().join(" ")).not.toMatch(/รุ่น|version|revision/i);
         await screen.findByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน");
-        const activity = screen.getByRole("list", { name: "ประวัติการดำเนินการ Ticket #19" });
+        const activity = screen.getByRole("list", { name: "ประวัติการดำเนินการ #19" });
         expect(await within(activity).findByText("เริ่มดำเนินการ")).toBeInTheDocument();
         expect(within(activity).getByText("ผู้ดำเนินการ: เจ้าหน้าที่อีกคน")).toBeInTheDocument();
         expect(activityReadCount).toBe(2);

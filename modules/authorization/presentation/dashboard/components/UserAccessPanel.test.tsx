@@ -447,6 +447,7 @@ describe("User Access presentation", () => {
             ...normalUser,
             resolverEffectivePermissionStatus: { status: "INVALID_CONFIGURATION", error },
             resolverEffectivePermissions: [],
+            configurationIssues: [{ source: "EFFECTIVE_RESOLUTION", ...error }],
             effectiveAccessStatus: { status: "RESOLVED" },
             effectiveAccess: [],
             effectiveAccessSummary: {
@@ -464,7 +465,15 @@ describe("User Access presentation", () => {
 
         expect(screen.getByText("พบการตั้งค่าสิทธิ์ที่ต้องตรวจสอบ")).toBeInTheDocument();
         expect(screen.getByText(/บางสิทธิ์ของผู้ใช้นี้ไม่สามารถนำมาใช้งานได้อย่างปลอดภัย/)).toBeInTheDocument();
-        expect(screen.queryByText("UNKNOWN_PERSISTED_CAPABILITY")).not.toBeInTheDocument();
+        const details = screen.getByText("รายละเอียดทางเทคนิค");
+        expect(screen.getByText("พบสิทธิ์ที่ไม่มีอยู่ในรายการระบบปัจจุบัน")).toBeVisible();
+        expect(screen.getByText(error.code)).not.toBeVisible();
+        expect(screen.getByText(error.capabilityKey)).not.toBeVisible();
+
+        fireEvent.click(details);
+
+        expect(screen.getByText(error.code)).toBeVisible();
+        expect(screen.getByText(error.capabilityKey)).toBeVisible();
         expect(screen.queryByText("ALLOW")).not.toBeInTheDocument();
         expect(screen.queryByText("สิทธิ์พื้นฐาน")).not.toBeInTheDocument();
         expectInvalidConfigurationSurfaceToBeReadOnly();

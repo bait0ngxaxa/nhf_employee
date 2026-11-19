@@ -45,36 +45,56 @@ export type {
 
 function getRoutineApiErrorMessage(
     response: Extract<ApiResponse<unknown>, { success: false }>,
+    accessDenied: string,
 ): string {
     switch (response.status) {
         case 401:
             return isRecoveredLiffUnauthorizedResponse(response)
                 ? LIFF_SESSION_RECOVERED_MUTATION_MESSAGE
-                : "การยืนยันตัวตนหมดอายุ กรุณาลองใหม่อีกครั้ง";
+                : "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ";
         case 403:
-            return "บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้";
+            return accessDenied;
         case 404:
-            return response.errorThai || ROUTINE_API_MESSAGES.liffResourceNotFound;
+            return response.error === ROUTINE_API_MESSAGES.liffFeatureDisabled
+                ? ROUTINE_API_MESSAGES.liffFeatureDisabled
+                : ROUTINE_API_MESSAGES.liffResourceNotFound;
         case 409:
-            return response.errorThai || "ข้อมูล Routine เปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่";
+            return response.errorThai && response.errorThai === response.error
+                ? response.errorThai
+                : "ข้อมูลงานประจำเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลล่าสุด";
         case 413:
             return "คำขอ Routine มีขนาดใหญ่เกินไป";
         case 429:
             return "คุณทำรายการ Routine ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่";
+        case 400:
+        case 422:
+            return response.errorThai || "ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง";
         default:
-            return response.errorThai || "ไม่สามารถเชื่อมต่อข้อมูล Routine ได้";
+            if (response.status === undefined) {
+                return response.code === "TIMEOUT"
+                    ? "การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่"
+                    : "เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่";
+            }
+            return "บริการงานประจำไม่พร้อมใช้งานชั่วคราว กรุณาลองอีกครั้ง";
     }
+}
+
+async function unwrapRoutineResponse<T>(
+    response: ApiResponse<T>,
+    accessDenied: string,
+): Promise<T> {
+    return unwrapLiffResponse(response, (failure) => getRoutineApiErrorMessage(failure, accessDenied));
 }
 
 export async function fetchLiffRoutineSummary(): Promise<{
     summary: LiffRoutineSummary;
 }> {
-    return unwrapLiffResponse(
+    return unwrapRoutineResponse(
         await apiGet<{ summary: LiffRoutineSummary }>(
             API_ROUTES.line.routineSummary,
             LIFF_API_REQUEST_OPTIONS,
         ),
-        getRoutineApiErrorMessage,
+        "บัญชีนี้เปิดสรุปงานประจำไม่ได้",
     );
 }
 
@@ -99,34 +119,34 @@ export async function fetchLiffRoutineTasks(input: {
         params.set("occurrenceId", String(input.occurrenceId));
     }
 
-    return unwrapLiffResponse(
+    return unwrapRoutineResponse(
         await apiGet<LiffRoutineTasksResponse>(
             `${API_ROUTES.line.routineTasks}?${params.toString()}`,
             LIFF_API_REQUEST_OPTIONS,
         ),
-        getRoutineApiErrorMessage,
+        "บัญชีนี้เปิดรายการงานประจำไม่ได้",
     );
 }
 
 export async function fetchLiffRoutineReference(): Promise<LiffRoutineReferenceData> {
-    return unwrapLiffResponse(
+    return unwrapRoutineResponse(
         await apiGet<LiffRoutineReferenceData>(
             API_ROUTES.line.routineReference,
             LIFF_API_REQUEST_OPTIONS,
         ),
-        getRoutineApiErrorMessage,
+        "บัญชีนี้เปิดข้อมูลสำหรับจัดการงานประจำไม่ได้",
     );
 }
 
 export async function fetchLiffRoutineTask(
     taskId: number | string,
 ): Promise<LiffRoutineTaskDetailResponse> {
-    return unwrapLiffResponse(
+    return unwrapRoutineResponse(
         await apiGet<LiffRoutineTaskDetailResponse>(
             API_ROUTES.line.routineTaskById(taskId),
             LIFF_API_REQUEST_OPTIONS,
         ),
-        getRoutineApiErrorMessage,
+        "บัญชีนี้เปิดรายละเอียดงานประจำไม่ได้",
     );
 }
 
@@ -134,7 +154,7 @@ export async function createLiffRoutineTask(
     payload: LiffRoutineTaskCreateInput,
     idempotencyKey: string,
 ): Promise<LiffRoutineTaskCreateResponse> {
-    return unwrapLiffResponse(
+    return unwrapRoutineResponse(
         await apiPost<LiffRoutineTaskCreateResponse>(
             API_ROUTES.line.routineTasks,
             payload,
@@ -143,7 +163,7 @@ export async function createLiffRoutineTask(
                 headers: { "Idempotency-Key": idempotencyKey },
             },
         ),
-        getRoutineApiErrorMessage,
+        "บัญชีนี้สร้างงานประจำไม่ได้",
     );
 }
 
@@ -151,24 +171,24 @@ export async function updateLiffRoutineTask(
     taskId: number | string,
     payload: LiffRoutineTaskUpdateInput,
 ): Promise<LiffRoutineTaskMutationResponse> {
-    return unwrapLiffResponse(
+    return unwrapRoutineResponse(
         await apiPatch<LiffRoutineTaskMutationResponse>(
             API_ROUTES.line.routineTaskById(taskId),
             payload,
             LIFF_API_REQUEST_OPTIONS,
         ),
-        getRoutineApiErrorMessage,
+        "บัญชีนี้แก้ไขงานประจำไม่ได้",
     );
 }
 
 export async function deleteLiffRoutineTask(
     taskId: number | string,
 ): Promise<void> {
-    await unwrapLiffResponse(
+    await unwrapRoutineResponse(
         await apiDelete<{ success: true }>(
             API_ROUTES.line.routineTaskById(taskId),
             LIFF_API_REQUEST_OPTIONS,
         ),
-        getRoutineApiErrorMessage,
+        "บัญชีนี้ลบงานประจำไม่ได้",
     );
 }

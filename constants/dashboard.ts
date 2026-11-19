@@ -102,7 +102,7 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         id: "authorization-administration",
         label: "จัดการสิทธิ์การใช้งาน",
         icon: KeyRound,
-        description: "จัดการ Team, TeamRole และสิทธิ์การเข้าถึง",
+        description: "จัดทีม กำหนดหน้าที่ และดูแลสิทธิ์การใช้งาน",
         requiredRole: "ADMIN",
     },
 ];
@@ -122,7 +122,7 @@ const DASHBOARD_PAGE_LABELS: Readonly<Record<string, string>> = {
     "manager-approval": "อนุมัติการลา",
     "leave-history": "ประวัติการลา",
     notifications: "การแจ้งเตือน",
-    sessions: "จัดการเซสชัน",
+    sessions: "อุปกรณ์ที่เข้าสู่ระบบ",
     routine: "NHF Routine",
     "authorization-administration": "จัดการสิทธิ์การใช้งาน",
 };

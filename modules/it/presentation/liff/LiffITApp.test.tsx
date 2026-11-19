@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as LiffApi from "./api";
 
 const mocks = vi.hoisted(() => ({
     fetchTickets: vi.fn(),
@@ -80,7 +81,7 @@ const originalCreateObjectUrl = URL.createObjectURL;
 const originalRevokeObjectUrl = URL.revokeObjectURL;
 
 async function openCreateForm(): Promise<void> {
-    await screen.findByRole("heading", { name: "IT Ticket ของฉัน" });
+    await screen.findByRole("heading", { name: "คำขอ IT ของฉัน" });
     fireEvent.click(screen.getByRole("button", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" }));
     await screen.findByRole("heading", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" });
 }
@@ -137,7 +138,7 @@ describe("LiffITApp requester experience", () => {
         mocks.fetchTickets.mockReturnValueOnce(response.promise);
         render(<LiffITApp />);
 
-        expect(screen.getByRole("status", { name: "กำลังโหลดรายการ Ticket" })).toBeInTheDocument();
+        expect(screen.getByRole("status", { name: "กำลังโหลดรายการคำขอ" })).toBeInTheDocument();
         await act(async () => response.resolve(LIST));
 
         expect(await screen.findByRole("heading", { name: TICKET.title })).toBeInTheDocument();
@@ -147,6 +148,20 @@ describe("LiffITApp requester experience", () => {
         expect(screen.getByText(/ปรับปรุงล่าสุด/)).toBeInTheDocument();
         expect(screen.queryByText(/ผู้รับผิดชอบ|หมวดหมู่ภายใน|วิเคราะห์/)).not.toBeInTheDocument();
         expect(mocks.fetchTickets).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the real detail API denial and keeps backend diagnostics out of the view", async () => {
+        const api = await vi.importActual<typeof LiffApi>("./api");
+        vi.stubGlobal("fetch", vi.fn(async () => Response.json(
+            { error: "it.ticket.read OWN internal-host" },
+            { status: 403 },
+        )));
+        mocks.fetchTicket.mockImplementationOnce(api.fetchLiffITTicket);
+
+        render(<LiffITApp ticketId="42" />);
+
+        expect(await screen.findByText(/บัญชีนี้เปิดรายละเอียดคำขอไม่ได้/)).toBeVisible();
+        expect(screen.queryByText(/it\.ticket\.read|internal-host/)).not.toBeInTheDocument();
     });
 
     it("shows a useful error with retry and an empty state for a successful empty list", async () => {
@@ -159,7 +174,7 @@ describe("LiffITApp requester experience", () => {
             pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
         });
         fireEvent.click(screen.getByRole("button", { name: "โหลดรายการอีกครั้ง" }));
-        expect(await screen.findByText("ยังไม่มี Ticket")).toBeInTheDocument();
+        expect(await screen.findByText("ยังไม่มีคำขอ")).toBeInTheDocument();
         expect(view.container).toHaveTextContent("เมื่อส่งคำขอแล้ว รายการและสถานะจะแสดงที่นี่");
     });
 
@@ -204,9 +219,9 @@ describe("LiffITApp requester experience", () => {
         render(<LiffITApp />);
         await openCreateForm();
 
-        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการคำขอ" }));
 
-        expect(await screen.findByRole("heading", { name: "IT Ticket ของฉัน" })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: "คำขอ IT ของฉัน" })).toBeInTheDocument();
         expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
         await openCreateForm();
         expect(screen.getByRole("combobox", { name: "ประเภทคำขอ" })).toHaveValue("INCIDENT");
@@ -238,7 +253,7 @@ describe("LiffITApp requester experience", () => {
                 });
             }
 
-            fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+            fireEvent.click(screen.getByRole("button", { name: "กลับรายการคำขอ" }));
 
             const confirmation = await screen.findByRole("alertdialog");
             expect(within(confirmation).getByText(/ข้อมูลที่กรอกและรูปภาพที่เลือกจะหายไป/)).toBeInTheDocument();
@@ -263,7 +278,7 @@ describe("LiffITApp requester experience", () => {
             target: { files: [new File(["image"], "หน้าจอ.png", { type: "image/png" })] },
         });
 
-        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการคำขอ" }));
         const confirmation = await screen.findByRole("alertdialog");
         fireEvent.click(within(confirmation).getByRole("button", { name: "กลับไปแก้ไข" }));
 
@@ -279,10 +294,10 @@ describe("LiffITApp requester experience", () => {
         revokeObjectUrl.mockImplementation(() => {
             expect(screen.queryByRole("img", { name: "ตัวอย่างรูป หน้าจอ.png" })).not.toBeInTheDocument();
         });
-        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการคำขอ" }));
         fireEvent.click(screen.getByRole("button", { name: "ทิ้งข้อมูลและกลับรายการ" }));
 
-        expect(await screen.findByRole("heading", { name: "IT Ticket ของฉัน" })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: "คำขอ IT ของฉัน" })).toBeInTheDocument();
         await waitFor(() => expect(revokeObjectUrl).toHaveBeenCalledWith("blob:liff-1"));
         await openCreateForm();
         expect(screen.getByRole("combobox", { name: "ประเภทคำขอ" })).toHaveValue("INCIDENT");
@@ -301,12 +316,12 @@ describe("LiffITApp requester experience", () => {
         await openCreateForm();
         fillCreateForm();
 
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         expect(await screen.findByRole("alert")).toHaveTextContent("ระบบ Ticket ขัดข้องชั่วคราว");
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
 
         const successMessage = await screen.findByRole("status");
-        expect(successMessage).toHaveTextContent("ส่ง Ticket #73 เรียบร้อยแล้ว");
+        expect(successMessage).toHaveTextContent("ส่งคำขอ #73 เรียบร้อยแล้ว");
         expect(mocks.createTicket).toHaveBeenCalledTimes(2);
         expect(mocks.createTicket.mock.calls[0]?.[2]).toBe("create-key-1");
         expect(mocks.createTicket.mock.calls[1]?.[2]).toBe("create-key-1");
@@ -326,7 +341,7 @@ describe("LiffITApp requester experience", () => {
         await openCreateForm();
         fillCreateForm();
 
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
 
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
         expect(mocks.createTicket.mock.calls[0]?.[2]).toMatch(/^idem_\d+_[a-z0-9]+$/);
@@ -341,13 +356,13 @@ describe("LiffITApp requester experience", () => {
         render(<LiffITApp />);
         await openCreateForm();
         fillCreateForm("หัวข้อเดิม");
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         await screen.findByRole("alert");
 
         fireEvent.change(screen.getByRole("textbox", { name: "หัวข้อ" }), {
             target: { value: "หัวข้อใหม่" },
         });
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(2));
         expect(mocks.createTicket.mock.calls[0]?.[2]).toBe("changed-key-1");
         expect(mocks.createTicket.mock.calls[1]?.[2]).toBe("changed-key-2");
@@ -371,9 +386,9 @@ describe("LiffITApp requester experience", () => {
             expect.stringContaining("blob:liff-"),
         );
 
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         await screen.findByRole("alert");
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(2));
 
         expect(mocks.createTicket.mock.calls[0]?.[2]).toBe("file-key-1");
@@ -384,7 +399,7 @@ describe("LiffITApp requester experience", () => {
         expect(revokeObjectUrl).toHaveBeenCalledWith("blob:liff-1");
         const changedFile = new File(["different content"], "หน้าจอ.png", { type: "image/png" });
         fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), { target: { files: [changedFile] } });
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(3));
 
         expect(mocks.createTicket.mock.calls[2]?.[2]).toBe("file-key-2");
@@ -399,14 +414,14 @@ describe("LiffITApp requester experience", () => {
         render(<LiffITApp />);
         await openCreateForm();
         fillCreateForm();
-        const form = screen.getByRole("button", { name: "ส่ง Ticket" }).closest("form");
+        const form = screen.getByRole("button", { name: "ส่งคำขอ" }).closest("form");
         if (!(form instanceof HTMLFormElement)) throw new Error("Expected Ticket form");
 
         fireEvent.submit(form);
         fireEvent.submit(form);
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
-        expect(screen.getByRole("button", { name: "กลับรายการ Ticket" })).toBeDisabled();
-        fireEvent.click(screen.getByRole("button", { name: "กลับรายการ Ticket" }));
+        expect(screen.getByRole("button", { name: "กลับรายการคำขอ" })).toBeDisabled();
+        fireEvent.click(screen.getByRole("button", { name: "กลับรายการคำขอ" }));
         expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "แจ้งปัญหา / ขอความช่วยเหลือ" })).toBeInTheDocument();
         await act(async () => pending.resolve({ ...TICKET, id: 91, title: "ขอความช่วยเหลือเรื่องระบบ" }));
@@ -424,7 +439,7 @@ describe("LiffITApp requester experience", () => {
         fireEvent.change(screen.getByLabelText(/รูปภาพประกอบ/), {
             target: { files: [new File(["image"], "หลักฐาน.png", { type: "image/png" })] },
         });
-        fireEvent.click(screen.getByRole("button", { name: "ส่ง Ticket" }));
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
         await waitFor(() => expect(mocks.createTicket).toHaveBeenCalledTimes(1));
 
         view.unmount();
@@ -490,10 +505,10 @@ describe("LiffITApp requester experience", () => {
         expect(activityDisclosure.closest("details")).not.toHaveAttribute("open");
         fireEvent.click(activityDisclosure);
         const activity = await screen.findByRole("list", {
-            name: "ประวัติการดำเนินการ Ticket #42",
+            name: "ประวัติการดำเนินการ #42",
         });
         expect(within(activity).getByText("เริ่มดำเนินการ")).toBeInTheDocument();
-        expect(screen.getByText("การตอบกลับของคุณจะไม่เปลี่ยนสถานะ Ticket โดยอัตโนมัติ")).toBeInTheDocument();
+        expect(screen.getByText("การตอบกลับของคุณจะไม่เปลี่ยนสถานะคำขอโดยอัตโนมัติ")).toBeInTheDocument();
 
         fireEvent.change(screen.getByRole("textbox", { name: "ตอบกลับ" }), {
             target: { value: "ยังพบปัญหา" },
@@ -536,7 +551,7 @@ describe("LiffITApp requester experience", () => {
         render(<LiffITApp ticketId="42" />);
         expect(await screen.findByRole("heading", { name: TICKET.title })).toBeInTheDocument();
 
-        const backToList = screen.getByRole("link", { name: "กลับรายการ Ticket" });
+        const backToList = screen.getByRole("link", { name: "กลับรายการคำขอ" });
         expect(backToList).toHaveAttribute("href", APP_ROUTES.line.it);
         backToList.addEventListener("click", (event) => event.preventDefault(), { once: true });
         fireEvent.click(backToList);
@@ -559,7 +574,7 @@ describe("LiffITApp requester experience", () => {
                 target: { value: "ขออัปเดต" },
             });
             fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
-            fireEvent.click(await screen.findByRole("button", { name: "โหลดสถานะ Ticket ล่าสุด" }));
+            fireEvent.click(await screen.findByRole("button", { name: "โหลดสถานะคำขอล่าสุด" }));
 
             expect(await screen.findByText(`ตรวจสอบสถานะไม่ได้ (${status})`)).toBeInTheDocument();
             expect(screen.queryByRole("heading", { name: TICKET.title })).not.toBeInTheDocument();
@@ -596,9 +611,9 @@ describe("LiffITApp requester experience", () => {
             target: { value: "ขออัปเดต" },
         });
         fireEvent.click(screen.getByRole("button", { name: "ส่งข้อความ" }));
-        fireEvent.click(await screen.findByRole("button", { name: "โหลดสถานะ Ticket ล่าสุด" }));
+        fireEvent.click(await screen.findByRole("button", { name: "โหลดสถานะคำขอล่าสุด" }));
 
-        expect(screen.getByText("กำลังโหลดสถานะ Ticket ล่าสุด…")).toBeInTheDocument();
+        expect(screen.getByText("กำลังโหลดสถานะคำขอล่าสุด…")).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: TICKET.title })).toBeInTheDocument();
         expect(screen.getByText(existingComment.body)).toBeInTheDocument();
         await act(async () => refresh.reject(new LiffApiError("ระบบ Ticket ขัดข้องชั่วคราว", 503)));
@@ -609,7 +624,7 @@ describe("LiffITApp requester experience", () => {
         expect(screen.getByText(/ยังยืนยันสถานะล่าสุดไม่ได้/)).toBeInTheDocument();
         expect(screen.queryByRole("textbox", { name: "ตอบกลับ" })).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole("button", { name: "ลองโหลด Ticket อีกครั้ง" }));
+        fireEvent.click(screen.getByRole("button", { name: "ลองโหลดคำขออีกครั้ง" }));
 
         expect(await screen.findByText("ปิดงานแล้ว")).toBeInTheDocument();
         expect(screen.getByText(existingComment.body)).toBeInTheDocument();

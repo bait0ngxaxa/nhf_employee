@@ -4,28 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeaveHistoryFilters } from "../../application/queries/history-filters";
 import type { LeavePresentationCapabilities } from "../../application/types";
 import type { ApproverLeaveAction, EmployeeLeaveAction, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
+import type * as LineClient from "@/modules/line/client";
+import type * as LiffApi from "./api";
 
 const mocks = vi.hoisted(() => {
-    class MockLiffApiError extends Error {
-        readonly status: number | undefined;
-        readonly sessionRecovered: boolean;
-        readonly unauthorizedRecovery:
-            { recovered: boolean; replayed: boolean } | undefined;
-
-        constructor(
-            message: string,
-            status?: number,
-            _details?: unknown,
-            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
-        ) {
-            super(message);
-            this.name = "LiffApiError";
-            this.status = status;
-            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
-            this.unauthorizedRecovery = unauthorizedRecovery;
-        }
-    }
-
     return {
     search: "",
     fetchHome: vi.fn(),
@@ -37,14 +19,7 @@ const mocks = vi.hoisted(() => {
     decideCancellation: vi.fn(),
     requestNotTaken: vi.fn(),
         submitDecision: vi.fn(),
-        MockLiffApiError,
-        isRecoveredLiffMutation: (error: unknown): boolean =>
-            error instanceof MockLiffApiError
-            && error.status === 401
-            && error.sessionRecovered
-            && error.unauthorizedRecovery?.replayed === false,
-        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+
     };
 });
 
@@ -63,12 +38,9 @@ vi.mock("./api", () => ({
     submitLiffLeaveDecision: mocks.submitDecision,
 }));
 
-vi.mock("@/modules/line/client", () => ({
+vi.mock("@/modules/line/client", async (importOriginal) => ({
+    ...await importOriginal<typeof LineClient>(),
     fetchLiffHome: mocks.fetchHome,
-    LiffApiError: mocks.MockLiffApiError,
-    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
-    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
 }));
 
 vi.mock("./LiffLeaveOverview", () => ({
@@ -392,14 +364,14 @@ describe("LIFF Leave app orchestration", () => {
                 canCreateOwnRequests: false,
             }));
         });
-        expect(await screen.findByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+        expect(await screen.findByText("บัญชีนี้เปิดหน้าวันลานี้ไม่ได้"))
             .toBeInTheDocument();
 
         await act(async () => {
             olderHome.resolve(leaveHome("บัญชีเก่า"));
         });
 
-        expect(screen.getByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+        expect(screen.getByText("บัญชีนี้เปิดหน้าวันลานี้ไม่ได้"))
             .toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "ยื่นลา" })).not.toBeInTheDocument();
         expect(mocks.fetchProfile).not.toHaveBeenCalled();
@@ -492,7 +464,7 @@ describe("LIFF Leave app orchestration", () => {
 
         render(<LiffLeaveApp />);
 
-        expect(await screen.findByText("บัญชีนี้ยังไม่มีสิทธิ์ดูข้อมูล Leave ที่เปิดอยู่"))
+        expect(await screen.findByText("บัญชีนี้เปิดหน้าวันลานี้ไม่ได้"))
             .toBeInTheDocument();
         expect(mocks.fetchProfile).not.toHaveBeenCalled();
         expect(mocks.fetchApprovals).not.toHaveBeenCalled();
@@ -673,6 +645,34 @@ describe("LIFF Leave app orchestration", () => {
         expect(screen.queryByTestId("detail-approve")).not.toBeInTheDocument();
     });
 
+    it("shows the approval denial inside the pending action", async () => {
+        mocks.search = "requestId=leave-1&action=approve";
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: { canApproveLeave: true, leaveCapabilities: LEAVE_CAPABILITIES },
+        });
+        mocks.fetchRequest.mockResolvedValueOnce({
+            id: "leave-1", viewerRole: "APPROVER", availableActions: ["APPROVE"],
+            leaveType: "SICK", startDate: "2031-01-01", endDate: "2031-01-01",
+        });
+        const api = await vi.importActual<typeof LiffApi>("./api");
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+            Response.json({ error: "leave.request.approve ASSIGNED" }, { status: 403 }),
+        );
+        mocks.submitDecision.mockImplementationOnce(api.submitLiffLeaveDecision);
+        try {
+            render(<LiffLeaveApp />);
+            fireEvent.click(await screen.findByTestId("detail-approve"));
+            fireEvent.click(screen.getByRole("button", { name: "ยืนยันการทดสอบ" }));
+            expect(await screen.findByText("บัญชีนี้พิจารณาคำขอลาไม่ได้")).toBeVisible();
+            expect(screen.queryByText(/leave\.request\.approve/)).not.toBeInTheDocument();
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        } finally {
+            fetchMock.mockRestore();
+        }
+    });
+
     it("fails an inaccessible deep link safely without revealing its request", async () => {
         mocks.search = "requestId=private_leave&action=approve";
         mocks.fetchRequest.mockRejectedValueOnce(new LiffApiError("private", 404));
@@ -680,7 +680,7 @@ describe("LIFF Leave app orchestration", () => {
         render(<LiffLeaveApp />);
 
         await waitFor(() => {
-            expect(screen.getByText("ไม่พบคำขอลานี้ หรือคุณไม่มีสิทธิ์ดูรายการดังกล่าว"))
+            expect(screen.getByText("ไม่พบคำขอลาที่เปิดดูได้"))
                 .toBeInTheDocument();
         });
         expect(screen.queryByText(/รายละเอียด private_leave/)).not.toBeInTheDocument();

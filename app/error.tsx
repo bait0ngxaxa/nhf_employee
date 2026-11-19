@@ -36,16 +36,8 @@ export default function GlobalError({ error, reset }: ErrorProps) {
                 </CardHeader>
                 <CardContent className="text-center space-y-4">
                     <p className="text-content-neutral-secondary">
-                        ขออภัย เกิดข้อผิดพลาดบางอย่างขึ้น กรุณาลองใหม่อีกครั้ง
+                        กรุณาลองอีกครั้ง หากยังพบปัญหา กรุณาติดต่อผู้ดูแลระบบ
                     </p>
-
-                    {process.env.NODE_ENV === "development" && (
-                        <div className="rounded-lg border border-status-error-border bg-status-error-surface p-3 text-left">
-                            <p className="text-xs font-mono text-status-error-foreground break-all">
-                                {error.message}
-                            </p>
-                        </div>
-                    )}
 
                     <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                         <Button

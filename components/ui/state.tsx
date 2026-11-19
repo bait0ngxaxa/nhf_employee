@@ -188,7 +188,7 @@ export function EmptyState({
 
 export function ErrorState({
     title = "โหลดข้อมูลไม่สำเร็จ",
-    description = "ตรวจสอบการเชื่อมต่อ แล้วลองใหม่อีกครั้ง",
+    description = "กรุณาลองอีกครั้ง หากยังพบปัญหา กรุณาติดต่อผู้ดูแลระบบ",
     action,
     icon = <AlertCircle className="h-5 w-5" aria-hidden="true" />,
     compact = false,
@@ -212,8 +212,8 @@ export function ErrorState({
 }
 
 export function PermissionState({
-    title = "ไม่มีสิทธิ์เข้าถึงข้อมูลนี้",
-    description = "กรุณาเข้าสู่ระบบด้วยบัญชีที่มีสิทธิ์เพื่อดำเนินการต่อ",
+    title = "บัญชีนี้เปิดข้อมูลนี้ไม่ได้",
+    description = "หากต้องใช้ข้อมูลนี้ กรุณาติดต่อผู้ดูแลระบบ",
     action,
     icon = <LockKeyhole className="h-6 w-6" aria-hidden="true" />,
     compact = false,

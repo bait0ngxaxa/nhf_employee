@@ -379,7 +379,7 @@ describe("RoutineTaskForm reminder rules", () => {
         expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
         expect(screen.queryByLabelText("ค้นหาพนักงาน")).not.toBeInTheDocument();
         expect(screen.getByText(
-            "ตรวจตามเวลาไทย (Asia/Bangkok) และแจ้งเตือนในระบบ อีเมล และ LINE เมื่อผู้รับเชื่อมบัญชีไว้",
+            "แจ้งเตือนตามเวลาไทย ผ่านระบบและอีเมล ผู้ที่เชื่อมบัญชี LINE ไว้จะได้รับแจ้งเตือนทาง LINE ด้วย",
         )).toBeInTheDocument();
 
         fireEvent.change(screen.getByDisplayValue("เลือกหน่วยงาน"), { target: { value: "1" } });

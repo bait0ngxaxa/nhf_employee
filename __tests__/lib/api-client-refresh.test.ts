@@ -80,6 +80,36 @@ describe("api-client refresh retry", () => {
         expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/auth/refresh");
     });
 
+    it.each([
+        [401, "รายละเอียดการตรวจบัญชีภายใน", /เข้าสู่ระบบอีกครั้ง/],
+        [503, "เชื่อมต่อฐานข้อมูลภายในไม่ได้", /ลองใหม่/],
+        [409, "คำขอได้รับการอนุมัติแล้ว", /ได้รับการอนุมัติแล้ว/],
+        [422, "ยอดคงเหลือไม่เพียงพอ", /ยอดคงเหลือไม่เพียงพอ/],
+    ] as const)("keeps the status and safely presents HTTP %s", async (status, rawMessage, expected) => {
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(JSON.stringify({ error: rawMessage }), {
+                status,
+                headers: { "content-type": "application/json" },
+            }),
+        );
+
+        const result = await apiRequest("/api/example", {
+            method: "POST",
+            skipAuthRefresh: true,
+            retryCount: 0,
+        });
+
+        expect(result).toMatchObject({
+            success: false,
+            status,
+            errorThai: expect.stringMatching(expected),
+        });
+        if (status === 401 || status >= 500) {
+            expect(result).not.toMatchObject({ errorThai: rawMessage });
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("sends FormData without forcing JSON content-type", async () => {
         const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
             new Response(JSON.stringify({ upload: { url: "/uploads/item/test.webp" } }), {

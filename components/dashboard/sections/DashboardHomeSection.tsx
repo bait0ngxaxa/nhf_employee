@@ -14,7 +14,6 @@ import {
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { LineAddFriendCard } from "@/components/dashboard/line/LineAddFriendCard";
-import { formatTeamSummary } from "@/shared/identity/team-presentation";
 import { DashboardGreetingFallback } from "./DashboardGreeting";
 
 const ClientDashboardGreeting = dynamic(
@@ -345,8 +344,7 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
         ? userNameParts.slice(0, -1).join(" ")
         : userName;
     const nickname = hasNickname ? lastNamePart : undefined;
-    const userTeamSummary = formatTeamSummary(user?.teams);
-    const userDepartment = getDisplayText(user?.department, "ฝ่ายทั่วไป");
+    const userDepartment = user?.department?.trim();
 
     return (
         <div className="relative min-h-[calc(100dvh-6rem)] rounded-2xl border border-border-subtle/70 bg-dashboard-workspace p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
@@ -390,24 +388,9 @@ export function DashboardHomeSection({ announcement }: { announcement?: ReactNod
                             </p>
                         </div>
 
-                        <dl className="mt-8 hidden max-w-2xl lg:grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border-subtle pt-4 sm:gap-x-10">
-                            <div className="min-w-0">
-                                <dt className="text-xs font-semibold tracking-[0.08em] text-content-muted">
-                                    ทีม
-                                </dt>
-                                <dd className="mt-1 truncate text-sm font-bold text-content-primary">
-                                    {userTeamSummary}
-                                </dd>
-                            </div>
-                            <div className="min-w-0">
-                                <dt className="text-xs font-semibold tracking-[0.08em] text-content-muted">
-                                    แผนก
-                                </dt>
-                                <dd className="mt-1 truncate text-sm font-bold text-content-primary">
-                                    {userDepartment}
-                                </dd>
-                            </div>
-                        </dl>
+                        {userDepartment ? (
+                            <p className="mt-2 text-sm text-content-secondary">แผนก {userDepartment}</p>
+                        ) : null}
                     </div>
 
                 </section>

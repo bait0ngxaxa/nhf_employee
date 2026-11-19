@@ -148,7 +148,7 @@ describe("browser mobile navigation", () => {
         expect(within(nav).queryByRole("link", { name: "จัดการสิทธิ์การใช้งาน" })).not.toBeInTheDocument();
         expect(within(nav).getAllByRole("link").some((link) => link.getAttribute("href")?.startsWith("/liff"))).toBe(false);
         expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute("data-page-heading");
-        expect(screen.getByRole("link", { name: "จัดการเซสชัน" })).toHaveAttribute("href", "/dashboard/sessions");
+        expect(screen.getByRole("link", { name: "อุปกรณ์ที่เข้าสู่ระบบ" })).toHaveAttribute("href", "/dashboard/sessions");
         expect(screen.getAllByRole("button", { name: /พนักงานทดสอบ|เมนูผู้ใช้/ }).length).toBeGreaterThan(0);
     });
 

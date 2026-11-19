@@ -33,18 +33,11 @@ import {
     useDashboardDataContext,
 } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
-import {
-    NO_TEAM_PRESENTATION,
-    formatTeamSummary,
-} from "@/shared/identity/team-presentation";
 
 export function DashboardAccountMenu(): ReactElement {
     const { handleSignOut, handleMenuClick } = useDashboardUIContext();
     const { user } = useDashboardDataContext();
-    const teamSummary = formatTeamSummary(user?.teams);
-    const teamNames = user?.teams
-        ?.map((team) => team.name.trim())
-        .filter(Boolean) ?? [];
+    const department = user?.department?.trim();
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [logoutError, setLogoutError] = useState("");
@@ -101,9 +94,6 @@ export function DashboardAccountMenu(): ReactElement {
                                     <span className="text-sm font-semibold text-content-primary">
                                         {user?.name || "ผู้ใช้"}
                                     </span>
-                                    <span className="text-xs font-medium leading-5 text-content-secondary">
-                                        {teamSummary}
-                                    </span>
                                 </div>
                                 <ChevronDown className="h-3 w-3 text-content-subtle transition-colors group-hover:text-brand-foreground" />
                             </Button>
@@ -119,18 +109,9 @@ export function DashboardAccountMenu(): ReactElement {
                                 <p className="mt-1 truncate text-xs text-content-secondary">
                                     {user?.email}
                                 </p>
-                                <dl className="mt-3 space-y-2 text-xs">
-                                    <div>
-                                        <dt className="text-content-muted">หน่วยงาน</dt>
-                                        <dd className="mt-0.5 text-content-body">{user?.department || "ไม่ระบุหน่วยงาน"}</dd>
-                                    </div>
-                                    <div>
-                                        <dt className="text-content-muted">ทีม</dt>
-                                        <dd className="mt-0.5 text-content-body">
-                                            {teamNames.length > 0 ? teamNames.join(" · ") : NO_TEAM_PRESENTATION}
-                                        </dd>
-                                    </div>
-                                </dl>
+                                {department ? (
+                                    <p className="mt-2 text-xs text-content-secondary">แผนก {department}</p>
+                                ) : null}
                             </div>
 
                             <DropdownMenuItem
@@ -139,7 +120,7 @@ export function DashboardAccountMenu(): ReactElement {
                             >
                                 <Smartphone className="mr-3 h-4 w-4 text-content-subtle transition-colors group-hover:text-brand-foreground" />
                                 <span className="text-sm font-bold text-content-secondary group-hover:text-brand-strong">
-                                    จัดการเซสชัน
+                                    อุปกรณ์ที่เข้าสู่ระบบ
                                 </span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
@@ -178,7 +159,9 @@ export function DashboardAccountMenu(): ReactElement {
                             <div className="border-b border-border-subtle px-3 pb-3 pt-2">
                                 <p className="truncate text-sm font-semibold text-content-primary">{user?.name || "ผู้ใช้"}</p>
                                 <p className="mt-1 truncate text-xs text-content-secondary">{user?.email || "ไม่ระบุอีเมล"}</p>
-                                <p className="mt-2 text-xs text-content-secondary">{teamSummary}</p>
+                                {department ? (
+                                    <p className="mt-2 text-xs text-content-secondary">แผนก {department}</p>
+                                ) : null}
                             </div>
                             <DropdownMenuItem
                                 onClick={() => handleMenuClick("sessions")}
@@ -186,7 +169,7 @@ export function DashboardAccountMenu(): ReactElement {
                             >
                                 <Smartphone className="mr-3 h-4 w-4 text-content-subtle" />
                                 <span className="text-sm font-bold text-content-secondary">
-                                    จัดการเซสชัน
+                                    อุปกรณ์ที่เข้าสู่ระบบ
                                 </span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="my-1 bg-surface-subtle" />
@@ -236,7 +219,7 @@ export function DashboardAccountMenu(): ReactElement {
                                     ออกจากระบบบัญชีนี้?
                                 </DialogTitle>
                                 <DialogDescription className="text-sm font-medium leading-6 text-content-secondary [overflow-wrap:anywhere]">
-                                    ระบบจะสิ้นสุดเซสชันบนอุปกรณ์นี้ และพาคุณกลับไปหน้าเข้าสู่ระบบ
+                                    คุณจะออกจากระบบบนอุปกรณ์นี้และกลับไปที่หน้าเข้าสู่ระบบ
                                 </DialogDescription>
                             </DialogHeader>
                         </div>

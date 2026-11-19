@@ -99,8 +99,8 @@ function TicketStatus({ status }: { readonly status: ITTicketStatus }): ReactEle
 
 function TicketListLoading(): ReactElement {
     return (
-        <div role="status" aria-label="กำลังโหลดรายการ Ticket" className="space-y-3">
-            <span className="sr-only">กำลังโหลดรายการ Ticket ของคุณ</span>
+        <div role="status" aria-label="กำลังโหลดรายการคำขอ" className="space-y-3">
+            <span className="sr-only">กำลังโหลดรายการคำขอของคุณ</span>
             {[0, 1, 2].map((row) => (
                 <div key={row} className="animate-pulse motion-reduce:animate-none space-y-3 rounded-xl border border-border-neutral bg-surface-raised p-4">
                     <div className="h-5 w-2/3 rounded bg-surface-subtle" />
@@ -210,7 +210,7 @@ function LiffITTicketList(): ReactElement {
                 setListState({
                     key: requestKey,
                     kind: "error",
-                    message: getErrorMessage(error, "ไม่สามารถโหลดรายการ Ticket ได้ กรุณาลองอีกครั้ง"),
+                    message: getErrorMessage(error, "ไม่สามารถโหลดรายการคำขอได้ กรุณาลองอีกครั้ง"),
                 });
             });
         return () => controller.abort();
@@ -321,7 +321,7 @@ function LiffITTicketList(): ReactElement {
             }
         } catch (error) {
             if (mountedRef.current) {
-                setCreateError(getErrorMessage(error, "ไม่สามารถสร้าง Ticket ได้ กรุณาลองอีกครั้ง"));
+                setCreateError(getErrorMessage(error, "ไม่สามารถส่งคำขอได้ กรุณาลองอีกครั้ง"));
             }
         } finally {
             createInFlightRef.current = false;
@@ -331,7 +331,7 @@ function LiffITTicketList(): ReactElement {
 
     const listHeading = (
         <header className="space-y-2">
-            <h1 className="text-2xl font-bold leading-tight tracking-tight text-content-heading">IT Ticket ของฉัน</h1>
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-content-heading">คำขอ IT ของฉัน</h1>
             <p className="text-sm leading-6 text-content-secondary">
                 แจ้งปัญหาหรือขอความช่วยเหลือ แล้วติดตามความคืบหน้าได้ที่นี่
             </p>
@@ -348,7 +348,7 @@ function LiffITTicketList(): ReactElement {
                     className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-semibold text-content-secondary underline-offset-4 hover:text-content-heading hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                     <ArrowLeft aria-hidden="true" className="size-4" />
-                    กลับรายการ Ticket
+                    กลับรายการคำขอ
                 </button>
                 <section className="space-y-5">
                     <div className="space-y-2">
@@ -455,7 +455,7 @@ function LiffITTicketList(): ReactElement {
                         <div className="flex flex-col gap-3 pt-1">
                             <Button type="submit" disabled={submitting} className="min-h-12 w-full text-base">
                                 {submitting ? <RefreshCw aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" /> : <Plus aria-hidden="true" className="size-4" />}
-                                {submitting ? "กำลังส่ง Ticket…" : "ส่ง Ticket"}
+                                {submitting ? "กำลังส่งคำขอ…" : "ส่งคำขอ"}
                             </Button>
                         </div>
                     </form>
@@ -470,7 +470,7 @@ function LiffITTicketList(): ReactElement {
                         <AlertDialogHeader>
                             <AlertDialogTitle>มีข้อมูลที่ยังไม่ได้ส่ง</AlertDialogTitle>
                             <AlertDialogDescription>
-                                หากกลับไปยังรายการ Ticket ข้อมูลที่กรอกและรูปภาพที่เลือกจะหายไป ต้องการทิ้งข้อมูลหรือไม่
+                                หากกลับไปยังรายการคำขอ ข้อมูลที่กรอกและรูปภาพที่เลือกจะหายไป ต้องการทิ้งข้อมูลหรือไม่
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -501,7 +501,7 @@ function LiffITTicketList(): ReactElement {
                 <div role="status" className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
                     <TicketCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
                     <div className="min-w-0">
-                        <p className="font-semibold">ส่ง Ticket #{createdTicket.id} เรียบร้อยแล้ว</p>
+                        <p className="font-semibold">ส่งคำขอ #{createdTicket.id} เรียบร้อยแล้ว</p>
                         <Link href={APP_ROUTES.line.itTicket(createdTicket.id)} className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             เปิดรายละเอียดและการสนทนา
                         </Link>
@@ -512,7 +512,7 @@ function LiffITTicketList(): ReactElement {
             <section aria-labelledby="liff-it-ticket-list-heading" className="space-y-3">
                 <div className="flex items-end justify-between gap-3">
                     <div className="space-y-1">
-                        <h2 id="liff-it-ticket-list-heading" className="text-lg font-semibold text-content-heading">รายการ Ticket</h2>
+                        <h2 id="liff-it-ticket-list-heading" className="text-lg font-semibold text-content-heading">รายการคำขอ</h2>
                         {loadedList ? <p className="text-sm text-content-secondary">ทั้งหมด {loadedList.pagination.total} รายการ</p> : null}
                     </div>
                     {listError ? (
@@ -539,7 +539,7 @@ function LiffITTicketList(): ReactElement {
                 {loadedList && loadedList.tickets.length === 0 ? (
                     <div className="space-y-3 rounded-xl border border-dashed border-border-neutral bg-surface-raised px-5 py-8 text-center">
                         <TicketCheck aria-hidden="true" className="mx-auto size-8 text-content-muted" />
-                        <h3 className="font-semibold text-content-heading">ยังไม่มี Ticket</h3>
+                        <h3 className="font-semibold text-content-heading">ยังไม่มีคำขอ</h3>
                         <p className="text-sm leading-6 text-content-secondary">เมื่อส่งคำขอแล้ว รายการและสถานะจะแสดงที่นี่</p>
                     </div>
                 ) : null}
@@ -549,13 +549,13 @@ function LiffITTicketList(): ReactElement {
                             <li key={ticket.id}>
                                 <Link
                                     href={APP_ROUTES.line.itTicket(ticket.id)}
-                                    aria-label={`เปิด Ticket #${ticket.id}: ${ticket.title}`}
+                                    aria-label={`เปิดคำขอ #${ticket.id}: ${ticket.title}`}
                                     className="block rounded-xl border border-border-neutral bg-surface-raised p-4 transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 >
                                     <div className="space-y-3">
                                         <div className="flex flex-wrap items-start justify-between gap-2">
                                             <div className="min-w-0 space-y-1">
-                                                <p className="text-xs font-semibold tabular-nums text-content-muted">Ticket #{ticket.id}</p>
+                                                <p className="text-xs font-semibold tabular-nums text-content-muted">คำขอ #{ticket.id}</p>
                                                 <h3 className="break-words text-base font-semibold leading-6 text-content-heading">{ticket.title}</h3>
                                             </div>
                                             <TicketStatus status={ticket.status} />
@@ -576,7 +576,7 @@ function LiffITTicketList(): ReactElement {
                 ) : null}
 
                 {loadedList && loadedList.pagination.totalPages > 1 ? (
-                    <nav aria-label="แบ่งหน้ารายการ Ticket" className="flex items-center justify-between gap-3 pt-2">
+                    <nav aria-label="แบ่งหน้ารายการคำขอ" className="flex items-center justify-between gap-3 pt-2">
                         <Button type="button" variant="outline" className="min-h-11 flex-1" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
                             <ArrowLeft aria-hidden="true" className="size-4" />
                             ก่อนหน้า
@@ -613,7 +613,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
             .catch((error: unknown) => {
                 if (controller.signal.aborted) return;
                 setRefreshing(false);
-                const message = getErrorMessage(error, "ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง");
+                const message = getErrorMessage(error, "ไม่สามารถโหลดคำขอได้ กรุณาลองอีกครั้ง");
                 const status = error instanceof LiffApiError ? error.status : undefined;
                 const transientFailure = status === undefined
                     || status === 408
@@ -637,19 +637,19 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
         <main className="space-y-5 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-5">
             <Link href={APP_ROUTES.line.it} className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-semibold text-content-secondary underline-offset-4 hover:text-content-heading hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <ArrowLeft aria-hidden="true" className="size-4" />
-                กลับรายการ Ticket
+                กลับรายการคำขอ
             </Link>
 
-            {!validId ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">หมายเลข Ticket ไม่ถูกต้อง</p> : null}
+            {!validId ? <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">หมายเลขคำขอไม่ถูกต้อง</p> : null}
             {validId && ticketState === null ? (
-                <div role="status" aria-label="กำลังโหลด Ticket" className="space-y-4 rounded-xl border border-border-neutral bg-surface-raised p-5">
-                    <span className="sr-only">กำลังโหลดรายละเอียด Ticket</span>
+                <div role="status" aria-label="กำลังโหลดคำขอ" className="space-y-4 rounded-xl border border-border-neutral bg-surface-raised p-5">
+                    <span className="sr-only">กำลังโหลดรายละเอียดคำขอ</span>
                     <div className="h-5 w-1/3 animate-pulse motion-reduce:animate-none rounded bg-surface-subtle" />
                     <div className="h-7 w-4/5 animate-pulse motion-reduce:animate-none rounded bg-surface-subtle" />
                     <div className="h-24 animate-pulse motion-reduce:animate-none rounded bg-surface-subtle" />
                 </div>
             ) : null}
-            {refreshing ? <p role="status" className="text-sm text-content-secondary">กำลังโหลดสถานะ Ticket ล่าสุด…</p> : null}
+            {refreshing ? <p role="status" className="text-sm text-content-secondary">กำลังโหลดสถานะคำขอล่าสุด…</p> : null}
             {error ? (
                 <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
                     <p className="flex items-start gap-2"><CircleAlert aria-hidden="true" className="mt-1 size-4 shrink-0" />{error}</p>
@@ -658,7 +658,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                         setRefreshVersion((value) => value + 1);
                     }} disabled={refreshing} aria-busy={refreshing}>
                         <RefreshCw aria-hidden="true" className="size-4" />
-                        {refreshing ? "กำลังโหลด Ticket…" : "โหลด Ticket อีกครั้ง"}
+                        {refreshing ? "กำลังโหลดคำขอ…" : "โหลดคำขออีกครั้ง"}
                     </Button>
                 </div>
             ) : null}
@@ -671,7 +671,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                         setRefreshVersion((value) => value + 1);
                     }} disabled={refreshing} aria-busy={refreshing}>
                         <RefreshCw aria-hidden="true" className="size-4" />
-                        {refreshing ? "กำลังโหลด Ticket…" : "ลองโหลด Ticket อีกครั้ง"}
+                        {refreshing ? "กำลังโหลดคำขอ…" : "ลองโหลดคำขออีกครั้ง"}
                     </Button>
                 </div>
             ) : null}
@@ -680,7 +680,7 @@ function LiffITTicketDetail({ ticketId }: { readonly ticketId: string }): ReactE
                     <article className="space-y-5 rounded-xl border border-border-neutral bg-surface-raised p-4">
                         <header className="space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-sm font-semibold tabular-nums text-content-muted">Ticket #{ticket.id}</p>
+                                <p className="text-sm font-semibold tabular-nums text-content-muted">คำขอ #{ticket.id}</p>
                                 <TicketStatus status={ticket.status} />
                             </div>
                             <div className="space-y-1">

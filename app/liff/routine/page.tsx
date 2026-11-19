@@ -14,5 +14,5 @@ export default function Page(): ReactElement {
         return <LiffRoutineApp />;
     }
 
-    return <LiffModuleLanding module="routine" enabled={false} />;
+    return <LiffModuleLanding module="routine" reason="disabled" />;
 }

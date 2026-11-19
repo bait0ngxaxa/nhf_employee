@@ -174,7 +174,17 @@ describe("TeamAdministration", () => {
         renderTeam();
 
         expect(screen.getByText(/พบการตั้งค่าสิทธิ์ของทีมที่ต้องตรวจสอบ/)).toBeInTheDocument();
-        expect(screen.queryByText("old.capability")).not.toBeInTheDocument();
+        const warning = screen.getByRole("alert");
+        expect(warning).toHaveTextContent(/อาจใช้กำหนดการเข้าถึงอย่างปลอดภัยไม่ได้/);
+        expect(warning).toHaveTextContent(/ที่ต้องตรวจสอบ \(1\)/);
+        expect(screen.getByText("old.capability")).not.toBeVisible();
+
+        const disclosure = screen.getByText("รายละเอียดทางเทคนิค");
+        expect(disclosure.tagName).toBe("SUMMARY");
+        disclosure.focus();
+        expect(disclosure).toHaveFocus();
+        fireEvent.click(disclosure);
+        expect(screen.getByText("old.capability")).toBeVisible();
         fireEvent.click(screen.getByRole("button", { name: "หน้าที่ในทีมและสิทธิ์" }));
         expect(screen.getByRole("button", { name: "เพิ่มหน้าที่" })).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "สมาชิก" }));

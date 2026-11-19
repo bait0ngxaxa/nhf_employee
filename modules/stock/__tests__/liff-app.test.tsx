@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
+import type * as LineClient from "@/modules/line/client";
+import type * as LiffApi from "../presentation/liff/api";
 
 import { LiffApiError } from "@/modules/line/client";
 import type {
@@ -14,25 +16,6 @@ import type {
 } from "../contracts/liff";
 
 const mocks = vi.hoisted(() => {
-    class MockLiffApiError extends Error {
-        readonly status: number | undefined;
-        readonly sessionRecovered: boolean;
-        readonly unauthorizedRecovery: { recovered: boolean; replayed: boolean } | undefined;
-
-        constructor(
-            message: string,
-            status?: number,
-            _details?: unknown,
-            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
-        ) {
-            super(message);
-            this.name = "LiffApiError";
-            this.status = status;
-            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
-            this.unauthorizedRecovery = unauthorizedRecovery;
-        }
-    }
-
     return {
     search: "",
     fetchHome: vi.fn(),
@@ -46,14 +29,7 @@ const mocks = vi.hoisted(() => {
     cancelRequest: vi.fn(),
         issueRequest: vi.fn(),
         useLiffWorkforce: vi.fn(),
-        MockLiffApiError,
-        isRecoveredLiffMutation: (error: unknown): boolean =>
-            error instanceof MockLiffApiError
-            && error.status === 401
-            && error.sessionRecovered
-            && error.unauthorizedRecovery?.replayed === false,
-        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+
     };
 });
 
@@ -61,13 +37,10 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 
-vi.mock("@/modules/line/client", () => ({
-    LiffApiError: mocks.MockLiffApiError,
-    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
-    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
-    useLiffWorkforce: mocks.useLiffWorkforce,
+vi.mock("@/modules/line/client", async (importOriginal) => ({
+    ...await importOriginal<typeof LineClient>(),
     fetchLiffHome: mocks.fetchHome,
+    useLiffWorkforce: mocks.useLiffWorkforce,
 }));
 
 vi.mock("../presentation/liff/api", () => ({
@@ -365,7 +338,7 @@ describe("LIFF Stock app orchestration", () => {
         );
 
         expect(screen.getByRole("status")).toHaveTextContent(
-            "กำลังตรวจสอบสิทธิ์การใช้งาน Stock",
+            "กำลังโหลดบริการเบิกวัสดุ",
         );
         await waitFor(() => expect(mocks.fetchHome).toHaveBeenCalledTimes(2));
 
@@ -374,7 +347,7 @@ describe("LIFF Stock app orchestration", () => {
             modules: {},
             capabilities: { stockCapabilities: EMPLOYEE_STOCK_CAPABILITIES },
         });
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
             .not.toBeInTheDocument();
@@ -388,7 +361,7 @@ describe("LIFF Stock app orchestration", () => {
             await oldProcessorHome.promise;
         });
 
-        expect(screen.getByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(screen.getByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(screen.queryByRole("tab", { name: /รอดำเนินการ/ }))
             .not.toBeInTheDocument();
@@ -439,7 +412,7 @@ describe("LIFF Stock app orchestration", () => {
         fireEvent.click(screen.getByRole("button", { name: "ลองตรวจสอบอีกครั้ง" }));
 
         expect(screen.getByRole("status")).toHaveTextContent(
-            "กำลังตรวจสอบสิทธิ์การใช้งาน Stock",
+            "กำลังโหลดบริการเบิกวัสดุ",
         );
         expect(await screen.findByRole("heading", { name: "เลือกวัสดุที่ต้องการเบิก" }))
             .toBeInTheDocument();
@@ -542,7 +515,7 @@ describe("LIFF Stock app orchestration", () => {
 
         render(<LiffStockApp />);
 
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).not.toHaveBeenCalled();
         expect(mocks.issueRequest).not.toHaveBeenCalled();
@@ -557,7 +530,7 @@ describe("LIFF Stock app orchestration", () => {
 
         const view = render(<LiffStockApp />);
 
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(mocks.fetchRequest).not.toHaveBeenCalled();
         expect(mocks.issueRequest).not.toHaveBeenCalled();
@@ -570,12 +543,12 @@ describe("LIFF Stock app orchestration", () => {
         fireEvent.click(screen.getByRole("button", { name: "รายละเอียด" }));
         expect(await screen.findByRole("heading", { name: "รายละเอียดคำขอ #70" }))
             .toBeInTheDocument();
-        expect(screen.queryByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(screen.queryByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .not.toBeInTheDocument();
         expect(mocks.search).toBe("requestId=71&action=issue");
 
         view.rerender(<LiffStockApp />);
-        expect(screen.queryByText("บัญชีนี้ไม่มีสิทธิ์ดำเนินการคำขอเบิกนี้"))
+        expect(screen.queryByText("บัญชีนี้ดำเนินการคำขอเบิกนี้ไม่ได้"))
             .not.toBeInTheDocument();
         expect(mocks.fetchRequest).toHaveBeenCalledTimes(1);
         expect(mocks.fetchRequest).toHaveBeenCalledWith(70);
@@ -600,7 +573,7 @@ describe("LIFF Stock app orchestration", () => {
 
         render(<LiffStockApp />);
 
-        expect(await screen.findByText("บัญชีนี้ไม่มีสิทธิ์ดูรายละเอียดคำขอเบิกนี้"))
+        expect(await screen.findByText("บัญชีนี้เปิดรายละเอียดคำขอเบิกนี้ไม่ได้"))
             .toBeInTheDocument();
         expect(await screen.findByRole("tab", { name: /รอดำเนินการ/ }))
             .toBeInTheDocument();
@@ -663,6 +636,26 @@ describe("LIFF Stock app orchestration", () => {
         fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
 
         await waitFor(() => expect(mocks.issueRequest).toHaveBeenCalledWith(71));
+    });
+
+    it("shows the issue endpoint denial in the processor confirmation", async () => {
+        mocks.search = "requestId=71&action=issue";
+        mockProcessorHome();
+        const api = await vi.importActual<typeof LiffApi>("../presentation/liff/api");
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+            Response.json({ error: "stock.request.issue ALL" }, { status: 403 }),
+        );
+        mocks.issueRequest.mockImplementationOnce(api.issueLiffStockRequest);
+        try {
+            render(<LiffStockApp />);
+            fireEvent.click(await screen.findByRole("button", { name: "จ่ายวัสดุ" }));
+            fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
+            expect(await screen.findByText("บัญชีนี้จ่ายวัสดุสำหรับคำขอไม่ได้")).toBeVisible();
+            expect(screen.queryByText(/stock\.request\.issue/)).not.toBeInTheDocument();
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        } finally {
+            fetchMock.mockRestore();
+        }
     });
 
     it("refreshes processor detail after an issue conflict without retrying", async () => {

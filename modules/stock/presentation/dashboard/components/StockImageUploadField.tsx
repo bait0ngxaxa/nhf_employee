@@ -22,7 +22,6 @@ type UploadResponse = {
     upload?: {
         url: string;
     };
-    error?: string;
 };
 
 export function StockImageUploadField({
@@ -62,7 +61,7 @@ export function StockImageUploadField({
             );
 
             if (!result.upload?.url) {
-                throw new Error(result.error ?? "อัปโหลดรูปไม่สำเร็จ");
+                throw new Error("อัปโหลดรูปไม่สำเร็จ");
             }
 
             onChange(result.upload.url);

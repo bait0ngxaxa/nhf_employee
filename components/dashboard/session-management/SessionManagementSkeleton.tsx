@@ -34,7 +34,7 @@ export function SessionManagementSkeleton(): ReactElement {
             role="status"
             aria-live="polite"
             aria-busy="true"
-            aria-label="กำลังโหลดข้อมูลเซสชัน"
+            aria-label="กำลังโหลดรายการเข้าสู่ระบบ"
         >
             <div className="mx-auto max-w-6xl space-y-5">
                 <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

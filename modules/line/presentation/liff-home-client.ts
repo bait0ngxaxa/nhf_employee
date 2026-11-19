@@ -11,9 +11,9 @@ function getLiffHomeApiErrorMessage(
 ): string {
     switch (response.status) {
         case 401:
-            return "การยืนยันตัวตนหมดอายุ กรุณาลองใหม่อีกครั้ง";
+            return "กรุณาเปิด NHFapp จาก LINE อีกครั้งเพื่อเข้าสู่ระบบ";
         case 403:
-            return "บัญชี NHFapp นี้ยังไม่สามารถใช้บริการผ่าน LINE ได้";
+            return "บัญชี NHFapp นี้ยังไม่สามารถใช้บริการผ่าน LINE ได้ กรุณาติดต่อผู้ดูแลระบบ";
         default:
             return "ไม่สามารถโหลดบริการของคุณได้ กรุณาลองใหม่อีกครั้ง";
     }

@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 vi.mock("./ITTicketSelfService", () => ({
-    ITTicketSelfService: () => <div>เนื้อหา Ticket ของฉัน</div>,
+    ITTicketSelfService: () => <div>เนื้อหา คำขอของฉัน</div>,
 }));
 vi.mock("./ITTicketOperatorQueue", () => ({
     ITTicketOperatorQueue: (props: Record<string, unknown>) => {
@@ -101,13 +101,13 @@ describe("IT unified workspace presentation", () => {
         mocks.search = "itTab=queue";
         render(<ITWorkspace capabilities={{ ...none, canReadOwnTickets: true }} />);
 
-        expect(screen.getByRole("tab", { name: "Ticket ของฉัน" })).toHaveAttribute(
+        expect(screen.getByRole("tab", { name: "คำขอของฉัน" })).toHaveAttribute(
             "data-state",
             "active",
         );
         expect(screen.queryByRole("tab", { name: "คิวงาน IT" })).not.toBeInTheDocument();
         expect(screen.queryByRole("tab", { name: "รายงาน" })).not.toBeInTheDocument();
-        expect(await screen.findByText("เนื้อหา Ticket ของฉัน")).toBeInTheDocument();
+        expect(await screen.findByText("เนื้อหา คำขอของฉัน")).toBeInTheDocument();
         await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith(
             "/dashboard/it?itTab=my-tickets",
             { scroll: false },
@@ -122,7 +122,7 @@ describe("IT unified workspace presentation", () => {
             "data-state",
             "active",
         );
-        expect(screen.queryByRole("tab", { name: "Ticket ของฉัน" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("tab", { name: "คำขอของฉัน" })).not.toBeInTheDocument();
         expect(screen.queryByRole("tab", { name: "รายงาน" })).not.toBeInTheDocument();
         expect(await screen.findByText("เนื้อหาคิวงาน IT")).toBeInTheDocument();
         await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith(
@@ -140,7 +140,7 @@ describe("IT unified workspace presentation", () => {
             canReadAnalytics: true,
         }} />);
 
-        expect(screen.getByRole("tab", { name: "Ticket ของฉัน" })).toBeInTheDocument();
+        expect(screen.getByRole("tab", { name: "คำขอของฉัน" })).toBeInTheDocument();
         expect(screen.getByRole("tab", { name: "คิวงาน IT" })).toBeInTheDocument();
         expect(screen.getByRole("tab", { name: "รายงาน" })).toBeInTheDocument();
         fireEvent.mouseDown(screen.getByRole("tab", { name: "คิวงาน IT" }), {

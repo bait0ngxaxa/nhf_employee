@@ -81,7 +81,7 @@ describe("global LIFF client", () => {
 
         expect(error).toBeInstanceOf(LiffApiError);
         expect(error).toMatchObject({
-            message: "บัญชี NHFapp นี้ยังไม่สามารถใช้บริการผ่าน LINE ได้",
+            message: "บัญชี NHFapp นี้ยังไม่สามารถใช้บริการผ่าน LINE ได้ กรุณาติดต่อผู้ดูแลระบบ",
         });
         expect(String(error)).not.toContain("Routine");
     });
@@ -92,7 +92,7 @@ describe("global LIFF client", () => {
         await expect(fetchLiffRoutineSummary()).rejects.toMatchObject({
             name: "LiffApiError",
             status: 403,
-            message: "บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้",
+            message: "บัญชีนี้เปิดสรุปงานประจำไม่ได้",
         });
     });
 });

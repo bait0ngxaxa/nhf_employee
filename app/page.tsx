@@ -16,30 +16,6 @@ export const metadata: Metadata = {
     description: "แอปพลิเคชันสำหรับผู้ใช้งาน NHF",
 };
 
-interface IntroPoint {
-    title: string;
-    description: string;
-}
-
-const INTRO_POINTS: IntroPoint[] = [
-    {
-        title: "พื้นที่เดียวขององค์กร",
-        description: "จุดเริ่มต้นสำหรับผู้ใช้งาน NHF",
-    },
-    {
-        title: "เข้าถึงตามสิทธิ์ที่ได้รับ",
-        description: "แสดงเฉพาะงานและบริการที่บัญชีนี้ใช้งานได้",
-    },
-    {
-        title: "ใช้งานง่าย",
-        description: "หน้าจอเรียบง่าย อ่านสบาย และไม่ซับซ้อนเกินจำเป็น",
-    },
-    {
-        title: "สำหรับพนักงาน NHF",
-        description: "สร้างขึ้นเพื่อรองรับการทำงานร่วมกันของคนในองค์กร",
-    },
-];
-
 const TRUST_POINTS = [
     "สำหรับผู้ใช้งานของมูลนิธิสาธารณสุขแห่งชาติ",
     "ใช้บัญชีที่ได้รับอนุญาตจากองค์กร",
@@ -61,26 +37,6 @@ function BrandMark(): ReactElement {
                 </p>
             </div>
         </Link>
-    );
-}
-
-function IntroPointList() {
-    return (
-        <div className="grid gap-3 sm:grid-cols-2">
-            {INTRO_POINTS.map((point) => (
-                <div
-                    key={point.title}
-                    className="border-t border-border-neutral-default/60 pt-3"
-                >
-                    <h3 className="text-base font-bold leading-6 text-content-heading [overflow-wrap:anywhere]">
-                        {point.title}
-                    </h3>
-                    <p className="mt-1 text-sm font-medium leading-6 text-content-body [overflow-wrap:anywhere]">
-                        {point.description}
-                    </p>
-                </div>
-            ))}
-        </div>
     );
 }
 
@@ -177,30 +133,13 @@ export default async function Home() {
                             National Health Foundation Application
                         </h1>
                         <p className="mt-5 max-w-3xl text-base font-medium leading-8 text-content-body sm:text-lg">
-                            พื้นที่ดิจิทัลของมูลนิธิสาธารณสุขแห่งชาติ
-                            สำหรับเริ่มใช้งานระบบงานของ NHF
+                            NHFapp รวมบริการและงานภายในมูลนิธิสาธารณสุขแห่งชาติไว้ในที่เดียว ให้พนักงานเข้าใช้บริการที่เปิดให้ใช้งานได้สะดวก
                         </p>
                     </div>
 
                     <AccessPanel />
                 </section>
 
-                <section className="mt-12 border-t border-action-primary-border-subtle pt-8">
-                    <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-                        <div>
-                            <h2 className="text-xl font-bold leading-8 text-content-heading">
-                                แอปพลิเคชัน NHFapp
-                            </h2>
-                            <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-content-secondary">
-                                Single source of truth
-                            </p>
-                        </div>
-                        <p className="text-sm font-semibold text-content-muted">
-                            สำหรับการทำงานภายใน NHF
-                        </p>
-                    </div>
-                    <IntroPointList />
-                </section>
             </main>
 
             <footer className="border-t border-border-neutral-default/50 bg-surface-raised/70">
