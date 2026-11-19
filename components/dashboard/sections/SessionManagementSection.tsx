@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { SessionManagementView } from "@/components/dashboard/session-management/SessionManagementView";
 import { useSessionManagement } from "@/components/dashboard/session-management/useSessionManagement";
 
-function SessionErrorState({ onRetry }: { onRetry: () => void }) {
+function SessionErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
     return (
         <div className="min-h-[calc(100dvh-6rem)]">
             <div className="space-y-5 p-4 md:p-8">
@@ -24,12 +24,12 @@ function SessionErrorState({ onRetry }: { onRetry: () => void }) {
                     <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex min-w-0 gap-3">
                             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-danger-foreground" />
-                            <div className="min-w-0 space-y-1">
+                            <div role="alert" className="min-w-0 space-y-1">
                                 <p className="font-semibold text-status-danger-strong">
                                     โหลดรายการอุปกรณ์ไม่สำเร็จ
                                 </p>
                                 <p className="text-sm leading-6 text-status-danger-strong [overflow-wrap:anywhere]">
-                                    กรุณาลองใหม่อีกครั้ง หากยังไม่สำเร็จให้เข้าสู่ระบบใหม่
+                                    {message}
                                 </p>
                             </div>
                         </div>
@@ -71,6 +71,7 @@ export function SessionManagementSection() {
     if (error) {
         return (
             <SessionErrorState
+                message={error.message}
                 onRetry={() => {
                     void refresh();
                 }}

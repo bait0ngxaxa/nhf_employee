@@ -157,7 +157,7 @@ export function ITTicketSelfService({
         void fetch(`${API_ROUTES.itTickets.list}?${query}`, { signal: controller.signal })
             .then(async (response) => {
                 const payload: unknown = await response.json().catch(() => null);
-                if (!response.ok) throw new Error(readITRequesterError(payload, response.status));
+                if (!response.ok) throw new Error(readITRequesterError(payload, response.status, "list"));
                 const parsed = parseITRequesterTicketList(payload);
                 if (parsed === null) throw new Error("ข้อมูลรายการคำขอ ไม่ถูกต้อง กรุณาลองอีกครั้ง");
                 if (controller.signal.aborted) return;
@@ -236,7 +236,7 @@ export function ITTicketSelfService({
                 body,
             }));
             const responseBody: unknown = await response.json().catch(() => null);
-            if (!response.ok) throw new Error(readITRequesterError(responseBody, response.status));
+            if (!response.ok) throw new Error(readITRequesterError(responseBody, response.status, "create"));
             const createdTicket = isITTicketResponseRecord(responseBody) && responseBody.success === true
                 ? parseITRequesterTicket(responseBody.ticket)
                 : null;

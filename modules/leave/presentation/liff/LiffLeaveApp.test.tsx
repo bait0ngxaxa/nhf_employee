@@ -6,26 +6,6 @@ import type { LeavePresentationCapabilities } from "../../application/types";
 import type { ApproverLeaveAction, EmployeeLeaveAction, LiffLeaveRequestDetail as LiffLeaveRequestDetailData } from "../types";
 
 const mocks = vi.hoisted(() => {
-    class MockLiffApiError extends Error {
-        readonly status: number | undefined;
-        readonly sessionRecovered: boolean;
-        readonly unauthorizedRecovery:
-            { recovered: boolean; replayed: boolean } | undefined;
-
-        constructor(
-            message: string,
-            status?: number,
-            _details?: unknown,
-            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
-        ) {
-            super(message);
-            this.name = "LiffApiError";
-            this.status = status;
-            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
-            this.unauthorizedRecovery = unauthorizedRecovery;
-        }
-    }
-
     return {
     search: "",
     fetchHome: vi.fn(),
@@ -37,14 +17,7 @@ const mocks = vi.hoisted(() => {
     decideCancellation: vi.fn(),
     requestNotTaken: vi.fn(),
         submitDecision: vi.fn(),
-        MockLiffApiError,
-        isRecoveredLiffMutation: (error: unknown): boolean =>
-            error instanceof MockLiffApiError
-            && error.status === 401
-            && error.sessionRecovered
-            && error.unauthorizedRecovery?.replayed === false,
-        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+
     };
 });
 
@@ -63,12 +36,9 @@ vi.mock("./api", () => ({
     submitLiffLeaveDecision: mocks.submitDecision,
 }));
 
-vi.mock("@/modules/line/client", () => ({
+vi.mock("@/modules/line/client", async (importOriginal) => ({
+    ...await importOriginal<typeof import("@/modules/line/client")>(),
     fetchLiffHome: mocks.fetchHome,
-    LiffApiError: mocks.MockLiffApiError,
-    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
-    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
 }));
 
 vi.mock("./LiffLeaveOverview", () => ({
@@ -671,6 +641,34 @@ describe("LIFF Leave app orchestration", () => {
             "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
         )).toBeInTheDocument();
         expect(screen.queryByTestId("detail-approve")).not.toBeInTheDocument();
+    });
+
+    it("shows the approval denial inside the pending action", async () => {
+        mocks.search = "requestId=leave-1&action=approve";
+        mocks.fetchHome.mockResolvedValueOnce({
+            workforce: { userId: 1, employeeId: 1, name: "หัวหน้า ทดสอบ" },
+            modules: {},
+            capabilities: { canApproveLeave: true, leaveCapabilities: LEAVE_CAPABILITIES },
+        });
+        mocks.fetchRequest.mockResolvedValueOnce({
+            id: "leave-1", viewerRole: "APPROVER", availableActions: ["APPROVE"],
+            leaveType: "SICK", startDate: "2031-01-01", endDate: "2031-01-01",
+        });
+        const api = await vi.importActual<typeof import("./api")>("./api");
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+            Response.json({ error: "leave.request.approve ASSIGNED" }, { status: 403 }),
+        );
+        mocks.submitDecision.mockImplementationOnce(api.submitLiffLeaveDecision);
+        try {
+            render(<LiffLeaveApp />);
+            fireEvent.click(await screen.findByTestId("detail-approve"));
+            fireEvent.click(screen.getByRole("button", { name: "ยืนยันการทดสอบ" }));
+            expect(await screen.findByText("บัญชีนี้พิจารณาคำขอลาไม่ได้")).toBeVisible();
+            expect(screen.queryByText(/leave\.request\.approve/)).not.toBeInTheDocument();
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        } finally {
+            fetchMock.mockRestore();
+        }
     });
 
     it("fails an inaccessible deep link safely without revealing its request", async () => {

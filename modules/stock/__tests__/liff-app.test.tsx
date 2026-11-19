@@ -14,25 +14,6 @@ import type {
 } from "../contracts/liff";
 
 const mocks = vi.hoisted(() => {
-    class MockLiffApiError extends Error {
-        readonly status: number | undefined;
-        readonly sessionRecovered: boolean;
-        readonly unauthorizedRecovery: { recovered: boolean; replayed: boolean } | undefined;
-
-        constructor(
-            message: string,
-            status?: number,
-            _details?: unknown,
-            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
-        ) {
-            super(message);
-            this.name = "LiffApiError";
-            this.status = status;
-            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
-            this.unauthorizedRecovery = unauthorizedRecovery;
-        }
-    }
-
     return {
     search: "",
     fetchHome: vi.fn(),
@@ -46,14 +27,7 @@ const mocks = vi.hoisted(() => {
     cancelRequest: vi.fn(),
         issueRequest: vi.fn(),
         useLiffWorkforce: vi.fn(),
-        MockLiffApiError,
-        isRecoveredLiffMutation: (error: unknown): boolean =>
-            error instanceof MockLiffApiError
-            && error.status === 401
-            && error.sessionRecovered
-            && error.unauthorizedRecovery?.replayed === false,
-        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
+
     };
 });
 
@@ -61,13 +35,10 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(mocks.search),
 }));
 
-vi.mock("@/modules/line/client", () => ({
-    LiffApiError: mocks.MockLiffApiError,
-    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
-    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
-    useLiffWorkforce: mocks.useLiffWorkforce,
+vi.mock("@/modules/line/client", async (importOriginal) => ({
+    ...await importOriginal<typeof import("@/modules/line/client")>(),
     fetchLiffHome: mocks.fetchHome,
+    useLiffWorkforce: mocks.useLiffWorkforce,
 }));
 
 vi.mock("../presentation/liff/api", () => ({
@@ -663,6 +634,26 @@ describe("LIFF Stock app orchestration", () => {
         fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
 
         await waitFor(() => expect(mocks.issueRequest).toHaveBeenCalledWith(71));
+    });
+
+    it("shows the issue endpoint denial in the processor confirmation", async () => {
+        mocks.search = "requestId=71&action=issue";
+        mockProcessorHome();
+        const api = await vi.importActual<typeof import("../presentation/liff/api")>("../presentation/liff/api");
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+            Response.json({ error: "stock.request.issue ALL" }, { status: 403 }),
+        );
+        mocks.issueRequest.mockImplementationOnce(api.issueLiffStockRequest);
+        try {
+            render(<LiffStockApp />);
+            fireEvent.click(await screen.findByRole("button", { name: "จ่ายวัสดุ" }));
+            fireEvent.click(screen.getByRole("button", { name: "ยืนยันจ่ายวัสดุ" }));
+            expect(await screen.findByText("บัญชีนี้จ่ายวัสดุสำหรับคำขอไม่ได้")).toBeVisible();
+            expect(screen.queryByText(/stock\.request\.issue/)).not.toBeInTheDocument();
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        } finally {
+            fetchMock.mockRestore();
+        }
     });
 
     it("refreshes processor detail after an issue conflict without retrying", async () => {

@@ -15,6 +15,8 @@ vi.mock("@/lib/client/api-client", () => ({
 import {
     fetchLiffLeaveAttachment,
     fetchLiffLeaveProfile,
+    cancelLiffLeave,
+    fetchLiffLeaveRequest,
     submitLiffLeaveDecision,
     submitLiffLeaveRequest,
 } from "./api";
@@ -32,6 +34,23 @@ describe("LIFF Leave client", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.unstubAllGlobals();
+    });
+
+    it.each([
+        ["profile", apiGetMock, () => fetchLiffLeaveProfile({ page: 1 }), "บัญชีนี้เปิดข้อมูลและประวัติวันลาไม่ได้"],
+        ["detail", apiGetMock, () => fetchLiffLeaveRequest("1"), "บัญชีนี้เปิดรายละเอียดคำขอลาไม่ได้"],
+        ["cancel", apiPostMock, () => cancelLiffLeave("1"), "บัญชีนี้ยกเลิกคำขอลาไม่ได้"],
+        ["approval", apiPostMock, () => submitLiffLeaveDecision({ leaveId: "1", action: "APPROVE" }), "บัญชีนี้พิจารณาคำขอลาไม่ได้"],
+    ] as const)("presents the denial for %s", async (_action, transport, operation, message) => {
+        transport.mockResolvedValueOnce({
+            success: false,
+            status: 403,
+            code: "FORBIDDEN",
+            error: "รหัสสิทธิ์ภายใน",
+            errorThai: "รหัสสิทธิ์ภายใน",
+        });
+
+        await expect(operation()).rejects.toMatchObject({ status: 403, message });
     });
 
     it("keeps history filtering server-side and disables normal auth refresh", async () => {

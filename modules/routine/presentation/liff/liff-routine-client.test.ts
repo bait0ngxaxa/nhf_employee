@@ -19,6 +19,7 @@ import {
     deleteLiffRoutineTask,
     fetchLiffRoutineReference,
     fetchLiffRoutineTask,
+    fetchLiffRoutineTasks,
     updateLiffRoutineTask,
 } from "./api";
 import { LIFF_API_REQUEST_OPTIONS } from "@/modules/line/client";
@@ -38,6 +39,23 @@ function success<T>(data: T) {
 describe("LIFF Routine client contract", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    it.each([
+        ["list", mocks.apiGet, () => fetchLiffRoutineTasks({ page: 1, limit: 10 }), "บัญชีนี้เปิดรายการงานประจำไม่ได้"],
+        ["detail", mocks.apiGet, () => fetchLiffRoutineTask(1), "บัญชีนี้เปิดรายละเอียดงานประจำไม่ได้"],
+        ["update", mocks.apiPatch, () => updateLiffRoutineTask(1, { version: 1, title: "แก้ไข" }), "บัญชีนี้แก้ไขงานประจำไม่ได้"],
+        ["delete", mocks.apiDelete, () => deleteLiffRoutineTask(1), "บัญชีนี้ลบงานประจำไม่ได้"],
+    ] as const)("presents the denial for %s", async (_action, transport, operation, message) => {
+        transport.mockResolvedValueOnce({
+            success: false,
+            status: 403,
+            code: "FORBIDDEN",
+            error: "รหัสสิทธิ์ภายใน",
+            errorThai: "รหัสสิทธิ์ภายใน",
+        });
+
+        await expect(operation()).rejects.toMatchObject({ status: 403, message });
     });
 
     it("fetches reference data through the shared API client", async () => {
@@ -123,11 +141,11 @@ describe("LIFF Routine client contract", () => {
         });
     });
 
-    it("preserves a server-provided resource-not-found message", async () => {
+    it("keeps a protected resource denial neutral", async () => {
         mocks.apiGet.mockResolvedValueOnce({
             success: false as const,
-            error: "ไม่พบงานประจำ",
-            errorThai: "ไม่พบงานประจำ",
+            error: "พบงานประจำที่เป็นของพนักงานคนอื่น",
+            errorThai: "พบงานประจำที่เป็นของพนักงานคนอื่น",
             code: "UNKNOWN_ERROR" as const,
             status: 404,
         });
@@ -135,7 +153,7 @@ describe("LIFF Routine client contract", () => {
         await expect(fetchLiffRoutineTask(71)).rejects.toMatchObject({
             name: "LiffApiError",
             status: 404,
-            message: "ไม่พบงานประจำ",
+            message: "ไม่พบข้อมูล Routine ที่ต้องการ",
         });
     });
 

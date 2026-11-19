@@ -354,7 +354,7 @@ export function ITTicketConversation({
             if (!response.ok) {
                 if (response.status < 500 && response.status !== 409) setUnresolvedPost(false);
                 if (response.status === 401 || response.status === 403) setPostingDenied(true);
-                throw new Error(readITTicketReadError(payload, response.status, operator));
+                throw new Error(readITTicketReadError(payload, response.status, operator, "comment"));
             }
             const result = parseITTicketCommentSubmission(payload);
             if (result === null) throw new Error("ระบบยืนยันผลการส่งข้อความไม่ได้ กรุณาลองส่งซ้ำ");

@@ -200,7 +200,7 @@ describe("IT operator presentation contracts", () => {
                 updatedAt: "2026-09-02T03:00:00.000Z",
             },
         })).toMatchObject({ changed: true, ticket: { id: 19, version: 5 } });
-        expect(readITOperatorError({ error: "Ticket เปลี่ยนแปลงแล้ว" }, 409, true))
+        expect(readITOperatorError({ error: "Ticket เปลี่ยนแปลงแล้ว" }, 409, "detail"))
             .toBe("Ticket เปลี่ยนแปลงแล้ว");
         expect(isITOperatorMutationVersionConflict({
             code: "MUTATION_CONFLICT",

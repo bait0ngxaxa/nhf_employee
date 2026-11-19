@@ -141,7 +141,7 @@ function containsThai(text: string): boolean {
 }
 
 function resolveThaiErrorMessage(code: ApiErrorCode, rawMessage: string): string {
-    if (code === "UNAUTHORIZED" || code === "INTERNAL_ERROR") {
+    if (code === "UNAUTHORIZED" || code === "FORBIDDEN" || code === "INTERNAL_ERROR") {
         return getThaiErrorMessageByCode(code);
     }
     if (containsThai(rawMessage)) {
@@ -354,7 +354,7 @@ export async function apiRequest<T>(
                 success: false,
                 error: normalized.message,
                 code: normalized.code,
-                errorThai: resolveThaiErrorMessage(normalized.code, normalized.message),
+                errorThai: getThaiErrorMessageByCode(normalized.code),
                 requestId,
             };
         } finally {

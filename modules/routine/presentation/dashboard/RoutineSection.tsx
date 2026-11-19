@@ -39,10 +39,10 @@ async function fetchRoutine<T>(url: string): Promise<T> {
     const response = await fetch(url);
     const body: unknown = await response.json().catch(() => null);
     if (!response.ok) {
-        if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
-            throw new Error(body.error);
-        }
-        throw new Error("โหลดข้อมูลไม่สำเร็จ");
+        if (response.status === 401) throw new Error("กรุณาเข้าสู่ระบบอีกครั้ง");
+        if (response.status === 403) throw new Error("บัญชีนี้เปิดข้อมูลงานประจำไม่ได้");
+        if (response.status === 404) throw new Error("ไม่พบข้อมูลงานประจำที่เปิดดูได้");
+        throw new Error("โหลดข้อมูลงานประจำไม่สำเร็จ กรุณาลองอีกครั้ง");
     }
     return body as T;
 }

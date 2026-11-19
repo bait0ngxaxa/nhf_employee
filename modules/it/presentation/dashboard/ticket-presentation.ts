@@ -379,30 +379,45 @@ export function parseITRequesterTicketList(value: unknown): ITRequesterTicketLis
 export function readITRequesterError(
     payload: unknown,
     status: number,
-    detail = false,
+    operation: "list" | "detail" | "create",
 ): string {
     if (status === 401) return "กรุณาเข้าสู่ระบบอีกครั้ง";
-    if (status === 403) return "บัญชีนี้ทำรายการนี้ไม่ได้ หากต้องใช้งาน กรุณาติดต่อทีม IT";
+    if (status === 403) {
+        return {
+            list: "บัญชีนี้เปิดรายการคำขอไม่ได้",
+            detail: "บัญชีนี้เปิดรายละเอียดคำขอไม่ได้",
+            create: "บัญชีนี้ส่งคำขอแจ้งปัญหา IT ไม่ได้",
+        }[operation] + " หากต้องใช้งาน กรุณาติดต่อทีม IT";
+    }
     if (status === 404) return "ไม่พบคำขอที่เปิดดูได้";
     if (status >= 500) return "บริการ IT ขัดข้องชั่วคราว กรุณาลองอีกครั้ง";
-    if (isITTicketResponseRecord(payload) && typeof payload.error === "string") {
+    if ((status === 400 || status === 422 || status === 409)
+        && isITTicketResponseRecord(payload) && typeof payload.error === "string") {
         return payload.error;
     }
     if (status === 409) return "ดำเนินการต่อไม่ได้ กรุณาตรวจสอบสถานะคำขอล่าสุด";
-    return detail
-        ? "ไม่สามารถโหลดคำขอได้ กรุณาลองอีกครั้ง"
-        : "ไม่สามารถเชื่อมต่อบริการ IT ได้ กรุณาลองอีกครั้ง";
+    return {
+        list: "ไม่สามารถโหลดรายการคำขอได้ กรุณาลองอีกครั้ง",
+        detail: "ไม่สามารถโหลดคำขอได้ กรุณาลองอีกครั้ง",
+        create: "ไม่สามารถส่งคำขอได้ กรุณาลองอีกครั้ง",
+    }[operation];
 }
 
 export function readITOperatorError(
     payload: unknown,
     status: number,
-    detail = false,
+    operation: "list" | "detail" | "update" = "list",
 ): string {
     if (status === 401) return "กรุณาเข้าสู่ระบบอีกครั้ง";
-    if (status === 403) return "บัญชีนี้ไม่มีสิทธิ์ดำเนินการกับคิว IT Ticket";
-    if (status === 404 && detail) return "ไม่พบ Ticket ที่ระบุ";
-    if (status >= 500) return detail
+    if (status === 403) {
+        return {
+            list: "บัญชีนี้เปิดข้อมูลคิว IT Ticket ไม่ได้",
+            detail: "บัญชีนี้เปิดรายละเอียด IT Ticket ไม่ได้",
+            update: "บัญชีนี้บันทึกการเปลี่ยนแปลง IT Ticket ไม่ได้",
+        }[operation];
+    }
+    if (status === 404) return "ไม่พบ Ticket ที่เปิดดูได้";
+    if (status >= 500) return operation === "detail"
         ? "ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง"
         : "ไม่สามารถเชื่อมต่อคิว IT Ticket ได้ กรุณาลองอีกครั้ง";
     if (status === 409) {
@@ -410,10 +425,11 @@ export function readITOperatorError(
             ? payload.error
             : "Ticket ถูกเปลี่ยนแปลงหรือไม่สามารถดำเนินการตามสถานะปัจจุบันได้";
     }
-    if (isITTicketResponseRecord(payload) && typeof payload.error === "string") {
+    if ((status === 400 || status === 422 || status === 409)
+        && isITTicketResponseRecord(payload) && typeof payload.error === "string") {
         return payload.error;
     }
-    return detail
+    return operation === "detail"
         ? "ไม่สามารถโหลด Ticket ได้ กรุณาลองอีกครั้ง"
         : "ไม่สามารถเชื่อมต่อคิว IT Ticket ได้ กรุณาลองอีกครั้ง";
 }
@@ -750,14 +766,18 @@ export function readITTicketReadError(
     payload: unknown,
     status: number,
     operator: boolean,
+    operation: "read" | "comment" = "read",
 ): string {
     if (status === 401) return "กรุณาเข้าสู่ระบบอีกครั้ง";
-    if (status === 403) return "บัญชีนี้ดำเนินการกับรายการนี้ไม่ได้ หากต้องใช้งาน กรุณาติดต่อทีม IT";
+    if (status === 403) return operation === "comment"
+        ? "บัญชีนี้ส่งข้อความไม่ได้ หากต้องใช้งาน กรุณาติดต่อทีม IT"
+        : "บัญชีนี้เปิดข้อมูลส่วนนี้ไม่ได้ หากต้องใช้งาน กรุณาติดต่อทีม IT";
     if (status === 404) return operator
         ? "ไม่พบ Ticket ที่ระบุ"
         : "ไม่พบคำขอที่เปิดดูได้";
     if (status >= 500) return "ระบบขัดข้องชั่วคราว กรุณาลองอีกครั้ง";
-    if (isITTicketResponseRecord(payload) && typeof payload.error === "string") {
+    if ((status === 400 || status === 422 || status === 409)
+        && isITTicketResponseRecord(payload) && typeof payload.error === "string") {
         return payload.error;
     }
     return status === 409

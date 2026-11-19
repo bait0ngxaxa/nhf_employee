@@ -56,7 +56,7 @@ export function ITTicketDetail({
                     setDetailState({
                         key: requestKey,
                         kind: "error",
-                        message: readITRequesterError(payload, response.status, true),
+                        message: readITRequesterError(payload, response.status, "detail"),
                         status: response.status,
                     });
                     return;
@@ -79,7 +79,7 @@ export function ITTicketDetail({
                 setDetailState({
                     key: requestKey,
                     kind: "error",
-                    message: readITRequesterError(null, 500, true),
+                    message: readITRequesterError(null, 500, "detail"),
                 });
             });
 

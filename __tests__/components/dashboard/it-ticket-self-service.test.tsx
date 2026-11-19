@@ -147,6 +147,33 @@ afterEach(() => {
 });
 
 describe("IT Ticket self-service presentation", () => {
+    it("shows a submission denial while keeping raw diagnostics out of the form", async () => {
+        fetchMock.mockResolvedValueOnce(emptyListResponse())
+            .mockResolvedValueOnce(apiResponse({ error: "SQL connection failed: internal-host:3306" }, 403));
+
+        render(<ITTicketSelfService capabilities={capabilities} />);
+        await openCreateDialog();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
+
+        expect(await screen.findByText(/บัญชีนี้ส่งคำขอแจ้งปัญหา IT ไม่ได้/)).toBeVisible();
+        expect(screen.queryByText(/internal-host/)).not.toBeInTheDocument();
+        expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    });
+
+    it("keeps actionable business validation in the submit form", async () => {
+        fetchMock.mockResolvedValueOnce(emptyListResponse())
+            .mockResolvedValueOnce(apiResponse({
+                error: "กรุณาเลือกหมวดหมู่ที่เปิดใช้งานก่อนส่งคำขอ",
+            }, 400));
+
+        render(<ITTicketSelfService capabilities={capabilities} />);
+        await openCreateDialog();
+        fireEvent.click(screen.getByRole("button", { name: "ส่งคำขอ" }));
+
+        expect(await screen.findByText("กรุณาเลือกหมวดหมู่ที่เปิดใช้งานก่อนส่งคำขอ")).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "หัวข้อ" })).toHaveValue("  ขอความช่วยเหลือระบบงาน  ");
+    });
+
     it("shows a skeleton while the bounded requester list is loading", async () => {
         mockApiImplementation(() => new Promise<Response>(() => undefined));
 
@@ -301,7 +328,7 @@ describe("IT Ticket requester detail", () => {
         render(<ITTicketDetail ticketId={19} canCommentOwnTickets />);
 
         const alert = await screen.findByRole("alert");
-        expect(alert).toHaveTextContent(/บัญชีนี้.*ติดต่อทีม IT/);
+        expect(alert).toHaveTextContent(/บัญชีนี้เปิดรายละเอียดคำขอไม่ได้.*ติดต่อทีม IT/);
         expect(alert).not.toHaveTextContent(/it\.ticket\.read|OWN/);
         expect(screen.queryByRole("link", { name: "เข้าสู่ระบบอีกครั้ง" })).not.toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "ลองอีกครั้ง" })).not.toBeInTheDocument();

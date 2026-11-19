@@ -92,7 +92,7 @@ describe("global LIFF client", () => {
         await expect(fetchLiffRoutineSummary()).rejects.toMatchObject({
             name: "LiffApiError",
             status: 403,
-            message: "บัญชีนี้เปิดงานประจำไม่ได้ หากต้องใช้งาน กรุณาติดต่อผู้ดูแลระบบ",
+            message: "บัญชีนี้เปิดสรุปงานประจำไม่ได้",
         });
     });
 });

@@ -2,27 +2,6 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-    class MockLiffApiError extends Error {
-        readonly status: number | undefined;
-        readonly sessionRecovered: boolean;
-        readonly unauthorizedRecovery: { recovered: boolean; replayed: boolean } | undefined;
-        readonly details: unknown;
-
-        constructor(
-            message: string,
-            status?: number,
-            unauthorizedRecovery?: { recovered: boolean; replayed: boolean },
-            details?: unknown,
-        ) {
-            super(message);
-            this.name = "LiffApiError";
-            this.status = status;
-            this.sessionRecovered = unauthorizedRecovery?.recovered === true;
-            this.unauthorizedRecovery = unauthorizedRecovery;
-            this.details = details;
-        }
-    }
-
     return {
         useSearchParams: vi.fn(),
         fetchLiffHome: vi.fn(),
@@ -33,14 +12,6 @@ const mocks = vi.hoisted(() => {
         createLiffRoutineTask: vi.fn(),
         updateLiffRoutineTask: vi.fn(),
         deleteLiffRoutineTask: vi.fn(),
-        MockLiffApiError,
-        isRecoveredLiffMutation: (error: unknown): boolean =>
-            error instanceof MockLiffApiError
-            && error.status === 401
-            && error.sessionRecovered
-            && error.unauthorizedRecovery?.replayed === false,
-        LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-            "เชื่อมต่อกับ LINE ใหม่เรียบร้อยแล้ว กรุณาตรวจสอบสถานะล่าสุดก่อนลองดำเนินการอีกครั้ง",
     };
 });
 
@@ -48,12 +19,9 @@ vi.mock("next/navigation", () => ({
     useSearchParams: mocks.useSearchParams,
 }));
 
-vi.mock("@/modules/line/client", () => ({
+vi.mock("@/modules/line/client", async (importOriginal) => ({
+    ...await importOriginal<typeof import("@/modules/line/client")>(),
     fetchLiffHome: mocks.fetchLiffHome,
-    LiffApiError: mocks.MockLiffApiError,
-    isRecoveredLiffMutation: mocks.isRecoveredLiffMutation,
-    LIFF_SESSION_RECOVERED_MUTATION_MESSAGE:
-        mocks.LIFF_SESSION_RECOVERED_MUTATION_MESSAGE,
 }));
 
 vi.mock("./api", () => ({
@@ -73,6 +41,17 @@ import type {
     LiffRoutineTaskDetail,
     LiffRoutineTaskWorkItem,
 } from "./types";
+
+import { LiffApiError } from "@/modules/line/client";
+
+function routineError(
+    message: string,
+    status?: number,
+    unauthorizedRecovery?: ConstructorParameters<typeof LiffApiError>[3],
+    details?: unknown,
+): LiffApiError {
+    return new LiffApiError(message, status, details, unauthorizedRecovery);
+}
 
 const SUMMARY = {
     summary: {
@@ -502,7 +481,7 @@ describe("LiffRoutineApp", () => {
         const retrySummary = deferred<typeof SUMMARY>();
         mocks.fetchLiffRoutineSummary
             .mockRejectedValueOnce(
-                new mocks.MockLiffApiError(
+                routineError(
                     "บัญชี NHF นี้ยังไม่สามารถเข้าถึง Routine ได้",
                     403,
                 ),
@@ -910,7 +889,7 @@ describe("LiffRoutineApp", () => {
             value: vi.fn(),
         });
         mocks.updateLiffRoutineTask.mockRejectedValue(
-            new mocks.MockLiffApiError(
+            routineError(
                 "ข้อมูลรายละเอียดเพิ่มเติมไม่ถูกต้อง",
                 422,
                 undefined,
@@ -949,7 +928,7 @@ describe("LiffRoutineApp", () => {
 
     it("keeps one create idempotency key when the same logical submission is retried", async () => {
         mocks.createLiffRoutineTask
-            .mockRejectedValueOnce(new mocks.MockLiffApiError("เครือข่ายขัดข้อง"))
+            .mockRejectedValueOnce(routineError("เครือข่ายขัดข้อง"))
             .mockResolvedValueOnce({ task: DETAIL, replayed: false });
 
         render(<LiffRoutineApp />);
@@ -981,7 +960,7 @@ describe("LiffRoutineApp", () => {
 
     it("refreshes Routine state after recovered create ambiguity without auto retrying", async () => {
         mocks.createLiffRoutineTask
-            .mockRejectedValueOnce(new mocks.MockLiffApiError(
+            .mockRejectedValueOnce(routineError(
                 "session recovered",
                 401,
                 { recovered: true, replayed: false },
@@ -1034,7 +1013,7 @@ describe("LiffRoutineApp", () => {
             .mockResolvedValueOnce(HOME)
             .mockResolvedValueOnce(revokedHome);
         mocks.createLiffRoutineTask.mockRejectedValueOnce(
-            new mocks.MockLiffApiError(
+            routineError(
                 "session recovered",
                 401,
                 { recovered: true, replayed: false },
@@ -1087,7 +1066,7 @@ describe("LiffRoutineApp", () => {
             .mockResolvedValueOnce(HOME)
             .mockResolvedValueOnce(unavailableHome);
         mocks.createLiffRoutineTask.mockRejectedValueOnce(
-            new mocks.MockLiffApiError(
+            routineError(
                 "session recovered",
                 401,
                 { recovered: true, replayed: false },
@@ -1408,10 +1387,36 @@ describe("LiffRoutineApp", () => {
         expect(within(relevantSection).queryByText("10 กันยายน 2569")).not.toBeInTheDocument();
     });
 
+    it("shows the update endpoint denial in the task editor", async () => {
+        const api = await vi.importActual<typeof import("./api")>("./api");
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+            Response.json({ error: "routine.task.update ALL" }, { status: 403 }),
+        );
+        mocks.updateLiffRoutineTask.mockImplementationOnce(api.updateLiffRoutineTask);
+        mocks.fetchLiffRoutineTask.mockResolvedValueOnce({ task: DETAIL });
+        try {
+            render(<LiffRoutineApp />);
+            fireEvent.click(await screen.findByRole("button", { name: "เปิดรายละเอียดงาน ตรวจสอบระบบ" }));
+            await screen.findByText("รายละเอียดฉบับเต็ม");
+            fireEvent.click(screen.getByRole("button", { name: "แก้ไขงาน" }));
+            const dialogs = await screen.findAllByRole("dialog");
+            const formDialog = within(dialogs[dialogs.length - 1]);
+            fireEvent.change(formDialog.getByRole("textbox", { name: "ชื่องาน" }), {
+                target: { value: "งานที่แก้ไข" },
+            });
+            fireEvent.click(formDialog.getByRole("button", { name: "บันทึกการแก้ไข" }));
+            expect(await formDialog.findByText("บัญชีนี้แก้ไขงานประจำไม่ได้")).toBeVisible();
+            expect(screen.queryByText(/routine\.task\.update/)).not.toBeInTheDocument();
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        } finally {
+            fetchMock.mockRestore();
+        }
+    });
+
     it("reloads the latest detail after a stale update without silently retrying", async () => {
         const latestTask = { ...DETAIL, title: "ฉบับล่าสุดบนระบบ", version: 4 };
         mocks.updateLiffRoutineTask.mockRejectedValueOnce(
-            new mocks.MockLiffApiError("ข้อมูล Routine เปลี่ยนแปลงแล้ว", 409),
+            routineError("ข้อมูล Routine เปลี่ยนแปลงแล้ว", 409),
         );
         mocks.fetchLiffRoutineTask
             .mockResolvedValueOnce({ task: DETAIL })
@@ -1444,7 +1449,7 @@ describe("LiffRoutineApp", () => {
     it("reloads the latest version after recovered update ambiguity while keeping the draft", async () => {
         const latestTask = { ...DETAIL, title: "ฉบับล่าสุดบนระบบ", version: 4 };
         mocks.updateLiffRoutineTask.mockRejectedValueOnce(
-            new mocks.MockLiffApiError(
+            routineError(
                 "session recovered",
                 401,
                 { recovered: true, replayed: false },
@@ -1491,7 +1496,7 @@ describe("LiffRoutineApp", () => {
             .mockResolvedValueOnce(HOME)
             .mockResolvedValueOnce(revokedHome);
         mocks.updateLiffRoutineTask.mockRejectedValueOnce(
-            new mocks.MockLiffApiError(
+            routineError(
                 "session recovered",
                 401,
                 { recovered: true, replayed: false },
@@ -1593,7 +1598,7 @@ describe("LiffRoutineApp", () => {
 
     it("refreshes task existence after recovered delete ambiguity without deleting twice", async () => {
         mocks.deleteLiffRoutineTask.mockRejectedValueOnce(
-            new mocks.MockLiffApiError(
+            routineError(
                 "session recovered",
                 401,
                 { recovered: true, replayed: false },
@@ -1636,7 +1641,7 @@ describe("LiffRoutineApp", () => {
             .mockResolvedValueOnce(readDeleteOnlyHome)
             .mockResolvedValueOnce(readDeleteOnlyHome);
         mocks.deleteLiffRoutineTask.mockRejectedValueOnce(
-            new mocks.MockLiffApiError(
+            routineError(
                 "session recovered",
                 401,
                 { recovered: true, replayed: false },

@@ -12,6 +12,8 @@ vi.mock("@/lib/client/api-client", () => ({
 
 import {
     fetchLiffStockItems,
+    cancelLiffStockRequest,
+    fetchLiffStockRequest,
     fetchLiffStockMyRequests,
     fetchLiffStockProcessingQueue,
     issueLiffStockRequest,
@@ -38,6 +40,23 @@ describe("LIFF Stock client", () => {
         vi.clearAllMocks();
         apiGetMock.mockResolvedValue(SUCCESS);
         apiPostMock.mockResolvedValue(SUCCESS);
+    });
+
+    it.each([
+        ["catalog", apiGetMock, () => fetchLiffStockItems({ page: 1 }), "บัญชีนี้เปิดรายการวัสดุไม่ได้"],
+        ["detail", apiGetMock, () => fetchLiffStockRequest(1), "บัญชีนี้เปิดรายละเอียดคำขอเบิกไม่ได้"],
+        ["cancel", apiPostMock, () => cancelLiffStockRequest(1), "บัญชีนี้ยกเลิกคำขอเบิกไม่ได้"],
+        ["issue", apiPostMock, () => issueLiffStockRequest(1), "บัญชีนี้จ่ายวัสดุสำหรับคำขอไม่ได้"],
+    ] as const)("presents the denial for %s", async (_action, transport, operation, message) => {
+        transport.mockResolvedValueOnce({
+            success: false,
+            status: 403,
+            code: "FORBIDDEN",
+            error: "รหัสสิทธิ์ภายใน",
+            errorThai: "รหัสสิทธิ์ภายใน",
+        });
+
+        await expect(operation()).rejects.toMatchObject({ status: 403, message });
     });
 
     it("keeps catalog search and category filtering on the LIFF API", async () => {

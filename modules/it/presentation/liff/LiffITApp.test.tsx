@@ -149,6 +149,20 @@ describe("LiffITApp requester experience", () => {
         expect(mocks.fetchTickets).toHaveBeenCalledTimes(1);
     });
 
+    it("shows the real detail API denial and keeps backend diagnostics out of the view", async () => {
+        const api = await vi.importActual<typeof import("./api")>("./api");
+        vi.stubGlobal("fetch", vi.fn(async () => Response.json(
+            { error: "it.ticket.read OWN internal-host" },
+            { status: 403 },
+        )));
+        mocks.fetchTicket.mockImplementationOnce(api.fetchLiffITTicket);
+
+        render(<LiffITApp ticketId="42" />);
+
+        expect(await screen.findByText(/บัญชีนี้เปิดรายละเอียดคำขอไม่ได้/)).toBeVisible();
+        expect(screen.queryByText(/it\.ticket\.read|internal-host/)).not.toBeInTheDocument();
+    });
+
     it("shows a useful error with retry and an empty state for a successful empty list", async () => {
         mocks.fetchTickets.mockRejectedValueOnce(new LiffApiError("ระบบ Ticket ขัดข้องชั่วคราว กรุณาลองอีกครั้ง", 503));
         const view = render(<LiffITApp />);

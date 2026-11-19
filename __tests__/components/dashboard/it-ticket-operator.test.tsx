@@ -967,7 +967,7 @@ describe("IT operator Ticket detail presentation", () => {
         expect(accessWarning.closest('[role="alert"]')).toHaveTextContent(
             "สิทธิ์หรือสถานะพนักงานเปลี่ยนแปลง จึงปิดการดำเนินการไว้",
         );
-        expect(toast.error).toHaveBeenCalledWith("บัญชีนี้ไม่มีสิทธิ์ดำเนินการกับคิว IT Ticket");
+        expect(toast.error).toHaveBeenCalledWith("บัญชีนี้บันทึกการเปลี่ยนแปลง IT Ticket ไม่ได้");
         expect(toast.error).toHaveBeenCalledTimes(1);
         expect(screen.queryByRole("heading", { name: "ดำเนินการกับ Ticket" })).not.toBeInTheDocument();
         expect(screen.queryByText("internal authorization detail")).not.toBeInTheDocument();

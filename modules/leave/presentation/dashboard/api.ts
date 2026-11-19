@@ -64,7 +64,7 @@ const DEFAULT_FETCH_ERROR = "ไม่สามารถดึงข้อมู
 
 const ensureSuccess = <T>(response: ApiResponse<T>): T => {
     if (!response.success) {
-        throw new Error(response.error || response.errorThai || DEFAULT_FETCH_ERROR);
+        throw new Error(response.errorThai || DEFAULT_FETCH_ERROR);
     }
     return response.data;
 };
