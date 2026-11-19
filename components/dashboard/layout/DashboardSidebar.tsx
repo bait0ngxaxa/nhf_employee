@@ -10,7 +10,6 @@ import {
     useExpandedSidebarGroups,
 } from "@/components/dashboard/layout/DashboardSidebarPrimitives";
 import { cn } from "@/lib/ui/utils";
-import { formatTeamSummary } from "@/shared/identity/team-presentation";
 
 type DashboardSidebarProps = {
     variant?: "desktop" | "mobile";
@@ -29,7 +28,6 @@ export function DashboardSidebar({
     const { expandedGroups, toggleGroup } =
         useExpandedSidebarGroups(availableMenuGroups);
     const displayName = user?.name?.trim() || "ผู้ใช้งาน";
-    const teamSummary = formatTeamSummary(user?.teams);
     const sidebarOpen = variant === "mobile" || !desktopSidebarCollapsed;
 
     return (
@@ -62,7 +60,6 @@ export function DashboardSidebar({
             <SidebarFooter
                 sidebarOpen={sidebarOpen}
                 name={displayName}
-                secondaryText={teamSummary}
             />
         </aside>
     );

@@ -14,14 +14,14 @@ import Home from "@/app/page";
 import AccessDenied from "@/app/access-denied/page";
 
 describe("role-free public presentation copy", () => {
-    it("uses capability-oriented landing copy", async () => {
+    it("introduces employee services and account actions", async () => {
         getCurrentUserProjection.mockResolvedValue(null);
 
         render(await Home());
 
-        expect(screen.getByText("เข้าถึงตามสิทธิ์ที่ได้รับ")).toBeInTheDocument();
-        expect(screen.getByText("แสดงเฉพาะงานและบริการที่บัญชีนี้ใช้งานได้")).toBeInTheDocument();
-        expect(screen.getByText("สำหรับการทำงานภายใน NHF")).toBeInTheDocument();
+        expect(screen.getByText(/ยื่นคำขอลา เบิกวัสดุ ติดตามงานประจำ/)).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "ลงทะเบียนบัญชี" })).toHaveAttribute("href", "/signup");
+        expect(screen.getByRole("link", { name: "เข้าสู่ระบบ" })).toHaveAttribute("href", "/login");
         expect(screen.queryByText("เข้าถึงตามบทบาท")).not.toBeInTheDocument();
         expect(screen.queryByText("เวอร์ชันสำหรับพนักงานและผู้ดูแลระบบ")).not.toBeInTheDocument();
     });

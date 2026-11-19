@@ -210,18 +210,19 @@ describe("DashboardSidebar", () => {
         ).not.toBeInTheDocument();
     });
 
-    it("shows Team context without exposing the internal system role", () => {
+    it("shows the employee name without the Team or system role", () => {
         mockSidebarContext(false);
 
         render(<DashboardSidebar />);
 
-        expect(screen.getByText("ทีม IT")).toBeInTheDocument();
+        expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
+        expect(screen.queryByText("ทีม IT")).not.toBeInTheDocument();
         expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
         expect(screen.queryByText("บทบาทระบบ")).not.toBeInTheDocument();
     });
 
-    it("uses the neutral no-Team fallback", () => {
+    it("shows the name without a Team placeholder", () => {
         mockSidebarContext(false);
         vi.mocked(useDashboardDataContext).mockReturnValue({
             status: "authenticated",
@@ -236,7 +237,8 @@ describe("DashboardSidebar", () => {
 
         render(<DashboardSidebar />);
 
-        expect(screen.getByText("ยังไม่กำหนดทีม")).toBeInTheDocument();
+        expect(screen.getByText("สมชาย ใจดี")).toBeInTheDocument();
+        expect(screen.queryByText("ยังไม่กำหนดทีม")).not.toBeInTheDocument();
         expect(screen.queryByText("USER")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ใช้งาน")).not.toBeInTheDocument();
     });

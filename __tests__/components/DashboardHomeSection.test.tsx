@@ -31,7 +31,7 @@ describe("DashboardHomeSection identity presentation", () => {
                 name: "สมชาย ใจดี",
                 role: "ADMIN",
                 department: "IT",
-                teams: [{ id: 1, name: "IT" }],
+                teams: [{ id: 1, name: "ทีมสนับสนุน" }, { id: 2, name: "ทีมปฏิบัติการ" }],
             },
             isAdmin: true,
             availableMenuGroups: [],
@@ -82,7 +82,7 @@ describe("DashboardHomeSection identity presentation", () => {
                     name: "สมชาย ใจดี",
                     role: "ADMIN",
                     department: "IT",
-                    teams: [{ id: 1, name: "IT" }],
+                    teams: [{ id: 1, name: "ทีมสนับสนุน" }, { id: 2, name: "ทีมปฏิบัติการ" }],
                 },
                 isAdmin: true,
                 availableMenuGroups: [],
@@ -134,7 +134,7 @@ describe("DashboardHomeSection identity presentation", () => {
         expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("สมชาย วัฒนศิริกุลมหาประเสริฐ (ชาย)");
     });
 
-    it("uses Team context instead of exposing the internal system role", () => {
+    it("shows the HR department without exposing Teams or the system role", () => {
         vi.mocked(useDashboardDataContext).mockReturnValue({
             status: "authenticated",
             user: {
@@ -142,7 +142,7 @@ describe("DashboardHomeSection identity presentation", () => {
                 name: "สมชาย ใจดี",
                 role: "ADMIN",
                 department: "IT",
-                teams: [{ id: 1, name: "IT" }],
+                teams: [{ id: 1, name: "ทีมสนับสนุน" }, { id: 2, name: "ทีมปฏิบัติการ" }],
             },
             isAdmin: true,
             availableMenuGroups: [],
@@ -160,7 +160,8 @@ describe("DashboardHomeSection identity presentation", () => {
 
         render(<DashboardHomeSection />);
 
-        expect(screen.getByText("ทีม IT")).toBeInTheDocument();
+        expect(screen.getByText("แผนก IT")).toBeInTheDocument();
+        expect(screen.queryByText(/ทีมสนับสนุน|ทีมปฏิบัติการ/)).not.toBeInTheDocument();
         expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
     });

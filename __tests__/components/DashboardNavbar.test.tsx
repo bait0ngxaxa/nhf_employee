@@ -84,7 +84,7 @@ describe("DashboardNavbar mobile navigation", () => {
         expect(notificationDropdownMock).not.toHaveBeenCalled();
     });
 
-    it("shows Team context without exposing the internal system role", () => {
+    it("shows the employee name without exposing the Team or system role", () => {
         mockNavbarContext(false);
         vi.mocked(useDashboardDataContext).mockReturnValue({
             status: "authenticated",
@@ -101,13 +101,14 @@ describe("DashboardNavbar mobile navigation", () => {
 
         render(<DashboardNavbar />);
 
-        expect(screen.getAllByText("ทีม IT").length).toBeGreaterThan(0);
+        expect(screen.getByRole("button", { name: "สมชาย ใจดี" })).toBeInTheDocument();
+        expect(screen.queryByText("ทีม IT")).not.toBeInTheDocument();
         expect(screen.queryByText("ADMIN")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ดูแลระบบ")).not.toBeInTheDocument();
         expect(screen.queryByText("บทบาทระบบ")).not.toBeInTheDocument();
     });
 
-    it("uses the neutral no-Team fallback", () => {
+    it("shows the account controls for an employee without Teams", () => {
         mockNavbarContext(false);
         vi.mocked(useDashboardDataContext).mockReturnValue({
             status: "authenticated",
@@ -123,7 +124,8 @@ describe("DashboardNavbar mobile navigation", () => {
         });
         render(<DashboardNavbar />);
 
-        expect(screen.getAllByText("ยังไม่กำหนดทีม").length).toBeGreaterThan(0);
+        expect(screen.getByRole("button", { name: "เมนูผู้ใช้" })).toBeInTheDocument();
+        expect(screen.queryByText("ยังไม่กำหนดทีม")).not.toBeInTheDocument();
         expect(screen.queryByText("USER")).not.toBeInTheDocument();
         expect(screen.queryByText("ผู้ใช้งาน")).not.toBeInTheDocument();
     });
