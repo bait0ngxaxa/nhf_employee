@@ -62,11 +62,6 @@ const EMPTY_STOCK_CAPABILITIES: StockPresentationCapabilities = Object.freeze({
 
 const STOCK_ITEMS_SEARCH_DEBOUNCE_MS = 500;
 
-function subscribeToHistory(listener: () => void): () => void {
-    window.addEventListener("popstate", listener);
-    return () => window.removeEventListener("popstate", listener);
-}
-
 function updateStockUrl(
     mode: "push" | "replace",
     updates: Record<string, string | null>,
@@ -102,6 +97,19 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
     const { user } = useAuth();
     const nextSearchParams = useSearchParams().toString();
     const pathname = usePathname();
+    const searchTimerRef = useRef<number | undefined>(undefined);
+    const [traversal, setTraversal] = useState(0);
+    const subscribeToHistory = useCallback((listener: () => void): (() => void) => {
+        const onPopState = () => {
+            // Back/Forward owns the destination as soon as the browser moves,
+            // including when the restored URL has the same search term.
+            window.clearTimeout(searchTimerRef.current);
+            setTraversal((current) => current + 1);
+            listener();
+        };
+        window.addEventListener("popstate", onPopState);
+        return () => window.removeEventListener("popstate", onPopState);
+    }, []);
     // Next's snapshot signals navigation. The browser URL is already current
     // even if Next acknowledges one of our synchronous writes late.
     const currentUrlSearch = useSyncExternalStore(
@@ -132,8 +140,6 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
     const [requestSearchQuery, setRequestSearchQuery] = useState("");
     const debouncedRequestSearchQuery = useDebouncedValue(requestSearchQuery);
     const canonicalSearchQuery = searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "";
-    const [traversal, setTraversal] = useState(0);
-    useEffect(() => subscribeToHistory(() => setTraversal((current) => current + 1)), []);
     const [search, setSearch] = useState(() => createSearchState(canonicalSearchQuery, traversal));
     if (search.urlQuery !== canonicalSearchQuery || search.traversal !== traversal) {
         // Search writes record their URL query with the applied query below.
@@ -195,6 +201,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
             || !stockCapabilities.canReadCatalog
             || !stockCapabilities.canManageInventory) return;
 
+        window.clearTimeout(searchTimerRef.current);
         const query = sku.trim();
         setSearch(createSearchState(query, traversal));
         updateStockUrl("push", {
@@ -288,6 +295,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
                 [STOCK_ITEMS_SEARCH_QUERY_KEY]: appliedQuery || null,
             });
         }, STOCK_ITEMS_SEARCH_DEBOUNCE_MS);
+        searchTimerRef.current = timer;
         return () => window.clearTimeout(timer);
     }, [canonicalSearchQuery, composing, pathname, pending, searchQuery]);
 

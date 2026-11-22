@@ -379,10 +379,12 @@ describe("StockProvider live search", () => {
         render(<StockProvider><StockSearchProbe /></StockProvider>);
         const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
         fireEvent.change(input, { target: { value: "pen" } });
-        act(() => navigationMocks.setExternalSearchParams("stockSearch=paper&stockItemsPage=4", true));
+        act(() => {
+            navigationMocks.setExternalSearchParams("stockSearch=paper&stockItemsPage=4", true);
+            vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS);
+        });
         expect(input).toHaveValue("paper");
         expect(screen.getByTestId("items-page")).toHaveTextContent("4");
-        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
         expect(navigationMocks.history.replace).not.toHaveBeenCalled();
     });
 
