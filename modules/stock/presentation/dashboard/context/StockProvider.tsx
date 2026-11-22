@@ -6,9 +6,10 @@ import {
     useCallback,
     useMemo,
     useRef,
+    useSyncExternalStore,
     type ReactNode,
 } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { type StockRequestStatus } from "@prisma/client";
 import { isAdminRole } from "@/lib/ssot/permissions";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
@@ -59,24 +60,32 @@ const EMPTY_STOCK_CAPABILITIES: StockPresentationCapabilities = Object.freeze({
     canExportReports: false,
 });
 
-interface StockSearchDraftState {
-    canonicalValue: string;
-    value: string;
-    urlSyncRevision: number;
+const STOCK_ITEMS_SEARCH_DEBOUNCE_MS = 500;
+
+function updateStockUrl(
+    mode: "push" | "replace",
+    updates: Record<string, string | null>,
+): void {
+    if (!isStockDashboardRoute(window.location.pathname)) return;
+
+    const url = createStockDashboardUrl(new URLSearchParams(window.location.search), updates);
+    // Stock's URL state is client-side. Use Next.js's native History integration
+    // so a local write commits immediately and cannot arrive after a newer write.
+    if (mode === "push") {
+        window.history.pushState(null, "", url);
+    } else {
+        window.history.replaceState(null, "", url);
+    }
 }
 
-function parseSearchUrlSyncInput(value: string): {
-    query: string;
-    revision: number;
-} {
-    const separatorIndex = value.indexOf("\u0000");
-    if (separatorIndex < 0) {
-        return { query: "", revision: 0 };
-    }
-
+function createSearchState(urlQuery: string, traversal: number) {
     return {
-        query: value.slice(separatorIndex + 1),
-        revision: Number(value.slice(0, separatorIndex)),
+        urlQuery,
+        traversal,
+        draft: urlQuery,
+        appliedQuery: urlQuery,
+        pending: false,
+        composing: false,
     };
 }
 
@@ -84,14 +93,33 @@ interface StockProviderProps {
     children: ReactNode;
 }
 
-export function StockProvider({ children }: StockProviderProps) {
+export function StockProvider({ children }: StockProviderProps): ReactNode {
     const { user } = useAuth();
-    const router = useRouter();
-    const searchParams = useSearchParams();
+    const nextSearchParams = useSearchParams().toString();
     const pathname = usePathname();
+    const searchTimerRef = useRef<number | undefined>(undefined);
+    const [traversal, setTraversal] = useState(0);
+    const subscribeToHistory = useCallback((listener: () => void): (() => void) => {
+        const onPopState = () => {
+            // Back/Forward owns the destination as soon as the browser moves,
+            // including when the restored URL has the same search term.
+            window.clearTimeout(searchTimerRef.current);
+            setTraversal((current) => current + 1);
+            listener();
+        };
+        window.addEventListener("popstate", onPopState);
+        return () => window.removeEventListener("popstate", onPopState);
+    }, []);
+    // Next's snapshot signals navigation. The browser URL is already current
+    // even if Next acknowledges one of our synchronous writes late.
+    const currentUrlSearch = useSyncExternalStore(
+        subscribeToHistory,
+        () => window.location.pathname === pathname ? window.location.search.slice(1) : nextSearchParams,
+        () => nextSearchParams,
+    );
+    const searchParams = useMemo(() => new URLSearchParams(currentUrlSearch), [currentUrlSearch]);
     const isAdmin = isAdminRole(user?.role);
     const stockCapabilities = user?.stockCapabilities ?? EMPTY_STOCK_CAPABILITIES;
-    const latestSearchParamsRef = useRef(searchParams);
     const tabFromUrl = normalizeStockTab(
         searchParams.get(STOCK_TAB_QUERY_KEY),
         stockCapabilities,
@@ -112,35 +140,13 @@ export function StockProvider({ children }: StockProviderProps) {
     const [requestSearchQuery, setRequestSearchQuery] = useState("");
     const debouncedRequestSearchQuery = useDebouncedValue(requestSearchQuery);
     const canonicalSearchQuery = searchParams.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "";
-    const [searchDraft, setSearchDraft] = useState<StockSearchDraftState>(() => ({
-        canonicalValue: canonicalSearchQuery,
-        value: canonicalSearchQuery,
-        urlSyncRevision: 0,
-    }));
-    if (searchDraft.canonicalValue !== canonicalSearchQuery) {
-        setSearchDraft({
-            canonicalValue: canonicalSearchQuery,
-            value: canonicalSearchQuery,
-            urlSyncRevision: 0,
-        });
+    const [search, setSearch] = useState(() => createSearchState(canonicalSearchQuery, traversal));
+    if (search.urlQuery !== canonicalSearchQuery || search.traversal !== traversal) {
+        // Search writes record their URL query with the applied query below.
+        // Other query changes and browser Back/Forward restore the URL's search.
+        setSearch(createSearchState(canonicalSearchQuery, traversal));
     }
-    const effectiveSearchDraft = searchDraft.canonicalValue === canonicalSearchQuery
-        ? searchDraft
-        : {
-            canonicalValue: canonicalSearchQuery,
-            value: canonicalSearchQuery,
-            urlSyncRevision: 0,
-        };
-    const searchQuery = effectiveSearchDraft.value;
-    const searchUrlSyncRevision = effectiveSearchDraft.urlSyncRevision;
-    const debouncedSearchQuery = useDebouncedValue(searchQuery);
-    const debouncedSearchUrlSyncInput = useDebouncedValue(
-        `${searchUrlSyncRevision}\u0000${searchQuery}`,
-    );
-    const {
-        query: debouncedSearchQueryForUrl,
-        revision: debouncedSearchUrlSyncRevision,
-    } = parseSearchUrlSyncInput(debouncedSearchUrlSyncInput);
+    const { draft: searchQuery, appliedQuery: debouncedSearchQuery, pending, composing } = search;
     const selectedCategoryId = parseOptionalPositiveInteger(
         searchParams.get(STOCK_ITEMS_CATEGORY_QUERY_KEY),
     );
@@ -149,14 +155,7 @@ export function StockProvider({ children }: StockProviderProps) {
     >();
     const previousRequestFilterKeyRef = useRef<string | null>(null);
     const activeTab = tabFromUrl;
-    const itemsPage =
-        searchUrlSyncRevision > 0
-            ? 1
-            : activeTab === "inventory" ? inventoryItemsPage : browseItemsPage;
-
-    useEffect(() => {
-        latestSearchParamsRef.current = searchParams;
-    }, [searchParams]);
+    const itemsPage = pending ? 1 : activeTab === "inventory" ? inventoryItemsPage : browseItemsPage;
 
     useEffect(() => {
         const rawTab = searchParams.get(STOCK_TAB_QUERY_KEY);
@@ -165,16 +164,15 @@ export function StockProvider({ children }: StockProviderProps) {
             || rawTab === null
             || rawTab === tabFromUrl
             || !tabFromUrl
+            || rawTab !== new URLSearchParams(window.location.search).get(STOCK_TAB_QUERY_KEY)
         ) {
             return;
         }
 
-        router.replace(createStockDashboardUrl(searchParams, {
+        updateStockUrl("replace", {
             [STOCK_TAB_QUERY_KEY]: tabFromUrl,
-        }), {
-            scroll: false,
         });
-    }, [pathname, router, searchParams, tabFromUrl]);
+    }, [pathname, searchParams, tabFromUrl]);
 
     const setActiveTab = useCallback(
         (tab: string) => {
@@ -188,17 +186,15 @@ export function StockProvider({ children }: StockProviderProps) {
                 return;
             }
 
-            if (searchParams.get(STOCK_TAB_QUERY_KEY) === nextTab) {
+            if (new URLSearchParams(window.location.search).get(STOCK_TAB_QUERY_KEY) === nextTab) {
                 return;
             }
 
-            router.push(createStockDashboardUrl(searchParams, {
+            updateStockUrl("push", {
                 [STOCK_TAB_QUERY_KEY]: nextTab,
-            }), {
-                scroll: false,
             });
         },
-        [pathname, router, searchParams, stockCapabilities],
+        [pathname, stockCapabilities],
     );
 
     const navigateToInventory = useCallback((sku: string): void => {
@@ -206,16 +202,17 @@ export function StockProvider({ children }: StockProviderProps) {
             || !stockCapabilities.canReadCatalog
             || !stockCapabilities.canManageInventory) return;
 
-        // Cancel a pending search draft before changing the canonical URL.
-        setSearchDraft({ canonicalValue: canonicalSearchQuery, value: canonicalSearchQuery, urlSyncRevision: 0 });
-        router.push(createStockDashboardUrl(searchParams, {
+        window.clearTimeout(searchTimerRef.current);
+        const query = sku.trim();
+        setSearch(createSearchState(query, traversal));
+        updateStockUrl("push", {
             [STOCK_TAB_QUERY_KEY]: "inventory",
-            [STOCK_ITEMS_SEARCH_QUERY_KEY]: sku.trim() || null,
+            [STOCK_ITEMS_SEARCH_QUERY_KEY]: query || null,
             [STOCK_ITEMS_CATEGORY_QUERY_KEY]: null,
             [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
             [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: "1",
-        }), { scroll: false });
-    }, [canonicalSearchQuery, pathname, router, searchParams, stockCapabilities]);
+        });
+    }, [pathname, stockCapabilities, traversal]);
 
     const setRequestsPage = useCallback(
         (page: number) => {
@@ -226,103 +223,85 @@ export function StockProvider({ children }: StockProviderProps) {
             }
 
             const currentPage = parsePositivePage(
-                searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY),
+                new URLSearchParams(window.location.search).get(STOCK_REQUESTS_PAGE_QUERY_KEY),
             );
             if (currentPage === nextPage) return;
 
-            router.push(createStockDashboardUrl(searchParams, {
+            updateStockUrl("push", {
                 [STOCK_REQUESTS_PAGE_QUERY_KEY]: String(nextPage),
-            }), {
-                scroll: false,
             });
         },
-        [pathname, router, searchParams],
+        [pathname],
     );
 
     const setItemsPage = useCallback(
         (page: number) => {
             const nextPage = normalizePositivePage(page);
-            const pageQueryKey = getStockItemsPageQueryKey(activeTab);
 
             if (!isStockDashboardRoute(pathname)) {
                 return;
             }
 
-            const currentPage = parsePositivePage(
-                searchParams.get(pageQueryKey),
+            const params = new URLSearchParams(window.location.search);
+            const currentTab = normalizeStockTab(
+                params.get(STOCK_TAB_QUERY_KEY),
+                stockCapabilities,
             );
+            const pageQueryKey = getStockItemsPageQueryKey(currentTab);
+            const currentPage = parsePositivePage(params.get(pageQueryKey));
             if (currentPage === nextPage) return;
 
-            router.push(createStockDashboardUrl(searchParams, {
+            updateStockUrl("push", {
                 [pageQueryKey]: String(nextPage),
-            }), {
-                scroll: false,
             });
         },
-        [activeTab, pathname, router, searchParams],
+        [pathname, stockCapabilities],
     );
 
-    const setSearchQuery = useCallback(
-        (value: string) => {
-            setSearchDraft((currentDraft) => ({
-                canonicalValue: canonicalSearchQuery,
-                value,
-                urlSyncRevision:
-                    currentDraft.canonicalValue === canonicalSearchQuery
-                        ? currentDraft.urlSyncRevision + 1
-                        : 1,
-            }));
-        },
-        [canonicalSearchQuery],
-    );
+    const setSearchQuery = useCallback((value: string, isComposing?: boolean): void => {
+        setSearch((current) => {
+            const nextComposing = isComposing ?? current.composing;
+            if (current.draft === value && current.composing === nextComposing) return current;
+
+            return {
+                ...current,
+                draft: value,
+                pending: current.pending || current.draft !== value,
+                composing: nextComposing,
+            };
+        });
+    }, []);
 
     useEffect(() => {
-        if (debouncedSearchUrlSyncRevision === 0
-            || debouncedSearchUrlSyncRevision !== searchUrlSyncRevision
-            || debouncedSearchQueryForUrl !== searchQuery) {
-            return;
-        }
+        if (!pending || composing || !isStockDashboardRoute(pathname)) return;
 
-        const latestSearchParams = latestSearchParamsRef.current;
+        const timer = window.setTimeout(() => {
+            // Compare against the live location in case a browser navigation
+            // happened before the next React render.
+            if (window.location.pathname !== pathname) return;
+            const params = new URLSearchParams(window.location.search);
+            if ((params.get(STOCK_ITEMS_SEARCH_QUERY_KEY) ?? "") !== canonicalSearchQuery) return;
 
-        if (!isStockDashboardRoute(pathname)) {
-            return;
-        }
+            const appliedQuery = searchQuery.trim();
+            setSearch((current) => ({
+                ...current,
+                urlQuery: appliedQuery,
+                appliedQuery,
+                pending: false,
+            }));
+            if (appliedQuery === canonicalSearchQuery
+                && parsePositivePage(params.get(STOCK_ITEMS_PAGE_QUERY_KEY)) === 1
+                && !params.has(STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY)) return;
 
-        const nextSearch = debouncedSearchQueryForUrl.trim();
-        const currentSearch = latestSearchParams.get(
-            STOCK_ITEMS_SEARCH_QUERY_KEY,
-        ) ?? "";
-        const currentPage = parsePositivePage(
-            latestSearchParams.get(STOCK_ITEMS_PAGE_QUERY_KEY),
-        );
-        const hasInventoryPage = latestSearchParams.has(
-            STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY,
-        );
-
-        if (
-            currentSearch === nextSearch
-            && currentPage === 1
-            && !hasInventoryPage
-        ) {
-            return;
-        }
-
-        router.replace(createStockDashboardUrl(latestSearchParams, {
-            [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
-            [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: null,
-            [STOCK_ITEMS_SEARCH_QUERY_KEY]: nextSearch || null,
-        }), {
-            scroll: false,
-        });
-    }, [
-        debouncedSearchQueryForUrl,
-        debouncedSearchUrlSyncRevision,
-        searchUrlSyncRevision,
-        searchQuery,
-        pathname,
-        router,
-    ]);
+            updateStockUrl("replace", {
+                [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
+                [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: null,
+                [STOCK_ITEMS_SEARCH_QUERY_KEY]: appliedQuery || null,
+            });
+        }, STOCK_ITEMS_SEARCH_DEBOUNCE_MS);
+        searchTimerRef.current = timer;
+        return () => window.clearTimeout(timer);
+    }, [canonicalSearchQuery, composing, pathname, pending, searchQuery]);
 
     const setSelectedCategoryId = useCallback(
         (categoryId: number | undefined) => {
@@ -330,16 +309,14 @@ export function StockProvider({ children }: StockProviderProps) {
                 return;
             }
 
-            router.replace(createStockDashboardUrl(searchParams, {
+            updateStockUrl("replace", {
                 [STOCK_ITEMS_PAGE_QUERY_KEY]: "1",
                 [STOCK_INVENTORY_ITEMS_PAGE_QUERY_KEY]: null,
                 [STOCK_ITEMS_CATEGORY_QUERY_KEY]:
                     categoryId === undefined ? null : String(categoryId),
-            }), {
-                scroll: false,
             });
         },
-        [pathname, router, searchParams],
+        [pathname],
     );
 
     const itemsQuery = useMemo(
@@ -396,11 +373,17 @@ export function StockProvider({ children }: StockProviderProps) {
                 1,
                 Math.ceil((response.total ?? 0) / getStockItemsLimit(activeTab)),
             );
-            if (itemsPage > totalPages) {
-                setItemsPage(totalPages);
-            }
+            if (itemsPage <= totalPages) return;
+
+            const currentTab = normalizeStockTab(
+                new URLSearchParams(window.location.search).get(STOCK_TAB_QUERY_KEY),
+                stockCapabilities,
+            );
+            if (currentTab !== activeTab) return;
+
+            setItemsPage(totalPages);
         },
-        [activeTab, itemsPage, itemsQueryKey, setItemsPage],
+        [activeTab, itemsPage, itemsQueryKey, setItemsPage, stockCapabilities],
     );
 
     const reconcileRequestsPage = useCallback(

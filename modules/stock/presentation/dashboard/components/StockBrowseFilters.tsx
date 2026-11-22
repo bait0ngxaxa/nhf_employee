@@ -14,7 +14,7 @@ import type { StockCategory } from "../context/types";
 
 type StockBrowseFiltersProps = {
     searchQuery: string;
-    onSearchChange: (value: string) => void;
+    onSearchChange: (value: string, isComposing?: boolean) => void;
     selectedCategoryId: number | undefined;
     onCategoryChange: (value: number | undefined) => void;
     categories: StockCategory[];
@@ -47,6 +47,9 @@ export function StockBrowseFilters({
                         placeholder="ค้นหาวัสดุ…"
                         value={searchQuery}
                         onChange={(event) => onSearchChange(event.target.value)}
+                        onCompositionStart={(event) => onSearchChange(event.currentTarget.value, true)}
+                        onCompositionEnd={(event) => onSearchChange(event.currentTarget.value, false)}
+                        onBlur={(event) => onSearchChange(event.currentTarget.value, false)}
                         className="h-12 rounded-2xl border-border-subtle bg-surface-raised pl-11 pr-11 text-content-primary placeholder:text-content-muted focus-visible:border-action-primary-border-strong focus-visible:ring-action-primary-border"
                     />
                     {searchQuery.trim().length > 0 && (
@@ -54,7 +57,7 @@ export function StockBrowseFilters({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => onSearchChange("")}
+                            onClick={() => onSearchChange("", false)}
                             className="absolute right-2 top-1/2 size-11 -translate-y-1/2 rounded-full text-content-muted hover:bg-surface-muted hover:text-content-body sm:size-8"
                             aria-label="ล้างคำค้นหาวัสดุ"
                         >
