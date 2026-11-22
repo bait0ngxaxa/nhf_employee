@@ -792,6 +792,45 @@ describe("StockProvider live search", () => {
         expect(screen.getByTestId("items-page")).toHaveTextContent("2");
     });
 
+    it("paginates the browser's new tab before React renders it", () => {
+        navigationMocks.searchParams = "stockTab=browse&stockItemsPage=4&stockInventoryPage=2";
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const inventory = screen.getByRole("button", { name: "inventory tab" });
+        const pageThree = screen.getByRole("button", { name: "item page three" });
+
+        act(() => {
+            fireEvent.click(inventory);
+            expect(new URLSearchParams(window.location.search).get("stockTab")).toBe("inventory");
+            expect(screen.getByTestId("active-tab")).toHaveTextContent("browse");
+            fireEvent.click(pageThree);
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        expect(params.get("stockInventoryPage")).toBe("3");
+        expect(params.get("stockItemsPage")).toBe("4");
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
+        expect(screen.getByTestId("items-page")).toHaveTextContent("3");
+    });
+
+    it("ignores a Browse response after the browser switches tabs before React renders", () => {
+        navigationMocks.searchParams = "stockTab=browse&stockItemsPage=4&stockInventoryPage=2";
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const browseQuery = latestCapturedQuery(vi.mocked(useStockItemsQuery));
+        const browseSuccess = vi.mocked(useStockItemsQuery).mock.lastCall?.[1];
+        expect(browseSuccess).toBeTypeOf("function");
+
+        act(() => {
+            fireEvent.click(screen.getByRole("button", { name: "inventory tab" }));
+            expect(screen.getByTestId("active-tab")).toHaveTextContent("browse");
+            browseSuccess?.({ items: [], total: 1 }, browseQuery);
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        expect(params.get("stockInventoryPage")).toBe("2");
+        expect(params.get("stockItemsPage")).toBe("4");
+        expect(navigationMocks.history.push).toHaveBeenCalledTimes(1);
+    });
+
     it("keeps browse and inventory pages independent and rejects a stale browse response", () => {
         navigationMocks.searchParams = new URLSearchParams(
             "stockTab=browse&stockItemsPage=4&stockInventoryPage=2",

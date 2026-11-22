@@ -237,22 +237,25 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
     const setItemsPage = useCallback(
         (page: number) => {
             const nextPage = normalizePositivePage(page);
-            const pageQueryKey = getStockItemsPageQueryKey(activeTab);
 
             if (!isStockDashboardRoute(pathname)) {
                 return;
             }
 
-            const currentPage = parsePositivePage(
-                new URLSearchParams(window.location.search).get(pageQueryKey),
+            const params = new URLSearchParams(window.location.search);
+            const currentTab = normalizeStockTab(
+                params.get(STOCK_TAB_QUERY_KEY),
+                stockCapabilities,
             );
+            const pageQueryKey = getStockItemsPageQueryKey(currentTab);
+            const currentPage = parsePositivePage(params.get(pageQueryKey));
             if (currentPage === nextPage) return;
 
             updateStockUrl("push", {
                 [pageQueryKey]: String(nextPage),
             });
         },
-        [activeTab, pathname],
+        [pathname, stockCapabilities],
     );
 
     const setSearchQuery = useCallback((value: string, isComposing?: boolean): void => {
@@ -370,11 +373,17 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
                 1,
                 Math.ceil((response.total ?? 0) / getStockItemsLimit(activeTab)),
             );
-            if (itemsPage > totalPages) {
-                setItemsPage(totalPages);
-            }
+            if (itemsPage <= totalPages) return;
+
+            const currentTab = normalizeStockTab(
+                new URLSearchParams(window.location.search).get(STOCK_TAB_QUERY_KEY),
+                stockCapabilities,
+            );
+            if (currentTab !== activeTab) return;
+
+            setItemsPage(totalPages);
         },
-        [activeTab, itemsPage, itemsQueryKey, setItemsPage],
+        [activeTab, itemsPage, itemsQueryKey, setItemsPage, stockCapabilities],
     );
 
     const reconcileRequestsPage = useCallback(
