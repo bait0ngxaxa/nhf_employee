@@ -164,6 +164,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
             || rawTab === null
             || rawTab === tabFromUrl
             || !tabFromUrl
+            || rawTab !== new URLSearchParams(window.location.search).get(STOCK_TAB_QUERY_KEY)
         ) {
             return;
         }
@@ -185,7 +186,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
                 return;
             }
 
-            if (searchParams.get(STOCK_TAB_QUERY_KEY) === nextTab) {
+            if (new URLSearchParams(window.location.search).get(STOCK_TAB_QUERY_KEY) === nextTab) {
                 return;
             }
 
@@ -193,7 +194,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
                 [STOCK_TAB_QUERY_KEY]: nextTab,
             });
         },
-        [pathname, searchParams, stockCapabilities],
+        [pathname, stockCapabilities],
     );
 
     const navigateToInventory = useCallback((sku: string): void => {
@@ -222,7 +223,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
             }
 
             const currentPage = parsePositivePage(
-                searchParams.get(STOCK_REQUESTS_PAGE_QUERY_KEY),
+                new URLSearchParams(window.location.search).get(STOCK_REQUESTS_PAGE_QUERY_KEY),
             );
             if (currentPage === nextPage) return;
 
@@ -230,7 +231,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
                 [STOCK_REQUESTS_PAGE_QUERY_KEY]: String(nextPage),
             });
         },
-        [pathname, searchParams],
+        [pathname],
     );
 
     const setItemsPage = useCallback(
@@ -243,7 +244,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
             }
 
             const currentPage = parsePositivePage(
-                searchParams.get(pageQueryKey),
+                new URLSearchParams(window.location.search).get(pageQueryKey),
             );
             if (currentPage === nextPage) return;
 
@@ -251,7 +252,7 @@ export function StockProvider({ children }: StockProviderProps): ReactNode {
                 [pageQueryKey]: String(nextPage),
             });
         },
-        [activeTab, pathname, searchParams],
+        [activeTab, pathname],
     );
 
     const setSearchQuery = useCallback((value: string, isComposing?: boolean): void => {

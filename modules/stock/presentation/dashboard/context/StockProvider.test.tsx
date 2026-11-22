@@ -4,7 +4,7 @@ import {
     render,
     screen,
 } from "@testing-library/react";
-import { useSyncExternalStore } from "react";
+import { useLayoutEffect, useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuth } from "@/modules/auth/client";
@@ -109,6 +109,7 @@ function StockSearchProbe() {
         itemsPage,
         setItemsPage,
         requestsPage,
+        setRequestsPage,
         selectedCategoryId,
         setSelectedCategoryId,
     } = useStockUIContext();
@@ -135,7 +136,10 @@ function StockSearchProbe() {
             <button type="button" onClick={() => setActiveTab("browse")}>browse tab</button>
             <button type="button" onClick={() => setActiveTab("inventory")}>inventory tab</button>
             <button type="button" onClick={() => setSelectedCategoryId(3)}>category three</button>
+            <button type="button" onClick={() => setItemsPage(2)}>item page two</button>
             <button type="button" onClick={() => setItemsPage(3)}>item page three</button>
+            <button type="button" onClick={() => setRequestsPage(2)}>request page two</button>
+            <button type="button" onClick={() => setRequestsPage(3)}>request page three</button>
         </>
     );
 }
@@ -442,6 +446,73 @@ describe("StockProvider live search", () => {
         expect(navigationMocks.history.replace).toHaveBeenCalledWith(
             expect.stringContaining("stockSearch=key"),
         );
+    });
+
+    it("uses the browser tab for consecutive navigation before React renders", () => {
+        navigationMocks.searchParams = "stockTab=browse&stockItemsPage=4&stockInventoryPage=5";
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const browse = screen.getByRole("button", { name: "browse tab" });
+        const inventory = screen.getByRole("button", { name: "inventory tab" });
+
+        act(() => {
+            fireEvent.click(browse);
+            expect(navigationMocks.history.push).not.toHaveBeenCalled();
+            fireEvent.click(inventory);
+            expect(new URLSearchParams(window.location.search).get("stockTab")).toBe("inventory");
+            expect(screen.getByTestId("active-tab")).toHaveTextContent("browse");
+            fireEvent.click(inventory);
+            fireEvent.click(browse);
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        expect(params.get("stockTab")).toBe("browse");
+        expect(params.get("stockItemsPage")).toBe("4");
+        expect(params.get("stockInventoryPage")).toBe("5");
+        expect(screen.getByTestId("active-tab")).toHaveTextContent("browse");
+        expect(navigationMocks.history.push).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+        ["browse", "item", "items-page", "stockItemsPage"],
+        ["inventory", "item", "items-page", "stockInventoryPage"],
+        ["my-requests", "request", "requests-page", "stockRequestsPage"],
+    ])("uses the browser page on %s for consecutive navigation before React renders", (tab, kind, pageOutput, pageKey) => {
+        const initial = new URLSearchParams("stockItemsPage=7&stockInventoryPage=8&stockRequestsPage=9&stockCategoryId=4");
+        initial.set("stockTab", tab);
+        initial.set(pageKey, "2");
+        navigationMocks.searchParams = initial;
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const pageTwo = screen.getByRole("button", { name: `${kind} page two` });
+        const pageThree = screen.getByRole("button", { name: `${kind} page three` });
+
+        act(() => {
+            fireEvent.click(pageTwo);
+            expect(navigationMocks.history.push).not.toHaveBeenCalled();
+            fireEvent.click(pageThree);
+            expect(new URLSearchParams(window.location.search).get(pageKey)).toBe("3");
+            expect(screen.getByTestId(pageOutput)).toHaveTextContent("2");
+            fireEvent.click(pageThree);
+            fireEvent.click(pageTwo);
+        });
+
+        expect(new URLSearchParams(window.location.search)).toEqual(initial);
+        expect(screen.getByTestId(pageOutput)).toHaveTextContent("2");
+        expect(navigationMocks.history.push).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not normalize a stale tab over navigation before the effect runs", () => {
+        function NavigateOnMount() {
+            const { activeTab, setActiveTab } = useStockUIContext();
+            useLayoutEffect(() => setActiveTab("inventory"), [setActiveTab]);
+            return <output>{activeTab}</output>;
+        }
+
+        navigationMocks.searchParams = "stockTab=unknown";
+        render(<StockProvider><NavigateOnMount /></StockProvider>);
+
+        expect(new URLSearchParams(window.location.search).get("stockTab")).toBe("inventory");
+        expect(screen.getByText("inventory")).toBeInTheDocument();
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
     });
 
     it("restores the canonical Stock tab from external URL changes while mounted", () => {
