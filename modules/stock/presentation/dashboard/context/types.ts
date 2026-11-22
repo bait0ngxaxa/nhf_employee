@@ -125,7 +125,7 @@ export interface StockUIContextValue {
     requestSearchQuery: string;
     setRequestSearchQuery: (q: string) => void;
     searchQuery: string;
-    setSearchQuery: (q: string) => void;
+    setSearchQuery: (q: string, isComposing?: boolean) => void;
     selectedCategoryId: number | undefined;
     setSelectedCategoryId: (id: number | undefined) => void;
     statusFilter: StockRequestStatus | undefined;

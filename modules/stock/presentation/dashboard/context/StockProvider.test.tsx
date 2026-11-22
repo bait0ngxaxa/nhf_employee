@@ -17,6 +17,9 @@ import type { StockItemsResponse, StockRequestsResponse } from "./hooks";
 import { StockProvider } from "./StockProvider";
 import { useStockUIContext } from "./StockContext";
 import { LIVE_SEARCH_DEBOUNCE_MS } from "@/constants/ui";
+import { StockBrowseFilters } from "../components/StockBrowseFilters";
+
+const ITEM_SEARCH_DELAY_MS = 500;
 
 const navigationMocks = vi.hoisted(() => {
     let currentSearchParams = new URLSearchParams();
@@ -38,23 +41,33 @@ const navigationMocks = vi.hoisted(() => {
         }
     };
 
-    const navigate = (url: string, _options?: { scroll?: boolean }) => {
-        setSearchParams(new URL(url, "http://localhost").searchParams);
+    const writeBrowserUrl = window.history.replaceState.bind(window.history);
+    const acknowledge = (url: string) => {
+        setSearchParams(new URL(url, window.location.origin).searchParams);
+    };
+    const navigate = (url: string) => {
+        writeBrowserUrl(null, "", url);
+        acknowledge(url);
     };
 
     return {
         pathname: "/dashboard/stock",
-        router: {
+        history: {
             push: vi.fn(navigate),
             replace: vi.fn(navigate),
         },
-        get searchParams() {
+        acknowledge,
+        writeBrowserUrl,
+        get searchParams(): URLSearchParams {
             return currentSearchParams;
         },
         set searchParams(value: string | URLSearchParams) {
+            writeBrowserUrl(null, "", `/dashboard/stock?${value}`);
             setSearchParams(value, false);
         },
-        setExternalSearchParams(value: string | URLSearchParams) {
+        setExternalSearchParams(value: string | URLSearchParams, traversal = false) {
+            writeBrowserUrl(null, "", `/dashboard/stock?${value}`);
+            if (traversal) window.dispatchEvent(new PopStateEvent("popstate"));
             setSearchParams(value);
         },
         subscribe(listener: () => void) {
@@ -76,7 +89,6 @@ vi.mock("./hooks", () => ({
 
 vi.mock("next/navigation", () => ({
     usePathname: () => navigationMocks.pathname,
-    useRouter: () => navigationMocks.router,
     useSearchParams: () =>
         useSyncExternalStore(
             navigationMocks.subscribe,
@@ -95,6 +107,7 @@ function StockSearchProbe() {
         setActiveTab,
         navigateToInventory,
         itemsPage,
+        setItemsPage,
         requestsPage,
         selectedCategoryId,
         setSelectedCategoryId,
@@ -102,10 +115,12 @@ function StockSearchProbe() {
 
     return (
         <>
-            <input
-                aria-label="item search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+            <StockBrowseFilters
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                categories={[]}
+                selectedCategoryId={selectedCategoryId}
+                onCategoryChange={setSelectedCategoryId}
             />
             <input
                 aria-label="request search"
@@ -120,6 +135,7 @@ function StockSearchProbe() {
             <button type="button" onClick={() => setActiveTab("browse")}>browse tab</button>
             <button type="button" onClick={() => setActiveTab("inventory")}>inventory tab</button>
             <button type="button" onClick={() => setSelectedCategoryId(3)}>category three</button>
+            <button type="button" onClick={() => setItemsPage(3)}>item page three</button>
         </>
     );
 }
@@ -167,6 +183,12 @@ describe("StockProvider live search", () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.clearAllMocks();
+        vi.spyOn(window.history, "pushState").mockImplementation((_state, _title, url) => {
+            if (url) navigationMocks.history.push(String(url));
+        });
+        vi.spyOn(window.history, "replaceState").mockImplementation((_state, _title, url) => {
+            if (url) navigationMocks.history.replace(String(url));
+        });
         navigationMocks.pathname = "/dashboard/stock";
         navigationMocks.searchParams = new URLSearchParams();
 
@@ -196,6 +218,7 @@ describe("StockProvider live search", () => {
     });
 
     afterEach(() => {
+        vi.restoreAllMocks();
         vi.useRealTimers();
     });
 
@@ -207,13 +230,13 @@ describe("StockProvider live search", () => {
         navigationMocks.searchParams = new URLSearchParams(initial);
         render(<StockProvider><StockSearchProbe /></StockProvider>);
         fireEvent.click(screen.getByRole("button", { name: "low stock inventory" }));
-        expect(navigationMocks.router.push).toHaveBeenCalledTimes(1);
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(navigationMocks.history.push).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
         expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
-        expect(screen.getByRole("textbox", { name: "item search" })).toHaveValue("PAPER-A4");
+        expect(screen.getByRole("textbox", { name: "ค้นหาวัสดุ" })).toHaveValue("PAPER-A4");
         expect(screen.getByTestId("category-id")).toHaveTextContent("none");
         expect(screen.getByTestId("items-page")).toHaveTextContent("1");
-        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS * 2));
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS * 2));
         expect(navigationMocks.searchParams.get("stockSearch")).toBe("PAPER-A4");
         expect(navigationMocks.searchParams.has("stockCategoryId")).toBe(false);
         expect(navigationMocks.searchParams.get("source")).toBe(new URLSearchParams(initial).get("source"));
@@ -227,23 +250,23 @@ describe("StockProvider live search", () => {
         expect(screen.getByTestId("active-tab")).toHaveTextContent("reports");
         act(() => navigationMocks.setExternalSearchParams(destination));
         expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
-        expect(screen.getByRole("textbox", { name: "item search" })).toHaveValue("PAPER-A4");
-        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS * 2));
-        expect(navigationMocks.router.push).toHaveBeenCalledTimes(1);
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(screen.getByRole("textbox", { name: "ค้นหาวัสดุ" })).toHaveValue("PAPER-A4");
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS * 2));
+        expect(navigationMocks.history.push).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
     });
 
     it("does not replay a debounced search draft over the inventory destination", () => {
         navigationMocks.searchParams = new URLSearchParams("stockTab=reports&stockSearch=old&stockCategoryId=8&stockInventoryPage=6");
         render(<StockProvider><StockSearchProbe /></StockProvider>);
-        fireEvent.change(screen.getByRole("textbox", { name: "item search" }), { target: { value: "stale draft" } });
-        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS - 1));
+        fireEvent.change(screen.getByRole("textbox", { name: "ค้นหาวัสดุ" }), { target: { value: "stale draft" } });
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS - 1));
         fireEvent.click(screen.getByRole("button", { name: "low stock inventory" }));
-        act(() => vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS * 3));
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS * 3));
         expect(navigationMocks.searchParams.get("stockSearch")).toBe("PAPER-A4");
         expect(navigationMocks.searchParams.get("stockInventoryPage")).toBe("1");
-        expect(navigationMocks.router.push).toHaveBeenCalledTimes(1);
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(navigationMocks.history.push).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
     });
 
     it("does not navigate to inventory without both inventory capabilities", () => {
@@ -251,8 +274,131 @@ describe("StockProvider live search", () => {
         vi.mocked(useAuth).mockReturnValue({ user: { stockCapabilities: { ...stockCapabilities, canManageInventory: false } } } as never);
         render(<StockProvider><StockSearchProbe /></StockProvider>);
         fireEvent.click(screen.getByRole("button", { name: "low stock inventory" }));
-        expect(navigationMocks.router.push).not.toHaveBeenCalled();
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(navigationMocks.history.push).not.toHaveBeenCalled();
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
+    });
+
+    it.each(["browse", "inventory"])("keeps newer typing on %s when a search URL update is acknowledged late", (tab) => {
+        navigationMocks.searchParams = new URLSearchParams({ stockTab: tab });
+        let pendingUrl = "";
+        navigationMocks.history.replace.mockImplementationOnce((url) => {
+            pendingUrl = url;
+            navigationMocks.writeBrowserUrl(null, "", url);
+        });
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
+        fireEvent.change(input, { target: { value: "p" } });
+        act(() => vi.advanceTimersByTime(110));
+        fireEvent.change(input, { target: { value: "pa" } });
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+        expect(pendingUrl).toContain("stockSearch=pa");
+
+        fireEvent.change(input, { target: { value: "pap" } });
+        act(() => vi.advanceTimersByTime(200));
+        fireEvent.change(input, { target: { value: "pape" } });
+        act(() => navigationMocks.acknowledge(pendingUrl));
+        expect(input).toHaveValue("pape");
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+        expect(latestCapturedQuery(vi.mocked(useStockItemsQuery))).toContain("search=pape");
+    });
+
+    it("ignores out-of-order acknowledgements after newer search and filter changes", () => {
+        const delayedUrls: string[] = [];
+        const delayAcknowledgement = (url: string) => {
+            delayedUrls.push(url);
+            navigationMocks.writeBrowserUrl(null, "", url);
+        };
+        navigationMocks.history.replace.mockImplementationOnce(delayAcknowledgement);
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
+        fireEvent.change(input, { target: { value: "pa" } });
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+
+        fireEvent.click(screen.getByRole("button", { name: "inventory tab" }));
+        fireEvent.click(screen.getByRole("button", { name: "category three" }));
+        navigationMocks.history.replace.mockImplementationOnce(delayAcknowledgement);
+        fireEvent.change(input, { target: { value: "paper" } });
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+
+        expect(delayedUrls).toHaveLength(2);
+        for (const url of delayedUrls.reverse()) {
+            act(() => navigationMocks.acknowledge(url));
+            expect(input).toHaveValue("paper");
+            expect(screen.getByTestId("active-tab")).toHaveTextContent("inventory");
+            expect(screen.getByTestId("category-id")).toHaveTextContent("3");
+            expect(latestCapturedQuery(vi.mocked(useStockItemsQuery))).toContain("search=paper&categoryId=3");
+        }
+        expect(new URLSearchParams(window.location.search).get("stockSearch")).toBe("paper");
+    });
+
+    it("shows Thai IME composition immediately and searches only after composition ends", () => {
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
+        fireEvent.compositionStart(input);
+        fireEvent.change(input, { target: { value: "กระดา" } });
+        expect(input).toHaveValue("กระดา");
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS * 2));
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
+        expect(latestCapturedQuery(vi.mocked(useStockItemsQuery))).not.toContain("search=");
+
+        fireEvent.change(input, { target: { value: "กระดาษ" } });
+        fireEvent.compositionEnd(input, { data: "กระดาษ" });
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS - 1));
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
+        act(() => vi.advanceTimersByTime(1));
+        const query = new URL(latestCapturedQuery(vi.mocked(useStockItemsQuery)), window.location.origin);
+        expect(query.searchParams.get("search")).toBe("กระดาษ");
+        expect(navigationMocks.searchParams.get("stockSearch")).toBe("กระดาษ");
+    });
+
+    it("clears the draft while a previous search acknowledgement is pending", () => {
+        let pendingUrl = "";
+        navigationMocks.history.replace.mockImplementationOnce((url) => {
+            pendingUrl = url;
+            navigationMocks.writeBrowserUrl(null, "", url);
+        });
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
+        fireEvent.change(input, { target: { value: "pa" } });
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+        fireEvent.change(input, { target: { value: "paper" } });
+        fireEvent.click(screen.getByRole("button", { name: "ล้างคำค้นหาวัสดุ" }));
+        act(() => navigationMocks.acknowledge(pendingUrl));
+        expect(input).toHaveValue("");
+
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+        expect(navigationMocks.searchParams.has("stockSearch")).toBe(false);
+        const queries = capturedQueries(vi.mocked(useStockItemsQuery));
+        expect(queries.some((query) => query.includes("search=paper"))).toBe(false);
+        expect(queries.at(-1)).not.toContain("search=");
+    });
+
+    it("cancels pending edits when Back restores the same search on a different page", () => {
+        navigationMocks.searchParams = "stockSearch=paper&stockItemsPage=2";
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
+        fireEvent.change(input, { target: { value: "pen" } });
+        act(() => navigationMocks.setExternalSearchParams("stockSearch=paper&stockItemsPage=4", true));
+        expect(input).toHaveValue("paper");
+        expect(screen.getByTestId("items-page")).toHaveTextContent("4");
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
+    });
+
+    it("ignores a previous search response when reconciling the current page", () => {
+        navigationMocks.searchParams = "stockSearch=old&stockItemsPage=3";
+        render(<StockProvider><StockSearchProbe /></StockProvider>);
+        const oldKey = latestCapturedQuery(vi.mocked(useStockItemsQuery));
+        fireEvent.change(screen.getByRole("textbox", { name: "ค้นหาวัสดุ" }), { target: { value: "paper" } });
+        act(() => vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS));
+        fireEvent.click(screen.getByRole("button", { name: "item page three" }));
+        const calls = vi.mocked(useStockItemsQuery).mock.calls;
+        const onSuccess = calls.at(-1)?.[1];
+        expect(onSuccess).toBeTypeOf("function");
+        act(() => onSuccess?.({ items: [], total: 0 }, oldKey));
+        expect(screen.getByTestId("items-page")).toHaveTextContent("3");
+        expect(navigationMocks.history.push).toHaveBeenCalledTimes(1);
     });
 
     it("updates item input immediately but debounces the API query and URL", () => {
@@ -265,10 +411,10 @@ describe("StockProvider live search", () => {
             </StockProvider>,
         );
         expect(screen.getByTestId("items-page")).toHaveTextContent("5");
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
         vi.mocked(useStockItemsQuery).mockClear();
 
-        const input = screen.getByRole("textbox", { name: "item search" });
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
         fireEvent.change(input, { target: { value: "k" } });
         fireEvent.change(input, { target: { value: "ke" } });
         fireEvent.change(input, { target: { value: "key" } });
@@ -278,10 +424,10 @@ describe("StockProvider live search", () => {
         expect(capturedQueries(vi.mocked(useStockItemsQuery))).not.toEqual(
             expect.arrayContaining([expect.stringContaining("search=")]),
         );
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
 
         act(() => {
-            vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
+            vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS);
         });
 
         const searchQueries = capturedQueries(vi.mocked(useStockItemsQuery))
@@ -290,10 +436,9 @@ describe("StockProvider live search", () => {
         expect(uniqueSearchQueries).toHaveLength(1);
         expect(uniqueSearchQueries[0]).toContain("search=key");
         expect(uniqueSearchQueries[0]).toContain("page=1");
-        expect(navigationMocks.router.replace).toHaveBeenCalledTimes(1);
-        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+        expect(navigationMocks.history.replace).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.history.replace).toHaveBeenCalledWith(
             expect.stringContaining("stockSearch=key"),
-            { scroll: false },
         );
     });
 
@@ -365,22 +510,22 @@ describe("StockProvider live search", () => {
             </StockProvider>,
         );
 
-        const input = screen.getByRole("textbox", { name: "item search" });
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
         expect(input).toHaveValue("paper");
         fireEvent.change(input, { target: { value: "pen" } });
         expect(input).toHaveValue("pen");
 
         act(() => {
-            vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
+            vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS);
         });
-        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+        expect(navigationMocks.history.replace).toHaveBeenCalledWith(
             expect.stringContaining("stockSearch=pen"),
-            { scroll: false },
         );
 
         act(() => {
             navigationMocks.setExternalSearchParams(
                 "stockSearch=paper&stockItemsPage=4&stockTab=browse",
+                true,
             );
         });
         expect(input).toHaveValue("paper");
@@ -388,6 +533,7 @@ describe("StockProvider live search", () => {
         act(() => {
             navigationMocks.setExternalSearchParams(
                 "stockSearch=pen&stockItemsPage=1&stockTab=browse",
+                true,
             );
         });
         expect(input).toHaveValue("pen");
@@ -401,7 +547,7 @@ describe("StockProvider live search", () => {
             </StockProvider>,
         );
 
-        const input = screen.getByRole("textbox", { name: "item search" });
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
         fireEvent.change(input, { target: { value: "pen" } });
 
         act(() => {
@@ -425,9 +571,8 @@ describe("StockProvider live search", () => {
         expect(screen.getByTestId("category-id")).toHaveTextContent("2");
         fireEvent.click(screen.getByRole("button", { name: "category three" }));
 
-        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+        expect(navigationMocks.history.replace).toHaveBeenCalledWith(
             expect.stringContaining("stockCategoryId=3"),
-            { scroll: false },
         );
         expect(screen.getByTestId("category-id")).toHaveTextContent("3");
         expect(screen.getByTestId("items-page")).toHaveTextContent("1");
@@ -490,24 +635,23 @@ describe("StockProvider live search", () => {
             </StockProvider>,
         );
 
-        const input = screen.getByRole("textbox", { name: "item search" });
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
         expect(input).toHaveValue("old");
         fireEvent.change(input, { target: { value: "" } });
 
         act(() => {
-            vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS - 1);
+            vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS - 1);
         });
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
 
         act(() => {
             vi.advanceTimersByTime(1);
         });
 
-        expect(navigationMocks.router.replace).toHaveBeenCalledTimes(1);
-        const [url, options] = navigationMocks.router.replace.mock.calls[0];
+        expect(navigationMocks.history.replace).toHaveBeenCalledTimes(1);
+        const [url] = navigationMocks.history.replace.mock.calls[0];
         expect(new URL(url, "http://localhost").searchParams.has("stockSearch"))
             .toBe(false);
-        expect(options).toEqual({ scroll: false });
     });
 
     it("persists the page reset when search returns to its original value", () => {
@@ -520,21 +664,20 @@ describe("StockProvider live search", () => {
             </StockProvider>,
         );
 
-        const input = screen.getByRole("textbox", { name: "item search" });
+        const input = screen.getByRole("textbox", { name: "ค้นหาวัสดุ" });
         fireEvent.change(input, { target: { value: "k" } });
         fireEvent.change(input, { target: { value: "" } });
 
         expect(screen.getByTestId("items-page")).toHaveTextContent("1");
-        expect(navigationMocks.router.replace).not.toHaveBeenCalled();
+        expect(navigationMocks.history.replace).not.toHaveBeenCalled();
 
         act(() => {
-            vi.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
+            vi.advanceTimersByTime(ITEM_SEARCH_DELAY_MS);
         });
 
-        expect(navigationMocks.router.replace).toHaveBeenCalledTimes(1);
-        expect(navigationMocks.router.replace).toHaveBeenCalledWith(
+        expect(navigationMocks.history.replace).toHaveBeenCalledTimes(1);
+        expect(navigationMocks.history.replace).toHaveBeenCalledWith(
             expect.stringContaining("stockItemsPage=1"),
-            { scroll: false },
         );
     });
 
@@ -560,9 +703,8 @@ describe("StockProvider live search", () => {
         });
 
         expect(screen.getByTestId("items-page")).toHaveTextContent("2");
-        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+        expect(navigationMocks.history.push).toHaveBeenCalledWith(
             expect.stringContaining("stockItemsPage=2"),
-            { scroll: false },
         );
 
         const pageTwoQuery = latestCapturedQuery(vi.mocked(useStockItemsQuery));
@@ -636,9 +778,8 @@ describe("StockProvider live search", () => {
         });
 
         expect(screen.getByTestId("requests-page")).toHaveTextContent("2");
-        expect(navigationMocks.router.push).toHaveBeenCalledWith(
+        expect(navigationMocks.history.push).toHaveBeenCalledWith(
             expect.stringContaining("stockRequestsPage=2"),
-            { scroll: false },
         );
 
         const pageTwoQuery = latestCapturedQuery(vi.mocked(useStockRequestsQuery));
