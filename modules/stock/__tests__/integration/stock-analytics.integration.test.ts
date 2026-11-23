@@ -31,12 +31,14 @@ vi.mock("@/lib/db/prisma", async (importOriginal) => {
 });
 
 describe("Stock analytics MySQL aggregation", () => {
+    const fixtureIssuerIds: number[] = [];
     let fixture: Awaited<ReturnType<typeof createStockFixture>>;
     let secondVariantId: number;
     beforeAll(async () => {
         const url = new URL(process.env.DATABASE_URL ?? "invalid:");
         if (url.protocol !== "mysql:" || !/(?:_test|_integration)$/.test(url.pathname)) throw new Error("Dedicated test database required");
         fixture = await createStockFixture(prisma, { suffix: `analytics-${Date.now()}` });
+        fixtureIssuerIds.push(fixture.issuer.id);
         const variant = await prisma.stockItemVariant.create({ data: { stockItemId: fixture.item.id, sku: `${fixture.item.sku}-2`, unit: "กล่อง", quantity: 0, minStock: 0 } });
         secondVariantId = variant.id;
         await prisma.stockRequest.create({ data: { requestedBy: fixture.requester.id, idempotencyKey: "analytics-issued", requestHash: "0".repeat(64), projectCode: fixture.request.projectCode, status: StockRequestStatus.ISSUED, issuedAt: new Date("2024-01-31T17:00:00Z"), items: { create: [
@@ -51,7 +53,14 @@ describe("Stock analytics MySQL aggregation", () => {
             await prisma.stockRequest.create({ data: { requestedBy: fixture.requester.id, idempotencyKey: key, requestHash: "0".repeat(64), projectCode: fixture.request.projectCode, status, issuedAt: new Date(at), items: { create: { itemId: fixture.item.id, variantId: fixture.variant.id, quantity: 99 } } } });
         }
     });
-    afterAll(async () => { await prisma.$disconnect(); });
+    afterAll(async () => {
+        try {
+            // Recipient integration tests query configured grants across the shared database.
+            await prisma.userCapabilityGrant.deleteMany({ where: { userId: { in: fixtureIssuerIds } } });
+        } finally {
+            await prisma.$disconnect();
+        }
+    });
 
     it("counts distinct material requests, lines, mixed units and exact Bangkok boundaries", async () => {
         const result = await getStockAnalytics({ year: 2024, fromMonth: 2, toMonth: 2, projectCode: fixture.request.projectCode, itemId: fixture.item.id });
@@ -122,6 +131,7 @@ describe("Stock analytics MySQL aggregation", () => {
 
     it("reads alert labels, reservations, stock health and issued counts from one snapshot during a writer commit", async () => {
         const state = await createStockFixture(prisma, { suffix: "analytics-snapshot", quantity: 5, minStock: 2 });
+        fixtureIssuerIds.push(state.issuer.id);
         const input = { year: 2024, projectCode: state.request.projectCode };
         const label = await prisma.stockAttribute.create({ data: { name: "สี" } });
         const value = await prisma.stockAttributeValue.create({ data: { attributeId: label.id, value: "เขียว" } });

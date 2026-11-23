@@ -134,6 +134,8 @@ Benchmark concurrency ใช้ 16,000 active Variants แบบ dense และ
 | `npx eslint <ไฟล์ที่แก้> --max-warnings=0` | ผ่าน targeted lint |
 | `npm run architecture:check` | ผ่าน |
 
+Full MySQL Integration รอบแรกพบว่า Stock Analytics fixtures ทิ้ง direct grants ของ issuer สองรายไว้ ทำให้ recipient lookup ที่อ่านจากฐานข้อมูลร่วมได้ผลเกิน assertion เมื่อรันต่อจาก Stock Analytics ทดสอบซ้ำเฉพาะสองไฟล์จนได้ failure เดียวกัน แล้วเพิ่ม teardown ที่ลบ grants เฉพาะ issuer IDs ของ Stock Analytics fixtures การรัน Stock Analytics 7 tests แล้วตามด้วย recipient lookup 2 tests บน disposable DB เดียวกันผ่านทั้งหมดและตรวจ cleanup แล้ว [Integration job รอบแรก](https://github.com/bait0ngxaxa/nhf_employee/actions/runs/45115900038/job/137498555455)
+
 ```bash
 npm run test -- \
   modules/stock/domain/analytics.test.ts \
