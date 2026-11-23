@@ -17,7 +17,7 @@ jobs:
           node-version: '24.22.1'
           cache: npm
       - run: npm ci
-      - name: Profile IT resolution index
+      - name: Profile Stock query candidates
         run: node scripts/run-mysql-integration-tests.mjs --profile-routine
       - name: Verify disposable cleanup
         if: always()
