@@ -83,6 +83,7 @@ describe("disposable MySQL safety", () => {
     it.each([
         ["profile-routine-scheduler.mjs", { profileScheduler: true }],
         ["profile-stock-analytics.mjs", { profileStockAnalytics: true }],
+        ["profile-it-resolution.mjs", { profileITResolution: true }],
     ])("validates the live disposable database before granting profiling reads for %s", async (script, mode) => {
         const h = harness({ fail: script });
         await expect(runIntegration({ env: {}, ...h, ...mode })).rejects.toMatchObject({ exitCode: 23 });
