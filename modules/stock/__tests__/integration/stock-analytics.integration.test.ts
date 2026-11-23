@@ -1,5 +1,5 @@
-import { beforeAll, afterAll, describe, expect, it } from "vitest";
-import { StockRequestStatus } from "@prisma/client";
+import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import { type PrismaClient, StockRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getStockAnalytics } from "../../application/queries/analytics";
 import ExcelJS from "exceljs";
@@ -7,13 +7,38 @@ import { createStockRequestReportXlsxResponse } from "../../infrastructure/repor
 import { createStockBalanceReportXlsxResponse } from "../../infrastructure/reports/balance-export";
 import { createStockFixture } from "./stock-fixtures";
 
+const alertRead = vi.hoisted(() => ({ before: undefined as (() => Promise<void>) | undefined }));
+
+vi.mock("@/lib/db/prisma", async (importOriginal) => {
+    const { prisma } = await importOriginal<{ prisma: PrismaClient }>();
+    return {
+        prisma: prisma.$extends({
+            query: {
+                stockItemVariant: {
+                    async findMany({ args, query }) {
+                        const id = args.where?.id;
+                        if (alertRead.before && typeof id === "object" && id.in && args.select?.attributeValues) {
+                            const commit = alertRead.before;
+                            alertRead.before = undefined;
+                            await commit();
+                        }
+                        return query(args);
+                    },
+                },
+            },
+        }),
+    };
+});
+
 describe("Stock analytics MySQL aggregation", () => {
+    const fixtureIssuerIds: number[] = [];
     let fixture: Awaited<ReturnType<typeof createStockFixture>>;
     let secondVariantId: number;
     beforeAll(async () => {
         const url = new URL(process.env.DATABASE_URL ?? "invalid:");
         if (url.protocol !== "mysql:" || !/(?:_test|_integration)$/.test(url.pathname)) throw new Error("Dedicated test database required");
         fixture = await createStockFixture(prisma, { suffix: `analytics-${Date.now()}` });
+        fixtureIssuerIds.push(fixture.issuer.id);
         const variant = await prisma.stockItemVariant.create({ data: { stockItemId: fixture.item.id, sku: `${fixture.item.sku}-2`, unit: "กล่อง", quantity: 0, minStock: 0 } });
         secondVariantId = variant.id;
         await prisma.stockRequest.create({ data: { requestedBy: fixture.requester.id, idempotencyKey: "analytics-issued", requestHash: "0".repeat(64), projectCode: fixture.request.projectCode, status: StockRequestStatus.ISSUED, issuedAt: new Date("2024-01-31T17:00:00Z"), items: { create: [
@@ -28,7 +53,14 @@ describe("Stock analytics MySQL aggregation", () => {
             await prisma.stockRequest.create({ data: { requestedBy: fixture.requester.id, idempotencyKey: key, requestHash: "0".repeat(64), projectCode: fixture.request.projectCode, status, issuedAt: new Date(at), items: { create: { itemId: fixture.item.id, variantId: fixture.variant.id, quantity: 99 } } } });
         }
     });
-    afterAll(async () => { await prisma.$disconnect(); });
+    afterAll(async () => {
+        try {
+            // Recipient integration tests query configured grants across the shared database.
+            await prisma.userCapabilityGrant.deleteMany({ where: { userId: { in: fixtureIssuerIds } } });
+        } finally {
+            await prisma.$disconnect();
+        }
+    });
 
     it("counts distinct material requests, lines, mixed units and exact Bangkok boundaries", async () => {
         const result = await getStockAnalytics({ year: 2024, fromMonth: 2, toMonth: 2, projectCode: fixture.request.projectCode, itemId: fixture.item.id });
@@ -95,5 +127,110 @@ describe("Stock analytics MySQL aggregation", () => {
         expect(filtered.kpis.issuedRequests).toBe(1);
         expect(filtered.kpis.issuedLines).toBe(1);
         expect(filtered.stockHealth).toEqual(result.stockHealth);
+    });
+
+    it("reads alert labels, reservations, stock health and issued counts from one snapshot during a writer commit", async () => {
+        const state = await createStockFixture(prisma, { suffix: "analytics-snapshot", quantity: 5, minStock: 2 });
+        fixtureIssuerIds.push(state.issuer.id);
+        const input = { year: 2024, projectCode: state.request.projectCode };
+        const label = await prisma.stockAttribute.create({ data: { name: "สี" } });
+        const value = await prisma.stockAttributeValue.create({ data: { attributeId: label.id, value: "เขียว" } });
+        const size = await prisma.stockAttribute.create({ data: { name: "ขนาด", values: { create: { value: "ใหญ่" } } }, include: { values: true } });
+        await prisma.stockVariantAttributeValue.createMany({ data: [value, ...size.values].map(({ id }) => ({
+            variantId: state.variant.id, attributeValueId: id,
+        })) });
+        const variant = await prisma.stockItemVariant.create({ data: {
+            stockItemId: state.item.id, sku: state.variant.sku + "-inactive", unit: "กล่อง", quantity: 1, isActive: false,
+        } });
+        const toDeactivate = await prisma.stockItemVariant.create({ data: {
+            stockItemId: state.item.id, sku: state.variant.sku + "-active", unit: "กล่อง", quantity: 1,
+        } });
+        const toCancel = await prisma.stockRequest.create({ data: {
+            requestedBy: state.requester.id, idempotencyKey: "cancel-during-analytics", requestHash: "0".repeat(64),
+            projectCode: state.request.projectCode, status: StockRequestStatus.PENDING_ISSUE,
+            items: { create: { itemId: state.item.id, variantId: state.variant.id, quantity: 1 } },
+        } });
+        const original = await getStockAnalytics(input);
+        expect(original.lowStock).toContainEqual(expect.objectContaining({
+            id: state.variant.id, attributes: "ขนาด: ใหญ่, สี: เขียว", quantity: 5, minimum: 2, reserved: 4, available: 1, status: "low",
+        }));
+        expect(original.kpis.issuedRequests).toBe(0);
+        const commit = vi.fn(async () => {
+            await prisma.$transaction(async (tx) => {
+                await tx.stockItem.update({ where: { id: state.item.id }, data: { name: "วัสดุหลังแก้ไข", quantity: 2, minStock: 5 } });
+                await tx.stockAttributeValue.update({ where: { id: value.id }, data: { value: "น้ำเงิน" } });
+                await tx.stockItemVariant.update({ where: { id: state.variant.id }, data: { quantity: 2, minStock: 5 } });
+                await tx.stockItemVariant.update({ where: { id: variant.id }, data: { isActive: true, quantity: 0 } });
+                await tx.stockItemVariant.update({ where: { id: toDeactivate.id }, data: { isActive: false } });
+                await tx.stockRequest.update({ where: { id: state.request.id }, data: {
+                    status: StockRequestStatus.ISSUED, issuedAt: new Date("2024-02-09T00:00:00Z"),
+                } });
+                await tx.stockRequest.update({ where: { id: toCancel.id }, data: { status: StockRequestStatus.CANCELLED } });
+                await tx.stockRequest.create({ data: {
+                    requestedBy: state.requester.id, idempotencyKey: "reserve-during-analytics", requestHash: "0".repeat(64),
+                    projectCode: state.request.projectCode,
+                    items: { create: { itemId: state.item.id, variantId: state.variant.id, quantity: 3 } },
+                } });
+            });
+        });
+        alertRead.before = commit;
+        try {
+            const during = await getStockAnalytics(input);
+            expect(commit).toHaveBeenCalledTimes(1);
+            expect(during).toStrictEqual({ ...original, freshness: { ...original.freshness, generatedAt: during.freshness.generatedAt } });
+        } finally {
+            alertRead.before = undefined;
+        }
+        const after = await getStockAnalytics(input);
+        expect(after.kpis.issuedRequests).toBe(1);
+        expect(after.kpis.pendingRequests).toBe(original.kpis.pendingRequests - 1);
+        expect(after.stockHealth).toEqual({
+            healthy: original.stockHealth.healthy - 1, low: original.stockHealth.low - 1, out: original.stockHealth.out + 2,
+        });
+        expect(after.lowStock).toContainEqual(expect.objectContaining({
+            id: state.variant.id, name: "วัสดุหลังแก้ไข", attributes: "ขนาด: ใหญ่, สี: น้ำเงิน", quantity: 2, minimum: 5,
+            reserved: 3, available: 0, status: "out",
+        }));
+        expect(after.lowStock).toContainEqual(expect.objectContaining({ id: variant.id, status: "out" }));
+    });
+
+    it("ranks late out-of-stock variants before earlier low alerts across batches", async () => {
+        const input = { year: 2024, projectCode: "no-such-project" };
+        const before = await getStockAnalytics(input);
+        const rows = Array.from({ length: 550 }, (_, index) => ({
+            stockItemId: fixture.item.id,
+            sku: `${fixture.item.sku}-analytics-rank-${index}`,
+            unit: "ชิ้น",
+            quantity: index < 25 ? 1 : index >= 525 ? 0 : 5,
+            minStock: 1,
+        }));
+        await prisma.stockItemVariant.createMany({ data: rows });
+        const out = await prisma.stockItemVariant.findMany({
+            where: { stockItemId: fixture.item.id, sku: { startsWith: fixture.item.sku + "-analytics-rank-" }, quantity: 0 },
+            select: { id: true }, orderBy: { id: "asc" },
+        });
+        const current = await getStockAnalytics(input);
+        expect(current.stockHealth).toEqual({
+            healthy: before.stockHealth.healthy + 500, low: before.stockHealth.low + 25, out: before.stockHealth.out + 25,
+        });
+        const expected = [...before.lowStock.filter(({ status }) => status === "out"), ...out].slice(0, 20);
+        expect(current.lowStock.map(({ id }) => id)).toEqual(expected.map(({ id }) => id));
+        expect(current.lowStock.filter(({ id }) => out.some((variant) => variant.id === id)))
+            .toEqual(expect.arrayContaining([expect.objectContaining({ attributes: "" })]));
+    });
+
+    it("rejects a pending request item with no variant even when history is filtered out", async () => {
+        const invalid = await prisma.stockRequest.create({ data: {
+            requestedBy: fixture.requester.id, idempotencyKey: "missing-variant", requestHash: "0".repeat(64),
+            projectCode: fixture.request.projectCode,
+            items: { create: { itemId: fixture.item.id, variantId: null, quantity: 1 } },
+        } });
+        try {
+            await expect(getStockAnalytics({ year: 2024, projectCode: "no-such-project" }))
+                .rejects.toThrow("พบคำขอรอจ่ายที่ไม่มี variant snapshot");
+        } finally {
+            await prisma.stockRequestItem.deleteMany({ where: { requestId: invalid.id } });
+            await prisma.stockRequest.delete({ where: { id: invalid.id } });
+        }
     });
 });
