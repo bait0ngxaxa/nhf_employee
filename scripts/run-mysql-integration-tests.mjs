@@ -125,7 +125,7 @@ export async function runIntegration({ env = process.env, execute = command, con
         }
         run("ใช้ Prisma migrations", require.resolve("prisma/build/index.js"), ["migrate", "deploy"]);
         if (profileRoutine) {
-            run("Profile Stock query candidates", resolve(root, "scripts/profile-stock-query-candidates.mjs"), [], ["--expose-gc"]);
+            run("Profile Routine scheduler", resolve(root, "scripts/profile-routine-scheduler.mjs"), [], ["--expose-gc"]);
         } else {
             run("รัน Vitest", resolve(dirname(require.resolve("vitest/package.json")), "vitest.mjs"), ["run", "--config", "vitest.integration.config.ts"]);
         }
