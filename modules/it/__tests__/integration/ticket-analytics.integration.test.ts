@@ -983,6 +983,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         await grant(inactiveAccount.userId, "it.analytics.read");
         await prisma.user.update({ where: { id: inactiveAccount.userId }, data: { isActive: false } });
         const nonGlobal = await createWorkforceUser("non-global", departmentId);
+        // Exercise fail-closed resolution for an unsupported persisted grant.
         await prisma.userCapabilityGrant.create({
             data: { userId: nonGlobal.userId, capabilityKey: "it.analytics.read", scope: "OWN" },
         });
@@ -998,7 +999,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         await expect(getITAnalyticsDashboard(inactiveAccount.context, "7D", NOW))
             .rejects.toBeInstanceOf(ITWorkforceDeniedError);
         await expect(getITAnalyticsDashboard(nonGlobal.context, "7D", NOW))
-            .rejects.toBeInstanceOf(ITCapabilityDeniedError);
+            .rejects.toMatchObject({ name: "AuthorizationConfigurationError", code: "UNSUPPORTED_PERSISTED_SCOPE" });
 
         const analyticsOnly = await createWorkforceUser("analytics-only", departmentId);
         await grant(analyticsOnly.userId, "it.analytics.read");
