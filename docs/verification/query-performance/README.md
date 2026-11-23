@@ -1,0 +1,82 @@
+# ผลตรวจ Query Performance ของ NHF Employee
+
+## Phase 0 · ขอบเขตและลำดับความสำคัญ
+
+ตรวจจาก `origin/main` ที่ `62ef4abb51fb6351ba1e06b67932395f77d2b320` ครอบคลุม Routine, Stock, Employee, Leave, IT Support, Audit และ Authorization รวมถึงรายการและการส่งออกที่เกี่ยวข้อง ขนาดข้อมูลด้านล่างมาจาก fixture สังเคราะห์ ปริมาณและความถี่ของ production ยังไม่มีข้อมูลสำหรับจัดอันดับเชิงปริมาณ
+
+รายงานต่อยอดจาก baseline นี้บันทึกผล Stock search/index, Stock analytics และ IT historical resolution ส่วนผล Scheduler อยู่ท้ายเอกสาร [Stock และ IT candidate experiments](candidate-experiments.md)
+
+`T` = จำนวน Task ที่ผ่าน metadata และสิทธิ์, `O` = จำนวน Occurrence ของ Task เหล่านั้น, `P` = ขนาดหน้า, `V` = จำนวน active Variant, `E` = จำนวน event ที่แผนอ่าน, `N` = จำนวนแถวที่แผนต้องพิจารณา, `D` = offset, `U` = จำนวนผู้ใช้ต่อ batch และ `G` = จำนวน team-role grant ใน batch
+
+| Priority | Module / query | สถานะและสาเหตุ | ความซับซ้อน / ขนาดข้อมูลที่วัด | แผนและ baseline | สมมติฐานที่ควรทดสอบ / ความเสี่ยง |
+|---|---|---|---|---|---|
+| P1 | Routine · [`getRoutineTaskWorkItems`](../../../modules/routine/application/queries.ts#L853) | ยืนยันเส้นทาง timing/date filter ว่าอ่าน Task IDs ทั้งหมดและโหลด Occurrence พร้อม relation ก่อนเลือกและตัดหน้า | ส่ง `T + O` แถวหลักเข้า Node, มี `O(T + O)` พื้นที่และค่าแปลงวันต่อ Occurrence, รวมงาน sort แยกตาม Task | ดูตารางและแผนด้านล่าง | ใช้ relational existence และ anti-existence เพื่อให้ MySQL คัดก่อน pagination จากนั้น hydrate เฉพาะหน้า เทียบ DTO, scope, offset, focus, override, ลำดับและวันที่กรุงเทพฯ |
+| P1 | IT · [`readITAnalyticsPersistenceSnapshot`](../../../modules/it/infrastructure/persistence/ticket-analytics-repository.ts#L212) | ยืนยัน historical resolution scan ในผล benchmark เดิม กลุ่ม `MIN(occurredAt)` ต่อ ticket แล้วโหลด metadata ของ ticket ที่ได้ | กรณีกว้างอ่านตาม `E` และส่งผลต่อ ticket ที่ resolve ในช่วง; 10k/50k ticket และ 7,543/37,714 event | 30D แบบกว้างอ่าน 7,543/37,714 event ผ่าน index `(ticketId, occurredAt, id)` ได้ 272/1,357 กลุ่ม ใน 7.78/46.2 ms ที่ root iterator (รอบ EXPLAIN หนึ่งครั้งต่อกรณี) | ทดสอบ `(kind, toStatus, occurredAt, ticketId)` เทียบ event-first และ ticket-first รวม selectivity, ขนาด index และต้นทุนเขียน รักษา dedup ณ timestamp แรกในช่วง, grouping, scope และ Repeatable Read |
+| P1 | Routine · [`generateRoutineOccurrencesForScheduler`, `findSchedulerOccurrences`](../../../modules/routine/application/scheduler.ts#L174) และ [`generateRoutineTaskOccurrencesInTransaction`](../../../modules/routine/application/generation.ts#L268) | ยืนยันหนึ่ง Serializable transaction ต่อ active recurring Task แม้ไม่มี row ใหม่ งาน reconciliation มี safety window แต่รอบอ่าน reminder มีเพียงขอบล่างของ due date | Transaction `O(T)` บวกอ่านและเขียนตาม generation candidates และประวัติในช่วง reconciliation; รอบ reminder โหลด `O(O)` ของอนาคต | steady-state 25/250 Tasks ใช้ p95 154/1,277 ms และ 159/1,509–1,510 SELECTs; contention เมื่อสองรอบซ้อนกัน | ทดสอบลดงาน idempotent ใน transaction ทีละ Task ก่อนเพิ่ม concurrency และคง override, outbox idempotency และ late catch-up [Scheduler baseline](#routine-scheduler-baseline) |
+| P2 | Routine · [`getRoutineSummary`, `getRoutineTaskExportData`](../../../modules/routine/application/queries.ts#L1082) | พบความเสี่ยงในโค้ด summary อ่าน Work Item candidates แบบกว้าง และ export จำกัด Task แต่โหลดประวัติของ Task ใน batch | Summary `O(T + O)` แถวหลัก; export สูงสุด 2,000 Task ทีละ 100 | ยังไม่ได้วัด | ทดลองนำ query เลือก occurrence ไปใช้หลังยืนยันว่าขอบเขตของแต่ละ endpoint ตรงตามสัญญา |
+| P2 | Stock · [`getItems`](../../../modules/stock/application/queries/queries.ts#L26) | ยืนยัน full Item scan และ dependent variant lookup ทั้ง list และ count เมื่อไม่มี category filter | `LIKE '%…%'` ตรวจ `N` Items และ `O(N)` probes; fixture 10,000 Items, 20,000 Variants | 2 exact-token matches, p95 87.58 ms, scan 10,000 Items และ 9,998 probes ต่อ statement | คง name/SKU/variant substring และ debounce 500 ms. Exact/prefix-only สูญผลใน fixture [Stock search](candidate-experiments.md) |
+| P2 | Stock · [`getRequests`](../../../modules/stock/application/queries/queries.ts#L196), [report export](../../../modules/stock/infrastructure/reports/report-export.ts) | ยืนยัน numeric OR full scan และ filesort ของ list ที่กรองตาม requester/status ก่อนตัดหน้า | 50,000 Requests; scan `N`, ข้าม `D`; graph ถูกโหลดหลังเลือกหน้า | Numeric p95 326.20 ms; deep issued p95 66.21 → 10.82 ms เมื่อทดลอง composite index | รักษา text matches ของ input ตัวเลขและ scope เดิม; ยังไม่เลือก index migration จากผลเพิ่ม index รวม +45% [Index decision record](candidate-experiments.md) |
+| P1 | Stock · [`readInventorySnapshot`](../../../modules/stock/infrastructure/reports/analytics-query.ts#L83) | มี keyset batch และ SQL reservation aggregation แล้ว งานยังส่ง attributes และ stock rows ทุก batch ระหว่างถือ snapshot | 16,000 active Variants; `O(V)` rows; `ceil(V/500)` reservation groupBy บวก relation reads | Dashboard p95 1,354 ms / 140–141 query events; index ของ issued ส่วนต่างลดราว 83 ms | ทดลอง isolate reservation/attribute queries ก่อนเลือก SQL aggregate และ label hydration ตรวจ null snapshot exception, clamp, binary units, top 20 และ DTO ทั้งหมด [Stock analytics](candidate-experiments.md) |
+| P2 | Audit · [`getAuditLogs`](../../../modules/audit/application/queries.ts#L114), [`findAuditLogs`](../../../modules/audit/infrastructure/persistence/audit-log-repository.ts#L58) | พบความเสี่ยงในโค้ด cross-relation substring + count และ deep offset; JSON/privacy projection ทำเฉพาะหน้าที่ได้ | อาจอ่าน `N` เพื่อนับและข้าม `D`; Node โหลดสูงสุด 100 rows ต่อหน้า; retention 90 วัน | ยังไม่ได้วัด; schema มี `createdAt`, `action`, `(entityType, entityId)` | ตรวจ date-only/action-only และ cross-relation plan ใช้ numbered pagination เดิม ตรวจ completeness และ privacy projection |
+| P2 | Leave · [`getLeaveApprovalList`](../../../modules/leave/application/approvals/approval-list.ts#L57), [history filters](../../../modules/leave/application/queries/history-filters.ts), [recovery conditions](../../../modules/leave/application/approvals/approval-queries.ts#L189) | หลาย tabs เรียก list + count และ history min/max ตามสิทธิ์ approver; ส่วน history ข้ามได้; recovery มี relation predicates | สูงสุด 9 Prisma operations ก่อน relation reads ตาม tabs; `D` และคำค้นอาจเพิ่มงาน; ผลแต่ละหน้าถูกจำกัด | ยังไม่ได้วัด; มี index แยก approver/exceptionApprover/status และ timestamp บาง workflow | เริ่มจากผู้อนุมัติที่มีประวัติหนาแน่น วัด history และ recovery แยกกันก่อนรวม query/index ต้องคง pending, exception, reassignment และ attachment projection |
+| P3 | Employee · [`listEmployees`, `getEmployeeStats`](../../../modules/employee/infrastructure/persistence/employee-queries.ts#L182) | พบความเสี่ยงในโค้ด ค้น substring หลายคอลัมน์/แผนกและนับพร้อมรายการแบบจำกัดหน้า สถิติรันหก counts | list อาจอ่าน `N` และข้าม `D`; สถิติมีหก DB operations | ยังไม่ได้วัด; schema มี department FK index | เทียบ conditional aggregate กับหก counts รวม nullable/soft-delete behavior และ semantics แผนก เลื่อนการเปลี่ยนจนรู้ cardinality/frequency |
+| P3 | Authorization · [`loadAuthorizationResolutionsForUsers`](../../../modules/authorization/infrastructure/persistence/authorization-resolution-repository.ts#L25) | batch โหลด grant และ membership แบบ set-based แล้ว แต่กรอง team role grants ทั้ง batch ซ้ำต่อผู้ใช้; [`recipient repository`](../../../modules/authorization/infrastructure/persistence/authorization-recipient-repository.ts) ดึงผู้สมัครตาม configured grant scope | regroup เป็น `O(U × G)` ใน Node; ยังไม่มีหลักฐานว่า batch มีหลาย active roles มากพอ | ยังไม่ได้วัด; membership และ grants มี composite keys | วัดเมื่อมีผู้ใช้และ role กระจายมากก่อนทำ map ตาม roleId ตรวจ membership/activity และ fail-closed ทุกทาง |
+| P3 | Routine · [`resolveRelevantRoutineOccurrence`](../../../modules/routine/application/relevant-occurrence.ts#L20) และ Leave · [`projectLeaveQuotas`](../../../modules/leave/application/queries/quota-projection.ts#L8) | งานย่อยที่ตัด filter+sort ได้; Routine callers หลักส่ง Occurrence ที่เรียงวันที่มาจาก DB แล้ว ส่วน Leave มีจำนวนปีต่อคนเป็นตัวจำกัด | Routine worst-case `O(n log n)` เวลา/`O(n)` พื้นที่ต่อ Task; Leave filter/sort ต่อประเภทบนประวัติพนักงานคนเดียว | ยังไม่มี isolated CPU benchmark | Routine minimum pass ต้องคง focus และ tie by ID; Leave ต้องคง previous-year carry/reset เลื่อนงานจนวัดผลจาก input จริงได้ |
+
+IT แบบ type/category รวมที่ 50k tickets ใช้ category index อ่าน 3,846 tickets และ probe event index 3,846 ครั้ง ได้ 149 กลุ่ม ใช้ temporary aggregation โดย root iterator จบที่ 11.9 ms แผนนี้ให้จุดเปรียบเทียบสำหรับ index แบบ event-first ในกรณีที่ scope แคบ ส่วน backlog aging ใช้ conditional aggregation ที่ผ่านการวัดและตรวจ DTO แล้ว [ผลและแผน IT Analytics เดิม](../it-analytics-performance/README.md)
+
+Employee และ Routine export จำกัด 2,000 รายการและใช้ offset แบบ batch ภายใน ส่วน Leave จำกัด 3,000 และ Stock จำกัด 5,000 โดยตรวจจำนวนก่อนโหลดรายงานบางเส้นทาง Audit มี numbered list และ entity history ที่จำกัดจำนวน แรงจูงใจสำหรับ keyset ควรมาจาก export ที่วัดพบต้นทุน offset ภายใต้ limit เดิม และต้องรักษา order/tie-breaker ของแต่ละเส้นทาง [ค่ากลางของ export](../../../lib/ssot/exports.ts)
+
+## Routine work-item baseline
+
+```bash
+node scripts/run-mysql-integration-tests.mjs --profile-routine > routine-profile.log 2>&1
+```
+
+รันจาก checkout ที่ติดตั้ง dependencies แล้วบน Linux ที่มี Docker Compose ใช้ lifecycle เดียวกับ integration runner สุ่ม project และ credentials, bind เฉพาะ loopback, ตรวจ database/account/server UUID ก่อน migrate และตรวจซ้ำใน profiler ก่อนเพิ่ม fixture ทั้งหมดถูกลบพร้อม tmpfs ตอน teardown ข้อมูลผลลัพธ์อยู่ในบรรทัดที่ขึ้นต้นด้วย `ROUTINE_PROFILE `
+
+ชุด baseline ที่เก็บครบมาจาก Ubuntu 24.04 GitHub-hosted runner (Intel Xeon 6975P-C, 4 logical CPUs, 15.33 GiB), MySQL 8.0.46 (`utf8mb4_unicode_ci`), Prisma 6.19.3 และ Node 24.22.1 ทั้ง profiler และขั้นยืนยัน cleanup สำเร็จ [Hosted profile run](https://github.com/bait0ngxaxa/nhf_employee/actions/runs/45098708012)
+
+ใช้ 2 warm-ups และ 20 ตัวอย่างแบบ serial ต่อ scenario วัด application call จริงรวม serialization และ authorization time โดยไม่มี HTTP transport หรือ Next rendering ใช้ nearest-rank p50/p95 และเก็บ elapsed time, process CPU, Prisma query-event duration, จำนวน SELECT/transaction statements จาก MySQL status counters และ RSS หลังแต่ละ sample แยกกัน เรียก GC ก่อนจับเวลาเพื่อลดการสะสมหน่วยความจำระหว่าง sample ผล `EXPLAIN ANALYZE` จาก SQL ที่ Prisma สร้างจริงใช้สำหรับเวลาและจำนวนแถวต่อ iterator ฝั่ง MySQL ค่ารวม Prisma duration เป็นผลรวมเวลา query event ซึ่งอาจทำงานพร้อมกัน จำนวน `SELECT` ของ MySQL บางรอบสูงกว่า query-event count รวมการอ่านที่ server นับและอาจเกิดจากการตั้งค่า connection ไม่มีการแยกเวลารอ connection ออกจากผล end-to-end
+
+Fixture มี 0–2,500 active MANUAL Tasks, 10 Occurrences ต่อ Task, ชื่อซ้ำเป็นคู่ทดสอบ tie by ID, active assignee 10%, historical dates และ due-date overrides วันครบกำหนดที่ใกล้ที่สุดกระจายสี่กรณีเท่า ๆ กัน ได้แก่ วันนี้ พรุ่งนี้ วันที่แปด หรือไม่มี occurrence ในอนาคต ใช้วันที่กรุงเทพฯ ณ วันที่รัน และตรวจว่า benchmark ไม่ข้ามเที่ยงคืน ใช้วันเดียวกันเมื่อเทียบ payload digest ตรวจจำนวน หน้า และลำดับจาก fixture oracle ทุก sample ตรวจ authorized historical focus ข้าม timing filter, unauthorized focus ที่ได้ผลว่าง และ all-scope denial 403 ในชุดที่มีข้อมูล
+
+การลองครั้งแรกที่ 5,000 Tasks / 50,000 Occurrences (ก่อนเรียก GC ระหว่าง samples) ถูก WSL OOM killer ยุติใน `all-upcoming-deep` จึงลดขนาดสูงสุดของรอบเปรียบเทียบเป็น 25,000 Occurrences หลัง WSL คืน `Wsl/Service/E_UNEXPECTED` ในรอบถัดมา จึงย้ายไปใช้ hosted runner ค่าในตารางมาจาก hosted run เดียว ชุดข้อมูลบน WSL ที่รันไม่ครบถูกเก็บกวาดด้วย Compose ตาม project ที่สร้างขึ้นและตรวจว่าไม่มี container คงเหลือ
+
+| Operation | Occurrences | ก่อน p50 (ms) | ก่อน p95 (ms) | SELECT | ความถูกต้อง |
+|---|---:|---:|---:|---:|---|
+| All unfiltered control | 0 | 3.84 | 4.32 | 8 | Oracle และ DTO digest ผ่าน |
+| All upcoming | 0 | 3.18 | 4.09 | 7 | ผ่าน |
+| Mine today–day 7 | 0 | 3.19 | 3.59 | 7 | ผ่าน |
+| All unfiltered control | 1,000 | 23.07 | 25.93 | 18 | ผ่าน |
+| All upcoming | 1,000 | 68.50 | 71.85 | 18 | ผ่าน |
+| Mine today–day 7 | 1,000 | 14.41 | 14.95 | 18 | ผ่าน |
+| All unfiltered control | 10,000 | 25.03 | 25.80 | 18 | ผ่าน |
+| All upcoming, page 5 | 10,000 | 617.20 | 635.00 | 18–21 | ผ่าน |
+| Mine today–day 7 | 10,000 | 72.44 | 74.61 | 18 | ผ่าน |
+| All unfiltered control | 25,000 | 28.05 | 29.12 | 18 | ผ่าน |
+| All upcoming, page 12 | 25,000 | 1,649.16 | 1,685.99 | 18–21 | ผ่าน |
+| Mine today–day 7 | 25,000 | 166.82 | 168.35 | 18 | ผ่าน |
+
+ที่ 25,000 occurrences เส้นทาง All upcoming สแกน Task 2,500 แถว (`table scan`, 1 loop) แล้วสแกนและ sort Occurrence 25,000 แถวเพื่อส่งกลับแอป (`table scan`, 1 loop, root 12.5 ms) การ hydrate 25 Tasks ใช้ PK range และ materialize `_count.occurrences` อีกครั้ง โดย covering index `routine_occurrences_taskId_periodKey_key` อ่าน 25,000 แถว (1 loop) ทั้งที่ DTO ใช้ task fields โดยไม่อ่านค่า count ค่า CPU p50 ของ process อยู่ที่ 1,643.06 ms, Prisma query-event duration รวม p50 60 ms, RSS ที่เก็บได้สูงสุด 1,469.1 MiB และไม่มี transaction control statement สัญญาณนี้รองรับการลดจำนวน Occurrences ที่ส่งเข้า Node ก่อนแปลงวันและ resolve พร้อมลด aggregate ที่ DTO ใช้ไม่ถึง [SQL, EXPLAIN, samples และ DTO digests](routine-work-items-baseline.jsonl)
+
+## เงื่อนไขก่อนแก้ production query
+
+- Routine Work Items มี oracle สำหรับ pagination และ hash ของ payload ทั้งหมดเพื่อเทียบ implementation ใหม่ การทดลองต้องรักษา `title, id` และเลือก effective `dueDate` ที่เร็วที่สุดตั้งแต่วันกรุงเทพฯ ปัจจุบัน แล้วใช้ id ต่ำสุดเมื่อวันที่เท่ากัน รวมกรณี focused history ที่ผ่านสิทธิ์ก่อนการกรองปกติ เป้าหมายคือให้จำนวน DTO candidate เข้า Node ขึ้นกับขนาดหน้าและลด p95 ที่ 10k/25k โดยตรวจผลในหน้าเล็กและ scope แคบด้วย
+- Scheduler และ Stock มี baseline เส้นทางจริงแล้ว ยังต้องมีผลเปรียบเทียบ candidate ที่รักษา behavior ก่อนแก้ query/schema ส่วน Employee, Leave, Audit และ Authorization มีหลักฐานจากโค้ด ต้องวัด cardinality, frequency และ plan ก่อนลงมือ
+- IT มี evidence ของ historical scan แล้ว การเลือก index หรือเปลี่ยน aggregation ต้องทดลองกับแผนหลาย selectivity วัดต้นทุน write/index และเทียบ DTO ด้วย harness เดิมก่อน
+- ยังไม่มี production telemetry, concurrent workload สำหรับ Work Items, instrumentation ของ `ROWS_EXAMINED` ต่อ statement หรือ MySQL memory profiling แผนจาก iterator ใช้ประเมินจำนวนแถวที่ถูกอ่าน/ส่งออกในแต่ละขั้นได้ ค่า `rows × loops` ของหลาย iterator อาจนับงานส่วนเดียวกันซ้ำ [MySQL EXPLAIN ANALYZE](https://dev.mysql.com/doc/refman/8.0/en/explain.html)
+
+## Routine Scheduler baseline
+
+ใช้ `runRoutineScheduler` ของ baseline บน MySQL 8.0.46, Node 24.22.1, Prisma 6.19.3, Intel Xeon 6975P-C 4 logical CPUs / RAM 15.33 GiB. Fixture มี 25 แล้วเพิ่มเป็น 250 active monthly Tasks, มี owner และ `IN_APP` due reminder หนึ่ง rule ต่อ Task, fixed clock เวลา 10:00 กรุงเทพฯ ของ 7 พ.ย. 2026. วัด first-run 1 ครั้ง, steady state 2 warm-ups และ 20 serial samples ต่อขนาด, และทดลอง 5 คู่ที่มี 2 schedulers เริ่มพร้อมกันใน steady state ขนาด 25 Tasks [สคริปต์และ workflow สำหรับรันซ้ำ](https://github.com/bait0ngxaxa/nhf_employee/tree/af3f11d1/scripts) [Hosted run และ cleanup](https://github.com/bait0ngxaxa/nhf_employee/actions/runs/45100422587) [Samples และ counters](routine-scheduler-baseline.jsonl)
+
+| Operation | Tasks | p50 (ms) | p95 (ms) | SELECTs | BEGIN/COMMIT | ผลลัพธ์ |
+|---|---:|---:|---:|---:|---|---|
+| First generation | 25 ใหม่ | 291.88 ครั้งเดียว | — | 384 | 50/50 | 75 Occurrences, 25 outbox |
+| Steady state | 25 | 128.83 | 153.90 | 159 | 25/25 | 0 new Occurrences/outbox, 25 duplicate reminders skipped |
+| Two concurrent steady runs | 25 | 189.20 | — | 319–324 | 50–51/50 | 0 new Occurrences/outbox, 0 application errors |
+| Incremental first generation | 225 ใหม่ จาก 250 | 2,508.26 ครั้งเดียว | — | 3,534 | 475/475 | 675 Occurrences, 225 outbox |
+| Steady state | 250 | 1,258.44 | 1,277.49 | 1,509–1,510 | 250/250 | 0 new Occurrences/outbox, 250 duplicate reminders skipped |
+
+Steady state ที่ 250 Tasks ยืนยันว่าต้นทุนหลักคือ serial reconciliation แม้ไม่มี Occurrence หรือ outbox ใหม่. Serial samples ไม่มี row-lock waits; ใน 5 คู่ที่ overlap พบ 2–24 waits, 0–4 ms lock time และ 0–1 rollback ต่อคู่. ใช้ MySQL global counters ของ disposable server และยังแยกสาเหตุของ rollback หรือจำนวน retry จาก log ระดับ statement ไม่ได้. Fixture นี้ไม่ครอบคลุม contract expiry, late catch-up, override reconciliation ที่มีการแก้พร้อมกัน หรือ contention ขณะสร้าง Occurrence ใหม่ จึงคง scheduler ไว้และจัดลำดับการลด redundant reads ภายใต้ transaction เดิมก่อนเพิ่ม concurrency
