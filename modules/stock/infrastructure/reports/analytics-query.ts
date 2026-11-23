@@ -78,7 +78,37 @@ export async function readStockAnalytics(query: StockAnalyticsQuery): Promise<St
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
 }
 
-/** Scan bounded batches; reservations are aggregated by the database, never historical rows in memory. */
+interface InventoryBatchRow {
+    id: number;
+    stockItemId: number;
+    sku: string;
+    unit: string;
+    quantity: number;
+    minStock: number;
+    reserved: Prisma.Decimal;
+}
+
+async function readInventoryBatch(tx: Prisma.TransactionClient, cursor: number): Promise<InventoryBatchRow[]> {
+    // Driving the keyset from Variant IDs lets MySQL stop after filling a page.
+    // The physical MySQL value for PENDING_ISSUE is PENDING.
+    return tx.$queryRaw<InventoryBatchRow[]>`
+        WITH batch AS (
+            SELECT v.id, v.stockItemId, v.sku, v.unit, v.quantity, v.minStock
+            FROM stock_item_variants v STRAIGHT_JOIN stock_items i ON i.id = v.stockItemId AND i.isActive = TRUE
+            WHERE v.id > ${cursor} AND v.isActive = TRUE
+            ORDER BY v.id LIMIT 500
+        ), reservations AS (
+            SELECT ri.variantId, SUM(ri.quantity) AS reserved
+            FROM batch b JOIN stock_request_items ri ON ri.variantId = b.id
+            JOIN stock_requests r ON r.id = ri.requestId AND r.status = 'PENDING'
+            GROUP BY ri.variantId
+        )
+        SELECT b.id, b.stockItemId, b.sku, b.unit, b.quantity, b.minStock, COALESCE(r.reserved, 0) AS reserved
+        FROM batch b LEFT JOIN reservations r ON r.variantId = b.id
+        ORDER BY b.id`;
+}
+
+/** Scan bounded batches and keep the availability and health rules in the domain functions. */
 async function readInventorySnapshot(tx: Prisma.TransactionClient, materials: AnalyticsMaterial[]): Promise<{ health: StockAnalyticsResponse["stockHealth"]; alerts: AnalyticsVariant[] }> {
     const invalid = await tx.stockRequestItem.findFirst({ where: { variantId: null, request: { status: StockRequestStatus.PENDING_ISSUE } }, select: { id: true } });
     if (invalid) throw new StockInvariantViolationError("พบคำขอรอจ่ายที่ไม่มี variant snapshot");
@@ -87,16 +117,11 @@ async function readInventorySnapshot(tx: Prisma.TransactionClient, materials: An
     const materialById = new Map(materials.map((m) => [m.id, m]));
     let cursor = 0;
     for (;;) {
-        const variants = await tx.stockItemVariant.findMany({
-            where: { id: { gt: cursor }, isActive: true, stockItem: { isActive: true } },
-            take: 500, orderBy: { id: "asc" },
-            select: { id: true, stockItemId: true, sku: true, unit: true, quantity: true, minStock: true },
-        });
+        const variants = await readInventoryBatch(tx, cursor);
         if (!variants.length) break;
-        const reservations = await tx.stockRequestItem.groupBy({ by: ["variantId"], where: { variantId: { in: variants.map((v) => v.id) }, request: { status: StockRequestStatus.PENDING_ISSUE } }, _sum: { quantity: true } });
-        const reserved = new Map(reservations.map((r) => [r.variantId, r._sum.quantity ?? 0]));
         for (const v of variants) {
-            const available = getAvailableQuantity(v.quantity, reserved.get(v.id) ?? 0);
+            const reserved = number(v.reserved);
+            const available = getAvailableQuantity(v.quantity, reserved);
             const status = classifyStockHealth(available, v.minStock);
             health[status]++;
             const material = materialById.get(v.stockItemId);
@@ -108,7 +133,7 @@ async function readInventorySnapshot(tx: Prisma.TransactionClient, materials: An
             }
             if (status !== "healthy") {
                 alerts.push({ id: v.id, itemId: v.stockItemId, sku: v.sku,
-                    unit: v.unit, quantity: v.quantity, reserved: reserved.get(v.id) ?? 0, available, minimum: v.minStock, status });
+                    unit: v.unit, quantity: v.quantity, reserved, available, minimum: v.minStock, status });
                 alerts.sort((a, b) => Number(b.status === "out") - Number(a.status === "out") || a.id - b.id);
                 if (alerts.length > 20) alerts.pop();
             }
