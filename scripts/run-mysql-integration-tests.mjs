@@ -114,6 +114,12 @@ export async function runIntegration({ env = process.env, execute = command, con
         await assertDisposableMysql(childEnv, connect);
         write("Disposable database identity verified before migrations/tests");
         if (probe) throw new IntentionalCleanupProbeError();
+        if (profileScheduler) {
+            compose("exec", "-T", "-e", `MYSQL_PWD=${childEnv.MYSQL_INTEGRATION_ROOT_PASSWORD}`,
+                "mysql-integration", "mysql", "-uroot", "-e",
+                "GRANT SELECT ON performance_schema.events_statements_summary_by_digest TO 'integration_user'@'%'; "
+                + "GRANT SELECT ON performance_schema.events_errors_summary_global_by_error TO 'integration_user'@'%'");
+        }
         const run = (label, cli, args, nodeOptions = []) => {
             write(`${label}...`);
             execute(process.execPath, [...nodeOptions, cli, ...args], childEnv);
