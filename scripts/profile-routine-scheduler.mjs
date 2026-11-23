@@ -30,22 +30,25 @@ const stats = (values) => {
 async function counters() {
     const [rows] = await sql.query(`SHOW GLOBAL STATUS WHERE Variable_name IN
         ('Com_select', 'Com_delete', 'Com_insert', 'Com_update', 'Com_begin', 'Com_commit', 'Com_rollback',
-         'Innodb_row_lock_waits', 'Innodb_row_lock_time', 'Threads_connected')`);
+         'Com_stmt_execute', 'Innodb_row_lock_waits', 'Innodb_row_lock_time', 'Threads_connected')`);
     const [errors] = await sql.query(`SELECT ERROR_NAME AS Variable_name, SUM_ERROR_RAISED AS Value
         FROM performance_schema.events_errors_summary_global_by_error
         WHERE ERROR_NAME IN ('ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT', 'ER_DUP_ENTRY')`);
     return Object.fromEntries([...rows, ...errors].map(({ Variable_name, Value }) => [Variable_name, Number(Value)]));
 }
 
-// Server-side timing includes lock time. Filter to the disposable application's
-// schema and exclude the profiler's own reads and status commands.
+// Prisma sends DML and SELECT as binary prepared statements. MySQL does not
+// attribute their execution to the SQL digest in this server version. Keep the
+// profiler's own reads on the text protocol so they cannot increment Execute.
 async function statementCounters() {
-    const [rows] = await sql.execute(`SELECT DIGEST_TEXT AS shape, COUNT_STAR AS count,
-        SUM_TIMER_WAIT / 1000000000 AS ms, SUM_ROWS_EXAMINED AS examined,
-        SUM_ROWS_SENT AS sent, SUM_ROWS_AFFECTED AS affected
-        FROM performance_schema.events_statements_summary_by_digest
-        WHERE SCHEMA_NAME = DATABASE() AND DIGEST_TEXT NOT LIKE '%performance_schema%'
-          AND DIGEST_TEXT NOT LIKE 'SHOW %'`);
+    const [rows] = await sql.query(`SELECT EVENT_NAME AS shape, SUM(COUNT_STAR) AS count,
+        SUM(SUM_TIMER_WAIT) / 1000000000 AS ms, SUM(SUM_ROWS_EXAMINED) AS examined,
+        SUM(SUM_ROWS_SENT) AS sent, SUM(SUM_ROWS_AFFECTED) AS affected
+        FROM performance_schema.events_statements_summary_by_account_by_event_name
+        WHERE USER = 'integration_user'
+          AND EVENT_NAME IN ('statement/com/Execute', 'statement/sql/begin', 'statement/sql/commit',
+            'statement/sql/rollback', 'statement/sql/set_option')
+        GROUP BY EVENT_NAME`);
     return new Map(rows.map(({ shape, ...metrics }) =>
         [shape, Object.fromEntries(Object.entries(metrics).map(([key, value]) => [key, Number(value)]))]));
 }
@@ -55,10 +58,8 @@ function statementDelta(before, after) {
     for (const [shape, current] of after) {
         const previous = before.get(shape);
         if (current.count === (previous?.count ?? 0)) continue;
-        const operation = shape.split(" ", 1)[0];
-        const table = shape.match(/(?:FROM|INTO|UPDATE)\s+(?:`[^\x60]+`\s*\.\s*)?`([a-z_]+)`/i)?.[1] ?? "connection";
-        const group = groups[`${operation} ${table}`] ??= { count: 0, ms: 0, examined: 0, sent: 0, affected: 0 };
-        for (const key of Object.keys(group)) group[key] += current[key] - (previous?.[key] ?? 0);
+        groups[shape] = Object.fromEntries(Object.entries(current).map(([key, value]) =>
+            [key, value - (previous?.[key] ?? 0)]));
     }
     return groups;
 }
@@ -153,7 +154,9 @@ try {
         const memory = process.memoryUsage();
         const after = await counters();
         const serverQueries = statementDelta(statementsBefore, await statementCounters());
-        assert.ok(Object.values(serverQueries).some(({ count }) => count > 0), "MySQL statement digest instrumentation is required");
+        assert.ok(after.Com_stmt_execute > before.Com_stmt_execute, "Expected actual prepared statement executions");
+        assert.equal(serverQueries["statement/com/Execute"]?.count, after.Com_stmt_execute - before.Com_stmt_execute,
+            "MySQL timing must include every prepared statement");
         return { elapsed, cpu, rss: memory.rss, heapUsed: memory.heapUsed, queries, result,
             connections: [before.Threads_connected, after.Threads_connected],
             serverQueries,

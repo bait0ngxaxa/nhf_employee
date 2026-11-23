@@ -44,6 +44,7 @@ function summarize(scenario) {
         latency: scenario.latency,
         state: scenario.state,
         counters: schedulerOutput(scenario)[0],
+        prismaQueryBreakdown: runs[0].queries,
         queryBreakdown: runs[0].serverQueries,
         samples,
     };
