@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, RoutineOccurrenceAssignee } from "@prisma/client";
 import { ZodError } from "zod";
 
 import { buildRoutineScheduleDefinition } from "../schemas/routine";
@@ -60,14 +60,11 @@ const ROUTINE_OCCURRENCE_RECONCILIATION_SELECT = {
     originalDueDate: true,
     isDueDateOverridden: true,
     scheduleVersion: true,
-    assignees: {
-        select: { employeeId: true, role: true },
-    },
 } as const satisfies Prisma.RoutineOccurrenceSelect;
 
 type RoutineOccurrenceReconciliationRow = Prisma.RoutineOccurrenceGetPayload<{
     select: typeof ROUTINE_OCCURRENCE_RECONCILIATION_SELECT;
-}>;
+}> & { assignees?: readonly RoutineAssigneeSnapshot[] };
 
 function assigneeSnapshotKey(
     assignees: readonly RoutineAssigneeSnapshot[],
@@ -83,7 +80,7 @@ function shouldSyncFutureAssignees(
     currentDate: string,
     previousAssignees: readonly RoutineAssigneeSnapshot[] | undefined,
 ): boolean {
-    if (!previousAssignees) return false;
+    if (!previousAssignees || !occurrence.assignees) return false;
     if (
         compareCalendarDates(
             toBangkokCalendarDate(occurrence.dueDate),
@@ -103,9 +100,7 @@ async function refreshExistingRoutineOccurrence(
     candidate: ScheduledRoutineOccurrence,
     taskVersion: number,
     currentDate: CalendarDate,
-    taskAssignees: ReadonlyArray<
-        RoutineOccurrenceReconciliationRow["assignees"][number]
-    >,
+    taskAssignees: ReadonlyArray<Pick<RoutineOccurrenceAssignee, "employeeId" | "role">>,
     previousAssignees: readonly RoutineAssigneeSnapshot[] | undefined,
 ): Promise<void> {
     const currentOriginalDueDate = toBangkokCalendarDate(
@@ -356,6 +351,12 @@ export async function generateRoutineTaskOccurrencesInTransaction(
         currentDate,
         ROUTINE_RECONCILIATION_MAX_FUTURE_DAYS,
     );
+    const reconciliationSelect = {
+        ...ROUTINE_OCCURRENCE_RECONCILIATION_SELECT,
+        assignees: options.previousAssignees === undefined
+            ? false
+            : { select: { employeeId: true, role: true } },
+    } as const satisfies Prisma.RoutineOccurrenceSelect;
 
     const existingFutureOccurrences = await tx.routineOccurrence.findMany({
         where: {
@@ -365,7 +366,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                 lte: calendarDateToDate(reconciliationSafetyBound),
             },
         },
-        select: ROUTINE_OCCURRENCE_RECONCILIATION_SELECT,
+        select: reconciliationSelect,
     });
     const existingByPeriodKey = new Map(
         existingFutureOccurrences.map((occurrence) => [
@@ -418,13 +419,22 @@ export async function generateRoutineTaskOccurrencesInTransaction(
             occurrence,
         ]),
     );
-    await deleteStaleFutureOccurrences(
-        tx,
-        task.id,
-        currentDate,
-        existingFutureMaxDate,
-        [...reconciliationCandidatesByPeriodKey.keys()],
-    );
+    // The Serializable range read already covers the cleanup interval when
+    // the upper bound fits. Only skip the DELETE if every loaded key is valid.
+    if (
+        compareCalendarDates(existingFutureMaxDate, reconciliationSafetyBound) > 0
+        || existingFutureOccurrences.some(({ periodKey }) =>
+            !reconciliationCandidatesByPeriodKey.has(periodKey),
+        )
+    ) {
+        await deleteStaleFutureOccurrences(
+            tx,
+            task.id,
+            currentDate,
+            existingFutureMaxDate,
+            [...reconciliationCandidatesByPeriodKey.keys()],
+        );
+    }
 
     const generationPeriodKeys = new Set(
         generationCandidates.map((occurrence) => occurrence.periodKey),
@@ -458,7 +468,7 @@ export async function generateRoutineTaskOccurrencesInTransaction(
                         periodKey: occurrence.periodKey,
                     },
                 },
-                select: ROUTINE_OCCURRENCE_RECONCILIATION_SELECT,
+                select: reconciliationSelect,
             });
         if (current) {
             await refreshExistingRoutineOccurrence(
