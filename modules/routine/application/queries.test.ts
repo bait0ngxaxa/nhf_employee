@@ -1197,12 +1197,10 @@ describe("NHF Routine query authorization", () => {
 
     it("filters resolved occurrences before paginating task totals", async () => {
         const today = getCurrentBangkokDate();
-        prismaMock.routineTask.findMany
-            .mockResolvedValueOnce(asNever([{ id: 71 }, { id: 72 }, { id: 73 }]))
-            .mockResolvedValueOnce(asNever([taskRow(73)]));
+        prismaMock.$transaction.mockImplementation(async (run) => run(prismaMock));
+        prismaMock.routineTask.count.mockResolvedValueOnce(2);
+        prismaMock.routineTask.findMany.mockResolvedValueOnce(asNever([taskRow(73)]));
         prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
-            occurrenceRow(1, 71, addCalendarDays(today, -2)),
-            occurrenceRow(2, 72, addCalendarDays(today, 4)),
             occurrenceRow(3, 73, addCalendarDays(today, 5)),
         ]));
 
@@ -1213,7 +1211,12 @@ describe("NHF Routine query authorization", () => {
 
         expect(result.tasks.map((task) => task.id)).toEqual([73]);
         expect(result.pagination).toEqual({ page: 2, limit: 1, total: 2, pages: 2 });
-        expect(prismaMock.routineTask.count).not.toHaveBeenCalled();
+        const where = prismaMock.routineTask.count.mock.calls[0]?.[0]?.where;
+        expect(where).toEqual({ AND: [{ isActive: true }, { occurrences: {
+            some: { dueDate: { gte: calendarDateToDate(addCalendarDays(today, 1)), lte: calendarDateToDate(addCalendarDays(today, 7)) } },
+            none: { dueDate: { gte: calendarDateToDate(today), lt: calendarDateToDate(addCalendarDays(today, 1)) } },
+        } }] });
+        expect(prismaMock.routineTask.findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 1, take: 1 }));
     });
 
     it.each<[string, { activeOnly?: true; status?: "active" | "inactive" }, { isActive?: boolean }]>([
