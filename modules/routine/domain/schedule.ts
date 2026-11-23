@@ -221,14 +221,15 @@ export function calendarDateToBangkokStart(value: CalendarDate): Date {
     return new Date(`${value}T00:00:00.000+07:00`);
 }
 
+const bangkokCalendarDateFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: ROUTINE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+});
+
 export function toBangkokCalendarDate(value: Date): CalendarDate {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-        timeZone: ROUTINE_TIME_ZONE,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    });
-    const parts = formatter.formatToParts(value);
+    const parts = bangkokCalendarDateFormatter.formatToParts(value);
     const year = parts.find((part) => part.type === "year")?.value;
     const month = parts.find((part) => part.type === "month")?.value;
     const day = parts.find((part) => part.type === "day")?.value;
