@@ -11,6 +11,7 @@ import {
 } from "@/modules/routine";
 import {
     createRoutineTaskInTransaction,
+    updateRoutineOccurrenceOverride,
     updateRoutineTask,
 } from "@/modules/routine";
 import {
@@ -143,6 +144,11 @@ async function createRoutineReminderFixture(): Promise<RoutineReminderFixture> {
                 capabilityKey: "routine.task.update",
                 scope: "ALL",
             },
+            {
+                userId: admin.id,
+                capabilityKey: "routine.occurrence.override",
+                scope: "ALL",
+            },
         ],
     });
     const [unit, category] = await Promise.all([
@@ -261,6 +267,9 @@ async function findOnlyOccurrence(taskId: number) {
             id: true,
             taskId: true,
             dueDate: true,
+            originalDueDate: true,
+            isDueDateOverridden: true,
+            scheduleVersion: true,
             reminderVersion: true,
             assignees: {
                 select: { employeeId: true, role: true },
@@ -443,5 +452,93 @@ describe("Routine reminder multiple-assignee integration", () => {
                 contractEndDate,
             ),
         }]);
+    });
+
+    it("generates a single occurrence and outbox event when two schedulers start together", async () => {
+        const fixture = await createRoutineReminderFixture();
+        const today = getCurrentBangkokDate();
+        const dueDate = addCalendarDays(today, 2);
+        const input = routineTaskInput(fixture, dueDate, true);
+        const task = await prisma.routineTask.create({
+            data: {
+                ...input,
+                createdById: fixture.actor.id,
+                updatedById: fixture.actor.id,
+                assignees: { create: input.assignees },
+                reminderRules: { create: input.reminderRules },
+            },
+        });
+        const now = getRoutineReminderScheduledFor(today, 0, 10);
+
+        const results = await Promise.all([runRoutineScheduler(now), runRoutineScheduler(now)]);
+
+        expect(results.map(({ errors }) => errors)).toEqual([0, 0]);
+        expect(results.map(({ occurrencesCreated }) => occurrencesCreated).sort()).toEqual([0, 1]);
+        expect(results.map(({ outboxEnqueued }) => outboxEnqueued).sort()).toEqual([0, 1]);
+        expect(results.map(({ duplicatesSkipped }) => duplicatesSkipped).sort()).toEqual([0, 1]);
+        const occurrence = await findOnlyOccurrence(task.id);
+        expect(occurrence.assignees).toHaveLength(2);
+        const [rule] = occurrence.task.reminderRules;
+        expect(await prisma.notificationOutbox.findMany({ select: { eventKey: true } })).toEqual([{
+            eventKey: buildRoutineReminderEventKey(occurrence.id, rule.id, occurrence.reminderVersion),
+        }]);
+        const repeat = await runRoutineScheduler(now);
+        expect(repeat).toMatchObject({ occurrencesCreated: 0, outboxEnqueued: 0, duplicatesSkipped: 1, errors: 0 });
+    });
+
+    it("reconciles schedule and assignee updates and preserves an override during scheduler overlap", async () => {
+        const fixture = await createRoutineReminderFixture();
+        const today = getCurrentBangkokDate();
+        const dueDate = addCalendarDays(today, 2);
+        const shiftedDueDate = addCalendarDays(today, 3);
+        const overrideDueDate = addCalendarDays(today, 4);
+        const task = await runSerializableTransaction((tx) =>
+            createRoutineTaskInTransaction(tx, routineTaskInput(fixture, dueDate, false), fixture.actor),
+        );
+        const now = getRoutineReminderScheduledFor(today, 0, 10);
+
+        const [scheduleRace] = await Promise.all([
+            runRoutineScheduler(now),
+            updateRoutineTask(task.id, {
+                version: task.version,
+                scheduleType: "ONE_TIME",
+                scheduleConfig: { date: shiftedDueDate },
+                assignees: [{ employeeId: fixture.coOwnerEmployeeId, role: "OWNER" }],
+            }, fixture.actor),
+        ]);
+        expect(scheduleRace.errors).toBe(0);
+        const shifted = await findOnlyOccurrence(task.id);
+        expect(toBangkokCalendarDate(shifted.dueDate)).toBe(shiftedDueDate);
+        expect(shifted.assignees).toEqual([{ employeeId: fixture.coOwnerEmployeeId, role: "OWNER" }]);
+        expect(shifted.scheduleVersion).toBe(task.version + 1);
+
+        const [overrideRace] = await Promise.all([
+            runRoutineScheduler(now),
+            updateRoutineOccurrenceOverride(shifted.id, {
+                dueDate: overrideDueDate,
+                expectedReminderVersion: shifted.reminderVersion,
+                assignees: [{ employeeId: fixture.ownerEmployeeId, role: "OWNER" }],
+            }, fixture.actor),
+        ]);
+        expect(overrideRace.errors).toBe(0);
+        const catchup = getRoutineReminderScheduledFor(overrideDueDate, 1, 10);
+        expect(await runRoutineScheduler(catchup)).toMatchObject({ outboxEnqueued: 1, errors: 0 });
+        expect(await runRoutineScheduler(catchup)).toMatchObject({ outboxEnqueued: 0, duplicatesSkipped: 1, errors: 0 });
+
+        const occurrence = await findOnlyOccurrence(task.id);
+        expect(occurrence.id).toBe(shifted.id);
+        expect(toBangkokCalendarDate(occurrence.dueDate)).toBe(overrideDueDate);
+        expect(toBangkokCalendarDate(occurrence.originalDueDate)).toBe(shiftedDueDate);
+        expect(occurrence.reminderVersion).toBe(shifted.reminderVersion + 1);
+        expect(occurrence.assignees).toEqual([{ employeeId: fixture.ownerEmployeeId, role: "OWNER" }]);
+        expect(occurrence.isDueDateOverridden).toBe(true);
+        const [rule] = occurrence.task.reminderRules;
+        const queued = await prisma.notificationOutbox.update({
+            where: { eventKey: buildRoutineReminderEventKey(occurrence.id, rule.id, occurrence.reminderVersion) },
+            data: { status: "PROCESSING" },
+        });
+        const payload: unknown = JSON.parse(queued.payload);
+        await expect(dispatchRoutineReminderOutbox(queued, payload, catchup)).resolves.toBe("SENT");
+        await expectRecipientDeliveries([{ userId: fixture.ownerUserId, email: fixture.ownerEmail }]);
     });
 });
