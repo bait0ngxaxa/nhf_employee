@@ -22,7 +22,7 @@ db.$on("query", ({ query, duration }) => {
     group.count += 1;
     group.clientMs += duration;
 });
-const emit = (record) => console.log("SCHEDULER_PROFILE " + JSON.stringify(record));
+const emit = (record) => process.stdout.write(`SCHEDULER_PROFILE ${JSON.stringify(record)}\n`);
 const stats = (values) => {
     const sorted = values.toSorted((a, b) => a - b);
     return { p50: sorted[Math.ceil(values.length * 0.5) - 1], p95: sorted[Math.ceil(values.length * 0.95) - 1] };
