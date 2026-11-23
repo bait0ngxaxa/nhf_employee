@@ -74,37 +74,36 @@ async function createRoutineReminderFixture(): Promise<RoutineReminderFixture> {
     });
     const ownerEmail = "routine-owner@integration.test";
     const coOwnerEmail = "routine-co-owner@integration.test";
-    const [ownerEmployee, coOwnerEmployee, actorEmployee] = await Promise.all([
-        prisma.employee.create({
-            data: {
-                firstName: "เจ้าของงาน",
-                lastName: "ทดสอบ",
-                email: "routine-owner-employee@integration.test",
-                position: "เจ้าหน้าที่ทดสอบ",
-                departmentId: department.id,
-            },
-        }),
-        prisma.employee.create({
-            data: {
-                firstName: "ผู้รับผิดชอบร่วม",
-                lastName: "ทดสอบ",
-                email: "routine-co-owner-employee@integration.test",
-                position: "เจ้าหน้าที่ทดสอบ",
-                departmentId: department.id,
-            },
-        }),
-        prisma.employee.create({
-            data: {
-                firstName: "ผู้ดูแล Routine Reminder",
-                lastName: "ทดสอบ",
-                email: "routine-reminder-admin-employee@integration.test",
-                position: "ผู้ดูแลทดสอบ",
-                departmentId: department.id,
-                status: "ACTIVE",
-                deletedAt: null,
-            },
-        }),
-    ]);
+    // Keep fixture creation sequential so only the operations under test contend.
+    const ownerEmployee = await prisma.employee.create({
+        data: {
+            firstName: "เจ้าของงาน",
+            lastName: "ทดสอบ",
+            email: "routine-owner-employee@integration.test",
+            position: "เจ้าหน้าที่ทดสอบ",
+            departmentId: department.id,
+        },
+    });
+    const coOwnerEmployee = await prisma.employee.create({
+        data: {
+            firstName: "ผู้รับผิดชอบร่วม",
+            lastName: "ทดสอบ",
+            email: "routine-co-owner-employee@integration.test",
+            position: "เจ้าหน้าที่ทดสอบ",
+            departmentId: department.id,
+        },
+    });
+    const actorEmployee = await prisma.employee.create({
+        data: {
+            firstName: "ผู้ดูแล Routine Reminder",
+            lastName: "ทดสอบ",
+            email: "routine-reminder-admin-employee@integration.test",
+            position: "ผู้ดูแลทดสอบ",
+            departmentId: department.id,
+            status: "ACTIVE",
+            deletedAt: null,
+        },
+    });
     const [ownerUser, coOwnerUser, admin] = await Promise.all([
         prisma.user.create({
             data: {
