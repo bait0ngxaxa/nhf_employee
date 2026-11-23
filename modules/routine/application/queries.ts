@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { getAuditEntityHistory } from "@/modules/audit";
 import { prisma } from "@/lib/db/prisma";
@@ -14,6 +14,7 @@ import {
 } from "../domain/schedule";
 import {
     getRoutineTimingStatus,
+    ROUTINE_DUE_SOON_DAYS,
     type RoutineTimingStatus,
 } from "../domain/timing";
 import { isRoutineNotificationReady } from "../domain/notification-readiness";
@@ -83,7 +84,7 @@ const ROUTINE_OCCURRENCE_SELECT = {
     },
 } as const satisfies Prisma.RoutineOccurrenceSelect;
 
-const ROUTINE_TASK_SELECT = {
+const ROUTINE_TASK_WITHOUT_COUNT_SELECT = {
     id: true,
     unitId: true,
     categoryId: true,
@@ -134,6 +135,10 @@ const ROUTINE_TASK_SELECT = {
         },
         orderBy: [{ daysBefore: "asc" }, { sendHour: "asc" }],
     },
+} as const satisfies Prisma.RoutineTaskSelect;
+
+const ROUTINE_TASK_SELECT = {
+    ...ROUTINE_TASK_WITHOUT_COUNT_SELECT,
     _count: { select: { occurrences: true } },
 } as const satisfies Prisma.RoutineTaskSelect;
 
@@ -152,6 +157,7 @@ type RoutineTaskRow = Prisma.RoutineTaskGetPayload<{
 }>;
 
 type RoutineTaskListRow = RoutineTaskRow & RoutineTaskCapabilities;
+type RoutineTaskWorkItemRow = Omit<RoutineTaskRow, "_count">;
 
 type RoutineTaskDetailRow = RoutineTaskRow & {
     occurrences: RoutineOccurrenceRow[];
@@ -317,10 +323,10 @@ function buildOccurrenceDueDateFilter(
         }
         case "DUE_SOON":
             dueDate.gt = calendarDateToDate(today);
-            dueDate.lte = calendarDateToDate(addCalendarDays(today, 7));
+            dueDate.lte = calendarDateToDate(addCalendarDays(today, ROUTINE_DUE_SOON_DAYS));
             break;
         case "UPCOMING":
-            dueDate.gt = calendarDateToDate(addCalendarDays(today, 7));
+            dueDate.gt = calendarDateToDate(addCalendarDays(today, ROUTINE_DUE_SOON_DAYS));
             break;
     }
 
@@ -728,17 +734,19 @@ function resolveOccurrenceRows(
 
 async function findRoutineOccurrenceRowsForTasks(
     taskIds: readonly number[],
+    client: Prisma.TransactionClient = prisma,
+    dueDate?: Prisma.DateTimeFilter,
 ): Promise<RoutineOccurrenceRow[]> {
     if (taskIds.length === 0) return [];
-    return prisma.routineOccurrence.findMany({
-        where: { taskId: { in: [...taskIds] } },
+    return client.routineOccurrence.findMany({
+        where: { taskId: { in: [...taskIds] }, ...(dueDate ? { dueDate } : {}) },
         select: ROUTINE_OCCURRENCE_SELECT,
         orderBy: [{ dueDate: "asc" }, { id: "asc" }],
     });
 }
 
 function serializeRoutineTaskFields(
-    task: RoutineTaskRow,
+    task: RoutineTaskWorkItemRow,
     relevantOccurrence: RoutineOccurrenceRow | undefined,
     today: string,
 ): SerializedRoutineTaskExportItem {
@@ -792,22 +800,32 @@ function serializeRoutineTaskFields(
     };
 }
 
-function matchesRoutineTaskOccurrenceFilters(
-    occurrence: RoutineOccurrenceRow | undefined,
+function getRelevantOccurrenceWindow(
     filters: RoutineOccurrenceFilters,
     today: string,
-): boolean {
-    if (!occurrence) return false;
-    const dueDate = toBangkokCalendarDate(occurrence.dueDate);
-    if (filters.dueFrom && dueDate < filters.dueFrom) return false;
-    if (filters.dueTo && dueDate > filters.dueTo) return false;
-    if (
-        filters.timingStatus
-        && getRoutineTimingStatus(today, dueDate) !== filters.timingStatus
-    ) {
-        return false;
+): { from: string; to: string | undefined } | null {
+    // Without authorized focus, only today and future occurrences are eligible.
+    if (filters.timingStatus === "OVERDUE") return null;
+
+    let from = today;
+    let statusEnd: string | undefined;
+    switch (filters.timingStatus) {
+        case "DUE_TODAY":
+            statusEnd = today;
+            break;
+        case "DUE_SOON":
+            from = addCalendarDays(today, 1);
+            statusEnd = addCalendarDays(today, ROUTINE_DUE_SOON_DAYS);
+            break;
+        case "UPCOMING":
+            from = addCalendarDays(today, ROUTINE_DUE_SOON_DAYS + 1);
+            break;
     }
-    return true;
+    if (filters.dueFrom && filters.dueFrom > from) from = filters.dueFrom;
+    const to = statusEnd && (!filters.dueTo || statusEnd < filters.dueTo)
+        ? statusEnd
+        : filters.dueTo;
+    return to && to < from ? null : { from, to };
 }
 
 export async function getRoutineOccurrences(
@@ -930,69 +948,58 @@ export async function getRoutineTaskWorkItems(
         );
 
     if (mustResolveBeforePagination) {
-        const taskIdRows = await prisma.routineTask.findMany({
-            where: focusedTaskWhere,
-            select: { id: true },
-            orderBy: [{ title: "asc" }, { id: "asc" }],
-        });
-        const taskIds = taskIdRows.map((task) => task.id);
-        const occurrenceRows = await findRoutineOccurrenceRowsForTasks(taskIds);
-        const relevantByTask = resolveOccurrenceRows(
-            occurrenceRows,
-            today,
-            null,
-        );
-        const matchingTaskIds = taskIds.filter((taskId) =>
-            matchesRoutineTaskOccurrenceFilters(
-                relevantByTask.get(taskId),
-                filters,
-                today,
-            ),
-        );
-        const total = matchingTaskIds.length;
-        const pageTaskIds = matchingTaskIds.slice(
-            (filters.page - 1) * filters.limit,
-            filters.page * filters.limit,
-        );
-        if (pageTaskIds.length === 0) {
+        const window = getRelevantOccurrenceWindow(filters, today);
+        if (window === null) {
             return {
                 tasks: [],
                 pagination: {
                     page: filters.page,
                     limit: filters.limit,
-                    total,
-                    pages: Math.ceil(total / filters.limit),
+                    total: 0,
+                    pages: 0,
                 },
             };
         }
-
-        const tasks = await prisma.routineTask.findMany({
-            where: { ...focusedTaskWhere, id: { in: pageTaskIds } },
-            select: ROUTINE_TASK_SELECT,
-            orderBy: [{ title: "asc" }, { id: "asc" }],
+        const dateFrom = calendarDateToDate(window.from);
+        const dueDate = { gte: dateFrom, ...(window.to ? { lte: calendarDateToDate(window.to) } : {}) };
+        // A match in the window is relevant only when no eligible occurrence precedes it.
+        const where: Prisma.RoutineTaskWhereInput = {
+            AND: [focusedTaskWhere, {
+                occurrences: {
+                    some: { dueDate },
+                    ...(window.from > today ? {
+                        none: { dueDate: { gte: calendarDateToDate(today), lt: dateFrom } },
+                    } : {}),
+                },
+            }],
+        };
+        const skip = (filters.page - 1) * filters.limit;
+        const { total, tasks, occurrenceRows } = await prisma.$transaction(async (tx) => {
+            const total = await tx.routineTask.count({ where });
+            if (skip >= total) return { total, tasks: [], occurrenceRows: [] };
+            const tasks = await tx.routineTask.findMany({
+                where,
+                select: ROUTINE_TASK_WITHOUT_COUNT_SELECT,
+                orderBy: [{ title: "asc" }, { id: "asc" }],
+                skip,
+                take: filters.limit,
+            });
+            const occurrenceRows = await findRoutineOccurrenceRowsForTasks(tasks.map((task) => task.id), tx, dueDate);
+            return { total, tasks, occurrenceRows };
+        }, {
+            isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
         });
-        const tasksById = new Map(tasks.map((task) => [task.id, task]));
+        const relevantByTask = resolveOccurrenceRows(occurrenceRows, today, null);
         const serializedTasks = await Promise.all(
-            pageTaskIds.map(async (taskId) => {
-                const task = tasksById.get(taskId);
-                if (!task) return null;
-                return serializeRoutineTaskWorkItem(
-                    task,
-                    relevantByTask.get(taskId),
-                    today,
-                    await getRoutineTaskCapabilities(
-                        task,
-                        queryActor,
-                        employeeId,
-                        mutationAuthorizations,
-                    ),
-                );
-            }),
+            tasks.map(async (task) => serializeRoutineTaskWorkItem(
+                task,
+                relevantByTask.get(task.id),
+                today,
+                await getRoutineTaskCapabilities(task, queryActor, employeeId, mutationAuthorizations),
+            )),
         );
         return {
-            tasks: serializedTasks.filter(
-                (task): task is SerializedRoutineTaskWorkItem => task !== null,
-            ),
+            tasks: serializedTasks,
             pagination: {
                 page: filters.page,
                 limit: filters.limit,
@@ -1455,7 +1462,7 @@ function buildLiffRoutineTaskAccessWhere(
 }
 
 function serializeRoutineTaskWorkItem(
-    task: RoutineTaskRow,
+    task: RoutineTaskWorkItemRow,
     relevantOccurrence: RoutineOccurrenceRow | undefined,
     today: string,
     capabilities: RoutineTaskCapabilities,
