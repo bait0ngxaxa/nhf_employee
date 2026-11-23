@@ -31,4 +31,14 @@ describe("IT analytics reporting periods", () => {
         expect(() => getITAnalyticsPeriodBounds("30D", new Date(Number.NaN)))
             .toThrow(RangeError);
     });
+
+    it("advances the reporting window exactly at Bangkok midnight across the year boundary", () => {
+        const midnight = new Date("2026-12-31T17:00:00.000Z");
+        const before = getITAnalyticsPeriodBounds("7D", new Date(+midnight - 1));
+        const after = getITAnalyticsPeriodBounds("7D", midnight);
+        expect(before.startAt.toISOString()).toBe("2026-12-24T17:00:00.000Z");
+        expect(after.startAt.toISOString()).toBe("2026-12-25T17:00:00.000Z");
+        expect(after.endAt).toEqual(midnight);
+        expect(after.dates.at(-1)).toBe("2027-01-01");
+    });
 });

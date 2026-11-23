@@ -40,7 +40,7 @@ import {
     ITAnalyticsInputValidationError,
     parseITAnalyticsPeriod,
 } from "./analytics";
-import { buildITAuthorizationContext } from "./authorization";
+import { buildITAuthorizationContext, ITCapabilityDeniedError } from "./authorization";
 import type { ITAnalyticsPersistenceSnapshot } from "../infrastructure/persistence/ticket-analytics-repository";
 
 const tx = {};
@@ -386,6 +386,22 @@ describe("IT analytics application query", () => {
             .rejects.toThrow("inactive workforce");
         expect(mocks.authorize).not.toHaveBeenCalled();
         expect(mocks.readSnapshot).not.toHaveBeenCalled();
+    });
+
+    it("rejects a scoped analytics grant before reading any dashboard facts", async () => {
+        mocks.authorize.mockResolvedValueOnce({ scopes: ["OWN"], decision: { reason: undefined } });
+
+        await expect(getITAnalyticsDashboard(actor, { period: "7D", category: "uncategorized" }, now))
+            .rejects.toBeInstanceOf(ITCapabilityDeniedError);
+        expect(mocks.readSnapshot).not.toHaveBeenCalled();
+    });
+
+    it("rejects invalid category and type filters before opening the transaction", async () => {
+        await expect(getITAnalyticsDashboard(actor, { category: "0" }, now))
+            .rejects.toBeInstanceOf(ITAnalyticsInputValidationError);
+        await expect(getITAnalyticsDashboard(actor, { type: "OUTAGE" }, now))
+            .rejects.toBeInstanceOf(ITAnalyticsInputValidationError);
+        expect(mocks.transaction).not.toHaveBeenCalled();
     });
 
     it("does not use administrator or ticket capabilities as analytics authority", async () => {
