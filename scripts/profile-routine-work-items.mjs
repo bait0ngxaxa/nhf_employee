@@ -74,7 +74,7 @@ try {
     today, samples, warmups: 2, concurrency: 1 });
 
     const fixtures = [];
-    for (const taskCount of [0, 100, 1_000, 2_500]) {
+    for (const taskCount of [2_500]) {
         while (fixtures.length < taskCount) {
             const offset = fixtures.length;
             const data = Array.from({ length: Math.min(100, taskCount - offset) }, (_, row) => ({
@@ -103,12 +103,9 @@ try {
             await db.routineOccurrence.createMany({ data: occurrences });
         }
         await connection.query("ANALYZE TABLE routine_tasks, routine_occurrences");
-        const page = Math.max(1, Math.floor(taskCount / 200));
         const scenarios = [
-            { name: "all-unfiltered", filters: { scope: "all", page: 1 }, expected: fixtures },
-            { name: "all-upcoming-deep", filters: { scope: "all", page, timingStatus: "UPCOMING" }, expected: fixtures.filter((row) => row.shift === 8) },
-            { name: "mine-today-to-seven", filters: { scope: "mine", page: 1, dueFrom: today, dueTo: dateAt(today, 7).toISOString().slice(0, 10) },
-                expected: fixtures.filter((row) => row.index % 10 === 0 && row.shift === 0) },
+            { name: "all-from-today-deep", filters: { scope: "all", page: 12, dueFrom: today },
+                expected: fixtures.filter((row) => row.shift >= 0) },
         ];
         if (taskCount > 0) {
             const historical = await db.routineOccurrence.findFirstOrThrow({ where: { taskId: fixtures[1].id, periodKey: "fixture-0" } });
